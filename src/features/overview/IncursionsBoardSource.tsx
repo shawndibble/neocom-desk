@@ -1,15 +1,3 @@
-/**
- * The Incursions card's reads, mounted only while the card is switched on:
- * the pilot's location, their jump basis and the public feed are three
- * fetches a board that never shows the card has no business making. A
- * component rather than a hook on the route, because the reads it gates
- * (`useCurrentSystem`, the jump basis) start on mount and take no flag.
- *
- * The same read Route Safety's "Incursions near you" uses (`useIncursions`,
- * #3540). Renders nothing; it reports up to the route, which needs the rows
- * for the folded phone line as well as the card, and reports `null` when it
- * unmounts so a card switched back on never shows the last session's feed.
- */
 import { useEffect, useMemo } from 'react';
 import { useCurrentSystem } from '@/features/route/currentSystem';
 import { useSolarSystemIndex } from '@/features/route/useSolarSystems';
@@ -20,9 +8,7 @@ export function IncursionsBoardSource({
   refreshKey,
   onChange,
 }: {
-  /** Bumped by the board's Refresh: re-reads the feed. */
   refreshKey: number;
-  /** Must be stable (a state setter): it is an effect dependency. */
   onChange: (data: IncursionsBoardData | null) => void;
 }) {
   const current = useCurrentSystem();

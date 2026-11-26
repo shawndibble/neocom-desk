@@ -1,18 +1,3 @@
-/**
- * Pilot Lookup at 390px (issue #2520).
- *
- * - A Recent kills and losses row cut the other pilot's name to ~9
- *   characters ("Victim: Aurelianu…"), with nowhere else on the page to read
- *   it: below `sm` the name now takes the row's last line of its own.
- * - The identity header's Corporation and Alliance links were once 44px
- *   targets; they are text height again, and must not overlap when they wrap.
- *
- * The looked-up pilot is the signed-in fixture character, whose public info,
- * corporation and alliance the shared ESI mock already answers. zKillboard
- * (answered empty by the shared mock) is overridden with one kill that
- * carries its killmail inline, so no ESI `/killmails/` read is made, and
- * `/universe/names` with the long names (a later `page.route` wins).
- */
 import type { Page } from '@playwright/test';
 import { test, expect, PHONE, DESKTOP } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
@@ -20,7 +5,6 @@ import { ALLIANCE_ID, ALLIANCE_NAME, CHARACTER_ID, CORPORATION_ID } from './supp
 import { expectNoPageOverflow } from './support/overflow';
 
 const TABLET = { width: 820, height: 1100 };
-/** A cold dev server can take longer than Playwright's default 5s to serve the route. */
 const COLD_LOAD = { timeout: 15_000 };
 
 const VICTIM_ID = 90000777;
@@ -122,9 +106,6 @@ test.describe('Pilot Lookup at 390px', () => {
     const fits = await nameSpan.evaluate((el) => el.scrollWidth <= el.clientWidth);
     expect(fits).toBe(true);
 
-    // The header's links stay text height (DESIGN.md "Touch tier"): they sit on
-    // one line when they fit and wrap onto two when they do not, and either way
-    // neither covers the other.
     const corpBox = await page.getByRole('link', { name: LONG_CORPORATION_NAME }).boundingBox();
     const allianceBox = await page.getByRole('link', { name: ALLIANCE_NAME }).boundingBox();
     if (corpBox === null || allianceBox === null) throw new Error('org links not laid out');
@@ -139,7 +120,6 @@ test.describe('Pilot Lookup at 390px', () => {
     await page.setViewportSize(DESKTOP);
     await openPilot(page);
 
-    // One line is ~32px (py-1.5 around a 20px icon); a wrapped name would make it ~56px.
     const rowBox = await killmailRow(page).boundingBox();
     expect(rowBox?.height).toBeLessThan(40);
     const corpBox = await page.getByRole('link', { name: LONG_CORPORATION_NAME }).boundingBox();
@@ -176,10 +156,6 @@ test.describe('Pilot Lookup at 390px', () => {
   });
 });
 
-/**
- * `hasTouch` is scoped to this block: it flips `(pointer: coarse)`, which is
- * what swaps the hint's "press Enter" for "tap Look up" (issue #3203).
- */
 test.describe('Pilot Lookup hint on a touch device', () => {
   test.use({ hasTouch: true });
 

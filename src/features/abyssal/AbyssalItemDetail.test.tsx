@@ -89,8 +89,6 @@ function renderDetail(typeId: number, dynamic: Parameters<typeof AbyssalItemDeta
 describe('AbyssalItemDetail', () => {
   it('renders nothing for an ordinary type', async () => {
     const { container } = renderDetail(587, { status: 'none' });
-    // An Abyssal type beside it: once its table is up, the shared lookup and
-    // dictionary have loaded for both.
     renderDetail(ABYSSAL_NEUT, { status: 'none' });
     await screen.findByRole('table', { name: /Heavy Energy Neutralizer II/ });
     expect(container).toBeEmptyDOMElement();
@@ -104,13 +102,11 @@ describe('AbyssalItemDetail', () => {
       `/?info=type-${GREMLIN}`
     );
     expect(screen.getByRole('link', { name: NAMES[DECAYED] })).toBeInTheDocument();
-    // Only Gravid applies to the T2 base; its label drops the words every name shares.
     expect(within(table).getByRole('columnheader', { name: 'Gravid' })).toBeInTheDocument();
     expect(within(table).queryByRole('columnheader', { name: 'Decayed' })).toBeNull();
     const cap = within(table).getByRole('row', { name: /Activation Cost/ });
     expect(within(cap).getByText('80 – 130')).toBeInTheDocument();
     expect(within(cap).getByText('Lower is better')).toBeInTheDocument();
-    // Duration is stored in ms and shown in seconds.
     const duration = within(table).getByRole('row', { name: /duration/ });
     expect(within(duration).getByText('10.8 – 14.4')).toBeInTheDocument();
   });
@@ -147,7 +143,6 @@ describe('AbyssalItemDetail', () => {
     expect(within(cap).getByText('200')).toBeInTheDocument();
     expect(within(cap).getByText('170')).toBeInTheDocument();
     expect(within(cap).getByText('100%')).toBeInTheDocument();
-    // The best roll the mutaplasmid could make: green, with a full bar.
     expect(within(cap).getByText('170')).toHaveClass('text-success');
     expect(
       within(cap).getByRole('progressbar', { name: 'Roll quality of Activation Cost' })
@@ -161,7 +156,6 @@ describe('AbyssalItemDetail', () => {
       createdBy: 9,
       sourceTypeId: NEUT_II,
       mutatorTypeId: GRAVID,
-      // Base 100 GJ and 12 s; possible 80-130 GJ and 10.8-14.4 s, lower is better.
       attributes: [
         [6, 125],
         [73, 12500],
@@ -173,7 +167,6 @@ describe('AbyssalItemDetail', () => {
     const cap = within(table).getByRole('row', { name: /Activation Cost/ });
     expect(within(cap).getByText('125')).toHaveClass('text-danger');
     expect(within(cap).getByText('10%')).toBeInTheDocument();
-    // Slower than base, yet mid-range: fair, not red.
     const duration = within(table).getByRole('row', { name: /Activation time/ });
     expect(within(duration).getByText('12.5')).toHaveClass('text-warning');
     expect(within(duration).getByText('53%')).toBeInTheDocument();

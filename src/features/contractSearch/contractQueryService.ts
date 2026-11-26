@@ -1,11 +1,3 @@
-/**
- * The Item search's query as one shared worker call (`useContractOfferQuery`
- * is its only caller). The worker gets the snapshot's rows once — again only
- * when the page holds a different array — and then answers each query with
- * indices into those rows. Where there is no Worker (jsdom, old browsers), or
- * it has failed, `contractQueryWorkerAvailable` says so and the caller runs the
- * same pure query on the page.
- */
 import type { PublicContractOfferRow } from '@/engine/contracts/contractOffers';
 import type {
   ContractOfferQuery,
@@ -62,12 +54,10 @@ function ensureWorker(): Worker | null {
   return worker;
 }
 
-/** Whether a query can go to the worker; false once it has failed. */
 export function contractQueryWorkerAvailable(): boolean {
   return !workerBroken && typeof Worker !== 'undefined';
 }
 
-/** Rejects with `SUPERSEDED` when a newer query replaced this one before it ran. */
 export function askContractQuery(
   rows: readonly PublicContractOfferRow[],
   query: ContractOfferQuery
@@ -86,7 +76,6 @@ export function askContractQuery(
       const request: ContractQueryRequest = { kind: 'query', id, snapshot: loaded.snapshot, query };
       target.postMessage(request);
     } catch (error) {
-      // Cloning the snapshot can fail (memory): the page answers instead.
       pending.delete(id);
       loaded = null;
       reject(error instanceof Error ? error : new Error('post failed'));

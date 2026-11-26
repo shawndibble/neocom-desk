@@ -17,11 +17,6 @@ const OPTIONS: readonly { order: StationOrder; label: string }[] = [
   { order: 'trades', label: 'wallet.stationsByTrades' },
 ];
 
-/**
- * Orders the By station view's groups. A sort, not a filter, so it is its own
- * icon button beside the funnel rather than a field inside it; it applies the
- * moment a choice is made. Rows inside a group keep the column sort.
- */
 export function StationSortMenu({
   value,
   onChange,

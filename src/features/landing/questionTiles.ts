@@ -1,12 +1,5 @@
 import { DESKTOP_SIZE, PHONE_SIZE, type Screenshot } from './screenshots';
 
-/**
- * One cell of the grid: the `login.answers.<key>` copy and the capture that
- * answers it. `span` is a literal Tailwind class (never built from a number,
- * which the compiler would not see); the six-column grid is arranged so every
- * row sums to six on lg and to two on md. `wide` lays the cell out text-left,
- * image-right on lg.
- */
 export interface Tile {
   key: string;
   shot: Screenshot;
@@ -14,10 +7,6 @@ export interface Tile {
   wide?: boolean;
 }
 
-/**
- * Led by the market searched by jumps on the pilot's own route rules, the
- * first thing most pilots alt-tab out of the client for.
- */
 export const QUESTION_TILES: Tile[] = [
   {
     key: 'marketRange',
@@ -53,7 +42,6 @@ export const QUESTION_TILES: Tile[] = [
   },
 ];
 
-/** The phone band: three tall captures, staggered beside their questions. */
 export const PHONE_TILES: Tile[] = [
   {
     key: 'marketJumps',

@@ -74,7 +74,6 @@ describe('campaignWidgetRows', () => {
     expect(rows).toHaveLength(1);
     expect(rows[0]!.joined).toBeNull();
     expect(rows[0]!.title).toBe(FAILOVER.objectiveTitle);
-    // 640 × 28,000 ISK + 6 full blocks × 4,000 LP × 800.
     expect(rows[0]!.turnIn).toMatchObject({
       name: 'Shield Failover Report',
       held: 640,

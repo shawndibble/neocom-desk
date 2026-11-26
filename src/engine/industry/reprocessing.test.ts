@@ -6,11 +6,9 @@ import {
   BASE_STATION_REPROCESSING_RATE,
 } from './reprocessing';
 
-/** Tritanium, Pyerite — the two the fixtures below refine into. */
 const TRITANIUM = 34;
 const PYERITE = 35;
 
-/** One portion of 10 units yields 1,000 Tritanium and 200 Pyerite. */
 const YIELD = {
   portionSize: 10,
   materials: [
@@ -42,7 +40,6 @@ describe('reprocessingEfficiency', () => {
   });
 
   it('multiplies the three skill bonuses onto the station rate', () => {
-    // 0.5 x 1.15 x 1.10 x 1.10
     expect(
       reprocessingEfficiency({
         reprocessingLevel: 5,
@@ -68,8 +65,6 @@ describe('reprocessingEfficiency', () => {
   });
 
   it('ignores Reprocessing and Reprocessing Efficiency for scrap, applying only the specialisation (Scrapmetal Processing) bonus (issue #1226)', () => {
-    // 0.5 x 1.10 (Scrapmetal V only) — Reprocessing V and Reprocessing
-    // Efficiency V are trained but must not apply to scrap.
     expect(
       reprocessingEfficiency({
         reprocessingLevel: 5,
@@ -139,15 +134,11 @@ describe('reprocessingYield', () => {
   });
 
   it('floors a fractional material rather than rounding it up', () => {
-    // 1 batch x 200 x 0.507 = 101.4 -> 101
     const result = reprocessingYield({ ...YIELD, units: 10, efficiency: 0.507 });
     expect(result.outputs).toContainEqual({ typeId: PYERITE, quantity: 101 });
   });
 
   describe('multi-batch rounding, pinned to an in-game capture (issue #2876)', () => {
-    // Compressed Scordite: portion 100, Tritanium 150 and Pyerite 110 per
-    // portion. The game showed 76.4% yield and returned 114/84 for 100 units
-    // and 343/252 for 300 units in one go.
     const SCORDITE = {
       portionSize: 100,
       materials: [
@@ -167,8 +158,6 @@ describe('reprocessingYield', () => {
     });
 
     it('floors once over the whole stack, not per batch', () => {
-      // floor(150 x 3 x 0.764) = floor(343.8) = 343. A per-batch floor would
-      // give 3 x floor(114.6) = 342; round-to-nearest would give 344.
       const result = reprocessingYield({ ...SCORDITE, units: 300 });
       expect(result.outputs).toEqual([
         { typeId: TRITANIUM, quantity: 343 },

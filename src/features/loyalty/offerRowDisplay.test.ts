@@ -27,7 +27,6 @@ describe('lpShortfall', () => {
   it('is null when affordable, when LP is unknown, and when the pilot holds none', () => {
     expect(lpShortfall(row({ lpCost: 1000 }), 1000)).toBeNull();
     expect(lpShortfall(row({ lpCost: 1000 }), null)).toBeNull();
-    // With 0 LP every offer is out of reach; dimming all of them says nothing.
     expect(lpShortfall(row({ lpCost: 1000 }), 0)).toBeNull();
   });
 });

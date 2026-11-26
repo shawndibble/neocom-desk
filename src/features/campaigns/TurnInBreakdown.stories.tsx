@@ -6,12 +6,6 @@ import type { DestinationBlock, PileParticipate } from './turnInContent';
 import { FAILOVER, PHONE, STEREO, STRATEGIC_INTEL } from './turnInStoryData';
 import { TurnInSampleMark } from './TurnInSampleMark';
 
-/**
- * `TurnInBreakdown`: the modal for a pile worth turning in (the Appraisal's
- * Turn in total), grouped by Item Trader with a subtotal, Set destination and
- * Copy list each, and each item's Participate state. Drawn with every read
- * made (`TurnInBreakdownView`); the marks are `PermissionCellMark`.
- */
 const ITEMS: TurnInBreakdownItem[] = [
   {
     name: 'Shield Failover Report',
@@ -93,10 +87,8 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** @summary Participating in every objective: two Item Traders, subtotals, the Participate column. */
 export const Participating: Story = {};
 
-/** @summary Some objectives not participated in: their cells in warning, and no pile-wide line. */
 export const SomeNotParticipating: Story = {
   render: () => (
     <Breakdown
@@ -106,7 +98,6 @@ export const SomeNotParticipating: Story = {
   ),
 };
 
-/** @summary No objective participated in: every cell in warning, and the line saying where to press Participate. */
 export const NotParticipating: Story = {
   render: () => (
     <Breakdown
@@ -120,22 +111,18 @@ export const NotParticipating: Story = {
   ),
 };
 
-/** @summary Military Campaigns missing: no column, the caveat with its mark (opened). */
 export const MilitaryCampaignsMissing: Story = {
   render: () => <Breakdown participate={{ kind: 'paysOnlyIf', mark: true }} openMark />,
 };
 
-/** @summary Military Campaigns dismissed, or no Character: the caveat alone. */
 export const MilitaryCampaignsDismissed: Story = {
   render: () => <Breakdown participate={{ kind: 'paysOnlyIf', mark: false }} />,
 };
 
-/** @summary Autopilot waypoints missing: each Set destination aria-disabled with the mark after it. */
 export const WaypointsMissing: Story = {
   render: () => <Breakdown participate={{ kind: 'perItem' }} destination={{ kind: 'mark' }} />,
 };
 
-/** @summary On a phone: rows stack, the group actions wrap under the trader. */
 export const Phone: Story = {
   globals: PHONE,
   render: () => (
@@ -143,7 +130,6 @@ export const Phone: Story = {
   ),
 };
 
-/** @summary Autopilot waypoints dismissed: Set destination disabled, its tooltip names the Permission. */
 export const WaypointsDismissed: Story = {
   render: () => (
     <Breakdown
@@ -153,7 +139,6 @@ export const WaypointsDismissed: Story = {
   ),
 };
 
-/** @summary No Character: the caveat alone, Set destination disabled with "Log in a character…". */
 export const NoCharacter: Story = {
   render: () => (
     <Breakdown

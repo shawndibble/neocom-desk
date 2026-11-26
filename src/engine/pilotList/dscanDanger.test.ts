@@ -15,28 +15,27 @@ import type { DscanTypeInfo } from './dscanRoles';
 import type { DscanRow } from './parsePilotPaste';
 
 const SHIP = 6;
-// typeId -> [name, groupId, categoryId]
 const TYPES: Record<number, [string, number, number]> = {
-  1: ['Cenotaph', 419, SHIP], // battlecruiser, damage
-  2: ['Bustard', 380, SHIP], // deep space transport
-  3: ['Rapier', 833, SHIP], // force recon
-  4: ['Catalyst', 420, SHIP], // destroyer, damage
-  5: ['Sabre', 541, SHIP], // interdictor
-  6: ['Widow', 898, SHIP], // black ops
-  7: ['Rifter', 25, SHIP], // frigate, damage
-  8: ['Caracal', 26, SHIP], // cruiser, damage
-  9: ['Raven', 27, SHIP], // battleship, damage
-  10: ['Iteron V', 28, SHIP], // industrial
-  11: ['Retriever', 463, SHIP], // mining barge
-  12: ['Revelation', 485, SHIP], // dreadnought
+  1: ['Cenotaph', 419, SHIP],
+  2: ['Bustard', 380, SHIP],
+  3: ['Rapier', 833, SHIP],
+  4: ['Catalyst', 420, SHIP],
+  5: ['Sabre', 541, SHIP],
+  6: ['Widow', 898, SHIP],
+  7: ['Rifter', 25, SHIP],
+  8: ['Caracal', 26, SHIP],
+  9: ['Raven', 27, SHIP],
+  10: ['Iteron V', 28, SHIP],
+  11: ['Retriever', 463, SHIP],
+  12: ['Revelation', 485, SHIP],
   13: ['Combat Scanner Probe I', 479, 8],
   14: ['Cynosural Field', 1, 2],
-  15: ['Scimitar', 832, SHIP], // logistics
+  15: ['Scimitar', 832, SHIP],
   16: ['Drake', 419, SHIP],
   17: ['Atron', 25, SHIP],
   18: ['Capsule', 29, SHIP],
-  19: ['Unmapped hull', 9999, SHIP], // a damage hull no size is pinned for
-  89240: ['Pioneer', 420, SHIP], // ORE mining destroyer
+  19: ['Unmapped hull', 9999, SHIP],
+  89240: ['Pioneer', 420, SHIP],
 };
 const infoOf = (typeId: number): DscanTypeInfo | undefined => {
   const t = TYPES[typeId];
@@ -87,11 +86,11 @@ describe('hull ranks and the kill threshold', () => {
   });
 
   it('a damage ship threatens a hull one size smaller than itself or larger; small hulls fear anything', () => {
-    expect(killThresholdRank(4)).toBe(3); // Hurricane: cruiser and up
-    expect(killThresholdRank(1)).toBe(1); // hauler: any damage ship
+    expect(killThresholdRank(4)).toBe(3);
+    expect(killThresholdRank(1)).toBe(1);
     expect(killThresholdRank(2)).toBe(1);
     expect(killThresholdRank(5)).toBe(4);
-    expect(killThresholdRank(null)).toBe(3); // unknown ship: the old cruiser-and-up rule
+    expect(killThresholdRank(null)).toBe(3);
   });
 });
 
@@ -166,7 +165,6 @@ describe('buildDangerRead: level and counts', () => {
   });
 
   it('a big crowd with no doctrine is a Busy hub, with no danger level', () => {
-    // Three damage hulls spread over 115 km: no doctrine, no tight gang.
     const crowd = [rows(7, 10, 5), rows(17, 10, 60), rows(8, 10, 120), rows(10, 10)];
     expect(crowd.flat().length).toBeGreaterThanOrEqual(BUSY_MIN_SHIPS);
     const r = read(crowd);

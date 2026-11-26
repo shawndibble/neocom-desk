@@ -1,8 +1,3 @@
-/**
- * A finished search's rows in their sections (Make flyable, No downside,
- * Trade-offs, never ranked against each other) under the best swap found,
- * and the footer where the ticked set is checked and applied.
- */
 import { Fragment, useId, useMemo, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -36,7 +31,6 @@ import type { ImproveSelection } from './useImproveSelection';
 import type { SelectionCheck } from './useSelectionCheck';
 import type { TargetProfile } from '@/engine/fittings/targetProfile';
 
-/** How many overrun fixes get an implant search: each runs the Implant Finder whole. */
 const FLYABLE_IMPLANT_FIXES = 3;
 
 interface Props {
@@ -46,7 +40,6 @@ interface Props {
   labels: ImproveLabels;
   selection: ImproveSelection;
   check: SelectionCheck;
-  /** Ticked rows that no list shows: covers added from the footer. */
   tickedCovers: ImproveOption[];
   target?: TargetProfile;
   renderFlyableImplants?: (fix: RejectedOption, label: string) => ReactNode;
@@ -138,11 +131,9 @@ export function ImproveResults({
           {t('fittings.improve.partial', { checked: result.checked })}
         </p>
       )}
-      {/* A labelled select, not segments: segments read as a filter, and this only orders the goal's swaps. */}
       <div className="flex items-center gap-2">
         <span id={sortLabelId} className={eyebrowClassName}>
           {t('fittings.improve.sortLabel')}
-          {/* Visual only, so the control's name stays "Sort by" like every other sort label. */}
           <span aria-hidden="true">:</span>
         </span>
         <Select

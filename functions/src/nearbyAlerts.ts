@@ -1,16 +1,3 @@
-// Nearby alerts for a closed app (issue #5122, ADR 0028): which Incursions and raidable
-// skyhook windows came within a device's N jumps of a Character's location since the
-// last poll. Pure: the poller (pollEveNotifications.ts) hands in the location, the two
-// public lists, the device's choices and the state it stored last time.
-//
-// Every rule is the Foreground Poller's, so the open app neither toasts twice nor files
-// a second row: the entries are built as `pollDomains/incursions.ts` and
-// `pollDomains/skyhooksNearby.ts` build them, diffed by mirrors of the app's own
-// `diffIncursionNearby` / `diffSkyhookRaidableNearby`, counted over the same stargate
-// graph by a mirror of `engine/route/jumpRoute.ts` under the device's Travel Settings,
-// and keyed by the same Occurrence Keys. Wormhole and Ansiblex shortcuts are left out
-// (decision 20261025: the server counts gates only).
-
 import { STARGATES, SYSTEM_SECURITY } from './data/stargateGraph.js';
 import {
   diffIncursionNearby,
@@ -39,59 +26,45 @@ export function isNearbyEventId(value: string): value is NearbyEventId {
   return (NEARBY_EVENT_IDS as readonly string[]).includes(value);
 }
 
-/** What one jump count is asked under: the device's Travel Settings (`features/route/routeRules.ts`). */
 export interface NearbyRouteRules {
   preference: RoutePreferenceKind;
-  /** 0–100. */
   securityPenalty: number;
-  /** Avoided Systems, already resolved by the device (its own list and the pod-kill / EDENCOM / Triglavian rules). */
   avoid: readonly number[];
 }
 
-/** The app's defaults (`DEFAULT_ROUTE_PREFERENCE`, the game's penalty), for a device that sent no rules. */
 export const DEFAULT_NEARBY_ROUTE_RULES: NearbyRouteRules = {
   preference: 'prefer-highsec',
   securityPenalty: DEFAULT_SECURITY_PENALTY,
   avoid: [],
 };
 
-/** One entry of ESI `GET /skyhooks/raidable`; only the fields used. */
 export interface RaidableSkyhook {
   solar_system_id: number;
   planet_id: number;
   theft_vulnerability?: { start: string; end: string };
 }
 
-/** One entry of ESI `GET /incursions`; only the fields used. */
 export interface IncursionListing {
   constellation_id: number;
   staging_solar_system_id: number;
   state: string;
 }
 
-/** The two public lists for this run; `null` where one could not be read. */
 export interface NearbyLists {
   skyhooks: readonly RaidableSkyhook[] | null;
   incursions: readonly IncursionListing[] | null;
 }
 
-/** The frame a snapshot was counted in: the Current System and the pilot's N. */
 export interface NearbyFrame {
   originSystemId: number;
   withinJumps: number;
 }
 
-/**
- * A stored snapshot, cut down to what the diff reads: the frame (or `null` for a
- * snapshot with no entries, which the app's diff treats as frameless) and the entries
- * that were in range. The out-of-range rest only ever told the diff the frame.
- */
 export interface StoredSnapshot<Entry> {
   frame: NearbyFrame | null;
   inRange: Entry[];
 }
 
-/** One device's stored state for one Character. */
 export interface StoredNearby {
   incursion?: StoredSnapshot<IncursionAlertEntry>;
   skyhook?: StoredSnapshot<SkyhookAlertEntry>;
@@ -99,11 +72,8 @@ export interface StoredNearby {
 
 export interface DeviceCharacterNearby {
   characterId: number;
-  /** The Character's location this run. */
   originSystemId: number;
-  /** The nearby events this device enabled for the browser channel for this Character. */
   events: readonly string[];
-  /** This device's N per event for this Character; an event without one is not polled. */
   nearbyJumps: Partial<Record<NearbyEventId, number>>;
 }
 
@@ -114,7 +84,6 @@ export interface KeyedNearbyFire {
   occurrenceKey: string;
 }
 
-/** `src/engine/occurrenceKey.ts`'s `skyhookRaidableNearby` case; no Character, the window is the world's. */
 export function skyhookRaidableNearbyOccurrenceKey(
   systemId: number,
   planetId: number,
@@ -123,7 +92,6 @@ export function skyhookRaidableNearbyOccurrenceKey(
   return ['skyhookRaidableNearby', systemId, planetId, startMs].join(':');
 }
 
-/** `src/engine/occurrenceKey.ts`'s `incursionNearby` case; no Character, the Incursion is the world's. */
 export function incursionNearbyOccurrenceKey(
   constellationId: number,
   stagingSystemId: number
@@ -146,7 +114,6 @@ function stargateGraph(): JumpGraph {
 
 const securityOf = (systemId: number): number | undefined => SYSTEM_SECURITY[String(systemId)];
 
-/** Jumps from `originSystemId` to every system it reaches by stargate, under `rules`. */
 export function jumpDistancesUnder(
   originSystemId: number,
   rules: NearbyRouteRules
@@ -168,7 +135,6 @@ function parseInstant(iso: string | undefined): number | null {
 const inRange = (entry: { jumps: number | null; withinJumps: number }) =>
   entry.jumps !== null && entry.jumps <= entry.withinJumps;
 
-/** The diff's view of a stored snapshot: in-range entries, or one out-of-range carrier for the frame. */
 function restore<Entry extends { jumps: number | null }>(
   stored: StoredSnapshot<Entry> | undefined,
   carrier: (frame: NearbyFrame) => Entry,
@@ -193,7 +159,6 @@ function store<Entry extends NearbyFrame & { jumps: number | null }>(
   };
 }
 
-/** The entries `pollDomains/skyhooksNearby.ts` builds: one per readable window. */
 function skyhookEntries(
   list: readonly RaidableSkyhook[],
   originSystemId: number,
@@ -217,7 +182,6 @@ function skyhookEntries(
   }));
 }
 
-/** The entries `pollDomains/incursions.ts` builds: every Incursion in a known state. */
 function incursionEntries(
   list: readonly IncursionListing[],
   originSystemId: number,
@@ -243,28 +207,18 @@ function incursionEntries(
 }
 
 export interface DeviceNearbyInput {
-  /** The device's Characters that have a location this run. */
   characters: readonly DeviceCharacterNearby[];
-  /** Stored state by Character id (string keys, as Firestore stores them). */
   prev: Readonly<Record<string, StoredNearby>>;
   lists: NearbyLists;
   nowMs: number;
-  /** Jumps from an origin under this device's rules; memoised by the caller. */
   distancesFrom: (originSystemId: number) => ReadonlyMap<number, number>;
 }
 
 export interface DeviceNearbyResult {
-  /** One per occurrence, already reduced to the best Character's copy. */
   fires: KeyedNearbyFire[];
-  /** The state to store: every Character in `prev`, updated for those polled. */
   next: Record<string, StoredNearby>;
 }
 
-/**
- * Lower sorts first: the nearest, then the lowest id (stable across polls) —
- * `foregroundPoller/sharedWorldFires.ts`'s rank, minus "visible", which every
- * Character here is (the device enabled the event for the browser channel).
- */
 function better(a: NearbyFire, b: NearbyFire): boolean {
   return a.jumps !== b.jumps ? a.jumps < b.jumps : a.characterId < b.characterId;
 }
@@ -338,7 +292,6 @@ export function computeDeviceNearby(input: DeviceNearbyInput): DeviceNearbyResul
           input.nowMs
         );
         diffSkyhookRaidableNearby(character.characterId, before, snapshot).forEach(offer);
-        // A closed window can never fire again: its next window is a new start.
         state.skyhook = store(entries, (entry) => entry.endMs > input.nowMs);
       }
     }
@@ -352,16 +305,8 @@ export function computeDeviceNearby(input: DeviceNearbyInput): DeviceNearbyResul
   };
 }
 
-/**
- * Occurrence Key → epoch ms it was first pushed to this device. An entry stays
- * while its occurrence is still listed (the Incursion, or a raid window not yet
- * over), as the app's own feed row with `notifiedHereAt` stops a second toast
- * for as long as it exists: a second Character reaching the same Incursion a
- * day later is not pushed again.
- */
 export type NearbyPushLog = Record<string, number>;
 
-/** The occurrences each list still names; `null` for a list not read this run. */
 export interface LiveOccurrences {
   incursions: ReadonlySet<string> | null;
   skyhooks: ReadonlySet<string> | null;
@@ -402,10 +347,6 @@ export function notYetPushed(log: Readonly<NearbyPushLog>, key: string): boolean
   return log[key] === undefined;
 }
 
-/**
- * The log with `keys` added, dropping entries whose occurrence a list read this
- * run no longer names. An entry for a list that could not be read is kept.
- */
 export function recordPushed(
   log: Readonly<NearbyPushLog>,
   keys: readonly string[],

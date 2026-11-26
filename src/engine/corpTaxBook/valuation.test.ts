@@ -36,7 +36,6 @@ describe('priceObservedDay', () => {
       ],
     });
     expect(day.prices.get(RAW_A)).toBe(30);
-    // No compressed counterpart: stays raw.
     expect(day.prices.get(RAW_B)).toBe(5);
     expect(day.sources.get(RAW_A)).toBe('saved');
   });
@@ -92,7 +91,6 @@ describe('valueObservedEntry', () => {
       [RAW_A, 30],
       [RAW_B, 5],
     ]);
-    // 100*30 + 50*5 = 3250; 10% = 325
     expect(valueObservedEntry(entry, prices, 10)).toEqual({ estimatedValue: 3250, taxOwed: 325 });
   });
 

@@ -8,7 +8,6 @@ import { materialsCsvColumns } from './materialsCsv';
 const t = (k: string) => k;
 const nameFor = (typeID: number) => `Item ${typeID}`;
 
-/** Built through the engine so the fixtures can never drift from what the panel exports. */
 function line(
   typeID: number,
   baseQuantity: number,
@@ -92,7 +91,6 @@ describe('materialsCsvColumns', () => {
     const columns = materialsCsvColumns(t, nameFor, undefined, true);
     const csv = toCsv([line(99, 10, 10, { 34: 5.5 })], columns);
     const dataLine = csv.split('\r\n')[1];
-    // "Item 99,10,," — unit price and line total both blank.
     expect(dataLine.endsWith(',,')).toBe(true);
     expect(dataLine).not.toContain('No price');
     expect(dataLine).not.toContain('Unpriced');

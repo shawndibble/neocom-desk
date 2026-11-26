@@ -46,10 +46,6 @@ describe('netOverWindow', () => {
 });
 
 describe('dailyOutgoings', () => {
-  /**
-   * Spending only — the rail's runway asks how long the balance lasts, and
-   * income is exactly what a runway must not assume will keep arriving.
-   */
   it('averages spending per day, ignoring income entirely', () => {
     const entries = [entry(1, -30 * VITALS_WINDOW_DAYS), entry(2, 1_000_000)];
     expect(dailyOutgoings(entries, NOW)).toBe(30);
@@ -74,11 +70,6 @@ describe('runwayDays', () => {
     expect(runwayDays(1_000, 100)).toBe(10);
   });
 
-  /**
-   * A corporation that has spent nothing has no burn rate to divide by, and
-   * "infinite days of runway" would be a claim the journal does not support.
-   * `null` is the rail's cue to say so rather than print a number.
-   */
   it('has no answer when nothing is being spent', () => {
     expect(runwayDays(1_000, 0)).toBeNull();
   });

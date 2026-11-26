@@ -1,7 +1,3 @@
-// SRP Doctrine Fit input: parsing the Director's save and delete, no Firestore.
-// The client sends an already-built snapshot (pasted EFT or a picked Fitting, resolved to type
-// ids); the server only checks its shape and bounds, and sorts the lists.
-
 import { HttpsError } from 'firebase-functions/v2/https';
 import { boundedString, docId, record } from './communities.js';
 import { int } from './corpTaxBook.js';
@@ -9,12 +5,9 @@ import { sortedIds } from './srpDoctrine.js';
 import type { SaveDoctrineInput } from './srpTypes.js';
 
 export const MAX_DOCTRINE_NAME = 80;
-// A hull has at most 8 each of high, mid and low plus 5 subsystems, and 3 rigs; headroom for T3s.
 export const MAX_DOCTRINE_MODULES = 40;
 export const MAX_DOCTRINE_RIGS = 8;
 const TYPE_ID_MAX = 2_147_483_647;
-// Mirrors MAX_FITTING_SHARE_CODE_LENGTH and the base64url check of the client's Fitting Share Code
-// (src/engine/fittings); functions never import src/.
 export const MAX_DOCTRINE_SHARE_CODE = 20_100;
 const SHARE_CODE = /^[A-Za-z0-9_-]+$/;
 
@@ -42,11 +35,6 @@ function typeIds(value: unknown, field: string, max: number): number[] {
   return sortedIds(value.map((v) => int(v, field, 1, TYPE_ID_MAX)));
 }
 
-/**
- * `{ id?, name, snapshot: { hullTypeId, modules, rigs }, shareCode? }`; `id` present replaces that
- * fit. `shareCode` is the whole fit (charges, drones, cargo) members open; the snapshot alone is
- * what SRP matches.
- */
 export function parseSaveDoctrine(data: unknown): SaveDoctrineInput {
   const d = record(data);
   const name = boundedString(d.name, 'name', MAX_DOCTRINE_NAME);

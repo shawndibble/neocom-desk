@@ -51,9 +51,6 @@ export function ExtractionsTab() {
   const { run, onCloseAutoFocus } = useOpenAfterMenu();
   const navigate = useNavigate();
   const shareMarks = usePopShareMarks();
-  // Open moon page is the row click. Beyond it a row earns a menu only with two real actions:
-  // Change survey (the ore came from a survey; an unknown-ore row has the visible Link button)
-  // and Dismiss tax (inert at zero tax, so it does not count).
   const hasMenu = (row: ExtractionRow) => canEdit && row.oreSource === 'survey' && row.tax > 0;
   const rowContextMenu = useCallback(
     (row: ExtractionRow, tr: ReactElement) =>
@@ -81,13 +78,11 @@ export function ExtractionsTab() {
     [canEdit, names, run, onCloseAutoFocus, t]
   );
   const rows = view.extractions;
-  // A book that reads a moon owner's Extractions names each row's corporation (#6097).
   const namesCorporations = rows.some((r) => r.sourceCorporationId !== undefined);
   const now = Date.parse(view.input.now);
   const phone = useIsPhone();
   const inStates = rows.filter((r) => states.has(r.state));
   const listed = inStates.filter((r) => !isPastExtraction(r, now));
-  // Newest expiry first, so "Load older" walks back through history.
   const past = inStates
     .filter((r) => isPastExtraction(r, now))
     .sort((a, b) => expiryOf(b).localeCompare(expiryOf(a)));
@@ -128,7 +123,6 @@ export function ExtractionsTab() {
       id: 'state',
       header: t('corpTaxBook.moons.cols.state'),
       render: (row) => <StateWord state={row.state} />,
-      // State order (what is minable first), then the soonest chunk: the order the timeline lists them.
       sortValue: (row) => `${FILTER_STATES.indexOf(row.state)}|${row.chunkArrivalAt}`,
     },
     {

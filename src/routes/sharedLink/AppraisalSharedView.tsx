@@ -14,7 +14,6 @@ function appraisalState(share: StoredShare): AppraisalShareState {
   return view.ok ? { status: 'ready', view: view.value } : { status: 'invalid' };
 }
 
-/** A stored appraisal share. Its own chunk (`SharedLink` loads it on demand). */
 export function AppraisalSharedView({ share, shareId }: { share: StoredShare; shareId: string }) {
   const state = appraisalState(share);
   return (

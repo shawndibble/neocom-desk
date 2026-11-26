@@ -48,7 +48,6 @@ describe('StationHeading', () => {
     fireEvent.keyDown(field, { key: 'Enter' });
 
     expect(await screen.findByRole('heading', { name: 'Home market' })).toBeVisible();
-    // The real name stays as the dim second line (heading line and PlaceName).
     expect(screen.getAllByText(REAL).length).toBeGreaterThan(0);
     await waitFor(async () =>
       expect((await db.settings.get('sync.placeNicknames'))?.value).toEqual({

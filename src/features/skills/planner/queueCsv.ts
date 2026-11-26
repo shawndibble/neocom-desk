@@ -8,29 +8,19 @@ import { isoTime, joined } from '@/lib/exportSheets';
 import { priorityLabelKey } from './entryList/rowChrome';
 import type { MergedRow, PinnedInProgressEntry } from './queueRows';
 
-/** Why a plan row is listed: a scheduled step, or what keeps its entry out of the schedule. */
 export type QueueEntryStatus =
   'scheduled' | 'trained' | 'unknown' | 'queued' | 'training' | 'unscheduled' | 'orphanMilestone';
 
-/**
- * One exported plan row: a scheduled step, or a plan entry with no step of its
- * own, so the file lists every entry the plan holds, in the plan's order. A
- * Plan Milestone with no row to sit on is a row of its own.
- */
 export interface QueueCsvRow {
   status: QueueEntryStatus;
   skillTypeID: number;
   level: number;
-  /** Index into `schedule.scheduled`; present for `scheduled` only. */
   stepIndex?: number;
-  /** The level in training in the live queue: its real time left, and the instant that ends. */
   remainingSeconds?: number;
   doneByMs?: number;
-  /** Names of the Plan Milestones anchored at this skill level. */
   milestone?: string;
 }
 
-/** What the columns read a row against: the costed schedule and the catalog. */
 export interface QueueCsvContext {
   schedule: Pick<
     SkillPlanSchedule,
@@ -44,11 +34,6 @@ export interface QueueCsvContext {
   engineSkills: ReadonlyMap<number, EngineSkill>;
 }
 
-/**
- * The editor's merged rows (each entry's prerequisites ahead of it, markers
- * skipped) as export rows: every scheduled step, plus a status row for an entry
- * with no step of its own. Built when an export runs.
- */
 export function queueCsvRows({
   mergedRows,
   schedule,
@@ -60,7 +45,6 @@ export function queueCsvRows({
   mergedRows: readonly MergedRow[];
   schedule: Pick<SkillPlanSchedule, 'scheduled' | 'isKnownSkill' | 'error'>;
   trainedSkills: ReadonlyMap<number, TrainedSkill>;
-  /** The entry that is the in-game queue's level in training, with its real seconds left. */
   pinned: PinnedInProgressEntry | null;
   nowMs: number;
   milestones: readonly PlanMilestone[];
@@ -98,7 +82,6 @@ export function queueCsvRows({
         doneByMs: nowMs + pinned.seconds * 1000,
       });
     } else {
-      // A plan the normalizer rejected has no schedule at all: say so rather than "queued".
       rows.push({ ...base, status: schedule.error === null ? 'queued' : 'unscheduled' });
     }
   }
@@ -138,12 +121,6 @@ const STATUS_KEY: Record<QueueEntryStatus, string> = {
   orphanMilestone: 'plans.csvStatusOrphanMilestone',
 };
 
-/**
- * CSV columns for the computed training queue. Level/seconds/cumulative
- * seconds are raw numbers, not the roman numeral or formatDuration() strings
- * the list renders, so the file supports spreadsheet math. Start and done-by
- * are the instants a step begins and ends on the plan's own clock.
- */
 export function queueCsvColumns(
   t: CsvTranslate,
   nameFor: (skillTypeID: number) => string,
@@ -221,7 +198,6 @@ export function queueCsvColumns(
     },
     {
       header: t('plans.csvPrereq'),
-      // A step whose skill isn't one the user listed was inserted by the planner as a prerequisite.
       value: (row) =>
         row.stepIndex === undefined ? null : exportFlag(t, !userSkillTypeIDs.has(row.skillTypeID)),
     },

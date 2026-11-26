@@ -4,7 +4,6 @@ import type { TypeInfoShard } from './typeInfoShard';
 const fetchMock = vi.fn<typeof fetch>();
 
 const RIFTER = 587;
-/** Same shard as the Rifter (bucket 0: ids 0–1999). */
 const SAME_SHARD = RIFTER + 32;
 
 const shard: TypeInfoShard = {
@@ -25,7 +24,6 @@ function shardResponse(): Response {
 }
 
 beforeEach(() => {
-  // Fresh module per test: shards are memoized for the whole session.
   vi.resetModules();
   fetchMock.mockReset();
   vi.stubGlobal('fetch', fetchMock);

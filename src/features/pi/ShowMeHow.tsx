@@ -1,14 +1,3 @@
-/**
- * "Show me how": the three steps that open directly under a recipe card.
- * 1. find a planet (the nearest systems with the type), 2. build these pins,
- * 3. run it. Every figure comes from the recommendation model's layout
- * (`buildHowTo`), the system list from the SDE planet finder.
- *
- * Cues follow DESIGN.md §6c: item names open their PI Product Detail
- * (`PiProductLink`), system names are
- * Route Safety links with the security colour plus its number, "Highsec only"
- * is a checkbox, and the panel takes focus when it opens.
- */
 import { fixed1 } from '@/lib/fixedFormat';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { formatCount } from '@/lib/formatCount';
@@ -42,13 +31,11 @@ interface Props {
   recipe: RecipeRank;
   pi: PiData;
   origin: FinderOrigin;
-  /** The pilot's colonies on a planet type that hosts this recipe. */
   mine: readonly OwnedColony[];
   hubName: string;
   buybackPct: number | null;
   restartDays: number;
   estimate: boolean;
-  /** The Highsec only box: null follows the origin's security. Kept by the parent across cards. */
   highsecPick: boolean | null;
   onHighsecPick: (value: boolean) => void;
   onClose: () => void;
@@ -340,7 +327,6 @@ export function ShowMeHow(props: Props) {
   const { id, recipe, pi, onClose } = props;
   const mdUp = useMediaQuery('(min-width: 48rem)');
   const ref = useRef<HTMLElement>(null);
-  // Opens under the tapped card: scroll it into view and move focus to it.
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
@@ -348,7 +334,6 @@ export function ShowMeHow(props: Props) {
     el.focus({ preventScroll: true });
   }, []);
   const how = buildHowTo(recipe, pi);
-  // Closing removes the focused panel: hand focus back to the card's button.
   const close = () => {
     const opener = document.querySelector<HTMLElement>(`[aria-controls="${id}"]`);
     onClose();

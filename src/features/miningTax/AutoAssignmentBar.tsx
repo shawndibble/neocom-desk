@@ -1,13 +1,3 @@
-/**
- * The Moon Mining Tax tab's Auto Assignment bar (issue #4684): one slim row
- * per live Survey connection, like the attention strip but in accent, since it
- * is something running rather than something wrong. Who the moon's ore goes to
- * and at what rate · where · until when, then Stop: the same Stop as on the
- * Survey, for a pilot who has moved on to another one.
- *
- * Only one connection runs at a time (`startSurveyConnection`), so this is
- * one row; a list synced from an older device can briefly hold two.
- */
 import { Fragment, useEffect, useState } from 'react';
 import { InlineError } from '@/components/ui/InlineError';
 import { useTranslation } from 'react-i18next';
@@ -27,12 +17,9 @@ export function AutoAssignmentBar({
   systemNames,
   nowMs: nowOverride,
 }: {
-  /** The Characters the tab shows. */
   characterIds: readonly number[];
-  /** Named in the row only when more than one Character is tracked. */
   characterNames: ReadonlyMap<number, string>;
   systemNames: ReadonlyMap<number, string>;
-  /** For tests; otherwise the clock, read each minute. */
   nowMs?: number;
 }) {
   const { t } = useTranslation();
@@ -74,11 +61,9 @@ export function AutoAssignmentBar({
               aria-label={t('miningTax.surveyConnections.title')}
               className="flex min-h-9 items-center gap-2 rounded-xs border border-accent/60 bg-accent/10 px-2.5 py-1 text-xs md:min-h-0"
             >
-              {/* The eyebrow's type in accent, not its dim colour: the bar's one tone, as warning is the attention strip's. */}
               <span className="shrink-0 text-[0.6875rem] font-semibold tracking-widest text-accent uppercase">
                 {t('miningTax.surveyConnections.title')}
               </span>
-              {/* Cut short on a phone: the full line is a tap away. */}
               <span className="min-w-0 flex-1 truncate text-text-dim">
                 <HintText content={detail} onlyWhenTruncated>
                   {detail}

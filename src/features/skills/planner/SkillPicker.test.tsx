@@ -28,7 +28,6 @@ const SKILLS: SkillType[] = [
   skill({ typeID: 4, name: 'Zzz Named Skill', groupName: 'Frigate' }),
 ];
 
-/** The picker only reads the catalog to render prerequisites and unlocks. */
 const CATALOG: SkillCatalog = (() => {
   const engineSkills = new Map(
     SKILLS.map((s) => [
@@ -52,7 +51,6 @@ const CATALOG: SkillCatalog = (() => {
 
 const NO_TRAINED: ReadonlyMap<number, TrainedSkill> = new Map();
 
-/** Descriptions are the point of these: search reaches them as a secondary field. */
 const DESCRIBED_SKILLS: SkillType[] = [
   skill({
     typeID: 11,
@@ -105,8 +103,6 @@ describe('SkillPicker', () => {
 
     await user.type(screen.getByRole('searchbox'), 'frigate');
 
-    // The search re-rank is debounced (#408) — wait it out rather than
-    // reading results synchronously right after typing.
     const items = await screen.findAllByRole('listitem');
     expect(items.map((li) => li.textContent)).toEqual([
       expect.stringContaining('Frigate'),
@@ -207,7 +203,6 @@ describe('SkillPicker', () => {
     const jumpLink = await screen.findByRole('button', { name: /jump to it/i });
     await user.click(jumpLink);
     expect(scrollIntoView).toHaveBeenCalled();
-    // Focus follows the scroll, onto the row's handle (WCAG 2.4.3).
     expect(within(row).getByRole('button', { name: /reorder/i })).toHaveFocus();
   });
 
@@ -340,11 +335,6 @@ describe('SkillPicker level flags (#408)', () => {
     const firstItem = (await screen.findAllByRole('listitem'))[0];
     await user.click(within(firstItem).getByRole('button', { name: /^Frigate/ }));
 
-    // Accessible names concatenate with no separator ("Level IIIAlready
-    // trained"), so a plain roman-numeral match must not also swallow a
-    // longer numeral sharing its prefix ("Level II" is a prefix of "Level
-    // III") — the negative lookahead rules out another roman-numeral letter
-    // immediately following.
     const levelIII = screen.getByRole('button', { name: /^Level III(?![IVX])/ });
     expect(levelIII).toHaveTextContent(/already trained/i);
     const levelIV = screen.getByRole('button', { name: /^Level IV(?![IVX])/ });

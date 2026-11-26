@@ -19,11 +19,6 @@ interface Filter {
 
 const EMPTY: Filter = { text: '', unreadOnly: false, from: '' };
 
-/**
- * jsdom's stub never matches (`vitest.setup.ts`), which `useIsNarrow` reads as
- * a pointer viewport — so the funnel box under the row is what every route
- * test sees by default. Narrow has to be asked for.
- */
 function useNarrowViewport(): void {
   stubViewport(NARROW_QUERY);
 }
@@ -147,7 +142,6 @@ describe('FilterBar', () => {
     render(<Harness />);
     expect(screen.getByRole('button', { name: 'Filters' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Unread only' })).not.toBeInTheDocument();
-    // The search box is the page's primary affordance and never moves.
     expect(screen.getByRole('searchbox', { name: 'Search' })).toBeInTheDocument();
   });
 
@@ -168,7 +162,6 @@ describe('FilterBar', () => {
     const user = userEvent.setup();
     render(<Harness initial={{ ...EMPTY, unreadOnly: true }} />);
     const trigger = screen.getByRole('button', { name: 'Filters (1 active)' });
-    // Drawn as well as announced — colour is never the only signal.
     expect(trigger.parentElement).toHaveTextContent('1');
     await user.click(trigger);
     expect(screen.getByRole('dialog', { name: 'Filters' })).toBeInTheDocument();
@@ -177,8 +170,6 @@ describe('FilterBar', () => {
   it('names the trigger for more than one active filter', () => {
     useNarrowViewport();
     render(<Harness initial={{ ...EMPTY, unreadOnly: true, from: 'CONCORD' }} />);
-    // `count` is i18next's plural selector, not a plain interpolation — this
-    // pins that the base key still resolves for the non-one case.
     expect(screen.getByRole('button', { name: 'Filters (2 active)' })).toBeInTheDocument();
   });
 
@@ -225,7 +216,6 @@ describe('FilterBar', () => {
     await user.click(trigger);
     expect(trigger).toHaveAttribute('aria-expanded', 'true');
     const popover = screen.getByRole('dialog');
-    // Uncaptioned, like the box under the row — captions are the sheet's.
     expect(screen.queryByText('From')).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Unread only' }));
     expect(popover).toContainElement(screen.getByRole('button', { name: 'Unread only' }));
@@ -397,7 +387,6 @@ describe('FilterField hideCaption', () => {
     );
     await user.click(screen.getByRole('button', { name: 'Change filter: Starred only' }));
     const dialog = screen.getByRole('dialog');
-    // The chip's own label, once — no caption above it.
     expect(within(dialog).getAllByText('Starred only')).toHaveLength(1);
     await waitFor(() =>
       expect(within(dialog).getByRole('button', { name: 'Starred only' })).toHaveFocus()
@@ -522,7 +511,6 @@ describe('FilterBar inline key filter', () => {
     render(<InlineHarness placement="below" />);
     const field = screen.getByRole('textbox', { name: 'Space' });
     const funnel = screen.getByRole('button', { name: /^Filters/ });
-    // The `below` line follows the row that holds the funnel in document order.
     expect(funnel.compareDocumentPosition(field) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(funnel.closest('div.flex-wrap')).not.toContainElement(field);
   });

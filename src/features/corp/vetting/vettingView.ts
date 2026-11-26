@@ -1,7 +1,3 @@
-/**
- * What the vetting pages show, worked out from the wire types (`engine/vetting.ts`). Pure: no
- * React, no i18n calls; wording keys and their figures come back for the component to translate.
- */
 import { VETTING_SCOPES, type VettingScope } from '@/auth/vettingScopes';
 import {
   VETTING_CHECK_SOURCES,
@@ -29,15 +25,10 @@ const DECIDED: ReadonlySet<VettingState> = new Set([
   'declined',
 ]);
 
-/** A review nobody has to act on any more: the Decided tab's rows. */
 export function isDecided(state: VettingState): boolean {
   return DECIDED.has(state);
 }
 
-/**
- * A review's result in words. "Nothing found" is neutral on purpose: a clean read is not proof,
- * so it never gets a success tone.
- */
 export function reviewResult(
   row: Pick<VettingReviewSummary, 'state' | 'flags' | 'worst' | 'missing'>
 ): { result: VettingResult; tone: VettingTone } {
@@ -51,7 +42,6 @@ export function reviewResult(
   return { result: 'nothing', tone: 'neutral' };
 }
 
-/** The queue never lists a review about the viewing officer: it is closed to them. */
 export function visibleReviews<T extends Pick<VettingReviewSummary, 'pilot'>>(
   reviews: readonly T[],
   viewerId: number
@@ -59,7 +49,6 @@ export function visibleReviews<T extends Pick<VettingReviewSummary, 'pilot'>>(
   return reviews.filter((review) => review.pilot.characterId !== viewerId);
 }
 
-/** The caller still owes a sign-off the queue should point at. */
 export function needsYours(row: Pick<VettingReviewSummary, 'state' | 'yours'>): boolean {
   return row.yours && row.state === 'open';
 }
@@ -67,12 +56,10 @@ export function needsYours(row: Pick<VettingReviewSummary, 'state' | 'yours'>): 
 export interface ResultLineState {
   flags: number;
   checks: number;
-  /** Checks that could not run. */
   missing: number;
   severity: VettingSeverity | 'clear';
 }
 
-/** The report's one-line answer: flags found, nothing found, and whether it is incomplete. */
 export function resultLine(assessment: VettingAssessment): ResultLineState {
   const missing = assessment.checks.filter((check) => check.state === 'missing').length;
   const critical = assessment.flags.some((flag) => flag.severity === 'critical');
@@ -88,7 +75,6 @@ export function resultLine(assessment: VettingAssessment): ResultLineState {
   };
 }
 
-/** A party's name, with its corporation's when the report placed it in one it also names. */
 export function partyLabel(parties: readonly VettingParty[], id: number): string | null {
   const party = parties.find((candidate) => candidate.id === id);
   if (!party) return null;
@@ -101,15 +87,10 @@ const ROMAN = ['0', 'I', 'II', 'III', 'IV', 'V'];
 
 export interface FlagFormat {
   isk: (value: number) => string;
-  /** A large count in short form ("3.2M"). */
   compact: (value: number) => string;
   party: (id: number) => string;
 }
 
-/**
- * The figures a flag's sentence (`vetting.checks.<check>.finding`) is built from. `count` is the
- * plural driver wherever the sentence counts something.
- */
 export function flagFindingParams(
   flag: Pick<VettingFlag, 'check' | 'facts'>,
   format: FlagFormat
@@ -143,10 +124,6 @@ export function flagFindingParams(
   }
 }
 
-/**
- * Where each check's rows come from, as the report names it (`vetting.sources.<id>`). A label
- * only: which sources a check needs is the engine's `VETTING_CHECK_SOURCES`.
- */
 export type VettingSourceLabel = VettingSource | 'history' | 'walletRecent' | 'walletContracts';
 
 export const CHECK_SOURCE_LABEL: Record<VettingCheckId, VettingSourceLabel> = {
@@ -161,7 +138,6 @@ export const CHECK_SOURCE_LABEL: Record<VettingCheckId, VettingSourceLabel> = {
   thinCharacter: 'skills',
 };
 
-/** Evidence rows whose `what` has its own wording; anything else reads as "Other". */
 const KNOWN_WHAT: ReadonlySet<string> = new Set([
   'player_donation',
   'player_trading',
@@ -180,17 +156,10 @@ export function evidenceWhatKey(what: string): string {
 
 export interface MissingCheck {
   check: VettingCheckId;
-  /** What the check reads that was not shared, in the engine's order. */
   sources: VettingSource[];
-  /** Declared characters that did not share it. */
   names: string[];
 }
 
-/**
- * Checks that could not run, with who did not share what. A check that still flagged is not one.
- * The sources come from the engine's `VETTING_CHECK_SOURCES`, narrowed to the ones those
- * characters actually left out when the report says which.
- */
 export function missingChecks(
   assessment: VettingAssessment,
   characters: readonly { characterId: number; name: string; missing?: readonly VettingSource[] }[]
@@ -216,9 +185,7 @@ export function missingChecks(
 }
 
 export type SignOffRow =
-  /** The caller has not decided and may. */
   | { kind: 'yours' }
-  /** Someone decided; what they decided shows once the caller has. */
   | { kind: 'hidden'; name: string; at: number }
   | {
       kind: 'decided';
@@ -228,13 +195,8 @@ export type SignOffRow =
       decision: 'yes' | 'no';
       note: string;
     }
-  /** Asked for the review, so cannot sign it off. `you` when that is the caller. */
   | { kind: 'barred'; name: string; you: boolean };
 
-/**
- * Who has to decide and where each stands, as the caller may see it: recorded sign-offs first
- * (hidden ones without their decision), then the caller's own open row, then whoever is barred.
- */
 export function signOffRows(
   review: Pick<VettingReview, 'state' | 'yours' | 'requestedBy' | 'signOffs'>,
   reviewerId: number
@@ -253,7 +215,6 @@ export function signOffRows(
   );
   if (review.state !== 'open' && review.state !== 'requested') return rows;
   if (review.state === 'open' && review.yours) rows.push({ kind: 'yours' });
-  // A requested review still shows who asked: they cannot sign it off, before or after sharing.
   if (review.requestedBy) {
     rows.push({
       kind: 'barred',
@@ -264,7 +225,6 @@ export function signOffRows(
   return rows;
 }
 
-/** The caller is whoever asked for this review (and so cannot sign it off). */
 export function askedByReviewer(
   review: Pick<VettingReview, 'requestedBy'>,
   reviewerId: number
@@ -280,15 +240,10 @@ const SCOPE_SOURCE: Record<VettingScope, VettingSource> = {
   'esi-skills.read_skills.v1': 'skills',
 };
 
-/**
- * The sources a sign-in holding `scopes` could not share: what a device Character's own grant
- * leaves out of a report, so the page can ask for a vetting sign-in before reading it.
- */
 export function missingSourcesFor(scopes: ReadonlySet<string>): VettingSource[] {
   return VETTING_SCOPES.filter((scope) => !scopes.has(scope)).map((scope) => SCOPE_SOURCE[scope]);
 }
 
-/** The minimums a corp set above "none", in the order the apply page lists them. */
 export function askedMinimums(
   minimums: VettingMinimums
 ): { id: VettingMinimumId; value: number }[] {
@@ -301,17 +256,12 @@ export function askedMinimums(
   ];
 }
 
-/** Every minimum a corp can set, in the order the pages list them. */
 export const VETTING_MINIMUM_IDS: readonly VettingMinimumId[] = [
   'ageDays',
   'skillPoints',
   'characters',
 ];
 
-/**
- * The minimums a `below-minimum` refusal names: the server lists the unmet ids in its message,
- * comma separated. Anything else in there is ignored.
- */
 export function unmetFromRefusal(error: unknown): VettingMinimumId[] {
   const message = (error as { message?: unknown } | null)?.message;
   if (typeof message !== 'string') return [];
@@ -319,16 +269,13 @@ export function unmetFromRefusal(error: unknown): VettingMinimumId[] {
   return VETTING_MINIMUM_IDS.filter((id) => named.includes(id));
 }
 
-/** What stands between the applicant and Send, first thing first; null when Send is live. */
 export type SendBlock = 'characters' | 'reading' | 'minimums' | 'answers' | 'tick';
 
 export function sendBlock(input: {
   characters: number;
   allMine: boolean;
   reading: boolean;
-  /** Minimums the corp set that the draft does not meet. */
   unmet?: number;
-  /** Required questions left blank. */
   unanswered?: number;
 }): SendBlock | null {
   if (input.characters === 0) return 'characters';
@@ -338,15 +285,10 @@ export function sendBlock(input: {
   return input.allMine ? null : 'tick';
 }
 
-/** Whether the applicant's Send is live. */
 export function canSend(input: Parameters<typeof sendBlock>[0]): boolean {
   return sendBlock(input) === null;
 }
 
-/**
- * Refusals the vetting callables name in `details.reason` (functions/src/vettingStore.ts,
- * vettingDecide.ts, vettingEsi.ts) that have their own wording.
- */
 const KNOWN_REASONS: ReadonlySet<string> = new Set([
   'not-found',
   'bad-key',
@@ -380,10 +322,6 @@ const KNOWN_REASONS: ReadonlySet<string> = new Set([
   'esi-forbidden',
 ]);
 
-/**
- * The pilot's review is gone: deleted, withdrawn, or never there. The server gives one answer
- * for "no such review" and "wrong key" (`bad-key`), so a key cannot be probed for.
- */
 export function isReviewGone(reason: string | null): boolean {
   return reason === 'bad-key' || reason === 'not-found';
 }

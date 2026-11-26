@@ -1,10 +1,3 @@
-/**
- * A page's own settings, edited in place: the same form Settings renders for
- * that page's section, in a modal, with a way through to the full section. A
- * page with a ⋮ menu opens it from a "Settings" item there; a page without
- * one gets `PageSettingsButton`, a gear in its header, rather than a ⋮ menu
- * holding one item.
- */
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
@@ -20,11 +13,8 @@ import type { SettingsSectionId } from './sections';
 interface PageSettingsModalProps {
   open: boolean;
   onClose: () => void;
-  /** The page's name, for the title ("Industry settings"). */
   pageName: string;
-  /** The Settings section the "All settings" link opens. */
   section: SettingsSectionId;
-  /** The page's settings form(s) — the ones Settings renders for `section`. */
   children: ReactNode;
 }
 
@@ -57,7 +47,6 @@ export function PageSettingsModal({
   );
 }
 
-/** A page header's gear: opens `PageSettingsModal` for a page with no ⋮ menu to hold it. */
 export function PageSettingsButton(props: Omit<PageSettingsModalProps, 'open' | 'onClose'>) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);

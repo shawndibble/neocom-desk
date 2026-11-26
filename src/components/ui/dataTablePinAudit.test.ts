@@ -2,20 +2,13 @@ import { readdirSync, readFileSync, existsSync, statSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-// Every `responsive="table"` DataTable scrolls sideways on a phone, so its
-// identifying column must be pinned (`stickyStart`) or the row loses its name.
-
 const ROOT = resolve(__dirname, '../../..');
 const SRC = join(ROOT, 'src');
 
-// Files that legitimately pin without `stickyStart`.
 const ALLOWLIST: Record<string, string> = {
-  // Pins its attribute column with hand-rolled `sticky left-0` classes shared
-  // with a custom header and a fixed matrix width, so the column prop can't be used.
   'src/features/market/CompareAttributesMatrix.tsx': 'hand-rolled sticky attribute column',
 };
 
-// Columns passed in as props from a hook the file doesn't import.
 const EXTRA_COLUMN_SOURCES: Record<string, string[]> = {};
 
 function walk(dir: string, out: string[] = []): string[] {

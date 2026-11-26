@@ -157,7 +157,6 @@ describe('neocom database', () => {
       addedAt: 1000,
       corporationId: 98000001,
     });
-    // A character whose corp has not been learned yet: legal, just not indexed.
     await db.characters.add({
       characterId: 90000001,
       name: 'CCP Beta',
@@ -173,16 +172,10 @@ describe('neocom database', () => {
   });
 });
 
-/**
- * AC 1 of issue #293: the `corporationId` bump is ADDITIVE. Run against a
- * throwaway database rather than `neocom` so the real one is never opened at
- * an old version mid-suite.
- */
 describe('schema upgrade v6 -> v7', () => {
   const NAME = 'neocom-upgrade-probe';
 
   it('an existing device gains the corporationId index without losing data', async () => {
-    // v6: characters keyed by characterId alone, one row already stored.
     const before = new Dexie(NAME);
     before.version(6).stores({ characters: 'characterId' });
     await before.open();
@@ -191,7 +184,6 @@ describe('schema upgrade v6 -> v7', () => {
       .put({ characterId: 2112625428, name: 'CCP Alpha', ownerHash: 'hash-1', addedAt: 1000 });
     before.close();
 
-    // v7 adds the index and nothing else.
     const after = new Dexie(NAME);
     after.version(6).stores({ characters: 'characterId' });
     after.version(7).stores({ characters: 'characterId, corporationId' });
@@ -202,7 +194,6 @@ describe('schema upgrade v6 -> v7', () => {
       ownerHash: 'hash-1',
       addedAt: 1000,
     });
-    // Pre-upgrade rows carry no corp id, so they simply are not in the index.
     expect(
       await after.table('characters').where('corporationId').equals(98000001).toArray()
     ).toEqual([]);
@@ -233,9 +224,6 @@ describe('schema upgrade v6 -> v7', () => {
 
 describe('schema upgrade v7 -> v8', () => {
   it('adds planetRichness, indexed the way the Advisor reads it', () => {
-    // One system's planets at a time (planetId), and one Character's whole
-    // ranking set on load (characterId) — both are queried, so both are
-    // indexed rather than scanned.
     expect(db.planetRichness.schema.indexes.map((i) => i.name).sort()).toEqual([
       'characterId',
       'planetId',
@@ -330,9 +318,6 @@ describe('schema upgrade v11 -> v12 (Open Orders problem samples, issue #1018)',
 
 describe('a blocked upgrade', () => {
   function fireBlocked(oldVersion: number, newVersion: number | null) {
-    // Dexie exposes its event hubs as callable `.fire()`, which is how the
-    // real `req.onblocked` reaches subscribers — there is no way to provoke a
-    // genuine cross-connection block in a single-process test.
     (db.on as unknown as { blocked: { fire: (event: unknown) => void } }).blocked.fire({
       oldVersion,
       newVersion,
@@ -343,10 +328,6 @@ describe('a blocked upgrade', () => {
     const close = vi.spyOn(db, 'close').mockImplementation(() => {});
     try {
       fireBlocked(100, 110);
-      // The whole point: `req.onblocked` never rejects the open, so without
-      // this the read stays pending forever and no error path is ever
-      // reached. `close()` cancels an in-flight open with DatabaseClosed,
-      // which `useLiveQuery` rethrows into ErrorBoundary.
       expect(close).toHaveBeenCalledOnce();
     } finally {
       close.mockRestore();
@@ -359,8 +340,6 @@ describe('a blocked upgrade', () => {
     const unsubscribe = onUpgradeBlocked((event) => seen.push(event));
     try {
       fireBlocked(100, 110);
-      // Closing loses the versions (DatabaseClosed carries none), so the
-      // signal has to fire first or the diagnosis is gone.
       expect(seen).toEqual([{ oldVersion: 100, newVersion: 110 }]);
     } finally {
       unsubscribe();

@@ -1,16 +1,3 @@
-/**
- * "Assign Taxes" on a moon Survey, in one click (issue #4684): finds or adds
- * the Payee, connects the Survey's moon to it (`surveyConnections.ts`),
- * stopping any other Survey's connection, and assigns whatever of that moon's
- * ore is already in the Mining Ledger. While
- * the Survey is open and connected it re-reads the ledger on opening and then
- * every few minutes, so ore mined since is assigned too; the Tax tab's own
- * load does the same. Each run that assigns or adds something says so with
- * Undo.
- *
- * The connection follows the Survey as it is scanned: a moving ETA, a
- * location set later, or a new moon ore type are saved onto it.
- */
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { db, type MiningTaxAssignmentRecord } from '@/db';
@@ -36,16 +23,12 @@ import { resolvePlaceSystemId } from '@/features/route/placeSystem';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 import { ensurePayee, findOrCreatePayee, samePayeeName } from './moonTaxPayee';
 
-/** How often an open, connected Survey re-reads the ledger. ESI caches it for ten minutes, so oftener finds nothing new. */
 export const AUTO_ASSIGN_EVERY_MS = 5 * 60 * 1000;
 
-/** What a Survey page knows that a connection is built from. */
 export interface ConnectableSurvey {
   id: string;
   expiresAt: number;
-  /** The Survey Location's id; null with no location, or a typed one. */
   locationId: number | null;
-  /** The Survey Location's name, where the structure comes from. */
   locationName?: string;
   summary: Pick<
     SurveySummary,
@@ -68,7 +51,6 @@ async function systemOf(locationId: number | null, characterId: number): Promise
   return resolvePlaceSystemId(locationId, characterId).catch(() => null);
 }
 
-/** The connection without its structure, so one the Survey no longer names is dropped rather than stored as `undefined`. */
 function omitStructure(connection: SurveyConnection): SurveyConnection {
   const rest = { ...connection };
   delete rest.structureLabel;
@@ -87,11 +69,8 @@ export function useSurveyConnection({
 }: {
   characterId: number | null;
   survey: ConnectableSurvey | undefined;
-  /** The Survey's Payee and rate, once both are set. */
   tax: SurveyTax | null;
-  /** The owner's click also makes the rate an existing Payee's default; a viewer's keeps their own. */
   updateRate: boolean;
-  /** An Undo that could not be saved. */
   onFailed: () => void;
 }) {
   const { t } = useTranslation();
@@ -108,8 +87,6 @@ export function useSurveyConnection({
     survey !== undefined && characterId !== null
       ? all.find((c) => c.surveyId === survey.id && c.characterId === characterId)
       : undefined;
-  // Shown as connected only while it is live and still names the Survey's
-  // current Payee and rate: an owner who changes either connects again.
   const connection =
     stored !== undefined &&
     tax !== null &&
@@ -119,7 +96,6 @@ export function useSurveyConnection({
       ? stored
       : null;
 
-  /** An Undo's writes, reporting a failure rather than leaving half of it done silently. */
   function undoWith(steps: () => Promise<unknown>) {
     return () => {
       setToast(null);
@@ -127,7 +103,6 @@ export function useSurveyConnection({
     };
   }
 
-  // Follow the Survey: a moving ETA, a location set later, a new moon ore.
   const span =
     survey && connection
       ? connectionWindow({ ...survey.summary, expiresAt: survey.expiresAt }, connection.connectedAt)
@@ -158,15 +133,13 @@ export function useSurveyConnection({
         next.structureLabel !== connection.structureLabel ||
         !sameIds(next.typeIds, connection.typeIds);
       if (changed) await refreshSurveyConnection(next);
-    })().catch(() => undefined); // Kept as it was; the next change or reopen tries again.
+    })().catch(() => undefined);
     return () => {
       cancelled = true;
     };
-    // `span` is read through its two fields, so a new object each render doesn't re-run this.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [connection, span?.untilMs, span?.fromDate, oreKey, locationId, structureLabel]);
 
-  // While connected and open: ore mined since keeps being assigned, from opening on.
   const live = connection !== null;
   const payeeId = connection?.payeeId ?? '';
   const payeeName = connection?.payeeName ?? '';
@@ -177,7 +150,6 @@ export function useSurveyConnection({
       setNow(Date.now());
       void autoAssignFromSurveys()
         .then((made) => {
-          // Only this Survey's Payee: another connected Survey's ore isn't this page's to undo.
           const created = made.filter((a) => a.payeeId === payeeId);
           if (cancelled || created.length === 0) return;
           setToast({
@@ -185,7 +157,7 @@ export function useSurveyConnection({
             onUndo: undoWith(() => unassign(created)),
           });
         })
-        .catch(() => undefined); // The next run, or the Tax tab's load, tries again.
+        .catch(() => undefined);
     };
     run();
     const id = setInterval(run, AUTO_ASSIGN_EVERY_MS);
@@ -195,18 +167,14 @@ export function useSurveyConnection({
     };
   }, [live, payeeId, payeeName, t]);
 
-  /** Adds the Payee if need be, connects the moon and assigns what is already mined. Rejects when nothing could be saved. */
   async function connect(): Promise<void> {
     if (characterId === null || survey === undefined || tax === null) return;
-    // A new Payee is linked to the one EVE corporation or character of that name;
-    // with none it throws `PayeeNotInEveError`, which the row explains.
     const found = await findOrCreatePayee(characterId, tax.name, tax.pct);
     const known = found.created ? undefined : found.payee;
     const payee =
       updateRate && known !== undefined && known.defaultTaxPct !== tax.pct
         ? await ensurePayee(characterId, known.name, tax.pct)
         : found.payee;
-    // Still the Assign dialog's suggestion for ore this connection can't place.
     await useSurveyPayeeId.getState().setValue(payee.id);
     const [typeIds, systemId] = await Promise.all([
       surveyMoonOreTypeIds(survey.summary.oreNames),
@@ -214,7 +182,6 @@ export function useSurveyConnection({
     ]);
     const structureLabel = structureFromLocation(survey.locationName);
     const connectedAt = Date.now();
-    // Only one runs at a time: whichever was running stops, and Undo brings it back.
     const started: SurveyConnection = {
       surveyId: survey.id,
       characterId,
@@ -241,8 +208,6 @@ export function useSurveyConnection({
     setToast({
       message: parts.filter((p) => p !== '').join(' '),
       onUndo: undoWith(async () => {
-        // A Payee this click added goes with everything assigned to it since,
-        // including what the open Survey assigned after the click.
         const assigned =
           known === undefined
             ? await db.miningTaxAssignments.filter((a) => a.payeeId === payee.id).toArray()
@@ -256,14 +221,12 @@ export function useSurveyConnection({
           const removed = await deletePayee(payee);
           if (!removed.ok) throw removed.cause;
         } else if (known.defaultTaxPct !== payee.defaultTaxPct) {
-          // The owner's click made the rate this Payee's default; Undo puts the old one back.
           await ensurePayee(characterId, known.name, known.defaultTaxPct);
         }
       }),
     });
   }
 
-  /** Disconnects the moon. Rejects when that could not be saved. */
   async function stop(): Promise<void> {
     if (connection === null) return;
     await removeSurveyConnection(connection.surveyId, connection.characterId);

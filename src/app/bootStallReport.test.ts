@@ -39,7 +39,6 @@ describe('reportBootStallOnce', () => {
     reportBootStallOnce(10_000, 'root');
     reportBootStallOnce(10_000, 'root');
     reportBootStallOnce(10_000, 'root');
-    // One stuck session, not one event per remount.
     expect(captureMessage).toHaveBeenCalledOnce();
   });
 });

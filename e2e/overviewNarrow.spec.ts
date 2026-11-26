@@ -1,12 +1,3 @@
-/**
- * The Overview's widget grid and header geometry. Invariants, not pixels (CI's
- * fonts are not this machine's): no overlap, no horizontal overflow, the
- * header's controls one height, an Open link on the touch floor, and the grid's
- * "four Small, three Medium, two Large across" rule at desktop width.
- *
- * A layout is seeded through the `sync.overviewLayout` settings row; without
- * one the Overview shows its first-run prompt (see overviewWidgets.spec.ts).
- */
 import type { Page } from '@playwright/test';
 import { test, expect, PHONE } from './support/testBase';
 import { overviewLayoutSetting, signInAndGoto, type SeededWidget } from './support/authSeed';
@@ -16,7 +7,6 @@ import type { MarketOrder } from '../src/esi/endpoints';
 const HOUR_MS = 60 * 60 * 1000;
 const FIRST_LOAD_MS = 20_000;
 
-/** Distinct kinds, enough to fill two rows of four. */
 const KINDS = [
   'training',
   'sp',
@@ -45,18 +35,13 @@ interface Box {
 
 async function cardBoxes(page: Page, count: number): Promise<Box[]> {
   const cards = page.locator('main section[aria-label]');
-  // The first load on a cold dev server is slow; later assertions use the default budget.
   await expect(cards).toHaveCount(count, { timeout: FIRST_LOAD_MS });
-  // Measure the settled board: the boxes are read one at a time, so a widget whose read lands
-  // between two reads (its skeleton giving way to its body) would move the cards after it and
-  // read as an overlap that is never on screen.
   await expect(page.locator('main section[aria-busy="true"]')).toHaveCount(0);
   const boxes: Box[] = [];
   for (let i = 0; i < count; i += 1) boxes.push((await cards.nth(i).boundingBox())!);
   return boxes;
 }
 
-/** How many cards share the first card's row. */
 function firstRowCount(boxes: readonly Box[]): number {
   return boxes.filter((box) => Math.abs(box.y - boxes[0].y) < 2).length;
 }
@@ -119,7 +104,6 @@ for (const viewport of [
     page,
   }) => {
     const boxes = await seedAndOpen(page, 'S', 8, viewport);
-    // Never more than four across; a narrower window wraps to fewer, not to a squeeze.
     expect(firstRowCount(boxes)).toBeLessThanOrEqual(4);
     expect(firstRowCount(boxes)).toBeGreaterThanOrEqual(2);
     expectNoOverlap(boxes);
@@ -143,10 +127,8 @@ test('on a phone M takes the whole row, with no overflow', async ({ page }) => {
 
 test("a widget's title link meets the 36px touch floor at 390px", async ({ page }) => {
   await seedAndOpen(page, 'S', 4, PHONE);
-  // The title is the link to the kind's page (no separate Open link).
   const openLink = page.locator('main section h2 a').first();
   await expect(openLink).toBeVisible();
-  // Polled: a card remounted as its reads land measures as a null box.
   await expect
     .poll(async () => (await openLink.boundingBox())?.height ?? 0)
     .toBeGreaterThanOrEqual(36);
@@ -173,7 +155,6 @@ for (const viewport of [{ width: 1280, height: 900 }, PHONE]) {
   test(`the header's controls are one height, with the bell top right, at ${viewport.width}px`, async ({
     page,
   }) => {
-    // A courier due soon gives the Next deadline button something to show.
     await page.route(`https://esi.evetech.net/characters/${CHARACTER_ID}/contracts*`, (route) =>
       route.fulfill({
         status: 200,
@@ -198,14 +179,11 @@ for (const viewport of [{ width: 1280, height: 900 }, PHONE]) {
 
     const main = page.locator('main');
     const phone = viewport.width < 768;
-    // Desktop's text says "Next ..."; the phone row leads with the countdown, so find it by where it goes.
     const next = main.locator('header a[href*="/contracts"]');
-    // Below `md` Customize and the data age share one ⋮ menu, so the phone's control is that menu.
     const customize = main.getByRole('button', { name: phone ? 'More actions' : 'Customize' });
     const bell = main.getByRole('button', { name: /^Alerts/ });
     await expect(next).toBeVisible({ timeout: FIRST_LOAD_MS });
     await expect(customize).toBeVisible();
-    // The header has no Refresh and no Character switcher.
     await expect(main.getByRole('button', { name: 'Refresh' })).toHaveCount(0);
     await expect(main.getByRole('button', { name: /^Character:/ })).toHaveCount(0);
 
@@ -217,13 +195,11 @@ for (const viewport of [{ width: 1280, height: 900 }, PHONE]) {
     expect(Math.abs(boxes.next.height - boxes.customize.height)).toBeLessThan(1);
     expect(Math.abs(boxes.bell.height - boxes.customize.height)).toBeLessThan(1);
     if (phone) expect(boxes.customize.height).toBeGreaterThanOrEqual(36);
-    // One row, Next then Customize (or ⋮) then the bell, the bell last.
     expect(Math.abs(boxes.bell.y - boxes.customize.y)).toBeLessThan(2);
     expect(boxes.bell.x).toBeGreaterThan(boxes.customize.x);
     expect(Math.abs(boxes.next.y - boxes.customize.y)).toBeLessThan(2);
     expect(boxes.next.x + boxes.next.width).toBeLessThanOrEqual(boxes.customize.x + 1);
 
-    // The button goes where the clock lives.
     await expect(next).toHaveAttribute('href', /\/contracts/);
     expect(await hasHorizontalOverflow(page)).toBe(false);
   });
@@ -231,7 +207,6 @@ for (const viewport of [{ width: 1280, height: 900 }, PHONE]) {
 
 const LONG_CORP = 'Bureau of Unified Harvesting';
 const LONG_ALLIANCE = 'Plenitude Alliance';
-/** The header row's `gap-x-3` (12px) between the name block and Customize, less sub-pixel slack. */
 const HEADER_GAP_MIN = 8;
 
 async function mockLongAffiliation(page: Page) {
@@ -312,25 +287,20 @@ for (const viewport of [
     for (const link of [allianceLink, header.getByRole('link', { name: LONG_CORP })]) {
       const box = (await link.boundingBox())!;
       if (phone) {
-        // Each affiliation has the name block's full width beside the portrait: nothing runs off the screen.
         expect(box.x + box.width).toBeLessThanOrEqual(viewport.width);
       } else {
-        // The name truncates inside its own box, which ends before Customize's (the row's gap apart).
         expect(box.x + box.width).toBeLessThanOrEqual(customize.x - HEADER_GAP_MIN);
       }
     }
     if (phone) {
-      // The controls have a line of their own under the name block, the bell last on it.
       expect(customize.y).toBeGreaterThanOrEqual(name.y + name.height - 1);
       expect(Math.abs(bell.y - customize.y)).toBeLessThan(2);
     } else {
-      // One row: the name block, Customize and the bell share a band; nothing wrapped under.
       for (const control of [customize, bell]) {
         expect(control.y).toBeLessThan(name.y + name.height);
         expect(name.y).toBeLessThan(control.y + control.height);
       }
     }
-    // No target in the header overlaps another.
     const targets = header.locator('a:visible, button:visible');
     const boxes: Box[] = [];
     for (let i = 0; i < (await targets.count()); i += 1)
@@ -345,7 +315,6 @@ for (const viewport of [
   });
 }
 
-/** Six sell orders, issued and expiring at different times so the Expires sort reorders them. */
 function openOrderFixtures(): MarketOrder[] {
   return [34, 35, 36, 37, 38, 39].map((type_id, i) => ({
     order_id: 500 + i,
@@ -386,7 +355,6 @@ test('Open Orders sort headers meet the 36px touch floor at 390px', async ({ pag
   expect(count).toBeGreaterThanOrEqual(2);
   const boxes: Box[] = [];
   for (let i = 0; i < count; i += 1) {
-    // Polled: a card remounted as its reads land measures as a null box.
     await expect
       .poll(async () => (await sortButtons.nth(i).boundingBox())?.height ?? 0)
       .toBeGreaterThanOrEqual(36);
@@ -396,7 +364,6 @@ test('Open Orders sort headers meet the 36px touch floor at 390px', async ({ pag
   for (const box of boxes) expect(box.x + box.width).toBeLessThanOrEqual(PHONE.width);
   expect(await hasHorizontalOverflow(page)).toBe(false);
 
-  // Sorting still works: Expires (a date) sets aria-sort newest first, a second tap flips it.
   const header = page.locator('main section th', {
     has: page.locator('button[aria-label^="Expires"], button[aria-label$="Expires"]'),
   });
@@ -421,7 +388,6 @@ for (const size of ['S', 'M'] as const) {
     const triggers = page.locator('main section button[aria-label^="Settings for"]');
     await expect(triggers).toHaveCount(4);
     for (let i = 0; i < 4; i += 1) {
-      // Polled: a card remounted as its reads land measures as a null box.
       await expect
         .poll(async () => (await triggers.nth(i).boundingBox())?.width ?? 0)
         .toBeGreaterThanOrEqual(36);
@@ -453,12 +419,6 @@ test('the widget settings trigger stays compact with a fine pointer at 1280px', 
   await expect.poll(async () => (await trigger.boundingBox())?.height ?? 99).toBeLessThan(40);
 });
 
-/**
- * L and F table widgets on a phone (#3683): column count follows the widget's size, not the
- * screen, so a layout resized on a desktop reaches a phone with every column. The first
- * column is the row's name; it must stay readable (>= 100px) and the table must stay inside
- * its card. `hideNarrow` columns drop out until the table is 28rem wide.
- */
 const DAY_MS = 24 * HOUR_MS;
 const ESI = 'https://esi.evetech.net';
 const MIN_NAME_PX = 100;
@@ -540,7 +500,6 @@ for (const kind of ['incursions', 'contracts'] as const) {
       expect(name!.width).toBeGreaterThanOrEqual(MIN_NAME_PX);
       expect(table!.x + table!.width).toBeLessThanOrEqual(box!.x + box!.width + 1);
       expect(await hasHorizontalOverflow(page)).toBe(false);
-      // Linked rows (incursions) keep the touch floor.
       const rowBox = await rows.first().boundingBox();
       if (kind === 'incursions') expect(rowBox!.height).toBeGreaterThanOrEqual(36);
     });
@@ -554,7 +513,6 @@ for (const kind of ['incursions', 'contracts'] as const) {
     ]);
     const tableEl = page.locator('main table').first();
     await expect(tableEl.locator('tbody tr').first()).toBeVisible({ timeout: FIRST_LOAD_MS });
-    // The last column is the one `hideNarrow` hides first; a linked table adds a blank caret header after it.
     const last = kind === 'incursions' ? 'Constellation' : 'Collateral';
     await expect(tableEl.getByRole('columnheader', { name: last })).toBeVisible();
   });

@@ -1,13 +1,10 @@
 import type { Firestore, WriteBatch } from 'firebase-admin/firestore';
 import { chunk } from './chunk.js';
 
-/** One write staged on a batch. */
 export type BatchOp = (batch: WriteBatch) => void;
 
-/** Firestore allows 500 ops per batch; 400 leaves headroom for transforms. */
 const DEFAULT_BATCH_OPS = 400;
 
-/** Applies `ops` in sequential batches of at most `size`. */
 export async function commitInBatches(
   db: Firestore,
   ops: readonly BatchOp[],

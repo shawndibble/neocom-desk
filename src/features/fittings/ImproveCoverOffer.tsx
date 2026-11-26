@@ -1,7 +1,3 @@
-/**
- * The ticked set overruns: the covers added so far, each with its own tick,
- * the swaps on offer that would cover it, and the implant alternative.
- */
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Checkbox, LiveNote } from '@/components/ui';
@@ -18,11 +14,8 @@ import type { ImproveLabels } from './useImproveLabels';
 
 interface Props {
   overruns: boolean;
-  /** Ticked rows that no list shows: covers added from here. */
   tickedCovers: ImproveOption[];
-  /** The covers found and within budget; null while they are searched. */
   offered: ImproveOption[] | null;
-  /** Whether covers were found at all, even ones over budget. */
   foundAny: boolean;
   setAsFix: RejectedOption | null;
   renderFlyableImplants?: (fix: RejectedOption, label: string) => ReactNode;

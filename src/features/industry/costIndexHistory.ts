@@ -1,17 +1,10 @@
-/**
- * A system's cost index history as the daily job publishes it to R2
- * (`cost-indices/<systemId>.json`), and the pure read of it the trend popover
- * draws. No fetch here: `costIndexHistoryRead.ts` owns the network.
- */
 import type { IndustryActivity } from '@/engine/industry/types';
 import { DAY_MS } from '@/lib/age';
 
 export interface CostIndexHistory {
   systemId: number;
   lastSyncedAt: number;
-  /** ISO dates, ascending. */
   dates: string[];
-  /** ESI activity name -> fraction per date (0.044 = 4.4%), null where unknown. */
   activities: Record<string, Array<number | null>>;
 }
 
@@ -21,17 +14,13 @@ export interface CostIndexTrend {
   today: number;
 }
 
-/** Fewer days than this and a trend says nothing. */
 export const MIN_TREND_DAYS = 7;
-/** The trend's "ago" comparison, and the most days it plots. */
 const TREND_WINDOW_DAYS = 7;
 const MAX_TREND_DAYS = 90;
-/** The Build Plan's activity as ESI's `/industry/systems` names it. */
 export function esiActivityName(activity: IndustryActivity): 'manufacturing' | 'reaction' {
   return activity === 'reaction' ? 'reaction' : 'manufacturing';
 }
 
-/** The object as the daily job writes it, or `null` when it is not that shape. */
 export function parseCostIndexHistory(raw: unknown): CostIndexHistory | null {
   if (typeof raw !== 'object' || raw === null) return null;
   const { systemId, lastSyncedAt, dates, activities } = raw as Record<string, unknown>;
@@ -52,11 +41,6 @@ export function parseCostIndexHistory(raw: unknown): CostIndexHistory | null {
   };
 }
 
-/**
- * The activity's known days, plus the figure a week before the latest one (the
- * newest day at or before it, else the oldest). `null` under `MIN_TREND_DAYS`
- * known days, or when the object has no such activity.
- */
 export function costIndexTrend(history: CostIndexHistory, activity: string): CostIndexTrend | null {
   const series = history.activities[activity];
   if (!series) return null;

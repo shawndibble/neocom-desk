@@ -256,8 +256,6 @@ describe('OrderSideCard', () => {
       )
     );
     expect(await screen.findByText('price 100')).toBeInTheDocument();
-    // First click is high to low (the first row anyway); the second, low to high, pulls
-    // the smallest from beyond the cap, which only a whole-book sort can do.
     await userEvent.click(screen.getByRole('button', { name: /Qty/ }));
     expect(screen.getByText('qty 900')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: /Qty/ }));
@@ -327,7 +325,6 @@ describe('OrderSideCard', () => {
       expect(await screen.findByText('≈ 4M ISK')).toBeInTheDocument();
       await userEvent.click(screen.getByRole('menuitemcheckbox', { name: 'Units listed' }));
       expect(screen.queryByText('2,500 units')).not.toBeInTheDocument();
-      // The pick is a stored preference; put it back for the next test.
       await userEvent.click(screen.getByRole('menuitemcheckbox', { name: 'Units listed' }));
     });
 
@@ -373,7 +370,6 @@ describe('OrderBookSummaryStrip turn-in', () => {
         />
       </MemoryRouter>
     );
-    // LP counts at the browsed hub's LP Value.
     expect(turnIns.offers).toHaveBeenCalledWith(amarr);
     const labels = screen.getAllByText(/^(Spread|Turn in)$/).map((node) => node.textContent);
     expect(labels).toEqual(['Spread', 'Turn in']);

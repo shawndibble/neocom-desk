@@ -2,7 +2,6 @@ import { describe, expect, it, vi } from 'vitest';
 import type { Firestore } from 'firebase-admin/firestore';
 import { firestoreNearbyStore, forgetNearbyCharacter } from './nearbyStore.js';
 
-/** `deviceRegistrations` in memory, with the one query the nearby store runs. */
 function fakeDb(docs: Record<string, Record<string, unknown>>) {
   const queries: number[][] = [];
   const update = vi.fn<(id: string, value: unknown) => Promise<void>>(async () => {});
@@ -37,7 +36,6 @@ describe('firestoreNearbyStore', () => {
         nearbyState: { characters: { '1': {} }, pushed: { k: 9, junk: 'x' } },
         updatedAt: { toMillis: () => 1234 },
       },
-      // No token: skipped.
       broken: { characterIds: [1] },
     });
     const ids = Array.from({ length: 31 }, (_, i) => i + 1);

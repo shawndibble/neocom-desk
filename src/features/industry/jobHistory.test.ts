@@ -104,7 +104,6 @@ describe('classifyHistoryJobs', () => {
 
   it('falls back to character + product + loggedAt after the job ended, each run used once', () => {
     const states = classifyHistoryJobs(jobs, [run({ id: 'a' })]);
-    // oldest job claims the single run
     expect(states.get(10)?.kind).toBe('logged');
     expect(states.get(11)?.kind).toBe('unlogged');
   });

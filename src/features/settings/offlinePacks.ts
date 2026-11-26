@@ -1,11 +1,5 @@
-/**
- * Settings → Offline data: how the downloadable files group into the packs a
- * pilot recognises, and how a byte count reads. Pure: the Cache Storage reads
- * live in `offlineStatus.ts`.
- */
 import { getDecimalMark, getGroupMark } from '@/lib/numberLocale';
 
-/** The packs, in display order: the lazy SDE files, then the build's route chunks (the fitting engine is a pack of its own, outside this list). */
 export const OFFLINE_PACK_IDS = [
   'itemInfo',
   'market',
@@ -15,16 +9,10 @@ export const OFFLINE_PACK_IDS = [
 ] as const;
 export type OfflinePackId = (typeof OFFLINE_PACK_IDS)[number];
 
-/**
- * Which pack a `public/data` file belongs to. Anything unrecognised is
- * `reference`, so a file added to `LAZY_SDE_FILES` shows up (and is counted)
- * without touching this.
- */
 export function packFor(file: string): OfflinePackId {
   if (file.startsWith('typeInfo/')) return 'itemInfo';
   if (file.startsWith('market/') || file === 'marketWideTrees.json') return 'market';
   if (file.startsWith('pi-')) return 'planetary';
-  // A build chunk (`lazy-chunks.json`), not a `public/data` file.
   if (file.startsWith('assets/')) return 'appPages';
   return 'reference';
 }
@@ -38,7 +26,6 @@ export interface PackSummary {
   state: PackState;
 }
 
-/** One summary per non-empty pack: `cached` counts the files of the pack present in `cachedFiles`. */
 export function summarizePacks(
   files: readonly string[],
   cachedFiles: ReadonlySet<string>
@@ -62,7 +49,6 @@ export function summarizePacks(
 
 const UNITS = ['byte', 'kilobyte', 'megabyte', 'gigabyte', 'terabyte'] as const;
 
-/** "5 MB", "3.5 GB": binary steps, at most one decimal, with the Number format's decimal mark. */
 export function formatBytes(bytes: number): string {
   let value = Math.max(0, bytes);
   let unit = 0;
@@ -77,6 +63,5 @@ export function formatBytes(bytes: number): string {
     unitDisplay: 'short',
     maximumFractionDigits: 1,
   }).format(value);
-  // Unit names stay English; the group and decimal marks follow the Number format.
   return text.replace(/[.,]/g, (c) => (c === '.' ? getDecimalMark() : getGroupMark()));
 }

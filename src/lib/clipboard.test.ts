@@ -29,8 +29,6 @@ describe('clipboard reader/writer injection', () => {
   it('restoring the reader with null drops the previously injected reader', () => {
     configureClipboardReader(async () => 'x');
     configureClipboardReader(null);
-    // jsdom has no real navigator.clipboard, so the restored reader throws
-    // reaching for it — the point is that it no longer returns 'x'.
     expect(() => readFromClipboard()).toThrow();
   });
 });

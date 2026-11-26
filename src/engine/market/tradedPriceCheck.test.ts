@@ -6,7 +6,6 @@ import {
   tradedPriceCeiling,
 } from '@/engine/market/tradedPriceCheck';
 
-// Jita, from the daily demand object of 2026-10-29.
 const LONE_BILLION_ORDER = {
   recentSalePrice: 17_300_000,
   latestDay: { date: '2026-10-28', highest: 17_290_000, lowest: 17_260_000 },

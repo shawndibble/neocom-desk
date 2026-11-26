@@ -1,4 +1,3 @@
-/** Whether it fits: each colony's role, load against its budget, and slots. */
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { cx } from '@/lib/cx';
 import { useTranslation } from 'react-i18next';
@@ -45,7 +44,6 @@ function SlotLine({
   pi,
 }: {
   slot: ExtractionSlot;
-  /** ECUs the colony runs on this P0 today, when known. */
   ecusToday: number | undefined;
   pi: PiData;
 }) {
@@ -86,7 +84,6 @@ export function ColonyFit({
 }: {
   assignments: readonly ColonyAssignment[];
   rows: readonly PlannerColonyRow[];
-  /** The change list's steps, so a colony reads "As is" in both places. */
   steps: readonly ColonyStep[];
   names: PlanNames;
 }) {

@@ -37,7 +37,6 @@ describe('pushDivisionNames (#6161)', () => {
       action: 'updateSettings',
       patch: { divisionNames: { 5: 'MOON TAXES' } },
     });
-    // The officer check comes first: the write rides on the role it caches, else a 403.
     expect(d.calls).toEqual(['verify', 'edit']);
   });
 
@@ -77,7 +76,6 @@ describe('divisionNamesFor', () => {
       divisionNamesFor(1, 77, true, [2], { 2: 'Market Funds' }, same.load)
     ).resolves.toBeNull();
     await expect(divisionNamesFor(1, 77, false, [2], {}, deps(null).load)).resolves.toBeNull();
-    // Only unnamed divisions read: the stored names stay rather than being cleared.
     const unnamed = deps({ wallet: [{ division: 2 }] });
     await expect(
       divisionNamesFor(1, 77, true, [2], { 2: 'Market Funds' }, unnamed.load)

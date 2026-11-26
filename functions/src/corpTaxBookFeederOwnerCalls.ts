@@ -1,8 +1,3 @@
-// The accounting corporation's side of a moon owner (issue #4586, spec #4504): agree a rate,
-// switch to settled otherwise, and list open invite links. Officer-only, the same live role
-// check as creating an invite. Either side sets the payee (#4653): see corpTaxBookPayee.ts.
-// Failures carry a stable `reason`; no player-facing text lives here.
-
 import { utcDay } from './timeConstants.js';
 import { fail, type Caller } from './actorAuth.js';
 import { FieldValue } from 'firebase-admin/firestore';
@@ -33,15 +28,10 @@ import { appendAudit, authorizeOfficer, feederRef, type BookDeps } from './corpT
 
 const MAX_NOTE = 500;
 
-/** How far back an agreed rate may be dated (#6347): "we agreed last week", not "months ago". */
 export const MAX_AS_OF_DAYS_BACK = 30;
 
-// --- Input -----------------------------------------------------------------
-
 export interface SetFeederRateInput extends FeederTargetCall {
-  /** The agreed owner rate (0-100). */
   pct: number;
-  /** First EVE/UTC day the rate counts from (YYYY-MM-DD). Absent means today. */
   asOf?: string;
 }
 
@@ -52,11 +42,6 @@ export function parseSetFeederRateInput(data: unknown): SetFeederRateInput {
   return { ...target, pct: pctField(d.pct, 'pct'), ...(asOf !== undefined ? { asOf } : {}) };
 }
 
-/**
- * The day an agreed rate counts from: `asOf`, or today. Never in the future, never more than
- * `MAX_AS_OF_DAYS_BACK` days back, never before the moon owner's first day. Judged on the
- * server clock.
- */
 export function resolveAsOf(rec: FeederRecord, asOf: string | undefined, now: number): string {
   const today = utcDay(now);
   if (asOf === undefined) return today;
@@ -88,13 +73,6 @@ export function parseSetFeederModeInput(data: unknown): SetFeederModeInput {
   return { ...target, mode: d.mode, ...(note !== undefined ? { note } : {}) };
 }
 
-// --- History ---------------------------------------------------------------
-
-/**
- * The history with an agreed rate dated `asOf` (default today). The entry counts from that day
- * only (`noBackdate`, #6347). Repeating the rate in force adds nothing, unless it is dated
- * before the entry in force.
- */
 export function appendAgreedRate(
   rec: FeederRecord,
   pct: number,
@@ -116,10 +94,6 @@ export function appendAgreedRate(
   ];
 }
 
-/**
- * The mode switches with one dated today, so accrual resumes (or stops) from the switch day.
- * Returns the derived list unchanged when the mode does not move.
- */
 export function appendModeChange(
   rec: FeederRecord,
   mode: FeederRecord['mode'],
@@ -131,9 +105,6 @@ export function appendModeChange(
   return [...changes, { from: utcDay(now), mode }];
 }
 
-// --- Calls -----------------------------------------------------------------
-
-/** A moon owner that left or was removed: its record takes no more edits. */
 export const ENDED: readonly FeederRecord['status'][] = ['left', 'removed'];
 
 async function editFeeder(
@@ -168,7 +139,6 @@ async function editFeeder(
   return { ok: true };
 }
 
-/** Agree a rate with a moon owner. It wins over what the moon owner asked for, from `asOf` (today by default) on. */
 export function setFeederRate(
   deps: BookDeps,
   caller: Caller,
@@ -187,7 +157,6 @@ export function setFeederRate(
   });
 }
 
-/** Settle a moon owner otherwise (or back to normal), from today on. */
 export function setFeederMode(
   deps: BookDeps,
   caller: Caller,
@@ -211,7 +180,6 @@ export interface OpenFeederInvite {
   offeredOwnerRatePct?: number;
 }
 
-/** The book's open invite links (neither revoked nor used), newest first. Never the codes: only hashes are stored. */
 export async function listFeederInvites(
   deps: BookDeps,
   caller: Caller,

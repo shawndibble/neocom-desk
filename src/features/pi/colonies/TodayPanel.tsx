@@ -23,7 +23,6 @@ import { eveClock, hoursLabel, initials } from './coloniesFormat';
 import { PlanetImage } from '../PlanetImage';
 import { STATUS_DOT_CLASS, STATUS_TONE_CLASS } from './statusStyles';
 
-/** A status word with a dot: the word carries it, the colour only reinforces. */
 export function StatusWord({ status }: { status: CheckStatus }) {
   const { t } = useTranslation();
   return (
@@ -43,16 +42,12 @@ interface TodayPanelProps {
   rows: readonly ColonyCheckRow[];
   check: TodayCheck;
   nowMs: number;
-  /** Planet name for a row. */
   nameOf: (row: ColonyCheckRow) => string;
   characterNameOf: (characterId: number) => string;
-  /** The first row's ISK a day, summed from Plan's own model; null without prices. */
   todayPerDay: number | null;
-  /** Hub prices could not be read: the price notice says so, so the "still loading" line stays out. */
   pricesFailed: boolean;
   fixCount: number;
   fixGainPerDay: number;
-  /** Colonies in the figures above that belong to the active Character. */
   ownCount: number;
   includesOthers: boolean;
   fetchedAt: Date | null;

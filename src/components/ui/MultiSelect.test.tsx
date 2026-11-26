@@ -216,7 +216,6 @@ describe('MultiSelect', () => {
       'id',
       search.getAttribute('aria-activedescendant')
     );
-    // The active option carries the keyboard-only ring cue; its neighbours don't.
     expect([...screen.getByRole('option', { name: 'Bob' }).classList]).toContain(
       'in-data-[input=keyboard]:outline-accent'
     );

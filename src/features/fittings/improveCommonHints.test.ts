@@ -4,7 +4,6 @@ import type { FittingModule } from '@/engine/fittings/types';
 import { cautionLines, communityHintsOf, hintLine } from './improveCommonHints';
 import type { FittingCatalogue } from './useFittingCatalogue';
 
-// Types: 1 and 2 are Ballistic Controls (group 367), 3 a Shield Extender (38, in "Large Shield Extenders"), 4 a propulsion module (46).
 const catalogue = {
   types: {
     '24698': { name: 'Drake', groupID: 419 },

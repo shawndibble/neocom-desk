@@ -45,20 +45,8 @@ import { NavHideToggle, NavItem } from './NavItem';
 const APPLE = isApplePlatform();
 const RAIL_GROUPS = railGroups();
 
-/**
- * Opens the command palette — a button, not a second search field (scope
- * decision `20261002-145653-go-to-button-opens-the-command-palette`). “Go to”
- * and a caret rather than “Search” and a magnifier, so it never reads as the
- * filter for the page underneath. The chord is printed on it, which is how
- * the shortcut gets learned.
- */
 const GO_TO_HINT = 'goTo';
 
-/**
- * A one-time "New" cue on the Go to button (§6c "Hints"): until the palette is
- * first opened, by this button or by the chord. Not on a phone, where the rail
- * is not what a pilot sees; and not twice in one session.
- */
 function useGoToNudge(): boolean {
   const isDesktop = useMediaQuery(MD_UP_QUERY);
   const hydrated = useHintCounts((state) => state.hydrated);
@@ -103,7 +91,6 @@ function GoToButton() {
   );
 }
 
-/** Small heading introducing a group of pages in the rail. */
 function NavGroupLabel({ id, children }: { id: string; children: string }) {
   return (
     <p
@@ -129,11 +116,6 @@ interface RailPageProps {
   attention?: boolean;
 }
 
-/**
- * One page in the rail, with its views under it while open. The link
- * navigates; the caret beside it only opens or closes the list, so a pilot can
- * look inside a page without leaving the one they are on.
- */
 const RailPage = memo(function RailPage({
   page,
   views,
@@ -151,7 +133,6 @@ const RailPage = memo(function RailPage({
   const listId = useId();
   const label = t(page.labelKey);
   const pageHidden = hidden.has(page.path);
-  // The view you are on stays listed even if hidden, as its page does.
   const shownViews = editing
     ? views
     : views.filter((view) => !hidden.has(view.path) || view.path === activeViewPath);
@@ -159,7 +140,6 @@ const RailPage = memo(function RailPage({
   return (
     <div>
       <div className="flex items-center gap-0.5">
-        {/* Corp is listed only while visible (`RailNavBody` filters it), and never locked. */}
         <NavItem
           to={page.path}
           label={label}
@@ -228,19 +208,6 @@ const RailPage = memo(function RailPage({
   );
 });
 
-/**
- * The desktop rail's pages (scope decision
- * `20261002-145653-rail-opens-the-current-page-icons-hiding-and`): the Go to
- * button, then each group's pages with the current page's views open under
- * it. Any other page's caret opens it to look inside; changing pages closes
- * it again, leaving only the page you land on open. Pages and views the pilot
- * hid stay out, unless one is where they are — the rail always shows the
- * pilot where they stand.
- *
- * Its own component because it reads the location, which `Layout` must not;
- * the body is memoized on the place it derives, so a query-string write (a
- * page's filters, as the pilot types) re-renders this wrapper alone.
- */
 export function RailNav() {
   const { pathname } = useLocation();
   const { pagePath, viewPath } = navPlaceFor(pathname);
@@ -257,7 +224,6 @@ const RailNavBody = memo(function RailNavBody({
   const { t } = useTranslation();
   const locked = useLockedRoutes(NAV_LOCK_PATHS);
   const navBadge = useNavBadges();
-  // One corp-access read for the rail (`useCorpNavVisible` is the same read).
   const { state: corpState } = useCorpAccess();
   const capabilities = useCorpViewCapabilities();
   const corporationId = useActiveCorporationId();
@@ -266,13 +232,10 @@ const RailNavBody = memo(function RailNavBody({
   const hiddenList = useHiddenNav((state) => state.value);
   const hidden = useMemo(() => new Set(hiddenList), [hiddenList]);
   const [editing, setEditing] = useState(false);
-  // Each button only exists in one mode, so pressing it unmounts it: hand focus to its counterpart.
   const focusAfterCommit = useFocusAfterCommit();
   const doneRef = useRef<HTMLButtonElement>(null);
   const editRef = useRef<HTMLButtonElement>(null);
 
-  // The one open section. Arriving on a new page resets it to that page,
-  // which is what closes a section opened only to look inside.
   const [open, setOpen] = useState<{ for: NavPagePath | null; path: string | null }>({
     for: current,
     path: current,
@@ -330,7 +293,6 @@ const RailNavBody = memo(function RailNavBody({
               isNavPageAvailable(page, corpVisible, capabilities) &&
               (editing || !hidden.has(page.path) || page.path === current)
           );
-          // A heading over nothing would strand itself.
           if (pages.length === 0) return null;
           return (
             <Fragment key={group.id}>

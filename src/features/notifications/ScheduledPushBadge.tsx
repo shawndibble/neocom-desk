@@ -4,17 +4,6 @@ import { GlyphSlash } from '@/components/ui/GlyphSlash';
 import { ScheduledPush, ICON_SIZE } from '@/components/ui/icons';
 import { useAlertsMail, useAlertsNearby, useEveGrantMissing } from './alertsGrant';
 
-/**
- * The "arrives with the app closed" mark on a Scheduled Push event's row, or on
- * a server-pushed event's (`kind="server"`, issue #5121): same mark, its own
- * promise, since those are not limited to a 72-hour window.
- *
- * `role="img"` plus `aria-label` rather than a focusable trigger (the
- * `MaterialsTable` pattern, not the column captions' one): the meaning has to
- * reach a screen reader, but there are seventeen rows here and
- * a tab stop on each would make the panel worse to keyboard through than the
- * badge is worth.
- */
 const BADGE_LABELS = {
   scheduled: 'settings.notifications.scheduledPushBadge',
   server: 'settings.notifications.serverPushBadge',
@@ -38,12 +27,6 @@ export function ScheduledPushBadge({
   );
 }
 
-/**
- * The mark's other state (issue #5330): the row's event needs a grant no
- * Character on this device has, so it cannot reach a closed app yet. Danger
- * colour plus a slash, so the colour is never the only signal; the tooltip
- * names the step.
- */
 export function MissingGrantBadge({ labelKey }: { labelKey: string }) {
   const { t } = useTranslation();
   const label = t(labelKey);
@@ -57,12 +40,6 @@ export function MissingGrantBadge({ labelKey }: { labelKey: string }) {
   );
 }
 
-/**
- * The same mark on a nearby event's row (ADR 0028): the normal mark once some
- * Character on this device has an Alerts Grant that carries the location, the
- * missing-grant mark while none does. Nothing while the server does not take
- * the scope, since there is then no step to take.
- */
 export function NearbyPushBadge() {
   const { supported, characterIds } = useAlertsNearby();
   if (characterIds.length > 0) return <ScheduledPushBadge kind="nearby" />;
@@ -71,7 +48,6 @@ export function NearbyPushBadge() {
   ) : null;
 }
 
-/** The same two states on the new-mail row (ADR 0029), for the mail scope. */
 export function MailPushBadge() {
   const { supported, characterIds } = useAlertsMail();
   if (characterIds.length > 0) return <ScheduledPushBadge kind="mail" />;
@@ -80,12 +56,6 @@ export function MailPushBadge() {
   ) : null;
 }
 
-/**
- * The mark on an EVE notification row: every type reaches a closed app only
- * through an active Alerts Grant (ADR 0020). `onlyWhenMissing` is for the
- * ~100 type rows, which carry no mark today: they show the missing-grant mark
- * and nothing else, so the page does not gain a column of normal marks.
- */
 export function EveNotificationBadge({ onlyWhenMissing = false }: { onlyWhenMissing?: boolean }) {
   const missing = useEveGrantMissing();
   if (missing === null) return null;

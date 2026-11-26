@@ -100,7 +100,6 @@ function openMore() {
   );
 }
 
-/** A phone: the narrow-menu query matches. */
 function narrowViewport() {
   stubViewport((media) => media.includes('max-width'));
 }
@@ -136,14 +135,12 @@ describe('RowActions submenus', () => {
     const load = await screen.findByRole('menuitem', { name: 'Load charge from cargo' });
     expect(load).toHaveAttribute('aria-haspopup', 'menu');
 
-    // ArrowRight opens it and moves into it; ArrowLeft closes it and returns.
     load.focus();
     await user.keyboard('{ArrowRight}');
     const scourge = await screen.findByRole('menuitem', { name: 'Scourge Heavy Missile' });
     expect(scourge).toHaveFocus();
     expect(load).toHaveAttribute('aria-expanded', 'true');
 
-    // A nested one: ArrowRight in, ArrowLeft back to its own trigger only.
     await user.keyboard('{ArrowRight}');
     expect(await screen.findByRole('menuitem', { name: 'Into this module' })).toHaveFocus();
     await user.keyboard('{ArrowLeft}');
@@ -155,7 +152,6 @@ describe('RowActions submenus', () => {
     expect(load).toHaveFocus();
     expect(load).toHaveAttribute('aria-expanded', 'false');
 
-    // Enter opens it too, and Escape still closes the whole menu.
     await user.keyboard('{Enter}');
     expect(load).toHaveAttribute('aria-expanded', 'true');
     await user.keyboard('{Escape}');
@@ -344,8 +340,6 @@ describe('linksKeepBrowserMenu: a link in the row keeps the browser link menu (D
     expect(event.defaultPrevented).toBe(false);
     expect(screen.queryByRole('menuitem')).not.toBeInTheDocument();
   });
-
-  // Touch-and-hold is checked in the browser: jsdom's pointer events carry no pointerType.
 });
 
 describe('row menu hints', () => {
@@ -379,7 +373,6 @@ describe('row menu hints', () => {
 
   it('adds the right-click tip to the first three ⋮ opens, never the right-click menu', async () => {
     const user = userEvent.setup();
-    // The hint on the ⋮ is its own subject below; spend it first.
     useHintCounts.setState({ value: { rowHint: 1 }, hydrated: true });
     render(plainRow);
     const more = screen.getByRole('button', { name: 'More actions for Row' });
@@ -528,7 +521,6 @@ describe('MenuGroup', () => {
         <MenuGroup id="game" size={1}>
           <MenuItem>Open in EVE</MenuItem>
         </MenuGroup>
-        {/* One wrapper element that renders two items. */}
         <MenuGroup id="game" size={2}>
           <>
             <MenuItem>Set waypoint in game</MenuItem>

@@ -61,7 +61,6 @@ import {
 import { OutOfDateNote } from './WorkbenchOutOfDate';
 import { WorkbenchSightingBadge } from './WorkbenchSightingBadge';
 
-/** What the panel reads from outside: the Workbench rows' sources, module names, and can-fly verdicts. */
 export interface PopularFitsSources extends WorkbenchHullSources, FitVerdictSources {
   typeName: (typeId: number) => Promise<string>;
 }
@@ -69,7 +68,6 @@ export interface PopularFitsSources extends WorkbenchHullSources, FitVerdictSour
 const POPULAR_FITS_SOURCES: PopularFitsSources = {
   ...workbenchHullSources,
   ...fitVerdictSources,
-  // Read when called, not now: a test mocking `@/sde/loadSde` may leave it out.
   typeName: (typeId) => typeName(typeId),
 };
 
@@ -77,47 +75,23 @@ interface PopularFitsPanelProps {
   shipTypeId: number;
   hullName: string;
   onOpen: (loaded: LoadedFitting) => void;
-  /** An open already under way: Open waits for it. */
   busy?: boolean;
-  /**
-   * Cap the list's height and scroll it in place — for a host with other
-   * content below it. Off, the list runs its full length and the host scrolls.
-   */
   capped?: boolean;
-  /** For tests: stand-ins for Firestore, the SDE, prices, zKillboard and Load. Pass it stable. */
   sources?: PopularFitsSources;
 }
 
-/** One row of the merged list: a group of zKillboard losses or an EVE Workbench guide. */
 type PanelRow = ListedFit &
-  (
-    | { source: 'loss'; fit: PopularFit; /** Its place among the losses, by count. */ rank: number }
-    | { source: 'guide'; guide: WorkbenchRow }
-  );
+  ({ source: 'loss'; fit: PopularFit; rank: number } | { source: 'guide'; guide: WorkbenchRow });
 
 const SORTS: readonly FitSort[] = ['newest', 'seen', 'training', 'cheapest'];
 
-/**
- * A row's height before it is measured: title line and one line of module
- * icons, plus the gap below it.
- */
 const ROW_ESTIMATE = 104;
 
 const rowKey = (row: PanelRow) => row.key;
 
-/** The types a row's verdict says the pilot can't use; none without a gap. */
 const unusableOf = (verdict: FitSkillVerdict | undefined) =>
   verdict?.kind === 'missing' ? verdict.unusableTypeIds : undefined;
 
-/**
- * Popular fits (issues #2327, #2484): one list of the hull's recent zKillboard
- * losses, grouped into distinct fits, and the community fits published on EVE
- * Workbench (our own synced copy in R2, `workbenchFits.ts`). A source filter,
- * "Can fly now" (#6011's verdicts) and a sort narrow and order it; a fit the
- * active Character can't fly yet opens to the skills it needs. Any row opens
- * the fit in the editor; a source that fails is a one-line note — the other
- * source and the rest of the page work without it.
- */
 export function PopularFitsPanel({
   shipTypeId,
   hullName,
@@ -189,9 +163,7 @@ export function PopularFitsPanel({
   const seconds = useFitTrainingSeconds(verdicts);
 
   const touch = useTouchContext();
-  // Without verdicts there is nothing to filter on: a Character switched away leaves it off.
   const flyFilter = flyOnly && verdicts !== null;
-  // Nor to rank by training: Least training is offered only with verdicts, and a pick of it reads as Newest.
   const sorts = verdicts === null ? SORTS.filter((value) => value !== 'training') : SORTS;
   const shownSort: FitSort = sorts.includes(sort) ? sort : 'newest';
   const lookup = useMemo(
@@ -391,7 +363,6 @@ export function PopularFitsPanel({
   );
 }
 
-/** What a row takes from the panel whichever source it is: tag, title, names, verdict and its skills. */
 type SharedRowProps = Pick<
   ComponentProps<typeof PopularFitRow>,
   'source' | 'title' | 'names' | 'unusable' | 'verdict' | 'details'
@@ -404,7 +375,6 @@ interface SourceRowProps {
   onOpen: () => void;
 }
 
-/** A group of zKillboard losses: when it was last seen, and its mean value. */
 function LossFitRow({ shared, fit, now, disabled, onOpen }: SourceRowProps & { fit: PopularFit }) {
   const { t } = useTranslation();
   return (
@@ -432,11 +402,6 @@ function LossFitRow({ shared, fit, now, disabled, onOpen }: SourceRowProps & { f
   );
 }
 
-/**
- * An EVE Workbench guide: when it was published, its price at the Default
- * Trade Hub (and what that leaves unpriced), its zKillboard sighting, and a
- * Load that failed.
- */
 function GuideFitRow({
   shared,
   guide,
@@ -469,7 +434,6 @@ function GuideFitRow({
   );
 }
 
-/** The skills a fit still needs, opened from its verdict, with Fit Check's add-to-plan bar. */
 function InlineMissingSkills({
   entries,
   characterId,
@@ -491,10 +455,6 @@ function InlineMissingSkills({
   );
 }
 
-/**
- * A Workbench row's price at the Default Trade Hub, in the zKillboard row's
- * "~87.5M ISK" style. A partial total's missing items are on the line below.
- */
 function WorkbenchFitPrice({ price }: { price: FitSellPrice }) {
   return (
     <Trans

@@ -2,37 +2,20 @@ import { iskDeltaOf, type ImproveOption } from '@/engine/fittings/improve';
 import { moveKey, optionKey, toggleTick } from '@/engine/fittings/improve';
 import type { Makeover } from '@/engine/fittings/improve';
 
-/**
- * The Makeover group's tick logic: which of the group's rows are ticked, the
- * group's three states, and when a row shows its own gain. Pure.
- */
 export type GroupTick = 'all' | 'some' | 'none';
 
-/** The group's tick: all rows ticked, none, or some (the dash). */
 export function groupTick(keys: readonly string[], ticked: ReadonlySet<string>): GroupTick {
   const count = keys.filter((key) => ticked.has(key)).length;
   if (count === 0) return 'none';
   return count === keys.length ? 'all' : 'some';
 }
 
-/** What a click on the group's tick asks for: all rows on, unless every row already is. */
 export function groupToggleTarget(state: GroupTick): boolean {
   return state !== 'all';
 }
 
-/**
- * A row's "on its own" gain is a guide to which rows carry the Makeover. With the
- * whole group ticked it would read as a part of the group's total, so it shows
- * only while the group is partly ticked.
- */
 export const showsOwnGain = (state: GroupTick): boolean => state === 'some';
 
-/**
- * The Makeover's rows as Improve options, so a ticked row joins the one set
- * Improve checks and applies. A row's own `fitting`, `after` and `score` are the
- * whole Makeover's (a row has no figure alone: that is `singleGainsOf`'s guide);
- * what the set shows comes from recalculating the ticked rows together.
- */
 export function makeoverOptionsOf(
   makeover: Makeover,
   priceOf: (typeId: number) => number | null
@@ -47,16 +30,10 @@ export function makeoverOptionsOf(
   }));
 }
 
-/**
- * Each row's gain on its own: that of the same swap in Improve's single-swap
- * results (same key, same copies). A row never scored alone has none; nothing
- * is searched to fill it.
- */
 export function singleGainsOf(
   rows: readonly ImproveOption['candidate'][],
   singles: readonly ImproveOption[]
 ): Map<string, number> {
-  // One copy count per key: the first single swap with that key and size, as `find` took.
   const scored = new Map<string, number>();
   for (const single of singles) {
     const key = `${optionKey(single)}#${single.candidate.at.length}`;
@@ -71,12 +48,6 @@ export function singleGainsOf(
   return gains;
 }
 
-/**
- * Ticks or unticks `rows` (the group's rows given). Ticking a row displaces any
- * pick sharing one of its slots, a single swap included (`toggleTick`'s rule: the
- * latest tick wins, and the displaced pick's label is remembered); unticking just
- * removes them.
- */
 export function tickMakeoverRows(
   ticked: ReadonlyMap<string, ImproveOption>,
   replaced: ReadonlyMap<string, string>,

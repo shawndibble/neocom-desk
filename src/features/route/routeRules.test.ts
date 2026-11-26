@@ -8,10 +8,6 @@ describe('parseRoutePreference', () => {
     expect(parseRoutePreference('avoid-highsec')).toBe('avoid-highsec');
   });
 
-  /*
-   * The Assets page's old device-local choice is adopted as this setting's
-   * first value, stored as it was — so its two words have to keep reading.
-   */
   it("reads the Assets page's old 'safest' as prefer safer", () => {
     expect(parseRoutePreference('safest')).toBe('prefer-highsec');
   });

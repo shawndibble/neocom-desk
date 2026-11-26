@@ -18,12 +18,6 @@ import { saveMyQuote } from './requestStore';
 import { syncQuoteLinks, type QuoteLinksResult } from './quoteLinks';
 import { quotePile, type PileQuote } from './sellTo';
 
-/**
- * Sell to a standing buyback Request (issue #4780): paste a pile, see one
- * figure at the Request's Rate, hold it 14 days. The Quote is saved on the
- * Member's own Pledge document the moment it is priced, and a second paste
- * replaces it. The contract itself is made in game, to the buyer named.
- */
 const CONTRACT_GROUPS = permissionsForEndpoints(DELIVERY_ENDPOINTS);
 
 export function SellToSection({
@@ -38,7 +32,6 @@ export function SellToSection({
   refreshPledges,
 }: {
   request: CommunityRequest;
-  /** The Request's terms: it is a standing Request, or there is nothing to sell to. */
   standing: StandingRequest;
   characterId: number;
   communityId: string;
@@ -53,12 +46,10 @@ export function SellToSection({
   const [busy, setBusy] = useState<'quote' | 'clear' | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notes, setNotes] = useState<PileQuote | null>(null);
-  // Tagged with the quote it was read for: a replaced quote's rows are not the new one's.
   const [read, setRead] = useState<{ quotedAt: number; result: QuoteLinksResult } | null>(null);
   const held = myPledge?.quote;
   const stillHeld = held !== undefined && quoteIsHeld(held, now);
   const current = held === undefined || quoteIsCurrent(held, standing);
-  // What this side can say about the linked contracts: the read just made, else the stored ids and statuses.
   const linkState = read && read.quotedAt === held?.quotedAt ? read.result : null;
   const linkRows: LinkedContractRow[] =
     linkState?.status === 'ok'
@@ -69,7 +60,6 @@ export function SellToSection({
       : (held?.links ?? []).map((link) => ({ ...link, priceDiffers: false }));
   const heldDate = held ? formatDateOnly(new Date(held.expiresAt)) : '';
 
-  // Which of the seller's contracts are this quote's: read when a held quote shows, not on a timer.
   useEffect(() => {
     if (!held || !quoteIsHeld(held, Date.now())) return;
     let cancelled = false;
@@ -98,7 +88,6 @@ export function SellToSection({
     return () => {
       cancelled = true;
     };
-    // The quote's date identifies it: a re-read of the same quote is not a reason to read contracts again.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [held?.quotedAt, characterId, communityId, request.id]);
 
@@ -108,11 +97,9 @@ export function SellToSection({
     try {
       const result = await quotePile(text, standing, Date.now());
       setNotes(result);
-      // Nothing priced is no quote: say why, keep what is held.
       if (result.quote.lines.length === 0) return;
       await saveMyQuote(characterId, communityId, request.id, result.quote);
       setText('');
-      // The quote is saved: a failed re-read must not read as a failed quote.
       await refreshPledges(request.id).catch((err: unknown) =>
         console.warn('Pledges could not be re-read after a quote', err)
       );

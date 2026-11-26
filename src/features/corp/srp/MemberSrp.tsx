@@ -1,4 +1,3 @@
-/** Member view (`/srp`, a sub-view of the Overview): file by pasted link or by picking a lost ship, follow My claims. No Corp Access needed. */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Disclosure, EmptyState, LoadFailedState, Panel, Spinner, Toast } from '@/components/ui';
@@ -95,19 +94,16 @@ function MemberSrpBody({ characterId, data, windowDays, fleetRequired, hullRules
   const fleetRef = useRef<HTMLInputElement>(null);
   const focusFleetRef = useRef(false);
 
-  // The fleet field only exists once the paste disclosure has opened on a phone.
   useEffect(() => {
     if (!focusFleetRef.current || fleetRef.current === null) return;
     focusFleetRef.current = false;
     fleetRef.current.focus();
   });
 
-  // The check is read only where the corp checks some hull; a hull it does not check answers none.
   const anyChecked = hullRules.some((r) => (r.doctrineIds?.length ?? 0) > 0);
   const doctrine = useDoctrinePreview(link, data.previewDoctrine, anyChecked);
 
   const claims = data.claims.state === 'ready' ? data.claims.value : [];
-  // By id, so the dialog follows a reload (a re-file) instead of holding the claim as it was.
   const detail = claims.find((c) => c.killmailId === detailId) ?? null;
   const claimedHull = (typeId: number) => data.names.hull(typeId);
 
@@ -149,19 +145,15 @@ function MemberSrpBody({ characterId, data, windowDays, fleetRequired, hullRules
     else fileUnchecked(row);
   }
 
-  /** A hull the corp checks: read the check first. Off doctrine asks in a dialog; anything else files as an unchecked hull would. */
   async function fileChecked(row: LostRow, known?: DoctrineCheckRecord) {
     setFiling(row.killmailId);
     setListError(null);
-    // The killmail modal already read the check; reading it again would spend another fetch slot.
     let check: DoctrineCheckRecord | undefined = known;
     if (check === undefined) {
       try {
         check = (await data.previewDoctrine(esiKillmailLink(row.killmailId, row.killmailHash)))
           .check;
-      } catch {
-        // Filing reports its own errors; an unreadable check is no reason to stop it.
-      }
+      } catch {}
     }
     setFiling(null);
     if (check?.status === 'off-doctrine') setOffDoctrine({ row, check });
@@ -170,7 +162,6 @@ function MemberSrpBody({ characterId, data, windowDays, fleetRequired, hullRules
 
   function fileUnchecked(row: LostRow) {
     if (fleetRequired && fleet.trim() === '') {
-      // The corp wants a Fleet or FC on every claim: fill the form in rather than file without one.
       setLink(esiKillmailLink(row.killmailId, row.killmailHash));
       setErrors({ fleet: t('srpMember.errors.fleetOrFcRequired') });
       setListError(null);
@@ -232,7 +223,6 @@ function MemberSrpBody({ characterId, data, windowDays, fleetRequired, hullRules
     </p>
   ) : null;
 
-  // The grant prompt, or what stands in for the list while it is not there to show.
   const lostNote =
     lost.state === 'denied' ? (
       <GrantBanner variant="ghost" characterId={characterId} endpoints={KILLMAIL_ENDPOINTS} />

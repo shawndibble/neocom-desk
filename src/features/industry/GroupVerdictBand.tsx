@@ -1,9 +1,3 @@
-/**
- * The group's own Acquisition Verdict, up front, as a single band — the
- * headline profit figure and the numbers that qualify it on one line under
- * it, mirroring `PlanVerdictHero`'s single-plan hero so a group and its
- * members never disagree about what "Build"/"Buy" mean.
- */
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import * as Icon from '@/components/ui/icons';
@@ -30,18 +24,10 @@ interface GroupVerdictBandProps {
 export function GroupVerdictBand({ view, plans, catalog, groupVolume }: GroupVerdictBandProps) {
   const { t } = useTranslation();
   const { members, rollup } = view;
-  // The group's own Acquisition Verdict, from the same `computeGroupRollup`
-  // the index row reads, unknown while any member is still loading or failed.
   const groupProfit = view.savings;
   const groupVerdict = view.verdict;
-  // Which way the numbers point, independent of whether they can be trusted:
-  // an unknown verdict (a material has no price) still carries a signed
-  // saving, and wording it as "BUY is cheaper by -X" was the bug. Headline and
-  // sub-line both read this, so they can't disagree at exactly zero.
   const buildIsCheaper = groupProfit !== null && (groupVerdict === 'build' || groupProfit > 0);
 
-  // The whole group's job tree — every member's own job plus each sub-job
-  // beneath it — scheduled together on the first member's character's slots.
   const groupJobNodes = useMemo(() => {
     const byId = new Map(plans.map((p) => [p.id, p]));
     return members.flatMap((member, i) => {
@@ -65,10 +51,6 @@ export function GroupVerdictBand({ view, plans, catalog, groupVolume }: GroupVer
   }, [members, plans, catalog]);
   const groupSchedule = usePlanSchedule(plans[0]?.characterId ?? null, groupJobNodes);
 
-  // The verdict band's sub-line: percent + hub only when there's a real
-  // comparison to state (buyCost known and non-zero on the relevant side);
-  // material cost, job fees, and job time are always known once pricing
-  // settles, so those three always show.
   const verdictQualifiers = useMemo(() => {
     const material = t('industry.groupVerdictMaterial', { amount: formatIsk(rollup.materialCost) });
     const jobFees = t('industry.groupVerdictJobFees', {
@@ -89,8 +71,6 @@ export function GroupVerdictBand({ view, plans, catalog, groupVolume }: GroupVer
       : rollup.totalCost > 0
         ? (-groupProfit / rollup.totalCost) * 100
         : null;
-    // A mixed-hub group has no one "buying at X" to name (see the mixed-hub
-    // notice in `BuildGroupPanel`) — the percent still stands on its own without it.
     const hub = rollup.singleHub ? hubLabel(rollup.hubIds[0]) : null;
     const comparisonKey = buildIsCheaper
       ? hub

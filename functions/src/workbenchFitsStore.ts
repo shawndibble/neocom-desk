@@ -1,15 +1,3 @@
-/**
- * The storage side of `workbenchFits.ts`'s `WorkbenchFitsStore` (issues #2484,
- * #4271, #5071). A hull's fits are one public, gzipped Cloudflare R2 object,
- * `workbench-fits/<shipTypeId>.json` = `{ shipTypeId, fits }`, which the client
- * fetches by hull id with no Firebase session; R2's custom domain serves
- * objects by key and offers no listing, so nobody pages through every fit. A
- * hull with no object yet simply has no fits.
- *
- * The sync checkpoint is a small R2 object too (`WORKBENCH_SYNC_STATE_R2_KEY`),
- * outside the `workbench-fits/` prefix the client reads, so the runner job
- * touches no Firestore. It holds only page numbers and fit ids.
- */
 import { gzipSync } from 'node:zlib';
 import type { R2Get, R2Put } from './r2Client.js';
 import {
@@ -22,10 +10,6 @@ import {
   type WorkbenchSyncState,
 } from './workbenchFits.js';
 
-/**
- * The sync runs every 12 hours, and a hull only changes when it gains fits:
- * six hours of edge staleness is invisible on a list of community fits.
- */
 const HULL_HEADERS = {
   'Content-Type': 'application/json',
   'Content-Encoding': 'gzip',
@@ -34,7 +18,6 @@ const HULL_HEADERS = {
 
 export type WorkbenchHulls = Pick<WorkbenchFitsStore, 'readHull' | 'writeHull'>;
 
-/** The hull half of the store: one R2 object per hull, read and replaced whole. */
 export function r2WorkbenchHulls(io: { get: R2Get; put: R2Put }): WorkbenchHulls {
   return {
     async readHull(shipTypeId) {
@@ -59,7 +42,6 @@ function parseHead(value: unknown): PassHead | null {
   };
 }
 
-/** A missing or malformed checkpoint reads as a fresh start: a pass from page 1. */
 export function parseSyncState(body: unknown): WorkbenchSyncState {
   const data = (body ?? {}) as {
     boundary?: unknown;

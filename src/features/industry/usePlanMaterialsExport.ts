@@ -7,7 +7,6 @@ import { materialsCsvColumns } from './materialsCsv';
 import type { MaterialTableRow } from './subBuildPlan';
 import type { usePlanMaterials } from './usePlanMaterials';
 
-/** The Materials table's rows as shown, for its export button and row menus. */
 export function usePlanMaterialsExport(
   plan: BuildPlanRecord,
   catalog: BlueprintCatalog,
@@ -34,8 +33,6 @@ export function usePlanMaterialsExport(
     surface: 'build-materials',
     rows: visibleMaterials,
     columns: materialsCsv,
-    // Materials renders one table per section (To buy, Building, …), so no
-    // single mounted table holds every row — export the plan's own list.
     source: 'rows',
   });
 }

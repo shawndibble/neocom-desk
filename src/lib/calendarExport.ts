@@ -1,11 +1,4 @@
 import { MINUTE_MS } from '@/lib/age';
-/**
- * Client-side "add to Google/Outlook calendar" export (issue #416): a plain
- * `.ics` file plus a Google Calendar prefilled-event URL, both generated from
- * fields the app already has (no new backend or dependency). ESI's Calendar
- * Event carries no location field, so neither output includes one — pure, no
- * fetch/DOM/Dexie imports.
- */
 
 export interface CalendarExportEvent {
   eventId: number;
@@ -19,7 +12,6 @@ function pad2(value: number): string {
   return String(value).padStart(2, '0');
 }
 
-/** `YYYYMMDDTHHMMSSZ`, the basic UTC format both ICS and Google Calendar's URL scheme use. */
 function toUtcBasic(date: Date): string {
   return (
     `${date.getUTCFullYear()}${pad2(date.getUTCMonth() + 1)}${pad2(date.getUTCDate())}` +
@@ -31,7 +23,6 @@ function endOf(event: CalendarExportEvent): Date {
   return new Date(event.start.getTime() + event.durationMinutes * MINUTE_MS);
 }
 
-/** RFC 5545 §3.3.11 text escaping: backslash first, then the characters it introduces. */
 function escapeIcsText(text: string): string {
   return text
     .replace(/\\/g, '\\\\')
@@ -43,11 +34,6 @@ function escapeIcsText(text: string): string {
 const ICS_LINE_OCTETS = 75;
 const encoder = new TextEncoder();
 
-/**
- * RFC 5545 §3.1 folding: a content line is at most 75 octets, longer ones
- * continue on following lines that start with one space. Splits fall between
- * characters, never inside a multibyte one.
- */
 function foldIcsLine(line: string): string {
   if (encoder.encode(line).length <= ICS_LINE_OCTETS) return line;
   const parts: string[] = [];
@@ -55,7 +41,6 @@ function foldIcsLine(line: string): string {
   let used = 0;
   for (const char of line) {
     const size = encoder.encode(char).length;
-    // Continuation lines spend one octet on their leading space.
     const limit = parts.length === 0 ? ICS_LINE_OCTETS : ICS_LINE_OCTETS - 1;
     if (used + size > limit) {
       parts.push(current);
@@ -69,11 +54,6 @@ function foldIcsLine(line: string): string {
   return parts.join('\r\n ');
 }
 
-/**
- * A single-event `.ics` file. `now` (default: wall clock) is injectable so a
- * test can pin `DTSTAMP` instead of freezing the clock — the same pattern
- * `downloadCsv`'s `now` param uses.
- */
 export function buildIcsFile(event: CalendarExportEvent, now: Date = new Date()): string {
   const lines = [
     'BEGIN:VCALENDAR',
@@ -92,7 +72,6 @@ export function buildIcsFile(event: CalendarExportEvent, now: Date = new Date())
   return lines.map(foldIcsLine).join('\r\n');
 }
 
-/** Google Calendar's documented prefilled-event URL scheme — also opens directly in Outlook.com/most calendar apps via "subscribe from URL" fallback flows, so one URL covers the ticket's "Google/Outlook" ask without a second code path. */
 export function googleCalendarUrl(event: CalendarExportEvent): string {
   const params = new URLSearchParams({
     action: 'TEMPLATE',

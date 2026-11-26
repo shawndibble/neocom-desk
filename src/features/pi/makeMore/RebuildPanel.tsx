@@ -60,7 +60,6 @@ function RebuildSentence({
   }
   if (card.status === 'keep') {
     const reason = card.keepReason ?? 'already-best';
-    // Never "keep on" raw ore: the recommendation ends at P1 or above.
     if (card.sellsRaw) {
       return (
         <Sentence
@@ -151,7 +150,6 @@ function formatTimes(ratio: number): string {
   return ratio >= 10 ? String(Math.round(ratio)) : (Math.round(ratio * 10) / 10).toString();
 }
 
-/** A caret text action that opens a block in place, below its row. */
 function InlineToggle({
   expanded,
   controls,
@@ -185,7 +183,6 @@ function RebuildCard({
 }: {
   card: RebuildCardView;
   haulDays: number;
-  /** The in-game steps for a change; null for a colony that keeps its setup. */
   steps: ChecklistColumn | null;
   ticks: Ticks;
 }) {
@@ -196,8 +193,6 @@ function RebuildCard({
   const stepsId = useId();
   const nowItem = card.sells[0];
   const doneCount = steps ? steps.steps.filter((step) => ticks.has(step.id)).length : 0;
-  // Opens once a step is ticked (ticks may load late) and stays open: unticking the last
-  // one must not fold the list under the pilot. The pilot's own toggle wins.
   const [stepsChoice, setStepsChoice] = useState<boolean | null>(null);
   const [autoOpened, setAutoOpened] = useState(doneCount > 0);
   if (doneCount > 0 && !autoOpened) setAutoOpened(true);
@@ -287,7 +282,6 @@ function RebuildCard({
                 </span>
               )}
             </span>
-            {/* A kept colony sits under its own fold: an As-is tag would repeat it. */}
             {isChange && <VerbTag verb="rebuild" label={t('piPlan.make.tagRebuild')} />}
           </div>
         )}
@@ -296,10 +290,6 @@ function RebuildCard({
   );
 }
 
-/**
- * The rebuilds. Changes stay in view; kept or unmeasured colonies fold under one
- * disclosure, so nothing-to-change is one line, not a card per planet.
- */
 export function RebuildPanel({
   view,
   ticks,
@@ -307,15 +297,12 @@ export function RebuildPanel({
 }: {
   view: PlanView;
   ticks: Ticks;
-  /** The card a `#plan-<anchor>` link points at, and that navigation's key. */
   reveal: { anchor: string | null; navKey: string };
 }) {
   const { t } = useTranslation();
   const stepsFor = new Map(view.checklist.map((column) => [column.planetId, column]));
   const changed = view.rebuilds.filter((card) => card.status === 'change');
   const kept = view.rebuilds.filter((card) => card.status !== 'change');
-  // A link to a folded card opens the fold in the same render, so the card exists when
-  // the page scrolls to it; following the link again reopens it. A toggle made since wins.
   const [choice, setChoice] = useState<{ open: boolean; navKey: string } | null>(null);
   const linkedIntoKept =
     reveal.anchor !== null && kept.some((card) => card.anchor === reveal.anchor);

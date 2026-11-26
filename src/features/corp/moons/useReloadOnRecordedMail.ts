@@ -1,15 +1,8 @@
-/**
- * The send queue mails a Late notice from the shell, outside the book's page, and records the mail
- * on the notice (`recordLateNoticeMail`). Nothing on the page re-reads the book after that, so the
- * notice still read "not mailed" until a reload. This re-reads the book once a notice mail of this
- * corporation is recorded, a moment after the last one when a run records several.
- */
 import { useEffect, useRef } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
 import { isLateNoticeMail } from '@/engine/corpTaxBook/mailQueue';
 
-/** How long after the last recorded mail the book is read again, so a run reloads once. */
 const SETTLE_MS = 1_500;
 
 export function useReloadOnRecordedMail(
@@ -26,7 +19,6 @@ export function useReloadOnRecordedMail(
       return [];
     }
   }, [corporationId, enabled]);
-  // What was recorded before this page opened is in the book it read already.
   const seen = useRef<Set<string> | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const reloadRef = useRef(reload);
@@ -46,6 +38,5 @@ export function useReloadOnRecordedMail(
     timer.current = setTimeout(() => reloadRef.current(), SETTLE_MS);
   }, [recorded]);
   useEffect(() => () => clearTimeout(timer.current), []);
-  /** The notice mails recorded so far; undefined until the queue is read. */
   return { recorded: recorded?.length };
 }

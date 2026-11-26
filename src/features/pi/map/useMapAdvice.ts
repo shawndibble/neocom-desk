@@ -1,16 +1,3 @@
-/**
- * Everything the Map reads, gathered the way the Plan tab gathers it, and fed
- * to the one recommendation model. The Map never prices anything itself: this
- * hook builds a `PlanAdviceInput` (snapshot, hub books, sell market, cadence,
- * the Plan tab's rebuild preference (`usePlanPreference`), every recipe) and
- * returns `buildPlanAdvice`'s answer. Two tabs reading the same model with the same input show the same
- * figures.
- *
- * The main advice is built off the main thread (`useAdviceOf`). What-if advice
- * (a planet type the pilot does not have, added) is built on demand the same
- * way and cached per input, so trying all eight types costs at most eight builds
- * and a re-render never repeats one.
- */
 import { useMemo } from 'react';
 import type { PlanAdvice, PlanAdviceInput } from '../planAdviceModel';
 import { askAdvice } from '../planAdviceAsync';
@@ -38,11 +25,8 @@ export type MapAdviceState =
       adviceWithWhatIf: (types: ReadonlySet<PlanetType>) => PlanAdvice | Promise<PlanAdvice>;
       colonies: MapColony[];
       finder: FinderOrigin;
-      /** The colony read failed: the board runs as for a pilot with no colonies, plus this notice. */
       esiFailed: { retry: () => void; retrying: boolean } | null;
-      /** Hub prices could not be read: the board runs on empty books, so no product has an ISK figure. */
       pricesFailed: boolean;
-      /** P3/P4 multi-planet chain estimates, priced in slices after the board draws. */
       chainOf: ChainEstimateOf;
       pi: PiData;
     };
@@ -51,14 +35,11 @@ export function useMapAdvice(
   characterId: number,
   planetLabel: (planetId: number) => string
 ): MapAdviceState {
-  // Keep the last snapshot while re-reading: the board and the notice stay mounted, so Retry keeps focus.
   const { snapshot, failed, retrying, retry } = usePiSnapshot(characterId);
 
-  // The Plan tab's Most ISK / Least hauling choice, so both tabs rank alike.
   const preference = usePlanPreference((state) => state.value);
   const preferenceHydrated = useHydratedStore(usePlanPreference);
   const inputs = usePiAdviceInputs(snapshot, characterId, preference);
-  // Wait for the stored choice: ranking by the default first would flash the wrong picks.
   const input =
     (inputs.status === 'ready' || inputs.status === 'prices-failed') && preferenceHydrated
       ? (inputs.input ?? null)
@@ -71,7 +52,6 @@ export function useMapAdvice(
     if (buildResult.status === 'pending') return null;
     if (buildResult.status === 'error' || !input) return 'error' as const;
     const { advice } = buildResult;
-    // One input object per type set, so the worker service remembers each answer.
     const cache = new Map<string, PlanAdviceInput>();
     const adviceWithWhatIf = (types: ReadonlySet<PlanetType>): Promise<PlanAdvice> => {
       const key = whatIfKey([...types]);

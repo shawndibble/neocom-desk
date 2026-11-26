@@ -10,7 +10,6 @@ describe('fighter edits', () => {
     expect(one.fighters).toEqual([{ typeId: 23055, quantity: 6, state: 'active' }]);
     const two = addSquadron(one, 37599, { launch: false });
     expect(two.fighters?.[1]).toEqual({ typeId: 37599, quantity: 3, state: 'online' });
-    // The Fitting it came from is untouched.
     expect(carrier).not.toHaveProperty('fighters');
   });
 

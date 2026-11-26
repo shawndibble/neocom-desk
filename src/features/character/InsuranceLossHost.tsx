@@ -1,4 +1,3 @@
-/** Renders the insurance-payout loss modal for the Wallet journal; mounted once beside the table. */
 import { lazy, Suspense } from 'react';
 import { guarded } from '@/app/routeChunks';
 import { useInsuranceLossModalStore } from '@/stores/insuranceLossModal';

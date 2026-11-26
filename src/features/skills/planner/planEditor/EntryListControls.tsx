@@ -17,7 +17,6 @@ import * as Icon from '@/components/ui/icons';
 import { GROUPING_MODES, type GroupingMode } from '../groupingMode';
 import type { usePlanViewPrefs } from './usePlanViewPrefs';
 
-/** Group-by and Columns: the entry list's own view controls, riding the skill picker's search row. */
 export function EntryListControls({
   viewPrefs,
 }: {
@@ -29,9 +28,6 @@ export function EntryListControls({
     mode === 'priority' ? t('plans.groupByPriority') : t('plans.groupByAttributePair');
   return (
     <>
-      {/* Pointer widths: the labelled select. On a phone it is too wide to share
-          the search box's row, so an icon opens the same choices (DESIGN.md §6c,
-          as Skills › Certificates does for its sort). */}
       <label className="hidden items-center gap-1 sm:flex">
         {t('plans.groupBy')}
         <Select

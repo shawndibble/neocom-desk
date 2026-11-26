@@ -24,11 +24,8 @@ export interface TaxSnapshot {
   systemNames: Map<number, string>;
   systemSecurity: Map<number, number>;
   typeNames: Map<number, string>;
-  /** Per-hub, per-date buy prices — the day the ore was mined, not "now" (issue #523 follow-up). Resolved per Payee/date by `pricesFor`. */
   datedPrices: DatedUnitPrices;
-  /** Per hub, the ore types that hub quoted no buy price for on any date they appeared — their price entry is 0, which is not the same claim as "worthless". */
   unpricedByHub: ReadonlyMap<TradeHub['id'], ReadonlySet<number>>;
-  /** Union of `unpricedByHub` — whether the banner has anything at all to say. */
   unpricedTypeIds: Set<number>;
 }
 
@@ -57,9 +54,6 @@ export async function loadTaxSnapshot(
     };
   }
   const unclassifiedTypeIds = result.unclassified.flatMap((u) => u.typeIds);
-  // Every hub any Payee bills at, so a dialog can re-price live as the pilot
-  // changes which Payee an entry is assigned to. One fetch per *distinct*
-  // hub — an all-Jita ledger, the common case, still makes exactly one.
   const payeeHubIds = [...result.payeesByCharacter.values()].flatMap((payees) =>
     payees.map((payee) => payee.hubId)
   );

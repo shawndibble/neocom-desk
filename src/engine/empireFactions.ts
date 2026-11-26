@@ -1,8 +1,3 @@
-/**
- * The four empire factions and their ids, as the SDE and ESI name a faction
- * (`factionId` on a Military Campaign, a hub's owner, a ship's race). One
- * table, so no surface hand-writes the ids again.
- */
 export const EMPIRE_FACTION_IDS = {
   amarr: 500003,
   caldari: 500001,
@@ -19,7 +14,6 @@ const BY_ID = new Map(
   ])
 );
 
-/** The empire faction a faction id is, or null for any other faction (or none). */
 export function empireFactionOf(factionId: number | null | undefined): EmpireFaction | null {
   return factionId == null ? null : (BY_ID.get(factionId) ?? null);
 }

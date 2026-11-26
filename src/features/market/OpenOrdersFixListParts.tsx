@@ -1,8 +1,3 @@
-/**
- * The Open Orders fix list's own pieces around its table: the headline
- * summary, the healthy fold with the badges legend under the list, and the
- * notices folded into one quiet line at its foot.
- */
 import { Fragment, type ReactNode } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import { Button, IskAmount, NeedsConnection, textActionClassName } from '@/components/ui';
@@ -15,10 +10,8 @@ import { STAT_CHIP_TONE_TEXT_CLASS } from '@/components/ui/statChipTone';
 import { orderSlotTone, type OrderSlotBreakdown } from '@/engine/market/orderSlots';
 import { WorkThroughSummaryTail } from './WorkThroughControls';
 
-/** As `AssumesBaseStandingsNote`'s. */
 const STANDINGS_ENDPOINTS: readonly EsiEndpointId[] = ['getCharacterStandings'];
 
-/** The viewed Character's open orders against their ceiling; `breakdown` null when skills are missing. */
 export interface OrderSlotsFigure {
   used: number;
   breakdown: OrderSlotBreakdown | null;
@@ -28,8 +21,6 @@ function OrderSlotsMeter({ used, breakdown }: OrderSlotsFigure) {
   const { t } = useTranslation();
   if (!breakdown) return null;
   const { total, base, skills } = breakdown;
-  // The breakdown is a list, so it sits in the tooltip text as one sentence (touch opens it on tap)
-  // and the used / max figure itself is always visible.
   const detail = [
     t('market.orders.slots.base', { count: base }),
     ...skills
@@ -58,7 +49,6 @@ function OrderSlotsMeter({ used, breakdown }: OrderSlotsFigure) {
   );
 }
 
-/** "5 orders need you", then "600.8M ISK tied up in them · 3 to watch · 9 fine" and the work-through. */
 export function FixListSummary({
   actCount,
   actIskTiedUp,
@@ -71,11 +61,6 @@ export function FixListSummary({
   actIskTiedUp: number;
   watchCount: number;
   fineCount: number;
-  /**
-   * What the funnel matched, passed only while a funnel filter narrows: the ISK across all of it, so
-   * a pilot who filtered to a station or a Character sees what that set is worth. The Needs you
-   * figure beside it is part of this one.
-   */
   matching?: { count: number; iskTiedUp: number };
   orderSlots?: OrderSlotsFigure;
 }) {
@@ -127,7 +112,6 @@ export function FixListSummary({
   );
 }
 
-/** "9 healthy orders · Show" while a segment hides them, then the badges legend. */
 export function HealthyFold({
   fineCount,
   folded,
@@ -135,7 +119,6 @@ export function HealthyFold({
   onLegend,
 }: {
   fineCount: number;
-  /** Whether the segment on screen leaves the healthy orders out. */
   folded: boolean;
   onShow: () => void;
   onLegend: () => void;
@@ -159,10 +142,6 @@ export function HealthyFold({
   );
 }
 
-/**
- * One Character's "fees assume base standings" note, only once its grant is
- * known to lack standings (`GrantNote`'s rule), with its Grant.
- */
 function StandingsAssumed({ characterId, name }: { characterId: number; name: string }) {
   const { t } = useTranslation();
   const lacks = useCharacterLacksEndpoints(characterId, STANDINGS_ENDPOINTS);
@@ -185,16 +164,10 @@ function StandingsAssumed({ characterId, name }: { characterId: number; name: st
   );
 }
 
-/**
- * The notices that qualify the list, as one quiet line at its foot: fees
- * priced at base standings, and Characters that have not shared their orders.
- * Empty, it takes no room.
- */
 export function ListNotes({
   floorCharacters,
   notShared,
 }: {
-  /** Characters with a floor on any matched order: each floor prices with their standings. */
   floorCharacters: readonly { characterId: number; name: string }[];
   notShared: readonly { characterId: number; name: string }[];
 }) {

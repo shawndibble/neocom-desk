@@ -57,55 +57,31 @@ import {
   queueChipTone,
 } from '@/features/character/rosterQueueChip';
 
-/** One character's table row — everything a column might render, gathered once per character rather than re-derived per cell. */
 export interface CharacterRow {
   character: CharacterRecord;
   corporationName: string | undefined;
   stats: CharacterSortStats | undefined;
   queue: QueueInfo | undefined;
-  /** Whether this Character's `characterNotTraining` alert is on — false only for its one opt-out (issue #1731). */
   notTrainingAlertEnabled: boolean;
   attention: AttentionEntry | undefined;
   alertCount: number;
-  /** From the same roster snapshot `stats` comes from — undefined until skills have loaded once. */
   jobSlotSkills: JobSlotSkills | undefined;
-  /** Raw `total_sp` (not `correctedTotalSp`) — see `rosterView.ts`'s doc comment. */
   totalSp: number | undefined;
   starred: boolean;
-  /** Marked SP Farm: the only characters SP extraction readiness applies to. */
   spFarm: boolean;
-  /** Null when ungrouped — same as the card's `groupId` prop. */
   groupId: string | null;
-  /** Undefined until read (and never read while neither column shows). */
   whereabouts: CharacterWhereabouts | undefined;
-  /** False when the stored grant lacks the scope: the cell says which Permission, not "unknown". */
   locationGranted: boolean;
   shipGranted: boolean;
-  /** Newest Net Worth Snapshot; undefined until the app has snapshotted this Character. */
   netWorth: LatestNetWorth | undefined;
-  /** The accelerator the pilot typed in for this Character, if any. */
   acceleratorRecord: CharacterAcceleratorRecord | undefined;
-  /** The bonus the attribute sheet implies; null when not cached or legal. */
   detectedAccelerator: number | null;
-  /** Capability roles and grant coverage; undefined until read (and never read while neither corp column shows). */
   corpStanding: CorpStanding | undefined;
   alertsWhenClosed: AlertsRowState;
 }
 
 const NOTIFICATION_SETTINGS_PATH = tabPath(SETTINGS_TABS, 'notifications');
 
-/**
- * One `manufacturing`/`science`/`reaction` job-slot column — three of these,
- * not one combined column, so each category gets its own header-click sort
- * (`DataTable` sorts one `sortValue` per column; a pilot who wants "who's out
- * of reaction slots" specifically couldn't ask that of a single merged
- * column). The number shown is *open* (free) slots — `max - running` — not
- * the running count: "Open jobs" names how much room is left, and reading it
- * as "jobs currently open/running" would say the opposite of what a pilot
- * checking for spare capacity wants to know. `max` comes from
- * `jobSlotSkills` (trained skills), `running` from `attention.jobCounts`
- * (live industry jobs) — either missing means unknown, not zero.
- */
 function openJobsColumn(
   id: CharacterColumnId,
   category: JobSlotCategory,
@@ -126,10 +102,6 @@ function openJobsColumn(
       const max = row.jobSlotSkills ? maxJobSlots(row.jobSlotSkills)[category] : undefined;
       if (running === undefined || max === undefined) return '—';
       const open = max - running;
-      // Red when every slot sits idle (0/5 used → nothing queued, go fill
-      // them), fading to plain text as slots fill up — the number is a
-      // call to action, not a health check, so more open reads as more
-      // urgent, not less.
       const tone = open === max ? 'text-danger' : open / max >= 0.5 ? 'text-warning' : 'text-text';
       return (
         <HintText
@@ -143,7 +115,6 @@ function openJobsColumn(
   };
 }
 
-/** A dash that names the Permission this Character has not granted. */
 function missingPermission(
   name: string,
   permission: 'characterDetails' | 'currentShip',
@@ -161,11 +132,6 @@ function missingPermission(
   );
 }
 
-/**
- * Every column the table can show, keyed by id — the picker offers a subset
- * of these keys, and the table renders whichever the pilot has checked, in
- * this record's own order (not the order they were picked in).
- */
 export function buildColumns(
   t: (key: string, options?: Record<string, unknown>) => string,
   spExtractionThresholdSp: number,
@@ -177,7 +143,6 @@ export function buildColumns(
   onMoveToGroup: (characterId: number, groupId: string | null) => void,
   achievements: AchievementLookup
 ): Record<CharacterColumnId, DataTableColumn<CharacterRow>> {
-  // The row's one corp action: switch to that Character, then its Corporation Permission.
   const corpPermissionsLink = (row: CharacterRow, label: string) => (
     <GrantMissingLink groups={['corp']} asCharacter={row.character.characterId}>
       {label}
@@ -242,12 +207,6 @@ export function buildColumns(
           ? missingPermission(row.character.name, 'currentShip', t)
           : (row.whereabouts?.shipName ?? '—'),
     },
-    // Same Select the card view's group control renders (issue #2077) — a
-    // visible, Tab-reachable move-to-group in table view, no context-menu
-    // twin needed. Only offered when `groups.length > 0` (gated in
-    // `availableCharacterColumns`), so `groups` here is never empty in
-    // practice, but the map still runs off the live list rather than a
-    // snapshot so a group renamed mid-session updates every row's dropdown.
     group: {
       id: 'group',
       header: t('characters.column.group'),
@@ -359,9 +318,6 @@ export function buildColumns(
         if (!row.queue) return '—';
         const tone =
           STAT_CHIP_TONE_TEXT_CLASS[queueChipTone(row.queue.state, row.notTrainingAlertEnabled)];
-        // Only `training`/`endingSoon` carry a finish time — paused/idle/
-        // unknown have nothing to count down to, so they keep the plain
-        // state label they've always shown.
         if (row.queue.trainingFinishMs === null) {
           return <span className={tone}>{t(`characters.queueStates.${row.queue.state}`)}</span>;
         }
@@ -401,20 +357,12 @@ export function buildColumns(
           );
         }
         const tone = STAT_CHIP_TONE_TEXT_CLASS[PI_ATTENTION_TONE[attention]];
-        // Some attention states have nothing currently extracting to count
-        // down to (e.g. `decayed` with no program running at all) — those
-        // keep the categorical label; anything with a real, future expiry
-        // gets the countdown instead, which is strictly more useful.
         if (expiryMs == null) {
           return <span className={tone}>{t(`pi.attention.${attention}`)}</span>;
         }
         const label = formatDuration((expiryMs - Date.now()) / 1000);
         return (
           <HintText content={formatTimestamp(new Date(expiryMs), timeZone)} className={tone}>
-            {/* The countdown alone is a colour-only tell of the underlying
-                  attention state (DESIGN.md §7) — colour-blind sighted readers
-                  need the word too, not just screen readers, so it prints
-                  rather than hiding in an sr-only span. */}
             {t(`pi.attention.${attention}`)} · {label}
           </HintText>
         );
@@ -473,7 +421,6 @@ export function buildColumns(
           '—'
         ),
     },
-    // Gaps sort first (ascending), so a 13-director roster reads its holes at the top.
     corpRoles: {
       id: 'corpRoles',
       header: t('characters.column.corpRoles'),
@@ -482,7 +429,6 @@ export function buildColumns(
       render: (row) => {
         const standing = row.corpStanding;
         if (!standing) return '—';
-        // Plain text: the access cell beside it carries the fix (DESIGN.md §6c Restraint).
         if (standing.kind === 'notGranted') {
           return <span className="text-text-dim">{t('characters.corpRolesNotGranted')}</span>;
         }
@@ -521,7 +467,6 @@ export function buildColumns(
       sortValue: (row) => alertsWhenClosedRank(row.alertsWhenClosed),
       render: (row) => {
         const label = t(`settings.notifications.alertsWhenClosed.state.${row.alertsWhenClosed}`);
-        // Only a gap links: "On" needs nothing done (DESIGN.md §6c Restraint).
         if (row.alertsWhenClosed === 'on') return label;
         return (
           <Link to={NOTIFICATION_SETTINGS_PATH} className={inlineLinkClassName}>

@@ -1,7 +1,3 @@
-/**
- * Per-item reduction for the Compare drawer's Trade hubs view: which hub has
- * the row's cheapest sell and highest buy. Pure; the hook supplies quotes.
- */
 export interface HubQuoteState {
   sell: number | null;
   buy: number | null;
@@ -31,7 +27,6 @@ function bestHub<Id extends string>(
       bestValue = value;
     }
   }
-  // One quote compares nothing, so it earns no mark.
   return quoting >= 2 ? best : null;
 }
 

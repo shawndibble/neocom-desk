@@ -1,11 +1,3 @@
-/**
- * Adapts SDE blueprint + type data (src/sde) to a searchable catalog for the
- * Build Plan blueprint picker, and to the shape src/engine/industry expects.
- * Callers hold the result in component state, so `loadBlueprintCatalog` hands
- * back the same catalog for as long as the SDE files it is built from are the
- * same: a rebuilt copy is a new identity, which re-renders and re-prices an
- * open Build Plan although nothing in it changed. Read-only to callers.
- */
 import { loadBlueprints, loadTypes } from '@/sde/loadSde';
 import type { BlueprintMap, BlueprintType, TypeMap } from '@/sde/types';
 import type { IndustryBlueprint } from '@/engine/industry/types';
@@ -14,32 +6,18 @@ import type { BuildPlanRecord } from '@/db';
 export interface BlueprintCatalogEntry {
   blueprintTypeID: number;
   blueprint: BlueprintType;
-  /** Manufactured item type ID; null for a blueprint with no product (shouldn't happen in v1 data). */
   productTypeID: number | null;
-  /** Product name when known, else the blueprint's own name. */
   productName: string;
-  /** `productName.toLowerCase()`, precomputed once at catalog load rather than per search call — the picker calls `searchByProductName` on every keystroke, and lower-casing every entry's name each time was the actual per-keystroke cost over ~thousands of blueprints, not the substring scan itself. */
   productNameLower: string;
 }
 
 export interface BlueprintCatalog {
   entries: BlueprintCatalogEntry[];
   byBlueprintTypeID: Map<number, BlueprintCatalogEntry>;
-  /**
-   * First blueprint producing a given item (Market Browser's "jump to a
-   * Build Plan" context-menu action). Multiple blueprints can share a
-   * product in principle; v1 data doesn't, so first-wins is fine.
-   */
   byProductTypeID: Map<number, BlueprintCatalogEntry>;
-  /** Raw type-info map (name lookups for materials), keyed by typeID string. */
   typesById: TypeMap;
 }
 
-/**
- * A catalog with nothing in it: what a view that can still show something
- * without blueprint data (the LP Store lists its offers, just without build
- * costs) uses when `loadBlueprintCatalog` rejects. Compare by identity.
- */
 export const EMPTY_BLUEPRINT_CATALOG: BlueprintCatalog = {
   entries: [],
   byBlueprintTypeID: new Map(),
@@ -85,13 +63,6 @@ function buildCatalog(blueprints: BlueprintMap, types: TypeMap): BlueprintCatalo
   return { entries, byBlueprintTypeID, byProductTypeID, typesById: types };
 }
 
-/**
- * What a Build Plan opened from `typeId` would build, and the blueprint that
- * builds it � null when nothing does. Two readings, blueprint first: a
- * blueprint asset means "build what this makes", a plain item means "build
- * this" (same rule as `plannableProductTypeID`). `/industry?product=` takes
- * the *product*, so a blueprint must never resolve to itself.
- */
 export function planTargetForItem(
   catalog: BlueprintCatalog,
   typeId: number
@@ -107,23 +78,10 @@ export function planTargetForItem(
   return asProduct ? { blueprintTypeID: asProduct.blueprintTypeID, productTypeID: typeId } : null;
 }
 
-/** Item name for a typeID (materials, products), falling back to `#typeID` when unknown. */
 export function nameForType(catalog: BlueprintCatalog, typeID: number): string {
   return catalog.typesById[String(typeID)]?.name ?? `#${typeID}`;
 }
 
-/**
- * Per-unit volume (m3) for a typeID from the baked SDE; null when unknown or
- * out of a sane range, exactly like `buyPricedLine`'s range check on a raw
- * price — this reaches past the engine into the same raw type map. Prefers
- * the *packaged* figure where the bake has one (a manufacturing material
- * whose packaged volume differs from its assembled volume — a ship hull, a
- * capital module) so a hauled hull line reads what actually fits in a hold,
- * not the 10-100x larger assembled figure (issue #874, corrected in #1085).
- * Falls back to the assembled `volume`, which is exactly right for every
- * ordinary mineral/component and for any type the packaged-volume bake
- * couldn't resolve.
- */
 export function volumeForType(catalog: BlueprintCatalog, typeID: number): number | null {
   const entry = catalog.typesById[String(typeID)];
   const candidate = entry?.packagedVolume ?? entry?.volume;
@@ -132,7 +90,6 @@ export function volumeForType(catalog: BlueprintCatalog, typeID: number): number
     : null;
 }
 
-/** Case-insensitive substring search over product names. */
 export function searchByProductName(
   catalog: BlueprintCatalog,
   query: string
@@ -142,14 +99,6 @@ export function searchByProductName(
   return catalog.entries.filter((e) => e.productNameLower.includes(q));
 }
 
-/**
- * First owned Build Plan whose blueprint consumes a given material typeID,
- * keyed by that typeID — mirrors `byProductTypeID`'s first-wins shape.
- * Backs Assets' "View in Industry as material" action (issue #414): it
- * links off the character's own plans, not a full-SDE reverse index over
- * every blueprint in the game (GLOSSARY.md round 49 — materials are matched
- * by SDE type against a Build Plan's own materials list).
- */
 export function buildPlansByMaterialTypeID(
   plans: readonly BuildPlanRecord[],
   catalog: BlueprintCatalog
@@ -165,12 +114,10 @@ export function buildPlansByMaterialTypeID(
   return map;
 }
 
-/** One product an item goes into — a row of Item Detail's "Used in". */
 export interface MaterialUse {
   blueprintTypeID: number;
   productTypeID: number;
   productName: string;
-  /** Units of the item one run consumes, before ME. */
   quantity: number;
   activity: BlueprintType['activity'];
 }
@@ -178,15 +125,6 @@ export interface MaterialUse {
 const materialUsesByCatalog = new WeakMap<BlueprintCatalog, Map<number, MaterialUse[]>>();
 const NO_USES: readonly MaterialUse[] = [];
 
-/**
- * Every product whose blueprint or reaction formula consumes `typeID`, by
- * product name — Item Detail's "Used in". Unlike `buildPlansByMaterialTypeID`
- * this is the full-SDE reverse index: the question is "what is this for", not
- * "which of my plans needs it". Built once per catalog on first ask (a mineral
- * feeds thousands of blueprints). One row per product, from the blueprint
- * `byProductTypeID` holds — the one Build Plan opens — so the quantity per
- * run is that blueprint's.
- */
 export function materialUsesFor(catalog: BlueprintCatalog, typeID: number): readonly MaterialUse[] {
   let index = materialUsesByCatalog.get(catalog);
   if (!index) {
@@ -214,7 +152,6 @@ export function materialUsesFor(catalog: BlueprintCatalog, typeID: number): read
   return index.get(typeID) ?? NO_USES;
 }
 
-/** Adapt an SDE BlueprintType to the shape src/engine/industry consumes. */
 export function toIndustryBlueprint(blueprint: BlueprintType): IndustryBlueprint {
   return {
     name: blueprint.name,

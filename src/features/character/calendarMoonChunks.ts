@@ -1,20 +1,3 @@
-/**
- * One Character's moon-drill read for its corporation, for the corp board
- * and Due soon.
- *
- * **Gated before it fetches, not after.** CCP role-gates the extraction
- * endpoint server-side, so a Character without `Station_Manager` would get a
- * 403 for asking. This loader therefore checks the way `pollDomains`'
- * `corpContextFor` does — corporation, then roles, then scopes — and makes no
- * corp read at all unless every step passes. `undefined` means "not readable",
- * which the engine reads as a kind that contributes nothing (a Character who
- * cannot read a source is never shown a zero for it), so a pilot with no corp
- * role sees exactly the Calendar they had before.
- *
- * The roles read is itself scope-gated: `esi-characters.read_corporation_roles.v1`
- * is not part of every grant, and asking without it raises the app-wide re-auth
- * notice over a page that never needed corp data.
- */
 import type { CorporationStructure } from '@/esi/endpoints';
 import type { StatusResult } from '@/esi/cache';
 import {
@@ -28,13 +11,9 @@ import type { BoardExtractionSource } from '@/engine/corp/board';
 import { toMoonChunkSources } from './calendarBoardSources';
 
 export interface MoonChunkRead {
-  /** The extraction read, for the view's Data Age and offline marker. */
   result: StatusResult<unknown[]>;
-  /** `undefined` when the Character may not read extractions, so the kind is not readable. */
   sources: BoardClockSource[] | undefined;
-  /** The same extractions before a clock was picked, for the corp board's own ranking. */
   extractions?: BoardExtractionSource[];
-  /** The read was allowed and came back with nothing: an outage, not a role gap. */
   failed?: boolean;
 }
 

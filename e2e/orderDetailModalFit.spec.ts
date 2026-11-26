@@ -1,8 +1,3 @@
-/**
- * Order detail at in-between widths (a foldable's ~900px inner screen once
- * pushed Close off screen) and on a phone (bottom sheet): it fits the viewport,
- * Close is visible and works, no sideways scroll. Invariants only; CI fonts differ.
- */
 import type { Page } from '@playwright/test';
 import { test, expect, PHONE } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
@@ -59,7 +54,6 @@ for (const { width, height, sheet } of [
     await page.setViewportSize({ width, height });
     await page.goto('./market/orders');
 
-    // Below `lg` the list may be tap rows; above it a table whose row click opens the detail.
     const row = page
       .getByRole('button', { name: /^Mexallon/ })
       .or(page.getByRole('row', { name: /Mexallon/ }));
@@ -74,7 +68,6 @@ for (const { width, height, sheet } of [
     expect(box.left).toBeGreaterThanOrEqual(0);
     expect(box.right).toBeLessThanOrEqual(width);
     expect(box.top).toBeGreaterThanOrEqual(0);
-    // A phone gets a bottom sheet, its foot on the viewport's bottom edge.
     if (sheet) expect(Math.round(box.bottom)).toBe(height);
     else expect(box.bottom).toBeLessThanOrEqual(height);
 
@@ -83,7 +76,6 @@ for (const { width, height, sheet } of [
     const closeRight = await close.evaluate((el) => el.getBoundingClientRect().right);
     expect(closeRight).toBeLessThanOrEqual(width);
 
-    // Nothing inside may push the dialog's content wider than the dialog.
     const overflow = await dialog.evaluate((el) => {
       const widest = Math.max(...Array.from(el.querySelectorAll('*')).map((n) => n.scrollWidth));
       return { widest, client: el.clientWidth };

@@ -1,7 +1,3 @@
-/**
- * One audit entry as a sentence: the officer feed and a claim's audit trail share it.
- * The entry's `byName` is the actor, so the sentence carries what they did, not who.
- */
 import type { TFunction } from 'i18next';
 import { formatIsk } from '@/lib/isk';
 import { isSrpAuditAction } from '../srpAuditAction';
@@ -53,13 +49,8 @@ export function auditText(t: TFunction, entry: SrpAuditEntry): string {
   }
 }
 
-/** Saves by one officer this close together read as one line. */
 const SAVE_COLLAPSE_MS = MINUTE_MS;
 
-/**
- * Newest-first feed entries with a run of "Saved SRP settings" by the same officer, each within a
- * minute of the one kept, collapsed into the newest. Other actions are never dropped.
- */
 export function collapseRepeatedSaves(entries: readonly SrpAuditEntry[]): SrpAuditEntry[] {
   const out: SrpAuditEntry[] = [];
   for (const entry of entries) {

@@ -1,31 +1,7 @@
-/**
- * The Appraisal list as one URL-safe string (#5403): `?list=<code>` on
- * `/market/appraisal`, so Back, a reload and a copied address restore what
- * was on screen. The code is the whole state — no server, no lookup table —
- * so it also works on another device.
- *
- * Same shape as a Fitting Share Code (`engine/fittings/fittingShare.ts`):
- * `<version>.<base64url(deflate-raw(text))>` through the platform
- * `CompressionStream`, no compression library. Decoding never throws and
- * bounds both the encoded and the decompressed size, so a crafted link
- * cannot be a decompression bomb.
- *
- * The raw paste text is kept (after a lossless tidy), not a parsed item list,
- * so an EFT fit stays a fit.
- */
-
 export const APPRAISAL_LIST_CODE_VERSION = '1';
 
-/**
- * Longest `list` value that gets written. About 6,000 characters keeps the
- * whole address well under the ~8 KB request-line limit common hosts and
- * proxies enforce on a reload. A longer list is simply not written: the
- * Appraisal works from memory as usual, and this is the one case Back will
- * not restore.
- */
 export const MAX_APPRAISAL_LIST_CODE_LENGTH = 6000;
 
-/** A legitimate list is a few tens of KB at most; this only bounds a bomb. */
 const MAX_DECOMPRESSED_BYTES = 65536;
 
 const BASE64URL_TOKEN = /^[A-Za-z0-9_-]+$/;
@@ -36,7 +12,6 @@ export type EncodeAppraisalListResult =
 export type DecodeAppraisalListResult =
   { ok: true; text: string } | { ok: false; reason: 'invalid' };
 
-/** Trailing whitespace per line and blank lines go; what the list appraises does not change. */
 export function normaliseAppraisalList(text: string): string {
   return text
     .split(/\r?\n/)
@@ -54,7 +29,6 @@ function toStream(bytes: Uint8Array): ReadableStream<Uint8Array> {
   });
 }
 
-/** Drains a stream; a `null` result means it errored or passed `maxBytes`. */
 async function drain(stream: ReadableStream<Uint8Array>, maxBytes: number) {
   const reader = stream.getReader();
   const chunks: Uint8Array[] = [];
@@ -108,7 +82,6 @@ export async function encodeAppraisalList(text: string): Promise<EncodeAppraisal
   const normalised = normaliseAppraisalList(text);
   if (normalised === '') return { ok: false, reason: 'empty' };
   const bytes = new TextEncoder().encode(normalised);
-  // Decoding caps the inflated size, so a code that could not be read back is not written.
   if (bytes.length > MAX_DECOMPRESSED_BYTES) return { ok: false, reason: 'too-large' };
   let compressed: Uint8Array | null;
   try {
@@ -143,7 +116,6 @@ export async function decodeAppraisalList(code: string): Promise<DecodeAppraisal
       MAX_DECOMPRESSED_BYTES
     );
   } catch {
-    // No `deflate-raw` stream support: treated like any unreadable code.
     return invalid;
   }
   if (bytes === null) return invalid;

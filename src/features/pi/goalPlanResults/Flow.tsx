@@ -1,4 +1,3 @@
-/** The whole demand: every chain line, how much is made, and from where. */
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation } from 'react-router-dom';
@@ -15,14 +14,11 @@ import { piProductHref } from '../piPlanLink';
 import { HOURS_PER_DAY, formatPercent, planetTypesText, type PlanNames } from './format';
 import { flowCsvColumns } from './planExportColumns';
 
-/** Under this short of one, a made fraction is float dust. */
 const WHOLE = 0.995;
 
-/** The source, with how much is made where the line is partial. */
 function sourceLabel(line: DemandLine, t: TFunction): string {
   const percent = formatPercent(line.madeFraction * 100);
   if (line.source === 'bought') {
-    // The tier names what is bought; a part made as well is said alongside.
     return line.madeFraction > 1 - WHOLE
       ? t('piPlan.sourceBoughtPartial', { tier: line.tier, percent })
       : t('piPlan.sourceBoughtTier', { tier: line.tier });
@@ -68,15 +64,12 @@ export function Flow({
   names,
 }: {
   demand: readonly DemandLine[];
-  /** The plan's type gaps by P0, for naming what blocks the blocked goals. */
   typeGaps: ReadonlyMap<number, readonly PlanetType[]>;
   names: PlanNames;
 }) {
   const { t } = useTranslation();
   const { search } = useLocation();
   const { pi } = names;
-  // The live chain first, the blocked goals' chain folded below it: a type
-  // both need then reads as two lines in two places, not a duplicate.
   const rows = useMemo(
     () => [
       ...demand.filter((line) => line.source !== 'blocked'),
@@ -201,7 +194,6 @@ export function Flow({
         density="compact"
         stackColumns={2}
         rowMoreActions
-        // The product name opens its PI page.
         rowHref={(line) => piProductHref(line.typeId, search)}
         rowContextMenu={(line, tr) => (
           <ItemContextMenu

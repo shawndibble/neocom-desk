@@ -1,9 +1,3 @@
-/**
- * Device-local: which quantity the Mining Yield Overview's two charts plot —
- * ISK (today's only option), mined m³, or item count (issue #2160). Local,
- * not synced, same as `showRefiningPref.ts`: this is about how this device's
- * owner reads the page, not a fact about the pilot.
- */
 import { createLocalSetting } from '@/lib/useLocalSetting';
 
 export const CHART_METRICS = ['isk', 'volume', 'count'] as const;

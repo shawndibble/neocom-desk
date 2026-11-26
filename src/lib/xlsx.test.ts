@@ -50,7 +50,6 @@ describe('toXlsx', () => {
     const xml = sheetXml(
       toXlsx([{ name: 'a', qty: 1, at: '2026-01-01T12:00:00Z' }], columns, 'Sheet')
     );
-    // 2026-01-01 is Excel serial 46023; noon adds half a day.
     expect(xml).toContain('<c r="C2" s="2"><v>46023.5</v></c>');
   });
 

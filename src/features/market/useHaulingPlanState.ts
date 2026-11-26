@@ -14,22 +14,13 @@ import type { HaulingFees } from './useHaulingScan';
 const NO_OVERRIDES: ReadonlyMap<number, TripOverride> = new Map();
 
 interface HaulingPlanStateInput {
-  /** The Cargo Space's holds, or null while none is set. */
   holds: readonly CargoHold[] | null;
-  /** Max spend, whole ISK; null is no limit. */
   maxSpend: number | null;
   fees: HaulingFees;
-  /** The rows on the table: the scan's shown rows plus any added from the fill. */
   tableRows: readonly HaulingViewRow[];
-  /** A new route, category or mode starts a fresh plan. */
   scanKey: string;
 }
 
-/**
- * The Trip Plan and the user's edits to it. The edits (`overrides`) belong to
- * one scan: a new `scanKey` drops them. Every row starts ticked at a suggested
- * quantity; unticking or typing a number re-sizes the rest through `planTrip`.
- */
 export function useHaulingPlanState({
   holds,
   maxSpend,
@@ -45,7 +36,6 @@ export function useHaulingPlanState({
   }
 
   const tableCandidates = useMemo(() => tableRows.map((r) => r.candidate), [tableRows]);
-  // Every candidate carries its own destination's fees; `fees` here is only the fallback.
   const planBase = useMemo(
     () => ({ holds, budgetIsk: maxSpend, fees: fees.at(TRADE_HUBS[0]!) }),
     [holds, maxSpend, fees]
@@ -55,9 +45,6 @@ export function useHaulingPlanState({
     [planBase, tableCandidates, overrides]
   );
   const lineOf = useMemo(() => new Map(plan.lines.map((l) => [l.typeId, l])), [plan]);
-  // The Profit column sorts by the suggestion, not the edited plan: unticking
-  // a row or typing in Bring must not move the row out from under the pointer.
-  // Unedited, the suggestion is the plan itself.
   const noEdits = overrides.size === 0;
   const suggestion = useMemo(
     () =>
@@ -80,10 +67,8 @@ export function useHaulingPlanState({
     });
   }
 
-  /** Drops every edit: Select all's on state, and the menu's Fill hold. */
   const resetOverrides = () => setOverrides(NO_OVERRIDES);
 
-  /** Unticks every row: Select all's off state, and the menu's Clear all. */
   const clearAll = () =>
     setOverrides(new Map(tableRows.map((r) => [r.typeId, { selected: false }])));
 
@@ -110,11 +95,9 @@ interface HaulingExportInput {
   tableRows: readonly HaulingViewRow[];
   lineOf: ReadonlyMap<number, { quantity: number; profit: number; volumeM3: number }>;
   overrides: ReadonlyMap<number, TripOverride>;
-  /** Rows added by the fill, and the category each came from. */
   addedFromOf: (typeId: number) => string | null;
 }
 
-/** The table's CSV/clipboard export: Bring is the planned quantity, blank for an unticked row. */
 export function useHaulingExport({
   mode,
   anyEnd,

@@ -1,14 +1,3 @@
-/**
- * The demo's widget grid: the app's own `Widget` and `WidgetMenu`, drawn over
- * sample Views (`demoData.ts`) instead of the live feeds, in the same flex-wrap
- * rows as `WidgetGrid`. Loaded lazily by `OverviewDemo`, because the widget
- * stack is far too large for the landing page's first load.
- *
- * Everything is cosmetic. The edit context is a stand-in whose actions do
- * nothing (a menu choice just closes the menu), the titles are the real
- * link's look without a link, and a table's sort and pager are the only state
- * that moves, as they are local to the table in the app too.
- */
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { OverviewEditContext, type OverviewEdit } from '@/features/overview/widgets/editContext';
@@ -22,7 +11,6 @@ const none = () => undefined;
 
 export default function DemoBoard() {
   const { t } = useTranslation();
-  // Wall-clock read for the illustrative figures; lazy so it runs once.
   const [now] = useState(() => Date.now());
   const [widgets, setWidgets] = useState<readonly WidgetModel[]>(DEMO_WIDGETS);
   const views = useMemo(() => buildDemoViews(t, now), [t, now]);

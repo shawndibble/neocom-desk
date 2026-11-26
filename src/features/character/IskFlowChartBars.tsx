@@ -1,9 +1,3 @@
-/**
- * The bars of the Journal panel's daily In / Out chart (issue #3914), drawn
- * with Recharts. Statically imports `recharts`, so — same rule as
- * `industry/ProductionProfitChart.tsx` — this must only ever be reached
- * through a dynamic `import()` (see `IskFlowChart.tsx`).
- */
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -30,21 +24,17 @@ import { formatIsk, formatIskCompact } from '@/lib/isk';
 
 interface IskFlowChartBarsProps {
   days: readonly JournalDayFlow[];
-  /** The day the Journal is filtered to, when it is one day: the others dim. */
   selectedDay: string | null;
-  /** Touch: a tap only reads the bar's tooltip, it never filters. */
   readOnly: boolean;
   onSelectDay: (day: string) => void;
 }
 
 interface BarPoint extends JournalDayFlow {
-  /** Out as a negative number: stacked below the zero line. */
   below: number;
 }
 
 const BARS: { dataKey: string; fill: string; radius: [number, number, number, number] }[] = [
   { dataKey: 'in', fill: 'var(--color-isk-pos)', radius: [4, 4, 0, 0] },
-  // Recharts mirrors a negative bar's corners (its first two sit at the bar's far end), so `[4, 4, 0, 0]` rounds the tip here too.
   { dataKey: 'below', fill: 'var(--color-isk-neg)', radius: [4, 4, 0, 0] },
 ];
 
@@ -91,7 +81,6 @@ export default function IskFlowChartBars({
     ],
     [t]
   );
-  // The table skips the empty days before the first one with flow; the chart keeps its even axis.
   const tableDays = useMemo(() => {
     const first = days.findIndex((d) => d.in > 0 || d.out > 0);
     return first < 0 ? days : days.slice(first);
@@ -100,7 +89,6 @@ export default function IskFlowChartBars({
   const tickEvery = Math.max(0, Math.ceil(data.length / 5) - 1);
   return (
     <div>
-      {/* No role="img": it would swallow recharts' focusable layer; the table below is the equivalent. */}
       <div className="h-40 w-full">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart
@@ -126,7 +114,6 @@ export default function IskFlowChartBars({
             />
             <YAxis
               width={scalePx(COMPACT_ISK_Y_AXIS_WIDTH)}
-              // SVG axis tick: IskAmount can't render here (documented exception).
               tickFormatter={(value: number) => formatIskCompact(value)}
               tick={{ fontSize: '0.6875rem', fill: 'var(--color-text-dim)' }}
               tickLine={false}
@@ -154,7 +141,6 @@ export default function IskFlowChartBars({
           </BarChart>
         </ResponsiveContainer>
       </div>
-      {/* On a wrapper: a <table> ignores sr-only's clip and still stretches the page. */}
       <div className="sr-only">
         <DataTable
           columns={columns}

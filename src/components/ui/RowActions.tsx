@@ -1,15 +1,3 @@
-/**
- * A row's actions, reachable two ways from one definition: the right-click
- * (or long-press) context menu, and a visible "More actions" button a
- * keyboard user can Tab to (WCAG 2.1.1).
- *
- * The items are written once, with the kind-agnostic `MenuItem`/`MenuSub*`
- * below, and rendered into both menus — each item reads which Radix family
- * it sits in from context, so the two can't drift. A row menu wrapper
- * (`RowActionsMenu`, or a hand-rolled one that provides `RowActionsContext`)
- * publishes its items; a `RowMoreActions` anywhere under it — a cell in the
- * row, or `DataTable`'s `rowMoreActions` column — draws the button.
- */
 import {
   Children,
   Fragment,
@@ -78,11 +66,6 @@ export function MenuItem(props: ComponentProps<typeof ContextMenuItem>) {
   );
 }
 
-/**
- * "Open in new tab" for a row whose click goes to another page. A real link,
- * so the browser offers its own link menu on it too; same-origin, so no
- * `ExternalLink` mark. Row menus render it themselves from `openHref`.
- */
 export function OpenInNewTabMenuItem({ href }: { href: string }) {
   const { t } = useTranslation();
   return (
@@ -94,16 +77,6 @@ export function OpenInNewTabMenuItem({ href }: { href: string }) {
   );
 }
 
-/**
- * A `MenuItem` that stays hoverable, focusable and tappable while inert,
- * explaining why via a tap-reachable `Tooltip` (issue #2162) — same
- * `aria-disabled`-over-native reasoning as `Characters.tsx`'s refresh-all
- * button, adapted for a Radix menu item: `menuItemClassName`'s
- * `data-[disabled]:pointer-events-none` keys off the native `disabled` prop,
- * so passing it here would swallow the very tap meant to reveal `reason`.
- * `onSelect` no-ops instead, keeping the menu open so the bubble stays
- * readable.
- */
 export function DisabledMenuItem({ reason, children }: { reason: string; children: ReactNode }) {
   return (
     <Tooltip content={reason} openOnTap>
@@ -182,42 +155,21 @@ export function MenuRadioItem(props: ComponentProps<typeof ContextMenuRadioItem>
   );
 }
 
-/**
- * The ordered vocabulary a menu's items are grouped by (DESIGN.md §6c "Menu
- * length"). A menu groups its items with `MenuGroup`; the arranger below sorts
- * the groups into this order, puts a hairline between non-empty ones, and
- * folds the `fold` groups into a submenu, so no call site places a divider or
- * decides what folds. `other` is where an item outside any group lands.
- */
 const MENU_GROUP_ORDER = ['primary', 'track', 'copy', 'game', 'other'] as const;
 export type MenuGroupId = (typeof MENU_GROUP_ORDER)[number];
 
-/** Groups that fold into a submenu (value: its i18n label key) once they hold `MENU_FOLD_MIN` items. */
 const FOLDED_GROUPS: Partial<Record<MenuGroupId, string>> = {
   track: 'common.menuGroup.track',
   game: 'common.menuGroup.game',
 };
 
-/** A submenu of fewer items than this costs a click and hides too little: the group stays flat. */
 const MENU_FOLD_MIN = 3;
 
-/**
- * Marks `children` as one of a menu's groups. Groups with the same `id`, from
- * any number of `MenuGroup`s (a page's `extraItems` joining the shared menu's),
- * merge into one. Only a top-level child of the `items` counts. A folded
- * group folds on its `size`, which defaults to its element count: pass `size`
- * where a child renders more or fewer items than one.
- */
 export function MenuGroup({
   children,
 }: {
   id: MenuGroupId;
   children?: ReactNode;
-  /**
-   * How many items `children` render, when that is not the number of
-   * elements (a wrapper that renders two items, or none for an Abyssal
-   * type). Decides folding; summed across same-`id` groups.
-   */
   size?: number;
 }): ReactNode {
   return children;
@@ -231,20 +183,9 @@ function flattenMenuNodes(node: ReactNode): ReactNode[] {
   );
 }
 
-/**
- * Hairline between non-empty sibling groups, as CSS: a group whose items all
- * render nothing (an Abyssal item's market actions) is `:empty`, and neither
- * shows nor leaves a stray rule behind.
- */
 const GROUP_CLASS =
   'empty:hidden [&:not(:empty)~&:not(:empty)]:mt-1 [&:not(:empty)~&:not(:empty)]:border-t [&:not(:empty)~&:not(:empty)]:border-line [&:not(:empty)~&:not(:empty)]:pt-1';
 
-/**
- * Lays out a menu's items: groups in `MENU_GROUP_ORDER`, hairlines between
- * them, and the folded groups as submenus. Items with no `MenuGroup` anywhere
- * render as written (a menu not yet migrated keeps its own separators).
- * Kind-agnostic: render it inside whichever menu's content.
- */
 export function ArrangedMenuItems({ items }: { items: ReactNode }) {
   const { t } = useTranslation();
   const nodes = flattenMenuNodes(items);
@@ -262,7 +203,6 @@ export function ArrangedMenuItems({ items }: { items: ReactNode }) {
     if (isGroup(node)) {
       add(node.props.id, flattenMenuNodes(node.props.children), node.props.size);
     } else if (!(isValidElement(node) && node.type === MenuSeparator)) {
-      // A hand-placed separator is dropped: the groups own the hairlines.
       add('other', [node]);
     }
   }
@@ -290,12 +230,6 @@ export function ArrangedMenuItems({ items }: { items: ReactNode }) {
   );
 }
 
-/**
- * How many real actions `items` holds, or `undefined` when it can't tell (a
- * wrapper component may render any number). Separators and empties count 0; a
- * `MenuSub` counts as 2 (a submenu is a menu's worth of actions, so it never
- * trips the warning alone); a `MenuRadioGroup` counts its items.
- */
 function countMenuItems(node: ReactNode): number | undefined {
   let count = 0;
   for (const child of Children.toArray(node)) {
@@ -315,10 +249,6 @@ function countMenuItems(node: ReactNode): number | undefined {
 
 const warnedRestraint = new Set<string>();
 
-/**
- * Dev-only, once per row name: a `RowActionsMenu` over fewer than two real
- * actions is what DESIGN.md §6c's restraint rules retire.
- */
 function warnRestraint(name: string, items: ReactNode) {
   if (!import.meta.env.DEV || warnedRestraint.has(name)) return;
   const count = countMenuItems(items);
@@ -329,19 +259,12 @@ function warnRestraint(name: string, items: ReactNode) {
   );
 }
 
-/** Links and text fields: the browser's own menu (open in new tab, paste) is the one a pilot expects there. */
 const BROWSER_MENU_TARGETS = 'a[href], input, textarea, select, [contenteditable="true"]';
 
 function targetsBrowserMenu(event: SyntheticEvent): boolean {
   return event.target instanceof Element && event.target.closest(BROWSER_MENU_TARGETS) !== null;
 }
 
-/**
- * Right-click there stops before Radix's trigger (no `preventDefault`, so the browser menu shows).
- * A touch/pen press marks only React's event as prevented, in the trigger's own `onPointerDown`,
- * which Radix runs just before its long-press handler and skips that on a prevented event. The
- * native default (a tapped field taking focus, the browser's hold menu) still runs.
- */
 const browserMenuGuard = {
   onContextMenuCapture(event: MouseEvent) {
     if (targetsBrowserMenu(event)) event.stopPropagation();
@@ -353,17 +276,6 @@ const browserMenuGuard = {
   },
 };
 
-/**
- * Right-click menu around `trigger`, publishing the same items for
- * `RowMoreActions`. Touch-and-hold anywhere in the row opens it (with
- * `linksKeepBrowserMenu`, anywhere but a link or field), so the tooltips of
- * the controls inside give that gesture up (`tooltipHold.ts`): a hold inside
- * a row menu never reveals a tooltip.
- *
- * With `tooltip`, the trigger itself explains itself on hover and focus too
- * (a Fittings Ring tile); its touch-and-hold is the menu's alone, so what the
- * tooltip says must be reachable in the menu or elsewhere.
- */
 export function RowActionsMenu({
   name,
   items,
@@ -376,9 +288,7 @@ export function RowActionsMenu({
   children,
 }: RowActions & {
   tooltip?: string;
-  /** A click on the row goes to this page: both menus lead with "Open in new tab". Never makes a row earn a menu alone (§6c). */
   openHref?: string;
-  /** Right-click or hold on a link or text field stays the browser's (§6c "Entities", guardrail 2). */
   linksKeepBrowserMenu?: boolean;
   children: ReactElement;
 }) {
@@ -396,13 +306,7 @@ export function RowActionsMenu({
     >
       <TooltipHoldContext.Provider value={false}>
         <ContextMenu onOpenChange={onOpenChange} modal={modal}>
-          {tooltip === undefined ? (
-            trigger
-          ) : (
-            // Around the menu's own trigger (a Radix primitive that merges
-            // props), never inside it: a component there would drop them.
-            <Tooltip content={tooltip}>{trigger}</Tooltip>
-          )}
+          {tooltip === undefined ? trigger : <Tooltip content={tooltip}>{trigger}</Tooltip>}
           <ContextMenuContent onCloseAutoFocus={onCloseAutoFocus}>
             {href && <OpenInNewTabMenuItem href={href} />}
             <ArrangedMenuItems items={items} />
@@ -415,21 +319,8 @@ export function RowActionsMenu({
 
 const ROW_MENU_TIP = 'rowMenuTip';
 const ROW_HINT = 'rowHint';
-/** How many ⋮ opens carry the "right-click any row" footer. */
 const ROW_MENU_TIP_OPENS = 3;
 
-/**
- * The visible trigger for the enclosing row's actions. A real dropdown rather
- * than a synthetic right-click, so it announces `aria-haspopup`/`expanded`,
- * lands focus on the first item when opened from the keyboard, and hands
- * focus back to itself on close. `variant="plain"` drops the hairline border
- * so it doesn't compete with the row's own content. Renders nothing outside
- * a row that publishes actions. Only place one where §6c's restraint rules
- * allow a ⋮: at least two real actions reachable nowhere else, one trailing
- * control cluster at the row's right edge. Beside a `Button` in an action row
- * (the plan hero, next to Log production) pass `variant="ghost" size="sm"`:
- * a bordered button of the Button's own height.
- */
 export function RowMoreActions({
   className,
   variant = 'plain',
@@ -439,24 +330,15 @@ export function RowMoreActions({
   hints = true,
 }: {
   className?: string;
-  /** The button's accessible name, when "More actions for {name}" is not the wording ("Settings for Wallet"). */
   label?: string;
-  /** Marks the button as the place focus returns to (`data-focus-target`). */
   focusTarget?: boolean;
-  /**
-   * `false` keeps both row tips (the one-time hint and the menu footer) off this
-   * ⋮ and unspent, for a host that is not a row (an Overview widget card).
-   */
   hints?: boolean;
-  /** `ghost` draws the hairline border, for a ⋮ that stands beside a `Button` rather than inside a row. */
   variant?: Extract<IconButtonVariant, 'ghost' | 'plain'>;
-  /** `sm` matches `Button size="sm"`'s height. */
   size?: Extract<IconButtonSize, 'row' | 'sm'>;
 }) {
   const { t } = useTranslation();
   const actions = useContext(RowActionsContext);
   const [tip, setTip] = useState(false);
-  // Only once a pilot is logged in: never on /login, where no Character exists yet.
   const loggedIn = useCharacterCount() > 0;
   const showTips = hints && loggedIn;
   const [hintShown, dismissHint] = useOneTimeHint(ROW_HINT, actions !== null && showTips);
@@ -465,7 +347,6 @@ export function RowMoreActions({
   const onOpenChange = (open: boolean) => {
     if (open) {
       if (hintShown) dismissHint();
-      // Counted per open, but the footer stays for the open that earned it.
       const { value, hydrated } = useHintCounts.getState();
       const earned =
         showTips && hydrated && hintSeenCount(value, ROW_MENU_TIP) < ROW_MENU_TIP_OPENS;
@@ -493,16 +374,13 @@ export function RowMoreActions({
           align="end"
           aria-label={label ?? t('common.moreActionsLabel', { name: actions.name })}
           className="flex max-w-60 flex-col items-start gap-2 p-2 text-xs"
-          // A hint never takes focus from where the pilot is working.
           onOpenAutoFocus={(event) => event.preventDefault()}
           onCloseAutoFocus={(event) => event.preventDefault()}
-          // Portalled, so React still bubbles these to the row's own handlers.
           onClick={(event) => event.stopPropagation()}
           onContextMenu={(event) => event.stopPropagation()}
           onPointerDown={(event) => event.stopPropagation()}
           onPointerUp={(event) => event.stopPropagation()}
           onKeyDown={(event) => event.stopPropagation()}
-          // Focus moving elsewhere is not an answer; a press outside or Escape is.
           onFocusOutside={(event) => event.preventDefault()}
         >
           <p>{t('common.rowHint', { context })}</p>
@@ -511,8 +389,6 @@ export function RowMoreActions({
           </Button>
         </PopoverContent>
       </Popover>
-      {/* Stops a right-click on an item bubbling (through the React tree,
-          portal or not) to the row's own context-menu trigger. */}
       <DropdownMenuContent
         align="end"
         onContextMenu={(event) => event.stopPropagation()}

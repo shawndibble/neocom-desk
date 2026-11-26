@@ -43,7 +43,6 @@ describe('Travel › Route Safety › Thera / Turnur modal', () => {
   const JSPACE_TABLE = 'Open holes into J-space';
   const JSPACE_GROUP = /exits? into J-space · no gate route from you/;
 
-  /** The connection ids a table lists, top to bottom. */
   function holesIn(table: HTMLElement) {
     return within(table)
       .getAllByRole('row')
@@ -55,10 +54,8 @@ describe('Travel › Route Safety › Thera / Turnur modal', () => {
     return document.querySelector<HTMLElement>(`tr[data-row-key="${id}"]`)!;
   }
 
-  /** Opens More route options, then the modal from the Browse open wormholes button. */
   async function openFromBrowse(search = `?from=${JITA}`, { phone = false } = {}) {
     visit(search);
-    // A phone folds the rules panel until asked.
     if (phone)
       await userEvent
         .setup({ delay: null })
@@ -107,7 +104,6 @@ describe('Travel › Route Safety › Thera / Turnur modal', () => {
     const dialog = await openFromBrowse();
 
     const table = await within(dialog).findByRole('table', { name: MAIN_TABLE });
-    // Perimeter is one jump from Jita, Uedama two; the expired Jita hole is gone.
     await waitFor(() => expect(holesIn(table)).toEqual(['perimeter', 'uedama']));
     const perimeter = within(holeRow('perimeter'));
     expect(perimeter.getByText('Perimeter')).toHaveClass('font-semibold');
@@ -123,7 +119,6 @@ describe('Travel › Route Safety › Thera / Turnur modal', () => {
     const jspace = await within(dialog).findByRole('table', { name: JSPACE_TABLE });
     expect(holesIn(jspace)).toEqual(['jspace']);
     expect(within(holeRow('jspace')).getByText('No gate route')).toBeInTheDocument();
-    // J-space exits are not offered Use in route.
     expect(within(holeRow('jspace')).queryByRole('button')).not.toBeInTheDocument();
   });
 
@@ -152,7 +147,6 @@ describe('Travel › Route Safety › Thera / Turnur modal', () => {
     );
     const params = new URLSearchParams(window.location.search);
     expect(params.get('wh')).toBe('1');
-    // The first leg is the hole; the second leg keeps its pin.
     expect(params.get('pin')).toBe('uedama,gates');
     expect(params.get('from')).toBe(String(JITA));
   });
@@ -171,7 +165,6 @@ describe('Travel › Route Safety › Thera / Turnur modal', () => {
     await waitFor(() =>
       expect(holesIn(screen.getByRole('table', { name: MAIN_TABLE }))).toEqual(['uedama'])
     );
-    // Local to the modal: not in the page's URL.
     expect(window.location.search).not.toContain('hub=');
   });
 

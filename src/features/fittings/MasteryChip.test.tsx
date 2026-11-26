@@ -24,14 +24,14 @@ const trained = new Map([[3300, { skillId: 3300, level: 3 }]]);
 vi.mock('@/sde/loadSde', () => ({
   loadMasteries: vi.fn(async () => ({
     '626': [
-      [{ skillTypeID: 3300, level: 2 }], // I
-      [{ skillTypeID: 3300, level: 3 }], // II
+      [{ skillTypeID: 3300, level: 2 }],
+      [{ skillTypeID: 3300, level: 3 }],
       [
         { skillTypeID: 3300, level: 3 },
         { skillTypeID: 3436, level: 4 },
-      ], // III
-      [], // IV
-      [], // V
+      ],
+      [],
+      [],
     ],
   })),
 }));
@@ -76,7 +76,6 @@ describe('MasteryChip', () => {
     await openChip(user);
 
     expect(await screen.findByText('Vexor Mastery')).toBeInTheDocument();
-    // Gunnery is named by tiers I-III at levels 2/3/3: one row, not three.
     expect(screen.getAllByText('Gunnery III')).toHaveLength(1);
     expect(screen.getByText('Drones IV')).toBeInTheDocument();
   });
@@ -119,7 +118,6 @@ describe('MasteryChip', () => {
     try {
       await openChip(user);
       await screen.findByText('Drones IV');
-      // Gunnery is trained; Drones is the only untrained row and is planned.
       expect(
         screen.getByText('All of these skills are already in the Skill Plan')
       ).toBeInTheDocument();
@@ -137,7 +135,6 @@ describe('MasteryChip', () => {
   });
 
   it("holds the badge's place, silently, while the Mastery data loads", async () => {
-    // Issue #2255: the slot keeps the header's action group from jumping rows.
     let release: (value: MasteryMap) => void = () => {};
     vi.mocked(loadMasteries).mockImplementationOnce(
       () => new Promise<MasteryMap>((resolve) => (release = resolve))
@@ -180,7 +177,6 @@ describe('MasteryChip', () => {
     retry.focus();
     await userEvent.click(retry);
 
-    // Still the same panel and the same button, not a blank slot: focus has not been dropped.
     expect(screen.getByText(/Mastery data isn't available offline yet/)).toBeVisible();
     expect(screen.getByRole('button', { name: 'Try again' })).toHaveFocus();
 

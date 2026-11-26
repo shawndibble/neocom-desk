@@ -1,7 +1,3 @@
-/**
- * One `orderRowSummary` feeds the summary and verdict so the modal's lines can't disagree.
- * In features/market, not engine: the badge kind type comes from the `OrderProblemBadge` component.
- */
 import { orderBadgeFor, type OrderBadgeChoice } from './orderBadgeKind';
 import { orderRowSummary, type OrderAdviceInput, type OrderRowSummary } from './orderRowSummary';
 import { orderVerdict, type OrderVerdict } from './orderVerdict';

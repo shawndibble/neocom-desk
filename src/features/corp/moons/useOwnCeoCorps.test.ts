@@ -40,7 +40,6 @@ describe('findOwnCeoCorps', () => {
   });
 
   it('drops a pairing whose CEO has since moved to another corporation', async () => {
-    // The corp record still names Character 2 as CEO, but ESI now has them in corp 300.
     affiliations.rows[1] = { character_id: 2, corporation_id: 300 };
     corps.byId.set(300, { name: 'New Hollow', ceo_id: 9 });
     const found = await findOwnCeoCorps(ME, undefined);

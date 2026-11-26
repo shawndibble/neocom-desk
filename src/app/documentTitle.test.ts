@@ -34,11 +34,7 @@ describe('documentTitleFor', () => {
     expect(documentTitleFor('/market/history', t)).toBe(
       `${i18n.t('market.sections.history')} — Market — Neocom Desk`
     );
-    expect(documentTitleFor('/help/faq', t)).toBe(
-      // Literal on purpose: a label key that resolves to nothing would echo
-      // itself on both sides of a `t()`-built expectation and still pass.
-      'FAQ — Help & FAQ — Neocom Desk'
-    );
+    expect(documentTitleFor('/help/faq', t)).toBe('FAQ — Help & FAQ — Neocom Desk');
   });
 
   it('titles a tabbed page’s bare path as the page alone', () => {
@@ -46,7 +42,6 @@ describe('documentTitleFor', () => {
   });
 
   it('does not repeat a tab label that matches its page', () => {
-    // Market's Browser tab is labelled "Market".
     expect(documentTitleFor('/market/browser', t)).toBe('Market — Neocom Desk');
   });
 
@@ -93,14 +88,11 @@ describe('documentTitleFor', () => {
 
   it('gives every feature route a distinct title', () => {
     const concrete = (Object.keys(ROUTE_REQUIREMENTS) as AppRoutePath[])
-      // Redirect-only routes never render a page of their own.
       .filter((path) => !REDIRECT_ONLY.has(path))
       .map((path) => path.replace(/:\w+/g, '1').replace('/*', '/x'))
-      // `/assets/x` is the same page as `/assets`, one drill-down deeper.
       .filter((path) => !path.endsWith('/x'));
     const titles = concrete.map((path) => documentTitleFor(path, t));
     for (const title of titles) expect(title).not.toContain(i18n.t('notFound.title'));
-    // Nested :param routes share their section's title by design.
     const nested = new Set(['/skills/plans/1', '/industry/plans/1', '/industry/groups/1']);
     const distinct = concrete
       .filter((path) => !nested.has(path))

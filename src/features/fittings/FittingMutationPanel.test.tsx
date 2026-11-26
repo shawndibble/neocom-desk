@@ -123,9 +123,7 @@ function setup(
   );
   const { rerender } = render(panel(module, characterId));
   const fitting: Fitting = { ...newFitting(1, 'Test'), modules: [module] };
-  /** The module as the `n`th edit leaves it. */
   const after = (n = 0) => edit.mock.calls[n]![0](fitting).modules[0]!;
-  /** Shows the panel again, as the editor does after an edit or a Character switch. */
   const show = (shown: FittingModule, character = characterId) => rerender(panel(shown, character));
   return { edit, after, show };
 }
@@ -169,7 +167,6 @@ describe('FittingMutationPanel', () => {
         attributes: { [CAP]: 100, [POWER]: 1000 },
       },
     });
-    // A plain module has no rolls, nothing to remove.
     expect(screen.queryByRole('slider')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Remove mutation' })).toBeNull();
   });
@@ -177,7 +174,6 @@ describe('FittingMutationPanel', () => {
   it('rolls a mutated module on a worst-to-best slider showing the absolute value', async () => {
     const { edit, after } = setup(mutated);
     const cap = await screen.findByRole('slider', { name: 'Activation Cost' });
-    // 80 GJ is the best activation cost Gravid rolls (lower is better).
     expect(cap).toHaveValue('100');
     expect(cap).toHaveAttribute('aria-valuetext', '80 GJ, 100% roll');
     expect(screen.getByText('Worst 130 GJ')).toBeInTheDocument();
@@ -282,8 +278,6 @@ describe('FittingMutationPanel', () => {
       },
       needsReauth: false,
     });
-    // 501 rolls closer to the good end (lower power) so it has the higher quality,
-    // but 502 is what the fit likes better.
     assets.mutationsForItems.mockResolvedValue(
       new Map([
         [501, rolls(850)],
@@ -306,11 +300,9 @@ describe('FittingMutationPanel', () => {
       screen
         .getAllByRole('listitem')
         .map((li) => Number(/avg (\d+)%/.exec(li.textContent ?? '')?.[1]));
-    // By effect, the lower-quality 502 leads.
     await vi.waitFor(() => expect(order()[0]).toBeLessThan(order()[1]!));
     await user.click(screen.getByRole('button', { name: 'Roll quality' }));
     expect(order()[0]).toBeGreaterThan(order()[1]!);
-    // No MutaMarket call until a row asks.
     expect(rank.estimate).not.toHaveBeenCalled();
     await user.click(screen.getAllByRole('button', { name: 'Estimate price' })[0]!);
     expect(rank.estimate).toHaveBeenCalledTimes(1);
@@ -423,7 +415,6 @@ describe('FittingMutationPanel, assets it cannot read', () => {
   });
 });
 
-/** The picker waits on the base's values before it takes a choice. */
 async function waitForEnabled(element: HTMLElement) {
   await vi.waitFor(() => expect(element).toBeEnabled());
 }

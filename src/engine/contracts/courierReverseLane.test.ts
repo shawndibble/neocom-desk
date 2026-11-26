@@ -46,16 +46,6 @@ const DODIXIE: CourierEndpoint = {
   hasStargates: true,
 };
 
-/**
- * A player structure, which is what an unplaced end really is: `stations.json`
- * holds every NPC station, so an id it does not carry is a structure by
- * elimination — and nothing local gives it a system or a region.
- *
- * Every field below the id is null on purpose. A fixture that quietly placed
- * this end would pass both the "cannot say" case and the undercount case while
- * the producer emits neither, which is exactly how three earlier bugs in this
- * feature stayed green.
- */
 const STRUCTURE: CourierEndpoint = {
   locationId: 1035466617946,
   name: null,
@@ -114,21 +104,12 @@ describe('reverseLaneMatches', () => {
     expect(reverseLaneMatches(subject, [subject, back], NO_FILTER)).toBeNull();
   });
 
-  /**
-   * A pickup with no region is not the player-structure case — `courierEndpoints`
-   * hands every pickup the contract's own region column, structure or not. It is
-   * the narrower one below: a real NPC station whose *system* the local snapshot
-   * does not hold, which leaves the region unresolved with the name intact.
-   * Rare, and the reason the null guard on the pickup end is not dead code.
-   */
   it('has no lane to look up when the pickup station sits in a system the snapshot does not hold', () => {
     const stationOffTheMap: CourierEndpoint = {
       ...JITA,
       systemName: null,
       systemId: null,
       regionId: null,
-      // Spread from JITA, so this must be overridden too — a system the
-      // snapshot cannot place has no security status to inherit either.
       security: null,
       space: null,
     };
@@ -138,12 +119,6 @@ describe('reverseLaneMatches', () => {
     expect(reverseLaneMatches(subject, [subject, back], NO_FILTER)).toBeNull();
   });
 
-  /**
-   * An unplaced end has no region *and* no space band — they go null together.
-   * Run through the hauler's band filter, every row this is meant to report
-   * would be dropped before it could be counted, and the figure would read zero
-   * exactly when it has something to say.
-   */
   it('still reports the return hauls it cannot place when a space band is chosen', () => {
     const subject = haul(JITA, AMARR);
     const back = haul(AMARR, JITA);
@@ -157,13 +132,6 @@ describe('reverseLaneMatches', () => {
     expect(lane?.unplaceable.map((row) => row.contractId)).toEqual([unplaceable.contractId]);
   });
 
-  /**
-   * The lane is measured region to region, so a return haul whose drop-off is a
-   * player structure cannot be matched into it. Reported separately rather than
-   * silently missing from the count: "two more leave Domain for somewhere we
-   * cannot place" is the honest reading, and a bare count would read as
-   * "nobody is hauling back".
-   */
   it('reports the return hauls it cannot place, apart from the ones it counted', () => {
     const subject = haul(JITA, AMARR);
     const back = haul(AMARR, JITA);
@@ -175,10 +143,6 @@ describe('reverseLaneMatches', () => {
     expect(lane?.unplaceable.map((row) => row.contractId)).toEqual([unplaceable.contractId]);
   });
 
-  /**
-   * An intra-region haul's reverse lane is its own lane, so without this the
-   * load already being carried would be offered back as a return trip.
-   */
   it('never counts the haul being read as its own return trip', () => {
     const jitaToJita = haul(JITA, JITA);
     const other = haul(JITA, JITA);
@@ -195,9 +159,6 @@ describe('reverseLaneMatches', () => {
 
     const lane = reverseLaneMatches(subject, [subject, affordable, tooRich], {
       maxCollateral: 50_000_000,
-      // The lane's own regions, which must be overridden rather than honoured
-      // — this is the hauler's outbound leg, and keeping it would return the
-      // hauls they are already looking at.
       originRegionId: THE_FORGE,
       destinationRegionId: DOMAIN,
     });

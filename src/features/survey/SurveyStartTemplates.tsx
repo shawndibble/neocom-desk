@@ -1,8 +1,3 @@
-/**
- * Under the empty Survey page's hint: pick a template to start the field from,
- * or, with none saved yet, a line saying where they come from. Picking only
- * marks one; the Survey starts (and takes it) when the first scan is pasted.
- */
 import { useTranslation } from 'react-i18next';
 import { FilterChip, LiveNote } from '@/components/ui';
 import type { InfoTemplate } from '@/engine/survey/infoTemplate';

@@ -54,7 +54,6 @@ describe('brokerFeePct and brokerFee with a hub surcharge', () => {
   });
 
   it('adds it after the zero floor, so heavy skill and standing cuts never reduce it', () => {
-    // Standings far past the real -10..10 range push the base rate below zero.
     expect(brokerFeePct(5, 100, 100, 5)).toBe(5);
   });
 
@@ -66,7 +65,6 @@ describe('brokerFeePct and brokerFee with a hub surcharge', () => {
   });
 
   it('keeps the 100 ISK minimum on the skill fee only: a 230 ISK order at Manifest (measured)', () => {
-    // In game, untrained pilot: broker 100 (the minimum), safety tax 5% = 11.50.
     expect(brokerFee(230, 0, 0, 0, 5)).toBeCloseTo(111.5, 10);
   });
 
@@ -75,7 +73,6 @@ describe('brokerFeePct and brokerFee with a hub surcharge', () => {
   });
 
   it('breaks even above the minimum-fee floor when the safety tax is on a tiny order', () => {
-    // cost 230, 1 unit, untrained: revenue R satisfies R - 100 - 0.075R - 0.05R = 230.
     expect(breakEvenPrice(230, 1, 0, 0, 0, 0, 5)).toBeCloseTo(330 / (1 - 0.125), 8);
   });
 
@@ -92,7 +89,6 @@ describe('break-even and relist with a hub surcharge', () => {
   });
 
   it('charges no safety tax on a relist: Manifest 100 -> 5,000 ISK, one unit (measured)', () => {
-    // 4,900 increase at 3% = 147, plus 5,000 at the 50%-discounted 1.5% = 75.
     expect(relistFee(100, 5000, 1, 0, 0)).toBeCloseTo(222, 10);
   });
 });
@@ -114,19 +110,17 @@ describe('brokerFee', () => {
   });
 
   it('applies the 100 ISK minimum for a nonzero order', () => {
-    expect(brokerFee(1_000, 5)).toBe(100); // 15 ISK raw -> min 100
+    expect(brokerFee(1_000, 5)).toBe(100);
     expect(brokerFee(0, 5)).toBe(0);
   });
 });
 
 describe('breakEvenPrice', () => {
   it('solves from the tax/broker rates when the percentage fee exceeds the 100 ISK minimum', () => {
-    // revenue 10_000: tax 7.5% (750) + broker 3% (300, above the 100 min) = totalCost 8_950
     expect(breakEvenPrice(8_950, 100, 0, 0)).toBeCloseTo(100, 6);
   });
 
   it('re-solves against the 100 ISK broker-fee minimum when the percentage fee would bind below it', () => {
-    // revenue 1_000: tax 7.5% (75) + broker floored at 100 (raw 3% = 30) = totalCost 825
     expect(breakEvenPrice(825, 10, 0, 0)).toBeCloseTo(100, 6);
   });
 
@@ -159,14 +153,12 @@ describe('relistBrokerFeePct', () => {
   });
 
   it('applies the deeper discount per Advanced Broker Relations level', () => {
-    // Broker Relations V -> 1.5% base rate; ABR V -> 80% discount -> 0.3%
     expect(relistBrokerFeePct(5, 5)).toBeCloseTo(1.5 * 0.2, 12);
   });
 });
 
 describe('relistFee', () => {
   it('charges only the discounted rate on the full new total for a price decrease', () => {
-    // Broker Relations V (1.5%), ABR V (80% discount) -> 0.3% of new total
     expect(relistFee(200, 100, 1_000, 5, 5)).toBeCloseTo(100 * 1_000 * 0.003, 6);
   });
 
@@ -194,8 +186,6 @@ describe('relistFee', () => {
 
 describe('relistBreakEvenPrice', () => {
   it('matches breakEvenPrice when Advanced Broker Relations is at level 0 but discounts the rate', () => {
-    // Same fee/tax rates as breakEvenPrice's own equivalent test, but at half
-    // the broker rate (50% base discount), so revenue clears at a lower price.
     const full = breakEvenPrice(8_950, 100, 0, 0);
     const relist = relistBreakEvenPrice(8_950, 100, 0, 0, 0);
     expect(relist).not.toBeNull();
@@ -223,9 +213,7 @@ describe('a hub fee discount factor (Amarr Deaconry, measured in game: 1.69% sal
   });
 
   it('leaves the 100 ISK minimum broker fee unchanged', () => {
-    // 1% x 5,000 ISK = 50 ISK, under the minimum either way.
     expect(brokerFee(5_000, 3, 0, 0, 0, 0.5)).toBe(100);
-    // 1.05% x 100M = 1.05M, well above it.
     expect(brokerFee(100_000_000, 3, 0, 0, 0, 0.5)).toBeCloseTo(1_050_000, 6);
   });
 

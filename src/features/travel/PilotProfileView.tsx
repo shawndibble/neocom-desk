@@ -1,15 +1,3 @@
-/**
- * One pilot's profile as Pilot Lookup shows it (issue #2331): a compact
- * identity header with the Threat badge, the verdict band, the three meters,
- * where they kill, the ships they fly and kill, their all-time figures, and
- * their recent kills and losses. Shared with `PublicInfoModal`'s Character tab,
- * which lazy-loads it — so both places show a character the same way.
- *
- * Takes an already-loaded `PilotProfile`; each caller owns its own loading
- * and failure states. Where a corporation or alliance link goes is the
- * caller's too: Pilot Lookup opens the modal, the modal switches tabs.
- * Neither links to the modal's Character tab, which would only repeat this view.
- */
 import { fixed1 } from '@/lib/fixedFormat';
 import { ExternalLink } from '@/components/ui/ExternalLink';
 import { useEffect, useMemo, useState } from 'react';
@@ -42,17 +30,11 @@ import { useAchievementParts } from '@/features/character/useCharacterAchievemen
 
 export interface PilotProfileViewProps {
   profile: PilotProfile;
-  /**
-   * Inside Show Info the corporation / alliance names switch its tab instead
-   * of opening it; without these they are `CorporationLink` / `AllianceLink`.
-   */
   onOpenCorporation?: (corporationId: number) => void;
   onOpenAlliance?: (allianceId: number) => void;
-  /** Hides the name heading where the surrounding dialog already titles it. */
   hideName?: boolean;
 }
 
-/** Mount it keyed by the character id, so a new pilot never shows the last one's stats. */
 export function PilotProfileView(props: PilotProfileViewProps) {
   const { t } = useTranslation();
   const { characterId } = props.profile;
@@ -60,27 +42,18 @@ export function PilotProfileView(props: PilotProfileViewProps) {
   const [attempt, setAttempt] = useState(0);
   const { history, retry: retryHistory } = usePilotKillHistory(characterId);
   const now = useNow();
-  // Where you are, and who of theirs is in the Local list this was opened from (none otherwise).
   const hereSpace = useHereSpace().space;
   const orgMatesHere = useLocalThreatContext((state) => state.matesById.get(characterId) ?? null);
   const pilotStats = stats?.kind === 'stats' ? stats.stats : null;
-  // zKillboard could not be read: an empty kill list beside that is unknown, never "no kills".
   const zkillDown = stats?.kind === 'failed';
   const killsUnknown = zkillDown && history.kind === 'ready' && history.kills.length === 0;
 
-  // A pilot with no recent kill is "inactive" unless they lost a ship lately, so
-  // their losses are read (from the list Recent kills and losses already loads).
   const needsLosses = history.kind === 'ready' && needsLossHistory(history.kills, now);
   const losses = usePilotLossTimes(characterId, needsLosses);
-  // Their losses could not be read or dated: "inactive" would be a guess, so there is no verdict.
   const lossesUnreadable =
     needsLosses &&
     (losses.kind === 'failed' || (losses.kind === 'ready' && losses.timesMs === null));
 
-  // The verdict reads the kills and, for a pilot busy enough to be dangerous,
-  // the two ratios; until those arrive (or the losses, for a pilot with no
-  // recent kill) the badge says it is checking rather than showing a level
-  // that could still change.
   const threat = useMemo(() => {
     if (history.kind !== 'ready' || lossesUnreadable || killsUnknown) return null;
     const verdict = threatVerdict({
@@ -150,8 +123,6 @@ export function PilotProfileView(props: PilotProfileViewProps) {
         corporationId={props.profile.corporationId}
         allianceId={props.profile.allianceId}
       />
-      {/* The chart is the section the eye wants, so on a wide profile it takes the left, with "How
-          they fight" beside it; on a phone the meters come first, as a row, and the chart under. */}
       <div
         className={cx(
           'grid gap-3',
@@ -177,11 +148,6 @@ export function PilotProfileView(props: PilotProfileViewProps) {
 
 export default PilotProfileView;
 
-/**
- * The compact header: the portrait, then name and badge, corporation and alliance, and a facts line.
- * Its links stay text height on a phone: the header is three tight lines beside a portrait, and a 36px
- * box around each one pushed them apart more than it helped a thumb (see DESIGN.md "Touch tier").
- */
 function PilotIdentity({
   profile,
   onOpenCorporation,
@@ -189,7 +155,6 @@ function PilotIdentity({
   hideName = false,
 }: PilotProfileViewProps) {
   const { t } = useTranslation();
-  // Rendered once per lookup; "now" for an age in years and days needs no ticking.
   const [now] = useState(() => new Date());
   const age = pilotAge(profile.birthday, now);
   const { allianceId } = profile;

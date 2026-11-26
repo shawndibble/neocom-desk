@@ -13,7 +13,6 @@ function formatDelta(change: StatChange): number {
   return Math.round((change.after - change.before) * factor) / factor;
 }
 
-/** One stat change as the Variations table words it ("CPU used +5 tf"). */
 export function changeLabel(change: StatChange, t: Translate): string {
   if (change.key === 'capacitor') {
     return change.after >= 0
@@ -32,20 +31,12 @@ export function changeLabel(change: StatChange, t: Translate): string {
   return t(`fittings.variations.stat.${change.key}`, { value });
 }
 
-/** A swap's change as the Variations table words it: a role figure reads before → after. */
 export function swapChangeLabel({ kind, change }: SwapChange, t: Translate): string {
   return kind === 'role'
     ? t(`fittings.whatToTrain.role.${change.key}`, { before: change.before, after: change.after })
     : changeLabel(change, t);
 }
 
-/**
- * Export columns for the Variations table: the variant, its tier (the meta group the table
- * prints beside the name), then the changes and verdicts. The stat changes are one text
- * cell (the table's own wording, `; `-joined) — each is a different stat and
- * unit, so they do not split into summable columns. A cell still loading
- * exports blank rather than the table's "Loading…".
- */
 export function fittingVariationsCsvColumns(t: Translate): CsvColumn<VariationRow>[] {
   return [
     { header: t('fittings.variations.name'), value: (row) => row.name },
@@ -65,7 +56,7 @@ export function fittingVariationsCsvColumns(t: Translate): CsvColumn<VariationRo
         if (row.fits) return t('fittings.variations.fitsYes');
         return row.overage
           ? t('fittings.variations.stillOverBy', {
-              amount: row.overage.amount.toFixed(1), // fixed format: CSV
+              amount: row.overage.amount.toFixed(1),
               resource: t(`fittings.list.${row.overage.resource}`),
             })
           : t('fittings.variations.fitsNo');

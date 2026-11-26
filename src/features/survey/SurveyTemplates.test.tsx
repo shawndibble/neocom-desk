@@ -13,7 +13,6 @@ const { setSurveyInfo, setSurveyTax } = vi.hoisted(() => ({
   setSurveyTax: vi.fn(),
 }));
 vi.mock('./surveyStore', () => ({ setSurveyInfo, setSurveyTax, MAX_SURVEY_NOTES: 1000 }));
-// The real row has its own tests; here it only shows the draft the panel hands it.
 vi.mock('./MoonTaxRow', () => ({
   MoonTaxRow: ({ draft }: { draft?: { name: string; pct: string } }) => (
     <div data-testid="tax-edit">{draft ? `${draft.pct}|${draft.name}` : ''}</div>

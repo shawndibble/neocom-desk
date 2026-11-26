@@ -31,13 +31,6 @@ import { useFeederView } from './useFeederView';
 
 type Owner = Extract<FeederSetupStatus, { status: 'feeder' }>;
 
-/**
- * A moon owner's Moons page once an accounting corporation handles its tax:
- * the owner page (what is owed, who mined, payments and rate) from the server-built
- * view, the stale-ledger banner with Reconnect, and Leave. A member who is not
- * an officer of the corporation never reaches this (the status read is refused).
- * Leave shows what is still owed before it revokes anything.
- */
 export function MoonOwnerPanel({
   owner,
   characterId,
@@ -58,7 +51,6 @@ export function MoonOwnerPanel({
   const [leaving, setLeaving] = useState(false);
   const [reconnectError, setReconnectError] = useState<string | null>(null);
   const name = owner.collectorName ?? t('corpTaxBook.moons.owner.anonymous');
-  // The server's leave answer carries no balance; the page already loaded has it.
   const owed =
     load.state === 'ready' && load.view !== null ? owedOnLeaving(load.view.summary) : null;
   const removing = load.state === 'ready' && load.view?.summary.status === 'pending-removal';
@@ -119,7 +111,6 @@ export function MoonOwnerPanel({
             payee,
             canSendMail(grantedScopes)
           );
-          // After the save, and never awaited: the change does not wait on the mail.
           if (out.changed && out.at !== undefined) {
             const ownName = load.nameOf?.(corporationId) ?? `#${corporationId}`;
             const at = out.at;
@@ -157,7 +148,6 @@ export function MoonOwnerPanel({
                 {reconnectError && <InlineError>{reconnectError}</InlineError>}
               </>
             )}
-            {/* Optional (#4654): a grant from before reads no refinery names or no chunk ore. Reconnect covers it while stale. */}
             {lacks !== null && view.summary.status === 'active' && !isStale(view.summary) && (
               <>
                 <GrantAgainBanner lacks={lacks} onGrant={reconnect} />
@@ -194,7 +184,6 @@ export function MoonOwnerPanel({
   return (
     <div className="mx-auto max-w-page space-y-4">
       {body}
-      {/* Each accounting corporation it left keeps its own history until dismissed (#4621). */}
       {(owner.previousCollectorIds ?? []).map((id) => (
         <MoonOwnerPrevious
           key={id}

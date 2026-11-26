@@ -75,7 +75,6 @@ describe('industry', () => {
   it('is a record per job: finished ones first (oldest first), then the soonest to finish', () => {
     const view = buildView('industry', feeds(jobs()), ctx());
     expect(view.table!.rows.map((r) => r.key)).toEqual(['3', '2', '4', '1']);
-    // no aggregate "N jobs ready" row any more
     expect(view.rows.map((r) => r.key)).toEqual(['3', '2', '4', '1']);
   });
 
@@ -93,7 +92,6 @@ describe('industry', () => {
     expect(text(ready!.cells[column(view, 'ends')])).toBe('overview.board.ready');
     expect(text(ready!.cells[column(view, 'progress')])).toBe('100%');
     expect(ready!.tone).toBe('warning');
-    // 90 minutes left of a 3 hour job: half done
     expect(text(running!.cells[column(view, 'progress')])).toBe('50%');
   });
 
@@ -112,7 +110,6 @@ describe('industry', () => {
     expect(view.chart.rows.map((r) => r.key)).toEqual(['3', '2', '4', '1']);
     expect(view.chart.rows[0]).toMatchObject({ color: 'warning', text: 'overview.board.ready' });
     expect(view.chart.rows[2]).toMatchObject({ color: 'accent' });
-    // The earliest start is job 2 (10 h job that ended 25 min ago); the latest end is job 1.
     expect(view.chart.axis).toEqual({
       from: NOW - 10 * HOUR_MS - 25 * MINUTE_MS,
       to: NOW + 4 * HOUR_MS,
@@ -289,7 +286,6 @@ describe('structures', () => {
       }),
     };
     expect(buildView('structures', merged, ctx({ scopeAll: true })).table!.rows).toHaveLength(3);
-    // A header-scoped widget never reads the merged feed: it has not loaded it.
     expect(buildView('structures', merged, ctx()).table).toBeUndefined();
     expect(kindHasAllFeeds('structures')).toBe(true);
     expect(kindHasAllFeeds('training')).toBe(false);
@@ -303,7 +299,6 @@ describe('structures', () => {
       'structures',
       'corpStarbases',
     ]);
-    // A kind that cannot sum keeps its feeds whatever its widget asks for.
     expect(feedsFor([{ kind: 'training', scope: 'all' }]).sort()).toEqual(
       [...feedsOf('training')!].sort()
     );
@@ -408,7 +403,6 @@ describe('structures', () => {
     const troubled = () => [
       ...fleet(),
       source(4, 'Efa - Reinforced Fortizar', { stateTimerEndMs: NOW + 2 * HOUR_MS }),
-      // Five days of fuel is on the watch list, not low: the board calls low at three.
       source(5, 'Efa - Watch Raitaru', { fuelExpiresMs: NOW + 5 * DAY_MS }),
     ];
 
@@ -449,7 +443,6 @@ describe('structures', () => {
 
     it('takes its deadline and summary from the structures it lists, not hidden ones', () => {
       const fleet = feeds([
-        // Healthy, but its fuel runs out first and it is unanchoring: neither is a problem.
         source(1, 'Efa - Watch Raitaru', {
           fuelExpiresMs: NOW + 5 * DAY_MS,
           unanchorsAtMs: NOW + 4 * DAY_MS,
@@ -763,7 +756,6 @@ describe('industry job slots', () => {
     end_date: iso(NOW + endOffset),
     status: 'active',
   });
-  // Header Character 91: 2 Mfg slots, one busy. Character 92: base slots, nothing running.
   const own = [job(1, 2 * HOUR_MS)];
   const other = [job(2, -10 * MINUTE_MS)];
   const feeds = (): Feeds => ({

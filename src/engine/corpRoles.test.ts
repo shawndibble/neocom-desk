@@ -8,11 +8,6 @@ import {
   type CorpCapability,
 } from './corpRoles';
 
-/**
- * Every role-gated capability that is true — terser than asserting each boolean.
- * `canReadContracts` is left out: ESI names no role for it, so everyone holds it
- * (its own test below).
- */
 function held(roles: readonly string[]): CorpCapability[] {
   const capabilities = corpCapabilities(roles);
   return CORP_CAPABILITIES.filter(
@@ -27,8 +22,6 @@ describe('corpCapabilities', () => {
     expect(hasAnyCorpCapability(corpCapabilities([]))).toBe(false);
   });
 
-  // The contracts routes carry no `x-required-roles`: any member reads them, and
-  // that alone never opens a corp surface.
   it('grants contracts to every member, without opening any corp surface', () => {
     for (const roles of [[], ['Accountant'], ['Personnel_Manager']]) {
       expect(corpCapabilities(roles).canReadContracts, roles.join()).toBe(true);
@@ -36,8 +29,6 @@ describe('corpCapabilities', () => {
     expect(hasAnyCorpCapability({ ...NO_CORP_CAPABILITIES, canReadContracts: true })).toBe(false);
   });
 
-  // GET /corporations/{id}/wallets (+ journal, transactions) declares
-  // x-required-roles ["Accountant", "Junior_Accountant"] — either one alone.
   it('grants wallet and mining-ledger access to an Accountant', () => {
     expect(held(['Accountant'])).toEqual([
       'canReadWallet',
@@ -48,7 +39,6 @@ describe('corpCapabilities', () => {
     ]);
   });
 
-  // GET /corporations/{id}/orders declares x-required-roles ["Accountant", "Trader"].
   it('grants market orders to a Trader alone, and not to a Junior_Accountant', () => {
     expect(held(['Trader'])).toEqual(['canReadOrders']);
     expect(corpCapabilities(['Junior_Accountant']).canReadOrders).toBe(false);
@@ -58,13 +48,6 @@ describe('corpCapabilities', () => {
     expect(held(['Junior_Accountant'])).toEqual(['canReadWallet', 'canViewTaxBook']);
   });
 
-  /**
-   * GET /corporation/{id}/mining/observers (and /observers/{observer_id})
-   * declare x-required-roles ["Accountant"] — not Junior_Accountant, not
-   * Station_Manager, even though the extraction schedule beside it answers to
-   * Station_Manager. A Director holds it through the Director clause (and so
-   * does a CEO, whose ESI role list carries Director).
-   */
   it('grants mining-ledger access to an Accountant or a Director only', () => {
     expect(corpCapabilities(['Accountant']).canReadMiningLedger).toBe(true);
     expect(corpCapabilities(['Director']).canReadMiningLedger).toBe(true);
@@ -72,16 +55,6 @@ describe('corpCapabilities', () => {
     expect(corpCapabilities(['Station_Manager']).canReadMiningLedger).toBe(false);
   });
 
-  /**
-   * GET /corporations/{id}/structures declares ["Station_Manager"] — and so
-   * does GET /corporation/{id}/mining/extractions, verified against the same
-   * `x-required-roles` source the table cites. One role, two capabilities:
-   * they stay separate because they are separate *reads* behind separate
-   * scopes, and the moon panel needs something of its own to gate on.
-   *
-   * Note for anyone re-reading issue #296: its comment names the moon role
-   * `Structure_manager`. That spelling appears nowhere in ESI's spec.
-   */
   it('grants structure and moon-extraction access to a Station_Manager', () => {
     expect(held(['Station_Manager'])).toEqual([
       'canReadStructures',
@@ -90,43 +63,26 @@ describe('corpCapabilities', () => {
     ]);
   });
 
-  // GET /corporations/{id}/membertracking declares ["Director"].
   it('grants member access only to a Director', () => {
     expect(corpCapabilities(['Personnel_Manager']).canReadMembers).toBe(false);
   });
 
-  // GET /corporations/{id}/industry/jobs declares ["Factory_Manager"].
   it('grants industry access to a Factory_Manager', () => {
     expect(held(['Factory_Manager'])).toEqual(['canReadIndustry']);
   });
 
-  /**
-   * GET /corporations/{id}/assets declares ["Director"] and nothing else,
-   * verified against `x-required-roles` rather than taken from issue #327's
-   * prose. So it joins `canReadMembers` as a capability with no ordinary role
-   * of its own — the Director clause below is the whole of its gate, and a
-   * Hangar_Take/Hangar_Query holder (who can open a corp hangar in the client)
-   * gets nothing from ESI.
-   */
   it('grants asset access only to a Director', () => {
     expect(corpCapabilities(['Hangar_Take_1']).canReadAssets).toBe(false);
     expect(corpCapabilities(['Factory_Manager']).canReadAssets).toBe(false);
     expect(corpCapabilities(['Director']).canReadAssets).toBe(true);
   });
 
-  // GET /corporations/{id}/divisions declares x-required-roles ["Director"] alone,
-  // not the wallet's Accountant roles (#4756): an Accountant takes a 403 on it.
   it('reads corp divisions as a Director only, never as an Accountant', () => {
     expect(corpCapabilities(['Accountant']).canReadDivisions).toBe(false);
     expect(corpCapabilities(['Junior_Accountant']).canReadDivisions).toBe(false);
     expect(corpCapabilities(['Director']).canReadDivisions).toBe(true);
   });
 
-  /**
-   * GET /corporations/{id}/blueprints declares ["Director"] and nothing else
-   * (issue #839, verified against `x-required-roles` — the issue's own brief
-   * guessed Director/Factory_Manager, which the live spec does not confirm).
-   */
   it('grants corp blueprint access only to a Director', () => {
     expect(corpCapabilities(['Factory_Manager']).canReadBlueprints).toBe(false);
     expect(corpCapabilities(['Director']).canReadBlueprints).toBe(true);
@@ -180,12 +136,6 @@ describe('corpCapabilities', () => {
     expect(corpCapabilities(['Director']).canReadSkyhooks).toBe(true);
   });
 
-  /**
-   * The case a naive `roles.includes('Accountant')` gets wrong for the most
-   * important user. In EVE a Director implicitly holds every other role, and
-   * ESI does *not* expand that in the response — a Director's `roles` array is
-   * frequently just `["Director"]`.
-   */
   it('grants every capability to a Director, who is not listed under any other role', () => {
     expect(held(['Director'])).toEqual(
       CORP_CAPABILITIES.filter((capability) => capability !== 'canReadContracts')

@@ -1,16 +1,3 @@
-/**
- * The Survey tab's charts, drawn with Recharts on one shared time axis. Ore left
- * (the default) is the volume left in the field, stacked by ore with a dot and a
- * total-volume label on every scan and a dashed run to zero at the current pace,
- * and under it the total mining rate between each pair of scans. Depletion by
- * ore is its chart with the mining rate stacked by ore under it; ISK left is one
- * chart. Statically imports
- * `recharts`, so — same rule as `miningTax/MiningYieldCharts.tsx` — this must
- * only be reached through a dynamic `import()` from `SurveyBoard.tsx`.
- *
- * Ore layers borrow the clock-kind tokens (DESIGN.md "Clock kinds"): the same
- * rule every other categorical series follows, so no new palette.
- */
 import { scalePx } from '@/lib/fontScale';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -55,7 +42,6 @@ interface ScanTableRow {
   byOre: Record<string, number>;
 }
 
-/** Room a label needs, in px: "301.8K" and "1,116" at 10px. */
 const DELTA_LABEL_GAP = 46;
 
 interface VolumeRow {
@@ -63,7 +49,6 @@ interface VolumeRow {
   total?: number;
   delta?: number;
   projected?: number;
-  /** `total`, only on the scans whose label has room. */
   totalLabel?: number;
   [ore: string]: number | undefined;
 }
@@ -89,22 +74,12 @@ export function SurveyCharts({
   view = 'ore',
 }: {
   summary: SurveySummary;
-  /** Offered to the survey's owner: the right-click menu on a scan's node removes it. */
   onRemoveScan?: (at: number) => void;
-  /**
-   * Draws only the volume chart at this height in px, as the Overview's Mining
-   * survey widget does: its own time axis, no scan nodes or labels, no rate chart.
-   */
   compactHeight?: number;
-  /**
-   * Which chart the volume slot shows: `ore` (default, the stacked ore volume),
-   * `depletion` or `isk`. Ignored when `compactHeight` is set.
-   */
   view?: SurveyChartView;
 }) {
   const { t } = useTranslation();
   const compact = compactHeight !== undefined;
-  // Hours with no scans would fill the chart with a line nobody measured; the Overview's small chart keeps real time.
   const summary = useMemo(
     () => (compact ? surveySummary : compressGaps(surveySummary)),
     [compact, surveySummary]
@@ -112,9 +87,6 @@ export function SurveyCharts({
   const [plotWidth, setPlotWidth] = useState(0);
   const { domain, xAxis } = timeAxis(summary);
   const rows = volumeRows(summary);
-  // Scans can bunch up in time, so labels are thinned to the ones that fit.
-  // Every scan keeps its dot; the tooltip carries the rest. The projected
-  // finish row sits after the scans and draws no label.
   const rowsWithTotal = rows.slice(0, summary.points.length);
   const deltaShown = thinLabels(
     rowsWithTotal.map((r) => ({ at: r.at, weight: r.total ?? 0 })),
@@ -163,7 +135,6 @@ export function SurveyCharts({
   function VolumeTooltip({ active, payload }: TooltipContentProps) {
     const row = payload?.[0]?.payload as VolumeRow | undefined;
     if (!active || !row || row.total === undefined) return null;
-    // Most valuable first, which is the top of the stack, so the list reads like the chart.
     const layers = summary.oreNames.map((ore, i) => ({ ore, tone: oreTone(i) }));
     return (
       <ChartTooltipShell>
@@ -214,13 +185,11 @@ export function SurveyCharts({
   const plot = (
     <div className="w-full" style={{ height: compactHeight ?? FULL_HEIGHT }}>
       <ResponsiveContainer onResize={(w) => setPlotWidth(w)}>
-        {/* Recharts stacks in the order the areas first registered, and a re-sort only moves them, so a new order remounts the chart. */}
         <ComposedChart key={summary.oreNames.join('|')} data={chartRows} margin={MARGIN}>
           <CartesianGrid stroke="var(--color-line)" vertical={false} />
           {xAxis(!compact)}
           {yAxis({ compact })}
           {gapBreaks(summary, !compact)}
-          {/* Stacked bottom-up, so the most valuable ore (first) is drawn last, on top. */}
           {summary.oreNames
             .map((ore, i) => ({ ore, i }))
             .reverse()
@@ -306,7 +275,6 @@ export function SurveyCharts({
       <figure aria-label={t('survey.chartVolume')} className="m-0">
         {plot}
         <figcaption className="sr-only">{t('survey.chartVolume')}</figcaption>
-        {/* On a wrapper: a <table> ignores sr-only's clip and still stretches the page. */}
         <div className="sr-only">
           <DataTable
             columns={volumeColumns}

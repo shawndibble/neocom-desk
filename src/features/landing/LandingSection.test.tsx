@@ -11,7 +11,6 @@ describe('LandingSection', () => {
       </LandingSection>
     );
     expect(screen.getByRole('region', { name: 'Hello' })).toBeInTheDocument();
-    // Numbered and labelled from its header anchor.
     expect(screen.getByText('07 · FAQ')).toBeInTheDocument();
     expect(screen.getByText('Lead text')).toBeInTheDocument();
     expect(container.querySelector('.lp-layer')).toBeNull();

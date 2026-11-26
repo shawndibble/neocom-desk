@@ -18,7 +18,6 @@ import { MenuKindContext } from '@/components/ui/rowActionsContext';
 import { isApplePlatform, modChordDisplayKey } from '@/lib/shortcuts';
 import { useChord } from '@/lib/useChord';
 
-/** An inert item in this dropdown: focusable, its reason a tooltip (an empty reason shows none). */
 function DisabledItem({ reason, children }: { reason: string | undefined; children: ReactNode }) {
   return (
     <MenuKindContext.Provider value="dropdown">
@@ -28,28 +27,17 @@ function DisabledItem({ reason, children }: { reason: string | undefined; childr
 }
 
 interface FittingSaveButtonProps {
-  /** Save (or update) to My Fittings — the button itself. */
   onSave: () => void;
   canSave: boolean;
-  /** Why Save is off, when it is. */
   saveBlockedReason?: string;
-  /** The Fitting came from a My Fittings record, so Save updates it. */
   updating: boolean;
-  /** Saves what's on screen as a new My Fittings record, leaving the one it came from untouched. Only offered once there's an original to keep (`updating`). */
   onSaveAsNew: () => void;
   onSaveToEve: () => void;
   canSaveToEve: boolean;
   saveToEveBlockedReason?: string;
-  /** The Permissions Save to EVE lacks: lists a "Grant missing Permissions" item under it. */
   saveToEveMissingGroups?: readonly ScopeGroup[];
 }
 
-/**
- * Save as one split button (mockup A): the button saves to My Fittings — the
- * everyday save, named in its tooltip — and its caret lists every destination,
- * that one first, then Save to EVE, the rarer export that opens its own
- * dialog.
- */
 export function FittingSaveButton({
   onSave,
   canSave,
@@ -64,8 +52,6 @@ export function FittingSaveButton({
   const { t } = useTranslation();
   const navigate = useNavigate();
   const apple = isApplePlatform();
-  // Ctrl/Cmd+S saves, Ctrl/Cmd+Shift+S saves a copy — in any field too. Both
-  // always swallow the browser's own "save page", even while Save is off.
   useChord('s', onSave, { enabled: canSave });
   useChord('s', onSaveAsNew, { shift: true, enabled: canSave && updating });
   const destination = updating
@@ -79,7 +65,6 @@ export function FittingSaveButton({
     );
   return (
     <div className="flex">
-      {/* `aria-disabled`, not the native attribute, so the reason stays reachable. */}
       {withReason(
         <Button
           variant="primary"

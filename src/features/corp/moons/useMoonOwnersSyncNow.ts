@@ -1,8 +1,3 @@
-/**
- * Sync now's moon owner half (#6117): an editor of a book with moon owners reads every one of
- * them at once instead of waiting up to two hours for the schedule. The server rests it ten
- * minutes per book; a press inside that says when it runs again. The book reloads after a read.
- */
 import { useTimeZone } from '@/lib/timeFormat';
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -10,18 +5,15 @@ import { isStillRead, type MoonOwnerRow } from '@/engine/corpTaxBook/moonOwners'
 import { clockAt } from './moonsFormat';
 import { useBook } from './useBook';
 
-/** A toast line; `instance` changes on every press so a repeated line replays (DESIGN.md Toast). */
 export interface SyncNowNotice {
   message: string;
   instance: number;
 }
 
 export interface MoonOwnersSyncNow {
-  /** Whether this viewer's Sync now also reads moon owners. */
   enabled: boolean;
   busy: boolean;
   run: () => Promise<void>;
-  /** After a press that read nothing (too soon, refused, every read skipped); null otherwise. */
   notice: SyncNowNotice | null;
   clearNotice: () => void;
 }

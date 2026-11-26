@@ -1,8 +1,3 @@
-/**
- * The Compare drawer's Trade hubs view (issue #4697, mockup #4696): items down
- * the side, the five Trade Hubs across, each cell the hub station's best sell
- * over its best buy. A table at every width, like Prices.
- */
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { DataTable, type DataTableColumn } from '@/components/ui';
@@ -16,7 +11,6 @@ import { RemovableTypeIcon } from './RemovableTypeIcon';
 import type { CompareHubRow } from './compareHubsRows';
 import type { HubId } from './useCompareHubs';
 
-/** A best figure carries the word, not just the colour. */
 function BestTag({ children }: { children: string }) {
   return (
     <span className="ml-1.5 text-[0.6875rem] font-semibold tracking-wide text-success uppercase">
@@ -66,7 +60,6 @@ function TradeHubCell({ row, hub }: { row: CompareHubRow; hub: ComparedHub }) {
 export interface TradeHubsTableProps {
   rows: CompareHubRow[];
   jumps: Readonly<Record<HubId, number | null>>;
-  /** The pilot's saved Market hub, marked in its column header. */
   ownHub: TradeHub['id'];
   tableExport: UseTableExport<CompareHubRow>;
   onRemove: (typeId: number) => void;
@@ -130,7 +123,6 @@ export function TradeHubsTable({
       rows={rows}
       rowKey={(row) => row.typeId}
       label={t('market.compare.hubsTableLabel')}
-      // A compare table at every width, as Prices: sideways scroll, item pinned.
       responsive="table"
     />
   );

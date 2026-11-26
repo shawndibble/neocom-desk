@@ -69,9 +69,6 @@ function input(overrides: Partial<ColonyStopTierInput> = {}): ColonyStopTierInpu
     prices: PRICES,
     taxRate: 0.1,
     salesTaxPct: 0,
-    // The window this module used to hardcode, kept so every expectation
-    // below still measures what it measured before the cadence became a
-    // preference.
     bufferHours: 24,
     ...overrides,
   };
@@ -79,7 +76,6 @@ function input(overrides: Partial<ColonyStopTierInput> = {}): ColonyStopTierInpu
 
 describe('meanExtractorRate', () => {
   it('averages per extractor, not per resource', () => {
-    // Two extractors on one resource is 6,000 an hour each, not 12,000.
     const advice = colony({
       extractors: [
         { pinId: 1, productTypeId: MICROORGANISMS, ratePerHour: 6_000, expiryMs: null },
@@ -133,8 +129,6 @@ describe('colonyStopTierAdvice', () => {
   });
 
   it('says when the colony is already running what was recommended', () => {
-    // Test Cultures is schematic 86. A colony already making it is not being
-    // told to "build up to" it.
     const result = colonyStopTierAdvice(
       input({ colony: colony({ production: [{ schematicId: 86, count: 1 }] }) })
     );
@@ -145,8 +139,6 @@ describe('colonyStopTierAdvice', () => {
   });
 
   it('does not call a colony making something else already there', () => {
-    // Schematic 133 is Reactive Metals — not what this planet was advised to
-    // build, so the recommendation is still a change to make.
     const result = colonyStopTierAdvice(
       input({ colony: colony({ production: [{ schematicId: 133, count: 1 }] }) })
     );
@@ -156,8 +148,6 @@ describe('colonyStopTierAdvice', () => {
   });
 
   it('counts a raw recommendation as already there only when nothing is refined', () => {
-    // At 500 ISK the ore beats every made tier, and a colony with no factory
-    // is already doing exactly that.
     const rawWins = { ...PRICES, [MICROORGANISMS]: 500 };
     const bare = colonyStopTierAdvice(input({ prices: rawWins }));
     expect(bare.status === 'advised' && bare.alreadyRunning).toBe(true);
@@ -169,8 +159,6 @@ describe('colonyStopTierAdvice', () => {
   });
 
   it('fits against the budget the links leave, not the Command Center’s full supply', () => {
-    // The same colony with a heavier link draw has less Powergrid to fit into,
-    // so its recommendation is measurably smaller.
     const heavy = colonyStopTierAdvice(
       input({
         colony: colony({
@@ -223,8 +211,6 @@ describe('colonyStopTierAdvice', () => {
     expect(result.status).toBe('advised');
     if (result.status !== 'advised') return;
     const entries = result.advice.kind === 'nothing-to-score' ? [] : result.advice.entries;
-    // Test Cultures needs Microorganisms and Aqueous Liquids; a Lava planet
-    // yields neither.
     expect(entries.some((entry) => entry.typeId === TEST_CULTURES)).toBe(false);
   });
 });

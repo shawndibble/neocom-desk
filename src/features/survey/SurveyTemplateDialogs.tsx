@@ -1,8 +1,3 @@
-/**
- * The two dialogs behind the Templates menu: "Save as template" (a name and
- * which of the panel's fields to keep) and the list of templates, where each one
- * can be renamed, updated from the panel as it is now, or deleted (with Undo).
- */
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Checkbox, Modal, TextInput, Toast, Tooltip } from '@/components/ui';
@@ -26,14 +21,12 @@ import { DividedList } from '@/components/ui/DividedList';
 
 interface CurrentFields {
   fields: InfoFields;
-  /** The Survey shows a moon ore, so the moon tax is on the panel. */
   moon: boolean;
 }
 
 interface SaveDialogProps extends CurrentFields {
   templates: readonly InfoTemplate[];
   onClose: () => void;
-  /** The saved template's id, so the panel can track it. */
   onSaved: (id: string) => void;
 }
 

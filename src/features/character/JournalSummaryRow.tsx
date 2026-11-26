@@ -1,9 +1,3 @@
-/**
- * The Journal's summary line under its filter row: the filtered entry count
- * with its In / Out / Net, then how many lines between the pilot's own
- * Characters were left out. The filters themselves are `FilterBar`'s pills,
- * one line up; this row used to repeat them as chips (issue #3908).
- */
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { netToneClass } from '@/features/character/format';
@@ -12,12 +6,9 @@ import { signedIsk } from '@/lib/signedIsk';
 import { formatIsk } from '@/lib/isk';
 
 interface JournalSummaryRowProps {
-  /** The filtered rows' totals. */
   totals: JournalBreakdown;
   entryCount: number;
-  /** Where own-Character lines are netted (personal only): the corp journal says nothing of it. */
   showInternal: boolean;
-  /** Sits at the row's right end, level with the stats (the phone's sort icon). */
   sortControl?: ReactNode;
 }
 

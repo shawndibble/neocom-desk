@@ -1,8 +1,3 @@
-/**
- * The map's faction picker, in the in-game panel's place and shape: an icon
- * grid in the canvas's top-left corner, with the chosen faction's name,
- * flyable count and blurb under it. Phones and the ladder keep `FactionBar`.
- */
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Tooltip } from '@/components/ui';

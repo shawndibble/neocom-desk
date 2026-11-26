@@ -6,7 +6,6 @@ export const isk = (n: number) => formatIsk(n);
 
 export const units = (n: number) => formatNumber(n);
 
-/** Ore make-up as the Extractions tab prints it: "Xenotime 48% · Monazite 33%". */
 export function makeUp(ore: OreShare[]): string {
   const total = ore.reduce((s, o) => s + o.units, 0);
   return ore.map((o) => `${o.ore} ${Math.round((o.units / total) * 100)}%`).join(' · ');

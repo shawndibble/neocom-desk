@@ -1,28 +1,5 @@
-/**
- * Grades how badly one of the player's own market orders is beaten by rival
- * orders, across three NESTED scopes: station, system, region. Nesting is the
- * load-bearing idea — a cheaper order at my station is also in my system and
- * my region, so station implies system implies region, and the region's best
- * rival price can never be worse (for me) than the station's. Callers get one
- * severity (`worst` — the tightest scope with a rival) for a row's badge, plus
- * all three (`byScope`) for a detail view that shows the whole picture.
- *
- * "Beats me" is direction-sensitive: a lower price beats a sell order, a
- * higher price beats (outbids) a buy order — same maths, opposite sign. Only
- * orders on my own side are ever compared; the other side is dropped before
- * anything else runs, so a buy order can never register as undercutting a
- * sell order or vice versa.
- *
- * `scopesChecked` exists because station data is cheap and system/region cost
- * an extra ESI fetch. A scope the caller did not ask for is left OUT of
- * `byScope` entirely (absent, not `null`) so the UI can tell "checked, no
- * rival" apart from "not checked yet" — collapsing those two would make a
- * loading state indistinguishable from a genuinely clean order.
- */
-
 export type UndercutScope = 'station' | 'system' | 'region';
 
-/** The player's own order, as the comparison's origin. */
 export interface MyOrder {
   orderId: number;
   price: number;
@@ -31,7 +8,6 @@ export interface MyOrder {
   isBuyOrder: boolean;
 }
 
-/** One competing order from the region order book. */
 export interface CompetingOrder {
   orderId: number;
   price: number;
@@ -39,34 +15,24 @@ export interface CompetingOrder {
   systemId: number;
   volumeRemain: number;
   isBuyOrder: boolean;
-  /** ESI `range` of a buy order (`station`, `solarsystem`, `region` or a jump count); absent where the source has none. */
   range?: string;
-  /** ESI `min_volume` of a buy order. */
   minVolume?: number;
 }
 
 export interface UndercutRival {
   scope: UndercutScope;
-  /** The best (for the rival) price within this scope. */
   price: number;
-  /** Absolute ISK difference against my price — always positive. */
   gapIsk: number;
-  /** gapIsk as a percentage of MY price. */
   gapPct: number;
-  /** Volume remaining on the single best rival order. */
   volumeRemain: number;
   locationId: number;
   systemId: number;
-  /** How many competing orders beat mine within this scope. */
   ordersBeatingMe: number;
-  /** Sum of volume_remain across those orders. */
   unitsBeatingMe: number;
 }
 
 export interface UndercutResult {
-  /** The tightest scope with a rival beating me — the row's single badge. Null when nothing beats me. */
   worst: UndercutRival | null;
-  /** Every scope that was checked. A scope the caller did not resolve is absent, NOT null. */
   byScope: Partial<Record<UndercutScope, UndercutRival | null>>;
 }
 
@@ -78,9 +44,6 @@ const SCOPE_MATCHES: Record<UndercutScope, (mine: MyOrder, c: CompetingOrder) =>
   region: () => true,
 };
 
-/** True when `a` beats mine more badly than `b` does, breaking a price tie by
- * larger volumeRemain, then by lower orderId — so the reported rival is
- * stable across refreshes even when several orders share the best price. */
 function isWorseRival(mine: MyOrder, a: CompetingOrder, b: CompetingOrder): boolean {
   if (a.price !== b.price) {
     return mine.isBuyOrder ? a.price > b.price : a.price < b.price;
@@ -111,12 +74,6 @@ function buildRival(
   };
 }
 
-/**
- * Resolves the worst rival for `mine` within each requested scope, plus the
- * single tightest one. Returns `worst: null` (and an empty `byScope`) for a
- * non-positive `mine.price`, since `gapPct` has no sound value to divide by.
- * `ownOrderIds` are orders held by the account's other Characters: never rivals.
- */
 export function findUndercut(
   mine: MyOrder,
   competitors: readonly CompetingOrder[],

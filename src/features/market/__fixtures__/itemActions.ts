@@ -1,10 +1,3 @@
-/**
- * Test-only Item Actions: every action a mock, the Quickbar available, and no
- * catalog (Build Plan "checking…") unless `blueprints` is given — so a panel
- * test wraps its render once and asserts on the spies it cares about. A `.ts`
- * file (`createElement`, no JSX) so Fast Refresh's component-only-exports
- * rule doesn't apply to a test helper.
- */
 import { createElement, type ReactNode } from 'react';
 import { vi } from 'vitest';
 import type { BlueprintCatalog } from '@/features/industry/blueprintCatalog';
@@ -33,7 +26,6 @@ export function FakeItemActions({
   return createElement(ItemActionsContext.Provider, { value: actions }, children);
 }
 
-/** `ui` under `actions` (a fresh `fakeItemActions()` by default) — for `render(withItemActions(<Panel />))`. */
 export function withItemActions(ui: ReactNode, actions: ItemActions = fakeItemActions()) {
   return createElement(FakeItemActions, { actions, children: ui });
 }

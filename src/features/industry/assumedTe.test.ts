@@ -37,8 +37,6 @@ describe('useAssumedTe', () => {
     ['a string', '5'],
     ['null', null],
   ])('falls back to the default for %s', async (_label, stored) => {
-    // Out-of-range reaches the engine's own range check and throws, so a
-    // damaged row must not be clamped into a value the pilot never picked.
     await db.settings.put({ key: ASSUMED_TE_SETTING_KEY, value: stored });
     expect(await hydrated()).toBe(DEFAULT_ASSUMED_TE);
   });
@@ -49,8 +47,6 @@ describe('useAssumedTe', () => {
   });
 
   it('has no legacy device-local key to adopt — the preference is new', async () => {
-    // Unlike assumed ME, this never had a pre-sync life, so a row under the
-    // unprefixed name is somebody else's and must not be picked up.
     await db.settings.put({ key: 'industryAssumedTe', value: 8 });
     expect(await hydrated()).toBe(DEFAULT_ASSUMED_TE);
   });

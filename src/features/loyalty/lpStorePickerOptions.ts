@@ -1,13 +1,3 @@
-/**
- * The LP Store picker's option list (issue #2321): every NPC corporation that
- * runs an LP Store (`lpCorporations.json`, #2320), with the ones the active
- * Character holds LP with pinned first — highest balance first, carrying
- * that balance — and the rest alphabetically. A typed query filters both
- * groups; held corps stay pinned above the others either way.
- *
- * Only corps in the snapshot are offered: a balance with a corp that runs no
- * store (Paragon's EverMarks) has nothing to open.
- */
 import type { CharacterLoyaltyPoints } from '@/esi/endpoints';
 import type { LpCorporationEntry } from '@/sde/marketTypes';
 import { rankedSearch } from '@/lib/rankedSearch';
@@ -15,7 +5,6 @@ import { rankedSearch } from '@/lib/rankedSearch';
 export interface LpStorePickerOption {
   corporationId: number;
   name: string;
-  /** The active Character's LP with this corp; `null` when they hold none. */
   lp: number | null;
 }
 

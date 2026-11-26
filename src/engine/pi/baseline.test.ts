@@ -61,7 +61,6 @@ describe('colonyBaseline', () => {
       books({ [REACTIVE_METALS]: 500, [PRECIOUS_METALS]: 2000 })
     );
     expect(result).toMatchObject({ status: 'ok', slots: [{ p1TypeId: PRECIOUS_METALS }] });
-    // 20 P1/h × (2000 − 0.1 × 400 customs).
     if (result.status !== 'ok') throw new Error(result.status);
     expect(result.iskPerHour).toBeCloseTo(20 * 1960);
   });
@@ -90,7 +89,6 @@ describe('colonyBaseline', () => {
   });
 
   it('takes two P0s at one ECU each over two ECUs on one, when that earns more', () => {
-    // At CC5 both fit; 40 + 40 P1/h beats the 72 two ECUs on one P0 make.
     const result = colonyBaseline(
       colony({ cc: 5 }),
       pi,
@@ -112,7 +110,6 @@ describe('colonyBaseline', () => {
   });
 
   it('floors at zero: a colony whose best P1 nets below its customs sells nothing', () => {
-    // At 100% customs every P1 here costs 400 ISK a unit to export and fetches 100.
     const result = colonyBaseline(
       colony({ taxRate: 1 }),
       pi,
@@ -123,7 +120,6 @@ describe('colonyBaseline', () => {
   });
 
   it('says when nothing fits', () => {
-    // CC0's 6000 MW cannot carry one 10-head ECU (8100 MW).
     expect(
       colonyBaseline(
         colony({ cc: 0 }),

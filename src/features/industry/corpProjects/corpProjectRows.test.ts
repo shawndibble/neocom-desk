@@ -108,7 +108,6 @@ describe('planForCorpProject', () => {
 
   it('claims owned materials for every run, up to the stock held', () => {
     const plan = planForCorpProject({ ...base, owned: null, units: 7 });
-    // 7 runs x 100 = 700 needed, 250 held.
     expect(plan.materialSourcing?.[34]).toEqual({ ownedQuantity: 250 });
   });
 });
@@ -159,7 +158,6 @@ describe('buildCorpProjectRow', () => {
   });
 
   it('spreads a whole run’s cost over the units that earn the reward when a run makes more', () => {
-    // 10 units left, 100 per run: one run builds 100, and all of it is paid for.
     const row = buildCorpProjectRow({
       ...base,
       project: { ...project, cap: 13, contributed: 3, rewardEach: 1_000_000 },

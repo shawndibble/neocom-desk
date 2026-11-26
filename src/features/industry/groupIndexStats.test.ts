@@ -92,9 +92,6 @@ describe('verdictOf', () => {
   });
 
   it('is "unknown" when unpriceable, even with a non-null profit', () => {
-    // A `savings` figure can stay non-null (an unpriced material's line
-    // costs 0) while the group can't really be priced — `unpriceable` must
-    // override a confident-looking sign.
     expect(verdictOf(100, true)).toBe('unknown');
     expect(verdictOf(-1, true)).toBe('unknown');
   });
@@ -119,10 +116,7 @@ describe('computeGroupIndexStats', () => {
 
     const stats = computeGroupIndexStats(GROUP, plans, rows);
 
-    // profit is the sum of each member's own profit after fees: -10 + -5 = -15.
     expect(stats.profit).toBe(-15);
-    // verdict stays keyed off buy-vs-build savings (totalCost 160 vs buyCost
-    // 300), not the profit above — the two are deliberately independent.
     expect(stats.verdict).toBe('build');
   });
 
@@ -144,9 +138,6 @@ describe('computeGroupIndexStats', () => {
   });
 
   it('reads "unknown" verdict when a member is unpriceable, even though buyCost/totalCost still yield a signed savings', () => {
-    // An unpriced material's own line costs 0 (see materialResolution.ts),
-    // so `totalCost`/`buyCost` can still produce a confident-looking
-    // `savings` sign here — `unpriceable: true` must still win.
     const plans = [plan('p1')];
     const rows = new Map([
       ['p1', row('p1', { groupResult: result({ buyCost: 200, unpriceable: true }) })],
@@ -158,11 +149,6 @@ describe('computeGroupIndexStats', () => {
   });
 
   it('reads "unknown" verdict when profit is null even though the member itself reads unpriceable: false', () => {
-    // A member's own material (not product) can be unpriced while the
-    // group's owned-stock ledger fully covers it — `rollup.unpriceable`
-    // clears, but that member's `profit` was computed on the owned-disabled
-    // tree, where it's still unpriced, so `rollup.profit` stays null. The
-    // verdict must not read confident next to that null.
     const plans = [plan('p1')];
     const rows = new Map([
       [

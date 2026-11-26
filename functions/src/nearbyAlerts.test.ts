@@ -14,8 +14,6 @@ import {
 } from './nearbyAlerts.js';
 
 describe('Occurrence Keys', () => {
-  // The literals are pinned on the client side too (src/engine/occurrenceKey.test.ts):
-  // a push and the Foreground Poller must key the same feed row.
   it('match the Foreground Poller derivation', () => {
     expect(skyhookRaidableNearbyOccurrenceKey(30000142, 40009077, 1_700_000_000_000)).toBe(
       'skyhookRaidableNearby:30000142:40009077:1700000000000'
@@ -26,7 +24,6 @@ describe('Occurrence Keys', () => {
   });
 });
 
-// A line: 1 - 2 - 3 - 4 - 5 - 6, origin wherever the test says.
 function lineDistances(origin: number): ReadonlyMap<number, number> {
   const map = new Map<number, number>();
   for (let id = 1; id <= 6; id++) map.set(id, Math.abs(id - origin));
@@ -47,7 +44,6 @@ function lists(over: Partial<NearbyLists> = {}): NearbyLists {
           end: new Date(NOW + 2 * HOUR).toISOString(),
         },
       },
-      // No readable window: dropped, as the app drops it.
       { solar_system_id: 2, planet_id: 200 },
     ],
     incursions: [
@@ -128,8 +124,6 @@ describe('computeDeviceNearby', () => {
 
   it('re-baselines silently when the origin moves (the app does the same)', () => {
     const far = run([character({ originSystemId: 6 })], {}, {});
-    // From 6, the Incursion at 4 is 2 jumps, already in range: nothing new.
-    // Now the pilot moves to 1: a new frame, so nothing fires.
     expect(run([character({ originSystemId: 1 })], far.next).fires).toEqual([]);
   });
 
@@ -168,7 +162,6 @@ describe('computeDeviceNearby', () => {
     const fires = run([a, b, c], base.next).fires.filter(
       (f) => f.fire.eventId === 'incursionNearby'
     );
-    // Staging system 4: a is 2 jumps, b is 3, c is 2 — a tie on jumps goes to the lower id.
     expect(fires.map((f) => f.fire.characterId)).toEqual([5]);
   });
 
@@ -196,7 +189,6 @@ describe('push log', () => {
     expect(log).toEqual({ 'incursionNearby:1:2': NOW });
     expect(notYetPushed(log, 'incursionNearby:1:2')).toBe(false);
     expect(notYetPushed(log, 'incursionNearby:3:4')).toBe(true);
-    // A day later, still listed: still remembered.
     expect(recordPushed(log, [], NOW + 2 * HOUR * 24, live)).toEqual(log);
   });
   it('forgets one the list no longer names, and keeps one whose list was not read', () => {

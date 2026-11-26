@@ -1,9 +1,3 @@
-/**
- * The picker's own behaviour, with the search and the grant state mocked. The
- * search's ESI path is pinned by `searchBuildLocations.test.ts`; what matters
- * here is the scope prompt, the debounce, and that picking hands over every
- * field in one call.
- */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -42,10 +36,6 @@ beforeEach(() => {
   searchBuildLocations.mockResolvedValue([AZBEL]);
 });
 
-/**
- * The picker with a `selectedLabel` the caller can change later — a plan
- * rewriting its own location is what several of these assert.
- */
 function renderPicker(onPick = vi.fn(), selectedLabel: string | null = null) {
   function Wrapper({ label }: { label: string | null }) {
     return (
@@ -74,8 +64,6 @@ const optionId = (structureId: number) => `build-location-option-${structureId}`
 
 describe('BuildLocationPicker', () => {
   it('offers a re-auth instead of the search for a token predating the scope', async () => {
-    // The scope is in the base grant, so this only ever happens to a Character
-    // added before it existed. `/industry` stays usable meanwhile.
     const user = userEvent.setup();
     grant.scopes = [];
     renderPicker();
@@ -87,8 +75,6 @@ describe('BuildLocationPicker', () => {
   });
 
   it('keeps the summary and the override toggle while the grant is still unknown', () => {
-    // The fields behind Override are the whole feature for anyone who never
-    // gets the search, so the link is never gated on it.
     grant.scopes = undefined;
     renderPicker();
 
@@ -172,16 +158,10 @@ describe('BuildLocationPicker', () => {
 
     await user.click(await screen.findByRole('option', { name: /K2-18 R&D/ }));
 
-    // The place that was chosen, not the fragment typed to find it. This
-    // parent never writes the pick back, so what shows is the picker's own
-    // hold — the plan's older name takes over once one lands.
     expect((searchBox() as HTMLInputElement).value).toBe('K2-18 R&D');
   });
 
   it('lets go of the pick the moment the plan says it is somewhere else', async () => {
-    // A manual facility or build-system edit clears the plan's stored
-    // location; the box must follow it rather than keep naming the structure
-    // the job no longer runs in.
     const user = userEvent.setup();
     const { rerender } = renderPicker(vi.fn(), 'Jita IV - Moon 4');
 
@@ -195,9 +175,6 @@ describe('BuildLocationPicker', () => {
   });
 
   it('hands over every field in one call, and names the pick while the plan catches up', async () => {
-    // The parent's write is a Dexie round-trip, so the box states the chosen
-    // place itself for that gap rather than falling back to the plan's older
-    // one — and the result list closes either way.
     const user = userEvent.setup();
     const { onPick } = renderPicker();
 
@@ -222,8 +199,6 @@ describe('BuildLocationPicker', () => {
 
     await user.tab();
 
-    // Only one tab stop for the whole widget: Tab leaves the input directly
-    // rather than landing on a result row first.
     expect(document.activeElement).not.toBe(searchBox());
     expect(document.activeElement?.getAttribute('role')).not.toBe('option');
   });
@@ -257,7 +232,6 @@ describe('BuildLocationPicker', () => {
     await user.keyboard('{ArrowDown}{Enter}');
 
     expect(onPick).toHaveBeenCalledExactlyOnceWith(AZBEL);
-    // Same as a click: the box names the pick rather than the typed fragment.
     expect((searchBox() as HTMLInputElement).value).toBe('K2-18 R&D');
   });
 
@@ -276,9 +250,6 @@ describe('BuildLocationPicker', () => {
   });
 
   it('gives the box back to the plan when the search is abandoned', async () => {
-    // Escape keeps the typed text while the pilot is still in the field, but
-    // walking away from an unpicked fragment must not leave it standing where
-    // the plan's own location belongs.
     const user = userEvent.setup();
     renderPicker(vi.fn(), 'Jita IV - Moon 4');
 

@@ -13,12 +13,6 @@ import {
 import { useOverBudgetFlash } from '../useOverBudgetFlash';
 import { fmt1 } from '../stats/fixedFormat';
 
-/**
- * A cargo item beneath the ring: its icon, a count, and a tooltip naming it.
- * With the editor's actions, a click (or Enter) opens its menu — load it,
- * change its count, remove it — and on a pointer it drags onto the modules
- * that take it.
- */
 export function CargoTile({
   typeId,
   count,
@@ -30,7 +24,6 @@ export function CargoTile({
 }) {
   const actions = useFittingItemActions();
   const shown = formatCompactNumber(count);
-  // The badge's count is visible text, so it belongs in the name (WCAG 2.5.3).
   const name = shown === String(count) ? tooltip : `${tooltip} (${shown})`;
   const draggable = actions?.dropHandlers.loadCharge ?? false;
   const tile = (
@@ -68,7 +61,6 @@ export function CargoTile({
   );
 }
 
-/** The hold's m3 used of what it takes, flashing once as it goes over — as the drone bay's bar does. */
 export function CargoHoldReadout({ actions }: { actions: FittingItemActions }) {
   const { t } = useTranslation();
   const { cargoUsed: used, cargoCapacity: total } = actions;

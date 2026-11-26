@@ -46,7 +46,6 @@ import { useActiveCharacter } from '@/stores/activeCharacter';
 import { GrantNote } from '@/app/GrantNote';
 
 const SORTS: readonly CertificateSort[] = ['grade', 'name', 'time'];
-/** The group select's "every group" value — Radix Select reserves the empty string. */
 const ALL_GROUPS = '__all__';
 
 interface Added {
@@ -55,13 +54,6 @@ interface Added {
   entries: readonly PlanEntry[];
 }
 
-/**
- * Skills › Certificates (issue #2390): CCP's combat certificates graded
- * against the active Character, by area rather than by hull — the cross-hull
- * view ship masteries can't give. Each row shows its grade, what the next
- * grade still needs and how long that takes, and adds those levels to the
- * target Skill Plan.
- */
 export function SkillCertificates() {
   const { t } = useTranslation();
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
@@ -158,7 +150,6 @@ export function SkillCertificates() {
   } else if (!skillsKnown) {
     body = (
       <>
-        {/* Only when the stored grant really lacks the skills read. */}
         <GrantNote endpoints={['getCharacterSkills']} title={t('skills.reauthTitle')} />
         <EmptyState title={t('skills.emptyTitle')} hint={t('skills.emptyHint')} />
       </>
@@ -171,11 +162,7 @@ export function SkillCertificates() {
           aria-label={t('skills.certificates.filtersLabel')}
           className="flex flex-wrap items-center gap-2"
         >
-          {/* One row that never wraps on a phone: the two selects shrink
-              (`flex-1 min-w-0`), the sort icon keeps its size. */}
           <div className="flex w-full min-w-0 items-center gap-2 sm:w-auto">
-            {/* A select rather than a chip per group: ten chips wrapped to five
-                lines on a phone before the first certificate. */}
             <Select
               value={group ?? ALL_GROUPS}
               onValueChange={(next) => setGroup(next === ALL_GROUPS ? null : next)}
@@ -196,7 +183,6 @@ export function SkillCertificates() {
                 ))}
               </SelectContent>
             </Select>
-            {/* Each grade carries its count, so the filter doubles as the summary. */}
             <CheckboxSelect
               size="sm"
               label={t('skills.certificates.gradeFilter')}
@@ -211,9 +197,6 @@ export function SkillCertificates() {
               selected={grades}
               onToggle={toggleGrade}
             />
-            {/* Phone only: the sort select is too wide to share the row, so an
-                icon opens the same three choices. A deliberate exception to
-                one DOM at every width, like `mobileSort` (DESIGN.md §4). */}
             <div className="shrink-0 sm:hidden">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>

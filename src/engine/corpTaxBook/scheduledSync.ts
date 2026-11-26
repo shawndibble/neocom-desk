@@ -1,42 +1,22 @@
-/**
- * The scheduled server sync's public status (ADR 0025), as the book's
- * `meta/scheduledSync` document stores it. The server writes it; officers read
- * it. It carries no token, only who holds the schedule, whether it runs, why it
- * stopped, and what the last run did.
- */
-
-/** Why the schedule for a corporation stopped; each has its own health-strip wording. */
 export const SCHEDULED_STOP_REASONS = [
-  /** The holder no longer holds an editing role (CEO, Director or Accountant). */
   'role-lost',
-  /** The holder left the corporation. */
   'left-corp',
-  /** SSO no longer honours the refresh token (revoked or expired). */
   'token-revoked',
-  /** ESI refused the holder's token (the ledger is no longer readable with it). */
   'esi-refused',
-  /** The corporation's book was turned off. */
   'book-off',
-  /** The saved grant could not be decrypted, so it could never run again. */
   'grant-unreadable',
 ] as const;
 
 export type ScheduledStopReason = (typeof SCHEDULED_STOP_REASONS)[number];
 
 export interface ScheduledSyncRun {
-  /** Epoch ms. */
   at: number;
   outcome: 'synced' | 'skipped';
-  /** Why a run was skipped (`esi-unavailable`, `esi-budget`). */
   reason?: string;
   observedRows?: number;
   extractions?: number;
   donationsAdded?: number;
   settled?: number;
-  /**
-   * Sources the holder could not read that run. `ore`: the holder lacks Station_Manager, so
-   * neither the book's Extractions nor their ore were read.
-   */
   missing?: ('extractions' | 'donations' | 'ore')[];
 }
 
@@ -44,16 +24,13 @@ export interface ScheduledSyncStatus {
   status: 'active' | 'stopped';
   characterId: number;
   characterName: string;
-  /** Epoch ms the holder gave the grant. */
   enabledAt: number;
   stoppedAt?: number;
   stoppedReason?: ScheduledStopReason;
   lastRun?: ScheduledSyncRun;
-  /** The book's own refineries the sync read, from its `systemIds` keys (#6240); absent when none. */
   refineryIds?: number[];
 }
 
-/** Reads `meta/scheduledSync`, dropping anything malformed; null when the schedule was never on or was revoked. */
 export function scheduledSyncFrom(
   d: Record<string, unknown> | undefined
 ): ScheduledSyncStatus | null {

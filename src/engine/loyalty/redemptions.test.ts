@@ -36,7 +36,6 @@ function input(over: Partial<RedemptionsInput> = {}): RedemptionsInput {
 describe('priceRedemptions', () => {
   it('walks the sell book for N × quantity and marks the line that moved', () => {
     const r = priceRedemptions(input());
-    // 50 units: 20 @ 10 + 30 @ 20
     expect(r.requiredLines[0]).toMatchObject({ unitsNeeded: 50, filled: 20 + 30, unfilled: 0 });
     expect(r.requiredLines[0]!.lineCost).toBe(800);
     expect(r.requiredLines[0]!.moved).toBe(true);
@@ -70,7 +69,6 @@ describe('priceRedemptions', () => {
         buyOrders: [bid(5000, 4), bid(4000, 100)],
       })
     );
-    // 10 units: 4 @ 5000 + 6 @ 4000
     expect(r.output.revenue).toBe(44000);
     expect(r.output.moved).toBe(true);
     expect(r.output.unsold).toBe(0);
@@ -85,7 +83,6 @@ describe('priceRedemptions', () => {
         outputPriceCeiling: 5000,
       })
     );
-    // 2 @ the 5000 ceiling (bid 900k is bait) + 8 @ 4000
     expect(r.output.revenue).toBe(42000);
   });
 

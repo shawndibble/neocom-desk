@@ -1,8 +1,3 @@
-// SRP Doctrine Fits: the admin-SDK half. A Director saves or deletes a corp's
-// Doctrine Fit snapshot (re-checked live, CEO included, like Hull Rules); each change appends to
-// the audit log in the same transaction. Any member may preview the fit check of their
-// own loss (that writes nothing) and list the corp's fits for their Fittings library. Parsing: srpDoctrineInput.ts; the match: srpDoctrineCheck.ts.
-
 import { fail, type Caller } from './actorAuth.js';
 import { randomBytes } from 'node:crypto';
 import type { BookCall } from './corpTaxBook.js';
@@ -32,7 +27,6 @@ import {
   type SrpSettings,
 } from './srpTypes.js';
 
-/** Creates or replaces a Doctrine Fit. Returns its id. */
 export async function saveSrpDoctrine(
   deps: SrpDeps,
   caller: Caller,
@@ -49,7 +43,6 @@ export async function saveSrpDoctrine(
       fail('not-found', 'No such Doctrine Fit', 'doctrine-not-found');
     }
     if (existing && existing.snapshot.hullTypeId !== input.snapshot.hullTypeId) {
-      // a rule lists only fits of its own hull; moving one would silently un-check that hull
       const settings = (await tx.get(srpSettingsRef(deps.db, call.corporationId))).data() as
         SrpSettings | undefined;
       if (settings?.hullRules.some((r) => r.doctrineIds?.includes(id))) {
@@ -61,7 +54,6 @@ export async function saveSrpDoctrine(
       }
     }
     if (!existing) {
-      // ids only: the cap needs a count, not the fits
       const held = await tx.get(coll.select().limit(MAX_DOCTRINES));
       if (held.size >= MAX_DOCTRINES) {
         fail(
@@ -77,7 +69,6 @@ export async function saveSrpDoctrine(
       snapshot: input.snapshot,
       createdBy: existing?.createdBy ?? access.characterId,
       createdAt: existing?.createdAt ?? deps.now(),
-      // a re-save without one (an older client) drops the old code: it no longer matches the fit
       ...(input.shareCode !== undefined ? { shareCode: input.shareCode } : {}),
     };
     tx.set(ref, fit);
@@ -99,7 +90,6 @@ export async function saveSrpDoctrine(
   return { id };
 }
 
-/** Deletes a Doctrine Fit and drops it from every Hull Rule that listed it; filed claims keep their result. */
 export async function deleteSrpDoctrine(
   deps: SrpDeps,
   caller: Caller,
@@ -134,11 +124,6 @@ export async function deleteSrpDoctrine(
   return { id: input.id };
 }
 
-/**
- * The corp's Doctrine Fits for a verified member's Fittings library (#6202). Firestore rules keep
- * `srpDoctrines` officers-only because they cannot check current membership; this re-checks it
- * live, so a Character who left the corp reads nothing. SRP off lists nothing.
- */
 export async function listSrpDoctrineFits(
   deps: SrpDeps,
   caller: Caller,
@@ -157,20 +142,14 @@ export async function listSrpDoctrineFits(
   };
 }
 
-/**
- * What a filing of this killmail would store as its doctrine check, with nothing written. Same
- * member and own-loss checks as filing, so it is no way to read another pilot's fit.
- */
 export async function previewSrpDoctrineCheck(
   deps: SrpFileDeps,
   caller: Caller,
   call: BookCall,
   ref: KillmailRef
 ): Promise<DoctrinePreview> {
-  // The settings read needs no member, so it runs beside the affiliation lookup; a non-member
-  // still fails first, before anything about SRP being on or off is said.
   const settingsRead = srpSettingsRef(deps.db, call.corporationId).get();
-  settingsRead.catch(() => undefined); // its failure surfaces at the await below
+  settingsRead.catch(() => undefined);
   const member = await authorizeMember(deps, caller, call);
   const settings = (await settingsRead).data() as SrpSettings | undefined;
   if (!settings || settings.enabled !== true) {
@@ -179,8 +158,6 @@ export async function previewSrpDoctrineCheck(
   const { zkill, km } = await fetchOwnLoss(deps, member, ref);
   const hullTypeId = km.victim.shipTypeId;
   const { hull, fit } = shipFitItems(km.victim);
-  // None of these reads depends on another: the fit check (Firestore), the pricing chain (ESI
-  // hull group, then Jita when it needs it) and the two Jita values the pilot is shown.
   const [check, { classId, result }, hullValue, fitValue] = await Promise.all([
     doctrineCheckOf(deps.db, settings, call.corporationId, km.victim),
     priceLoss(deps.killmails, settings, km.victim, zkill.totalValue),
@@ -200,7 +177,6 @@ export async function previewSrpDoctrineCheck(
   };
 }
 
-/** The pricing result as the pilot is shown it. */
 function quoteOf(result: SrpPricingResult): PayoutQuote {
   switch (result.kind) {
     case 'amount':

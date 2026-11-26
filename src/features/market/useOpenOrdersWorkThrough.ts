@@ -11,14 +11,12 @@ import type { WorkThroughContextValue } from './workThroughContext';
 
 interface UseOpenOrdersWorkThroughOptions {
   sortedRows: readonly OpenOrderRow[];
-  /** The unnarrowed snapshot: never undercut an alt. */
   data: OpenOrdersPageSnapshot | null;
   snapshot: OpenOrdersPageSnapshot | null;
   ordersByOrderId: ReadonlyMap<number, MarketOrder>;
   rowCount: number;
 }
 
-/** The page's work-through: queue, start-from-link, scroll-to-current, and the context its modal shares. */
 export function useOpenOrdersWorkThrough({
   sortedRows,
   data,
@@ -34,7 +32,6 @@ export function useOpenOrdersWorkThrough({
     (characterId: number) => openInEveCharacterIds?.has(characterId) ?? false,
     [openInEveCharacterIds]
   );
-  // Every Character's orders, before any narrowing: never undercut an alt.
   const ownOrderIds = useMemo(
     () => (data ? ownOrderIdSet(data.openOrders) : new Set<number>()),
     [data]

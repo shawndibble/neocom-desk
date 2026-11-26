@@ -1,8 +1,3 @@
-/**
- * The report's "Data we read": one row per source with how many rows the read kept. The row and
- * its accent name open that source's data page (DESIGN section 6c: the row's primary action beats
- * a name link; no Open button).
- */
 import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { DataTable, Panel, textActionClassName, type DataTableColumn } from '@/components/ui';

@@ -57,11 +57,6 @@ interface RunDelta {
   reach: WeaponReachChange | null;
 }
 
-/**
- * What the weather does to the open fit, as the page's own stats would show it:
- * null while working, 'failed' if the engine threw. Keyed by `compare` too, so
- * an edited fit never shows the old fit's delta.
- */
 function useRunDelta(
   compare: WeatherCompare | null,
   weatherTypeId: number | null
@@ -78,12 +73,6 @@ function useRunDelta(
   return delta.status === 'failed' ? 'failed' : (delta.data ?? null);
 }
 
-/**
- * The hub's sell price for one filament type, via the same `getHubPrices` path
- * the Variations Jita price uses, at the Settings hub. Null while loading, on
- * a failed read, or when the hub quotes none; a stale answer for another
- * filament or hub is never shown.
- */
 function useFilamentPrice(typeId: number | null, hubId: string): number | null {
   const hub = getTradeHub(hubId);
   const percent = usePricePercentFor('fittings');
@@ -92,36 +81,26 @@ function useFilamentPrice(typeId: number | null, hubId: string): number | null {
     const prices = await getHubPricesAt(hub, [typeId], percent);
     return prices.get(typeId)?.sellMin ?? null;
   }, [hub, typeId, percent]);
-  // A failed lookup reads as no price.
   return (
     useKeyedLoad(typeId === null || !hub ? null : `${hubId}:${percent}:${typeId}`, load).data ??
     null
   );
 }
 
-/** What the stats column's Abyssal row says closed: the session weather's name, else normal space. */
 export function AbyssalWeatherMeta() {
   const { t } = useTranslation();
   const weatherTypeId = useAbyssalWeather((state) => state.weatherTypeId);
   return useWeatherName(weatherTypeId) ?? t('fittings.weather.none');
 }
 
-/**
- * The stats column's Abyssal section body, flat: the session weather, then a
- * run for the open fit in it. Writes the session weather, so the editor's
- * stats move with it. Mount it only while it is shown: mounting is what
- * starts working out the weather's delta on the fit.
- */
 export function AbyssalRunPlanner({
   hullGroupId,
   compare,
   cargo,
   typeName,
 }: {
-  /** The open fit's hull's inventory group; undefined while the catalogue loads hides the hull rule. */
   hullGroupId: number | undefined;
   compare: WeatherCompare | null;
-  /** The open fit's own cargo: matching filaments in it reduce the cost line. Never the pilot's assets. */
   cargo: readonly FittingCargoItem[];
   typeName: (typeId: number) => string;
 }) {
@@ -194,7 +173,6 @@ export function AbyssalRunPlanner({
               const next = Number(value) as AbyssalTier;
               const nextLevels = abyssalTierLevels(next);
               setTier(next);
-              // Off-tier strength: new tier's harsher one, kind kept.
               if (!nextLevels.includes(weather.level))
                 setWeather(abyssalWeatherOf(weather.kind, nextLevels[1]).typeId);
             }}
@@ -276,7 +254,6 @@ export function AbyssalRunPlanner({
 
 type Translate = ReturnType<typeof useTranslation>['t'];
 
-/** "x 3 · 3,000,000 ISK at Jita": the count, then the price when the hub quotes one. */
 function buyDetail(
   t: Translate,
   cost: ReturnType<typeof abyssalFilamentCost> | null,
@@ -305,11 +282,6 @@ function strengthRange(t: Translate, tier: AbyssalTier, weather: AbyssalWeather)
   return t('fittings.abyssalRun.strengthNote', tierRange(tier, weather));
 }
 
-/**
- * A filament fixes tier and kind; the site rolls the strength. An off-tier pick
- * keeps its filament and names the tiers that roll it; the stats stay at the pick.
- * An in-tier pick says nothing here: the range is in the section's info tooltip.
- */
 function StrengthOffNote({ tier, weather }: { tier: AbyssalTier; weather: AbyssalWeather }) {
   const { t } = useTranslation();
   const levels = abyssalTierLevels(tier);
@@ -359,7 +331,6 @@ function RunDeltaNote({
                 weapon: typeName(reach.typeId),
                 before: kmValue(reach.before.optimal),
                 after: kmValue(reach.after.optimal),
-                // Optimal plus falloff, as the stats column and the HUD read it.
                 fallBefore: kmValue(reach.before.optimal + reach.before.falloff),
                 fallAfter: kmValue(reach.after.optimal + reach.after.falloff),
               })}

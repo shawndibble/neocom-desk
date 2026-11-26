@@ -37,7 +37,6 @@ const CATALOG: BlueprintCatalog = {
   byProductTypeID: new Map(ENTRIES.map((e) => [e.productTypeID as number, e])),
   typesById: {
     [BUZZARD]: { name: 'Buzzard', groupID: 830, volume: 19400 },
-    // A faction module: has a name in the SDE but nothing produces it.
     2000: { name: 'Sisters Core Probe Launcher', groupID: 481, volume: 5 },
   },
 };
@@ -55,8 +54,6 @@ describe('FitImportDialog — initialText', () => {
       />
     );
     expect(screen.getByLabelText(/paste/i)).toHaveValue(FIT_TEXT);
-    // The hull is buildable, the faction module is not — both already
-    // visible with no click, as if the pilot had pasted and pressed Parse.
     expect(await screen.findByText('Buzzard x1')).toBeInTheDocument();
     expect(screen.getByText('Sisters Core Probe Launcher x1')).toBeInTheDocument();
   });

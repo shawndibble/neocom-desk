@@ -11,7 +11,7 @@ const SLOTS: EftSlotLookup = {
   400: 'rig',
   500: 'drone',
 };
-const CHARGE = 900; // no rack of its own: a charge
+const CHARGE = 900;
 const HULL = 626;
 
 type Item = NonNullable<KillmailVictim['items']>[number];
@@ -25,7 +25,6 @@ function item(typeId: number, flag: number, destroyed = 1, dropped = 0): Item {
   };
 }
 
-/** Two highs (one with a charge), a mid, a low and a rig. */
 const FIT_A: Item[] = [
   item(100, 27),
   item(CHARGE, 27, 40),
@@ -34,7 +33,6 @@ const FIT_A: Item[] = [
   item(300, 11),
   item(400, 92),
 ];
-/** A different fit: three lows. */
 const FIT_B: Item[] = [item(300, 11), item(300, 12), item(300, 13)];
 
 function loss(

@@ -18,7 +18,6 @@ const basic = (level, divisionID, isLocator = false) => ({
 const DIVISIONS = [
   { _key: 22, internalName: 'Distribution' },
   { _key: 24, internalName: 'Security' },
-  // No baked agent works here, so it is not shipped.
   { _key: 18, internalName: 'R&D' },
 ];
 
@@ -27,7 +26,6 @@ describe('bakeAgents', () => {
     character(3000002, 'Bela Zuun', 1000003, basic(2, 24, true)),
     character(3000001, 'Antaken Kamola', 1000002, basic(1, 22)),
     character(3000003, 'Cana Rhion', 1000002, basic(4, 24)),
-    // Not agents, or agents of a kind this version leaves out.
     character(3000004, 'A CEO', 1000002),
     character(3000005, 'A Research Agent', 1000002, { ...basic(3, 18), agentTypeID: 4 }),
     character(3000006, 'A Storyline Agent', 1000002, { ...basic(3, 24), agentTypeID: 7 }),
@@ -78,7 +76,6 @@ describe('bakeNpcCorporations', () => {
       taxRate: 0.11,
     },
     { _key: 1000002, name: { en: 'CBD Corporation' }, tickerName: 'CBDC', factionID: 500001 },
-    // Factionless, no headquarters, no tax.
     { _key: 1000130, name: { en: 'Sisters of EVE' }, tickerName: 'SOE', taxRate: 0 },
     { _key: 1000174, name: { en: 'Polaris Bug Hunters' }, tickerName: 'PBH', deleted: true },
   ];

@@ -1,4 +1,3 @@
-/** Shared text for the "vs 90d" figure: its header explanation and the phone cards' readout. */
 import type { TFunction } from 'i18next';
 import {
   isPriceSpike,
@@ -8,7 +7,6 @@ import {
 } from '@/engine/market/priceVsMedian';
 import { formatVsMedianPct } from '@/features/market/format';
 
-/** The "vs 90d" header's explanation, with the thresholds the figure is held to. */
 export function vs90dTooltip(t: TFunction): string {
   return t('industry.vs90dTooltip', {
     windowDays: VS_MEDIAN_WINDOW_DAYS,
@@ -17,7 +15,6 @@ export function vs90dTooltip(t: TFunction): string {
   });
 }
 
-/** A "vs 90d" figure and its tone: "…" while still being read, null when blank (a card leaves it out). */
 export function vs90dReadout(
   value: number | null | undefined
 ): { node: string; toneClassName?: string } | null {

@@ -179,7 +179,6 @@ describe('diffCommunityRequestPledged', () => {
 
   it('counts a Request absent from the previous poll as watched with nothing Pledged, whatever the clocks say', () => {
     const prev = at(1000, mine({ requestId: 'r0' }));
-    // createdAt is the server's clock: far in the past of this device's, and it makes no difference.
     const next = at(2000, mine({ requestId: 'r0' }), mine({ requestId: 'r1', at: 10 }), pledge());
     expect(diffCommunityRequestPledged(1, prev, next)).toHaveLength(1);
     const ahead = at(

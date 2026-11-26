@@ -1,10 +1,3 @@
-// Vetting: the admin-SDK side of the kept raw rows (ADR 0035). Chunks live under
-// `vettingReviews/{id}/rawRows`; a character's `raw` metadata names which ones belong to the
-// review, and the officer's page reads only those. So a chunk left behind by a failed or replaced
-// read is never shown, and every delete here is hygiene for data nobody can see, not what keeps
-// it private. Chunks are written outside the review's transaction (a transaction's commit is
-// capped at 10 MiB and 30,000 rows is several MiB), a few documents per batch.
-
 import { randomBytes } from 'node:crypto';
 import type { DocumentReference } from 'firebase-admin/firestore';
 import { chunk } from './chunk.js';
@@ -32,9 +25,7 @@ import {
   type VettingRead,
 } from './vettingTypes.js';
 
-/** Chunk documents per write batch: ten of ~400 KB stay well under the 10 MiB request cap. */
 const WRITE_BATCH = 10;
-/** Documents per delete batch (deletes carry no payload). */
 const DELETE_BATCH = 400;
 
 export interface PreparedRaw {
@@ -42,10 +33,6 @@ export interface PreparedRaw {
   chunks: { id: string; data: StoredRawChunk }[];
 }
 
-/**
- * Names for every id the rows mention, in one lookup. An id ESI cannot name, or a lookup ESI
- * refuses (a limit, an outage), leaves rows unnamed: the read is never failed by it.
- */
 async function namesFor(
   esi: VettingEsi,
   rows: readonly VettingRawRow[],
@@ -68,7 +55,6 @@ async function namesFor(
   }
 }
 
-/** The chunks and metadata for one read, with every party named. Writes nothing. */
 export async function prepareRaw(
   esi: VettingEsi,
   characterId: number,
@@ -120,10 +106,6 @@ async function deleteRefs(review: DocumentReference, refs: readonly DocumentRefe
   }
 }
 
-/**
- * Deletes every chunk of the review except those of a (character, generation) in `keep`.
- * `keep` empty deletes them all. Lists ids only (no document is read).
- */
 export async function pruneRaw(
   review: DocumentReference,
   keep: ReadonlyMap<number, string> = new Map()
@@ -138,7 +120,6 @@ export async function pruneRaw(
   );
 }
 
-/** Deletes exactly these chunk documents: a read's own, which nothing else is writing. */
 export async function deleteRawIds(
   review: DocumentReference,
   ids: readonly string[]
@@ -149,7 +130,6 @@ export async function deleteRawIds(
   );
 }
 
-/** Same as `deleteRawIds` after a transaction committed: a failure is noted, never thrown. */
 export async function tidyRawIds(
   review: DocumentReference,
   ids: readonly string[],
@@ -164,16 +144,11 @@ export async function tidyRawIds(
   }
 }
 
-/** The (character, generation) pairs a review's characters still own. */
 export const keptRaw = (
   characters: readonly Pick<StoredVettingCharacter, 'characterId' | 'raw'>[]
 ): Map<number, string> =>
   new Map(characters.flatMap(({ characterId, raw }) => (raw ? [[characterId, raw.gen]] : [])));
 
-/**
- * `pruneRaw` after a transaction that already committed: a failure leaves chunks nobody can
- * reach (the metadata no longer names them), deleted with the review, and must not fail the call.
- */
 export async function tidyRaw(
   review: DocumentReference,
   keep: ReadonlyMap<number, string>,
@@ -188,7 +163,6 @@ export async function tidyRaw(
   }
 }
 
-/** Where to start and what comes after, from the metadata alone. Null `at` means no such chunk. */
 export function rawPagePosition(
   characters: readonly Pick<StoredVettingCharacter, 'characterId' | 'raw'>[],
   source: VettingRawSource,
@@ -202,7 +176,6 @@ export function rawPagePosition(
   return start < 0 ? null : { order, start };
 }
 
-/** What a page returns for a chunk document read back. Malformed JSON reads as an empty chunk. */
 export function pageOfChunk(data: unknown): Pick<VettingRawPage, 'rows' | 'parties'> {
   const parse = <T>(json: unknown): T[] => {
     if (typeof json !== 'string') return [];

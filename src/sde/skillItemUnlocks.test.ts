@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-// Sanity checks on the committed file `scripts/lib/skillItemUnlocks.mjs` bakes.
 const read = <T>(name: string) =>
   JSON.parse(readFileSync(join(process.cwd(), 'public', 'data', name), 'utf-8')) as T;
 const types = read<Record<string, { name: string }>>('types.json');

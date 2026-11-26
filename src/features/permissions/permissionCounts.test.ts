@@ -54,11 +54,6 @@ describe('countGrantedPermissions', () => {
     expect(base.granted).toBe(base.total);
   });
 
-  /**
-   * #6102 made six read Permissions default-on without nagging the Characters
-   * signed in before it: the count is the same "n of N" it always was, never a
-   * new gap, because it counts Permissions held, not the default.
-   */
   it('counts a pre-#6102 Base Grant exactly as before the default changed', () => {
     const formerlyOptIn = new Set(FORMERLY_OPT_IN_GROUPS.flatMap((g) => [...scopesForGroup(g)]));
     const legacy = SCOPES.filter((scope) => !formerlyOptIn.has(scope));

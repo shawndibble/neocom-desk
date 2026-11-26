@@ -1,20 +1,3 @@
-/**
- * The ways to fly one Leg (issue #2477): by stargate alone, or through Thera
- * or Turnur — and the way a pilot pinned for it, which the leg is flown by
- * in place of the planner's pick.
- *
- * Pure. Forcing a leg through a hole is pieced together from ordinary sweeps:
- * the route to one end of the hole, the hole jump, and the route on from the
- * other end. The hole joins the search's options for that leg only — the
- * stargate graph is never touched, so Set waypoints still reads the hole
- * jump as a non-gate hop and cuts the waypoints at its entrance.
- *
- * Via Ansiblex (issue #2478): the leg by stargates and the known bridges,
- * no holes. Bridges are per-search connections too, never in the graph.
- *
- * Facts only (decision `20260912-172628`): the ways are listed side by side,
- * never ranked as better or worse.
- */
 import {
   findJumpRoute,
   routeCost,
@@ -31,20 +14,13 @@ import { gatesOnlyOptions, longerThanGates } from './holeDetour';
 import { holeNetwork, type HoleEnds } from './routeHoles';
 import { HUB_SYSTEM_IDS, type TheraHub } from './theraConnections';
 
-/**
- * What a jump drive leg is searched with (issue #3147): the systems with a
- * position, and the hull's drive. Absent when jump legs are off or the hull
- * has no drive.
- */
 export interface JumpContext {
   systems: readonly JumpSystem[];
   drive: JumpDriveOptions;
 }
 
-/** A hole a pin can name: its EVE-Scout id and the two systems it joins. */
 export type PinnableHole = HoleEnds & { id: string };
 
-/** `options` with these holes added to whatever holes it already has. */
 function withHoles(
   options: FindJumpRouteOptions,
   holes: readonly HoleEnds[]
@@ -57,7 +33,6 @@ function withHoles(
   };
 }
 
-/** `options` without the one connection joining an exit to its hub. */
 function withoutHole(options: FindJumpRouteOptions, hole: HoleEnds): FindJumpRouteOptions {
   const hubId = HUB_SYSTEM_IDS[hole.hub];
   const joins = ([a, b]: readonly [number, number]) =>
@@ -68,17 +43,10 @@ function withoutHole(options: FindJumpRouteOptions, hole: HoleEnds): FindJumpRou
   };
 }
 
-/** A route that never visits a system twice: anything else is a detour, not a way. */
 function visitsEachOnce(systems: readonly number[]): boolean {
   return new Set(systems).size === systems.length;
 }
 
-/**
- * The cheapest route from `from` to `to` that jumps through one of `holes`,
- * either way round: into the hub from its exit, or out of the hub to its exit.
- * The rest of the leg may use any hole `options` holds. A route that would
- * fly back out through the hole it came in by is never the answer.
- */
 export function routeThroughHoles(
   graph: JumpGraph,
   from: number,
@@ -110,7 +78,6 @@ export function routeThroughHoles(
     const exit = hole.exitSystemId;
     if (!graph.has(hubId) || !graph.has(exit)) continue;
 
-    // Into the hub through this hole, then on from the hub.
     const toExit = sweep(from).routeTo(exit);
     if (toExit) {
       let onward = sweep(hubId).routeTo(to);
@@ -120,8 +87,6 @@ export function routeThroughHoles(
       if (onward) consider([...toExit, ...onward]);
     }
 
-    // To the hub some other way, then out through this hole. Graph and holes
-    // run both ways, so the route on from the exit is the one back to it, reversed.
     let toHub = sweep(from).routeTo(hubId);
     if (toHub && toHub[toHub.length - 2] === exit) {
       toHub = routeSweepFrom(graph, from, withoutHole(forced, hole)).routeTo(hubId);
@@ -134,11 +99,6 @@ export function routeThroughHoles(
   return found ? { kind: 'route', systems: found.systems } : { kind: 'no-route' };
 }
 
-/**
- * The cheapest route from `from` to `to` by stargate and the known bridges,
- * holes left out — or `no-route` when it crosses no bridge, since that is the
- * gate way, not a way over bridges.
- */
 export function routeOverBridges(
   graph: JumpGraph,
   from: number,
@@ -158,11 +118,6 @@ export function routeOverBridges(
   return crossesBridge ? route : { kind: 'no-route' };
 }
 
-/**
- * The cheapest route by stargate and jump drive, holes and bridges left out —
- * or `no-route` when jump legs are off or none is on the way, since that is
- * the gate way.
- */
 export function routeOverJumps(
   graph: JumpGraph,
   from: number,
@@ -182,7 +137,6 @@ export function routeOverJumps(
   return route.kind === 'route' ? { kind: 'route', systems: route.systems } : route;
 }
 
-/** One way to fly a leg: by gates alone, the cheapest way through a hub, or over the bridges. */
 export interface LegWay {
   way: 'gates' | TheraHub | 'ansiblex' | 'jump';
   route: JumpRouteResult;
@@ -190,13 +144,6 @@ export interface LegWay {
 
 const HUBS: readonly TheraHub[] = ['thera', 'turnur'];
 
-/**
- * Every way to fly a leg: gates only, always — even when no gate route flies
- * it, which is itself the fact to show — then each hub with a qualifying hole
- * whose way through actually reaches in no more jumps than the gates, then
- * Via Ansiblex when a known bridge is on the way. `options` are the
- * planner's, holes and all.
- */
 export function legWays(
   graph: JumpGraph,
   from: number,
@@ -223,7 +170,6 @@ export function legWays(
   return ways;
 }
 
-/** How a pilot pinned a leg (`gates` | `thera` | `turnur` | `ansiblex` | an EVE-Scout hole id). */
 export type LegPin =
   | { kind: 'gates' }
   | { kind: 'hub'; hub: TheraHub }
@@ -231,10 +177,6 @@ export type LegPin =
   | { kind: 'ansiblex' }
   | { kind: 'jump' };
 
-/**
- * A pin read from its link token, or `null` for a token that names nothing.
- * EVE-Scout ids are word characters.
- */
 export function parseLegPin(token: string): LegPin | null {
   if (token === 'gates') return { kind: 'gates' };
   if (token === 'thera' || token === 'turnur') return { kind: 'hub', hub: token };
@@ -243,26 +185,10 @@ export function parseLegPin(token: string): LegPin | null {
   return /^[\w-]{1,40}$/.test(token) ? { kind: 'hole', id: token } : null;
 }
 
-/**
- * A hub or hole pin is answered from EVE-Scout's hole list, and waits while
- * there is none; gates and the bridge list never do.
- */
 export function pinWaitsOnHoleList(pin: LegPin): pin is Extract<LegPin, { kind: 'hub' | 'hole' }> {
   return pin.kind === 'hub' || pin.kind === 'hole';
 }
 
-/**
- * A pinned leg's route, or why it cannot be flown that way:
- * - `no-hole`: a hub pin, and that hub has no qualifying hole;
- * - `closed`: a hole pin, and EVE-Scout no longer lists that hole open;
- * - `no-bridge`: an ansiblex pin, and no Ansiblex is known;
- * - `no-route`: the pinned way does not reach the leg's far end (for an
- *   ansiblex pin, also when no known bridge is on the way).
- *
- * `qualifying` are the holes the filters allow; `listed` every open hole
- * EVE-Scout lists. A pinned hole is looked up in the second: the pilot chose
- * it by name, so it is flown even when the size or life filter would skip it.
- */
 export type PinnedLegRoute<T extends PinnableHole> =
   | { kind: 'route'; systems: number[]; hole: T | null }
   | { kind: 'no-hole' }

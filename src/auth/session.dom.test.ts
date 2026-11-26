@@ -93,7 +93,6 @@ describe('startLogin', () => {
     const state = url.searchParams.get('state');
     expect(state).toBeTruthy();
 
-    // this round trip's verifier is stashed under its own state
     const stored = sessionStorage.getItem(`neocom.sso.pkce.${state!}`);
     expect(stored).toBeTruthy();
     const { verifier, scopes } = JSON.parse(stored!) as { verifier: string; scopes: string[] };
@@ -140,7 +139,6 @@ describe('completeLogin', () => {
     expect(token?.scopes).toEqual(['esi-skills.read_skills.v1']);
     expect(token?.expiresAt).toBeGreaterThan(Date.now());
 
-    // exchange used the stored verifier, and the one-shot stash was cleared
     expect(tokenRequests[0].get('code_verifier')).toBe(verifier);
     expect(sessionStorage.getItem(`neocom.sso.pkce.${state}`)).toBeNull();
   });
@@ -170,9 +168,6 @@ describe('completeLogin', () => {
   });
 
   it('two racing logins both stay valid, and either can complete (#649)', async () => {
-    // The reported shape: a second press lands while the first navigation is
-    // already committing. A single shared slot let the second overwrite the
-    // first's verifier, so whichever round trip SSO returned lost.
     const first = new URL(await startLogin(['esi-skills.read_skills.v1'], cfg));
     const second = new URL(await startLogin(['esi-skills.read_skills.v1'], cfg));
     const firstState = first.searchParams.get('state')!;
@@ -182,7 +177,6 @@ describe('completeLogin', () => {
     const character = await completeLogin({ code: 'good-code', state: firstState }, cfg);
     expect(character.characterId).toBe(CHAR_ID);
 
-    // The loser is still live, and still one-shot.
     await db.tokens.clear();
     await db.characters.clear();
     expect((await completeLogin({ code: 'good-code', state: secondState }, cfg)).characterId).toBe(
@@ -194,8 +188,6 @@ describe('completeLogin', () => {
     const base = new URL(await startLogin(['esi-skills.read_skills.v1'], cfg));
     await startLogin(['esi-skills.read_skills.v1', 'esi-wallet.read_character_wallet.v1'], cfg);
 
-    // Completing the first must judge revocation against what *it* asked for,
-    // not against the wider set the second round trip requested.
     await completeLogin({ code: 'good-code', state: base.searchParams.get('state')! }, cfg);
     expect((await db.tokens.get(CHAR_ID))?.scopes).toEqual(['esi-skills.read_skills.v1']);
   });
@@ -211,11 +203,6 @@ describe('completeLogin', () => {
     expect(tokenRequests).toHaveLength(1);
   });
 
-  // #649 came from an outside reporter suggesting the `state` check itself was
-  // at fault. It is not, and relaxing it is how a login-CSRF gets shipped: an
-  // attacker who can make a browser open `/callback?code=<their code>` would
-  // silently bind their own Character into the victim's app. A `state` with no
-  // stashed verifier behind it must never reach the token endpoint.
   it('a forged callback with no login in progress creates nothing (#649)', async () => {
     await expect(
       completeLogin({ code: 'attacker-code', state: 'attacker-state' }, cfg)
@@ -244,7 +231,6 @@ describe('completeLogin', () => {
     entry.createdAt = Date.now() - 16 * 60_000;
     sessionStorage.setItem(key, JSON.stringify(entry));
 
-    // The next login prunes it.
     await startLogin(['esi-skills.read_skills.v1'], cfg);
     expect(sessionStorage.getItem(key)).toBeNull();
 
@@ -275,8 +261,6 @@ describe('completeLogin', () => {
   });
 
   it('a retry asks for what a live round trip asked for, never less (#649)', async () => {
-    // The single intent slot holds the most recent request, so with two round
-    // trips open it describes the wrong one; a live Pending Login is exact.
     await startLogin(['esi-skills.read_skills.v1', 'esi-corporations.read_divisions.v1'], cfg);
     await startLogin(['esi-skills.read_skills.v1'], cfg);
 
@@ -300,14 +284,12 @@ describe('completeLogin', () => {
       completeLogin({ code: 'good-code', state: 'some-other-state' }, cfg)
     ).rejects.toMatchObject({ reason: 'no-login-in-progress' });
 
-    // Still redeemable by the callback it belongs to.
     expect(
       (await completeLogin({ code: 'good-code', state: 'legacy-state' }, cfg)).characterId
     ).toBe(CHAR_ID);
   });
 
   it('finishes a login that left before the per-state stash shipped (#649)', async () => {
-    // Legacy single-slot layout, as a tab mid-login across the deploy holds it.
     const verifier = 'legacy-verifier';
     sessionStorage.setItem('neocom.sso.verifier', verifier);
     sessionStorage.setItem('neocom.sso.state', 'legacy-state');
@@ -338,14 +320,14 @@ describe('getValidAccessToken', () => {
       characterId: CHAR_ID,
       accessToken: 'stale-access',
       refreshToken: 'refresh-old',
-      expiresAt: Date.now() + 30_000, // < 60s buffer
+      expiresAt: Date.now() + 30_000,
       scopes: ['esi-skills.read_skills.v1'],
     });
     const access = await getValidAccessToken(CHAR_ID, cfg);
     expect(access).not.toBe('stale-access');
 
     const stored = await db.tokens.get(CHAR_ID);
-    expect(stored?.refreshToken).toBe('refresh-rotated'); // newest ALWAYS persisted
+    expect(stored?.refreshToken).toBe('refresh-rotated');
     expect(stored?.accessToken).toBe(access);
     expect(stored?.expiresAt).toBeGreaterThan(Date.now() + 60_000);
   });
@@ -363,7 +345,7 @@ describe('getValidAccessToken', () => {
       getValidAccessToken(CHAR_ID, cfg),
     ]);
     expect(a).toBe(b);
-    expect(tokenRequests).toHaveLength(1); // second concurrent call reuses in-flight refresh
+    expect(tokenRequests).toHaveLength(1);
     expect((await db.tokens.get(CHAR_ID))?.refreshToken).toBe('refresh-rotated');
   });
 
@@ -376,13 +358,12 @@ describe('getValidAccessToken', () => {
       scopes: [],
     });
     await getValidAccessToken(CHAR_ID, cfg);
-    // force stale again with a refreshable token
     await db.tokens.update(CHAR_ID, {
       expiresAt: Date.now() + 30_000,
       refreshToken: 'refresh-old',
     });
     await getValidAccessToken(CHAR_ID, cfg);
-    expect(tokenRequests).toHaveLength(2); // map entry cleared on settle
+    expect(tokenRequests).toHaveLength(2);
   });
 
   it('announces a dead grant to any caller, not only the ESI client', async () => {
@@ -448,11 +429,6 @@ describe('getValidAccessToken', () => {
   });
 
   it('regression: token record is read inside the single flight, never before it', async () => {
-    // The old code read db.tokens BEFORE checking for an in-flight refresh: a
-    // caller could snapshot the record, lose the microtask race to a completing
-    // refresh, and then re-send the rotated (burned) refresh token. With the
-    // read inside the flight, concurrent callers perform exactly ONE record
-    // read (plus one inside persistTokens), always post-rotation.
     await db.tokens.put({
       characterId: CHAR_ID,
       accessToken: 'stale-access',
@@ -469,7 +445,6 @@ describe('getValidAccessToken', () => {
     expect(a).toBe(b);
     expect(b).toBe(c);
     expect(tokenRequests).toHaveLength(1);
-    // 1 read inside the shared flight + 1 read by persistTokens.
     expect(getSpy).toHaveBeenCalledTimes(2);
     getSpy.mockRestore();
   });
@@ -483,7 +458,6 @@ describe('getValidAccessToken', () => {
           body.get('grant_type') === 'refresh_token' &&
           body.get('refresh_token') === 'refresh-keeper'
         ) {
-          // No refresh_token field: SSO chose not to rotate.
           return HttpResponse.json({
             access_token: makeAccessJwt(Math.floor(Date.now() / 1000) + 1200),
             token_type: 'Bearer',
@@ -503,15 +477,9 @@ describe('getValidAccessToken', () => {
     const access = await getValidAccessToken(CHAR_ID, cfg);
     const stored = await db.tokens.get(CHAR_ID);
     expect(stored?.accessToken).toBe(access);
-    expect(stored?.refreshToken).toBe('refresh-keeper'); // NOT clobbered to undefined
+    expect(stored?.refreshToken).toBe('refresh-keeper');
   });
 });
-
-// ---------------------------------------------------------------------------
-// Cross-tab refresh: the in-tab single flight above is per module instance, so
-// a second open tab has its own. `navigator.locks` serialises the two, and the
-// tab that waited re-reads the row the first one just rotated.
-// ---------------------------------------------------------------------------
 
 describe('getValidAccessToken across tabs', () => {
   afterEach(() => {
@@ -519,7 +487,6 @@ describe('getValidAccessToken across tabs', () => {
     vi.resetModules();
   });
 
-  /** A second tab: its own `session` module (and single flight), same IndexedDB. */
   async function openSecondTab() {
     vi.resetModules();
     return import('./session');
@@ -594,13 +561,6 @@ describe('getValidAccessToken across tabs', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Consent changes: a narrower scope grant or a change of owner invalidates
-// every cached ESI response for that character (privacy — see
-// src/esi/cachePurge.ts). persistTokens is the single funnel for both the
-// login and the refresh path, so the check lives there.
-// ---------------------------------------------------------------------------
-
 const SKILLS = 'esi-skills.read_skills.v1';
 const MAIL = 'esi-mail.read_mail.v1';
 const WALLET = 'esi-wallet.read_character_wallet.v1';
@@ -608,7 +568,6 @@ const OTHER_CHAR_ID = 90000001;
 
 const TOKEN_URL = 'https://login.eveonline.com/v2/oauth/token';
 
-/** Make the token endpoint answer every grant with a JWT carrying these claims. */
 function respondWith(claims: { scp?: string[]; owner?: string }): void {
   server.use(
     http.post(TOKEN_URL, async ({ request }) => {
@@ -635,7 +594,6 @@ async function cachedKeys(characterId: number): Promise<string[]> {
     .sort();
 }
 
-/** Prior state of a character that already logged in once. */
 async function seedPriorLogin(options: {
   scopes?: string[];
   ownerHash?: string;
@@ -651,23 +609,12 @@ async function seedPriorLogin(options: {
     characterId: CHAR_ID,
     accessToken: 'stale-access',
     refreshToken: 'refresh-old',
-    expiresAt: Date.now() + 30_000, // inside the 60s buffer: forces a refresh
+    expiresAt: Date.now() + 30_000,
     ...(options.omitScopes ? {} : { scopes: options.scopes ?? [SKILLS, MAIL, WALLET] }),
   };
-  // A record written before `scopes` existed genuinely has no such field.
   await db.tokens.put(record as TokenRecord);
 }
 
-/**
- * Drive a fresh interactive login whose JWT carries `claims`.
- *
- * `requested` is what the authorize URL asked SSO for, and it is now load
- * bearing rather than decoration: the login path judges revocation as
- * *requested* vs granted (issue #295). It defaults to the widest set these
- * tests use, which is what a re-auth from a character context sends —
- * `union(SCOPES, that character's grant)` — so a scope missing from the JWT
- * is a genuine denial unless a test says otherwise.
- */
 async function login(
   claims: { scp?: string[]; owner?: string },
   requested: string[] = [SKILLS, MAIL, WALLET]
@@ -677,7 +624,6 @@ async function login(
   await completeLogin({ code: 'good-code', state: url.searchParams.get('state')! }, cfg);
 }
 
-/** Drive the refresh path (getValidAccessToken) with a JWT carrying `claims`. */
 async function refresh(claims: { scp?: string[]; owner?: string }): Promise<void> {
   respondWith(claims);
   await getValidAccessToken(CHAR_ID, cfg);
@@ -685,13 +631,10 @@ async function refresh(claims: { scp?: string[]; owner?: string }): Promise<void
 
 describe('persistTokens: cache purge on scope revoke', () => {
   it('an unreadable Requested Scopes reads as unknown, not as "asked for nothing" (#649)', async () => {
-    // "Unknown" falls back to comparing against the stored grant, which still
-    // catches the revocation. An empty list would assert the app asked for
-    // nothing, and quietly disable revocation-driven purging altogether.
     await seedPriorLogin({ scopes: [SKILLS, MAIL, WALLET] });
     await seedCache(CHAR_ID, 'mail:headers');
 
-    respondWith({ scp: [SKILLS, WALLET] }); // mail revoked
+    respondWith({ scp: [SKILLS, WALLET] });
     const url = new URL(await startLogin([SKILLS, MAIL, WALLET], cfg));
     const state = url.searchParams.get('state')!;
     const key = `neocom.sso.pkce.${state}`;
@@ -708,16 +651,13 @@ describe('persistTokens: cache purge on scope revoke', () => {
     await seedCache(CHAR_ID, 'mail:headers');
     await seedCache(CHAR_ID, 'wallet:journal');
 
-    await login({ scp: [SKILLS, WALLET] }); // mail revoked
+    await login({ scp: [SKILLS, WALLET] });
 
     expect(await cachedKeys(CHAR_ID)).toEqual([]);
     expect((await db.tokens.get(CHAR_ID))?.scopes).toEqual([SKILLS, WALLET]);
   });
 
   it('does NOT purge when scopes are ADDED — a wider grant must never wipe the cache', async () => {
-    // Guards the app-update case: shipping a batch of new scopes widens every
-    // existing grant on the next login. If that purged, every user would lose
-    // their whole cache on deploy.
     await seedPriorLogin({ scopes: [SKILLS] });
     await seedCache(CHAR_ID, 'skills');
     await seedCache(CHAR_ID, 'wallet:journal');
@@ -737,8 +677,6 @@ describe('persistTokens: cache purge on scope revoke', () => {
   });
 
   it('does NOT purge on FIRST login — no prior token record is not a revocation', async () => {
-    // Nothing seeded: db.tokens.get returns undefined. An undefined prior grant
-    // must not be read as "previously had everything, now has none".
     await seedCache(CHAR_ID, 'skills');
 
     await login({ scp: [SKILLS] });
@@ -756,21 +694,7 @@ describe('persistTokens: cache purge on scope revoke', () => {
     expect((await db.tokens.get(CHAR_ID))?.scopes).toEqual([SKILLS]);
   });
 
-  // -------------------------------------------------------------------------
-  // Requested vs granted (issue #295). The login path asks SSO for a specific
-  // set and compares the answer against *that*, not against what the character
-  // happened to hold before. Two things turn on it: an add-a-character login
-  // asking for the base set alone must not read a wider stored grant as a
-  // revocation, and a scope the app asks for but never gets — a retired scope,
-  // or one the EVE application is not registered for — must not purge the
-  // cache on every login forever.
-  // -------------------------------------------------------------------------
-
   it('does NOT purge when the login asked for LESS than the character already held', async () => {
-    // Add-a-character: SSO decides who comes back, so the request is the base
-    // set alone. The grant genuinely narrows — that is the accepted trade —
-    // but a scope the app never asked for is no evidence of revocation, and
-    // purging on it is exactly the bug #293 was fixing.
     await seedPriorLogin({ scopes: [SKILLS, MAIL, WALLET] });
     await seedCache(CHAR_ID, 'skills');
     await seedCache(CHAR_ID, 'mail:headers');
@@ -782,9 +706,6 @@ describe('persistTokens: cache purge on scope revoke', () => {
   });
 
   it('DOES purge when a scope the login asked for came back denied', async () => {
-    // The other half: re-auth from a character context asks for the union, so
-    // a scope missing from the answer is a real denial. Revocation detection
-    // is not weakened by the rule above.
     await seedPriorLogin({ scopes: [SKILLS, MAIL] });
     await seedCache(CHAR_ID, 'mail:headers');
 
@@ -794,10 +715,6 @@ describe('persistTokens: cache purge on scope revoke', () => {
   });
 
   it('never purges over a requested scope the character never held', async () => {
-    // The trap in a plain `requested \ granted` diff: `SCOPES` keeps asking, so
-    // a scope SSO will never return — retired upstream, or not registered on
-    // the EVE application — would wipe the cache on every login, forever. Run
-    // twice: the second pass is the "forever" half.
     const UNREGISTERED = 'esi-corporations.read_structures.v1';
     await seedPriorLogin({ scopes: [SKILLS] });
     await seedCache(CHAR_ID, 'skills');
@@ -810,9 +727,6 @@ describe('persistTokens: cache purge on scope revoke', () => {
   });
 
   it('falls back to previous-vs-granted when the requested set was not stashed', async () => {
-    // A callback completed without this tab's `startLogin` having run. The
-    // conservative reading wins: with no record of what was asked for, a
-    // narrower grant is treated as a revocation exactly as it was before #295.
     await seedPriorLogin({ scopes: [SKILLS, MAIL] });
     await seedCache(CHAR_ID, 'mail:headers');
     respondWith({ scp: [SKILLS] });
@@ -826,17 +740,12 @@ describe('persistTokens: cache purge on scope revoke', () => {
   });
 
   it('clears the stashed request, so a later refresh judges on the stored grant', async () => {
-    // The stash belongs to one authorize round trip. Left behind, it would go
-    // on standing in for "what we asked for" on every later refresh — where
-    // nothing is requested at all and the stored grant is the only baseline.
     await login({ scp: [SKILLS] }, [SKILLS, MAIL]);
 
     expect(sessionStorage.getItem('neocom.sso.scopes')).toBeNull();
   });
 
   it('purges on a token REFRESH whose JWT carries fewer scopes (portal revocation)', async () => {
-    // A revocation performed in EVE's third-party-app portal never passes
-    // through Callback.tsx — it surfaces only in the refresh grant's JWT.
     await seedPriorLogin({ scopes: [SKILLS, MAIL] });
     await seedCache(CHAR_ID, 'mail:headers');
 
@@ -870,8 +779,6 @@ describe('persistTokens: cache purge on scope revoke', () => {
 
   it('purges BEFORE overwriting the stored record, so a failed purge is retried', async () => {
     await seedPriorLogin({ scopes: [SKILLS, MAIL] });
-    // A record the refresh actually changes: an unchanged one is not rewritten
-    // at all, which would leave no characters write to order against.
     await db.characters.update(CHAR_ID, { name: 'CCP Old Name' });
     await seedCache(CHAR_ID, 'mail:headers');
     const cacheSpy = vi.spyOn(db.esiCache, 'where');
@@ -895,11 +802,6 @@ describe('persistTokens: cache purge on scope revoke', () => {
 
 describe('persistTokens: cache purge on owner change', () => {
   it('purges the character cache when the ownerHash changed (character sold or transferred)', async () => {
-    // The sync-path wipe (sync/planSync.handleOwnerHashChange) only runs on a
-    // successful Firebase sync, which never happens when sync is unconfigured.
-    // Login is the owner-change checkpoint that always runs.
-    // Scopes pinned identical on both sides: only the owner change can purge,
-    // so this cannot pass by way of the scope-revoke path.
     await seedPriorLogin({ ownerHash: 'previous-owner-hash', scopes: [SKILLS] });
     await seedCache(CHAR_ID, 'wallet:journal');
     await seedCache(GLOBAL_CACHE_CHARACTER_ID, 'type:587');
@@ -912,10 +814,6 @@ describe('persistTokens: cache purge on owner change', () => {
   });
 
   it('leaves the sync ownerHash bookmark alone, so the sync-side plan wipe still fires', async () => {
-    // The two owner-change paths compare against different baselines:
-    // db.characters.ownerHash here, db.settings['sync.__ownerHash.N'] in
-    // sync/planSync. Updating that setting from here would silently disarm the
-    // Skill Plan / Build Plan wipe — the same bug class this fix closes.
     await seedPriorLogin({ ownerHash: 'previous-owner-hash', scopes: [SKILLS] });
     await db.settings.put({ key: `sync.__ownerHash.${CHAR_ID}`, value: 'previous-owner-hash' });
 
@@ -944,10 +842,6 @@ describe('persistTokens: cache purge on owner change', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Graceful degradation: a broken Dexie must never cost the user their login.
-// ---------------------------------------------------------------------------
-
 describe('persistTokens: a failing purge degrades, it never fails the session', () => {
   it('login SUCCEEDS when the targeted purge fails, escalating to a full cache clear', async () => {
     await seedPriorLogin({ scopes: [SKILLS, MAIL] });
@@ -957,12 +851,11 @@ describe('persistTokens: a failing purge degrades, it never fails the session', 
       throw new Error('index damaged');
     });
 
-    await login({ scp: [SKILLS] }); // mail revoked
+    await login({ scp: [SKILLS] });
     where.mockRestore();
 
     expect((await db.tokens.get(CHAR_ID))?.scopes).toEqual([SKILLS]);
     expect(await cachedKeys(CHAR_ID)).toEqual([]);
-    // Tier 2 is the whole table, global rows included: correctness over churn.
     expect(await cachedKeys(GLOBAL_CACHE_CHARACTER_ID)).toEqual([]);
     expect(await isCachePurgePending(CHAR_ID)).toBe(false);
   });
@@ -980,8 +873,6 @@ describe('persistTokens: a failing purge degrades, it never fails the session', 
     clear.mockRestore();
 
     expect((await db.tokens.get(CHAR_ID))?.scopes).toEqual([SKILLS]);
-    // Undeletable, therefore unreadable: offline shows an empty view rather
-    // than data the character no longer consents to us holding.
     expect(await cachedKeys(CHAR_ID)).toEqual(['mail:headers']);
     const served = await loadWithCache(CHAR_ID, 'mail:headers', async () => {
       throw new Error('offline');
@@ -1001,9 +892,6 @@ describe('persistTokens: a failing purge degrades, it never fails the session', 
     clear.mockRestore();
     expect(await isCachePurgePending(CHAR_ID)).toBe(true);
 
-    // Scopes now unchanged and ownerHash unchanged — the retry must be driven
-    // by the marker alone, not by re-detecting the revocation (the evidence is
-    // already overwritten in db.tokens).
     await db.tokens.update(CHAR_ID, {
       expiresAt: Date.now() + 30_000,
       refreshToken: 'refresh-old',
@@ -1046,18 +934,9 @@ describe('persistTokens: a failing purge degrades, it never fails the session', 
   });
 });
 
-// ---------------------------------------------------------------------------
-// Corporation changes (issue #293). Corp-owned rows are fetched with a
-// character's token but belong to the corporation, and neither trigger above
-// fires when a pilot changes corp: the ownerHash is the same person and the
-// grant is the same grant. This is the third trigger — and, unlike the other
-// two, it is surgical: only the corp-scoped rows go.
-// ---------------------------------------------------------------------------
-
 const CORP_OLD = 98000001;
 const CORP_NEW = 98000002;
 
-/** A signed-in character, optionally with a corporation already recorded. */
 async function seedCharacterInCorp(corporationId?: number): Promise<void> {
   await seedCharacter(CHAR_ID, 'CCP Alpha', {
     ownerHash: 'owner-hash-1',
@@ -1075,14 +954,11 @@ describe('recordCharacterCorporation', () => {
 
     await recordCharacterCorporation(CHAR_ID, CORP_NEW);
 
-    // Skills and mail are the pilot's own and survive the move.
     expect(await cachedKeys(CHAR_ID)).toEqual(['mail:headers', 'skills']);
     expect((await db.characters.get(CHAR_ID))?.corporationId).toBe(CORP_NEW);
   });
 
   it('learning the corporation for the FIRST time purges nothing', async () => {
-    // An upgraded device: the record predates `corporationId`, so there is no
-    // prior to differ from — an unknown corp is not a corp change.
     await seedCharacterInCorp(undefined);
     await seedCache(CHAR_ID, corpCacheKey(CORP_OLD, 'structures'));
     await seedCache(CHAR_ID, 'skills');
@@ -1111,9 +987,6 @@ describe('recordCharacterCorporation', () => {
   it('writes only the corporation, so a concurrent token refresh is not clobbered', async () => {
     await seedCharacterInCorp(CORP_OLD);
     const stale = { ...(await db.characters.get(CHAR_ID))! };
-    // A refresh lands in the window between this call's read and its write —
-    // `persistTokens` rebuilds the record from a JWT, so it moves name and
-    // ownerHash. Writing back a whole snapshot here would revert both.
     await db.characters.update(CHAR_ID, { name: 'CCP Renamed', ownerHash: 'owner-hash-2' });
     const get = vi.spyOn(db.characters, 'get').mockResolvedValue(stale);
 
@@ -1145,8 +1018,6 @@ describe('recordCharacterCorporation', () => {
   });
 
   it('still records the new corporation when the purge itself fails', async () => {
-    // A failed delete leaves ORPHANS, not a cross-corp read: the corp id is in
-    // the key, so nothing can reach the old rows under the new corp.
     await seedCharacterInCorp(CORP_OLD);
     const where = vi.spyOn(db.esiCache, 'where').mockImplementation(() => {
       throw new Error('index damaged');
@@ -1166,8 +1037,6 @@ describe('persistTokens: the character upsert preserves corporationId', () => {
 
     await refresh({ scp: [SKILLS, MAIL, WALLET] });
 
-    // Without this the corp trigger would look implemented and silently never
-    // fire: every refresh would reset the field to "not yet learned".
     expect((await db.characters.get(CHAR_ID))?.corporationId).toBe(CORP_OLD);
   });
 
@@ -1178,11 +1047,6 @@ describe('persistTokens: the character upsert preserves corporationId', () => {
   });
 });
 
-/**
- * Every `useLiveQuery` over `db.characters` (a couple dozen of them) re-runs on
- * any write to the table, so a token refresh that learned nothing new about the
- * Character must not write its record back.
- */
 describe('persistTokens: character record write on refresh', () => {
   afterEach(() => vi.restoreAllMocks());
 
@@ -1211,7 +1075,6 @@ describe('persistTokens: character record write on refresh', () => {
 
     expect(put).not.toHaveBeenCalled();
     put.mockRestore();
-    // The token write is not skipped: the rotated refresh token must land.
     const stored = await db.tokens.get(CHAR_ID);
     expect(stored?.accessToken).toBe(access);
     expect(stored?.refreshToken).toBe('refresh-rotated');

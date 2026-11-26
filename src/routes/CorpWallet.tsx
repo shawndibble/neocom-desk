@@ -1,27 +1,4 @@
 import { NO_NAMES } from '@/lib/emptyCollections';
-/**
- * `/corp/wallet` — the corporation's wallet, one division at a time: its
- * balance and its journal (issues #298, #570, #6320).
- *
- * This used to be the Corporation side of a Personal / Corporation switch on
- * `/wallet` (round 38). It moved here so `/wallet` is only ever the pilot's
- * own ISK, and the corporation's money sits in the Corp section beside
- * everything else the corporation owns — see `docs/context/decisions/` for the
- * decision reversing round 38 for Wallet.
- *
- * Gated like `/corp/members`: `useCorpRouteGate` with `canReadWallet`, so an
- * Accountant sees it and a Director with no wallet role does not, and its rail
- * entry is hidden by the same capability.
- *
- * No tab bar of its own: Corp Wallet is a page of its own, not a tab, so the
- * page is a strip of every division's balance (clicking one selects it) above
- * the journal. The division's market fills are read too, but never drawn: the
- * journal's market lines name their item from them. An old `?view=transactions`
- * link just shows the journal.
- *
- * The journal is the same table `/wallet` draws (`WalletJournalTable.tsx`) —
- * ESI returns the same schema for both.
- */
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import {
   focusRingInsetClassName,
@@ -99,16 +76,13 @@ import { useHighlightParam } from '@/lib/useHighlightParam';
 import { useUrlFilter, useUrlParam, useUrlSort } from '@/lib/useUrlState';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 
-/** `?division=` (issue #419, #1302). ESI divisions are 1-7. */
 const DIVISION_PARAM = intParam(1, { min: 1, max: 7 });
 
 const NO_IDS: ReadonlySet<number> = new Set();
 
-/** Stable identities, so a missing read doesn't invalidate its dependent memos every render. */
 const EMPTY_JOURNAL: readonly WalletJournalEntry[] = [];
 const EMPTY_TRANSACTIONS: readonly CorporationWalletTransaction[] = [];
 
-/** Balances and the division names, which need two separate reads and two separate scopes. */
 interface CorpBalancesSnapshot {
   walletsResult: StatusResult<CorporationWalletDivision[]>;
   divisionsResult: StatusResult<CorporationDivisions>;
@@ -126,10 +100,6 @@ async function loadCorpBalances(
   return { walletsResult, divisionsResult };
 }
 
-/**
- * One division's fills, plus the names for the item ids in them: the journal
- * names its market lines' items from these (a network read, so it lives here).
- */
 interface CorpTransactionsSnapshot {
   transactionsResult: StatusResult<CorporationWalletTransaction[]>;
   typeNames: Map<number, string>;
@@ -150,16 +120,9 @@ async function loadCorpTransactions(
   return { transactionsResult, typeNames };
 }
 
-/**
- * One division's journal, plus the names of the players in it. ESI names no
- * one on a journal line, only party ids, so the character side of each line is
- * looked up here — a network read, like the transactions' item names.
- */
 interface CorpJournalSnapshot {
   journalResult: StatusResult<WalletJournalEntry[]>;
-  /** Every party id that is a character, named or not: a failed name read must not hide its lines. */
   playerIds: Set<number>;
-  /** Character id -> name; absent for a name that did not resolve. */
   playerNames: Map<number, string>;
 }
 
@@ -192,10 +155,6 @@ interface CorpDivisionsPanelProps {
   onRetry: () => void;
 }
 
-/**
- * Every division's balance at once, each a button that selects the division
- * the table below reads — the division picker and the balance in one.
- */
 function CorpDivisionsPanel({
   balances,
   loading,
@@ -212,14 +171,10 @@ function CorpDivisionsPanel({
   const toggleRef = useRef<HTMLButtonElement>(null);
   const walletsResult = balances?.walletsResult.cached ?? null;
   const selectedEntry = divisions.find((entry) => entry.division === selected) ?? divisions[0];
-  // An unnamed, empty division is noise: one dim line says how many (the selected one stays).
   const shownDivisions = divisions.filter(
     (entry) => entry.name !== null || entry.balance !== 0 || entry === selectedEntry
   );
   const unused = divisions.length - shownDivisions.length;
-  // Seven full-width cards push the journal below the fold on a phone: fold to
-  // the selected division there. Loading, empty and one-division panels have
-  // nothing worth folding.
   const foldable = isPhone && !loading && !!walletsResult && divisions.length > 1;
   const offlineNote = walletsResult?.fromCache ? (
     <CachedNotice
@@ -324,7 +279,6 @@ interface CorpJournalPanelProps {
   journalColumns: DataTableColumn<JournalRow>[];
   playerOptions: readonly PlayerOption[];
   playerNameFor: (entry: JournalRow) => string;
-  /** The market fill behind a journal line, and the names of its items: the export's item columns. */
   linkFor: (entry: JournalRow) => WalletTransactionCommon | undefined;
   nameFor: (typeId: number) => string;
   filter: WalletJournalFilter;
@@ -335,10 +289,8 @@ interface CorpJournalPanelProps {
   divisionQualifier: string | undefined;
   refreshFailed: boolean;
   onRetry: () => void;
-  /** "Where the ISK went" side panel; its state lives on the page, which shifts aside for it. */
   iskPanelOpen: boolean;
   onIskPanelOpenChange: (open: boolean) => void;
-  /** The journal entry a `?highlight=` link (a Corp Tax Book payment) points at: scrolled to and pulsed. */
   highlightRowKey: number | null;
 }
 
@@ -370,8 +322,6 @@ function CorpJournalPanel({
     () => walletJournalCsvColumns(t, { playerName: playerNameFor, fills: { linkFor, nameFor } }),
     [t, playerNameFor, linkFor, nameFor]
   );
-  // Named after the division, so exporting two divisions never overwrites the
-  // same file (issue #413).
   const journalExport = useTableExport({
     surface: 'corp-wallet-journal',
     rows: filteredJournal,
@@ -396,8 +346,6 @@ function CorpJournalPanel({
       {loading ? (
         <Spinner block="panel" label={t('common.loading')} />
       ) : journalResult === null ? (
-        // No cache and the read didn't come back — offline, or a 403 the role
-        // gate swallowed (GLOSSARY.md's `/corp/assets` split, same axis here).
         <LoadFailedState
           title={t('common.loadFailed.corpJournal')}
           onRetry={onRetry}
@@ -448,30 +396,21 @@ function CorpJournalPanel({
   );
 }
 
-/** Mounted only once the gate is `ready` — see `useCorpRouteGate`. */
 function CorpWalletView({ canReadDivisions }: { canReadDivisions: boolean }) {
   const { t } = useTranslation();
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
-  // `undefined` while Dexie is still answering — every panel spins through
-  // that, rather than flashing its "nothing cached" state for one render.
   const corporationIdState = useActiveCorporationIdState();
   const corporationId = corporationIdState ?? null;
   const corpPending = corporationIdState === undefined;
   const [iskPanelOpen, setIskPanelOpen] = useState(false);
 
-  // The journal's item context menu (issue #817) — same Quickbar/Item
-  // Detail plumbing as every other item table.
   const itemActions = usePageItemActions({ activeCharacterId });
 
-  // Null until both are known: a corporation id is learned only from the
-  // public-info read, so on a cold device there is briefly nothing to read.
   const corpKey =
     activeCharacterId !== null && corporationId !== null
       ? `${activeCharacterId}:${corporationId}`
       : null;
 
-  // The key carries the corporation, so a corp change resets rather than
-  // relabelling its rows.
   const corpBalances = useCorpSnapshot<CorpBalancesSnapshot | null>(
     corpKey,
     async () =>
@@ -490,10 +429,6 @@ function CorpWalletView({ canReadDivisions }: { canReadDivisions: boolean }) {
     [corpBalances.data]
   );
 
-  // Derived, not effect-synced: falls back to the first division whenever the
-  // chosen one isn't in this corporation's list — which is exactly what a corp
-  // change looks like, and also what a `?division=` deep link (issue #419)
-  // naming a division this corporation doesn't have looks like.
   const highlightedEntry = useHighlightParam();
   const [division, setDivision] = useUrlParam('division', DIVISION_PARAM);
   const effectiveDivision = divisions.some((entry) => entry.division === division)
@@ -501,9 +436,6 @@ function CorpWalletView({ canReadDivisions }: { canReadDivisions: boolean }) {
     : (divisions[0]?.division ?? division);
   const selectedDivision = divisions.find((entry) => entry.division === effectiveDivision) ?? null;
 
-  // Its own key, division included: ESI publishes no all-divisions journal and
-  // each division caches separately (features/corp/wallet.ts). A division or
-  // corporation change resets it.
   const divisionKey = corpKey !== null ? `${corpKey}:${effectiveDivision}` : null;
   const corpJournal = useCorpSnapshot<CorpJournalSnapshot | null>(
     divisionKey,
@@ -514,7 +446,6 @@ function CorpWalletView({ canReadDivisions }: { canReadDivisions: boolean }) {
     { name: 'corp-wallet:journal', characterId: activeCharacterId }
   );
 
-  // Never drawn: the journal's market lines name their item from these fills.
   const corpTransactions = useCorpSnapshot<CorpTransactionsSnapshot | null>(
     divisionKey,
     async () =>
@@ -528,7 +459,6 @@ function CorpWalletView({ canReadDivisions }: { canReadDivisions: boolean }) {
     entry.name ?? t('wallet.corpDivisionFallback', { division: entry.division });
   const divisionQualifier = selectedDivision ? divisionLabel(selectedDivision) : undefined;
 
-  /** One Refresh button for every read on the page. */
   const handleRefresh = () => {
     corpBalances.refresh();
     corpJournal.refresh();
@@ -538,8 +468,6 @@ function CorpWalletView({ canReadDivisions }: { canReadDivisions: boolean }) {
   const corpTransactionsResult = corpTransactions.data?.transactionsResult.cached ?? null;
   const corpTransactionRows = corpTransactionsResult?.data ?? EMPTY_TRANSACTIONS;
   const corpTypeNames = corpTransactions.data?.typeNames ?? NO_NAMES;
-  // The one spelling of an item id on this page: the column, the CSV and the
-  // search all go through it, so what is drawn is what is searched.
   const nameForType = useMemo(() => typeNameLookup(corpTypeNames), [corpTypeNames]);
   const linkFor = useMemo(
     () => journalTransactionLinks(corpTransactionRows),
@@ -548,14 +476,11 @@ function CorpWalletView({ canReadDivisions }: { canReadDivisions: boolean }) {
   const corpJournalResult = corpJournal.data?.journalResult.cached ?? null;
   const playerNames = corpJournal.data?.playerNames ?? NO_NAMES;
   const playerIds = corpJournal.data?.playerIds ?? NO_IDS;
-  // The corp journal shows who did it; a party that isn't a resolved character
-  // (the corp itself, a system) leaves the cell blank.
   const playerNameFor = useCallback(
     (entry: JournalRow) =>
       entry.playerId === undefined ? '' : (playerNames.get(entry.playerId) ?? `#${entry.playerId}`),
     [playerNames]
   );
-  // Stamped on each line so the Player filter, column and CSV read one field.
   const stampedJournal = useMemo<JournalRow[]>(
     () =>
       (corpJournalResult?.data ?? EMPTY_JOURNAL).map((entry) => ({
@@ -578,11 +503,6 @@ function CorpWalletView({ canReadDivisions }: { canReadDivisions: boolean }) {
     [buildJournalColumns, linkFor, nameForType, playerNameFor]
   );
 
-  // Keyed on the raw `?division=` param, not `effectiveDivision`: the division
-  // list resolves async, so a cold reload of a filtered deep link would
-  // otherwise see the scope change as it resolves and wipe the very filter the
-  // URL just delivered. Reset on a real division switch — the rows change
-  // wholesale, and the ref-type dropdown is built from that journal's values.
   const filterScope = `division:${division}`;
   const [urlJournalFilter, setJournalFilter, urlJournalRowsFilter] =
     useUrlFilter<WalletJournalFilter>(
@@ -591,7 +511,6 @@ function CorpWalletView({ canReadDivisions }: { canReadDivisions: boolean }) {
       JOURNAL_FIELD_TO_PARAM,
       EMPTY_JOURNAL_FILTER_PARAMS
     );
-  // Party is a personal-journal filter: a stray `?journal.party=` must not hide corp rows.
   const journalFilter = useMemo(() => ({ ...urlJournalFilter, party: null }), [urlJournalFilter]);
   const journalRowsFilter = useMemo(
     () => ({ ...urlJournalRowsFilter, party: null }),
@@ -601,13 +520,7 @@ function CorpWalletView({ canReadDivisions }: { canReadDivisions: boolean }) {
 
   return (
     <ItemActionsProvider page={itemActions}>
-      <div
-        className={cx(
-          'mx-auto max-w-page space-y-4',
-          // Same shift as `/wallet`: 26rem = SlideOver's 25rem max width plus a 1rem gutter.
-          iskPanelOpen && 'md:mr-[26rem] md:ml-0'
-        )}
-      >
+      <div className={cx('mx-auto max-w-page space-y-4', iskPanelOpen && 'md:mr-[26rem] md:ml-0')}>
         <PageHeader
           title={t('corp.wallet.title')}
           actions={

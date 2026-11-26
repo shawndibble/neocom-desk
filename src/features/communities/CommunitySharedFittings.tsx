@@ -16,12 +16,6 @@ import { ROW_LIMIT } from './shareLists';
 import { loadCommunityFittings } from './sharedFittings';
 import { useReportMineCount } from './useTabSharing';
 
-/**
- * The Fittings tab's Everyone view: every Fitting the Community's Members
- * share, this Character's own included. A row opens the Fitting in the editor
- * for the pilot's own skills, where Save keeps a copy; the row is the link, so
- * it carries no other control (DESIGN.md §6c, Restraint).
- */
 export function CommunitySharedFittings({
   characterId,
   communityId,
@@ -30,9 +24,7 @@ export function CommunitySharedFittings({
 }: {
   characterId: number;
   communityId: string;
-  /** For the sharer's name; null while the roster loads. */
   members: readonly CommunityMember[] | null;
-  /** How many of the listed Fittings are this Character's, once loaded (the tab's sharing line). */
   onMineCount?: (count: number) => void;
 }) {
   const { t } = useTranslation();
@@ -49,7 +41,6 @@ export function CommunitySharedFittings({
     () => new Map((members ?? []).map((member) => [member.uid, member.characterName])),
     [members]
   );
-  // The label the row shows is the one the search matches ("you" for this Character's own).
   const sharerOf = useCallback(
     (uid: string) =>
       uid === myUid

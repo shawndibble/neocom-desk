@@ -32,13 +32,11 @@ import { useBreaksRule } from '../ruleBreakFlags';
 import { MODULE_STATE_STYLE } from '../moduleStateStyle';
 import { useLiftAfterHoldGuard } from '@/components/ui/liftAfterHold';
 
-/** What a slot will take, given which drops the ring handles at all. */
 interface DropHandlers {
   onDropType?: (rack: FittingSlotKind, index: number, typeId: number) => void;
   onMoveModule?: (rack: FittingSlotKind, from: number, to: number) => void;
 }
 
-/** A slot as a drop target, given which drops the ring handles — the one rule the highlight and the drop both read. */
 function slotAccepts(
   payload: FittingDragPayload | null,
   slot: RingSlot,
@@ -59,23 +57,16 @@ function slotAccepts(
 interface SlotTileProps extends DropHandlers {
   slot: RingSlot;
   cantUse: boolean;
-  /** The hardpoint a high-slot module takes; null for none, or not yet known. */
   hardpoint: HardpointKind | null;
-  /** The state the engine reached, when it has calculated this module. */
   reachedState?: FittingModuleResult['state'];
-  /** Whether this is the slot being filled; undefined when nothing can be. */
   selected?: boolean;
-  /** The highest state the module can reach, for its menu; every state until known. */
   maxState?: FittingItemState;
-  /** Whether the module takes a charge, for its menu; undefined until known. */
   takesCharges?: boolean;
-  /** Where the tile sits; its frame turns with the ring by `angle`, the icon stays upright. */
   position: CSSProperties;
   angle: number;
   compact: boolean;
   typeName?: (typeId: number) => string;
   onSelect?: (rack: FittingSlotKind, index: number) => void;
-  /** The ring's one tab stop (a roving tabindex); the arrow keys walk the rest. */
   tabbable: boolean;
   onKeyDown?: (event: KeyboardEvent<HTMLButtonElement>) => void;
   onFocus?: () => void;
@@ -136,12 +127,8 @@ export function SlotTile({
       ? 'fittings.ring.tooltipEmpty'
       : 'fittings.ring.tooltipEmptyClick';
 
-  // Only an empty tile on the full ring is a "fill this slot" target, as the
-  // List's empty-slot buttons are; a fitted one opens its module instead.
   const pressed = !compact && module === undefined ? selected : undefined;
-  // A charge drag lights every module that takes it and dims the rest.
   const lights = chargeDragLights(drag, slot.rack, slot.index);
-  // fixed format: CSS angle
   const upright = { transform: `rotate(${(-angle).toFixed(1)}deg)` };
   const chargePip =
     module?.chargeTypeId !== undefined ? 'loaded' : module && takesCharges ? 'empty' : undefined;
@@ -161,11 +148,8 @@ export function SlotTile({
   const draggable = !compact && module !== undefined && onMoveModule !== undefined;
   const interactive = !compact && onSelect !== undefined;
   const menu = !compact && actions !== null;
-  // A click on a fitted module steps its state, as the game does; a subsystem
-  // has none, and Enter/Space (a click with no detail) keep selecting.
   const cycles =
     menu && module !== undefined && shownState !== undefined && slot.rack !== 'subsystem';
-  // The one tooltip says what a click does, only where it does something.
   const cycleHint =
     cycles && shownState !== undefined
       ? t('fittings.ring.tooltipCycle', {
@@ -214,7 +198,6 @@ export function SlotTile({
     setOver(false);
     if (payload === null || !slotAccepts(payload, slot, handlers, actions)) return;
     event.preventDefault();
-    // A module out of the cargo goes through the page, which takes it off the stack.
     if (payload.kind === 'type' && !payload.fromCargo)
       onDropType?.(slot.rack, slot.index, payload.typeId);
     else if (payload.kind === 'slot') onMoveModule?.(slot.rack, payload.index, slot.index);
@@ -236,13 +219,11 @@ export function SlotTile({
       data-module-state={module ? shownState : undefined}
       tabIndex={tabbable ? 0 : -1}
       className={`absolute border bg-bg ${border} ${interactiveClassName} ${focusRingClassName} ${lights === 'dim' ? 'opacity-35' : ''} ${interactive ? `cursor-pointer${module === undefined ? ' hover:border-accent' : ''}` : ''} ${draggable ? 'active:cursor-grabbing' : ''}`}
-      // fixed format: CSS angle
       style={{ ...position, transform: `rotate(${angle.toFixed(1)}deg)` }}
       {...(cycles ? guard.handlers : undefined)}
       onClick={
         interactive || cycles
           ? (event) => {
-              // The click a touch lifting off a long-press sends is the menu's, not a cycle.
               if (cycles && guard.swallowClick(event)) return;
               if (cycles && event.detail > 0) cycleState();
               else onSelect?.(slot.rack, slot.index);
@@ -275,13 +256,11 @@ export function SlotTile({
       }
       onDragEnd={draggable ? endFittingDrag : undefined}
       onDragOver={handleDragOver}
-      // Moving onto the tile's own icon fires dragleave on the tile; only leaving it counts.
       onDragLeave={(event) => {
         if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setOver(false);
       }}
       onDrop={handleDrop}
     >
-      {/* The charge pip: a notch on the tile's rim side for a module that takes one, lit once loaded. */}
       {chargePip && (
         <span
           aria-hidden="true"
@@ -290,8 +269,6 @@ export function SlotTile({
           style={{ top: '-12%' }}
         />
       )}
-      {/* Counter-turned so the module reads upright wherever its tile sits, as in the game;
-          clipped to the tile, so a full-size icon on a slanted tile can't spill onto its neighbours. */}
       <span className="absolute inset-0 overflow-hidden">
         <span className="absolute inset-0 flex items-center justify-center" style={upright}>
           {module ? (
@@ -311,7 +288,6 @@ export function SlotTile({
         </span>
       </span>
       <span className="absolute inset-0" style={upright}>
-        {/* A mutated module the stats can't state exactly: an amber flag in the other corner. */}
         {unknownMutation && (
           <span
             data-mutation-flag={unknownMutation}
@@ -320,7 +296,6 @@ export function SlotTile({
             <Warn aria-hidden className="h-full w-full" />
           </span>
         )}
-        {/* A module that breaks a fitting rule: an amber flag in the bottom-right corner. */}
         {breaksRule && (
           <span
             data-rule-break-flag
@@ -329,7 +304,6 @@ export function SlotTile({
             <Warn aria-hidden className="h-full w-full" />
           </span>
         )}
-        {/* A corner flag, small enough to leave the module readable under it. */}
         {cantUse && (
           <span className="absolute top-0 right-0 flex h-[34%] w-[34%] bg-danger p-px text-bg">
             <Warn aria-hidden className="h-full w-full" />

@@ -107,13 +107,11 @@ function renderPanel(
   );
 }
 
-/** Opens the row's "Sold" split button's dropdown and clicks one of its extra items. */
 async function chooseSoldMenuItem(user: ReturnType<typeof userEvent.setup>, itemName: string) {
   await user.click(screen.getByRole('button', { name: 'More sale options' }));
   await user.click(await screen.findByRole('menuitem', { name: itemName }));
 }
 
-/** Unfolds the runs table, once its caret has arrived (rows load via useLiveQuery). */
 async function expandRuns(user: ReturnType<typeof userEvent.setup>) {
   await user.click(await screen.findByRole('button', { name: 'Show production runs' }));
 }
@@ -188,7 +186,6 @@ describe('ProductionRunsPanel', () => {
 
     expect(screen.queryByRole('columnheader', { name: /total cost/i })).toBeNull();
 
-    // The choice is stored on the device, so put it back for the tests after this one.
     await user.click(screen.getByRole('button', { name: 'Columns' }));
     await user.click(await screen.findByRole('menuitem', { name: /reset to default/i }));
     await user.keyboard('{Escape}');
@@ -343,7 +340,6 @@ describe('ProductionRunsPanel', () => {
       unitPrice: 100_000,
     });
 
-    // 5 * 100_000 = 500_000 gross revenue, shown once the link lands.
     await waitFor(() => {
       expect(screen.getByText(/500,000|500000/)).toBeInTheDocument();
     });
@@ -381,10 +377,6 @@ describe('ProductionRunsPanel', () => {
       name: "How this run's realized profit is calculated",
     });
 
-    // grossRevenue 500,000; salesTax 7.5% (Accounting 0) = 37,500; no watched
-    // order so brokerFeeableRevenue is 0 and broker fee is 0; netRevenue
-    // 462,500; totalCost 320,000 (300,000 material + 20,000 job fee); profit
-    // 142,500; margin 142,500 / 500,000 = 28.5%.
     expect(within(dialog).getByText('Gross revenue = 500,000')).toBeInTheDocument();
     expect(within(dialog).getByText('Sales tax = 37,500')).toBeInTheDocument();
     expect(within(dialog).getByText('Broker fee = 0')).toBeInTheDocument();
@@ -423,7 +415,6 @@ describe('ProductionRunsPanel', () => {
 
     await user.click(await screen.findByRole('button', { name: 'Sold' }));
 
-    // Already linked to another run — the picker must not offer it again.
     await waitFor(() => {
       expect(
         screen.getByText('No unlinked past sales of this item found in your saved wallet history.')
@@ -460,7 +451,6 @@ describe('ProductionRunsPanel', () => {
       closed: false,
     });
 
-    // Simulate a partial fill, then refresh.
     loadOrders.mockResolvedValue({
       cached: {
         data: [order({ volume_remain: 6 })],

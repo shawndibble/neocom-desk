@@ -5,13 +5,8 @@ import { loadWithCache } from '@/esi/cache';
 import { mswServer } from '@/test/msw';
 import { settleOrWarn } from '@/test/teardown';
 
-/**
- * The tests in each block run in order and depend on it: the first leaves
- * something behind, the second checks the shared teardown cleared it.
- */
 let lateHits = 0;
 const server = mswServer(
-  // Never answers: only the test-end abort can end this request.
   http.get('https://teardown.test/hang', () => new Promise<never>(() => {})),
   http.get('https://teardown.test/late', () => {
     lateHits += 1;
@@ -39,12 +34,6 @@ describe('a request still in flight when its test ends', () => {
   });
 });
 
-/**
- * #6188: the test ends while its load is still reading IndexedDB, so the load's
- * `fetch` starts after the test-end abort. Sent untracked, it parked on the
- * never-answering handler, and the next test's load of the same key deduped
- * onto it and hung.
- */
 describe('a request a test’s load starts after the test ended', () => {
   const CHAR_ID = 77;
   const KEY = 'teardown:late';
@@ -67,7 +56,6 @@ describe('a request a test’s load starts after the test ended', () => {
     expect(lateHits).toBe(0);
     await expect(leftover).resolves.toBeNull();
     server.use(http.get('https://teardown.test/late', () => HttpResponse.json('fresh')));
-    // A real-time cap: a load joined onto the stuck one never settles.
     let cap: ReturnType<typeof setTimeout> | undefined;
     const settled = await Promise.race([
       loadLate(),

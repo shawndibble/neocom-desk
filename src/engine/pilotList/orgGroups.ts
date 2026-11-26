@@ -1,22 +1,3 @@
-/**
- * The Local list's Organization grouping (issue #5668): who owns this Local,
- * alliance first, then corporation. Facts only — membership from ESI's
- * affiliation lookup, no verdicts (decision `20260912-172628`).
- *
- * - An alliance with two or more of its corporations here is one group with
- *   a sub-group per corporation.
- * - An alliance with one corporation here is headed by that corporation, the
- *   alliance named beside it: a second heading over one group says nothing.
- * - A corporation with no alliance heads its own pilots.
- * - A pilot with no one else from their corporation or alliance here is
- *   `alone`; a heading per lone pilot would be a heading per row.
- * - A pilot whose corporation is not known yet is `unplaced`, never "no
- *   alliance": unknown membership is not membership.
- *
- * Groups and corporations run largest first, then by name; an organization
- * whose name has not loaded sorts by id after the named ones of its size.
- */
-
 export interface OrgMember {
   corporationId: number | null;
   corporationName: string | null;
@@ -30,13 +11,11 @@ export interface CorporationGroup<T> {
   rows: T[];
 }
 
-/** An alliance with two or more of its corporations here. */
 export interface AllianceSection<T> {
   kind: 'alliance';
   id: number;
   name: string | null;
   rows: T[];
-  /** Largest first. */
   corporations: CorporationGroup<T>[];
 }
 
@@ -44,7 +23,6 @@ export interface CorporationSection<T> {
   kind: 'corporation';
   id: number;
   name: string | null;
-  /** A one-corporation alliance's name, shown beside its corporation. */
   alliance: { id: number; name: string | null } | null;
   rows: T[];
 }
@@ -132,7 +110,6 @@ export function groupByOrganization<T extends OrgMember>(rows: readonly T[]): Or
     });
   }
   sections.sort(bySizeThenName);
-  // Back in pasted order, whichever map they came out of.
   const lone = new Set(alone);
   return { sections, alone: rows.filter((row) => lone.has(row)), unplaced };
 }

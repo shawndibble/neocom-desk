@@ -1,7 +1,3 @@
-/**
- * What an Opportunities row was priced from: a reaction formula, a BPO or a
- * BPC, with its runs. Shared by the desktop table and the phone cards.
- */
 import { useTranslation } from 'react-i18next';
 import { StatChip } from '@/components/ui';
 import { isReaction, type OpportunityCandidate } from './opportunities';

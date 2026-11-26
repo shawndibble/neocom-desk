@@ -62,8 +62,6 @@ export function PlanEditor({
   onUpdate,
 }: PlanEditorProps) {
   const { t } = useTranslation();
-  // Which side the tools pane lands on — the same hook the rest of the app's two-column
-  // layouts switch on, so this pane can never disagree with them.
   const isDesktop = useIsDesktop();
   const { focusName, pastedPlanText } = usePlanLocationFlags(isDesktop);
   const viewPrefs = usePlanViewPrefs();
@@ -76,11 +74,6 @@ export function PlanEditor({
   });
   const { cloneState, whatIf, effectiveImplants, implantsAssumed, activeBoosters } = assumptions;
 
-  // Results about the plan as it stood when they were produced (BUG #1).
-  // Scoped, not cleared: each reads as null once the plan is swapped or its
-  // entries/markers change, and the Optimize ones also once the Clone State
-  // flips — a savings figure costed at one training rate describes nothing
-  // after the plan trains at another.
   const planScope = [plan.id, plan.entries, plan.markers];
   const costingScope = [...planScope, cloneState];
 
@@ -118,7 +111,6 @@ export function PlanEditor({
   });
   const { scheduled, error, startDate, boostedSteps, alphaCappedSteps, stepByKey } = schedule;
 
-  // Plan Milestone (GLOSSARY.md) statuses and the fit-goal picker, against the current schedule.
   const milestones = useMilestones({
     characterId,
     milestones: plan.milestones,
@@ -256,7 +248,6 @@ export function PlanEditor({
     <>
       <div
         onDragOver={(e) => {
-          // Only a file is ours to take; a text or row drag keeps its own handlers.
           if (e.dataTransfer.types.includes('Files')) e.preventDefault();
         }}
         onDrop={imports.handleEditorDrop}
@@ -286,9 +277,6 @@ export function PlanEditor({
 
           {implantsAssumed && <ImplantsAssumedNote hint={t('plans.assumesNoImplantsHint')} />}
 
-          {/* Plan Milestones (GLOSSARY.md) whose entry was removed from the plan
-            entirely — no row exists to flag any more, so they surface here
-            instead of vanishing silently. */}
           {milestones.orphanedMilestones.length > 0 && (
             <OrphanedMilestoneNotices
               orphanedMilestones={milestones.orphanedMilestones}
@@ -298,8 +286,6 @@ export function PlanEditor({
             />
           )}
 
-          {/* Below `lg` the plan tools are one collapsed row, which would bury
-            the one output worth reading first; this row sits outside them. */}
           {!isDesktop && <Panel padded={false}>{skillsToBuy(true)}</Panel>}
 
           {!isDesktop && toolsPane}
@@ -317,9 +303,6 @@ export function PlanEditor({
                 trainedSkills={trainedSkills}
                 planEntries={plan.entries}
                 onAdd={(entry) => onUpdate(addEntry(editable, entry))}
-                // Group-by and Columns are this list's own view controls —
-                // riding the search bar's row keeps them off the page
-                // header, which Import/Export already fills.
                 controls={<EntryListControls viewPrefs={viewPrefs} />}
               />
               {rowActions.dropError && <InlineError>{rowActions.dropError}</InlineError>}

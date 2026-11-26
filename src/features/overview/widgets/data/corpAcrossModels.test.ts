@@ -1,7 +1,3 @@
-/**
- * The four Corp Board widgets read across every corporation (All scope, #6100): Moon
- * extractions, Corp wallet (balances), Corp industry jobs and Corp kills.
- */
 import { HOUR_MS } from '@/lib/age';
 import { describe, expect, it } from 'vitest';
 import type { CorporationIndustryJob } from '@/esi/endpoints';
@@ -61,8 +57,6 @@ function across<F extends CorpFeedBase>(
 
 const textOf = (cell: TableCell | undefined) => (typeof cell === 'string' ? cell : cell?.text);
 
-// --- Corp wallet -----------------------------------------------------------------
-
 const wallet = (...balances: number[]): CorpWalletFeed => ({
   ...BASE,
   divisions: balances.map((balance, i) => ({ division: i + 1, name: null, balance })),
@@ -120,8 +114,6 @@ describe('corpWallet across corporations', () => {
     expect(view.status.error).toBe(true);
   });
 });
-
-// --- Corp industry jobs ------------------------------------------------------------
 
 function job(jobId: number, endInHours: number, status = 'active'): CorporationIndustryJob {
   return {
@@ -205,8 +197,6 @@ describe('corpJobs across corporations', () => {
   });
 });
 
-// --- Corp kills --------------------------------------------------------------------
-
 const stats = (kills: number, losses: number, destroyed: number, lost: number): PilotStats => ({
   kills,
   losses,
@@ -253,8 +243,6 @@ describe('corpKills across corporations', () => {
     expect(view.number.value).toBe('3');
   });
 });
-
-// --- Moon extractions --------------------------------------------------------------
 
 const chunk = (id: string, inHours: number, corp: number) => ({
   id,

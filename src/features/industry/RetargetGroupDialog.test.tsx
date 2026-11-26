@@ -51,7 +51,6 @@ describe('RetargetGroupDialog', () => {
       />
     );
 
-    // Editing the form and merely opening the preview must not write anything.
     await user.click(screen.getByRole('button', { name: 'Continue' }));
     expect(onApply).not.toHaveBeenCalled();
 
@@ -105,7 +104,6 @@ describe('RetargetGroupDialog', () => {
 
     await user.type(screen.getByRole('combobox', { name: 'Build location' }), 'K2-18');
     await user.click(await screen.findByRole('option', { name: /K2-18 R&D/ }));
-    // A structure shows its rig slots, like the plan page.
     expect(screen.getByRole('combobox', { name: 'Rig 1' })).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Continue' }));

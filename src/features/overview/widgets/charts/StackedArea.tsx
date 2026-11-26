@@ -4,12 +4,6 @@ import { CHART_COLOR } from './palette';
 import { StackBar } from './StackBar';
 import type { StackedAreaChartModel } from './types';
 
-/**
- * Layers piled up over time, so how a total moved and which layer moved it are
- * one picture, with the legend in layer order. At Small there is no room for a
- * history, so it is the latest day as one bar. Drawn aria-hidden; the model's
- * summary carries the figures.
- */
 export function StackedArea({
   model,
   height,
@@ -17,7 +11,6 @@ export function StackedArea({
 }: {
   model: StackedAreaChartModel;
   height: number;
-  /** Draw only the latest day as a bar. */
   compact: boolean;
 }) {
   if (compact) return <StackBar model={{ kind: 'stack', parts: model.parts, summary: '' }} />;

@@ -74,7 +74,6 @@ describe('findPricingGaps', () => {
 
   it("checks only the ore an Assignment owns, not the whole entry's", () => {
     const dr = displayRow('r1', '2026-09-01');
-    // A is the unpriced ore, but this Assignment only owns B.
     (dr as { assignment: unknown }).assignment = { oreLines: [{ typeId: B, quantity: 5 }] };
     expect(findPricingGaps([dr], lookups)).toEqual([]);
   });

@@ -39,7 +39,6 @@ describe('useNetWorthMissingNames', () => {
     });
     await waitFor(() => expect(result.current).toEqual(['Cy']));
 
-    // The first render with the new list, before any query could re-run.
     rerender({ chars: [A, B] });
     expect(result.current).toEqual([]);
   });

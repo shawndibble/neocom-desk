@@ -1,15 +1,3 @@
-/**
- * The mail format bar (decision 20261016-124635): bold, italic, underline,
- * colour, size, link, table and clear formatting, as one row of flat icon
- * buttons split into groups by hairlines, with the Source toggle at the right
- * end. It is the top strip of the editor's card on every width (the card owns
- * the frame; the bar draws only a hairline under itself). Colour, size, link
- * and table open a sheet rather than crowding the row.
- *
- * It only calls `MailEditorCommands`, so it works the same over the Preview
- * (Tiptap) and the Source textarea. Buttons never take focus from the writing
- * surface, or the keyboard would close under the pilot's thumb.
- */
 import { useState, type KeyboardEvent, type PointerEvent, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { IconButton } from '@/components/ui';
@@ -19,23 +7,19 @@ import { markupColorToCss } from '@/engine/mail/eveMarkup';
 import type { MailEditorCommands } from './commands';
 import { ColorDialog, LinkDialog, SizeDialog, TableDialog } from './FormatDialogs';
 
-/** The game's default mail text colour, `#bfffffff`. */
 const GAME_DEFAULT_TEXT_COLOR = '#bfffffff';
 
 const keepFocus = (e: PointerEvent) => e.preventDefault();
 
 interface MailFormatBarProps {
   commands: MailEditorCommands;
-  /** Phone layout: one row that scrolls sideways, and the sheets are bottom sheets. */
   phone: boolean;
   disabled?: boolean;
-  /** Source toggle at the right end; absent = no toggle. */
   sourceActive?: boolean;
   onToggleSource?: () => void;
   className?: string;
 }
 
-/** A hairline between button groups. */
 const Divider = () => <span aria-hidden className="mx-1 h-5 w-px shrink-0 self-center bg-line" />;
 
 export function MailFormatBar({
@@ -49,7 +33,6 @@ export function MailFormatBar({
   const { t } = useTranslation();
   const [sheet, setSheet] = useState<'color' | 'size' | 'link' | 'table' | null>(null);
   const { state } = commands;
-  // Roving tab stop (APG toolbar): one Tab stop for the bar, arrows move within it.
   const [stop, setStop] = useState('bold');
 
   const onBarKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
@@ -84,7 +67,6 @@ export function MailFormatBar({
       label={label}
       tooltip={extra.tooltip}
       pressed={extra.pressed}
-      // `aria-disabled`, not native: a native-disabled button fires no hover/focus, so its reason would never show.
       aria-disabled={disabled || extra.unavailable || undefined}
       data-bar-key={key}
       tabIndex={key === stop ? 0 : -1}
@@ -102,7 +84,6 @@ export function MailFormatBar({
       aria-hidden
       className="size-5 rounded-full border border-text-dim ring-1 ring-black/40"
       style={{
-        // No colour set = the game's own default text colour, white at 75%.
         backgroundColor: markupColorToCss(
           state.color === null || state.color === 'mixed' ? GAME_DEFAULT_TEXT_COLOR : state.color
         ),
@@ -125,7 +106,6 @@ export function MailFormatBar({
         <div
           className={cx(
             'flex min-w-0 flex-1 gap-0.5',
-            // Phone: one row that scrolls sideways (the cut-off button is the cue, as in Tabs).
             phone ? 'tab-scroller flex-nowrap overflow-x-auto' : 'flex-wrap'
           )}
         >
@@ -169,7 +149,6 @@ export function MailFormatBar({
           })}
         </div>
         {onToggleSource && (
-          // Outside the scroller, so the way back to Preview never scrolls out of reach.
           <span className="flex shrink-0 items-center pl-1">
             <Divider />
             {button('source', <Icon.OpenSource />, t('mail.format.source'), onToggleSource, {

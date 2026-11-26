@@ -16,8 +16,6 @@ function entry(over: Partial<NotificationFeedRecord> = {}): NotificationFeedReco
 
 describe('alertGroupKey', () => {
   it('keys an EVE notification off its type, not its parent event', () => {
-    // Every EVE notification shares the `eveNotification` eventId; grouping on
-    // that alone would collapse "structure under attack" into "corp bill due".
     const attack = entry({ eventId: 'eveNotification', eveType: 'StructureUnderAttack' });
     const bill = entry({ eventId: 'eveNotification', eveType: 'CorpAllBillMsg' });
     expect(alertGroupKey(attack)).not.toBe(alertGroupKey(bill));
@@ -52,7 +50,6 @@ describe('groupAlertsByType', () => {
   });
 
   it('breaks a severity tie on the newest fire, so the liveliest type leads', () => {
-    // Both `watch`, so severity decides nothing and the clock has to.
     const groups = groupAlertsByType([
       entry({ eventId: 'newMail', firedAt: 500 }),
       entry({ eventId: 'contractAccepted', firedAt: 900 }),
@@ -112,13 +109,11 @@ describe('alertSeverity', () => {
   });
 
   it('puts something that stopped happening above something that finished', () => {
-    // Nothing training is a standing fault; a level completing is an FYI.
     expect(alertSeverity({ kind: 'event', eventId: 'characterNotTraining' })).toBe('warning');
     expect(alertSeverity({ kind: 'event', eventId: 'skillLevelComplete' })).toBe('watch');
   });
 
   it('falls back to watch for a type it has no opinion about', () => {
-    // An entry written by a newer build, or an eveType outside the allow-list.
     expect(alertSeverity({ kind: 'eveType', type: 'SomethingUnheardOf' })).toBe('watch');
   });
 });

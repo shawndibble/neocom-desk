@@ -28,8 +28,6 @@ afterEach(() => vi.unstubAllGlobals());
 
 beforeEach(() => {
   getServiceWorkerRegistration.mockReset();
-  // Default: the published release is unreadable, so the worker is asked (the
-  // pre-existing path the tests below exercise).
   fetchLatestRelease.mockReset().mockResolvedValue(null);
   useUpdateStatus.setState({ status: 'unknown', build: null, found: 0 });
 });
@@ -91,7 +89,6 @@ describe('checkForUpdate', () => {
 describe('checkForUpdate against the published release', () => {
   it('is available at once for a newer release, without waiting for the install', async () => {
     const registration = fakeRegistration();
-    // An install that never finishes: the status must not depend on it.
     registration.update.mockReturnValue(new Promise(() => undefined));
     getServiceWorkerRegistration.mockResolvedValue(registration);
     fetchLatestRelease.mockResolvedValue('neocom-desk@9+newer');
@@ -144,7 +141,6 @@ describe('pollForUpdate', () => {
       fetchLatestRelease.mockResolvedValue(release);
       await pollForUpdate(registration as never);
     }
-    // The first build is not a "second find"; only @10 replacing @9 is.
     expect(useUpdateStatus.getState().found).toBe(1);
   });
 

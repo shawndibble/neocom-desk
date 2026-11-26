@@ -4,10 +4,10 @@ import { loadAllCharacterLedgers, loadAllCharacterYields } from './ledger';
 import { tagAsIgnored, tagAsMoonOre } from './typeOverrides';
 import { seedCharacter } from '@/test/seed';
 
-const MOON_ORE = 45490; // Zeolites
-const ORDINARY_ORE = 1230; // Veldspar — recognized, not moon ore
-const GAS = 30370; // Fullerite-C50 — harvested gas, on neither ore/ice list
-const UNKNOWN_TYPE = 999999; // recognized by neither list — allowlist gap
+const MOON_ORE = 45490;
+const ORDINARY_ORE = 1230;
+const GAS = 30370;
+const UNKNOWN_TYPE = 999999;
 
 const sdeMock = vi.hoisted(() => ({
   loadMoonOreTypeIds: vi.fn(async () => [MOON_ORE]),
@@ -147,10 +147,6 @@ describe('loadAllCharacterLedgers', () => {
 
     const [ledger] = await loadAllCharacterLedgers();
 
-    // Gas is never moon ore, so it stays out of the tax entries; and the Tax
-    // tab still calls it unclassified, exactly as before #880 widened only
-    // the Yield tracker's allowlist. "Ignore" (typeOverrides) remains the
-    // way a gas harvester silences that banner.
     expect(ledger.entries[0].oreLines).toEqual([{ typeId: MOON_ORE, quantity: 100 }]);
     expect(ledger.unclassifiedTypeIds).toEqual([GAS]);
     expect(sdeMock.loadGasCloudTypeIds).not.toHaveBeenCalled();

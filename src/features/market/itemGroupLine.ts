@@ -1,20 +1,9 @@
-/**
- * Item Detail's subtitle: what kind of item this is, by its **Group** (the
- * inventory taxonomy: "Heavy Assault Cruiser"), never its **Market Group**
- * (GLOSSARY.md), plus a ship's faction ("Amarr Empire") off the Ship Tree.
- *
- * The groupID is local (`types.json`); the Group's name is the cached
- * `GET /universe/groups/{id}` read `groupNames.ts` already makes for
- * Group-valued attributes. Null, never a rejection, when either is missing:
- * the subtitle is context, so the modal just goes without it.
- */
 import { SHIP_CATEGORY_ID } from '@/sde/categories';
 import { loadGroupCategories, loadShipTree, loadTypes } from '@/sde/loadSde';
 import { loadGroupNames } from './groupNames';
 
 export interface ItemGroupLine {
   group: string;
-  /** A ship's faction; null for anything else, or a hull the Ship Tree doesn't carry. */
   faction: string | null;
 }
 

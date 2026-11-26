@@ -5,13 +5,11 @@ import { makeoverMoves, rowsBetween } from './improveMakeover';
 import { mutatedKept } from './improveMutated';
 import type { Fitting, FittingModule } from '../types';
 
-// 10: a Tech I low module; 11 and 12 its siblings. Group 59 (Gyrostabilizer) holds 10 to 12 (the pool's one group).
 const index = buildVariationIndex(
   {
     10: { parentTypeId: null, metaGroupId: 1 },
     11: { parentTypeId: 10, metaGroupId: 2 },
     12: { parentTypeId: 10, metaGroupId: 2 },
-    // A mutated type has no variations of its own.
     900: { parentTypeId: null, metaGroupId: 15 },
   },
   { 1: 'Tech I', 2: 'Tech II', 15: 'Abyssal' }
@@ -60,7 +58,6 @@ describe('Improve and a fitted mutated module (#5800)', () => {
     const places = fromMutated.map((c) => c.at.map((at) => at.slotIndex).join());
     expect(new Set(places)).toEqual(new Set(['0', '1']));
     expect(fromMutated.every((c) => c.losesRoll === true)).toBe(true);
-    // Plain copies still merge into one candidate, and never lose a roll.
     const merged = candidates.filter((c) => c.fromTypeId === 10);
     expect(merged.every((c) => c.at.length === 2 && c.losesRoll === undefined)).toBe(true);
   });

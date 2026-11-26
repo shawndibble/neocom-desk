@@ -18,23 +18,11 @@ export interface IndustryHeaderProps {
   activeTab: IndustryTab;
   onTabChange: (tab: IndustryTab) => void;
   blueprintsNeedsReauth: boolean;
-  /**
-   * `'manual'` for `IndustryPlanPage`/`IndustryGroupPage`, whose `onTabChange`
-   * navigates away rather than swapping content in place — see `Tabs`'
-   * `activation` doc. Defaults to `'automatic'`, matching `Industry.tsx`'s own
-   * in-page tab switch, which arrow keys already handle correctly.
-   */
   tabsActivation?: 'automatic' | 'manual';
-  /** Beside the page title — the current tab's `DataAgeBadge`, when it has one. */
   meta?: ReactNode;
-  /** After "New to Industry?", before the settings gear — the current tab's own buttons (BPC Sourcing's Refresh). */
   actions?: ReactNode;
 }
 
-/**
- * The gear for the settings this tab reads, or none when it reads none.
- * Keyed by tab so an open modal never carries over to the next tab's form.
- */
 function tabSettings(tab: IndustryTab, t: TFunction): ReactNode {
   switch (tab) {
     case 'plans':
@@ -60,16 +48,6 @@ function tabSettings(tab: IndustryTab, t: TFunction): ReactNode {
   }
 }
 
-/**
- * The chrome every Industry page shares above its own content: title (with
- * "New to Industry?" and the current tab's settings gear beside it), Active Jobs, the reauth
- * banner, and the 4-tab strip — identical whether this is the index or a
- * plan/group's own full-width page, so moving
- * between them reads as "only the content under the tabs changed," not a
- * jump to a different page. `Industry.tsx`'s tab switch keeps this mounted
- * while it swaps content underneath; `IndustryPlanPage`/`IndustryGroupPage`
- * render it with `activeTab="plans"` and navigate on any other tab pick.
- */
 export function IndustryHeader({
   activeCharacterId,
   activeTab,
@@ -92,7 +70,6 @@ export function IndustryHeader({
         scope={<IndustryCharacterPicker activeCharacterId={activeCharacterId} />}
         actions={
           <>
-            {/* A `scope` header never wraps: on a phone, a tab with its own actions (BPC Sourcing's Refresh) leaves no room for the labelled trigger. */}
             {!(isPhone && actions) && <IndustryExplainerTrigger />}
             {actions}
             {tabSettings(activeTab, t)}

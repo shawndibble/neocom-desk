@@ -14,7 +14,6 @@ describe('AvoidedSystemsEditor', () => {
   it('hands focus to a neighbouring Remove, then the Add trigger, as systems go (issue #3365)', async () => {
     await useAvoidedSystems.getState().setValue([1, 2]);
     render(<AvoidedSystemsEditor />);
-    // Unnamed (no snapshot) systems list as #id, sorted: #1 then #2.
     fireEvent.click(await screen.findByRole('button', { name: /Remove .*#1/ }));
     const last = await screen.findByRole('button', { name: /Remove .*#2/ });
     await waitFor(() => expect(document.activeElement).toBe(last));

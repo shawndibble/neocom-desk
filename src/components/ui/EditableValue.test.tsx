@@ -10,7 +10,6 @@ describe('EditableValue', () => {
       </EditableValue>
     );
 
-    // jsdom trims the space after the comma that a browser keeps.
     expect(screen.getByRole('button', { name: /^Edit Have for Tritanium, ?3,000$/ })).toBeVisible();
   });
 

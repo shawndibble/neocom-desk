@@ -1,7 +1,3 @@
-// The nightly pass over every active book's server-built docs (ADR 0032, decision
-// 20261120-235011): rebuilds the moon docs that can still change and both tab read models,
-// repairs any drift, flags pulls that overlap, and records how it went in `meta/verifierHealth`.
-
 import type { Firestore } from 'firebase-admin/firestore';
 import { verifyMoonDocs } from './corpTaxBookMoonDocsStore.js';
 import { invalidateReadModels, reconcileReadModels } from './corpTaxBookReadModelsStore.js';
@@ -20,7 +16,6 @@ export interface VerifyOutcome {
   readModelRepairs: number;
 }
 
-/** One book's nightly pass. A failed part is logged and never fails the others. */
 export async function verifyBook(
   db: Firestore,
   corporationId: number,
@@ -32,7 +27,6 @@ export async function verifyBook(
   });
   const moonMismatches = moon?.plan.mismatches ?? [];
   const overlaps = moon?.overlaps ?? [];
-  // A doc also goes stale as an Extraction ages out of its window, so a repair is routine, not a flag.
   const readModels = await reconcileReadModels(db, corporationId, now()).catch(async (e) => {
     console.error('read models verify failed', e instanceof Error ? e.message : e);
     await invalidateReadModels(db, corporationId).catch(() => undefined);
@@ -85,7 +79,6 @@ export async function verifyBook(
   };
 }
 
-/** Verifies every active book, one after another, stopping at `budgetMs`. */
 export async function verifyAllBooks(
   db: Firestore,
   now: () => number,
@@ -93,7 +86,6 @@ export async function verifyAllBooks(
 ): Promise<{ books: number; failed: number; truncated: boolean }> {
   const start = now();
   const active = await db.collection('corps').where('active', '==', true).get();
-  // A run cut short by the budget starts one book further along tomorrow, so none starves.
   const docs = [...active.docs].sort((a, b) => a.id.localeCompare(b.id));
   const turn = docs.length > 0 ? Math.floor(start / DAY_MS) % docs.length : 0;
   let books = 0;

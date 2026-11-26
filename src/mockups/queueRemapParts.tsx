@@ -11,12 +11,6 @@ import { SCENARIOS, type ScenarioName } from './queueRemapFixtures';
 import { queueAdvice, savesTime } from './queueRemapAdvice';
 import { DAY_MS } from '@/lib/age';
 
-/**
- * Puts the proposed button into the real Attributes card (the mockup can't
- * edit the page): after the "Remaps: …" line on desktop, after the attribute
- * chips on a phone (which shows the chips bare). Re-attaches when the card
- * re-renders as its data arrives.
- */
 function IntoAttributesCard({ children }: { children: ReactNode }) {
   const [slot, setSlot] = useState<HTMLElement | null>(null);
   useEffect(() => {
@@ -49,13 +43,6 @@ function IntoAttributesCard({ children }: { children: ReactNode }) {
   return slot ? createPortal(children, slot) : null;
 }
 
-/**
- * Proposed: Optimize queue, at the foot of the Attributes card under the remap
- * budget it spends, past a divider, at the card's full width. An existing
- * `Button` with the Optimize button's icon; one press makes the plan, so no
- * "…". With an empty queue it stays focusable (`aria-disabled`) and says why
- * in its tooltip.
- */
 export function OptimizeQueueButton({ emptyQueue = false }: { emptyQueue?: boolean }) {
   const button = (
     <Button
@@ -98,11 +85,6 @@ function useEngineSkills(): ReadonlyMap<number, EngineSkill> | null {
   return skills;
 }
 
-/**
- * The toast Optimize queue leaves: on the new plan's editor (Undo deletes the
- * plan and goes back), or on the Plans page when no remap pays and no plan
- * was made. Text is built from the same `placeRemaps` run as the plan.
- */
 export function OptimizeQueueToast({
   scenario,
   planName,

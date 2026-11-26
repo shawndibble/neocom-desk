@@ -35,18 +35,8 @@ const KEY = 'thing';
 beforeEach(async () => {
   await db.esiCache.clear();
   await db.tokens.clear();
-  // Module state, not Dexie state: without this one test's failed revalidation
-  // for [91, 'thing'] silently suppresses the next test's fetch for the same key.
   resetRevalidationState();
 });
-
-/**
- * Every assertion in this file below this point exercises the *fast* path: a
- * live call that settles well inside `STALE_GRACE_MS` keeps the single-phase
- * contract it always had, including `needsReauth` and `skipCacheOnAuthFailure`.
- * That is the point of racing rather than serving stale unconditionally — see
- * the "grace period" block at the end for the slow path.
- */
 
 describe('GLOBAL_CACHE_CHARACTER_ID', () => {
   it('is the sentinel row 0', () => {
@@ -153,16 +143,6 @@ describe('loadWithCacheStatus — default auth-failure detection', () => {
 });
 
 describe('loadWithCacheStatus — shell auth-failure signal (issue #1521)', () => {
-  /**
-   * A route whose gated component briefly mounts before `ScopeGate` resolves
-   * the active grant (`app/ScopeGate.tsx`'s documented "passes children
-   * through while the Dexie read is in flight" window) can fire this exact
-   * shape: a 403 for a scope the stored grant never claimed in the first
-   * place. The shell's runtime auth-failure notice exists for a *revoked*
-   * scope (docs/context/decisions/20260831-140406-the-whole-app-sits-behind-authentication.md)
-   * and must stay silent for one that was simply never granted — the route's
-   * own `ScopeGate`/`needsReauth` banner is already the right signal for that.
-   */
   it('does not emit the shell auth-failure signal for a scope the stored grant never claimed', async () => {
     await db.tokens.put({
       characterId: CHAR_ID,
@@ -320,13 +300,6 @@ describe('loadWithCacheStatus — shell auth-failure signal (issue #1521)', () =
     expect(onFailure).toHaveBeenCalledWith(CHAR_ID);
   });
 
-  /**
-   * Same gate, exercised through the paginated path: a paginated endpoint's
-   * per-page esiFetch calls withhold endpointId (esi/paginated.ts), which is
-   * exactly the case that let a Core-only Character's /assets sweep leak the
-   * shell notice before esi/endpoints/'s fetchTransactionCursor and
-   * paginated.ts's fetchAllPagesStatus started patching it back in.
-   */
   it('does not emit for a paginated endpoint 403 when the stored grant never claimed its scope', async () => {
     await db.tokens.put({
       characterId: CHAR_ID,
@@ -360,8 +333,6 @@ describe('loadWithCacheStatus — options', () => {
       { detectAuthFailure: (err) => err instanceof EsiError && err.status === 403 }
     );
 
-    // A 401 no longer counts as an auth failure under this override, so it's
-    // treated as a generic offline-style error: falls back to cache as usual.
     expect(result.needsReauth).toBe(false);
     expect(result.cached?.fromCache).toBe(true);
   });
@@ -438,12 +409,6 @@ describe('readCached / writeCached', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Purge-pending suppression: both tiers failed, so the previous owner's rows
-// are still on disk and the read path must read as empty (see cachePurge.ts).
-// ---------------------------------------------------------------------------
-
-/** Drive cachePurge into tier 3 for real, rather than poking its internals. */
 async function suppressViaFailedPurge(characterId: number): Promise<void> {
   const where = vi.spyOn(db.esiCache, 'where').mockImplementation(() => {
     throw new Error('index damaged');
@@ -580,16 +545,14 @@ describe('readCachedRows', () => {
   });
 
   it('suppresses a purge-pending character while still serving the others', async () => {
-    // The batch read must honour the same gate readCachedRow does, or a
-    // previous owner's rows reach a caller that happened to read in bulk.
     await writeCached(CHAR_ID, KEY, 'previous owner', 1000);
     await writeCached(OTHER, KEY, 'mine', 1000);
     await suppressViaFailedPurge(CHAR_ID);
 
     const rows = await readCachedRows<string>([CHAR_ID, OTHER], KEY);
 
-    expect(await db.esiCache.get([CHAR_ID, KEY])).toBeDefined(); // still on disk
-    expect(rows.has(CHAR_ID)).toBe(false); // but never served
+    expect(await db.esiCache.get([CHAR_ID, KEY])).toBeDefined();
+    expect(rows.has(CHAR_ID)).toBe(false);
     expect(rows.get(OTHER)?.data).toBe('mine');
   });
 });
@@ -663,11 +626,6 @@ describe('loadPaginatedWithCache', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// In-flight dedupe: concurrent identical reads share one fetchLive call
-// rather than racing (issue #41).
-// ---------------------------------------------------------------------------
-
 describe('in-flight dedupe', () => {
   it('loadWithCacheStatus: two concurrent calls for the same key share one fetchLive call', async () => {
     let calls = 0;
@@ -740,17 +698,9 @@ describe('in-flight dedupe', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// ESI priority lanes (issue #2271): a load started by background work runs its
-// live call in the low lane — past the cache's own awaits — and a view that
-// joins it through the dedupe above promotes it rather than waiting behind the
-// background queue.
-// ---------------------------------------------------------------------------
-
 describe('ESI priority lanes', () => {
   afterEach(() => resetEsiBudget());
 
-  /** A `fetchLive` that records its lane and waits until `finish` is called. */
   function heldFetch<R>(value: R) {
     const seen: { lane: PriorityTicket | undefined } = { lane: undefined };
     let finish: () => void = () => {};
@@ -802,8 +752,6 @@ describe('ESI priority lanes', () => {
   });
 
   it('leaves an in-flight background load low when another background caller joins it', async () => {
-    // A Character no other test touches, so no module state it left behind
-    // (a pending cache purge, a recorded failure) changes the read path below.
     const charId = 2271;
     const { seen, fetchLive, finish } = heldFetch('v');
     const rowReads = vi.spyOn(db.esiCache, 'get');
@@ -812,10 +760,6 @@ describe('ESI priority lanes', () => {
       await vi.waitFor(() => expect(fetchLive).toHaveBeenCalled());
       const readsBefore = rowReads.mock.calls.length;
       const second = inBackgroundLane(() => loadWithCacheStatus(charId, KEY, fetchLive));
-      // The joiner's last await before `withDedupe` is its row read (no row,
-      // no meta, no purge, no recorded failure); past it the path is microtasks
-      // only, which one macrotask drains. So by here it has joined, or started
-      // a load of its own — which the call count below would catch.
       await vi.waitFor(() => expect(rowReads.mock.calls.length).toBeGreaterThan(readsBefore));
       await rowReads.mock.results[readsBefore].value;
       // eslint-disable-next-line no-restricted-syntax -- asserts no promotion: nothing to wait on but the microtask-only join, which one macrotask drains
@@ -872,18 +816,8 @@ describe('ESI priority lanes', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Freshness window: a repeated read inside the window ESI's own Expires
-// header declared is served from the Dexie row without a network call
-// (issue #41). Driven by `expiresCapture`, written by fetchLive itself so
-// the window reflects that specific response rather than a guessed constant.
-// ---------------------------------------------------------------------------
-
 describe('freshness window', () => {
   beforeEach(async () => {
-    // freshnessInvalidatedAt is module state shared across the whole file; a
-    // prior test's real-clock invalidateFreshness() call would otherwise
-    // outrank every mocked (small) timestamp used below. Pin it to 0 first.
     vi.spyOn(Date, 'now').mockReturnValue(0);
     invalidateFreshness();
     await clearCachePurgePending(CHAR_ID);
@@ -903,7 +837,7 @@ describe('freshness window', () => {
 
     await loadWithCacheStatus(CHAR_ID, KEY, fetchLive, { expiresCapture: capture });
 
-    vi.spyOn(Date, 'now').mockReturnValue(1_010_000); // 10s later, still inside the 60s window
+    vi.spyOn(Date, 'now').mockReturnValue(1_010_000);
     const result = await loadWithCacheStatus(CHAR_ID, KEY, fetchLive, { expiresCapture: capture });
 
     expect(fetchLive).toHaveBeenCalledTimes(1);
@@ -921,8 +855,6 @@ describe('freshness window', () => {
     const capture = { value: null as string | null };
     vi.spyOn(Date, 'now').mockReturnValue(1_000_000);
     const fetchLive = vi.fn(async () => {
-      // An hour, so the Expires header rather than the TTL floor is what this
-      // test is stepping past.
       capture.value = new Date(1_000_000 + 3_600_000).toUTCString();
       return 'live-value';
     });
@@ -972,7 +904,6 @@ describe('freshness window', () => {
     vi.spyOn(Date, 'now').mockReturnValue(1_000_000);
     const capture = { value: null as string | null };
     const fetchLive = vi.fn(async () => {
-      // ESI declares an hour — longer than the 10-minute default floor.
       capture.value = new Date(1_000_000 + 3_600_000).toUTCString();
       return 'live-value';
     });
@@ -988,7 +919,6 @@ describe('freshness window', () => {
     vi.spyOn(Date, 'now').mockReturnValue(1_000_000);
     const capture = { value: null as string | null };
     const fetchLive = vi.fn(async () => {
-      // ESI's own 60s cache; the floor is what the user asked for instead.
       capture.value = new Date(1_000_000 + 60_000).toUTCString();
       return 'live-value';
     });
@@ -1004,14 +934,11 @@ describe('freshness window', () => {
     vi.spyOn(Date, 'now').mockReturnValue(1_000_000);
     const fetchLive = vi.fn(async () => 'live-value');
 
-    // The refreshing route reloads its own key: bypassed, as intended.
     await loadWithCache(CHAR_ID, KEY, fetchLive);
     invalidateFreshness();
     await loadWithCache(CHAR_ID, KEY, fetchLive);
     expect(fetchLive).toHaveBeenCalledTimes(2);
 
-    // Another route's key, navigated to well after that refresh settled: its
-    // own window still holds. A global bypass would have refetched everything.
     const other = vi.fn(async () => 'other-value');
     await loadWithCache(CHAR_ID, 'other-key', other);
     invalidateFreshness();
@@ -1026,8 +953,6 @@ describe('freshness window', () => {
     const fetchLive = vi.fn(async () => 'Jita IV - Moon 4');
     const options = { staleAfterMs: STALE_AFTER.static };
 
-    // Assets resolves one of these per distinct location; a Refresh click that
-    // refetched them all would turn one click into a fan-out over map data.
     await loadWithCache(CHAR_ID, KEY, fetchLive, options);
     invalidateFreshness();
     await loadWithCache(CHAR_ID, KEY, fetchLive, options);
@@ -1063,9 +988,6 @@ describe('freshness window', () => {
     await suppressViaFailedPurge(CHAR_ID);
     const result = await loadWithCacheStatus(CHAR_ID, KEY, fetchLive, { expiresCapture: capture });
 
-    // Suppressed, so the window can't be read back — falls through to fetchLive,
-    // which itself fails to write (purge suppression only gates reads), so this
-    // just proves the stale row wasn't silently served.
     expect(fetchLive).toHaveBeenCalledTimes(2);
     expect(result.cached?.data).toBe('live-value');
   });
@@ -1090,16 +1012,7 @@ describe('freshness window', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Grace period: past the window, a live call that dawdles does not hold the
-// view hostage — the stored row is shown and the call finishes behind it.
-// Ordering assertions, so `fetchLive` is driven off a promise the test settles
-// by hand; a mocked clock alone would pass an implementation that never
-// returned early at all.
-// ---------------------------------------------------------------------------
-
 describe('grace period past the freshness window', () => {
-  /** A `fetchLive` the test decides when, and whether, to settle. */
   function deferredFetch<T>(value: T, failWith: unknown = new Error('offline')) {
     let settle!: (ok: boolean) => void;
     const gate = new Promise<void>((resolve, reject) => {
@@ -1112,7 +1025,6 @@ describe('grace period past the freshness window', () => {
     return { fetchLive, settle };
   }
 
-  /** Resolves the next time a late live call reports back. */
   function nextRevalidation(): Promise<void> {
     return new Promise((resolve) => {
       const off = onCacheRevalidated(() => {
@@ -1131,14 +1043,6 @@ describe('grace period past the freshness window', () => {
     });
   }
 
-  /**
-   * Waits out the real grace timer.
-   *
-   * Deliberately not `vi.useFakeTimers()`: `fake-indexeddb` schedules its own
-   * work on the same timers, so faking them deadlocks every Dexie read in this
-   * block — including the one `loadPastWindow` makes *after* the grace expires.
-   * A real quarter second per test is the cheaper price.
-   */
   async function expireGrace(): Promise<void> {
     // eslint-disable-next-line no-restricted-syntax -- the real grace timer; fake timers deadlock fake-indexeddb
     await new Promise((resolve) => setTimeout(resolve, STALE_GRACE_MS + 25));
@@ -1146,9 +1050,6 @@ describe('grace period past the freshness window', () => {
 
   beforeEach(async () => {
     await clearCachePurgePending(CHAR_ID);
-    // `freshnessInvalidatedAt` is module state with a 30s reach, so the manual
-    // refresh test below would otherwise keep every later test's row from
-    // being substituted. Pinning it to 0 puts it far outside REFRESH_BYPASS_MS.
     vi.spyOn(Date, 'now').mockReturnValue(0);
     invalidateFreshness();
     vi.restoreAllMocks();
@@ -1161,9 +1062,7 @@ describe('grace period past the freshness window', () => {
     const pending = loadWithCacheStatus<string>(CHAR_ID, KEY, fetchLive);
     const result = await pending;
 
-    // Resolved while fetchLive is still pending — the point of the whole thing.
     expect(result.cached?.data).toBe('two-days-old');
-    // No bad news yet, so no view raises its offline banner.
     expect(result.cached?.fromCache).toBe(false);
     settle(true);
   });
@@ -1204,7 +1103,6 @@ describe('grace period past the freshness window', () => {
     settle(false);
     await signalled;
 
-    // The bad news the optimistic read had none of.
     const reread = await loadWithCacheStatus<string>(CHAR_ID, KEY, fetchLive);
     expect(reread.cached?.data).toBe('two-days-old');
     expect(reread.cached?.fromCache).toBe(true);
@@ -1213,8 +1111,6 @@ describe('grace period past the freshness window', () => {
 
   it('does not hold a key after a timeout that never left the ESI gate (issue #2271)', async () => {
     await seedStaleRow('two-days-old');
-    // A background load queued behind a view until its clock ran out: ESI was
-    // never asked, so nothing says it is down.
     const { fetchLive, settle } = deferredFetch(
       'never-arrives',
       new EsiTimeoutError(REQUEST_TIMEOUT_MS, false)
@@ -1224,8 +1120,6 @@ describe('grace period past the freshness window', () => {
     await pending;
     settle(false);
 
-    // Once the timed-out load has settled, the next read goes to ESI rather
-    // than being answered from disk with the offline flag.
     const fresh = vi.fn(async () => 'fresh');
     await vi.waitFor(async () => {
       const reread = await loadWithCacheStatus<string>(CHAR_ID, KEY, fresh);
@@ -1302,8 +1196,6 @@ describe('grace period past the freshness window', () => {
     settle(false);
     await signalled;
 
-    // industry jobs / PI: a revoked scope must not leave a row on screen the
-    // character may no longer be entitled to.
     const reread = await loadWithCacheStatus<string>(CHAR_ID, KEY, fetchLive, options);
     expect(reread.cached).toBeNull();
   });
@@ -1319,8 +1211,6 @@ describe('grace period past the freshness window', () => {
       return r;
     });
     await expireGrace();
-    // The user clicked Refresh and is watching the button: it must report what
-    // actually happened, not hand back the row it already had.
     expect(resolved).toBe(false);
 
     settle(true);
@@ -1345,7 +1235,6 @@ describe('grace period past the freshness window', () => {
       await seedLapsedStation('Old Name');
       const { fetchLive, settle } = deferredFetch('New Name');
 
-      // Resolves with fetchLive still pending and without waiting out the grace timer.
       const started = performance.now();
       const result = await loadWithCacheStatus<string>(G, stationKey, fetchLive, STATIC);
 
@@ -1358,7 +1247,6 @@ describe('grace period past the freshness window', () => {
       await vi.waitFor(async () => {
         expect((await db.esiCache.get([G, stationKey]))?.value).toBe('New Name');
       });
-      // The refreshed row is inside its window again: served with no call.
       const next = await loadWithCacheStatus<string>(G, stationKey, fetchLive, STATIC);
       expect(next.cached?.data).toBe('New Name');
       expect(fetchLive).toHaveBeenCalledTimes(1);
@@ -1421,11 +1309,8 @@ describe('grace period past the freshness window', () => {
 
       await loadWithCacheStatus<string>(G, stationKey, fetchLive, STATIC);
       settle(false);
-      // Let the background call settle and record its failure.
       await expireGrace();
 
-      // Same answer the blocking path gave for a failed call: the stored row,
-      // flagged as a fallback.
       const reread = await loadWithCacheStatus<string>(G, stationKey, fetchLive, STATIC);
       expect(reread.cached?.data).toBe('Jita IV - Moon 4');
       expect(reread.cached?.fromCache).toBe(true);
@@ -1447,8 +1332,6 @@ describe('grace period past the freshness window', () => {
         return r;
       });
       await expireGrace();
-      // Such a loader must not be shown a row its Character may no longer be
-      // entitled to, so it never takes the silent stale path.
       expect(resolved).toBe(false);
 
       settle(true);
@@ -1493,8 +1376,6 @@ describe('grace period past the freshness window', () => {
   });
 
   it('never substitutes a stored row for a window between the default and a day, without the opt-in', async () => {
-    // Only game constants get the silent stale-serve; a 30-minute window
-    // (the synced public BPC snapshot) keeps the blocking live call.
     const snapshotKey = 'publicBpcContracts';
     await db.esiCache.put({
       characterId: GLOBAL_CACHE_CHARACTER_ID,
@@ -1519,10 +1400,6 @@ describe('grace period past the freshness window', () => {
   });
 
   it('serves the stored row for a long-window key that opts in with allowStaleServe', async () => {
-    // A published snapshot is not a game constant: it *does* change, just on
-    // the backend's own clock. Its long window is there to stop pointless
-    // refetches, not to make a lapsed row unshowable — so the opt-in restores
-    // the substitution the blanket long-window rule above removes.
     const snapshotKey = 'publicCourierContracts';
     await db.esiCache.put({
       characterId: GLOBAL_CACHE_CHARACTER_ID,
@@ -1538,16 +1415,12 @@ describe('grace period past the freshness window', () => {
     });
     const result = await pending;
 
-    // Resolved while the Firestore read is still in flight: the board renders
-    // last night's hauls now rather than a spinner for the whole fetch.
     expect(result.cached?.data).toBe('last-nights-snapshot');
     expect(result.cached?.fromCache).toBe(false);
     settle(true);
   });
 
   it('reports a failed background refresh on the next read of an opted-in key', async () => {
-    // The honesty rule: serving a stale row instantly is only allowed because
-    // a revalidation that fails eventually says so.
     const snapshotKey = 'publicCourierContracts';
     await db.esiCache.put({
       characterId: GLOBAL_CACHE_CHARACTER_ID,
@@ -1570,7 +1443,6 @@ describe('grace period past the freshness window', () => {
     failing.settle(false);
     await signalled;
 
-    // The re-read the signal provokes is what carries the bad news.
     const second = await loadWithCacheStatus<string>(
       GLOBAL_CACHE_CHARACTER_ID,
       snapshotKey,
@@ -1601,12 +1473,6 @@ describe('grace period past the freshness window', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Corp-owned rows (issue #293). A corporation's data is fetched with a
-// character's token but is not that character's to keep across a corp change,
-// so the key carries the corporation id.
-// ---------------------------------------------------------------------------
-
 describe('corpCacheKey', () => {
   const CORP_A = 98000001;
   const CORP_B = 98000002;
@@ -1627,13 +1493,11 @@ describe('corpCacheKey', () => {
     const fetchA = vi.fn().mockResolvedValue('corp A structures');
     await loadWithCache(CHAR_ID, corpCacheKey(CORP_A, 'structures'), fetchA);
 
-    // Same character, same data, same instant — only the corporation moved.
     const fetchB = vi.fn().mockResolvedValue('corp B structures');
     const result = await loadWithCache<string>(CHAR_ID, corpCacheKey(CORP_B, 'structures'), fetchB);
 
-    expect(fetchB).toHaveBeenCalledTimes(1); // a live call, not corp A's row
+    expect(fetchB).toHaveBeenCalledTimes(1);
     expect(result?.data).toBe('corp B structures');
-    // Corp A's row is still exactly where it was, untouched by B's read.
     expect(await readCached(CHAR_ID, corpCacheKey(CORP_A, 'structures'))).toBe('corp A structures');
   });
 });

@@ -1,13 +1,3 @@
-/**
- * The member's reads of a Corp Tax Book (issue #4065, ADR 0023). Firestore
- * rules let any signed-in Character `get` a book's settings and read their OWN
- * lines (`uid` / `uids`) — observed rows, payments, Late notices, dismissals and
- * Miner groupings — in any corp's book, including after leaving the corp. This
- * module reads exactly those, as each tracked Character in turn (the Firebase
- * session is one Character at a time); `engine/corpTaxBook/docShapes.ts` parses them
- * defensively into the engine's shapes. Every write is a callable; the only one a player makes is
- * claiming their own Unmatched donation.
- */
 import { LATE_NOTICES, RUNNING_ACCOUNTS } from '../../../../functions/src/corpTaxBookVersionKeys';
 import {
   collection,
@@ -70,7 +60,6 @@ import { readMemberObserved } from './memberObservedRead';
 
 type Data = Record<string, unknown>;
 
-// Parsers live in the engine (docShapes.ts); these types keep their old import path.
 export type { ClaimablePayment, HeldPayment, InReviewPayment, MemberFeederCoverage };
 
 export interface LoadedCorpBook {
@@ -79,54 +68,34 @@ export interface LoadedCorpBook {
   graceHours: number;
   hubId: string;
   oreForm: 'compressed' | 'raw';
-  /** The book's divisions, division 1 by default — where a donation should go. */
   divisions: number[];
-  /** The division to pay into first, when the book chose one (`primaryDivisionOf`). */
   primaryDivision?: number;
-  /** The corp's own names for those divisions, when a Director's visit stored them (#6161). */
   divisionNames?: DivisionNames;
-  /** Who a member's tax question is also mailed to; absent → the CEO. */
   taxContact?: TaxContact;
   rates: TaxRate[];
-  /** When an officer last synced it; absent when never. */
   lastSyncedAt?: string;
-  /** The last sync that read the wallet's donations (`PersonalBook.donationsCheckedAt`). */
   donationsCheckedAt?: string | null;
   observed: ObservedMiningEntry[];
   payments: TaxPayment[];
   held: HeldPayment[];
   claimable: ClaimablePayment[];
-  /** The tracked Characters' donations it holds for review without counting them (#6207). */
   inReview?: InReviewPayment[];
   dismissals: Dismissal[];
-  /** The tracked Characters' own Late notices. */
   notices: LateNotice[];
-  /** Their Miners' snapshots (`accounts/{minerId}.snapshot`), by Miner id. */
   checkpoints?: Map<string, RunningAccountCheckpoint>;
   miners: Miner[];
-  /** The tracked Characters this was read for — the ones whose lines it holds. */
   characterIds: number[];
-  /** Which of them are in the corporation now; none means every one has left (Leavers keep read access). */
   memberCharacterIds: number[];
-  /** Each moon owner's coverage and read clock, when the book lets this reader see them (#4622). */
   feeders?: MemberFeederCoverage[];
-  /** The tracked Characters' own corrections (#4622). */
   adjustments?: Adjustment[];
-  /** The tracked Characters' own officer write-offs (#4637). */
   writeOffs?: RecordedWriteOff[];
-  /** Declarations on their own Late notices (#6206); absent before the rules let members read them. */
   declarations?: Declaration[];
-  /** Their own Conflict disputes (#6206). */
   disputes?: OreDispute[];
-  /** Officers' per-day limits on what a shortfall of theirs may forgive. */
   toleranceExemptions?: ToleranceExemption[];
-  /** Each of their Miners' paid-through day, as the book recorded it. */
   minerPaidThrough?: Map<string, string>;
-  /** Refinery names, where a Late notice or ESI gave one (#4622). */
   structureNames?: Record<number, string>;
 }
 
-/** Refinery names the Late notices went out with; the officer side's placeholder is no name. */
 export function refineryNamesOf(
   notices: readonly Pick<LateNotice, 'names'>[]
 ): Record<number, string> {
@@ -142,7 +111,6 @@ export function refineryNamesOf(
   return out;
 }
 
-/** Names ESI gives the miner's own Characters for refineries no Late notice named. Never throws. */
 async function namesFromEsi(
   observed: readonly { structureId: number; characterId: number }[],
   known: Record<number, string>
@@ -158,37 +126,26 @@ async function namesFromEsi(
   return out;
 }
 
-/** A read the rules may not allow yet (a newer collection before its rules deploy): none, never a failed book. */
 const orNone = <T>(read: Promise<T>): Promise<T | null> => read.catch(() => null);
 
 function mergeById<T extends { id: string }>(lists: readonly (readonly T[])[]): T[] {
   return [...new Map(lists.flat().map((x) => [x.id, x])).values()];
 }
 
-/**
- * The books of the corporations the tracked Characters are in, each with those
- * Characters' own lines. A corp with no active book (D24) is simply absent;
- * a read that fails (offline, signed out, a lapsed grant) drops that corp
- * rather than the tab — the personal ledger never depends on it.
- */
 export async function loadCorpBooks(
   characters: readonly { characterId: number; corporationId: number }[]
 ): Promise<LoadedCorpBook[]> {
   return (await readCorpBooks(characters)).books;
 }
 
-/** The books read, and the corporations whose read threw (as opposed to a book that is gone or hidden). */
 export interface CorpBooksRead {
   books: LoadedCorpBook[];
   failed: number[];
 }
 
-/** `loadCorpBooks` that also says which reads failed, so a caller holding the last good book can keep it. */
 export async function readCorpBooks(
   characters: readonly { characterId: number; corporationId: number }[]
 ): Promise<CorpBooksRead> {
-  // A leaver keeps read access to their own lines, but nothing says which corp they left: remember
-  // each corporation whose book a Character has been read in.
   const remembered = await readRememberedCorps();
   const byCorp = new Map<number, { characterIds: Set<number>; members: Set<number> }>();
   const entry = (corporationId: number) => {
@@ -196,9 +153,7 @@ export async function readCorpBooks(
     byCorp.set(corporationId, held);
     return held;
   };
-  /** `${characterId}:${corporationId}` for each book whose pointer names the Character. */
   const billed = new Set<string>();
-  /** Characters whose pointer could not be read this load: their coverage is read live. */
   const unknown = new Set<number>();
   for (const c of characters) {
     entry(c.corporationId).characterIds.add(c.characterId);
@@ -206,7 +161,6 @@ export async function readCorpBooks(
     for (const corporationId of remembered[c.characterId] ?? []) {
       entry(corporationId).characterIds.add(c.characterId);
     }
-    // The books that bill this Character, whatever corporation they are in (#4517).
     const pointer = await readBilledBy(c.characterId);
     if (pointer === null) unknown.add(c.characterId);
     for (const corporationId of pointer ?? []) {
@@ -229,24 +183,17 @@ export async function readCorpBooks(
         )
       );
       if (!book) continue;
-      // ESI names what no Late notice did; no Firebase session needed for that.
       const named = book.structureNames ?? {};
       const structureNames = { ...named, ...(await namesFromEsi(book.observed, named)) };
       books.push({ ...book, structureNames, memberCharacterIds: [...members] });
       await rememberCorp(book.characterIds, corporationId);
     } catch {
-      // Quiet by design: see above.
       failed.push(corporationId);
     }
   }
   return { books, failed };
 }
 
-/**
- * The corporations whose books bill a Character, from the pointer the sync writes
- * (rules: only that Character reads it). A moon owner's miner is billed by a book
- * that is not their corporation's; nothing else would lead the client to it.
- */
 export function readBilledByPointer(d: Data | undefined): number[] {
   const books = d?.books;
   if (typeof books !== 'object' || books === null) return [];
@@ -255,7 +202,6 @@ export function readBilledByPointer(d: Data | undefined): number[] {
     .filter((id) => Number.isInteger(id) && id > 0);
 }
 
-/** The pointer's books, or null when it could not be read (offline, signed out). */
 async function readBilledBy(characterId: number): Promise<number[] | null> {
   try {
     return await underFirebaseSession(async () => {
@@ -270,7 +216,6 @@ async function readBilledBy(characterId: number): Promise<number[] | null> {
       );
     });
   } catch {
-    // Offline or signed out: the current and remembered corporations still load.
     return null;
   }
 }
@@ -293,33 +238,12 @@ async function rememberCorp(characterIds: readonly number[], corporationId: numb
       held[id] = [...new Set([...(held[id] ?? []), corporationId])];
     }
     await localDb.settings.put({ key: REMEMBERED_KEY, value: held });
-  } catch {
-    // A remembered corp is a convenience; the next read finds the book again.
-  }
+  } catch {}
 }
 
-/** A query's documents as plain data, the shape a book's parts are cached in. */
 type Docs = { id: string; data: Data }[];
 const docsOf = (snap: QuerySnapshot): Docs => snap.docs.map((d) => ({ id: d.id, data: d.data() }));
 
-/**
- * One book, with the Characters' own lines.
- *
- * Each part is reused from this tab's copy while the book's version marker
- * for its subcollection is unchanged (issue #5050, on #5047's marker; see
- * features/corp/taxBook/bookCache.ts), so an unchanged book costs its settings
- * document — and a ledger reload or Settle up's 10-minute recheck reads only
- * that, unless something was written.
- *
- * Serving a copy never outlives the member's access: every line here is
- * readable by its own `uid`/`uids` field alone (firestore.rules
- * `isOwnLine`/`isOnOwnLine`), so access only changes with a write, which moves
- * the stamp. The one part gated on anything else, `feederCoverage`
- * (`isBilledHere`: the Character's `corpTaxBookBilledBy` pointer, outside the
- * book and so never stamped), is served from the copy only while that pointer —
- * read fresh on every load — still names the book; when the pointer could not
- * be read it is read live, as before, and the rules decide.
- */
 async function readOneBook(
   corporationId: number,
   characterIds: readonly number[],
@@ -335,7 +259,6 @@ async function readOneBook(
   );
   const settings = readBookSettings(corporationId, bookDoc);
   if (!settings) {
-    // The book is gone or hidden from members: keep none of its lines on this device.
     for (const characterId of characterIds) await forgetMemberParts(characterId, corporationId);
     return null;
   }
@@ -362,7 +285,6 @@ async function readOneBook(
   for (const characterId of characterIds) {
     const uid = await ensureSignedIn(characterId);
     const memberFs = getSyncFirestore(characterId);
-    // Its own key: a member's copy holds only its own lines, never an officer's whole book.
     const key = `member:${characterId}:${corporationId}`;
     const store = memberPartStore(characterId, corporationId);
     const part = (name: string, field: 'uid' | 'uids'): Promise<Docs> =>
@@ -381,8 +303,6 @@ async function readOneBook(
           ),
         { store }
       );
-    // Readable by a Character the book bills; any one of them will do. Cached only
-    // while this load's pointer names the book; with no pointer read, live as before.
     const readCoverage = async () =>
       docsOf(await getDocs(collection(memberFs, root, 'feederCoverage')));
     const billing = feeders === null ? billedHere(characterId) : 'not-billed';
@@ -424,7 +344,6 @@ async function readOneBook(
       orNone(part('adjustments', 'uids')),
       orNone(part('writeOffs', 'uids')),
       coverageRead,
-      // #6206. A collection no write ever stamped holds nothing: no read.
       written('declarations') ? orNone(part('declarations', 'uids')) : Promise.resolve(null),
       written('disputes') ? orNone(part('disputes', 'uids')) : Promise.resolve(null),
       written('toleranceExemptions')
@@ -495,7 +414,6 @@ async function readOneBook(
   };
 }
 
-/** The tracked Characters' corporations, as last learned from ESI. */
 export async function trackedCharacterCorporations(): Promise<
   { characterId: number; corporationId: number }[]
 > {
@@ -507,10 +425,6 @@ export async function trackedCharacterCorporations(): Promise<
   );
 }
 
-/**
- * A player claims one of their own Unmatched donations (D5); audited server side. `inReview`: one
- * the sync held for an officer's review (#6207), which the player says was tax; never automatic.
- */
 export async function claimCorpTaxBookPayment(
   characterId: number,
   corporationId: number,
@@ -529,10 +443,6 @@ export async function claimCorpTaxBookPayment(
   });
 }
 
-/**
- * A Miner's own "I paid this another way" on one of their Late notices (#6206), with an optional
- * amount and note. It pauses Overdue until an officer confirms or rejects it.
- */
 export async function declareCorpTaxBookPayment(
   characterId: number,
   {
@@ -540,11 +450,9 @@ export async function declareCorpTaxBookPayment(
     ...input
   }: {
     corporationId: number;
-    /** The Late notice it is about, sent as `NOTICE_ID_FIELD`. */
     noticeId: string;
     amount?: number;
     note?: string;
-    /** The transfers from the member's wallet journal: checked against the book before any officer sees them. */
     transfers?: ClaimedTransfer[];
   }
 ): Promise<{ declarationId: string; checks?: ClaimCheck[]; confirmed?: boolean }> {
@@ -557,11 +465,6 @@ export async function declareCorpTaxBookPayment(
   });
 }
 
-/**
- * A Miner tells the book about a day (#6206): its ore went to another Payee (`payee`, the
- * default), or — resolving in the app — the book recorded too much ore, billed too high a rate,
- * or they will not pay it, each with their reason. An open one holds the day for 14 days.
- */
 export async function disputeCorpTaxBookConflict(
   characterId: number,
   input: {
@@ -583,7 +486,6 @@ export async function disputeCorpTaxBookConflict(
   });
 }
 
-/** A Miner takes back their own Conflict day dispute while no officer has answered it. */
 export async function withdrawCorpTaxBookDispute(
   characterId: number,
   input: { corporationId: number; date: string }
@@ -597,24 +499,15 @@ export async function withdrawCorpTaxBookDispute(
   });
 }
 
-/** The server's `MAX_LEARNED_SYSTEMS`: it refuses a longer call. */
 const MAX_LEARNED_SYSTEMS = 50;
-/** `corp:structure` already reported this session, so a reload does not send them again. */
 const reportedSystems = new Set<string>();
 
-/**
- * Tells each book the systems the member's own ledger places its moon owner refineries in
- * (#4650): a moon owner's rows rarely carry one, and only the miner holds their own ledger.
- * Each Character reports under its own session, for the refineries it mined at. Never throws:
- * the personal ledger never waits on, or breaks with, a book.
- */
 export async function teachRefinerySystems(
   books: readonly Pick<LoadedCorpBook, 'corporationId' | 'characterIds' | 'observed'>[],
   personal: readonly MiningLedgerEntry[]
 ): Promise<void> {
   for (const book of books) {
     for (const characterId of book.characterIds) {
-      // Matching is entries × ledger: skip what this session already reported first.
       const entries = book.observed.filter(
         (o) =>
           o.characterId === characterId &&
@@ -637,7 +530,6 @@ export async function teachRefinerySystems(
           );
         });
       } catch {
-        // Quiet by design: a later load tries again.
         for (const [id] of fresh) reportedSystems.delete(`${book.corporationId}:${id}`);
       }
     }

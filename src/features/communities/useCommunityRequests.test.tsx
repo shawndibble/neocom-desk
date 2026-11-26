@@ -18,7 +18,6 @@ const request = { id: 'r1' };
 beforeEach(() => {
   vi.resetAllMocks();
   vi.spyOn(console, 'warn').mockImplementation(() => undefined);
-  // No version: these tests read the whole board each time (the cache has its own tests).
   store.loadBoardVersion.mockResolvedValue(null);
   store.loadRequests.mockResolvedValue([request]);
   store.loadCommunityPledges.mockResolvedValue(new Map());
@@ -29,7 +28,6 @@ describe('useCommunityRequests', () => {
     let release: () => void = () => undefined;
     store.loadCommunityPledges.mockReturnValue(new Promise((r) => (release = () => r(new Map()))));
     renderHook(() => useCommunityRequests(1, 'c1', true));
-    // The Pledge read starts without waiting for the Requests to land.
     await waitFor(() => expect(store.loadCommunityPledges).toHaveBeenCalledTimes(1));
     release();
   });

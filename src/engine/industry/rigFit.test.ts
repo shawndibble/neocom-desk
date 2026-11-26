@@ -72,7 +72,6 @@ describe('rigBonusPct', () => {
   });
 
   it('applies EVE stacking penalty to a second same-type rig rather than adding it in full', () => {
-    // Two T1 ME rigs: 2% (full) + 2% * 0.869 (2nd-slot penalty) = 3.738%.
     const fit: readonly ['meT1', 'meT1', 'none'] = ['meT1', 'meT1', 'none'];
     expect(rigBonusPct(fit, 'me', 'manufacturing', 'highsec')).toBeCloseTo(3.738, 10);
   });
@@ -80,8 +79,6 @@ describe('rigBonusPct', () => {
   it('ranks stacking penalty by the strongest rig first regardless of slot order', () => {
     const weakFirst: readonly ['meT1', 'meT2', 'none'] = ['meT1', 'meT2', 'none'];
     const strongFirst: readonly ['meT2', 'meT1', 'none'] = ['meT2', 'meT1', 'none'];
-    // Both orderings: the T2 (2.4%) rig is always the unpenalized one, the T1
-    // (2%) rig always takes the 0.869 second-slot penalty.
     const expected = 2.4 + 2 * 0.869;
     expect(rigBonusPct(weakFirst, 'me', 'manufacturing', 'highsec')).toBeCloseTo(expected, 10);
     expect(rigBonusPct(strongFirst, 'me', 'manufacturing', 'highsec')).toBeCloseTo(expected, 10);

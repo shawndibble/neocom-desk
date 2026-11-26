@@ -78,7 +78,6 @@ describe('overdueStatus', () => {
       now: '2026-08-29T00:00:00Z',
       declarations: [declaration('2026-08-10T00:00:00Z')],
     });
-    // Paused 14 of the 14 days: Overdue moves from 15 Aug to 29 Aug.
     expect(status).toMatchObject({
       state: 'overdue',
       overdueAt: '2026-08-29T00:00:00.000Z',
@@ -136,7 +135,6 @@ describe('overdueStatus', () => {
         }),
       ],
     });
-    // Only the two days it waited count, as for a confirmed one.
     expect(status).toMatchObject({ state: 'overdue', overdueAt: '2026-08-17T00:00:00.000Z' });
   });
 });

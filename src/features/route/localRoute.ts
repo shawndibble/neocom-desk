@@ -1,22 +1,3 @@
-/**
- * Route distances from the local stargate graph (issue #942) — what every
- * jump count in the app runs on (`jumpBasis.ts`), with no ESI `/route/`
- * request, so it costs nothing per pair and never touches the shared error
- * budget.
- *
- * This is what makes a distance affordable across a whole table: both
- * snapshots are local files indexed once per session, so resolving a page of
- * rows costs no requests at all and never touches the shared error budget.
- *
- * Three outcomes, and keeping them apart is the point:
- * - a route, with the systems it crosses;
- * - `no-route`, a fact about New Eden (wormhole space has no stargates, and
- *   some ids genuinely do not connect);
- * - `unknown`, meaning a snapshot could not be read and this app cannot say.
- *
- * Collapsing the last two would let an offline first visit report "no gate
- * route exists" for every haul in the game.
- */
 import { crossesHole, findFlownRoute, flownJumpDistancesFrom } from '@/engine/route/holeDetour';
 import {
   type FindJumpRouteOptions,
@@ -32,22 +13,8 @@ import { loadJumpGraph } from '@/sde/jumpGraph';
 import type { RouteRules } from './routeRules';
 import { loadSolarSystemsById } from '@/sde/solarSystems';
 
-/**
- * What a route is asked under: the Travel Settings, or a page's own preference
- * over them. Every entry point takes these explicitly rather than reading the
- * settings here: callers compute inside effects keyed on their inputs, and
- * rules read behind their back would never re-run them when they change.
- */
 export type LocalRouteRules = Partial<RouteRules>;
 
-/**
- * Connections beyond the stargates, and the systems they make free — the open
- * Thera / Turnur holes (issue #2476) and known Ansiblex bridges, as
- * `useJumpBasis` builds them from the pilot's Route Safety settings. Every
- * count passes the same ones, and drops a hole route longer than the gates as
- * Route Safety does (`engine/route/holeDetour.ts`), so every count matches the
- * route Route Safety draws.
- */
 export type RouteGraphExtras = Pick<FindJumpRouteOptions, 'extraConnections' | 'freeSystems'>;
 
 function engineOptions(
@@ -67,15 +34,6 @@ function engineOptions(
 
 export type LocalRouteResult = JumpRouteResult | { kind: 'unknown' };
 
-/**
- * A security lookup for the pathfinder, or `undefined` where there is nothing
- * to bias on.
- *
- * `shortest` never consults security, so it does not pay for `systems.json`
- * (~98 KB gzipped) at all; a biased preference that cannot read the snapshot
- * degrades to shortest rather than pretending to a safety judgement it has no
- * data for.
- */
 async function securityLookupFor(
   preference: RoutePreferenceKind
 ): Promise<((systemId: number) => number | undefined) | undefined> {
@@ -84,20 +42,10 @@ async function securityLookupFor(
   return systems ? (systemId) => systems.get(systemId)?.security : undefined;
 }
 
-/** The jump graph and the security lookup one search under `rules` needs. */
 function loadSearchContext(rules: LocalRouteRules) {
   return Promise.all([loadJumpGraph(), securityLookupFor(rules.preference ?? 'shortest')]);
 }
 
-/**
- * The stargate route between two solar systems under one preference.
- *
- * Never throws and never rejects: an unreadable graph answers `unknown`, the
- * same contract `lookupSolarSystem` and `lookupNpcStation` already follow.
- *
- * For many destinations from one origin, reach for `localJumpDistances`
- * instead — one sweep answers all of them for about what two of these cost.
- */
 export async function findLocalRoute(
   originSystemId: number,
   destinationSystemId: number,
@@ -114,15 +62,9 @@ export async function findLocalRoute(
   );
 }
 
-/** A jump count, or which of the two reasons there isn't one. */
 export type LocalJumpsResult =
   { kind: 'known'; jumps: number } | { kind: 'no-route' } | { kind: 'unknown' };
 
-/**
- * Deliberately not `engine/jumpsAway.ts`'s `JumpsAwayResult`: its two reasons
- * are the Assets page's own, and neither can say "a snapshot could not be
- * read".
- */
 export async function findLocalJumps(
   originSystemId: number,
   destinationSystemId: number,
@@ -136,15 +78,6 @@ export async function findLocalJumps(
 export type LocalJumpDistances =
   { kind: 'known'; jumps: ReadonlyMap<number, number> } | { kind: 'unknown' };
 
-/**
- * Jumps from one origin to every system it can reach, in one pass — the shape
- * a table ranking hauls by distance should use.
- *
- * A system absent from the map is unreachable by stargate. The result is
- * wrapped rather than returned bare because an empty map from an unreadable
- * snapshot would otherwise be indistinguishable from an origin that reaches
- * nothing, and those are the two meanings this module exists to keep apart.
- */
 export async function localJumpDistances(
   originSystemId: number,
   rules: LocalRouteRules = {},
@@ -161,18 +94,6 @@ export async function localJumpDistances(
 export type LocalRoutesFromOrigin =
   { kind: 'known'; routes: ReadonlyMap<number, number[] | null> } | { kind: 'unknown' };
 
-/**
- * The route from each of `systemIds` to `originSystemId`, from one sweep out
- * of the origin — the shape for many colonies to one hub, where a search per
- * colony is the fan-out `routeExposure` warns against.
- *
- * Each route is flown toward the origin: the sweep's path out, reversed. A
- * `null` route is a system no stargate joins to the origin. Under a biased
- * preference the reverse of the outbound route can differ from the best inbound
- * one by an equal-cost tie; jump counts and security exposure are unchanged
- * for `shortest`. A route over a hole longer than the gates is re-searched as
- * `findLocalRoute` would, so only that rare case costs a search of its own.
- */
 export async function localRoutesFromOrigin(
   originSystemId: number,
   systemIds: readonly number[],
@@ -202,17 +123,6 @@ export async function localRoutesFromOrigin(
 export type LocalJumpCounts =
   { kind: 'known'; counts: readonly (number | null)[] } | { kind: 'unknown' };
 
-/**
- * Jumps for a whole table of routes in one pass — the shape a board ranking
- * hauls by distance wants, and the only one that does not scale with row
- * count.
- *
- * A `null` count is a haul with no distance to give: an end in a player
- * structure this app cannot place, or two ends no stargate connects. That is
- * per row. `unknown` is the whole answer being unavailable because the graph
- * could not be read — a board shows the first as an unavailable cell and the
- * second as a column that cannot be ranked at all.
- */
 export async function localJumpCountsForRoutes(
   routes: readonly RouteEnds[],
   rules: LocalRouteRules = {},
@@ -226,20 +136,10 @@ export async function localJumpCountsForRoutes(
   };
 }
 
-/**
- * `graph` is the stargate map the trip was planned on, for telling a gate step
- * from a hole; `options` the search it was planned under, holes and all, for
- * weighing a leg's other ways the same way (`engine/route/legWays.ts`).
- */
 export type LocalTripResult =
   | { kind: 'trip'; plan: TripPlan; graph: JumpGraph; options: FindJumpRouteOptions }
   | { kind: 'unknown' };
 
-/**
- * A trip from `start` through several Stops (issue #2475): every leg, and the
- * cheapest stop order when asked, all under the same rules a single route is
- * drawn with — the graph and security lookup load once for the whole trip.
- */
 export async function planLocalTrip(
   start: number,
   stops: readonly number[],
@@ -258,11 +158,6 @@ export async function planLocalTrip(
   };
 }
 
-/**
- * A haul route (issue #4965) for a Move plan's pickups, counted on the same
- * graph and rules as every other jump. `unknown` is a stargate snapshot that
- * could not be read.
- */
 export async function planLocalHaul(
   input: Omit<HaulInput, 'graph' | 'options'>,
   rules: LocalRouteRules = {},

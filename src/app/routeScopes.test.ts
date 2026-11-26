@@ -1,5 +1,4 @@
 import { describe, it, expect } from 'vitest';
-// Raw source of the route table, for the "no hand-written route" check below.
 import appSource from './App.tsx?raw';
 import {
   ROUTE_REQUIREMENTS,
@@ -23,22 +22,14 @@ describe('scope derivation', () => {
   });
 
   it('drops PUBLIC endpoints, so a route reading only public data needs nothing', () => {
-    // /assets also calls getUniverseStation, getUniverseSystem,
-    // postUniverseNames and getUniverseType — all PUBLIC, so exactly one
-    // scope survives.
     expect(requiredScopesForRoute('/assets')).toHaveLength(1);
   });
 
   it('requires nothing for an ungated route, including the character-agnostic Market Browser', () => {
-    // /market reads SDE + Fuzzwork only. Login-required and scope-required are
-    // different things; the gate must not conflate them.
     expect(requiredScopesForRoute('/market')).toEqual([]);
     expect(requiredScopesForRoute('/overview')).toEqual([]);
     expect(requiredScopesForRoute('/skills')).toEqual([]);
     expect(requiredScopesForRoute('/industry')).toEqual([]);
-    // /contracts is the other shape of ungated: History does need
-    // read_character_contracts, but the page gates it per tab so the Search
-    // tab it lands on — a shared public snapshot — is reachable without it.
     expect(requiredScopesForRoute('/contracts')).toEqual([]);
   });
 
@@ -94,11 +85,6 @@ describe('gated routes', () => {
   });
 });
 
-/**
- * Mirrors `App.tsx`'s `satisfies Record<AppRoutePath, ReactElement>`, which
- * cannot be observed at runtime: one test proves the tables agree, one proves
- * nobody bypassed the table with a hand-written route element.
- */
 describe('every route must declare its scope requirement', () => {
   const elementBlock = /const ROUTE_ELEMENTS = \{([\s\S]*?)\n\} satisfies/.exec(appSource)?.[1];
 
@@ -112,8 +98,6 @@ describe('every route must declare its scope requirement', () => {
   });
 
   it('has no hand-written feature <Route path="...">, which would skip both checks', () => {
-    // Everything outside the gated area, listed deliberately: adding a path
-    // here asserts the route needs no Character and no scope.
     const literalPaths = [...appSource.matchAll(/<Route\s+path="([^"]+)"/g)].map((m) => m[1]);
     expect(literalPaths.sort()).toEqual([
       '*',

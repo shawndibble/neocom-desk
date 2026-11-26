@@ -1,15 +1,3 @@
-/**
- * Settings > Notifications' Topics: every Notification Event once, filed under
- * seven Topics (`topics.ts`), each row speaking for all Characters (see
- * `AggregateRow`). Corp keeps its shared best-effort note and one permission
- * line, and EVE notifications close the list.
- *
- * Desktop: tabs across the top, each with its event count, one table per
- * Topic. Phone: a list of Topics, each with a one-line state, drilling into
- * the Topic (the `topic` URL param, so Back returns to the list). A search
- * shows the matches of every Topic in one stack instead, listing under the EVE
- * notifications row only the EVE types it matched.
- */
 import { Tabs, TabPanel, useTabsId } from '@/components/ui';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import * as Icon from '@/components/ui/icons';
@@ -29,7 +17,6 @@ import { isEventEnabledFor } from './eventSelection';
 import { characterEventPrefs } from './preferences';
 import { notificationTopics, summarizeTopic, TOPIC_IDS, type Topic } from './topics';
 
-/** Module scope so `useUrlParam` sees a stable codec identity across renders. */
 const TOPIC_PARAM = enumParam(['', ...TOPIC_IDS] as const, '');
 
 export function NotificationEventList({
@@ -42,9 +29,7 @@ export function NotificationEventList({
   eventIds: readonly NotificationEventId[];
   context: EventRowContext;
   extraTypesByCharacter: ReadonlyMap<number, readonly string[]>;
-  /** A search is active: show every matching Topic in one stack, not one at a time. */
   searching?: boolean;
-  /** While searching, the EVE types the query matched (`visibleEveTypes`); none means the row shows no types. */
   eveTypes?: ReadonlySet<string>;
 }) {
   const { t } = useTranslation();
@@ -151,7 +136,6 @@ export function NotificationEventList({
   );
 }
 
-/** Whether one Character can use one event: scope and corp role, as the row says. */
 function canUse(context: EventRowContext, eventId: NotificationEventId, characterId: number) {
   return eventApplicability(
     eventId,
@@ -160,7 +144,6 @@ function canUse(context: EventRowContext, eventId: NotificationEventId, characte
   ).rowEnabled;
 }
 
-/** "Device 3 · Alerts 3 of 3", or for Corp with nobody able to use it, why. */
 function TopicStateLine({ topic, context }: { topic: Topic; context: EventRowContext }) {
   const { t } = useTranslation();
   const summary = summarizeTopic(
@@ -193,14 +176,11 @@ function TopicTable({
   topic: Topic;
   context: EventRowContext;
   extraTypesByCharacter: ReadonlyMap<number, readonly string[]>;
-  /** A search's matched EVE types, or null for the whole list. */
   eveTypeFilter: ReadonlySet<string> | null;
 }) {
   const { t } = useTranslation();
-  // Every corp event rides the one opt-in Corporation Permission, so the Topic says it once.
   const corpMissing =
     topic.id === 'corp' ? missingPermissionSummary(topic.eventIds, context) : null;
-  // When nobody can use any corp event, that one line says it; rows don't repeat "None can use this".
   const nobodyCanUse =
     topic.id === 'corp' &&
     !topic.eventIds.some((eventId) =>

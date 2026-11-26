@@ -1,7 +1,3 @@
-/**
- * Show Info › Interactions, Corporation scope: the corp wallet, corp contracts and killmails with
- * the player. Pure mapping; `corpFacts.ts` does the loading.
- */
 import type { Contract, WalletJournalEntry } from '@/esi/endpoints';
 import type { Interaction } from '@/engine/interactions/interactions';
 import { formatIskCompact } from '@/lib/isk';
@@ -16,16 +12,11 @@ const WALLET_TYPE: Record<string, string> = {
   corporation_account_withdrawal: 'payment',
 };
 
-/** A corp journal row with the player, dated and signed from the corp's side. `division` is the wallet division. */
 export interface CorpJournalRow {
   division: number;
   entry: WalletJournalEntry;
 }
 
-/**
- * Corp wallet rows with `otherId`. A row the corp book already lists as a tax payment
- * (`bookPaymentIds`) and a row that only carries a contract's price are left out.
- */
 export function corpWalletInteractions(
   rows: readonly CorpJournalRow[],
   otherId: number,
@@ -85,7 +76,6 @@ function contractState(c: Contract): { state: string; tone: Interaction['stateTo
   }
 }
 
-/** Corp contracts the player issued, was assigned or accepted. */
 export function corpContractInteractions(
   contracts: readonly Contract[],
   otherId: number,
@@ -119,22 +109,14 @@ export function corpContractInteractions(
   return out;
 }
 
-/** One killmail between the corp and the player. */
 export interface CorpKill {
   killmailId: number;
-  /** Epoch ms. */
   at: number;
-  /** `weLost`: a corp pilot died with the player on it. `weKilled`: a corp pilot got the kill, the player died. */
   side: 'weLost' | 'weKilled';
   value: number | null;
-  /** The corp's SRP paid this loss. */
   srpPaid: boolean;
 }
 
-/**
- * Which of the player's killmails involve a corp member: their kills with a member as the victim
- * are corp losses, their losses with a member among the attackers are corp kills.
- */
 export function classifyCorpKills(
   lists: { kills: readonly KillInvolvement[]; losses: readonly KillInvolvement[] },
   isMember: (characterId: number) => boolean,

@@ -83,7 +83,6 @@ describe('loadContractItemsDetailed', () => {
     expect(first.result?.data).toEqual(items);
     const again = await loadContractItemsDetailed(CHAR_ID, 21);
     expect(again.networkRead).toBe(false);
-    // A fresh row is `fromCache: false` in production: it is not the signal.
     expect(again.result?.fromCache).toBe(false);
     expect(hits).toBe(1);
   });

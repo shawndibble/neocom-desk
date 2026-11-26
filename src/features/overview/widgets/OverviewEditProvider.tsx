@@ -1,17 +1,3 @@
-/**
- * Owns Customize mode and every layout edit (see `editContext.ts`).
- *
- * - Entering Customize snapshots the layout; Cancel writes that snapshot back
- *   exactly, Done keeps what is there.
- * - A change that can be undone (add, remove, resize, duplicate, reset, a role
- *   replacing the layout) raises one `Toast` with an Undo. That toast is
- *   persistent by design (it carries an action; docs/DESIGN.md §6c, WCAG
- *   2.2.1), and Cancel drops it because its `undoTo` is older than the snapshot.
- *   Done drops one raised while Customizing too; one raised from a widget's
- *   settings menu outside Customize stays until dismissed.
- * - A widget leaving takes its focus target with it, so focus moves to its
- *   neighbour (or the edit bar) rather than falling to the top of the page.
- */
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Toast } from '@/components/ui';
@@ -56,7 +42,6 @@ import { useWidgetBoard } from './board';
 import { kindSumsAcrossCharacters } from './data/models';
 import { visibleWidgets } from './visibility';
 
-/** Whether a widget of `kind` would sum across Characters with the settings it is created with. */
 function sumsAsCreated(kind: string, show?: WidgetShow): boolean {
   const created = newWidget(kind, 'new', show);
   return created !== null && kindSumsAcrossCharacters(kind, created);
@@ -74,7 +59,6 @@ interface OverviewEditProviderProps {
 interface UndoToast {
   message: string;
   to: OverviewLayout;
-  /** Raised while Customize was open, so Done retires it with the bar. */
   inCustomize: boolean;
 }
 
@@ -92,8 +76,6 @@ export function OverviewEditProvider({
   const snapshot = useRef<OverviewLayout | null>(null);
   const pendingFocus = useRef<{ id: string | null } | null>(null);
 
-  // Actions read the latest layout, not the one their closure was made with, so
-  // two changes in one tick (a drop, then the toast's own render) compose.
   const layoutRef = useRef(layout);
   useEffect(() => {
     layoutRef.current = layout;
@@ -133,7 +115,6 @@ export function OverviewEditProvider({
     return () => clearTimeout(timer);
   }, [flashId]);
 
-  // Move focus to where the pilot was working once a removed widget is gone.
   useEffect(() => {
     const pending = pendingFocus.current;
     if (pending === null) return;
@@ -180,9 +161,6 @@ export function OverviewEditProvider({
         if (before !== null) commit(restoreLayout(before));
       },
       add: (kind, init) => {
-        // A new widget opens on All characters wherever its kind can sum them (the Overview's
-        // default; the Corp Board's named kinds). A preset that reads one corporation (the
-        // corp wallet on Flow) stays on it.
         const opensOnAll =
           (boardRef.current.id === 'overview' || boardRef.current.opensOnAll.has(kind)) &&
           sumsAsCreated(kind, init?.show);
@@ -237,8 +215,6 @@ export function OverviewEditProvider({
           setAllScopesUndoable(
             layoutRef.current,
             scope,
-            // On the Overview a kind that cannot sum stays where it is; on the Corp Board it is
-            // put on All too, so it asks which corporation instead of quietly reading one.
             (w) =>
               scope !== 'all' ||
               boardRef.current.id === 'corp' ||

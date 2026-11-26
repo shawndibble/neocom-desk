@@ -23,7 +23,6 @@ const row = {
   date: '2026-11-06',
   recordKey: '7:1000:2026-11-06',
   oreLines: [{ typeId: 45490, quantity: 100 }],
-  // The member's own record has less ore: there is something to dispute.
   personalOreLines: [{ typeId: 45490, quantity: 90 }],
   billed: 1_840_320,
   taxOwed: 1_840_320,
@@ -64,7 +63,6 @@ describe('ResolveDialog', () => {
     expect(screen.getByRole('radio', { name: /I don't owe this/ })).toBeChecked();
   });
 
-  // The "f-it" way out: one click, nothing sent, and honest about the bill.
   it('hides a problem on this device without sending anything', async () => {
     const user = userEvent.setup();
     const props = open({ ...base, kind: 'figure', bookAsksMore: true });
@@ -163,7 +161,6 @@ describe('ResolveDialog', () => {
     expect(screen.queryByRole('radio', { name: /I don't owe this/ })).toBeNull();
   });
 
-  // The hold does not renew, and the member can say it again.
   it('lets the member say it again after an officer kept the bill, and says the hold does not renew', async () => {
     const user = userEvent.setup();
     submit.tellNotOwed.mockClear();

@@ -18,11 +18,6 @@ import {
   triggerSyncMock,
 } from '@/test/skillPlansMocks';
 
-// Shared harness for the SkillPlans route tests (src/routes/SkillPlans*.test.tsx),
-// one file per concern so CI runs them in parallel. The `vi.mock` calls stay in
-// each test file (vitest hoists them per file); their factories live in
-// skillPlansMocks.tsx.
-
 export const CHAR_ID = 91;
 export const attributesPayload = {
   charisma: 19,
@@ -46,8 +41,6 @@ export const server = mswServer(
       { skill_id: 3, queue_position: 1, finished_level: 1 },
     ])
   ),
-  // Loaded alongside attributes for the What-If Implants lens (PlanEditor);
-  // no test in this file exercises real implant bonuses, so no implants.
   http.get(`https://esi.evetech.net/characters/${CHAR_ID}/implants`, () => HttpResponse.json([])),
   http.get(`https://esi.evetech.net/universe/types/${RIFTER_TYPE_ID}`, () =>
     HttpResponse.json({
@@ -57,8 +50,8 @@ export const server = mswServer(
       group_id: 25,
       published: true,
       dogma_attributes: [
-        { attribute_id: 182, value: 1.0 }, // requires Gunnery (typeID 1)...
-        { attribute_id: 277, value: 3.0 }, // ...level III
+        { attribute_id: 182, value: 1.0 },
+        { attribute_id: 277, value: 3.0 },
       ],
     })
   )
@@ -76,20 +69,10 @@ export function seedPlan(overrides: Partial<SkillPlanRecord> = {}): SkillPlanRec
   };
 }
 
-/** Most editor-focused tests below seed a single plan and want its editor
- * page open immediately, rather than exercising the list-click navigation
- * that `SkillPlans CRUD` already covers. */
 export function goToPlanEditor(id = 'plan-1') {
   window.history.pushState({}, '', `/skills/plans/${id}`);
 }
 
-/**
- * Below `lg` — where jsdom's stub `matchMedia` always lands — the plan's
- * tools (optimize/marker actions, the what-if lens, import/export) sit in a
- * collapsed disclosure, so the plan itself leads the page. Editor tests open
- * it before reaching for anything inside. Doubles as the "editor is up" wait,
- * and is a no-op once open.
- */
 export async function openPlanTools() {
   await screen.findByText('Your entries');
   const toggle = screen.queryByRole('button', { name: /plan tools/i });
@@ -98,11 +81,6 @@ export async function openPlanTools() {
   }
 }
 
-/**
- * Alpha, What-if implants, Booster and Skill injectors sit one level inside
- * Plan tools, under a closed-by-default Assumptions row. Opens it; call after
- * `openPlanTools`.
- */
 export async function openAssumptions() {
   const toggle = screen.getByRole('button', { name: /^assumptions/i });
   if (toggle.getAttribute('aria-expanded') === 'false') {
@@ -110,24 +88,16 @@ export async function openAssumptions() {
   }
 }
 
-/** Opens the Actions section's "Optimize" dropdown and clicks one of its mode items (#1411). */
 export async function clickOptimizeMode(user: ReturnType<typeof userEvent.setup>, name: string) {
   await user.click(screen.getByRole('button', { name: 'Optimize' }));
   await user.click(screen.getByRole('menuitem', { name }));
 }
 
-/**
- * The tools-pane section a heading titles (Actions / Attributes /
- * Import / Export). `closest('section')`, not `parentElement`: a heading
- * shares a flex row with its section's optional right-aligned actions (the
- * Attributes section's `DataAgeBadge`).
- */
 export function toolsSection(title: string): HTMLElement {
   const section = screen.getByRole('heading', { name: title }).closest('section');
   if (!section) throw new Error(`expected the "${title}" tools section`);
   return section as HTMLElement;
 }
-/** The clipboard writer the current test installed; replaced on every reset. */
 export const clipboard: { writeText: ReturnType<typeof vi.fn<ClipboardWriter>> } = {
   writeText: vi.fn<ClipboardWriter>(),
 };
@@ -162,18 +132,9 @@ export async function resetSession() {
   window.history.pushState({}, '', '/skills/plans');
 }
 
-/**
- * Per-test session reset plus one warm-up render per file. `app: true` is for
- * the few tests that boot the whole `<App />` (route wiring); the rest render
- * the Skills pages alone with `renderSkillsRoutes` (src/test/skillsRoutes.tsx).
- */
 export function installSkillPlansHarness({ app = false }: { app?: boolean } = {}): void {
   beforeAll(async () => {
-    // One throwaway render of the plans page, so no test pays for the first one:
-    // a worker's first render (lazy route chunks, jsdom, React warm-up) is
-    // seconds, and it landed on whichever test ran first, past its 1s findBy.
     await resetSession();
-    // Imported only here, so a file that never boots `App` never loads its graph.
     const App = app ? (await import('@/app/App')).App : null;
     if (app) {
       const routeChunks = await import('@/app/routeChunks');
@@ -190,7 +151,6 @@ export function installSkillPlansHarness({ app = false }: { app?: boolean } = {}
   beforeEach(resetSession);
 }
 
-/** Opens the "All plans" popover from the plan card. */
 export async function openAllPlans(user: ReturnType<typeof userEvent.setup>) {
   await user.click(await screen.findByRole('button', { name: 'All plans' }));
   return screen.findByRole('dialog', { name: 'All plans' });

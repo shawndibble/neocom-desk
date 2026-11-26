@@ -1,15 +1,3 @@
-/**
- * What the fitting editor says in place of data that never arrived. Two
- * downloads feed it, and each can be missing offline on a first visit: the
- * item catalogue (names, market groups, variations) and the ship data (the
- * ~10 MB dogma engine). A note says which is missing and whether a
- * connection is the cure, with a Retry; both also try again by themselves
- * when the connection returns (`onReconnect`), so Retry is for the lie-fi
- * case where the browser still thinks it is online.
- *
- * Each note's wrapper stays mounted through Retry and takes focus at the
- * click (`useRetryFocus`'s `hold`), so focus is never left on `<body>`.
- */
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui';
@@ -29,7 +17,6 @@ function FailedNote({
   failed: boolean;
   message: string;
   onRetry: () => void;
-  /** What shows while it is not failed. */
   children: ReactNode;
 }) {
   const { t } = useTranslation();
@@ -61,10 +48,6 @@ function FailedNote({
   );
 }
 
-/**
- * In place of "Loading items…": loading while it loads, an offline-aware
- * failure with Retry once it has not.
- */
 export function CatalogueLoadingNote() {
   const { t } = useTranslation();
   const failed = useFittingCatalogueFailed();
@@ -80,12 +63,6 @@ export function CatalogueLoadingNote() {
   );
 }
 
-/**
- * In place of "Ship data is still downloading…": that only while it is
- * downloading. When the download failed it says so, offline-aware, with
- * Retry. Idle or ready, there is nothing to wait for: the engine is not
- * what the panel is waiting on, so it stays quiet.
- */
 export function ShipDataWaitingNote() {
   const { t } = useTranslation();
   const status = useDogmaEngineStatus();

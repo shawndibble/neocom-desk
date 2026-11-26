@@ -1,8 +1,3 @@
-/**
- * Modal for a widget row with a `detail` (DESIGN §6c): an optional status line,
- * its facts, optional bars and list, then where it is. Set destination goes to
- * the EVE client; the jump count links to Route Safety.
- */
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Eyebrow, Modal, ProgressBar, STAT_CHIP_TONE_TEXT_CLASS } from '@/components/ui';
@@ -19,8 +14,6 @@ function Place({ place }: { place: NonNullable<RowDetailModel['place']> }) {
     <SetDestinationButton
       locationId={place.structureId ?? place.systemId}
       placeName={place.name}
-      // With no jump count there is nothing to read out, so the default "View route" button
-      // (a sibling of Set destination) beats a bare text link; a count stays a readout link.
       routeLink={
         place.jumps === undefined ? undefined : (
           <JumpsLink
@@ -45,8 +38,6 @@ function Status({ status }: { status: NonNullable<RowDetailModel['status']> }) {
   );
 }
 
-/** Label-over-value grid (not `ValueList`, which puts the value at the line end): a long value stays under its label. */
-/** Facts as a two-column grid: the label sits over its value, so nothing wraps beside a neighbour. */
 function Facts({ facts }: { facts: RowDetailModel['facts'] }) {
   return (
     <dl className="grid grid-cols-2 gap-x-6 gap-y-4">

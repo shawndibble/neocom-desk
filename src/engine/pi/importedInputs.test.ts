@@ -5,14 +5,12 @@ import type { PlanetPin } from '@/esi/endpoints';
 import type { PiData } from '@/sde/types';
 import { importedInputs } from './importedInputs';
 
-// The shipped payload: these figures are claims about the real schematic set.
 const pi = JSON.parse(
   readFileSync(resolve(process.cwd(), 'public/data/pi.json'), 'utf8')
 ) as PiData;
 
 const MICROORGANISMS = 2073;
 const AQUEOUS_LIQUIDS = 2268;
-/** Schematic ids: Bacteria (from Microorganisms), Water (from Aqueous Liquids), Test Cultures (from both). */
 const BACTERIA = 131;
 const WATER = 121;
 const TEST_CULTURES = 86;
@@ -37,7 +35,6 @@ const extractor = (pinId: number, productTypeId?: number): PlanetPin => ({
 
 describe('importedInputs', () => {
   it('says how much of an input nothing on the colony makes the factories eat per day', () => {
-    // One Bacteria factory eats 3,000 Microorganisms per 1,800 s cycle: 48 cycles a day.
     const [line, ...rest] = importedInputs([factory(1, BACTERIA)], pi);
     expect(rest).toEqual([]);
     expect(line).toEqual({
@@ -70,8 +67,6 @@ describe('importedInputs', () => {
   });
 
   it('sums factories that share one imported input and orders the lines by m³ a day', () => {
-    // Bacteria and Water each draw 144,000 a day of different P0s; Test Cultures draws two
-    // imported P1s (40 per 3,600 s cycle = 960 a day each), far fewer m³ than the P0s.
     const lines = importedInputs(
       [factory(1, BACTERIA), factory(2, BACTERIA), factory(3, WATER), factory(4, TEST_CULTURES)],
       pi

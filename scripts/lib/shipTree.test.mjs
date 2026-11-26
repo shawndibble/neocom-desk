@@ -1,24 +1,16 @@
 import { describe, it, expect } from 'vitest';
 import { buildShipTree, tidyDescription } from './shipTree.mjs';
 
-/** Turns a header + data-row lists into the array-of-arrays shape `parseCsv` returns. */
 function rows(header, ...data) {
   return [header, ...data];
 }
 
-/**
- * A minimal fixture covering: a normal hull (Rifter-like, 587), a T3
- * cruiser-like hull with no dgmTypeAttributes rows at all (2001), and rows
- * that must each fail exactly one hull-filter condition (999 unpublished,
- * 1000 wrong category, 1001 unknown Ship Tree class, 1002 unknown Ship Tree
- * faction).
- */
 function csv() {
   return {
     invGroups: rows(
       ['groupID', 'categoryID', 'groupName'],
-      ['25', '6', 'Frigate'], // ship category
-      ['99', '7', 'Widget'] // non-ship category
+      ['25', '6', 'Frigate'],
+      ['99', '7', 'Widget']
     ),
     invTypes: rows(
       [
@@ -32,7 +24,6 @@ function csv() {
         'shipTreeGroupID',
         'published',
       ],
-      // Valid hull.
       [
         '587',
         '25',
@@ -44,15 +35,10 @@ function csv() {
         '8',
         '1',
       ],
-      // T3-cruiser-like hull: no dgmTypeAttributes rows will reference it.
       ['2001', '25', 'Tengu', 'A Strategic Cruiser.', '500001', '0', '2', '8', '1'],
-      // Excluded: unpublished.
       ['999', '25', 'Unpublished Hull', '', '500001', '0', '1', '8', '0'],
-      // Excluded: group is not category 6.
       ['1000', '99', 'Not A Ship', '', '500001', '0', '1', '8', '1'],
-      // Excluded: shipTreeGroupID isn't a real Ship Tree class (junk on a non-ship row's analog).
       ['1001', '25', 'Unknown Class Hull', '', '500001', '0', '1', '999', '1'],
-      // Excluded: factionID isn't a Ship Tree faction (mirrors the Capsule, faction 500005).
       ['1002', '25', 'Capsule-like Hull', '', '500005', '0', '1', '8', '1']
     ),
     shipTreeGroups: rows(
@@ -63,7 +49,6 @@ function csv() {
         'Small, fast, fragile.',
         'res:/UI/Texture/Classes/ShipTree/groupIcons/frigate.png',
       ],
-      // A class with no hulls at all — still expected in the output.
       [
         '23',
         'Battlecruiser',
@@ -74,13 +59,11 @@ function csv() {
     shipTreeGroupPreReqSkills: rows(
       ['groupID', 'factionID', 'skillID', 'level', 'display'],
       ['8', '500001', '3327', '1', '1'],
-      // display=0: an implicit prereq the game doesn't draw.
       ['8', '500002', '3327', '1', '0']
     ),
     shipTreeFactions: rows(
       ['factionID', 'description'],
       ['500001', 'Favor missiles and Hybrid Turrets.'],
-      // No hull carries this faction — must be dropped from the output.
       ['500099', 'Unused faction.']
     ),
     chrFactions: rows(
@@ -91,9 +74,7 @@ function csv() {
     shipSkills: rows(['typeID', 'skillID', 'level'], ['587', '3327', '1']),
     invTraits: rows(
       ['typeID', 'skillID', 'bonus', 'bonusText', 'unitID'],
-      // Role bonus (skillID -1), a plain number, unit %.
       ['587', '-1', '10', 'bonus to <a href=showinfo:3336>ship</a> max velocity', '105'],
-      // Per-skill-level trait.
       [
         '587',
         '3329',
@@ -101,7 +82,6 @@ function csv() {
         'bonus to <a href=showinfo:3302>Small Projectile Turret</a> rate of fire',
         '105',
       ],
-      // Role bonus with no number at all ('' bonus, no unit).
       ['587', '-1', '', 'Can fit a <a href=showinfo:11578>Covert Ops Cloaking Device</a>', '']
     ),
     eveUnits: rows(['unitID', 'displayName'], ['105', '%']),
@@ -122,9 +102,6 @@ function csv() {
     ),
     dgmTypeAttributes: rows(
       ['typeID', 'attributeID', 'valueInt', 'valueFloat'],
-      // Rifter's real slot/hardpoint layout (3H/3M/4L, 2 launcher + 3 turret
-      // hardpoints) — mixes valueInt and valueFloat rows on purpose, to
-      // cover both branches.
       ['587', '14', '3', ''],
       ['587', '13', '3', ''],
       ['587', '12', '4', ''],
@@ -137,7 +114,6 @@ function csv() {
       ['587', '1132', '', '400.0'],
       ['587', '283', '0', ''],
       ['587', '1271', '0', '']
-      // 2001 (Tengu) intentionally has NO rows here.
     ),
   };
 }
@@ -260,7 +236,6 @@ describe('buildShipTree', () => {
 
   it("defaults techLevel to 1 and metaLevel to 0 when invTypes' columns are blank", () => {
     const fixture = csv();
-    // Blank techLevel/metaLevel on the Tengu row.
     const invTypes = fixture.invTypes.map((r) =>
       r[0] === '2001' ? [r[0], r[1], r[2], r[3], r[4], '', '', r[7], r[8]] : r
     );

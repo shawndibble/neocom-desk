@@ -1,10 +1,3 @@
-/**
- * The cache-through read behind the R2-served public snapshots. These
- * assertions exist because `ContractSearchPanel.test.tsx` mocks
- * `publicCourierContracts` outright, so nothing there exercises this module or
- * the cache path underneath it — a green panel suite says nothing about
- * whether a lapsed snapshot renders or blocks (issue #963).
- */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { db } from '@/db';
 import { GLOBAL_CACHE_CHARACTER_ID, resetRevalidationState } from '@/esi/cache';
@@ -48,14 +41,10 @@ describe('loadR2Snapshot', () => {
     const pending = loadR2Snapshot(source(read));
     const result = await pending;
 
-    // Settled while the live read is still in flight — the whole point.
     expect(result.cached?.data.rows).toEqual([{ id: 'last-cycle' }]);
-    // Nothing has failed yet, so no view raises its offline banner.
     expect(result.cached?.fromCache).toBe(false);
-    // But the board must be able to say a newer read is on its way.
     expect(result.revalidating).toBe(true);
     released();
-    // Let the background read land before the next test clears the cache.
     await vi.waitFor(async () =>
       expect((await db.esiCache.get([GLOBAL_CACHE_CHARACTER_ID, CACHE_KEY]))?.value).toMatchObject({
         rows: [{ id: 'this-cycle' }],

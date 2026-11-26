@@ -10,7 +10,6 @@ describe('corp roster columns', () => {
     expect(CORP_ROSTER_COLUMN_IDS).toContain('roles');
   });
 
-  /** Issue #1766: a Director who never asked for roles sees the roster unchanged. */
   it('hides the roles column until the pilot turns it on', () => {
     expect(CORP_ROSTER_DEFAULT_COLUMNS).not.toContain('roles');
     expect(useVisibleCorpRosterColumns.getState().value).toEqual(CORP_ROSTER_DEFAULT_COLUMNS);

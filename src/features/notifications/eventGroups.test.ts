@@ -41,7 +41,6 @@ describe('corpEventsApply', () => {
   it('drops corp events only when every Character is in a known NPC corporation', () => {
     expect(corpEventsApply([1000125, 1000167])).toBe(false);
     expect(corpEventsApply([1000125, 98000001])).toBe(true);
-    // A corporation not learned yet might be a player one.
     expect(corpEventsApply([1000125, undefined])).toBe(true);
     expect(corpEventsApply([])).toBe(true);
   });

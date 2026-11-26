@@ -59,7 +59,6 @@ describe('bakeTypeInfoShards', () => {
     expect(() => bakeTypeInfoShards([{ _key: 128_000, published: true }], [])).toThrow(
       /TYPE_INFO_SHARD_COUNT/
     );
-    // An unpublished one is never baked, so it doesn't need a bucket.
     expect(() => bakeTypeInfoShards([{ _key: 128_000, published: false }], [])).not.toThrow();
   });
 

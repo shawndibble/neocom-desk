@@ -1,15 +1,6 @@
 import { describe, it, expect } from 'vitest';
 
-/**
- * Every row menu is a `RowActionsMenu` (right-click plus a visible More-actions
- * button, DESIGN.md §4). A bare `ContextMenu*` import from `@/components/ui`
- * in a feature or route builds a right-click-only menu, so it must be on this
- * allowlist — which lists only the legitimate exceptions.
- */
-const ALLOWED = new Set([
-  // Table-only shortcuts to pages the nav already reaches.
-  'src/features/character/CharacterRowContextMenu.tsx',
-]);
+const ALLOWED = new Set(['src/features/character/CharacterRowContextMenu.tsx']);
 
 const sources = import.meta.glob<string>(['/src/features/**/*.tsx', '/src/routes/**/*.tsx'], {
   query: '?raw',

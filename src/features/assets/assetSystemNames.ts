@@ -4,13 +4,6 @@ import { resolvePlace } from '@/features/places/resolve';
 import type { PlaceRef } from '@/features/places/types';
 import type { CharacterAsset } from '@/esi/endpoints';
 
-/**
- * The places the assets sit in directly under a station, structure or solar
- * system, once each, with the Character who holds an asset there (a structure's
- * system is ACL-checked per Character). Only places whose name resolved are
- * asked about, so the reads are served from the cache that name filled and a
- * place that 404s or 5xxs is never asked a second time.
- */
 export function rootPlaceRefs(
   assets: readonly CharacterAsset[],
   locationNames: ReadonlyMap<number, string>,
@@ -20,7 +13,6 @@ export function rootPlaceRefs(
   const refs = new Map<string, PlaceRef>();
   for (const asset of assets) {
     const { location_id: locationId, location_type: type } = asset;
-    // An 'item' parent with no row of its own is a structure ESI never listed.
     if (type === 'item' && itemIds.has(locationId)) continue;
     if (type === 'solar_system' || !locationNames.has(locationId)) continue;
     const kind = type === 'station' ? 'station' : 'structure';
@@ -30,7 +22,6 @@ export function rootPlaceRefs(
   return [...refs.values()];
 }
 
-/** The system name of each place, by location id; a read that fails leaves its place out. */
 export async function loadPlaceSystemNames(
   refs: readonly PlaceRef[]
 ): Promise<Map<number, string>> {
@@ -60,15 +51,10 @@ export async function loadPlaceSystemNames(
   return byLocation;
 }
 
-/**
- * The export's System column: read once an export menu has opened, so a page
- * visit that never exports pays nothing. `pending` marks a file made before it lands.
- */
 export function useExportSystemNames(
   armed: boolean,
   refs: readonly PlaceRef[]
 ): { names: ReadonlyMap<number, string>; pending: boolean } {
-  // Keyed by what is asked, so a new asset list re-reads and the same one does not.
   const key = armed ? refs.map((r) => `${r.locationId}:${r.characterId ?? ''}`).join(',') : null;
   const load = useCallback(() => loadPlaceSystemNames(refs), [refs]);
   const loaded = useKeyedLoad(key, load);

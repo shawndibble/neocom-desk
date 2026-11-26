@@ -55,7 +55,6 @@ vi.mock('@/features/corp/rosterState', () => ({
 const mockedAccess = vi.mocked(useCorpAccess);
 const mockedGrouping = vi.mocked(useRosterGrouping);
 
-/** What a Character that cannot edit a book gets: no grouping at all. */
 const NO_GROUPING: RosterGrouping = {
   canGroup: false,
   groupOf: () => undefined,
@@ -101,7 +100,6 @@ function cached<T>(data: T): StatusResult<T> {
   return { cached: result, needsReauth: false };
 }
 
-/** A read that fell back to its saved copy, an hour older than a fresh one. */
 function savedCopy<T>(data: T): StatusResult<T> {
   const result = cached(data).cached!;
   return {
@@ -148,12 +146,10 @@ function renderMembers(initialEntry = '/corp/members') {
   );
 }
 
-/** Opens the funnel: the dark-only chip and the other filters sit behind it. */
 async function openFilters(user = userEvent.setup()) {
   await user.click(screen.getByRole('button', { name: /^Filters/ }));
 }
 
-/** The dark-only chip, by its own name — the stat strip's "About" tooltip also mentions it. */
 function darkToggle(): HTMLElement {
   return screen.getByRole('button', { name: /^Dark 30d\+/ });
 }
@@ -162,7 +158,6 @@ function currentLocation(): string {
   return screen.getByTestId('location').textContent ?? '';
 }
 
-/** Renders, then waits for the roster table to have replaced the loading spinner. */
 async function rosterTable(): Promise<HTMLElement> {
   renderMembers();
   return waitFor(() => screen.getByRole('table', { name: 'Corporation members' }));
@@ -170,7 +165,6 @@ async function rosterTable(): Promise<HTMLElement> {
 
 beforeEach(async () => {
   vi.clearAllMocks();
-  // The column picker test hides a column; that must not leak into the next test.
   await db.settings.clear();
   useVisibleCorpRosterColumns.setState({ value: CORP_ROSTER_DEFAULT_COLUMNS, hydrated: false });
   vi.setSystemTime(NOW);
@@ -215,11 +209,6 @@ describe('access (AC1)', () => {
     expect(retry).toHaveBeenCalledTimes(1);
   });
 
-  /**
-   * The narrower half of the gate. `membertracking` answers to Director alone,
-   * so a `ready` Accountant must get the explanation rather than the table —
-   * and must not spend a request buying a guaranteed 403.
-   */
   it('renders nothing but the reason for a ready character without the membership capability', async () => {
     mockedAccess.mockReturnValue(accessOf('ready', { canReadWallet: true }));
     renderMembers();
@@ -274,7 +263,6 @@ describe('the roster table', () => {
     expect(row).toHaveTextContent('Rifter');
     expect(row).toHaveTextContent('Jita IV - Moon 4');
     expect(row).toHaveTextContent('1h ago');
-    // Member and ship names are real links (§6c): Show Info and Market.
     expect(
       within(row as HTMLElement)
         .getByRole('link', { name: 'Jita Local' })
@@ -305,7 +293,6 @@ describe('the roster table', () => {
     expect(row).toHaveTextContent('Never');
   });
 
-  /** CX-13: newest first by default, so the down arrow reads like a date column. */
   it('opens with the most recently seen member first, under a down arrow', async () => {
     mocked.loadCorporationMemberTracking.mockResolvedValue(
       cached([
@@ -360,7 +347,6 @@ describe('the roster table', () => {
     const active = within(table).getByText('1h ago').closest('td')!;
     expect(dark.className).toContain('text-warning');
     expect(active.className).not.toContain('text-warning');
-    // Not hue alone (WCAG 1.4.1): the dark cell carries a glyph, the active one none.
     expect(dark.querySelectorAll('svg')).toHaveLength(1);
     expect(active.querySelectorAll('svg')).toHaveLength(0);
     expect(screen.getByText('Dark 30d+').parentElement).toHaveTextContent('1');
@@ -379,7 +365,6 @@ describe('the roster table', () => {
       ])
     );
     const table = await rosterTable();
-    // Text starts A to Z; dates start newest first.
     const first = {
       Member: 'ascending',
       'Last seen': 'descending',
@@ -396,7 +381,6 @@ describe('the roster table', () => {
     expect(within(member).getByRole('button')).toBeInTheDocument();
   });
 
-  /** Issue #2187: matches the EmploymentHistory table's `duration` sibling. */
   it('right-aligns the Last seen column, header and cells alike', async () => {
     const table = await rosterTable();
     const header = within(table).getByRole('columnheader', { name: 'Last seen' });
@@ -423,10 +407,8 @@ describe('the roster table', () => {
     expect(await screen.findAllByText("Couldn't load")).not.toHaveLength(0);
     expect(screen.queryByText('No member activity')).not.toBeInTheDocument();
     expect(screen.queryByRole('table')).not.toBeInTheDocument();
-    // The join/leave baseline is not consumed while the page cannot show the change.
     expect(mocked.recordRoster).not.toHaveBeenCalled();
 
-    // Retry reads again, and a read that now succeeds fills the table.
     mocked.loadCorporationMemberTracking.mockResolvedValue(
       cached([tracking({ character_id: 1001 })])
     );
@@ -485,7 +467,6 @@ describe('the joins/leaves summary', () => {
     expect(screen.getByRole('link', { name: 'Departed Soul' })).toBeInTheDocument();
   });
 
-  /** A leaver is in neither read any more, so their name has to be asked for. */
   it('asks for the names of members who left', async () => {
     mocked.readPreviousRoster.mockResolvedValue([1001, 1004]);
     await rosterTable();
@@ -502,10 +483,6 @@ describe('the joins/leaves summary', () => {
     );
   });
 
-  /**
-   * Overwriting the baseline with a roster we could not read would swallow
-   * every change made since the last successful read.
-   */
   it('leaves the baseline alone when the roster could not be read', async () => {
     mocked.loadCorporationMemberIds.mockResolvedValue({ cached: null, needsReauth: false });
     await rosterTable();
@@ -660,7 +637,6 @@ describe('filtered to zero', () => {
     await user.click(screen.getByRole('button', { name: 'Reset filters' }));
 
     expect(await screen.findByRole('table', { name: 'Corporation members' })).toBeInTheDocument();
-    // Text params reach the URL once typing pauses, so the cleared `q` lands a beat later.
     await waitFor(() => expect(currentLocation()).toBe('/corp/members'));
     expect(screen.getByPlaceholderText('Search name, ship, location…')).toHaveValue('');
   });
@@ -673,7 +649,6 @@ describe('column picker', () => {
     await user.click(screen.getByRole('button', { name: 'Columns' }));
     expect(screen.queryByRole('menuitemcheckbox', { name: 'Member' })).not.toBeInTheDocument();
     await user.click(screen.getByRole('menuitemcheckbox', { name: 'Ship' }));
-    // The open menu hides the page from the accessibility tree; close it first.
     await user.keyboard('{Escape}');
 
     expect(within(table).queryByRole('columnheader', { name: 'Ship' })).not.toBeInTheDocument();
@@ -735,7 +710,6 @@ describe('"you" tag (issue #1766)', () => {
 });
 
 describe('CSV export (issue #421, AC4)', () => {
-  /** Title-bar export button → Download CSV, by keyboard (jsdom has no hover intent). */
   async function downloadCsvFromMenu() {
     const user = userEvent.setup();
     fireEvent.pointerDown(screen.getByRole('button', { name: 'Export Members' }), {
@@ -1001,7 +975,6 @@ describe('the Players view', () => {
     const user = userEvent.setup();
     await rosterTable();
     const menus = screen.getAllByRole('button', { name: /More actions for/ });
-    // Only the grouped row (character 1002) carries the item.
     for (const menu of menus) {
       await user.click(menu);
       const item = screen.queryByRole('menuitem', { name: 'Show in Players view' });
@@ -1013,7 +986,6 @@ describe('the Players view', () => {
     }
     const players = await screen.findByRole('table', { name: 'Corporation members by Player' });
     expect(currentLocation()).toContain('view=players');
-    // The Player opened itself for the highlighted alt, and the one-shot param was spent.
     expect(await within(players).findAllByText('Outer Rim Alt')).not.toHaveLength(0);
     await waitFor(() => expect(currentLocation()).not.toContain('highlight='));
   });
@@ -1025,7 +997,6 @@ describe('the Players view', () => {
     renderMembers('/corp/members?view=players&highlight=7');
     await screen.findByRole('table', { name: 'Corporation members' });
     loaded = true;
-    // Any state change re-renders the page, which now reads the groups.
     await user.click(screen.getByRole('button', { name: /^Ship/ }));
     const players = await screen.findByRole('table', { name: 'Corporation members by Player' });
     expect(await within(players).findAllByText('Outer Rim Alt')).not.toHaveLength(0);

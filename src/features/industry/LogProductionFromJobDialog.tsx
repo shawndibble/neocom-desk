@@ -1,11 +1,3 @@
-/**
- * The "Log production" job-row action (issue #1787) resolves to exactly one
- * Build Plan before it navigates anywhere: this dialog is what asks the
- * pilot when that isn't already obvious — no plan builds the job's
- * blueprint yet (offer to create one), or more than one does (pick which).
- * Never shown for the single-match case, which `ActiveJobsPanel` navigates
- * straight through.
- */
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Modal } from '@/components/ui';
@@ -18,13 +10,9 @@ import type { BuildPlanRecord } from '@/db';
 import { DialogFooter } from '@/components/ui/DialogFooter';
 
 interface LogProductionFromJobDialogProps {
-  /** The job's product/blueprint name, for the dialog's copy. */
   productName: string;
-  /** The character's own plans that already build this blueprint — never length 1 (the caller resolves that case without opening this dialog). */
   matches: readonly BuildPlanRecord[];
-  /** Creates a new plan for the job's blueprint and resolves to its id, or null if the blueprint isn't in the SDE catalog. */
   onCreatePlan: () => Promise<string | null>;
-  /** A target plan was resolved — the pilot picked one, or one was just created. */
   onResolved: (planId: string) => void;
   onClose: () => void;
 }
@@ -43,7 +31,6 @@ export function LogProductionFromJobDialog({
   async function handleCreate() {
     setCreating(true);
     setCreateFailed(false);
-    // A catalog that won't load rejects here; it reads as the same failure as "not in the catalog".
     const planId = await onCreatePlan().catch(() => null);
     if (planId) {
       onResolved(planId);

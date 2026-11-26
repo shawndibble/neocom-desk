@@ -90,12 +90,7 @@ describe('pollEveNotifications', () => {
         kind: 'ok',
         etag: '"new"',
         budgetLow: false,
-        notifications: [
-          note(9), // at/below high-water
-          note(11),
-          note(12, 'KillReportVictim'), // not enabled on the device, first sighting
-          note(13),
-        ],
+        notifications: [note(9), note(11), note(12, 'KillReportVictim'), note(13)],
       }),
     });
     const summary = await pollEveNotifications(deps);
@@ -253,7 +248,6 @@ describe('pollEveNotifications', () => {
 });
 
 describe('quiet time (issue #4566)', () => {
-  // 13:00Z; AFTER is 13:00Z too.
   const NOW = Date.parse('2026-10-14T13:30:00Z');
   const window = (over: Partial<NonNullable<PollDevice['quietHours']>> = {}) => ({
     start: '13:00',
@@ -625,7 +619,6 @@ describe('pollEveNotifications: new-mail alerts (issue #5143)', () => {
 
 describe('pollEveNotifications: skipping idle grants and stale devices (issue #5144)', () => {
   const DAY = 24 * 3_600_000;
-  // Lands on the hourly slot of the stale-device back-off (floor(now / 15 min) % 4 === 0).
   const SLOT = 4_000 * 15 * 60_000;
   const OFF_SLOT = SLOT + 15 * 60_000;
   const now = () => OFF_SLOT;
@@ -792,8 +785,8 @@ describe('pollEveNotifications: skipping idle grants and stale devices (issue #5
         etag: '"fresh"',
         budgetLow: false,
         notifications: [
-          { ...note(11), timestamp: '2026-10-14T12:00:00Z' }, // before it was wanted
-          { ...note(12), timestamp: '2026-10-14T13:00:00Z' }, // after
+          { ...note(11), timestamp: '2026-10-14T12:00:00Z' },
+          { ...note(12), timestamp: '2026-10-14T13:00:00Z' },
         ],
       }),
       now: () => Date.parse('2026-10-14T13:15:00Z'),

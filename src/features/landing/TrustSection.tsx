@@ -14,11 +14,6 @@ import {
 import { AUTHORIZED_APPS_URL, REPO_URL } from '@/lib/links';
 import { ScopesAccordion } from './ScopesAccordion';
 
-/**
- * The objections a pilot weighs before handing an EVE SSO grant to a
- * third-party site. Deliberately the last thing above the closing button:
- * it is where the hesitation actually happens.
- */
 const TRUST: { icon: ComponentType<IconProps>; key: string }[] = [
   { icon: ReadOnly, key: 'readOnly' },
   { icon: TokenPrivacy, key: 'token' },
@@ -26,7 +21,6 @@ const TRUST: { icon: ComponentType<IconProps>; key: string }[] = [
   { icon: OpenSource, key: 'openSource' },
 ];
 
-/** The body of the landing page's trust section: four trust points, then what login asks for, by area. */
 export function TrustSection() {
   const { t } = useTranslation();
   return (
@@ -45,12 +39,6 @@ export function TrustSection() {
           </Panel>
         ))}
       </div>
-      {/*
-        The scope list sits here rather than beside the hero button: it is
-        what a hesitant reader wants after the trust points and immediately
-        before the closing CTA. Closed, it is a list of area names and counts.
-        From lg the accordion fills the left column and the notes the right.
-      */}
       <div className="mt-8 grid gap-8 lg:grid-cols-2 lg:gap-10">
         <div>
           <p className="text-sm text-text-dim">{t('login.permissionsHint')}</p>

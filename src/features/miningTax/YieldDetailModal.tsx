@@ -1,18 +1,3 @@
-/**
- * Mining Yield row detail: clicking a day's row on the Overview tab opens
- * what that day actually was — every ore type mined with its icon, units and
- * m³, what each line is worth sold raw against refined, what the whole day
- * refines into, and the two assumptions both numbers rest on.
- *
- * Deliberately NOT a reuse or generalization of the Tax tab's
- * `RowDetailModal`: that one is bound to the rent model (Assignment, Payee,
- * status) this tab has no concept of — same ledger, different question, see
- * `yieldGrouping.ts`'s note. The two share the visual vocabulary and nothing
- * else.
- *
- * Everything here is read-only. A Mining Yield row records what ESI reported;
- * there is nothing about it for a pilot to edit.
- */
 import { fixed1 } from '@/lib/fixedFormat';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { OreIcon, OreLink } from './OreIcon';
@@ -53,43 +38,26 @@ interface YieldDetailModalProps {
   onClose: () => void;
   row: MiningYieldRow;
   systemName: string;
-  /** Undefined while still resolving, null when unresolvable — `SecurityValue` renders nothing either way. */
   systemSecurity: number | null | undefined;
   typeNames: ReadonlyMap<number, string>;
-  /** m³ per unit, by type. A type with no known volume (issue #1283) is simply absent. */
   typeVolumes: ReadonlyMap<number, number>;
-  /** Issue #1281's page switch — hides the refined-output section entirely. */
   showRefining: boolean;
-  /** The page's Value choice, which "How this is priced" names. */
   basis: PriceBasis;
   buybackRate: number;
-  /** EVE's today, so a not-yet-published day can say it is priced live. */
   today: string;
 }
 
 const CARD = 'min-w-0 rounded-xs border bg-panel-2 p-2 sm:p-2.5';
-/** Marks the exit worth more — a recommendation, not decoration, so accent is
- *  in bounds per DESIGN.md §6. Same treatment as `BuildGroupPanel`'s best row. */
 const CARD_SUGGESTED = 'border-accent-dim bg-accent/5';
-/** Two lines tall below sm so the three figures share a baseline when a label wraps. */
 const CARD_LABEL =
   'min-h-8 text-[0.6875rem] leading-4 font-semibold tracking-wider uppercase sm:min-h-0 sm:tracking-widest';
 const CARD_FIGURE = 'mt-1 text-lg font-semibold tabular-nums sm:text-xl';
 const CARD_HINT = 'mt-0.5 break-words text-[0.6875rem] text-text-dim';
-/**
- * A table's title strip: the title, with that table's export button at the right.
- * The menu's negative margin keeps the strip the height of the plain
- * "How this is priced" one, with or without a menu in it.
- */
 const TABLE_TITLE =
   'flex items-center justify-between gap-2 border-b border-line bg-panel-2 py-1.5 pr-1 pl-2.5';
 const TABLE_TITLE_TEXT = eyebrowClassName;
 const TABLE_TITLE_MENU = '-my-1.5 flex';
 
-/**
- * Which exit this line was worth more through, or null when the two tie or
- * neither priced — a day with no market history must not green an em dash.
- */
 function lineWinner(line: OreLineValuation): 'raw' | 'refined' | null {
   if (line.rawValue <= 0 && line.refineValue <= 0) return null;
   if (line.refineValue > line.rawValue) return 'refined';
@@ -116,7 +84,6 @@ export function YieldDetailModal({
 
   const typeName = (typeId: number) => typeNames.get(typeId) ?? `#${typeId}`;
 
-  /** `wrapOnPhone` lets a name break onto a second line below `sm` instead of ellipsizing. */
   const typeNameCell = (typeId: number, wrapOnPhone = false) => (
     <span className="flex items-center gap-1.5">
       <OreIcon typeId={typeId} size={32} className="h-5 w-5 shrink-0" />
@@ -149,7 +116,6 @@ export function YieldDetailModal({
     };
   }, [valuation, typeVolumes]);
 
-  /** Every line's refining output folded into one per-material list, most valuable first. */
   const refinedRows: RefinedRow[] = useMemo(() => {
     const byType = new Map<number, number>();
     for (const line of valuation.lines) {
@@ -224,8 +190,6 @@ export function YieldDetailModal({
       header: t('miningTax.overview.rawSellValue'),
       align: 'right',
       className: 'whitespace-nowrap',
-      // A line with no mined-date price has a zero `rawValue` that means
-      // "unpriced", not "worthless" — an em dash says so, "0 ISK" would not.
       render: (line) =>
         line.rawValue > 0 ? (
           <IskAmount
@@ -288,8 +252,6 @@ export function YieldDetailModal({
     },
   ];
 
-  // A day where nothing priced has a zero delta that means "unknown", not
-  // "break even" — it gets neither a suggestion nor a tone.
   const anyValue = valuation.rawValue > 0 || valuation.refineValue > 0;
   const suggested: 'raw' | 'refined' | null = !anyValue
     ? null
@@ -346,10 +308,6 @@ export function YieldDetailModal({
           </StatChips>
         </div>
 
-        {/* The whole point of the row: which exit was worth more, and by how
-            much. Raw and refined sit side by side so neither reads as the
-            headline number on its own — with refining hidden there is
-            nothing to compare, so just the raw figure stands alone. */}
         <div className={cx('grid gap-2 sm:gap-3', showRefining && 'grid-cols-3')}>
           <div
             className={cx(
@@ -402,8 +360,6 @@ export function YieldDetailModal({
                         : t('miningTax.overview.detail.refineEvenCard')}
                 </p>
                 <p className={cx(CARD_FIGURE, deltaTone)}>
-                  {/* Nothing priced is unknown, not break-even: an em dash says so,
-                      "0 ISK" would claim the two exits were measured and tied. */}
                   {!anyValue ? (
                     '—'
                   ) : (
@@ -439,10 +395,6 @@ export function YieldDetailModal({
                 />
               </span>
             </div>
-            {/* `overflow-hidden` above is what rounds the corners, so it
-                cannot scroll — the table gets its own scroller, per
-                DESIGN.md §4a. Between `sm` and `lg` these five columns are
-                un-stacked in a narrow box and would otherwise clip. */}
             <div className="overflow-x-auto">
               <DataTable
                 {...oreExport.tableProps}
@@ -451,8 +403,6 @@ export function YieldDetailModal({
                 rowKey={(line) => line.typeId}
                 label={t('miningTax.overview.detail.oreMinedTitle')}
                 defaultSort={{ columnId: 'raw', direction: 'desc' }}
-                // A compare table: raw against refined across the columns, so it
-                // stays a table on a phone and scrolls sideways.
                 responsive="table"
               />
             </div>
@@ -490,8 +440,6 @@ export function YieldDetailModal({
                     />
                   </div>
                 )}
-                {/* The portion trap, stated rather than rounded away:
-                    `reprocessing.ts` returns nothing at all for a part batch. */}
                 {totals.unitsLeftOver > 0 && (
                   <p className="border-t border-line px-2.5 py-1.5 text-[0.6875rem] text-warning">
                     {t('miningTax.overview.detail.leftOverHint', {

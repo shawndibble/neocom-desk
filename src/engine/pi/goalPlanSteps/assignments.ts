@@ -1,8 +1,3 @@
-/**
- * Step 7 of `planGoals` (numbered as in `../goalPlan.ts`): every colony's role in the final plan. A used colony
- * with room sells one more slot; a colony the plan leaves alone keeps its
- * **Baseline**; only one with nothing worth selling is idle.
- */
 import type { PiData } from '@/sde/types';
 import { bidOf, p1NetPerUnit, type ColonyBaseline } from '../baseline';
 import {
@@ -22,11 +17,6 @@ import type { PinCounts } from '../types';
 import type { Wants } from './extraction';
 import { EPSILON, byId } from './shared';
 
-/**
- * The best-selling extra slot `colony` can add beside `current` (and its
- * `fixed` factories), or null when none fits or none is priced. A P0 already
- * in `current` is not offered again: its ECU count was the solver's call.
- */
 export function spareSlot(
   colony: PlannerColony,
   current: readonly ExtractionWant[],
@@ -55,18 +45,11 @@ export function spareSlot(
 }
 
 export interface Assigned {
-  /** One per colony, by planet id. */
   assignments: ColonyAssignment[];
-  /** The spare slot each used colony sells, by planet id. */
   spare: Map<number, ExtractionSlot>;
 }
 
-/**
- * Roles for every colony on the final extraction. `host` and `hostFactories`
- * are the settled host (`settleHost`), which may be null.
- */
 export function assignColonies(args: {
-  /** By planet id. */
   colonies: readonly PlannerColony[];
   wants: Wants;
   host: PlannerColony | null;
@@ -127,7 +110,6 @@ export function assignColonies(args: {
     }
     const own = baselines.get(c.planetId);
     if (own?.status === 'ok' && own.slots.length > 0) {
-      // The Baseline was picked from fitting options, so this refit fits.
       const keep = colonyExtraction(
         c,
         own.slots.map((s) => ({ p0TypeId: s.p0TypeId, ecus: s.ecus })),

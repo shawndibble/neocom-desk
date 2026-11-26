@@ -1,8 +1,3 @@
-/**
- * Sample offers and marks for the turn-in stories (`TurnInDetail.stories.tsx`,
- * `TurnInBreakdown.stories.tsx`): Fractured Skies Item Traders, LP at 800
- * ISK/LP. The marks are `TurnInSampleMark`.
- */
 import type { TurnInOfferDetail } from './useTurnIns';
 
 export const FAILOVER: TurnInOfferDetail = {
@@ -60,7 +55,6 @@ export const STEREO: TurnInOfferDetail = {
   factionId: 500002,
 };
 
-/** The same offer with no LP Value to count its LP at. */
 export const FAILOVER_UNPRICED: TurnInOfferDetail = {
   ...FAILOVER,
   lpValue: null,

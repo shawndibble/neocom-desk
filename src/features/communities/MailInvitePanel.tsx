@@ -39,14 +39,6 @@ type Problem =
   | 'sendFailed'
   | 'sendUnsure';
 
-/**
- * Invite by in-game mail (issue #3604): the admin types a Character name, the
- * app looks it up and mails that Character the Community's invite link from the
- * admin's own Character. A fixed template, no free text. The server holds the
- * cap (20 a day, one mail per target per Community): the slot is reserved
- * before the mail goes out and given back if it fails. The result is a
- * time-stamped "Sent" and nothing more — ESI offers no read receipt.
- */
 export function MailInvitePanel({
   community,
   characterId,
@@ -74,9 +66,7 @@ export function MailInvitePanel({
         if (cancelled) return;
         setRemaining(status.remaining);
         setSent(status.sent);
-      } catch {
-        // The counter is a convenience: the server enforces the cap either way.
-      }
+      } catch {}
     })();
     return () => {
       cancelled = true;
@@ -138,14 +128,12 @@ export function MailInvitePanel({
               link: communityInviteUrl(reservation.inviteCode),
             })
           ),
-        // ESI refused it: nothing went out, so give the slot and the day's count back.
         release: () =>
           releaseMailInvite(characterId, community.id, target.characterId, target.name),
         confirm: () =>
           confirmMailInvite(characterId, community.id, target.characterId, target.name),
       });
       if (settled !== 'sent') {
-        // A timeout or server error: the mail may have been delivered, so the slot stays spent.
         setProblem(settled === 'refused' ? 'sendFailed' : 'sendUnsure');
         return;
       }

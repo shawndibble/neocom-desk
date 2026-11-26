@@ -26,7 +26,6 @@ function fakeR2() {
   };
 }
 
-/** A fold stand-in: fills every hub with `types` types of one sell and one buy order. */
 function fold(types: number, publishedAt: number | null = PUBLISHED) {
   return async (_url: string, books: HaulingBookFold) => {
     for (const hub of SNAPSHOT_HUBS) {

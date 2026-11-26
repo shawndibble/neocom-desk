@@ -1,8 +1,3 @@
-/**
- * The pure side of the Vetting data page (#6341): which kept row a flag points at, the one kind
- * filter each source has, search, and corporation-history tenure. The rows are the wire's
- * `VettingRawRow`s; names ride beside them and are resolved here, once, when a source loads.
- */
 import type {
   VettingCheckId,
   VettingFlag,
@@ -12,10 +7,8 @@ import type {
   VettingSeverity,
 } from '@/engine/vetting';
 
-/** Cynosural Field Theory: the skill `assessVetting`'s `cynoNoCapital` reads. */
 export const CYNO_SKILL_ID = 21603;
 
-/** The sources that carry a date a range can filter on. History's dates are columns. */
 export const RAW_DATED: Record<VettingRawSource, boolean> = {
   wallet: true,
   contact: false,
@@ -27,7 +20,6 @@ export const RAW_DATED: Record<VettingRawSource, boolean> = {
 
 export interface RawFilters {
   query: string;
-  /** The source's one kind filter; '' for all. */
   kind: string;
   from: string | null;
   to: string | null;
@@ -47,11 +39,9 @@ export interface RawFlagRef {
   severity: VettingSeverity;
 }
 
-/** A row ready to draw, filter and sort: its flag, kind and lower-cased search text worked out once. */
 export interface RawItem {
   key: string;
   row: VettingRawRow;
-  /** The value of the source's kind filter. */
   kind: string;
   flag: RawFlagRef | null;
   hay: string;
@@ -60,9 +50,7 @@ export interface RawItem {
 export interface RawContext {
   parties: ReadonlyMap<number, VettingParty>;
   flags: readonly VettingFlag[];
-  /** Skill name and group by type id; empty until the catalog loads. */
   skills: ReadonlyMap<number, { name: string; group: string }>;
-  /** The words a journal or contract type reads as. */
   whatLabel: (what: string) => string;
 }
 
@@ -73,7 +61,6 @@ export function standingBucket(standing: number | undefined): StandingBucket | '
   return standing < 0 ? 'hostile' : standing === 0 ? 'neutral' : 'friendly';
 }
 
-/** Contract types, as `evidenceWhatKey` knows them: the other rows of a mixed flag are wallet. */
 const CONTRACT_WHATS: ReadonlySet<string> = new Set(['item_exchange', 'courier', 'auction']);
 
 const evidenceKey = (
@@ -84,10 +71,6 @@ const evidenceKey = (
   amount: number | undefined
 ) => `${characterId}|${at ?? ''}|${partyId ?? ''}|${what}|${amount ?? ''}`;
 
-/**
- * The flag whose evidence a wallet or contract row is, matched on character, time, party, type
- * and amount; and the Cyno skill row of the flag's characters. First flag wins.
- */
 function flagFinder(flags: readonly VettingFlag[]) {
   const byEvidence = new Map<string, RawFlagRef>();
   for (const flag of flags) {
@@ -170,7 +153,6 @@ export function filterRawItems(items: readonly RawItem[], filters: RawFilters): 
     if (filters.flagged && item.flag === null) return false;
     if (filters.kind !== '' && item.kind !== filters.kind) return false;
     if (filters.from !== null || filters.to !== null) {
-      // An undated row is in no range.
       if (item.row.at === null) return false;
       const day = item.row.at.slice(0, 10);
       if (filters.from !== null && day < filters.from) return false;
@@ -180,12 +162,10 @@ export function filterRawItems(items: readonly RawItem[], filters: RawFilters): 
   });
 }
 
-/** The distinct kinds in a source's rows, for its one kind filter. */
 export function rawKindOptions(items: readonly RawItem[]): string[] {
   return [...new Set(items.map((item) => item.kind).filter((kind) => kind !== ''))].sort();
 }
 
-/** Seconds in a corporation: to the day the read ran while the character is still there. */
 export function tenureSeconds(row: VettingRawRow, readAt: number): number {
   if (row.joined === undefined) return 0;
   const end = row.left ? Date.parse(row.left) : readAt;
@@ -193,19 +173,12 @@ export function tenureSeconds(row: VettingRawRow, readAt: number): number {
   return Number.isFinite(seconds) ? Math.max(0, seconds) : 0;
 }
 
-/** A time the server sent, or null when it is not a date: a malformed row must not throw in a format call. */
 export function validTime(iso: string | null | undefined): number | null {
   if (!iso) return null;
   const ms = Date.parse(iso);
   return Number.isNaN(ms) ? null : ms;
 }
 
-/**
- * Where a flag's rows are in the data, for the link inside its "rows behind this": the source,
- * and how many of the flag's own (capped) evidence rows are in it, which is how many the data
- * page tints. Count is null for the Cyno skill, one row of Skills. Null for a flag whose rows
- * are not a source's rows (a count of corporations, a thin character).
- */
 export function flagDataTarget(
   flag: VettingFlag
 ): { source: VettingRawSource; count: number | null } | null {

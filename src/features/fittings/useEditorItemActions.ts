@@ -1,16 +1,3 @@
-/**
- * The Fitting editor's item actions (`FittingItemActions`, what every item
- * menu and drop does), built once per change to what they read rather than
- * on every render of the page, so the menus that take them in context
- * (`FittingItemMenu`, `ModuleMenuItems`…) keep their memoization. Along with
- * them, the few edits the page itself also needs: fitting a module into a
- * slot (charged as the Add panel's are), whether an Add panel item has
- * anywhere to go, and the drone bay's size.
- *
- * Every edit goes through `edit((current) => …)`, so the callbacks read the
- * Fitting they change rather than close over the one last rendered, and
- * keep their identity across edits that leave their inputs alone.
- */
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { CandidateRack } from '@/engine/fittings/candidates';
 import {
@@ -59,49 +46,31 @@ import type { FittingChange } from './useFittingWorkspace';
 interface EditorItemActionsInput {
   fitting: Fitting | null;
   stats: FittingStats | null;
-  /** The stats for exactly this Fitting; null while a calculation is pending. `stats` lags an edit by one. */
   currentStats: FittingStats | null;
   edit: (change: FittingChange, coalesceKey?: string) => void;
-  /** Null while the engine, pilot or catalogue loads. */
   context: FittingContext | null;
   catalogue: FittingCatalogue | null;
   charges: ChargeLoading;
-  /** The Add panel's chosen slot — an Add panel item always has room there. */
   target: AddTarget | null;
-  /** The Drones rack is shown: a drone has somewhere to go. */
   dronesShown: boolean;
-  /** Drag is pointer-only: without one, every drop is off. */
   dragEnabled: boolean;
-  /** Stable (a `useCallback` over a state setter), as the next one is. */
   selectTarget: (target: AddTarget) => void;
-  /** Opens the quantity dialog for a cargo item. */
   openCargoQuantity: (typeId: number) => void;
-  /** Opens a fitted module's dialog with its Variations unfolded. Stable. */
   openVariations: (rack: FittingSlotKind, index: number) => void;
-  /** Opens a fitted module's dialog with its Mutation section unfolded. Stable. */
   openMutation: (rack: FittingSlotKind, index: number) => void;
 }
 
 export interface EditorItemActions {
-  /** Null with no Fitting open. */
   itemActions: FittingItemActions | null;
-  /**
-   * A module into `slotIndex`, or its rack's first free slot with `'firstFree'`;
-   * charged as the Add panel's are. `fromCargo` takes it off the cargo's stack.
-   */
   fitAt: (
     rack: FittingSlotKind,
     slotIndex: number | 'firstFree',
     typeId: number,
     fromCargo?: boolean
   ) => void;
-  /** Null before the ship data, so nothing is capped yet. */
   droneBay: DroneBay | null;
-  /** The types last fitted to a rack, newest first; `fitAt` notes them itself. */
   noteRecent: (rack: FittingSlotKind, typeId: number) => void;
-  /** Charges a not-yet-fitted `typeId` could default to at `rack` on `shipTypeId`. */
   defaultCharges: (shipTypeId: number, rack: FittingSlotKind, typeId: number) => number[];
-  /** A drop on the List, the cargo, or the Ring's open space (the Ring's slots fit modules through its own props). */
   drop: (payload: FittingDragPayload, target: FittingDropTarget, alt: boolean) => void;
 }
 
@@ -124,8 +93,6 @@ export function useEditorItemActions({
   openMutation,
 }: EditorItemActionsInput): EditorItemActions {
   const mutaplasmids = useMutaplasmidLookup();
-  // The types last fitted to each rack, newest first — an empty slot's
-  // "Add module" and "Fill rack with last used".
   const [recent, setRecent] = useState<Partial<Record<FittingSlotKind, number[]>>>({});
   const noteRecent = useCallback((rack: FittingSlotKind, typeId: number) => {
     setRecent((prev) => ({
@@ -136,7 +103,6 @@ export function useEditorItemActions({
       ),
     }));
   }, []);
-  // "Copy module", for "Paste module" into an empty slot of the same rack.
   const [copiedModule, setCopiedModule] = useState<{
     rack: FittingSlotKind;
     typeId: number;
@@ -156,12 +122,6 @@ export function useEditorItemActions({
     [currentStats]
   );
 
-  /**
-   * The charges a not-yet-fitted `typeId` could default to at `rack` — its
-   * own charge groups (calculated alone, since it has no fitted result yet),
-   * narrowed to what the hull and skills accept, alphabetical to match the
-   * Charges tab's own ordering (issue #1728's "first charge listed").
-   */
   const defaultCharges = useCallback(
     (shipTypeId: number, rack: FittingSlotKind, typeId: number): number[] => {
       if (context === null) return [];
@@ -192,7 +152,6 @@ export function useEditorItemActions({
               : firstFreeSlotIndex(f, rack, count)
             : slotIndex;
         if (index === null) return f;
-        // A stale drag out of a stack already emptied fits nothing.
         if (fromCargo && takeCargo(f, typeId, 1) === f) return f;
         noteRecent(rack, typeId);
         const next = addModule(f, rack, index, typeId, () =>
@@ -207,7 +166,6 @@ export function useEditorItemActions({
   const canPlace = useCallback(
     (rack: CandidateRack, typeId: number): boolean => {
       if (rack === 'drone') {
-        // Room for one more of this drone beside what the bay already holds.
         return dronesShown && fitting !== null && droneRoom(fitting, typeId, droneBay) >= 1;
       }
       if (fitting === null || slotCounts === null) return false;
@@ -217,17 +175,11 @@ export function useEditorItemActions({
     [dronesShown, fitting, droneBay, slotCounts, target]
   );
 
-  /**
-   * A drop on the List: a charge loads — into every module that takes it,
-   * or with Alt only the one it landed on — a module goes in, or moves, and
-   * a drone launches.
-   */
   const drop = useCallback(
     (payload: FittingDragPayload, onto: FittingDropTarget, alt: boolean) => {
       if (onto.kind === 'ring') {
         const placed = fitting === null ? null : ringDropFor(payload, fitting.modules, slotCounts);
         const fromCargo = payload.kind === 'type' && !!payload.fromCargo;
-        // Placed afresh against the Fitting being changed, so a stale index can't overwrite.
         if (placed?.kind === 'fit') fitAt(placed.rack, 'firstFree', placed.typeId, fromCargo);
         else if (placed?.kind === 'load')
           charges.load(placed.typeId, { fromCargo: placed.fromCargo, only: placed.only });
@@ -237,7 +189,6 @@ export function useEditorItemActions({
         if (payload.kind !== 'type' && payload.kind !== 'charge') return;
         const { typeId } = payload;
         edit((f) => addCargo(f, typeId, 1));
-        // One charge is rarely what's wanted: ask how many.
         if (payload.kind === 'charge') openCargoQuantity(typeId);
         return;
       }
@@ -255,7 +206,6 @@ export function useEditorItemActions({
       if (payload.kind === 'drone' || payload.rack === 'drone') {
         const { typeId } = payload;
         edit((f) => {
-          // From the Add panel, one more is carried (if the bay has room) and launches.
           if (payload.kind === 'type') return launchNewDrone(f, typeId, droneBay, launchLimits);
           return launchLimits === null ? f : launchDrones(f, launchLimits, typeId);
         });
@@ -263,7 +213,6 @@ export function useEditorItemActions({
       }
       const { rack, typeId, fromCargo } = payload;
       if (onto.kind === 'drones' || rack !== onto.rack) return;
-      // A rack heading takes it into the rack's first free slot.
       fitAt(rack, onto.kind === 'slot' ? onto.index : 'firstFree', typeId, fromCargo);
     },
     [charges, edit, droneBay, launchLimits, fitAt, fitting, slotCounts, openCargoQuantity]
@@ -284,12 +233,9 @@ export function useEditorItemActions({
         : cargoVolumeUsed({ cargo }, (typeId) => catalogueVolume(catalogue, typeId)),
     [cargo, catalogue]
   );
-  // The hold as fitted (a cargo expander counts), read off the stats already
-  // worked out under the conditions (All V, skill overrides…); null before them.
   const cargoCapacity = stats?.holds.cargo ?? null;
   const open = fitting !== null;
   const shipTypeId = fitting?.shipTypeId ?? null;
-  // Read by "Change charge" only when it opens: a ref, so each edit doesn't rebuild the actions.
   const chargePickerRef = useRef<ChargePickerInput | null>(null);
   const statModules = currentStats?.modules ?? null;
   useLayoutEffect(() => {
@@ -367,7 +313,6 @@ export function useEditorItemActions({
               }
               fitAt(rack, 'firstFree', typeId);
             },
-            // Drag is pointer-only: a touch screen has the menus instead.
             dropHandlers: dragEnabled
               ? {
                   addType: true,

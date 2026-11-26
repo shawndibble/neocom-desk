@@ -1,10 +1,3 @@
-/**
- * The static data the Fitting editor (issue #1533) browses and names things
- * from: `types.json` for names and charge groups, `fittingSlots.json` for
- * which rack an item takes, and the Market Browser's own market-group tree,
- * market types and meta groups. None of it needs the dogma engine, which is
- * why search works before the ship data has downloaded.
- */
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import { useRetryOnReconnect } from '@/lib/useRetryOnReconnect';
 import type { CandidateRack } from '@/engine/fittings/candidates';
@@ -20,17 +13,14 @@ export interface FittingCatalogue {
   groupsById: ReadonlyMap<number, MarketGroupNode>;
   childrenByParent: ReadonlyMap<number | null, MarketGroupNode[]>;
   parentOf: ReadonlyMap<number, number | null>;
-  /** Type ids per inventory group, for listing the charges a module's charge groups name. */
   typeIdsByGroup: ReadonlyMap<number, number[]>;
   variations: VariationData;
 }
 
-/** A type's name from the catalogue, or `#<id>` while it loads or when it has none. */
 export function catalogueTypeName(catalogue: FittingCatalogue | null, typeId: number): string {
   return catalogue?.types[String(typeId)]?.name ?? `#${typeId}`;
 }
 
-/** One unit's m3 from the catalogue, or 0 while it loads or when it has none. */
 export function catalogueVolume(catalogue: FittingCatalogue | null, typeId: number): number {
   return catalogue?.types[String(typeId)]?.volume ?? 0;
 }
@@ -74,12 +64,6 @@ function buildCatalogue(
   };
 }
 
-/**
- * Whether the last load failed, shared by every `useFittingCatalogue` caller
- * (the editor page, the Add panel and the hull picker each read it without
- * threading it down as a prop). `epoch` is how a retry reaches every caller's
- * load effect at once.
- */
 let loadFailed = false;
 let loadEpoch = 0;
 const statusListeners = new Set<() => void>();
@@ -95,12 +79,6 @@ function subscribeStatus(listener: () => void): () => void {
   return () => void statusListeners.delete(listener);
 }
 
-/**
- * The catalogue built once per `loadEpoch` and shared by every hook instance, so
- * they all hold the same object (the `hullFitService` fingerprint cache keys on
- * it) and the SDE-wide passes in `buildCatalogue` run once, not once per mount.
- * A failed load is never kept, so a retry loads again.
- */
 let cache: {
   epoch: number;
   promise: Promise<FittingCatalogue>;
@@ -138,14 +116,12 @@ function getCatalogue(): Promise<FittingCatalogue> {
   return entry.promise;
 }
 
-/** Test-only: forgets a failure, the retry count and the cached catalogue a previous test left in the module. */
 export function resetFittingCatalogueStatusForTests(): void {
   loadFailed = false;
   loadEpoch = 0;
   cache = null;
 }
 
-/** Tries the catalogue files again. A no-op unless the last load failed, so several callers retrying together load once. */
 export function retryFittingCatalogue(): void {
   if (!loadFailed) return;
   loadFailed = false;
@@ -153,7 +129,6 @@ export function retryFittingCatalogue(): void {
   for (const listener of [...statusListeners]) listener();
 }
 
-/** Whether the catalogue files could not be loaded (not downloaded on this device and no connection). */
 export function useFittingCatalogueFailed(): boolean {
   return useSyncExternalStore(
     subscribeStatus,
@@ -162,11 +137,6 @@ export function useFittingCatalogueFailed(): boolean {
   );
 }
 
-/**
- * Null until every file has loaded. If any failed it stays null, but
- * `useFittingCatalogueFailed()` turns true so the editor can say so and offer a
- * retry, and it loads again by itself when the connection returns.
- */
 export function useFittingCatalogue(): FittingCatalogue | null {
   const [catalogue, setCatalogue] = useState<FittingCatalogue | null>(() =>
     cache?.epoch === loadEpoch ? cache.value : null
@@ -179,7 +149,6 @@ export function useFittingCatalogue(): FittingCatalogue | null {
   const failed = useFittingCatalogueFailed();
   useEffect(() => {
     let cancelled = false;
-    // Failure is reported by `getCatalogue` itself, once per load rather than per mount.
     getCatalogue().then(
       (built) => {
         if (!cancelled) setCatalogue(built);

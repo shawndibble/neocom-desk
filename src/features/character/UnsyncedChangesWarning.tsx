@@ -5,13 +5,6 @@ import { useOnline } from '@/stores/network';
 import { subscribeSyncStatus } from '@/sync/status';
 import { mayHaveUnsyncedChanges } from './unsyncedChanges';
 
-/**
- * Warning inside a Remove / Log out confirm: the local copy is about to go,
- * and it may be the only one holding the pilot's latest edits. Offline nothing
- * can be pushed (nor shared items and alert grants cleaned up); online, a
- * Character whose last sync was not a clean success may still have edits
- * waiting. Renders nothing when sync is not set up, or when online and clean.
- */
 export function UnsyncedChangesWarning({
   characterIds,
   syncConfigured,
@@ -21,7 +14,6 @@ export function UnsyncedChangesWarning({
 }) {
   const { t } = useTranslation();
   const online = useOnline();
-  // Re-evaluate when a sync starts, finishes or fails, or an edit is scheduled.
   const [, setTick] = useState(0);
   useEffect(() => subscribeSyncStatus(() => setTick((n) => n + 1)), []);
   if (!mayHaveUnsyncedChanges({ characterIds, syncConfigured, online })) return null;

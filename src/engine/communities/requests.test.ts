@@ -219,7 +219,6 @@ describe('blueprint lines', () => {
 });
 
 describe('constants shared with the callables', () => {
-  // functions/ cannot be imported from the app, so the caps are written twice: pin them.
   const server = readFileSync('functions/src/communityRequests.ts', 'utf8');
   const constant = (name: string) => {
     const match = new RegExp(`export const ${name} = ([0-9_* ]+);`).exec(server);
@@ -235,8 +234,6 @@ describe('constants shared with the callables', () => {
   });
 
   it('pins the open-Request cap and lifetime the app words for Members', () => {
-    // Neither is an app constant any more (a Request carries its own expiresAt); the FAQ and
-    // the Communities copy state them, so a server change must come through here.
     expect(constant('MAX_OPEN_REQUESTS_PER_MEMBER')).toBe(10);
     expect(constant('REQUEST_LIFETIME_MS')).toBe(30 * DAY_MS);
   });

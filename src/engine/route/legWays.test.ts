@@ -13,14 +13,6 @@ import {
 } from './legWays';
 import { bridgeConnections, type AnsiblexGate } from './ansiblex';
 
-/**
- *   START ─ W1 ─ W2 ─ W3 ─ W4 ─ END          the gate way, five jumps
- *   START ─ ENTRY ⤳ THERA ⤳ EXIT ─ END       four jumps through Thera
- *   START ─ F1 ─ F2 ─ FAR ⤳ THERA            a third, far-off Thera hole
- *   W2 ─ TURNUR ⤳ TEXIT ─ END                Turnur is gated lowsec
- *
- * ISLAND has no gates and no hole: nothing reaches it.
- */
 const START = 30000001;
 const W1 = 30000002;
 const W2 = 30000003;
@@ -209,7 +201,6 @@ describe('legWays', () => {
   });
 
   it('leaves out a hub whose way through is more jumps than the gates', () => {
-    // Gates: START ─ W1 ─ W2 ─ W3, three jumps. Through either hub is longer.
     expect(legWays(GRAPH, START, W3, NETWORK, ALL_HOLES)).toEqual([
       { way: 'gates', route: { kind: 'route', systems: [START, W1, W2, W3] } },
     ]);
@@ -296,9 +287,6 @@ describe('pinnedLegRoute', () => {
   });
 });
 
-/**
- *   W1 ═ W4        an Ansiblex: START ─ W1 ═ W4 ─ END is three jumps
- */
 const BRIDGE: AnsiblexGate = { fromId: W1, toId: W4, name: 'W1 » W4 - Bridge' };
 const BY_BRIDGE = [START, W1, W4, END];
 

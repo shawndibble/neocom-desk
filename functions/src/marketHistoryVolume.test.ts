@@ -65,7 +65,7 @@ describe('VolumeFold', () => {
     try {
       bz2 = execFileSync('bzip2', ['-c'], { input: CSV });
     } catch {
-      return; // no bzip2 binary on this machine
+      return;
     }
     const fold = new VolumeFold();
     await foldHistoryBz2(Readable.from([bz2]), fold);
@@ -74,7 +74,6 @@ describe('VolumeFold', () => {
 });
 
 describe('VolumeFold.demandFor', () => {
-  // The same points and aggregate as src/engine/market/haulingMarket.test.ts reads.
   const ASOF = '2026-10-15';
   const day = (
     date: string,

@@ -1,10 +1,3 @@
-/**
- * One row of the event-first Notifications page, opened up: every Character
- * as a chip with its own Device and Alerts checkboxes, so the Characters that
- * differ from the rest can be fixed one by one. Characters the event cannot
- * apply to (a missing scope or corp role) stay listed, dimmed, with the same
- * explanation the old per-Character section gave.
- */
 import { useTranslation } from 'react-i18next';
 import { CharacterAvatar } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
@@ -21,12 +14,10 @@ export interface CharacterRef {
 export interface CharacterAvailability {
   enabled: boolean;
   reason: 'scope' | 'capability' | null;
-  /** Names the declined Permission in the scope tooltip (issue #1525). */
   permissionLabel?: string;
 }
 
 interface CharacterChipGridProps {
-  /** What the checkboxes' accessible names say they toggle, e.g. "New Mail". */
   label: string;
   characters: readonly CharacterRef[];
   differingIds: ReadonlySet<number>;
@@ -65,7 +56,6 @@ export function CharacterChipGrid({
               <CharacterAvatar characterId={character.characterId} size="sm" loading="lazy" />
               <span className="min-w-0 flex-1 truncate text-text">{character.name}</span>
               {differs && (
-                // Colour is never the only signal: a mark and, for a screen reader, words.
                 <span className="shrink-0 text-warning">
                   <Icon.Warn size={Icon.ICON_SIZE.sm} aria-hidden="true" />
                   <span className="sr-only">{t('settings.notifications.chipDiffers')}</span>

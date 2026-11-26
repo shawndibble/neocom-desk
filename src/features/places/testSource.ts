@@ -5,10 +5,9 @@ interface Entry {
   systemId?: number | null;
 }
 
-/** An in-memory PlaceSource for tests, counting every read. */
 export function memoryPlaceSource(data: {
   stations?: Record<number, Entry>;
-  structures?: Record<string, Entry>; // `${characterId}:${structureId}`
+  structures?: Record<string, Entry>;
   systems?: Record<number, { name?: string | null; security?: number | null }>;
 }): PlaceSource & { calls: string[] } {
   const calls: string[] = [];

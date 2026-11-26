@@ -12,7 +12,6 @@ import type { MailAgeSection } from '@/engine/mail/mailAge';
 import type { MailHeader } from '@/esi/endpoints';
 
 interface MailListPaneProps {
-  /** False below `lg:` while a mail is open: the pane is hidden, not unmounted. */
   visible: boolean;
   listState: MailListState;
   folderCount: number;
@@ -26,7 +25,6 @@ interface MailListPaneProps {
   names: ReadonlyMap<number, string>;
   locallyReadKeys: ReadonlySet<string>;
   locallyUnreadKeys: ReadonlySet<string>;
-  /** Mark read/unread, delete and Select mode (see `useMailOrganize`). */
   organize: {
     canOrganize: (row: MailRow) => boolean;
     selecting: boolean;
@@ -35,7 +33,6 @@ interface MailListPaneProps {
     onSetRead: (row: MailRow, read: boolean) => void;
     onDelete: (row: MailRow) => void;
   };
-  /** Select mode's bar, above the list. */
   selectionBar?: ReactNode;
   selectedKey: string | null;
   timeZone: ComponentProps<typeof MailListRow>['timeZone'];
@@ -48,7 +45,6 @@ interface MailListPaneProps {
   onLoadMore: () => void;
 }
 
-/** Mail's list column: age-grouped rows (or the empty state), the cap notice and "Load more". */
 export function MailListPane({
   visible,
   listState,
@@ -76,9 +72,6 @@ export function MailListPane({
   onLoadMore,
 }: MailListPaneProps) {
   const { t } = useTranslation();
-  // Sticky and a viewport tall, but at scroll 0 it starts below the header and
-  // filters: this keeps its bottom edge on the screen's. The `lg:max-h` class
-  // is the first-paint fallback.
   const isDesktop = useIsDesktop();
   const paneRef = useFitToViewport<HTMLElement>(visible && isDesktop, 'maxHeight');
   return (
@@ -102,13 +95,6 @@ export function MailListPane({
           onShowRead={onShowRead}
         />
       ) : (
-        // Below `lg` a flat cap, since the page scrolls and the "load more"
-        // button sits under the list. From `lg` the pane is sticky and capped
-        // to the viewport, and the list takes the height left after the
-        // search/selection bar and the load-more footer, so it fills the
-        // screen instead of stopping at a fixed height.
-        // Sticky date <h3>s, as in the Coming up rail; `scroll-pt-8`
-        // keeps a focused row out from under one (WCAG 2.4.11).
         <div className="max-h-[36rem] scroll-pt-8 overflow-y-auto pb-14 lg:max-h-none lg:pb-0 lg:min-h-0 lg:flex-1">
           {rowSections.map((section) => (
             <div key={section.key}>
@@ -123,9 +109,6 @@ export function MailListPane({
               <ul className="divide-y divide-line">
                 {section.items.map((row) => {
                   const { header, tab } = row;
-                  // Not `cond && get(...) ?? fallback`: `??` passes `false`
-                  // straight through, so a header with no sender rendered
-                  // nothing at all instead of the fallback.
                   const sender =
                     (header.from === undefined ? undefined : names.get(header.from)) ??
                     t('mail.unknownSender');
@@ -136,11 +119,6 @@ export function MailListPane({
                       isAll={isAll}
                       isRead={isMailRead(row, locallyReadKeys, locallyUnreadKeys)}
                       isSelected={selectedKey === row.key}
-                      // A Sent mail's sender is you, so the whole Sent folder read
-                      // as a column of your own name. Its recipients are already
-                      // resolved for the reading pane, so showing them here costs
-                      // no extra lookup and is what makes Sent legible without
-                      // spending a colour on it.
                       party={tab === 'sent' ? recipientSummary(header) : sender}
                       timeZone={timeZone}
                       onOpen={onOpenRow}

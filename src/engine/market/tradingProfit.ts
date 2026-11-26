@@ -1,16 +1,3 @@
-/**
- * Period sums over the Margin column (issue #3995): the Trading profit a date
- * range made, per day and per item, and the broker fees paid beside it.
- *
- * A total counts matched sales only. A sale without a margin (a sold build, a
- * missing tax line, stock the wallet never saw bought) adds nothing, and is
- * counted in `sales` but not `matched`, so the reader sees how much of the
- * range the figure covers. Broker fees carry no key to a sale, so they are a
- * period total shown beside the margin, never taken off it.
- *
- * Pure: the caller supplies the day-key function (a viewer's zone is a UI
- * concern) and the margins from `realizedMargins`.
- */
 import type { RealizedMargin } from './realizedMargin';
 import { parseInstant } from '../esiInstant';
 
@@ -23,9 +10,7 @@ export interface SaleFill {
 
 export interface MarginTotal {
   margin: number;
-  /** Sales that have a margin. */
   matched: number;
-  /** All sales (buys are not counted). */
   sales: number;
 }
 
@@ -49,7 +34,6 @@ export interface ItemMargin extends MarginTotal {
   typeId: number;
 }
 
-/** Matched margin per item, best first. */
 export function marginsByItem(
   fills: readonly SaleFill[],
   margins: ReadonlyMap<number, RealizedMargin>
@@ -72,7 +56,6 @@ interface FeeLine {
   date: string;
 }
 
-/** Broker fees paid in `[fromMs, toMs]`, as a positive total. */
 export function sumBrokerFees(journal: readonly FeeLine[], fromMs: number, toMs: number): number {
   let total = 0;
   for (const entry of journal) {

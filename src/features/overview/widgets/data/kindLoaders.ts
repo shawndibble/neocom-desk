@@ -1,14 +1,3 @@
-/**
- * Reads for the Widget Kinds that came after the old board: net worth, profit,
- * mining yield, loyalty points, best clone, wallet journal and location.
- *
- * Like `loaders.ts`, each closes over nothing but its arguments (a
- * `useRouteSnapshot` contract). Overview is in the signed-in shell chunk, so
- * anything heavy (the mining price snapshot, the clone attribute sheet, SDE
- * names) is behind `import()`: only the types come in statically, and
- * `app/bootImportGraph.test.ts` fails the build if a static import reaches
- * `@/sync`, Firebase or recharts from here.
- */
 import { db } from '@/db';
 import { characterIdsWithScopes } from '@/app/characterIdsWithScopes';
 import { ESI_REGISTRY, requiredScopesForEndpoints } from '@/esi/registry';
@@ -39,29 +28,20 @@ export type { JumpTimersWidgetData } from '@/features/character/jumpTimers';
 export type { SovRaidsWidgetData };
 export type { MercenaryDensWidgetData } from '@/features/character/mercenaryDens';
 
-// --- Wallet journal ------------------------------------------------------------
-
 export interface JournalData {
   result: CachedResult<WalletJournalEntry[]> | null;
   needsReauth: boolean;
 }
 
-/**
- * The wallet journal (about 30 days at most: that is all ESI keeps). The grant
- * is checked first so a missing permission never provokes a live 403 and the
- * app-wide re-auth banner.
- */
 export async function loadJournalPanel(characterId: number): Promise<JournalData> {
   if (!(await hasWalletScope(characterId))) return { result: null, needsReauth: true };
   const { cached, needsReauth } = await loadWalletJournalWithStatus(characterId);
   return { result: cached, needsReauth };
 }
 
-/** One Character's wallet balance in the All characters read. */
 export interface WalletAllCharacter {
   characterId: number;
   name: string;
-  /** The balance; null when the read landed nothing (a lapsed grant, or never read). */
   balance: number | null;
   needsReauth: boolean;
   fetchedAt: number | null;
@@ -70,11 +50,9 @@ export interface WalletAllCharacter {
 
 export interface WalletAllData {
   characters: WalletAllCharacter[];
-  /** Characters that never granted the wallet scope: listed in the count, never read. */
   skippedCount: number;
 }
 
-/** Every Character's balance (the Wallet page's cross-character read). */
 export async function loadWalletAllWidget(): Promise<WalletAllData> {
   const { entries, skipped } = await loadAllCharactersWalletBalances();
   return {
@@ -90,10 +68,6 @@ export async function loadWalletAllWidget(): Promise<WalletAllData> {
   };
 }
 
-/**
- * Every Character's journal merged into one list, in the shape the single read has, so the
- * flow builders serve both. Behind `import()` like the other journal reads.
- */
 export async function loadJournalAllWidget(): Promise<JournalData> {
   const { loadAllCharactersJournals, loadWalletScopedCharacterIds } =
     await import('@/features/character/walletJournalAll');
@@ -109,7 +83,6 @@ export async function loadJournalAllWidget(): Promise<JournalData> {
   return {
     result: {
       data: snapshot.loaded.flatMap((c) => c.journal),
-      // The merged read is as fresh as its stalest part.
       fetchedAt: new Date(Math.min(...reads)),
       fromCache: false,
       truncated: snapshot.loaded.some((c) => c.truncated),
@@ -118,30 +91,22 @@ export async function loadJournalAllWidget(): Promise<JournalData> {
   };
 }
 
-// --- Net worth -----------------------------------------------------------------
-
 export interface NetWorthDay {
-  /** The UTC day of the snapshot. */
   day: string;
   layers: LayerValues;
 }
 
-/** The days (the newest included) of a Character's snapshots the widget reads: what its change and chart cover. */
 export const NET_WORTH_HISTORY_DAYS = 365;
 
 export interface NetWorthCharacter {
   characterId: number;
-  /** The UTC day of the Character's newest snapshot. */
   day: string;
   layers: LayerValues;
-  /** Holds every permission a snapshot needs, so its figure counts toward a total. */
   covered: boolean;
-  /** The snapshots of the last `NET_WORTH_HISTORY_DAYS` days, oldest first (the newest is `day` and `layers`). */
   history: NetWorthDay[];
 }
 
 export interface NetWorthWidgetData {
-  /** Each Character's latest snapshot; Characters never snapshotted are absent. */
   characters: NetWorthCharacter[];
 }
 
@@ -151,11 +116,6 @@ const NET_WORTH_ENDPOINTS = [
   'getCharacterOrders',
 ] as const;
 
-/**
- * Each Character's newest daily snapshot, straight from Dexie (local, cheap).
- * Deliberately not `useNetWorthData`: that hook's module chain reaches the
- * snapshot recorder, which pulls `@/sync` into whatever imports it.
- */
 export async function loadNetWorthWidget(): Promise<NetWorthWidgetData> {
   const [rows, coveredIds] = await Promise.all([
     db.netWorthSnapshots.toArray(),
@@ -188,14 +148,10 @@ export async function loadNetWorthWidget(): Promise<NetWorthWidgetData> {
   };
 }
 
-// --- Realized profit -----------------------------------------------------------
-
 export interface ProfitRunRow {
   runId: string;
   productTypeID: number;
-  /** Units the run produced. */
   quantity: number;
-  /** Epoch ms the run was logged: the bucket its profit lands in, as the Production Log filters by it. */
   loggedAt: number;
   profit: number;
   status: 'new' | 'open' | 'closed';
@@ -203,16 +159,9 @@ export interface ProfitRunRow {
 
 export interface ProfitWidgetData {
   runs: ProfitRunRow[];
-  /** Product names, keyed by type id. */
   names: Map<number, string>;
 }
 
-/**
- * The Character's logged runs with their realized profit so far, from the
- * Dexie Production Log. The Trade Hub standing a run's plan would apply is
- * assumed 0 here (the log page resolves it per plan), so a pilot with
- * standings sees slightly less profit than the page, never more.
- */
 export async function loadProfitWidget(characterId: number): Promise<ProfitWidgetData> {
   const [runs, saleLinks, orderWatches, losses, corrected] = await Promise.all([
     db.productionRuns.where('characterId').equals(characterId).toArray(),
@@ -241,9 +190,7 @@ export async function loadProfitWidget(characterId: number): Promise<ProfitWidge
   return { runs: rows, names };
 }
 
-/** Every Character's logged runs, each read as that Character's own widget reads them. */
 export async function loadAllProfitWidget(): Promise<ProfitWidgetData> {
-  // Only Characters still on the account: a removed Character's runs are not the pilot's now.
   const [withRuns, stored] = await Promise.all([
     db.productionRuns.orderBy('characterId').uniqueKeys() as Promise<number[]>,
     db.characters.toArray(),
@@ -257,33 +204,24 @@ export async function loadAllProfitWidget(): Promise<ProfitWidgetData> {
   };
 }
 
-// --- Mining yield --------------------------------------------------------------
-
 export interface MiningYieldDay {
   characterId: number;
-  /** EVE/UTC calendar date. */
   date: string;
-  /** The day's ore, valued raw at that day's price. */
   isk: number;
-  ores: { typeId: number; isk: number; /** Units mined. */ units?: number }[];
+  ores: { typeId: number; isk: number; units?: number }[];
 }
 
 export interface MiningYieldWidgetData {
   rows: MiningYieldDay[];
   typeNames: Map<number, string>;
-  /** Characters whose ledger was read. */
   trackedIds: number[];
-  /** Characters whose mining grant lapsed. */
   reauthIds: number[];
-  /** The oldest day held at all, in or out of range. */
   oldestSaved: string | null;
   fetchedAt: Date | null;
 }
 
-/** Every tracked Character's mining ledger, valued; heavy (prices, SDE), so it loads on demand. */
 export async function loadMiningYieldWidget(): Promise<MiningYieldWidgetData> {
   const { loadMiningYieldSnapshot } = await import('@/features/miningTax/yieldSnapshot');
-  // No refining data: the widget counts what was mined, and skipping it spares the reprocessing reads.
   const snapshot = await loadMiningYieldSnapshot(false, true);
   const rows = snapshot.rows.map((row) => ({
     characterId: row.characterId,
@@ -308,17 +246,13 @@ export async function loadMiningYieldWidget(): Promise<MiningYieldWidgetData> {
   };
 }
 
-// --- Loyalty points ------------------------------------------------------------
-
 export interface LpWidgetData {
   entries: { corporationId: number; name: string | null; points: number }[];
-  /** Paragon's balance, which reads as its own currency and is not counted as LP. */
   everMarks: number;
   needsReauth: boolean;
   fetchedAt: Date | null;
 }
 
-/** Names are only resolved for the largest balances: the widget never draws more. */
 const LP_NAMED_ENTRIES = 12;
 
 export async function loadLpWidget(characterId: number): Promise<LpWidgetData> {
@@ -345,8 +279,6 @@ export async function loadLpWidget(characterId: number): Promise<LpWidgetData> {
   };
 }
 
-// --- Best clone ----------------------------------------------------------------
-
 export function loadClonesWidget(characterId: number) {
   return import('@/features/character/cloneVerdictLoad').then((m) =>
     m.loadCloneVerdictWidget(characterId)
@@ -357,7 +289,6 @@ export function loadJumpTimersWidget(characterId: number) {
   return import('@/features/character/jumpTimers').then((m) => m.loadJumpTimersWidget(characterId));
 }
 
-/** Every Character's campaign rows; LP counted at the header Character's Market hub. */
 export function loadMilitaryCampaignsWidget(characterId: number) {
   return import('@/features/campaigns/militaryCampaignsWidget').then((m) =>
     m.loadMilitaryCampaignsWidget(characterId)
@@ -370,24 +301,14 @@ export function loadMercenaryDensWidget(characterId: number) {
   );
 }
 
-// --- Location and ship ---------------------------------------------------------
-
 export interface LocationWidgetData {
-  /** The location grant is missing. */
   needsReauth: boolean;
-  /** Null when the location could not be read (offline, or not resolvable). */
   system: { id: number; name: string | null; security: number | null } | null;
   shipTypeId: number | null;
   shipName: string | null;
-  /**
-   * When ESI last answered for what is shown (the older of the location and ship
-   * reads, so a cache hit reports its row's age, not the time of the call); null
-   * when none was made (the grant is missing, or nothing could be read).
-   */
   fetchedAt: Date | null;
 }
 
-/** The earliest of the dates that exist; null when none do (nothing was read). */
 function oldestOf(...dates: Array<Date | null>): Date | null {
   const present = dates.filter((date): date is Date => date !== null);
   return present.length === 0 ? null : new Date(Math.min(...present.map((date) => date.getTime())));
@@ -433,21 +354,14 @@ export async function loadLocationWidget(characterId: number): Promise<LocationW
         : { id: systemId, name: system?.name ?? null, security: system?.security ?? null },
     shipTypeId,
     shipName,
-    // The older of the two reads: the widget is only as current as its stalest half.
     fetchedAt: oldestOf(location.fetchedAt, ship.fetchedAt),
   };
 }
 
-// --- Mining survey -------------------------------------------------------------
-
 export interface SurveyWidgetData {
-  /** False when this device tracks no survey, or its share link has expired. */
   hasSurvey: boolean;
-  /** Where the survey was taken, when its owner said. */
   location: string | null;
-  /** The survey read as a series of scans; null while there is nothing to read. */
   summary: SurveySummary | null;
-  /** Raw type id by ore name as the scanner printed it, for the rows' Show info. */
   oreTypeIds?: ReadonlyMap<string, number>;
   fetchedAt: Date | null;
 }
@@ -459,11 +373,6 @@ const NO_SURVEY: SurveyWidgetData = {
   fetchedAt: null,
 };
 
-/**
- * The survey this device is tracking, summarised: what is left of each ore and when the field runs out. A survey is a Firestore
- * share link and its prices are a market read, at the Survey page's own price
- * hub (the Mining page hub), so all of it is behind `import()`. A failed read throws, which keeps the last good figure on show.
- */
 export async function loadSurveyWidget(): Promise<SurveyWidgetData> {
   const { useCurrentSurveyId, migrateSurveyPriceHub } =
     await import('@/features/survey/surveyPref');
@@ -517,35 +426,22 @@ export async function loadSurveyWidget(): Promise<SurveyWidgetData> {
   };
 }
 
-// --- Hauling ---------------------------------------------------------------------
-
 export interface HaulingWidgetRoute {
   from: string;
   to: string;
   item: string;
   profit: number;
-  /** Stargate jumps between the two hubs; null where no route is known. */
   jumps: number | null;
 }
 
 export interface HaulingWidgetData {
-  /** False until the Hauling tab has finished a scan on this device. */
   hasScan: boolean;
-  /** Best first. */
   routes: HaulingWidgetRoute[];
-  /** When the scan these routes came from finished. */
   fetchedAt: Date | null;
 }
 
 const NO_SCAN: HaulingWidgetData = { hasScan: false, routes: [], fetchedAt: null };
 
-/**
- * The best hauls from the last scan the Hauling tab ran. Only a stored summary
- * is read, never a market call: a scan costs hundreds of requests and the
- * Overview must not start one on every load. The jump counts come from the
- * local stargate graph. The age shown is the scan's own, so a stale answer is
- * plainly stale; a fresh scan comes from the Hauling tab.
- */
 export async function loadHaulingWidget(): Promise<HaulingWidgetData> {
   const [{ useHaulingSummary }, { getTradeHub }, { findLocalJumps }] = await Promise.all([
     import('@/features/market/haulingSummary'),
@@ -575,21 +471,14 @@ export async function loadHaulingWidget(): Promise<HaulingWidgetData> {
   return { hasScan: true, routes: routes.flat(), fetchedAt: new Date(summary.fetchedAt) };
 }
 
-// --- Below-market contracts -------------------------------------------------------
-
 export type BelowMarketWidgetContract = Omit<BelowMarketSummaryContract, 'systemId'> & {
-  /** Stargate jumps from the Character's Current System; null when unknown. */
   jumps: number | null;
 };
 
 export interface BelowMarketWidgetData {
-  /** False until Item search's Below market view has run on this device. */
   hasView: boolean;
-  /** Every contract below market in that view. */
   count: number;
-  /** Best profit first. */
   contracts: BelowMarketWidgetContract[];
-  /** When the contract snapshot behind it was published. */
   fetchedAt: Date | null;
 }
 
@@ -600,10 +489,6 @@ const NO_BELOW_MARKET_VIEW: BelowMarketWidgetData = {
   fetchedAt: null,
 };
 
-/**
- * Reads the stored summary only (see `belowMarketSummary.ts`). Jumps: the
- * header Character's Current System over the local stargate graph.
- */
 export async function loadBelowMarketWidget(characterId: number): Promise<BelowMarketWidgetData> {
   const { useBelowMarketSummary } = await import('@/features/contractSearch/belowMarketSummary');
   await useBelowMarketSummary.getState().hydrate();
@@ -614,7 +499,6 @@ export async function loadBelowMarketWidget(characterId: number): Promise<BelowM
     import('@/features/route/jumpBasis'),
     import('@/features/route/localRoute'),
   ]);
-  // An unreadable graph leaves jumps unknown; the contracts still show.
   const [origin, basis] = await Promise.all([
     loadCurrentSystemId(characterId).catch(() => null),
     loadJumpBasis().catch(() => null),
@@ -635,26 +519,18 @@ export async function loadBelowMarketWidget(characterId: number): Promise<BelowM
   };
 }
 
-// --- Route safety --------------------------------------------------------------
-
 export interface RouteSafetyWidgetData {
-  /** False when Route Safety has drawn no route on this device yet. */
   hasRoute: boolean;
-  /** Route Safety, opened on the saved route. */
   href: string | null;
-  /** The saved route's systems in flight order, each with its kills over 24 hours. */
   systems: RouteKillSystem[];
-  /** Raidable skyhooks (public list) in the route's systems; empty when the list could not be read. */
   raidable: RouteRaidableSkyhook[];
   fetchedAt: Date | null;
 }
 
-/** One skyhook raid window in a system of the saved route (issue #4784). The public list carries no silo size. */
 export interface RouteRaidableSkyhook {
   key: string;
   systemId: number;
   name: string;
-  /** Jumps along the route from its first system. */
   jumps: number;
   window: RaidWindow;
 }
@@ -667,13 +543,6 @@ const NO_ROUTE: RouteSafetyWidgetData = {
   fetchedAt: null,
 };
 
-/**
- * The route Route Safety last drew, with each system's player kills over the
- * last day. No trip is planned here: the tab saved the systems it drew
- * (`travel/savedRoute`). Kills are one zKillboard read per region, cached and
- * behind `import()`. A read that got no system at all throws, which keeps the
- * last good figure on show rather than drawing a route of unknowns.
- */
 export async function loadRouteSafetyWidget(): Promise<RouteSafetyWidgetData> {
   const { useSavedRoute } = await import('@/features/travel/savedRoute');
   await useSavedRoute.getState().hydrate();
@@ -687,7 +556,6 @@ export async function loadRouteSafetyWidget(): Promise<RouteSafetyWidgetData> {
   const [kills, names, raidList] = await Promise.all([
     loadRouteKills24h(route.systems),
     loadSolarSystemsById().catch(() => null),
-    // Supplementary: an unread list costs the rows, never the widget.
     import('./sovRaidsLoader').then((m) => m.loadRaidableList()).catch(() => null),
   ]);
   const systems = route.systems.map((systemId) => ({
@@ -726,26 +594,19 @@ export async function loadRouteSafetyWidget(): Promise<RouteSafetyWidgetData> {
   };
 }
 
-// --- Kills and losses ------------------------------------------------------------
-
-/** One kill or loss of a tracked Character, dated and placed. */
 export interface KillsEntry {
   characterId: number;
   killmailId: number;
   side: 'kill' | 'loss';
   timeMs: number;
   systemId: number | null;
-  /** The hull that died. */
   shipTypeId: number | null;
-  /** zKillboard's total value; null when it states none. */
   value: number | null;
 }
 
 export interface KillsWidgetData {
   entries: KillsEntry[];
-  /** Per Character: how far back the read reaches (ms), null when the whole record is held. */
   reach: Record<number, number | null>;
-  /** Characters whose killboard could not be read this time. */
   failedIds: number[];
   trackedIds: number[];
   systemNames: Map<number, string>;
@@ -753,18 +614,9 @@ export interface KillsWidgetData {
   fetchedAt: Date;
 }
 
-/** Newest entries whose ship and system names are resolved; the table lists no more. */
 const KILLS_NAMED_ENTRIES = 40;
-/** Characters read at once: zKillboard asks callers to go gently. */
 const KILLS_FANOUT = 2;
 
-/**
- * Every tracked Character's kills and losses off zKillboard (public: no scope).
- * Reads go through the pilot-list cache, so a refresh inside ten minutes asks
- * zKillboard nothing. A Character that fails is listed in `failedIds`; when
- * every one fails this throws, which keeps the last good figure and shows
- * Retry. zKillboard, the SDE and the type names stay behind `import()`.
- */
 export async function loadKillsWidget(): Promise<KillsWidgetData> {
   const trackedIds = (await db.tokens.toArray()).map((token) => token.characterId);
   const { fetchPilotKillmailHistory } = await import('@/lib/zkillboard');
@@ -821,43 +673,24 @@ export async function loadKillsWidget(): Promise<KillsWidgetData> {
   };
 }
 
-// --- Omega coverage ----------------------------------------------------------------
-
-/** One journal line, reduced to what net income needs, with the netting already decided. */
 export interface OmegaRow {
   characterId: number;
   date: string;
   amount?: number;
-  /** Both parties are the pilot's own Characters. */
   internal?: boolean;
-  /** `plex_bought` / `plex_sold` for a PLEX market line. */
   refKey?: string;
 }
 
 export interface OmegaWidgetData {
-  /** Every loaded Character's lines, classified against all wallet-scoped Characters. */
   rows: OmegaRow[];
-  /** Per loaded Character: what its local journal truly covers; absent when nothing is held. */
   coverage: Record<number, HistoryCoverage>;
-  /** Per loaded Character: when its journal was read (ms). */
   journalFetchedAt: Record<number, number>;
-  /** The lowest PLEX sell price and when its book was read; null when it could not be read. */
   plex: PlexQuote | null;
-  /** Some journal pages were missing for a loaded Character. */
   truncated: boolean;
-  /** Wallet-scoped Characters whose journal did not load. */
   skippedCount: number;
   loadedIds: number[];
 }
 
-/**
- * Every wallet-scoped Character's journal (the local history, #3909) and the
- * PLEX price. Classified here against all of them, so a donation from your own
- * alt is internal even when the widget later narrows to one Character. The
- * journal read is heavy and the book is a market read, so both stay behind
- * `import()`. A missing PLEX price is `plex: null`, not an error. Coverage is the
- * archive's truthful reach and gaps (#3909), not just the oldest line held.
- */
 export async function loadOmegaWidget(): Promise<OmegaWidgetData> {
   const [
     { loadAllCharactersJournals, loadWalletScopedCharacterIds },
@@ -908,7 +741,6 @@ export async function loadOmegaWidget(): Promise<OmegaWidgetData> {
   await Promise.all(
     snapshot.loaded.map(async ({ characterId }) => {
       const info = await archive.loadWalletArchiveInfo(characterId).catch(() => null);
-      // Lines held with no recorded window (older archive): the oldest line is all we know.
       const since = info?.since ?? oldest[characterId];
       if (since !== undefined) coverage[characterId] = { since, gaps: info?.gaps ?? [] };
     })
@@ -926,8 +758,6 @@ export async function loadOmegaWidget(): Promise<OmegaWidgetData> {
   };
 }
 
-// --- Trading profit ------------------------------------------------------------------
-
 export interface TradingProfitCharacter {
   characterId: number;
   name: string;
@@ -936,18 +766,13 @@ export interface TradingProfitCharacter {
 }
 
 export interface TradingProfitWidgetData {
-  /** Every loaded Character's fills and journal; the builder pools or narrows them. */
   characters: TradingProfitCharacter[];
-  /** Item names, keyed by type id. */
   names: Map<number, string>;
-  /** Some Character's fills stopped at the page cap, so margins near the oldest edge may be missing. */
   truncated: boolean;
-  /** Wallet-scoped Characters whose journal did not load. */
   skippedCount: number;
   fetchedAt: Date;
 }
 
-/** Every Character's fills and journal (the local history), behind `import()` like the other journal reads. */
 export async function loadTradingProfitWidget(): Promise<TradingProfitWidgetData> {
   const { loadAllCharactersJournals, loadWalletScopedCharacterIds } =
     await import('@/features/character/walletJournalAll');
@@ -973,9 +798,6 @@ export async function loadTradingProfitWidget(): Promise<TradingProfitWidgetData
   };
 }
 
-// --- Skyhook raids ---------------------------------------------------------------
-
-/** The read, behind `import()`; its builder is the kind's `loadBuild` (`worldModels.ts`). */
 export async function loadSovRaidsWidget(characterId: number): Promise<SovRaidsWidgetData> {
   const { loadSovRaids } = await import('./sovRaidsLoader');
   return loadSovRaids(characterId);

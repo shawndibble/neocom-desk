@@ -1,8 +1,3 @@
-/**
- * Ships › Tree on a phone (scope decision `20260926-135538`): the ladder is
- * the default view, the map is one tap away and back, a tapped hull opens
- * its Ship Info window, and nothing widens the page past the screen.
- */
 import { test, expect, PHONE } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 import { expectNoPageOverflow } from './support/overflow';
@@ -44,10 +39,8 @@ test.describe('Ship Tree — narrow', () => {
       const info = page.getByRole('dialog', { name: 'Merlin' });
       await expect(info).toBeVisible();
       await info.getByRole('tab', { name: 'Fitting' }).click();
-      // On a phone the hull's stats fold behind a disclosure, so the fits start near the top.
       await info.getByRole('button', { name: 'Slots and fitting resources' }).click();
       await expect(info.getByText('High slots')).toBeVisible();
-      // Nothing (the phone tab bar, say) sits over the sheet's own actions.
       await info.getByRole('button', { name: 'Start empty fit' }).click({ trial: true });
       await expectNoPageOverflow(page);
     });
@@ -79,11 +72,8 @@ test.describe('Ship Tree — narrow', () => {
     await page.getByRole('button', { name: /^Filters/ }).click();
     const sheet = page.getByRole('dialog', { name: 'Ship filters' });
     await sheet.getByRole('button', { name: /^Can fly/ }).click();
-    // No Apply step: the funnel behind the open sheet already counts it.
     await expect(page.getByRole('button', { name: 'Filters (1 active)' })).toBeAttached();
     await expect(sheet).toBeVisible();
-    // The faction bar's hidden match counts once escaped its scroller here; a
-    // phone zoomed out to fit, cropping the sheet and losing the tab bar.
     await expectNoPageOverflow(page);
 
     await sheet.getByRole('button', { name: 'Close' }).click();

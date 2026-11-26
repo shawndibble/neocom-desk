@@ -1,8 +1,3 @@
-/**
- * Market › Stock fixtures: three markets the sample pilot keeps stocked, the
- * sell orders and hangar stock behind them, and Jita prices, plus the ESI and
- * Fuzzwork routes that serve them.
- */
 import type { StockList } from '@/engine/stockTargets/stockLists';
 import type { CharacterAsset, CharacterBlueprint, MarketOrder } from '@/esi/endpoints';
 import { walletFixtureRoutes } from './esiFixtureRoutes';
@@ -10,11 +5,8 @@ import type { FixtureRoute } from './fixtureFetch';
 import { SAMPLE_CHARACTERS, sampleDate } from './sampleData';
 import { DAY_MS } from '@/lib/age';
 
-/** Dodixie IX - Moon 20 - Federation Navy Assembly Plant. */
 const DODIXIE = 60011866;
-/** Hek VIII - Moon 12 - Boundless Creation Factory. */
 const HEK = 60005686;
-/** A player Fortizar in Tama. */
 const TAMA_FORT = 1_035_466_617_946;
 const TAMA_SYSTEM = 30002813;
 
@@ -26,25 +18,24 @@ export const STOCK_SCOPES: readonly string[] = [
   'esi-characters.read_blueprints.v1',
 ];
 
-/** [typeId, target, listed, inHangar, Jita sell price] */
 type Line = [number, number, number, number, number];
 
 const DODIXIE_LINES: Line[] = [
-  [2185, 50, 0, 0, 1_150_000], // Hammerhead II: out
-  [2488, 100, 0, 40, 520_000], // Warrior II: out, hangar part covers it
-  [2456, 60, 12, 0, 640_000], // Hobgoblin II: low
-  [2048, 20, 4, 20, 610_000], // Damage Control II: low, hangar covers it
-  [3831, 30, 31, 0, 1_890_000], // Medium Shield Extender II: ok
-  [28668, 5_000, 1_200, 2_000, 11_800], // Nanite Repair Paste: low
-  [222, 20_000, 26_000, 0, 32], // Antimatter Charge S: over
-  [12608, 10_000, 9_400, 0, 610], // Hail S: ok
-  [31718, 25, 25, 5, 410_000], // Medium EM Shield Reinforcer I: ok
-  [11269, 15, 0, 0, 2_250_000], // Multispectrum Energized Membrane II: out
-  [1999, 40, 22, 0, 930_000], // Tracking Enhancer II: low
-  [2281, 30, 30, 0, 1_420_000], // Multispectrum Shield Hardener II: ok
-  [3841, 25, 10, 15, 3_250_000], // Large Shield Extender II: low, hangar fills it
-  [4405, 40, 44, 0, 1_210_000], // Drone Damage Amplifier II: over
-  [12058, 15, 15, 0, 680_000], // 10MN Afterburner II: ok
+  [2185, 50, 0, 0, 1_150_000],
+  [2488, 100, 0, 40, 520_000],
+  [2456, 60, 12, 0, 640_000],
+  [2048, 20, 4, 20, 610_000],
+  [3831, 30, 31, 0, 1_890_000],
+  [28668, 5_000, 1_200, 2_000, 11_800],
+  [222, 20_000, 26_000, 0, 32],
+  [12608, 10_000, 9_400, 0, 610],
+  [31718, 25, 25, 5, 410_000],
+  [11269, 15, 0, 0, 2_250_000],
+  [1999, 40, 22, 0, 930_000],
+  [2281, 30, 30, 0, 1_420_000],
+  [3841, 25, 10, 15, 3_250_000],
+  [4405, 40, 44, 0, 1_210_000],
+  [12058, 15, 15, 0, 680_000],
 ];
 
 const HEK_LINES: Line[] = [
@@ -118,7 +109,6 @@ function hangarAssets(): CharacterAsset[] {
   );
 }
 
-/** A Hammerhead II original and a Hail S copy, so Builder has something to build. */
 function blueprints(): CharacterBlueprint[] {
   return [
     { type_id: 2186, runs: -1, material_efficiency: 10, time_efficiency: 20 },
@@ -171,7 +161,6 @@ export function stockFixtureRoutes(): FixtureRoute[] {
       respond: () => ({ body: { solar_system_id: 30002659, station_id: DODIXIE } }),
     },
     { path: at('/skills'), respond: () => ({ body: { skills: [], total_sp: 0 } }) },
-    // Read beside the skills on a slow runner (fee standings, clone implants): none of either.
     { path: at('/standings/'), respond: () => ({ body: [] }) },
     { path: at('/implants'), respond: () => ({ body: [] }) },
     {

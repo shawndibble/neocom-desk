@@ -9,7 +9,6 @@ import { buildRows } from '../markers';
 import { buildMergedRows, placeBandHeaders, summarizeEntryQueue } from '../queueRows';
 import type { PlanScheduleResult } from './usePlanSchedule';
 
-/** The entry list's rows: entries, dimmed prereqs and markers merged in order, plus the band header each row opens. */
 export function usePlanRows({
   plan,
   schedule,
@@ -22,16 +21,10 @@ export function usePlanRows({
   groupingMode: GroupingMode;
 }) {
   const { scheduled, entryBoundaries, priorityMap } = schedule;
-  // #112: merge "Your entries" and the computed queue into one row list —
-  // one row per entry (own aggregated per-level/cumulative time) plus dimmed
-  // prereq rows positioned just ahead of the entry that needed them.
   const entryQueue = useMemo(
     () => summarizeEntryQueue(plan.entries, entryBoundaries, scheduled, schedule.isKnownSkill),
     [plan.entries, entryBoundaries, scheduled, schedule.isKnownSkill]
   );
-  // Built once and reused by both mergedRows and bandsAt below (#408: the
-  // two used to each call buildRows independently over the same
-  // entries/markers, a duplicate pass on every render).
   const rows = useMemo(() => buildRows(plan.entries, plan.markers), [plan.entries, plan.markers]);
   const mergedRows = useMemo(
     () => buildMergedRows(plan.entries, plan.markers, entryQueue, rows),

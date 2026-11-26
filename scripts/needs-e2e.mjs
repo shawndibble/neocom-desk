@@ -1,24 +1,10 @@
 #!/usr/bin/env node
-/**
- * Decides what e2e work this run does, for ci.yml's `build` job (`run_e2e`,
- * `e2e_shards`, `e2e_matrix`) and `tests-needed` job (`run_book`):
- *   node scripts/needs-e2e.mjs
- * and appends the answers to $GITHUB_OUTPUT.
- *
- * A pull request diffs its merge commit against the base (lib/changedFiles.mjs)
- * and runs the behaviour specs when app code changed, plus the Corp Tax Book
- * specs when their inputs did (`needsBookE2eOnPr`). A full run (`CI_FULL=true`,
- * `develop-full.yml`) runs every spec, layout ones included. Anything that does
- * not look like either answers `true`: a wasted e2e run is cheap, a skipped one
- * that mattered is not.
- */
 import { appendFileSync, readFileSync } from 'node:fs';
 import { changedFiles } from './lib/changedFiles.mjs';
 import { shardCount, shardMatrix } from './lib/ciPlan.mjs';
 import { listE2eSpecs } from './lib/e2eSpecs.mjs';
 import { needsBookE2eOnPr, needsE2e } from './lib/e2eRelevance.mjs';
 
-/** Seconds of worker time per shard to aim for (the weights are worker seconds). */
 const SHARD_TARGET_WEIGHT = 400;
 const MAX_SHARDS = 6;
 

@@ -1,14 +1,4 @@
 import { idSetKey } from '@/lib/idSetKey';
-/**
- * "Mutation" in a fitted module's dialog (GLOSSARY.md **Mutated module**,
- * **Mutaplasmid**, **Roll**): apply a mutaplasmid to the module, roll each
- * attribute it changes on a slider, load a real item's rolls from the
- * pilot's assets, or take the mutation off again. Every change is an
- * ordinary editor edit, so the stats and the Fitting Share Code follow.
- *
- * Drones are not covered: a mutated drone is its own one-drone stack, and
- * the drone rows have no dialog to hold this.
- */
 import { lazy, Suspense, useCallback, useId, useState, type ReactNode } from 'react';
 import { useKeyedLoad } from '@/lib/useAsyncLoad';
 import { useTranslation } from 'react-i18next';
@@ -54,10 +44,8 @@ const MutationFromAssets = lazy(() =>
   guarded(() => import('./MutationFromAssets')).then((m) => ({ default: m.MutationFromAssets }))
 );
 
-/** Slider positions from worst to best: one arrow-key press is 1%, the step the printed roll shows. */
 const STEPS = 100;
 
-/** The base module's own attribute values; null while they load (or for no base), 'failed' when unreadable. */
 function useBaseValues(typeId: number | null): BaseValue | 'failed' | null {
   const load = useCallback(() => loadBaseValues(typeId ?? 0, { retry: true }), [typeId]);
   const loaded = useKeyedLoad(typeId === null ? null : String(typeId), load);
@@ -70,9 +58,7 @@ export interface FittingMutationPanelProps {
   module: FittingModule;
   catalogue: FittingCatalogue | null;
   edit: (change: FittingChange, coalesceKey?: string) => void;
-  /** The active Character, whose assets "Load rolls from my assets" reads; null hides it. */
   characterId: number | null;
-  /** The open Fitting's evaluator, which ranks the owned modules by effect on the fit; null until ready. */
   variants?: VariantEvaluator | null;
 }
 
@@ -107,16 +93,12 @@ function MutationEditor({
 
   const apply = (next: ItemMutation | null) =>
     edit((f) => setModuleMutation(f, slot, slotIndex, next, lookup));
-  // Remove mutation, the base pick and an owned-item pick unmount the control that ran them; the
-  // picker takes focus once enabled (it waits on the new base's values).
   const focusPicker = () =>
     focusAfterCommit(() => {
       const picker = document.getElementById(pickerId);
       return picker instanceof HTMLButtonElement && !picker.disabled ? picker : null;
     });
 
-  // What "Load rolls from my assets" looks for: this abyssal type, or every
-  // one this base can become.
   const assetTypes =
     status === 'none'
       ? new Set(lookup.mutaplasmidsForBase(module.typeId).map((m) => m.resultTypeId))
@@ -124,7 +106,6 @@ function MutationEditor({
   const fromAssets = characterId !== null && (
     <Suspense fallback={null}>
       <MutationFromAssets
-        // Another Character or base starts a fresh search: the old one's items aren't these.
         key={`${characterId}:${idSetKey(assetTypes)}`}
         characterId={characterId}
         typeIds={assetTypes}
@@ -261,7 +242,6 @@ function MutaplasmidSelect({
   value: number | null;
   nameOf: (typeId: number) => string;
   disabled?: boolean;
-  /** What the empty picker asks; "Apply a mutaplasmid" by default. */
   placeholder?: string;
   onChange: (mutaplasmidTypeId: number) => void;
 }) {
@@ -303,11 +283,6 @@ function MutaplasmidSelect({
   );
 }
 
-/**
- * For an abyssal module of unknown base: which mutaplasmid made it, then
- * which base it was — every base that mutaplasmid takes becomes the same
- * abyssal type, so the pilot has to say.
- */
 function BasePicker({
   resultTypeId,
   lookup,

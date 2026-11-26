@@ -10,7 +10,6 @@ import type {
 import type { SrpOfficerBackendOverride } from '@/features/corp/srpBackendOverride';
 import { SAMPLE_ACTIVE_CHARACTER } from './sampleData';
 
-/** 23 Oct 2026, 14:00 EVE. */
 export const OFFICER_NOW = Date.UTC(2026, 9, 23, 14);
 const OFFICER = { id: SAMPLE_ACTIVE_CHARACTER.characterId, name: 'Kestrel Vane' };
 const at = (day: number, hour: number, minute = 0) => Date.UTC(2026, 9, day, hour, minute);
@@ -38,7 +37,6 @@ export type SrpOfficerScenario = 'queue' | 'empty';
 
 function sampleClaims(): SrpClaim[] {
   return [
-    // Off doctrine: a Gila with a gyrostabilizer pair where the doctrine has a damage control, and a rig short.
     base(131204551, {
       characterName: 'Varro Kestane',
       fleetOrFc: 'Roam, FC Dax Orlenn',
@@ -197,7 +195,6 @@ function sampleAudit(): SrpAuditEntry[] {
 
 const refusal = (reason: string) => Object.assign(new Error(reason), { details: { reason } });
 
-/** An in-memory officer queue for page stories; it applies the server's state rules. */
 export function createSrpOfficerFixture(scenario: SrpOfficerScenario): SrpOfficerBackendOverride {
   let claims = scenario === 'queue' ? sampleClaims() : [];
   const audit = scenario === 'queue' ? sampleAudit() : [];

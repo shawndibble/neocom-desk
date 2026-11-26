@@ -36,7 +36,6 @@ describe('activityLogCsvColumns', () => {
       '2026-09-29T14:05:06.000Z',
       'activityLog.outcomeAuthFailure',
     ]);
-    // The ISO form lands as a spreadsheet date-time, not text.
     expect(toCsv([entry()], columns).split('\r\n')[1]).toContain(',2026-09-29 14:05:06,');
   });
 

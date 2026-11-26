@@ -144,8 +144,6 @@ describe('legacy adoption', () => {
 
     expect(await loadManualMoonOreTypeIds()).toEqual([111, 222]);
     expect((await db.settings.get(MOON_ORE_KEY))?.value).toEqual([111, 222]);
-    // Adoption is a bare put, not a synced write — no push for a value that
-    // was already on this device.
     expect(setSyncedSetting).not.toHaveBeenCalled();
   });
 

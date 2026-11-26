@@ -22,34 +22,18 @@ import type { RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 
 export interface CorpAssetsSnapshot {
   corporationId: number | null;
-  /**
-   * `null` means the assets read itself did not come back — offline,
-   * uncached, or a 403 the role gate swallowed — and is distinct from a
-   * corporation that was read successfully and genuinely owns nothing.
-   */
   inputs: CorpAssetInput[] | null;
-  /** Division number -> the corp's own name for it, or null if unnamed/unresolved. */
   divisionNames: ReadonlyMap<number, string | null>;
-  /** Type names, and the location names already on the device. The rest arrive after first paint (`resolveMissingLocationNames`). */
   labels: CorpAssetLabels;
-  /** Every station/structure the assets sit in, named or not. */
   placeIds: readonly number[];
-  /** In-game names of the corporation's ships and containers by item id (issue #5652); empty when none can be read. */
   assetNames: AssetNameMap;
-  /** Global average market price per type, best-effort — an outage degrades ISK figures to 0 rather than the whole page. */
   priceByTypeId: ReadonlyMap<number, number>;
-  /** Each blueprint copy's own value by item id (`engine/blueprintCopyValue.ts`) — a copy never takes its type's average price. */
   copyValueByItemId: ReadonlyMap<number, number>;
-  /** Physical volume (m3, unpackaged) per type, best-effort from the slim SDE snapshot. */
   volumeByTypeId: ReadonlyMap<number, number>;
-  /** Top-level market group per type, best-effort from the market catalogue. */
   categoryByTypeId: ReadonlyMap<number, AssetCategory>;
-  /** The page cap was hit or a page was missing — corp holdings are the likelier of the two lists to hit it. */
   truncated: boolean;
   assetsShown: number;
-  /** Oldest `fetchedAt` across the reads — the badge speaks for the whole view. */
   fetchedAt: Date | null;
-  /** Either read fell back to its saved copy. */
   fromCache: boolean;
 }
 
@@ -80,23 +64,16 @@ export async function loadCorpAssetsSnapshot(
 
   const [assetsResult, divisionsResult, priceByTypeId] = await Promise.all([
     loadCorporationAssets(characterId, corporationId),
-    // Assets are Director-only, so this read is always open here.
     loadCorporationDivisions(characterId, corporationId, true),
     getAveragePriceByType(),
   ]);
 
-  // A character switch mid-load: skip the label fan-out for a snapshot about
-  // to be discarded rather than spending it on nothing.
   if (signal.cancelled) return { ...EMPTY_SNAPSHOT, corporationId };
 
   const assets = assetsResult.cached?.data ?? null;
   const inputs = assets === null ? null : toCorpAssetInputs(assets);
   const typeIds = inputs === null ? [] : [...new Set(inputs.map((i) => i.typeId))];
   const placeIds = assets === null ? [] : assetPlaceIds(assets);
-  // The corporation's own structures list names every hangar's structure with
-  // no per-id lookup. Any Character on the account that can read it will do,
-  // not just the active one (who may lack Station_Manager); a failed read
-  // falls back to `/universe/structures/{id}` after first paint.
   const structureNames: Promise<Map<number, string>> = accountCorpReaders(
     'canReadStructures',
     characterId
@@ -114,12 +91,10 @@ export async function loadCorpAssetsSnapshot(
     characterId,
     assets: assets ?? [],
     typeIds,
-    // Director-only endpoint: without the role a copy still prices, at ME0/TE0.
     loadBlueprints: async () =>
       canReadBlueprints
         ? ((await loadCorporationBlueprints(characterId, corporationId)).cached?.data ?? null)
         : null,
-    // Only past the Director-gated assets read above; swallows its own failures.
     loadAssetNames: async () =>
       assets === null
         ? NO_ASSET_NAMES

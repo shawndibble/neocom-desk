@@ -1,7 +1,3 @@
-/**
- * The ⓘ explanation modal of the hauling table (DESIGN.md §6c): how the rows were picked and
- * where each number came from, plus where this scan's demand and order books came from.
- */
 import { useTranslation } from 'react-i18next';
 import { Modal } from '@/components/ui';
 import { formatAge } from '@/lib/age';
@@ -10,7 +6,6 @@ import type { HaulingScan } from './haulingData';
 interface HaulingHowItWorksProps {
   open: boolean;
   onClose: () => void;
-  /** Instant mode sells into standing buy orders: no demand step. */
   instant: boolean;
   scan: Pick<HaulingScan, 'booksSource' | 'booksAsOf' | 'demandSource' | 'fetchedAt'>;
 }

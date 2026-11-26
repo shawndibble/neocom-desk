@@ -15,11 +15,6 @@ import { ELITE, type CertificateRow as Row, type CertificateTime } from './certi
 
 const GRADES = [1, 2, 3, 4, 5] as const;
 
-/**
- * The grade as five pips, filled up to it. Pips past an Alpha clone's reach
- * are drawn dashed in `warning`; the grade word always sits under them, so
- * colour is never the only signal.
- */
 function GradePips({ grade, alphaReach }: { grade: number; alphaReach: number | null }) {
   const { t } = useTranslation();
   return (
@@ -55,12 +50,10 @@ export interface CertificateRowProps {
   row: Row;
   expanded: boolean;
   onToggle: () => void;
-  /** Time to the next grade, by the plan scheduler; absent at Elite. */
   time: CertificateTime | undefined;
   planEntries: readonly PlanEntry[];
   trainedLevel: (skillTypeID: number) => number;
   skillName: (skillTypeID: number) => string;
-  /** Null while the Character's plans are still loading — no Add until then. */
   onAdd: (() => void) | null;
 }
 
@@ -122,11 +115,9 @@ export function CertificateRow({
   return (
     <li className="border-t border-line text-xs">
       <div
-        // The whole row opens its detail, bar the buttons and links inside it.
         onClick={(event) => isRowOwnEvent(event) && onToggle()}
         className="cursor-pointer grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 px-3 py-2 sm:grid-cols-[minmax(0,1.3fr)_auto_minmax(0,1.4fr)_12rem]"
       >
-        {/* Every row opens, Elite included: the description is there for all. */}
         <button
           ref={expanderRef}
           type="button"
@@ -148,8 +139,6 @@ export function CertificateRow({
           <span className="truncate">{certificate.name}</span>
         </button>
         <GradePips grade={grade} alphaReach={alphaReach} />
-        {/* The needs line and the action share a phone row. Only the Alpha
-            warning is long enough to take a full-width row and push the action below. */}
         <p className={cx('min-w-0 text-text-dim', capped && 'col-span-2 sm:col-span-1')}>
           {elite ? (
             <span className="text-success">{t('skills.certificates.eliteDone')}</span>
@@ -193,8 +182,6 @@ export function CertificateRow({
           )}
           {!elite && (
             <ul className="space-y-1">
-              {/* The schedule's own steps, not just `next`: a prerequisite the
-                scheduler injects shows here too, so the rows sum to the total. */}
               {(time?.steps ?? []).map((entry) => {
                 const have = trainedLevel(entry.skillTypeID);
                 return (

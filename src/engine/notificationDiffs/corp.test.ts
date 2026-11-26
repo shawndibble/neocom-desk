@@ -110,9 +110,6 @@ describe('diffStructureFuelLow', () => {
   });
 
   it('re-fires on a fresh refuel cycle that is itself already inside the window', () => {
-    // A refuel moves fuel_expires to a new, later instant — a different
-    // countdown from the one `prev` observed, so it is judged fresh rather
-    // than matched against the old identity and skipped as already seen.
     const prev = fuelSnapshot([fuelEntry({ structureId: 1, fuelExpiresMs: T0 + DAY_MS })], T0);
     const next = fuelSnapshot(
       [fuelEntry({ structureId: 1, fuelExpiresMs: T0 + 3 * DAY_MS })],
@@ -131,9 +128,6 @@ describe('diffStructureFuelLow', () => {
   });
 
   it('lowering the threshold does not re-fire for a structure already inside the wider, previous window', () => {
-    // Was inside the 7-day window (and so already reported) before the
-    // Character narrowed it to 1 day — narrowing must not manufacture a
-    // second fire for a crossing already reported under the wider setting.
     const prev = fuelSnapshot(
       [fuelEntry({ structureId: 1, fuelExpiresMs: T0 + 12 * 3_600_000, thresholdMs: 7 * DAY_MS })],
       T0
@@ -146,9 +140,6 @@ describe('diffStructureFuelLow', () => {
   });
 
   it('raising the threshold fires on the very next poll, without a reload (AC4)', () => {
-    // 5 days remaining was outside the old 1-day window (never reported);
-    // once the Character widens it to 7 days, that same 5 days is newly
-    // inside — must fire on this poll, not wait for a fresh baseline.
     const prev = fuelSnapshot(
       [fuelEntry({ structureId: 1, fuelExpiresMs: T0 + 5 * DAY_MS, thresholdMs: DAY_MS })],
       T0
@@ -321,8 +312,6 @@ describe('diffCorpWalletThreshold', () => {
   });
 
   it('raising the floor fires on the very next poll, without a reload (AC4)', () => {
-    // 40M was above the old 20M floor (never reported); once the Character
-    // raises the floor to 50M, that same 40M is newly under it.
     const prev = corpWalletSnapshot(
       [walletDivision({ division: 1, balance: 40_000_000, balanceFloorIsk: 20_000_000 })],
       T0

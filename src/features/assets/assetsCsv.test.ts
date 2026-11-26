@@ -54,7 +54,6 @@ describe('assetCsvRows', () => {
       ],
       context([a, b], { placeNicknames: { 60003760: 'Home market' } })
     );
-    // The nickname belongs to the root station, whatever holds the item.
     expect(rows.map((r) => [r.name, r.nickname, r.gameName, r.character])).toEqual([
       ['Tritanium', 'Home market', '', 'Rixx Javix'],
       ['Badger', 'Home market', 'Hauler 1', 'Rixx Javix'],

@@ -104,7 +104,6 @@ describe('compareFittingStats', () => {
     const row = (key: string) => table.rows.find((r) => r.key === key)!;
     expect(row('sustainedTank')).toMatchObject({ values: [50, 80], bestIndices: [1] });
     expect(row('burstTank')).toMatchObject({ values: [90, 80], bestIndices: [0] });
-    // A fit with nothing to overheat reads its plain DPS as its overheated DPS.
     expect(row('sustainedDps')).toMatchObject({ values: [95, 110], bestIndices: [1] });
     expect(row('overheatedDps')).toMatchObject({ values: [120, 110], bestIndices: [0] });
     expect(row('capacitorDelta').differs).toBe(false);

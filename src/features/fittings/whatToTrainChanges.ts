@@ -5,7 +5,6 @@ import { changeLabel } from './fittingVariationsCsv';
 
 const formatDecimal = createNumberFormat({ maximumFractionDigits: 3 });
 
-/** Every change a suggestion makes to the fit, worded: the Variations deltas, then the role stats. */
 export function gainChangeLabels(
   gain: Pick<LevelGain, 'delta' | 'roleChanges'>,
   t: TFunction

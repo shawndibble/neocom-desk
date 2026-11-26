@@ -38,7 +38,6 @@ const mockedLoadTransactions = vi.mocked(loadWalletTransactionsWithStatus);
 const mockedLoadJournal = vi.mocked(loadWalletJournal);
 const mockedTypeNames = vi.mocked(loadTypeNames);
 
-/** Resolves the transactions read with `cached`; `needsReauth` stays false unless given. */
 function mockTransactions(
   cached: Awaited<ReturnType<typeof loadWalletTransactionsWithStatus>>['cached'],
   needsReauth = false
@@ -67,7 +66,6 @@ function transaction(overrides: Partial<WalletTransaction> = {}): WalletTransact
   };
 }
 
-/** Renders the current query string, so a test can assert the filter params left the URL. */
 function LocationProbe() {
   return <output data-testid="location-search">{useLocation().search}</output>;
 }
@@ -109,7 +107,6 @@ describe('TransactionsPanel — the row as an item', () => {
     expect(within(row).getByRole('link', { name: 'Damage Control II' })).toBeInTheDocument();
     fireEvent.contextMenu(row);
 
-    // Right-click may still offer the table's own Export; never item actions.
     expect(screen.queryByRole('menuitem', { name: 'Show info' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^More actions/ })).not.toBeInTheDocument();
   });
@@ -131,7 +128,6 @@ describe('TransactionsPanel — page header controls', () => {
     ).toBeInTheDocument();
     expect(within(header).getByRole('button', { name: 'Refresh' })).toBeInTheDocument();
     expect(header.querySelector('time')).not.toBeNull();
-    // The table's card has no header strip left.
     const table = screen.getByRole('table', { name: 'Transactions' });
     expect(table.closest('.rounded-xs')?.querySelector('header')).toBeNull();
   });
@@ -159,7 +155,6 @@ describe('TransactionsPanel — page header controls', () => {
 
       const header = screen.getByRole('banner');
       const picker = await within(header).findByRole('button', { name: 'This character' });
-      // The header's touch tier reaches through the portal (re-provided context), not the panel's sm.
       expect(picker).toHaveClass('h-9');
       expect(picker).not.toHaveClass('md:h-7');
       expect(screen.getAllByRole('button', { name: 'This character' })).toHaveLength(1);
@@ -317,7 +312,6 @@ describe('TransactionsPanel — desktop filter and totals', () => {
     await waitFor(() => expect(spy).toHaveBeenCalledOnce());
     expect(spy.mock.calls[0][0]).toMatch(/^neocom-wallet-transactions-\d{4}-\d{2}-\d{2}\.csv$/);
     const lines = (spy.mock.calls[0][1] as string).trim().split('\r\n');
-    // Header plus the one buy the filter leaves — the Damage Control II sale is gone.
     expect(lines).toEqual([
       expect.stringContaining('"Date"'),
       expect.stringMatching(/^2026-09-10 12:00:00,.*"Tritanium","Buy",10,5,-50,,,,,,"[^"]+"$/),
@@ -327,7 +321,6 @@ describe('TransactionsPanel — desktop filter and totals', () => {
 });
 
 describe('TransactionsPanel — margin', () => {
-  // Margin is off by default; these tests are about what it says once ticked.
   beforeEach(() => {
     useVisibleTransactionsColumns.setState({ value: TRANSACTIONS_COLUMN_IDS });
   });
@@ -369,7 +362,6 @@ describe('TransactionsPanel — margin', () => {
       journal && { data: journal, fetchedAt: new Date(), fromCache: false, truncated: false }
     );
   }
-  /** Date, Item, Side, Qty, Unit price, Total, then Margin. */
   function marginCell(row: HTMLElement) {
     return within(row).getAllByRole('cell')[6];
   }
@@ -378,7 +370,6 @@ describe('TransactionsPanel — margin', () => {
     load([taxFor(2, -49_766.4), taxFor(3, -100)]);
     renderPanel();
     const row = await screen.findByRole('row', { name: /Damage Control II.*Sell/ });
-    // 3 × 460,800 − 3 × 400,000 − 49,766
     expect(marginCell(row)).toHaveTextContent('132,634');
   });
 
@@ -400,7 +391,6 @@ describe('TransactionsPanel — margin', () => {
     load([taxFor(2, -49_766.4), taxFor(3, -100)]);
     renderPanel();
     const row = await screen.findByRole('row', { name: /Damage Control II.*Sell/ });
-    // 132,633.6 over 3 × 400,000
     expect(row.querySelector('td[data-label="Margin %"]')).toHaveTextContent('11.1%');
     expect(row.querySelector('td[data-label="Unit cost"]')).toHaveTextContent('400,000');
     const noBuy = await screen.findByRole('row', { name: /Tritanium/ });
@@ -449,7 +439,6 @@ describe('TransactionsPanel — margin', () => {
 describe('TransactionsPanel — phone', () => {
   const originalScroll = Element.prototype.scrollIntoView;
   beforeEach(() => {
-    // `useIsPhone` reads a max-width query; answering yes is how a phone looks under test.
     stubViewport(() => true);
     Element.prototype.scrollIntoView = vi.fn();
   });
@@ -482,10 +471,8 @@ describe('TransactionsPanel — phone', () => {
     expect(await screen.findAllByRole('link', { name: 'Damage Control II' })).toHaveLength(2);
     expect(screen.getByRole('table')).toBeInTheDocument();
     const row = screen.getAllByRole('row')[1];
-    // Side starts unticked on a phone, so it isn't rendered at all.
     expect(row.querySelector('td[data-label="Side"]')).toBeNull();
     expect(row.querySelector('td[data-label="Date"]')).not.toHaveClass('max-sm:hidden');
-    // Date over time: the date and the time are separate block spans below `sm`.
     expect(row.querySelectorAll('td[data-label="Date"] span.max-sm\\:block')).toHaveLength(2);
     expect(row.querySelector('td[data-label="Margin"]')).toBeNull();
     expect(row.querySelector('td[data-label="Total"]')).not.toHaveClass('max-sm:hidden');
@@ -581,7 +568,6 @@ describe('TransactionsPanel — By station view', () => {
     [`1:${AMARR}`, { name: 'Amarr VIII', systemId: null, security: null, jumps: undefined }],
   ]);
   const FILLS = [
-    // Jita: sold 300, bought 100, net +200, two... three trades.
     transaction({ transaction_id: 1, location_id: JITA, unit_price: 100, quantity: 3 }),
     transaction({
       transaction_id: 2,
@@ -590,7 +576,6 @@ describe('TransactionsPanel — By station view', () => {
       quantity: 1,
       is_buy: true,
     }),
-    // Amarr: sold 1000, one trade, net +1,000.
     transaction({ transaction_id: 3, location_id: AMARR, unit_price: 1000, quantity: 1 }),
   ];
 
@@ -618,7 +603,6 @@ describe('TransactionsPanel — By station view', () => {
     renderPanel('/market/history?txn.view=station&txn.stationsBy=net');
     await screen.findAllByRole('link', { name: 'Damage Control II' });
     const [first, second] = headers();
-    // Net ranks highest first: Amarr +1,000 before Jita +200.
     expect(first).toHaveTextContent('Amarr VIII');
     expect(first).toHaveTextContent('1 trade');
     expect(first).toHaveTextContent(/Net \+1,000/);
@@ -657,7 +641,6 @@ describe('TransactionsPanel — By station view', () => {
     await screen.findAllByRole('link', { name: 'Damage Control II' });
     expect(headers()).toHaveLength(1);
     expect(headers()[0]).toHaveTextContent('Jita IV - Moon 4');
-    // The strip's Net is Jita's alone; Amarr's +1,000 is filtered out of it.
     expect(screen.getByText('+200')).toBeInTheDocument();
     expect(screen.queryByText('+1,000')).not.toBeInTheDocument();
   });

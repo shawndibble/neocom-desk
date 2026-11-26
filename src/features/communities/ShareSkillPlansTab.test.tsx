@@ -34,7 +34,6 @@ const record = (id: string, name: string, skills = 2) => ({
   updatedAt: 1,
 });
 
-/** Opens Add Skill plans and returns the dialog. */
 async function openAdd(user: ReturnType<typeof userEvent.setup>) {
   await user.click(await screen.findByRole('button', { name: p.add }));
   return screen.findByRole('dialog', { name: p.addTitle });
@@ -128,7 +127,6 @@ describe('ShareSkillPlansTab', () => {
     renderTab();
     expect(await screen.findByText(p.noPlans)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: p.makePlan })).toHaveAttribute('href', '/skills/plans');
-    // Add stays where it always is.
     const dialog = await openAdd(user);
     expect(within(dialog).getByText(p.noPlans)).toBeInTheDocument();
     expect(within(dialog).getByRole('link', { name: p.makePlan })).toBeInTheDocument();

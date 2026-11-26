@@ -29,26 +29,15 @@ import { SettingsHint, SettingsPanelLoading } from './settingsFields';
 import { AvoidedSystemsPanel } from './AvoidedSystemsPanel';
 import { usePhoneFold } from './usePhoneFold';
 
-/**
- * Settings → Travel: the in-game autopilot's route options, for planning.
- * Every jump count in the app follows them (`features/route/routeRules.ts`);
- * a page with its own route picker starts from the preference here. Route
- * Safety edits the same settings in place, through the same controls
- * (`features/route/TravelRuleFields.tsx`, and for wormholes and bridges
- * `features/travel/RouteRulesPanel.tsx`'s `RouteHoleFields`).
- */
 export function TravelSettingsPanel() {
   const { t } = useTranslation();
   const preference = useDefaultRoutePreference((state) => state.value);
   const setPreference = useDefaultRoutePreference((state) => state.setValue);
-  // The form waits for the settings only: a kill feed still loading must not blank it.
   const { settingsHydrated: hydrated, podKillsUnavailable } = useRouteRules();
-  // On a phone the "Also avoid" toggles fold behind a count of the rules on.
   const avoidFold = usePhoneFold();
   const edencom = useAvoidEdencom((state) => state.value);
   const triglavian = useAvoidTriglavian((state) => state.value);
   const podKills = useAvoidPodKills((state) => state.value);
-  // A pod-kill rule with no kill feed is not applied, so it is not "on".
   const rules = [edencom, triglavian, podKills && !podKillsUnavailable];
   const rulesOn = rules.filter(Boolean).length;
 

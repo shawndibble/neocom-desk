@@ -16,7 +16,6 @@ const RIFTER = {
   medium: ['1MN Afterburner I'],
 };
 
-/** Runs a search to the end, recording what it reported on the way. */
 async function run(
   fitting: Fitting,
   request: ImproveRequest,
@@ -52,7 +51,6 @@ describe('runImproveSearch (real engine)', () => {
     const rows = [...result.result.noDownside, ...result.result.tradeOffs];
     expect(rows.length).toBeGreaterThan(0);
     expect(result.sides).toBeUndefined();
-    // The search's own recalculation is handed back for the ticked set.
     expect((await result.recalc(fitting)).ehp).toBeCloseTo(result.before.ehp);
   });
 
@@ -76,7 +74,6 @@ describe('runImproveSearch (real engine)', () => {
     expect(result.sides).toBeDefined();
     expect(Object.keys(result.sides!).sort()).toEqual(['armor', 'shield']);
     expect(result.neutral).toBeDefined();
-    // One count for both runs.
     expect(result.result.checked).toBe(result.sides!.shield.checked + result.sides!.armor.checked);
   });
 
@@ -88,7 +85,6 @@ describe('runImproveSearch (real engine)', () => {
     expect(stoppedEarly.seen.makeover).toBe(false);
     expect(done(stoppedEarly.outcome).makeover).toBeUndefined();
 
-    // Stopped only once the Makeover has started: it did run, and the result says it ended early.
     const stoppedInMakeover = await run(fitting, request, (seen) => seen.makeover);
     expect(stoppedInMakeover.seen.makeover).toBe(true);
     expect(done(stoppedInMakeover.outcome).result.stopped).toBe(true);
@@ -98,14 +94,12 @@ describe('runImproveSearch (real engine)', () => {
     const STABILIZERS_II = world.id('Inertial Stabilizers II');
     const SHIELD_EXTENDER_II = world.id('Small Shield Extender II');
     const plain = world.fit('Astero', {
-      // Damage Control II's family has Officer modules; the rig is searched only as compensation (no rigs tick).
       low: ['Damage Control II', 'Inertial Stabilizers II'],
       medium: ['Small Shield Extender II'],
       rig: ['Small Core Defense Field Extender I'],
     });
     const fitting: Fitting = {
       ...plain,
-      // A mutated Inertial Stabilizers II (a roll this app cannot check, so it goes in bare): its siblings exist.
       modules: plain.modules.map((module) =>
         module.typeId === STABILIZERS_II
           ? {
@@ -115,7 +109,6 @@ describe('runImproveSearch (real engine)', () => {
           : module
       ),
     };
-    // The pilot cannot fly the extender: replacing it is a fix, which brings the compensating swaps into the search.
     const ports = world.ports(fitting);
     const fitCheck = ports.fitCheck;
     ports.fitCheck = (slot, typeId) =>
@@ -133,13 +126,11 @@ describe('runImproveSearch (real engine)', () => {
     const result = done(
       (await run(fitting, world.request(fitting, 'tank'), undefined, ports)).outcome
     );
-    // In the search: the compensating rig sibling is priced, and nothing mutated, Officer or Deadspace is.
     expect(priced[0]).toContain(world.id('Small Core Defense Field Extender II'));
     expect(allowed(priced[0]!)).toBe(true);
     const rows = [...result.result.noDownside, ...result.result.tradeOffs];
     expect(rows.some((row) => row.candidate.fromTypeId === STABILIZERS_II)).toBe(false);
 
-    // And in the pool a ticked set draws on later.
     const { swaps, priceOf } = await result.completion();
     expect(swaps.length).toBeGreaterThan(0);
     expect(priceOf(swaps[0]!.toTypeId)).toBe(PRICE);

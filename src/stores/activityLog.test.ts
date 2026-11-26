@@ -40,7 +40,6 @@ describe('useActivityLog.record', () => {
 
     const { entries } = useActivityLog.getState();
     expect(entries).toHaveLength(MAX_ACTIVITY_ENTRIES);
-    // Most recent (highest characterId) survives; the oldest 10 were dropped.
     expect(entries[0].characterId).toBe(MAX_ACTIVITY_ENTRIES + 9);
     expect(entries[entries.length - 1].characterId).toBe(10);
   });

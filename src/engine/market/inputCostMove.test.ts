@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import { INPUT_COST_MOVE_MIN_PCT, inputCostMove } from './inputCostMove';
 import type { OpenPricePoint } from './priceHistoryOpen';
 
-/** Eight daily points ending 2026-10-08: `first` on the 1st, `last` on the rest. */
 function line(first: number, last: number, side: 'buy' | 'sell' = 'sell') {
   const points: OpenPricePoint[] = [];
   for (let d = 1; d <= 8; d++) {
@@ -31,7 +30,6 @@ describe('inputCostMove', () => {
       materialSide: 'sell',
       product: { typeID: 999, side: 'sell' },
     });
-    // 2000 -> 2200: +10%. Input 34 is 1200 of 2200.
     expect(move?.costPct).toBeCloseTo(10);
     expect(move?.topInput.typeID).toBe(34);
     expect(move?.topInput.sharePct).toBeCloseTo((1200 / 2200) * 100);

@@ -7,12 +7,6 @@ import { useInPlaceEdit } from '@/lib/useInPlaceEdit';
 import { PLACE_NICKNAME_MAX, savePlaceNickname } from './placeNicknames';
 import { isRenamePlaceState } from './renamePlaceState';
 
-/**
- * The drilled-in station heading: the Place Nickname (else the real name) as
- * the title, the real name dim beneath when nicknamed, and the faint pencil
- * that renames in place, as on Clones. The one place a nickname is edited;
- * clearing the field removes it.
- */
 export function StationHeading({
   locationId,
   name,
@@ -22,17 +16,14 @@ export function StationHeading({
   children,
 }: {
   locationId: number;
-  /** The real, resolved place name. */
   name: string;
   nickname: string | undefined;
   headingRef: RefObject<HTMLHeadingElement | null>;
   headingClassName: string;
-  /** Inside the heading, after the title (a screen-reader-only item count). */
   children?: ReactNode;
 }) {
   const { t } = useTranslation();
   const hintId = useId();
-  // The row menu's Rename lands here with the field already open.
   const openOnArrival = isRenamePlaceState(useLocation().state);
   const {
     editing,

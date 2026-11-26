@@ -78,9 +78,6 @@ describe('loadCorrectedSkills', () => {
     expect(result.completedLevels.get(3300)).toEqual({ level: 4, sp: 45_255 });
     expect(result.completedSp).toBe(37_255);
     expect(result.totalSp).toBe(301_255);
-    // A just-finished queue entry raises both sides of the min() together —
-    // trained via completedLevels, active the same way — so the level is
-    // fully counted rather than stuck at the pre-completion snapshot.
     expect(result.effective.get(3300)).toBe(4);
   });
 
@@ -110,10 +107,6 @@ describe('loadCorrectedSkills', () => {
   });
 
   it('interpolates the in-progress level SP that /skills has frozen at training start', async () => {
-    // The "Coherent Ore Processing IV: plan 2d 2h, game 1d 9h" report. ESI's
-    // /skills reports the SP as of the last apply, so a skill half-way
-    // through a level still reads as if it had just begun, and the planner
-    // charges the whole level again.
     vi.mocked(loadCharacterSkillsWithStatus).mockResolvedValue(
       skillsStatus({
         data: {
@@ -148,10 +141,7 @@ describe('loadCorrectedSkills', () => {
 
     const result = await loadCorrectedSkills(CHAR_ID, NOW);
 
-    // Half-way through the window: 48,000 + (271,530 - 48,000)/2.
     expect(result.trained.get(60_378)).toEqual({ level: 3, sp: 159_765 });
-    // The level is not raised — that entry has not finished — and total_sp
-    // still reports only what completed levels credit, as it always has.
     expect(result.completedLevels.size).toBe(0);
     expect(result.totalSp).toBe(48_000);
   });

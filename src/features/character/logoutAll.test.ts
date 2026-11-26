@@ -147,13 +147,11 @@ describe('logoutAllCharacters', () => {
 
   it('still logs out when the push never settles', async () => {
     await seedCharacter(1);
-    // Only the timeout is faked: fake-indexeddb schedules on the other timers.
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     try {
       syncMock.triggerSync.mockImplementationOnce(() => new Promise<void>(() => {}));
 
       const done = logoutAllCharacters(true);
-      // One budget for all pushes, not one per Character.
       await vi.advanceTimersByTimeAsync(SYNC_FLUSH_TIMEOUT_MS + 1);
       await done;
 
@@ -167,7 +165,6 @@ describe('logoutAllCharacters', () => {
     await seedCharacter(1);
     await seedCharacter(2);
     sharedMock.unshareAllFittingsEverywhere.mockImplementation(async () => {
-      // The login must still be there to sign the removal.
       expect(await db.tokens.count()).toBe(2);
     });
 

@@ -1,12 +1,3 @@
-/**
- * The Command Palette's Contacts group (#2323): every Character's contacts,
- * searchable by name, each opening Public Info.
- *
- * Cache-only end to end — the contact lists and their names are read from
- * what the Contacts page (and every other name lookup) already cached, while
- * the palette is open, so typing never costs a request. A contact whose name
- * has never been resolved on this device is left out rather than fetched.
- */
 import { characterIdsWithScopes } from '@/app/characterIdsWithScopes';
 import type { CharacterContact } from '@/esi/endpoints';
 import { requiredScopesForEndpoints } from '@/esi/registry';
@@ -29,7 +20,6 @@ export interface PaletteContact {
   readonly kind: PublicInfoKind;
   readonly id: number;
   readonly name: string;
-  /** Every Character holding this contact, in the order the Characters were added. */
   readonly holders: readonly PaletteContactHolder[];
 }
 
@@ -37,12 +27,6 @@ function isPublicInfoKind(type: CharacterContact['contact_type']): type is Publi
   return type === 'character' || type === 'corporation' || type === 'alliance';
 }
 
-/**
- * Pure. The Contacts page's across-Characters rows, reduced to what the
- * palette can search and open: factions have no Public Info window, and a
- * contact with no known name cannot be searched for, so both are dropped.
- * `names` is keyed by bare id — EVE entity ids are unique across types.
- */
 export function buildPaletteContacts(
   rows: readonly AcrossCharactersRow[],
   names: ReadonlyMap<number, string>
@@ -67,11 +51,6 @@ export function buildPaletteContacts(
 
 const CONTACTS_SCOPES = requiredScopesForEndpoints(['getCharacterContacts']);
 
-/**
- * The cached contacts of every Character whose grant covers them, with their
- * cached names. No request, even for a lapsed name — a Character without the
- * scope contributes nothing, so with no grant anywhere the group never shows.
- */
 export async function loadPaletteContacts(): Promise<PaletteContact[]> {
   const granted = new Set(await characterIdsWithScopes(CONTACTS_SCOPES));
   if (granted.size === 0) return [];
@@ -85,17 +64,11 @@ export async function loadPaletteContacts(): Promise<PaletteContact[]> {
 }
 
 export interface ContactsProviderOptions {
-  /** `loadPaletteContacts()`'s answer, kept live while the palette is open; empty until it lands. */
   readonly contacts: readonly PaletteContact[];
   readonly onOpen: (kind: PublicInfoKind, id: number) => void;
-  /** The row's sublabel: its type and each holder's standing. */
   readonly describe: (contact: PaletteContact) => string;
 }
 
-/**
- * Synchronous over the already-loaded list, so no keystroke waits on (or
- * shows "Searching…" for) anything, and an empty list hides the group.
- */
 export function createContactsProvider({
   contacts,
   onOpen,

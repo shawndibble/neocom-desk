@@ -64,7 +64,6 @@ describe('parseEsiWar', () => {
 });
 
 describe('planSweep', () => {
-  // The newest 6 ids, newest first.
   const listed = [106, 105, 104, 103, 102, 101];
 
   it('on a first run starts seeding from the newest id and fetches no "new" ids', () => {
@@ -109,7 +108,7 @@ describe('advanceSweep', () => {
   });
 
   it('lowers the floor only through an unbroken run of read seed ids', () => {
-    const plan = planSweep(listed, {}, [], 4); // seeds 106,105,104,103
+    const plan = planSweep(listed, {}, [], 4);
     const next = advanceSweep(listed, {}, plan, new Set([106, 105, 103]));
     expect(next.floorId).toBe(105);
   });

@@ -29,7 +29,6 @@ vi.mock('@/features/character/ship', () => ({
 }));
 const loadCharacterAssetsMock = vi.hoisted(() => vi.fn());
 vi.mock('@/features/assets/assets', () => ({ loadCharacterAssets: loadCharacterAssetsMock }));
-// The asset-to-Fitting mapping has its own tests; here only which items reach it matters.
 const shipItemsToFittingMock = vi.hoisted(() =>
   vi.fn(async (ship: { typeId: number; name: string }) => ({
     name: ship.name,
@@ -48,7 +47,6 @@ vi.mock('@/sde/loadSde', () => ({
   })),
   loadTypeEffects: vi.fn(async () => ({})),
 }));
-// The preview's numbers are the compare hooks' job; here it only proves which row is picked.
 vi.mock('./FittingPreview', () => ({
   FittingPreview: ({
     row,
@@ -133,7 +131,6 @@ function renderDialog(
   return { workspace, onOpened };
 }
 
-/** A `path` starts the router there (`useNavigate` is mocked, so it never moves). */
 function renderScreen(
   workspace = makeWorkspace(),
   onStartHull = vi.fn(),
@@ -206,8 +203,6 @@ describe('FittingStartScreen', () => {
     const rifter = (
       await within(list).findByRole('heading', { name: 'Rifter' }, { timeout: 5000 })
     ).closest('section') as HTMLElement;
-    // The saved and in-game rows resolve their hull names independently and
-    // asynchronously — the heading can land before either row does.
     expect(await within(rifter).findByText('Kite', {}, { timeout: 5000 })).toBeInTheDocument();
     expect(
       await within(rifter).findByText('PvP Rifter', {}, { timeout: 5000 })
@@ -241,7 +236,6 @@ describe('FittingStartScreen', () => {
 
     await userEvent.clear(search);
     await userEvent.type(search, 'kite');
-    // `useNavigate` is mocked in this file, so the write is read off the mock.
     await waitFor(() =>
       expect(navigateMock).toHaveBeenLastCalledWith(
         expect.objectContaining({ pathname: '/ships/fittings', search: '?q=kite' }),
@@ -261,8 +255,6 @@ describe('FittingStartScreen', () => {
     const kite = await screen.findByRole('button', { name: /^Kite/ });
     expect(await screen.findByText('preview of Armor Drake')).toBeInTheDocument();
 
-    // A pointer passing over a row on its way elsewhere leaves the preview be,
-    // past the hover delay (fake timers: the delay is a timer).
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'], shouldAdvanceTime: true });
     try {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
@@ -286,15 +278,12 @@ describe('FittingStartScreen', () => {
     const kite = await screen.findByRole('button', { name: /^Kite/ });
     await screen.findByText('preview of Armor Drake');
 
-    // The hover delay is a timer: step past it rather than wait it out.
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'], shouldAdvanceTime: true });
     try {
-      // Boundary events alone, as a scroll under a still pointer fires them.
       fireEvent.pointerOver(kite, { pointerType: 'mouse' });
       act(() => vi.advanceTimersByTime(LIST_PREVIEW_DELAY_MS));
       expect(screen.getByText('preview of Armor Drake')).toBeInTheDocument();
 
-      // A pending hover loses to the keyboard focus that follows it.
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
       await user.hover(kite);
       act(() => screen.getByRole('button', { name: /^PvP Rifter/ }).focus());
@@ -383,8 +372,6 @@ describe('FittingStartScreen', () => {
   it('Enter on a row opens it and the arrow keys walk the list, the preview following', async () => {
     const workspace = renderScreen();
     const drake = await screen.findByRole('button', { name: /^Armor Drake/ });
-    // Kite (saved) and Armor Drake (In-game) load separately: ArrowDown from Drake reaches
-    // Kite only once both are listed.
     await screen.findByRole('button', { name: /^Kite/ });
     act(() => drake.focus());
     await userEvent.keyboard('{ArrowDown}');
@@ -446,7 +433,6 @@ describe('FittingStartScreen', () => {
       renderScreen(makeWorkspace(), onStartHull);
       const fit = await screen.findByRole('button', { name: 'Fit your Rifter' });
       expect(fit.className).toContain('bg-accent');
-      // One New from hull: the empty state's, not a second one in the toolbar.
       expect(screen.getAllByRole('button', { name: 'New from hull' })).toHaveLength(1);
       await userEvent.click(fit);
       expect(onStartHull).toHaveBeenCalledWith({ typeId: 587, name: 'Rifter' });
@@ -466,7 +452,6 @@ describe('FittingStartScreen', () => {
       shipTypeIdMock.mockReturnValue({ typeId: 670, status: 'ready' });
       renderScreen();
       await screen.findByText('No fittings yet');
-      // The buttons wait for the hull's type to load, so this is after the pod check ran.
       await screen.findByRole('button', { name: 'New from hull' });
       expect(screen.queryByRole('button', { name: /^Fit your/ })).not.toBeInTheDocument();
       expect(screen.getAllByRole('button', { name: 'New from hull' })).toHaveLength(1);
@@ -486,7 +471,6 @@ describe('FittingStartScreen', () => {
     renderScreen();
     expect(await screen.findByText(/: grant Fittings$/)).toBeInTheDocument();
     expect(loadInGameFittingsMock).not.toHaveBeenCalled();
-    // The saved ones still list.
     expect(await screen.findByRole('button', { name: /^Kite/ })).toBeInTheDocument();
   });
 
@@ -542,7 +526,6 @@ describe('FittingStartScreen on a phone', () => {
 });
 
 describe('FittingStartScreen on a touch tablet', () => {
-  // Wide enough for the pane, but a finger has no hover to preview with.
   let matchMedia: MockInstance<typeof window.matchMedia>;
   beforeEach(() => {
     const realMatchMedia = window.matchMedia;
@@ -586,8 +569,6 @@ describe('FittingStartScreen in a dialog', () => {
   it("keeps its search off the URL: it is a passing pick over another page's address", async () => {
     renderDialog();
     await screen.findByText('Armor Drake', {}, { timeout: 5000 });
-    // Past the URL's typing debounce (a timer, so stepped over): still nothing
-    // written. `useNavigate` is mocked in this file, so "nothing written" is no call to it.
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'], shouldAdvanceTime: true });
     try {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
@@ -670,7 +651,6 @@ describe('FittingStartScreen Active Fit', () => {
             location_flag: 'HiSlot0',
             is_singleton: true,
           },
-          // Another ship's module.
           {
             item_id: 12,
             type_id: 484,
@@ -696,7 +676,6 @@ describe('FittingStartScreen Active Fit', () => {
     expect(within(section).getByText(/up to an hour behind/)).toBeInTheDocument();
     expect(within(list).getAllByRole('heading')[0]).toBe(heading);
     expect(await screen.findByText('preview of Zipper')).toBeInTheDocument();
-    // Only what sits inside the flown ship is read as its fit.
     expect(shipItemsToFittingMock).toHaveBeenCalledWith({ typeId: 587, name: 'Zipper' }, [
       { typeId: 484, quantity: 1, flag: 'HiSlot0', itemId: 11 },
     ]);

@@ -4,7 +4,6 @@ import type { DisplayRow } from '@/features/miningTax/groupRows';
 import { TaxRowMenu } from '@/features/miningTax/TaxRowMenu';
 import type { TaxDialogActions } from '@/features/miningTax/useTaxDialogs';
 
-/** The row behaviour the Open and History tables share (spread onto both `DataTable`s). */
 export interface TaxRowProps {
   rowClassName: (dr: DisplayRow) => string;
   onRowClick: (dr: DisplayRow | null) => void;
@@ -12,12 +11,10 @@ export interface TaxRowProps {
   rowMoreActions: true;
 }
 
-/** Which combined rows are expanded in place, and what a click, a right-click and the row's class do on either table. */
 export function useTaxRowInteractions(
   systemName: (dr: DisplayRow) => string,
   actions: TaxDialogActions
 ) {
-  // Combined rows the pilot has expanded in place (desktop), to show each day.
   const [expandedCombined, setExpandedCombined] = useState<ReadonlySet<string>>(new Set());
 
   const toggleCombinedExpanded = useCallback((key: string) => {
@@ -29,7 +26,6 @@ export function useTaxRowInteractions(
     });
   }, []);
 
-  // Stable, so a row only re-renders when its own data changes (DataTable's note on `rowContextMenu`).
   const rowContextMenu = useCallback(
     (dr: DisplayRow, tr: ReactElement) => (
       <TaxRowMenu dr={dr} systemName={systemName(dr)} onAction={actions.runRowMenuAction}>

@@ -16,7 +16,6 @@ const bp: IndustryBlueprint = {
 describe('estimatedItemValue', () => {
   it('sums base (ME0) quantities times adjusted prices, times runs', () => {
     const prices = { 34: 4, 35: 10 };
-    // (1000*4 + 200*10) = 6000 per run
     expect(estimatedItemValue(bp, 1, prices)).toBe(6000);
     expect(estimatedItemValue(bp, 5, prices)).toBe(30000);
   });
@@ -53,7 +52,6 @@ describe('jobFee worked totals', () => {
 
 describe('jobFee', () => {
   it('computes NPC station fee: EIV * (SCI + tax + SCC)', () => {
-    // gross = 1e6 * 0.05 = 50_000; scc = 1e6 * 4% = 40_000; tax = 1e6 * 0.25% = 2_500
     const fee = jobFee(1_000_000, 0.05, FACILITY_PRESETS.npcStation);
     expect(fee.eiv).toBe(1_000_000);
     expect(fee.grossCost).toBeCloseTo(50_000, 6);
@@ -63,7 +61,6 @@ describe('jobFee', () => {
   });
 
   it('applies the structure job-cost bonus to the cost-index term only', () => {
-    // Raitaru 3%: gross = 1e6 * 0.05 * 0.97 = 48_500; scc still 40_000; tax 1% = 10_000
     const fee = jobFee(1_000_000, 0.05, FACILITY_PRESETS.raitaru, 1);
     expect(fee.grossCost).toBeCloseTo(48_500, 6);
     expect(fee.sccSurcharge).toBeCloseTo(40_000, 6);
@@ -73,7 +70,6 @@ describe('jobFee', () => {
 
   it('uses the preset default tax when none is given', () => {
     const fee = jobFee(1_000_000, 0.05, FACILITY_PRESETS.sotiyo);
-    // Sotiyo 5% bonus, default structure tax 0%
     expect(fee.grossCost).toBeCloseTo(47_500, 6);
     expect(fee.facilityTax).toBe(0);
     expect(fee.total).toBeCloseTo(87_500, 6);

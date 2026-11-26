@@ -8,11 +8,9 @@ interface SaveAsNewDialogProps {
   onClose: () => void;
   name: string;
   onNameChange: (name: string) => void;
-  /** Called with the trimmed, non-empty name; the dialog closes itself after. */
   onConfirm: (name: string) => void;
 }
 
-/** "Save as new": names the copy of the open Fitting. */
 export function SaveAsNewDialog({
   open,
   onClose,

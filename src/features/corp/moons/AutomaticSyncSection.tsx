@@ -12,14 +12,6 @@ import { useBook } from './useBook';
 
 type Notice = { tone: 'info' | 'warning'; text: string } | null;
 
-/**
- * The book's "Automatic sync" (ADR 0025, issue #4068): who holds the scheduled
- * sync, when it last ran, and the opt-in and revoke controls. Any book
- * editor can turn it on for their own Character (one holder per corporation, so
- * a new opt-in replaces the old); the holder can turn it off, and so can the CEO
- * for anyone. Turning it on sends the user to EVE to authorize the narrow scopes;
- * the token goes to our server and never to this device. Every state is a word.
- */
 export function AutomaticSyncSection() {
   const { t } = useTranslation();
   const location = useLocation();
@@ -29,8 +21,6 @@ export function AutomaticSyncSection() {
   const scheduled = data.scheduledSync ?? null;
   const [busy, setBusy] = useState(false);
 
-  // The Callback route hands the outcome back as router state, once. The notice is
-  // read from it on arrival, not set from an effect.
   const returned = (location.state as Partial<CorpSyncCallbackState> | null)?.corpSyncGrant;
   const [notice, setNotice] = useState<Notice>(() => {
     if (!returned) return null;
@@ -57,7 +47,6 @@ export function AutomaticSyncSection() {
         return { tone: 'info', text: t(key('cancelled')) };
     }
   });
-  // Drop the state so a reload does not replay it, and show the holder it just made.
   const handled = useRef<typeof returned>(undefined);
   useEffect(() => {
     if (!returned || handled.current === returned) return;

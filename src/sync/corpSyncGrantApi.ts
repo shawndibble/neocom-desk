@@ -1,12 +1,3 @@
-/**
- * The two Corp Tax Book sync grant callables (ADR 0025). Firebase: reach this
- * only through `await import(...)` from anything the startup bundle reaches
- * (`app/bootImportGraph.test.ts`).
- *
- * Saving needs the signed-in Character that holds the grant (the server checks
- * the grant's token is that Character's, and reads their corporation and roles
- * with it). Revoking is the holder's own act, or the CEO's with a live token.
- */
 import { getValidAccessToken } from '@/auth/session';
 import { callableErrorReason } from '@/lib/callableError';
 import { callRouted } from './routedCallable';
@@ -43,7 +34,6 @@ export interface FeederGrantCall {
   requestedRatePct?: number;
 }
 
-/** A moon owner's grant (ADR 0025 amendment): the signed-in player is the holder, whichever alt authorised. */
 export async function saveFeederGrantRemote(
   characterId: number,
   grant: FeederGrantCall
@@ -57,18 +47,11 @@ export async function saveFeederGrantRemote(
 
 type OwnCorpResult = { ok: true } | { ok: false; reason: string };
 
-/** The server's `details.reason` for a refusal; anything without one reads `unknown`. */
 const refusal = (error: unknown): OwnCorpResult => ({
   ok: false,
   reason: callableErrorReason(error) ?? 'unknown',
 });
 
-/**
- * Add one of the player's own corporations to a Corp Tax Book as a moon owner, with no invite
- * link: the editor's roles-scope token proves their standing in the book, and the CEO alt's
- * mining-scope tokens (a separate sign-in) are the grant. `coverageFrom` is a UTC day, up to 30
- * days back; the server clamps it.
- */
 export async function addOwnCorpFeederRemote(args: {
   editorCharacterId: number;
   collectorCorporationId: number;
@@ -98,7 +81,6 @@ export async function addOwnCorpFeederRemote(args: {
   }
 }
 
-/** End one of the player's own corporations as a moon owner at once; the book keeps its history. */
 export async function removeOwnCorpFeederRemote(args: {
   editorCharacterId: number;
   collectorCorporationId: number;
@@ -122,17 +104,11 @@ export async function removeOwnCorpFeederRemote(args: {
   }
 }
 
-/**
- * What Sync now did for the book's moon owners; `retryAt` (epoch ms) when it pressed too soon.
- * Mirrors `SyncMoonOwnersNowResult` (functions/src/corpTaxBookMoonOwnersSyncNow.ts), which the
- * client cannot import: that module pulls in firebase-admin.
- */
 export type MoonOwnersSyncNowResult =
   | { kind: 'synced'; read: number; stale: number; skipped: number }
   | { kind: 'rate-limited'; retryAt: number }
   | { kind: 'refused'; reason: string };
 
-/** Read every moon owner of the book now (#6117): an editor's live roles-scope token, rested per book. */
 export async function syncMoonOwnersNowRemote(args: {
   editorCharacterId: number;
   collectorCorporationId: number;

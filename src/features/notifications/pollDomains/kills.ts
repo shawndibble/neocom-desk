@@ -10,8 +10,6 @@ import { is, shapeGuard } from '../snapshotShape';
 import { defineDomain } from './defineDomain';
 import { currentThresholds } from './shared';
 
-/* Ship lost ------------------------------------------------------------------ */
-
 const isShipLossEntrySnapshot = shapeGuard<ShipLossEntrySnapshot>({
   killmailId: is.number,
   timeMs: is.number,
@@ -21,12 +19,6 @@ const isShipLossEntrySnapshot = shapeGuard<ShipLossEntrySnapshot>({
   thresholdIsk: is.number,
 });
 
-/**
- * A Character's losses from the same zKillboard read the Overview's Kills
- * widget makes (`fetchPilotKillmailHistory`), so the poll adds no request
- * beyond that read's own cache window. A failed read skips the poll (`null`)
- * rather than writing an empty baseline that would announce every loss as new.
- */
 export const killsDomain = defineDomain<
   ShipLossEntrySnapshot,
   ShipLossSnapshot,

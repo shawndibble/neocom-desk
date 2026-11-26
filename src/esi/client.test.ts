@@ -32,12 +32,9 @@ const server = mswServer();
 
 afterEach(() => {
   configureEsi({ getToken: null });
-  // The budget is app-wide module state: a test that deliberately serves a 420
-  // would otherwise shut the circuit for every test that follows it.
   resetEsiBudget();
 });
 
-/** Yield to the event loop until esiFetch has scheduled its retry timer. */
 async function untilTimerScheduled(): Promise<void> {
   while (vi.getTimerCount() === 0) {
     await new Promise((resolve) => setImmediate(resolve));
@@ -194,9 +191,6 @@ describe('esiFetch — rate limiting', () => {
   });
 
   it('does not retry a wait longer than the bound — it fails fast into the cache instead (issue #655)', async () => {
-    // We absorb a hiccup, we do not absorb an outage: a minute-long window is
-    // answered from the cache immediately rather than by sleeping on it, and
-    // the retry that is not made spends nothing against the error budget.
     let attempts = 0;
     server.use(
       http.get(`${ESI_BASE_URL}/alliances/99000001`, () => {
@@ -315,8 +309,6 @@ describe('esiFetch — app-wide error budget (issue #655)', () => {
     );
 
     await expect(esiFetch('/universe/structures/1')).rejects.toMatchObject({ status: 420 });
-    // The unrelated read behind it — a different route, a different Character —
-    // is the one the user's log showed being 420'd for free. It is not sent.
     await expect(esiFetch('/characters/123/mail')).rejects.toBeInstanceOf(EsiBudgetError);
 
     expect(structureRequests).toBe(1);
@@ -342,13 +334,8 @@ describe('esiFetch — app-wide error budget (issue #655)', () => {
     }
 
     expect(caught).toBeInstanceOf(EsiError);
-    // Not 420: reporting a status ESI never sent would make
-    // `features/character/typeNames.ts` answer a spent budget by fanning out a
-    // thousand per-id lookups. `reason` carries which limit is holding.
     expect((caught as EsiError).status).toBe(0);
     expect(caught).toMatchObject({ reason: 'errorLimit' });
-    // `esi/cache.ts` falls back to the stored row for anything that is not an
-    // auth failure; a shut circuit must land there, not on a re-auth banner.
     expect(isAuthFailure(caught)).toBe(false);
   });
 
@@ -371,9 +358,6 @@ describe('esiFetch — app-wide error budget (issue #655)', () => {
       esiFetch('/characters/123/mail', { endpointId: 'getCharacterMailHeaders' })
     ).rejects.toBeInstanceOf(EsiBudgetError);
 
-    // No route was called, so there is no ESI activity — the same reasoning
-    // that exempts a cancelled load. Otherwise /settings fills with errors for
-    // zero traffic during a throttle.
     expect(events).toEqual([]);
     unsubscribe();
   });
@@ -421,7 +405,6 @@ describe('esiFetch — app-wide error budget (issue #655)', () => {
       })
     );
 
-    // Three independent fan-outs, each already capped at its own call site.
     await Promise.all(
       Array.from({ length: ESI_MAX_IN_FLIGHT * 3 }, (_, i) => esiFetch(`/universe/types/${i}`))
     );
@@ -457,7 +440,6 @@ describe('esiFetch — app-wide error budget (issue #655)', () => {
 });
 
 describe('esiFetch — timeouts (issue #2271)', () => {
-  /** Stands in for the request scope's timeout, so the test fires it by hand. */
   function manualTimeout(): () => void {
     const timeout = new AbortController();
     vi.spyOn(AbortSignal, 'timeout').mockReturnValue(timeout.signal);
@@ -605,7 +587,6 @@ describe('esiFetch — PUT (issue #741)', () => {
     });
 
     expect(result.data).toBeNull();
-    // Also bodiless, but not a revalidation: nothing cached may be reused on it.
     expect(result.notModified).toBe(false);
   });
 

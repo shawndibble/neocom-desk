@@ -1,13 +1,3 @@
-/**
- * The price alert form (issue #680, extracted for #1427): shared by the
- * Quickbar row's popover, the Market Browser header bell's popover and the
- * item context menu's dialog. Takes just the item's name and current target
- * rather than a `QuickbarItem`, so an item that isn't pinned yet can use it.
- *
- * Edits a copy of the target, committed only on Save. A host that unmounts it
- * on close (Radix popovers and `Modal`'s children do) gets a fresh read of the
- * saved target each time it opens, with no sync effect.
- */
 import { useCallback, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -51,8 +41,6 @@ export function PriceAlertForm({
   const errorId = useId();
   const hasTarget = targetPrice !== undefined && targetDirection !== undefined;
 
-  // The hub the alert polls (`priceAlertDomain` → the Market page hub), not
-  // necessarily the one a Market link is showing.
   const { hubId } = useHubFor('market');
   const hub = getTradeHub(hubId) ?? DEFAULT_TRADE_HUB;
 

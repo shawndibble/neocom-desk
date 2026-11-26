@@ -24,7 +24,6 @@ const server = mswServer(
       });
     }
     if (params.id === '92') {
-      // Corp only, no alliance.
       return HttpResponse.json({
         name: 'Pilot Two',
         corporation_id: 1001,
@@ -155,7 +154,6 @@ describe('usePublicInfo', () => {
       addedAt: 1,
       corporationId: 1001,
     });
-    // A character record read two hours ago, still inside the static window.
     await db.esiCache.put({
       characterId: 0,
       key: `public-character:${CHAR_ID}`,
@@ -212,8 +210,6 @@ describe('usePublicInfo.loadMany', () => {
   it('dedupes shared corporation ids into a single names lookup', async () => {
     await usePublicInfo.getState().loadMany([CHAR_ID, 92]);
 
-    // Both characters share corporation_id 1001 — the names batch should
-    // resolve it once (1001 + 2001 = 2 ids), not once per character.
     expect(namesRequests).toBe(1);
   });
 
@@ -258,7 +254,6 @@ describe('usePublicInfo.loadMany', () => {
     await usePublicInfo.getState().loadMany([CHAR_ID, 92]);
 
     expect(usePublicInfo.getState().byCharacterId[CHAR_ID]?.corporationName).toBe('Test Corp');
-    // 92 was never read on this device: nothing stored, so a later visit retries.
     expect(usePublicInfo.getState().byCharacterId[92]).toBeUndefined();
   });
 

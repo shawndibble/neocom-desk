@@ -1,14 +1,3 @@
-// `extractionId` on every `observed` row (ADR 0032, #5254).
-//
-// A row's Extraction is `{structureId}_{startTimeMs}`: the pull whose fracture-to-expiry
-// window covers the row's day. `mergeObservedInto` stamps rows as it writes them (this
-// file's `stampRows`); `stampBook` backfills the rows written before it, once; and
-// `restampStructures` re-stamps a structure's rows when an Extraction is corrected.
-//
-// Additive and backward-compatible (dev and prod share one project): an old client ignores
-// the field. A stamp write leaves `updatedAt` alone, so no officer's device re-reads a row for it.
-// Both use the structure's own expiry, like the read-time placement (`placeOfFactory`).
-
 import type { DocumentReference, Firestore, Timestamp } from 'firebase-admin/firestore';
 import { FieldPath, FieldValue } from 'firebase-admin/firestore';
 import type { MirrorExtraction, ObservedRow } from './corpTaxBookEngine.js';
@@ -20,7 +9,6 @@ const MARKER = 'extractionIdStamped';
 const bookOf = (db: Firestore, corporationId: number) =>
   db.collection('corps').doc(String(corporationId));
 
-/** What placing a row needs: the book's Extractions (plus any being written) and per-structure expiry. */
 export interface StampContext {
   extractions: MirrorExtraction[];
   expiryHours: Record<string, number>;
@@ -37,7 +25,6 @@ export async function loadStampContext(
   const key = (x: MirrorExtraction) => `${x.structureId}_${Date.parse(x.extractionStartTime)}`;
   for (const d of stored.docs) byId.set(d.id, d.data() as MirrorExtraction);
   for (const x of incoming) {
-    // As the write does: an absent field keeps what is stored.
     const set = Object.fromEntries(Object.entries(x).filter(([, v]) => v !== undefined));
     byId.set(key(x), { ...byId.get(key(x)), ...set } as MirrorExtraction);
   }
@@ -47,18 +34,12 @@ export async function loadStampContext(
   };
 }
 
-/** Rows with their Extraction stamp, for the merge. */
 export function stampRows(rows: readonly ObservedRow[], ctx: StampContext): ObservedRow[] {
   return stampExtractionIds(rows, ctx.extractions, ctx.expiryHours);
 }
 
 const FAILED_PRECONDITION = 9;
 
-/**
- * Writes stamps with the row's read time as a precondition, so a merge's fresher write is never
- * overwritten by a stale stamp. A page that fails on one changed row retries row by row, skipping
- * the changed ones: the merge stamped those itself. Returns how many it wrote.
- */
 async function commitStamps(
   db: Firestore,
   writes: readonly {
@@ -88,18 +69,10 @@ async function commitStamps(
   return written;
 }
 
-/**
- * Whether every row of the book carries its Extraction stamp (`stampBook` ran), so a pull's rows
- * can be read by `extractionId` alone.
- */
 export async function isBookStamped(db: Firestore, corporationId: number): Promise<boolean> {
   return (await bookOf(db, corporationId).collection('meta').doc(MARKER).get()).exists;
 }
 
-/**
- * Stamps every unstamped row of the book once; returns how many it wrote. Rows no Extraction
- * covers stay unstamped, counted in the marker; a later Extraction stamps them (`restampStructures`).
- */
 export async function stampBook(
   db: Firestore,
   corporationId: number,
@@ -140,11 +113,6 @@ export async function stampBook(
   return written;
 }
 
-/**
- * Re-stamps the rows of these structures against the Extractions as they stand now: an
- * Extraction corrected (a later laser time, a cancel), a new one that covers old rows, or a
- * changed expiry. Returns how many rows changed.
- */
 export async function restampStructures(
   db: Firestore,
   corporationId: number,

@@ -1,15 +1,3 @@
-/**
- * Item Detail's "Made from": the forward recipe for an item a blueprint or
- * reaction formula produces — inputs per run, output per run, base time.
- * Reads `byProductTypeID` (first blueprint wins, like "Used in"). Loads the
- * blueprint catalog on its own and fails to nothing; an item no blueprint
- * makes renders nothing. Base quantities only — no ME/TE or skills.
- *
- * Given `pricing`, it closes on what a run's inputs cost at the Trade Hub and
- * the margin that leaves on the best sell Item Detail shows above
- * (`madeFromCost.ts`). The line is left out until every input is priced,
- * never shown as 0.
- */
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Disclosure, IskAmount, TypeIcon } from '@/components/ui';
@@ -30,9 +18,7 @@ import { marginOnBestSell, runInputCost } from './madeFromCost';
 import { useKeyedLoad } from '@/lib/useAsyncLoad';
 
 export interface MadeFromPricing {
-  /** Where the inputs are priced. */
   hub: TradeHub;
-  /** The best sell Item Detail shows; undefined while loading, null with no sell orders. */
   bestSell: number | null | undefined;
 }
 
@@ -47,11 +33,9 @@ export function MadeFromSection({
   const actions = useOptionalItemActions();
   const [open, setOpen] = useState(true);
 
-  // "Made from" is a bonus, not core item detail: a failed load renders nothing.
   const loadedCatalog = useKeyedLoad('catalog', loadBlueprintCatalog, !!actions?.blueprints);
   const catalog: BlueprintCatalog | null = actions?.blueprints ?? loadedCatalog.data ?? null;
 
-  // Show info swaps the open modal to another item without remounting it.
   const [shownFor, setShownFor] = useState(typeId);
   if (shownFor !== typeId) {
     setShownFor(typeId);
@@ -61,7 +45,6 @@ export function MadeFromSection({
   const entry = catalog?.byProductTypeID.get(typeId);
   const inputs = entry?.blueprint.materials;
   const hub = pricing?.hub;
-  /** Keyed by what it priced, so a swap to another item never shows the last one's cost. */
   const [inputCost, setInputCost] = useState<{
     inputs: typeof inputs;
     stationId: number;

@@ -40,12 +40,8 @@ describe('useActiveCharacter hydrate failure', () => {
     } finally {
       get.mockRestore();
     }
-    // A failed read must not be able to pin the app on BootScreen forever
-    // (the Root gate waits on `hydrated`). No character is the right answer
-    // here; the Login/character gates take it from there.
     expect(useActiveCharacter.getState().hydrated).toBe(true);
     expect(useActiveCharacter.getState().activeCharacterId).toBeNull();
-    // ...and the failure is reported rather than swallowed.
     expect(captureException).toHaveBeenCalledOnce();
   });
 });

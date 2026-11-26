@@ -1,10 +1,3 @@
-/**
- * The Market Trend feed: a hook source, because what it reads depends on the
- * widgets rather than on the kind. Each Market Trend widget names its own
- * items and Trade Hubs (or follows the Quickbar and the Market hub), so this
- * reads the layout, works out the lines every widget needs, and reads each
- * distinct line once (`loadMarketTrend`).
- */
 import { useEffect, useMemo, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
@@ -23,7 +16,6 @@ import { useOverviewRefresh } from './refreshContext';
 interface Loaded {
   data: MarketTrendFeed | null;
   error: boolean;
-  /** The request (and refresh) the last answer, good or failed, was for. */
   answered: string | null;
 }
 
@@ -31,11 +23,9 @@ export function MarketTrendSource() {
   const store = useFeedStore();
   const { epoch } = useOverviewRefresh();
   const layout = useOverviewLayout((state) => state.value);
-  // A widget with no hubs of its own prices at the Overview page hub.
   const { hubId: defaultHubId, hydrated: hubHydrated } = useHubFor('overview');
   const characterId = useActiveCharacter((state) => state.activeCharacterId);
   const hydrated = useHydratedStore(useOverviewLayout) && hubHydrated;
-  // Undefined only while the read is in flight, so a missing record (an empty Quickbar) still counts as loaded.
   const bar = useLiveQuery(
     async () => ({
       items:
@@ -55,7 +45,6 @@ export function MarketTrendSource() {
       }));
     return { quickbar, defaultHubId, sets };
   }, [hydrated, bar, layout, defaultHubId]);
-  // Only a change in what is asked reloads; an unrelated layout edit (a resize) keeps the same key.
   const signature = request === null ? null : JSON.stringify(request);
 
   const asked = signature === null ? null : `${epoch}:${signature}`;
@@ -65,7 +54,6 @@ export function MarketTrendSource() {
     let live = true;
     loadMarketTrend(JSON.parse(signature) as MarketTrendRequest).then(
       (data) => live && setState({ data, error: false, answered: asked }),
-      // The last good read stays behind a failed refresh.
       () => live && setState((prev) => ({ ...prev, error: true, answered: asked }))
     );
     return () => {

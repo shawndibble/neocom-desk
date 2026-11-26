@@ -12,7 +12,6 @@ import type { BuildPlanRecord } from '@/db';
 import type { BlueprintCatalog } from './blueprintCatalog';
 import type { BuildResult } from '@/engine/industry/types';
 
-// jsdom matches no media query, so without this every case would draw the phone layout.
 const viewport = vi.hoisted(() => ({ desktop: true }));
 vi.mock('@/lib/useIsDesktop', () => ({ useIsDesktop: () => viewport.desktop }));
 
@@ -150,10 +149,10 @@ describe('BuildPlanCompare', () => {
     expect(screen.getByText('Raven')).toBeInTheDocument();
     expect(screen.getByText('5')).toBeInTheDocument();
     expect(screen.getByText('2h 0m')).toBeInTheDocument();
-    expect(screen.getByText('565')).toBeInTheDocument(); // totalCost
-    expect(screen.getByText('435')).toBeInTheDocument(); // profit
-    expect(screen.getByText('77.0%')).toBeInTheDocument(); // marginPct
-    expect(screen.getByText('220')).toBeInTheDocument(); // iskPerHour
+    expect(screen.getByText('565')).toBeInTheDocument();
+    expect(screen.getByText('435')).toBeInTheDocument();
+    expect(screen.getByText('77.0%')).toBeInTheDocument();
+    expect(screen.getByText('220')).toBeInTheDocument();
   });
 
   it('shows an unresolved plan as "—" rather than dropping it, with an explanatory tooltip', () => {
@@ -169,8 +168,7 @@ describe('BuildPlanCompare', () => {
 
     expect(screen.getByText('Orphan')).toBeInTheDocument();
     expect(screen.getByText('Fine')).toBeInTheDocument();
-    // Both plans present — the unresolved one is not dropped from the table.
-    expect(screen.getAllByRole('row')).toHaveLength(3); // header + 2 rows
+    expect(screen.getAllByRole('row')).toHaveLength(3);
     expect(screen.getByRole('button', { name: "Orphan couldn't be priced" })).toBeInTheDocument();
   });
 
@@ -243,11 +241,9 @@ describe('BuildPlanCompare', () => {
     );
 
     expect(await screen.findByText('28')).toBeInTheDocument();
-    // 300 orders on one day of the 30-day window.
     expect(await screen.findByText('10')).toBeInTheDocument();
     expect(screen.getByRole('columnheader', { name: /Orders per day/ })).toBeInTheDocument();
     expect(screen.getByRole('columnheader', { name: /Buy orders/ })).toBeInTheDocument();
-    // The extras start unticked.
     expect(screen.queryByRole('columnheader', { name: /Sell orders/ })).toBeNull();
 
     await userEvent.click(screen.getByRole('button', { name: 'Columns' }));

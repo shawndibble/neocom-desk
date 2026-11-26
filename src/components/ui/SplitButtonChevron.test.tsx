@@ -29,7 +29,6 @@ describe('SplitButtonChevron', () => {
 
   it('overrides the size tier padding with an important utility', () => {
     render(<SplitButtonChevron label="More" size="sm" />);
-    // A bare `px-1` loses to the tier's `px-2.5` in Tailwind's stylesheet order.
     expect(screen.getByRole('button', { name: 'More' })).toHaveClass('px-1!');
   });
 });

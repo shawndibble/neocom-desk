@@ -1,18 +1,9 @@
-/**
- * Plan Milestone (GLOSSARY.md) naming modal: the one small form shared by
- * "Add milestone" and "Rename" — seeded with the existing name on rename,
- * blank on add. One instance is reused across every row (PlanEditor holds a
- * single `milestoneModal` state), so re-seeding on every open transition
- * matters — otherwise a second row would inherit whatever the first one was
- * mid-typing.
- */
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Modal, TextInput, Tooltip } from '@/components/ui';
 
 interface MilestoneModalProps {
   open: boolean;
-  /** Present only when renaming — seeds the field and switches the title/save copy. */
   initialName?: string;
   onClose: () => void;
   onSave: (name: string) => void;
@@ -21,13 +12,8 @@ interface MilestoneModalProps {
 export function MilestoneModal({ open, initialName, onClose, onSave }: MilestoneModalProps) {
   const { t } = useTranslation();
   const isRename = initialName !== undefined;
-  // Not `autoFocus`: that would focus the field before the Modal notes which element to give focus back to.
   const nameRef = useRef<HTMLInputElement>(null);
   const [draft, setDraft] = useState(initialName ?? '');
-  // Adjusted during render (react.dev "Adjusting state when a prop changes"),
-  // like RemapMarkerModal's own `wasOpen` — an effect would commit the stale
-  // draft for one frame first, and calling setState synchronously inside an
-  // effect body is exactly what triggers React's cascading-render warning.
   const [wasOpen, setWasOpen] = useState(open);
   if (open !== wasOpen) {
     setWasOpen(open);

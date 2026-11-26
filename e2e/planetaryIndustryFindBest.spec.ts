@@ -1,11 +1,3 @@
-/**
- * PI Plan, "Find the best thing to build", at laptop and phone widths.
- *
- * Only a real layout engine can say whether the cards, the Show me how panel
- * and the All products grid stay inside a 390px page and keep their 36px
- * targets. With `PI_SHOTS=<dir>` set, each state is also screenshot there, for
- * a side-by-side with `docs/design/pi-tabs/ref/`.
- */
 import type { Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
@@ -19,7 +11,6 @@ const DESKTOP = { width: 1440, height: 900 };
 async function assertNoOverflow(page: Page): Promise<void> {
   const doc = await page.evaluate(() => {
     const width = document.documentElement.clientWidth;
-    // On failure the offenders are the useful part of the message.
     const wide = [...document.querySelectorAll('main *')]
       .filter((el) => el.getBoundingClientRect().right > width + 0.5)
       .slice(0, 6)
@@ -37,7 +28,6 @@ async function assertNoOverflow(page: Page): Promise<void> {
 async function shot(page: Page, name: string): Promise<void> {
   const dir = process.env.PI_SHOTS;
   if (!dir) return;
-  // A phone page runs thousands of pixels; the first screens are what compare.
   const height = await page.evaluate(() => document.documentElement.scrollHeight);
   await page.screenshot({
     path: `${dir}/${name}.png`,
@@ -46,7 +36,6 @@ async function shot(page: Page, name: string): Promise<void> {
   });
 }
 
-/** Command Center Upgrades IV and Interplanetary Consolidation III: a pilot who can host a setup. */
 async function mockPiSkills(page: Page, commandCenterLevel = 4): Promise<void> {
   const trained = (skill_id: number, level: number) => ({
     skill_id,
@@ -100,7 +89,6 @@ for (const [label, viewport] of [
       await shot(page, `${label}-no-colonies`);
 
       const how = page.getByRole('button', { name: /^Show me/ }).first();
-      // boundingBox() doesn't wait and returns null for an element not yet rendered.
       await expect(how).toBeVisible();
       if (label === 'phone') {
         expect((await how.boundingBox())!.height).toBeGreaterThanOrEqual(36);
@@ -117,7 +105,6 @@ for (const [label, viewport] of [
           const target = panel.getByRole(name === 'Close' ? 'button' : 'checkbox', { name });
           await expect(target).toBeVisible();
           const box = (await target.boundingBox())!;
-          // The checkbox's label row carries the 36px target, not the 16px box.
           const height =
             name === 'Close'
               ? box.height

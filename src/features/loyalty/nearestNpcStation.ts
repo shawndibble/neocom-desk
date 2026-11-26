@@ -1,8 +1,3 @@
-/**
- * Which station of an NPC corporation is nearest the pilot (issue #5384).
- * Pure over the NPC station list and the jumps from the Current System, the
- * same `jumps` map `nearestStation` in `lpStoreSnapshot.ts` takes.
- */
 import type { NpcStationEntry } from '@/sde/marketTypes';
 
 export interface NearestNpcStation {
@@ -12,10 +7,6 @@ export interface NearestNpcStation {
   jumps: number;
 }
 
-/**
- * The station `owns` accepts with the fewest jumps; ties go to the lowest
- * station id. Null when distances are not known or none is reachable.
- */
 export function nearestStationWhere(
   stations: readonly NpcStationEntry[],
   jumps: ReadonlyMap<number, number> | null,
@@ -43,11 +34,6 @@ export function nearestStationWhere(
   return best;
 }
 
-/**
- * The corporation's station with the fewest jumps; ties go to the lowest
- * station id. Null when distances are not known, no station is reachable, or
- * the snapshot has no `ownerCorporationId` (owner unknown).
- */
 export function nearestNpcStation(
   corporationId: number,
   stations: readonly NpcStationEntry[],

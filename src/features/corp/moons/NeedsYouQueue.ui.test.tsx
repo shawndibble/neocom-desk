@@ -25,7 +25,6 @@ vi.mock('./lateNoticeMailing', () => ({
   mailTarget: vi.fn(),
   useCorporationName: () => 'Brass Anvil Corp',
 }));
-// The record dialog previews against a whole book; here only the amount it opens with matters.
 vi.mock('./BookDialogs', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./BookDialogs')>()),
   RecordPaymentDialog: ({
@@ -95,7 +94,6 @@ function renderQueue(
           {
             characterId: 9,
             corporationId: 98000001,
-            // The tabs read the view's Miners and Needs you items: the test's own.
             view: {
               ...((view as object | undefined) ?? {
                 input: {
@@ -128,7 +126,6 @@ function renderQueue(
                   },
                 ],
               }),
-              // A built view keeps its own Miners; a hand-built one takes the given ones.
               miners: (view as { miners?: MinerRow[] } | undefined)?.miners?.length
                 ? (view as { miners: MinerRow[] }).miners
                 : miners,
@@ -161,7 +158,6 @@ describe('NeedsYouQueue (#6207)', () => {
     await userEvent.setup().click(screen.getByRole('button', { name: 'Count Division 2' }));
     expect(editBook).toHaveBeenCalledWith(9, 98000001, {
       action: 'updateSettings',
-      // The server adds division 2 to what it stores; the list is for an older server.
       patch: { addDivision: 2, divisions: [1, 2] },
     });
   });
@@ -282,7 +278,6 @@ describe('NeedsYouQueue (#6207)', () => {
     expect(screen.getByText(/1,200 Zeolites to Rival Corp/)).toBeInTheDocument();
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: 'Waive their ore' }));
-    // 1,200 × 10,000 × 10%: the day's other ore stays billed.
     expect(screen.getByText(/1,200,000 of tax on the ore they disputed/)).toBeInTheDocument();
     await user.type(screen.getByRole('textbox'), 'Their ore');
     await user.click(screen.getByRole('button', { name: 'Waive 1,200,000' }));
@@ -296,7 +291,6 @@ describe('NeedsYouQueue (#6207)', () => {
   });
 
   it('still lets an officer answer a dispute of a locked day', () => {
-    // 2026-09-05 is before the lock date (2026-10-01) on 2026-12-20; the server allows the answer.
     renderQueue([], {
       disputes: [dispute],
       view: {
@@ -348,7 +342,6 @@ describe('NeedsYouQueue (#6207)', () => {
     await user.click(screen.getByRole('button', { name: 'Keep the bill' }));
     const [reason, nextStep] = screen.getAllByRole('textbox');
     await user.type(reason!, 'Our moon');
-    // The next step is required: Confirm stays disabled until it is filled.
     const confirm = screen.getAllByRole('button', { name: 'Keep the bill' }).at(-1)!;
     expect(confirm).toHaveAttribute('aria-disabled', 'true');
     expect(
@@ -444,7 +437,6 @@ describe('NeedsYouQueue (#6207)', () => {
     const miners = [{ ...miner('g1', 7), characterIds: [7, 9] }, miner('solo:8', 8)];
     renderQueue([], { miners, groupingAnswers: [declined] });
     await userEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
-    // The officer's own Character signs the call; the answer's Character is the one dismissed.
     expect(dismissGroupingAnswer).toHaveBeenCalledWith(9, 98000001, 8);
     cleanup();
     renderQueue([], {
@@ -493,7 +485,6 @@ describe('NeedsYouQueue (#6207)', () => {
       },
     ]);
     await userEvent.setup().click(screen.getByRole('button', { name: 'Confirm paid' }));
-    // The payment id comes from the declaration, so a retry or a second officer cannot double it.
     expect(await screen.findByText('Record payment: 4000000 as m_x1')).toBeInTheDocument();
   });
 
@@ -770,7 +761,6 @@ describe('NeedsYouQueue: late notices are due (#6294)', () => {
       structureExpiryHours: {},
       lastSyncedAt: '2026-10-18T12:00:00Z',
       rates: [{ scope: 'corp', pct: 10, effectiveFrom: '2026-08-01' }],
-      // 100,000 units at 1,000 ISK and 10%: 10M a day, the default notice minimum each.
       entries: ['2026-08-10', '2026-09-10'].map((date) => ({
         characterId: 7,
         recordedCorporationId: 98000001,

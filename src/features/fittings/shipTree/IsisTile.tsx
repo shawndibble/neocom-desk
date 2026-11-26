@@ -1,9 +1,3 @@
-/**
- * An ISIS hull tile: the grayscale render, the tech corner (always shown),
- * the winged Mastery badge, and the tile's tone — dim when the pilot can't
- * fly it, gold at Mastery V only. `thumb` is the ladder's 44px version with
- * the same marks.
- */
 import { memo, type FocusEvent, type MouseEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { romanLevel } from '@/engine/projection';
@@ -32,10 +26,6 @@ function Wing({ flip }: { flip?: boolean }) {
   );
 }
 
-/**
- * The winged Mastery badge: empty ring below Mastery I. Classes default to
- * the tile corner's; the Ship Info header passes its own.
- */
 export function MasteryBadge({
   mastery,
   className = 'isis-badge',
@@ -54,7 +44,6 @@ export function MasteryBadge({
   );
 }
 
-/** The tile's inner marks, shared by the map tile and the ladder thumbnail. */
 function TileMarks({ ship, mastery }: { ship: ShipTreeShip; mastery: number }) {
   const mark = techMark(ship);
   return (
@@ -118,7 +107,6 @@ export const IsisTile = memo(function IsisTile({
   );
 });
 
-/** The ladder's 44px thumbnail: decorative, the row around it carries the name. */
 export function IsisThumb({
   ship,
   status,

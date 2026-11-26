@@ -4,19 +4,6 @@ import { label } from '@/engine/corp/members';
 import type { RosterRow } from './CorpRoster';
 import { rolesText } from './roles';
 
-/**
- * CSV columns for the corp members roster export: member, last seen, ship,
- * location, joined and roles in the table's order, plus the CEO, you and dark
- * tags the member cell carries. `lastSeenMs`/`startMs` pass through as epoch
- * ms rather than the table's localized strings: the export is data, not a
- * screenshot of the rendering.
- *
- * The member column reuses the table's own `label()` — `characterId` is
- * never null, so it always degrades to `#id` rather than `label()`'s DASH
- * placeholder. Ship/location roll their own null handling instead: a CSV
- * blank cell (`null`), not `label()`'s em-dash, is the right "nothing here"
- * for a truly unresolved and unknown ship/location.
- */
 export function membersCsvColumns(t: CsvTranslate): CsvColumn<RosterRow>[] {
   return [
     {
@@ -43,7 +30,6 @@ export function membersCsvColumns(t: CsvTranslate): CsvColumn<RosterRow>[] {
       header: t('corp.members.columnRoles'),
       value: (row) => rolesText(row.roles),
     },
-    // The member cell's tags, as columns a spreadsheet can filter on.
     {
       header: t('corp.members.csvCeo'),
       value: (row) => exportFlag(t, row.isCeo),

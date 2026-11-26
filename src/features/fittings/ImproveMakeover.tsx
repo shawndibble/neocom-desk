@@ -1,10 +1,3 @@
-/**
- * The Makeover group (#5548): a whole-fit rework laid out by the fitted module
- * that leaves ("2× Shield Power Relay II split into", then one tickable row per
- * new module). One tick for the group, three states; the whole-fit before →
- * after figures on top. Renders from props only: the search, names and prices
- * come from the owner.
- */
 import type { TFunction } from 'i18next';
 import { formatSeconds } from '@/lib/duration';
 import { useTranslation } from 'react-i18next';
@@ -22,22 +15,14 @@ import { MakeItFitSection } from './MakeItFitSection';
 
 export interface ImproveMakeoverProps {
   makeover: Makeover;
-  /** The open fit's figures, the "before" of the whole-fit line. */
   before: FittingStats;
-  /** Keys (`moveKey` of a row's candidate) of the ticked rows. */
   ticked: ReadonlySet<string>;
-  /** Ticks (`checked`) or unticks every key given; the group passes all its rows. */
   onToggle: (rowKeys: readonly string[], checked: boolean) => void;
-  /** Each row's goal gain on its own, as a fraction, by row key; shown while the group is partly ticked. */
   singleGains?: ReadonlyMap<string, number>;
-  /** Rounds the search took, for "Found in N rounds"; absent: the line is left out. */
   rounds?: number;
   typeName: (typeId: number) => string;
-  /** ISK the row costs (a rig at full price); null: no price. */
   rowCost: (row: ImproveCandidate) => number | null;
-  /** A quiet line for a row whose target group most community fits carry (#5581); null: none. */
   hintOf?: (row: ImproveCandidate) => string | null;
-  /** Quiet cautions: groups this Makeover removes that most community fits keep. */
   cautions?: readonly string[];
 }
 
@@ -58,7 +43,6 @@ const toneClass: Record<Tone, string> = {
 
 const higher = (before: number, after: number): Tone =>
   after > before ? 'up' : after < before ? 'over' : 'same';
-/** Stable beats running dry; a higher stable level, or a longer time to empty, is better. */
 function capacitorTone(before: FittingStats, after: FittingStats): Tone {
   const was = before.capacitor;
   const now = after.capacitor;
@@ -69,9 +53,7 @@ function capacitorTone(before: FittingStats, after: FittingStats): Tone {
 const resourceTone = (used: number, total: number): Tone =>
   used > total ? 'over' : total > 0 && used / total >= 0.98 ? 'tight' : 'same';
 
-/** The whole-fit figures: DPS, EHP, speed, capacitor, CPU, powergrid. */
 function figuresOf(t: TFunction, before: FittingStats, after: FittingStats): Figure[] {
-  // How long it lasts, not only whether it lasts: running dry later is a gain the pilot can see.
   const cap = (s: FittingStats) =>
     s.capacitor.stable
       ? t('fittings.improve.makeover.capStable', { pct: Math.round(s.capacitor.stablePercentage) })
@@ -118,14 +100,11 @@ function figuresOf(t: TFunction, before: FittingStats, after: FittingStats): Fig
 }
 
 interface SourceGroup {
-  /** The fitted module that leaves; null for rows that fill an empty slot. */
   fromTypeId: number | null;
-  /** Copies of it that change, over all its rows. */
   copies: number;
   rows: ImproveCandidate[];
 }
 
-/** Rows under the fitted module they replace, in the Makeover's own order. */
 function groupBySource(rows: readonly ImproveCandidate[]): SourceGroup[] {
   const groups = new Map<number | null, SourceGroup>();
   for (const row of rows) {

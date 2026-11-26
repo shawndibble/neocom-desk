@@ -102,7 +102,6 @@ describe('PayeeRunningAccount', () => {
       expect(account.owes).toBeNull();
       expect(account.credit).toBe(0);
       expect(account.balance).toBe(0);
-      // Real money settled both days first: the marks had nothing left to settle.
       expect(account.marked.map((m) => m.amount)).toEqual([0, 0]);
     });
 
@@ -114,7 +113,6 @@ describe('PayeeRunningAccount', () => {
     });
 
     it('settles only what real money left of the day, and keeps the other day owed', () => {
-      // Real money 1,500 pays day one and half of day two; the mark on day one has nothing to do.
       const account = buildMarked([mark('m1'), link(9, 1_500, '2026-10-04')]);
       expect(account.owes).toEqual({ amount: 500, days: 1, oldest: '2026-10-02' });
       expect(account.credit).toBe(0);

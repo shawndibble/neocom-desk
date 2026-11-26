@@ -1,9 +1,3 @@
-/**
- * The app-wide Place Info for `?info=place-<id>` (a region, station or
- * structure), mounted once in `App.tsx` like `ItemInfoModal`: any place name
- * can link to it (`PlaceLink`) without its page owning a host. The dialog's
- * chunk loads on first open.
- */
 import { Suspense } from 'react';
 import { lazyNamed } from '@/app/lazyNamed';
 import { usePlaceInfoModalStore } from '@/stores/placeInfoModal';

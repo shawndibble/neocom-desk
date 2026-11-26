@@ -1,24 +1,3 @@
-/**
- * Prices Market-Wide candidates with the Build Plan engine.
- *
- * A row used to be priced from a flattened material tree
- * (`computeMarketWideRows`), which could not see what a plan sees: what the
- * blueprint itself costs from the contract, LP Store or market it comes from,
- * make-or-buy on intermediates, invention. The scan said +94% where the plan
- * it opened said −213%. Each candidate is now a Build Plan record — the one
- * a click on its row would create — run through `resolveBuildPlan`, the same
- * call the plan page, Compare and Group Rollups make, so the row's figures
- * are the plan's.
- *
- * Everything the plan reads is loaded once for the whole scan, never per
- * candidate: one price snapshot over the union of every plan's types, one
- * blueprint-offers read (a Fuzzwork call per region, cached LP lookups), one
- * contract snapshot. Resolving is pure arithmetic over those.
- *
- * Not carried: Depth Prices (order-book walks for a large need — one request
- * per material, a plan page does them for the plan it shows) and Community
- * Offers (free Shared Blueprints, read by a page hook).
- */
 import type { BuildPlanRecord } from '@/db';
 import type { CharacterModifiers } from '@/engine/industry/characterModifiers';
 import type { PricedMarketWideCandidate } from '@/engine/industry/marketWideOpportunities';
@@ -44,15 +23,11 @@ import type { MarketWideResearch } from './marketWideOpportunities';
 import { atPercent } from '@/features/market/pagePricePercents';
 import { DEFAULT_PRICE_PERCENT } from '@/features/market/pricePercent';
 
-/** One liquidity-selected candidate, ready to be priced as a plan. */
 export interface MarketWidePlanCandidate {
   productTypeID: number;
   tree: MarketWideTreeEntry;
-  /** The product's sell price the row is priced at — the hub's, or CCP's average when that was a troll order. */
   sellPrice: number;
-  /** ISK value of sell orders for the product at the hub, carried to the row's order-depth read. */
   sellDepthIsk: number;
-  /** The ME/TE the row is priced at (`researchFor`). */
   me: number;
   te: number;
 }
@@ -62,14 +37,11 @@ export interface MarketWidePlanContext {
   catalog: BlueprintCatalog;
   modifiers: CharacterModifiers;
   standing?: ResolvedStandings;
-  /** The plan's owner, and whose blueprints `research.owned` are. Absent reads as no Character. */
   characterId: number | null;
   research?: MarketWideResearch;
-  /** The Industry percent (issue #6531): materials and the product price at it. Absent is 100. */
   pricePercent?: number;
 }
 
-/** The snapshot with one product repriced, for a troll-capped sell order; shared otherwise. */
 function snapshotAt(
   snapshot: MarketSnapshot,
   productTypeID: number,
@@ -79,11 +51,6 @@ function snapshotAt(
   return { ...snapshot, hubPrices: { ...snapshot.hubPrices, [productTypeID]: price } };
 }
 
-/**
- * Prices every candidate as the Build Plan a click on its row would create.
- * A candidate the plan engine cannot price (an unpriced material, no product
- * price) is left out rather than shown at a guess.
- */
 export async function priceCandidatesAsPlans(
   candidates: readonly MarketWidePlanCandidate[],
   context: MarketWidePlanContext
@@ -97,7 +64,6 @@ export async function priceCandidatesAsPlans(
     loadActivityFacilityDefaults(),
     loadPi().catch(() => null),
     loadBpcContractRows().catch(() => null),
-    // A new plan starts its price basis (and hub) from the Character's latest plan.
     characterId === null ? null : loadLatestBuildPlan(characterId).catch(() => null),
   ]);
   const typeIds = new Set<number>();
@@ -110,7 +76,6 @@ export async function priceCandidatesAsPlans(
   for (const candidate of candidates) typeIds.add(candidate.productTypeID);
   const blueprintIds = blueprintTypeIdsIn([...typeIds], catalog);
 
-  // The job fee is charged where a new plan builds: the remembered system, else the hub's own.
   const location = startingLocation('manufacturing', facilityDefaults, latestPlan);
   const [snapshot, purchaseOffers, inventionMarket] = await Promise.all([
     loadMarketSnapshot(

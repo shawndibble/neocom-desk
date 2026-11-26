@@ -1,25 +1,12 @@
-/**
- * The Characters toolbar (New Group / density / view mode) at 390px (#768).
- *
- * jsdom has no layout, so the unit tests can assert the controls render but
- * not that they share one row without overflow — the same reasoning
- * `filterSheetNarrow.spec.ts` and `corpBoardNarrow.spec.ts` give for running
- * this one against a real browser instead.
- */
 import type { Page } from '@playwright/test';
 import { test, expect, PHONE } from './support/testBase';
 import { CHARACTER_NAME } from './support/fixtureData';
 
-/**
- * Both tests here start the same way. `support/login.ts`'s helper lands on
- * /overview, and this file is about the Characters toolbar specifically.
- */
 async function landOnCharactersAtPhoneWidth(page: Page) {
   await page.setViewportSize(PHONE);
   await page.goto('./');
   await page.getByRole('button', { name: 'Log in with EVE Online' }).first().click();
   await page.waitForLoadState('load');
-  // A first-ever login lands on /overview (#1771); this file is about the list.
   await expect(page).toHaveURL(/\/overview$/);
   await page.goto('./characters');
   await expect(page.getByRole('button', { name: `Select ${CHARACTER_NAME}` })).toBeVisible();
@@ -29,25 +16,16 @@ test('picking a Character from the More sheet returns to the page you switched f
   page,
 }) => {
   await landOnCharactersAtPhoneWidth(page);
-  // Picking on Characters itself (no origin page) stays put.
   await page.getByRole('button', { name: `Select ${CHARACTER_NAME}` }).click();
   await expect(page).toHaveURL(/\/characters$/);
 
   const mobileNav = page.getByRole('navigation', { name: 'Mobile navigation' });
 
-  // Navigate away from Overview via the More sheet, so switching characters
-  // has somewhere other than Overview to prove it returns to.
   await mobileNav.getByRole('button', { name: 'More' }).click();
   await page.getByRole('dialog', { name: 'More' }).getByRole('link', { name: 'Wallet' }).click();
-  // The link targets bare `/wallet`, which `TabRoute` then replaces with its
-  // default tab. Wait for that redirect to settle before recording where we
-  // are: matching the transient `/wallet` and reading `page.url()` raced the
-  // redirect, so the recorded origin was sometimes `/wallet` while the app
-  // (correctly) returned to `/wallet/balance`.
   await expect(page).toHaveURL(/\/wallet\/balance$/);
   const walletUrl = page.url();
 
-  // Switch characters via the More sheet's portrait+name row.
   await mobileNav.getByRole('button', { name: 'More' }).click();
   await page
     .getByRole('dialog', { name: 'More' })
@@ -79,8 +57,6 @@ test('New Group, density, and view-mode controls share one row at 390px', async 
   expect(newGroupBox).not.toBeNull();
   expect(densityBox).not.toBeNull();
   expect(cardsBox).not.toBeNull();
-  // Same row: vertical centers line up rather than one control wrapping onto
-  // its own line below the others.
   expect(
     Math.abs(newGroupBox!.y + newGroupBox!.height / 2 - (densityBox!.y + densityBox!.height / 2))
   ).toBeLessThan(4);
@@ -99,9 +75,6 @@ test('the table view shows Last synced age text at 390px (#1783)', async ({ page
   await landOnCharactersAtPhoneWidth(page);
   await page.getByRole('button', { name: 'Table' }).click();
 
-  // The age comes from stats and the skill queue, which load after the table
-  // renders ("Unknown" until then). On a loaded CI shard that outran the 5s
-  // default and the cell was still "Unknown", so wait for the data explicitly.
   const age = page.locator('table td time').first();
   await expect(age).toBeVisible({ timeout: 20_000 });
   await expect(age).not.toHaveText('');
@@ -120,7 +93,6 @@ test('the table view keeps the Name column pinned while scrolling right at 390px
     el.scrollLeft = el.scrollWidth;
     return el.scrollLeft;
   });
-  // Nothing to prove if the table happens to fit this fixture.
   expect(scrolled).toBeGreaterThan(0);
 
   const box = await nameCell.boundingBox();
@@ -130,11 +102,6 @@ test('the table view keeps the Name column pinned while scrolling right at 390px
   expect(box!.width).toBeLessThanOrEqual(130);
 });
 
-/**
- * The sole logged-in Character is active on first login (`Callback.tsx`), so
- * one Character proves the marker is selective; a second, non-active card is
- * already covered in `Characters.test.tsx`.
- */
 test('the active card shows aria-current and an Active label at 390px (#1793)', async ({
   page,
 }) => {
@@ -145,11 +112,6 @@ test('the active card shows aria-current and an Active label at 390px (#1793)', 
   await expect(card.getByText('Active')).toBeVisible();
 });
 
-/**
- * `hasTouch` is scoped to this block, not the file: it flips
- * `(pointer: coarse)`/`(hover: none)`, and the row-layout test above must keep
- * measuring the rendering it was written against.
- */
 test.describe('Refresh all on a touch device', () => {
   test.use({ hasTouch: true });
 
@@ -161,7 +123,6 @@ test.describe('Refresh all on a touch device', () => {
 
     const refreshAll = page.getByRole('button', { name: 'Refresh all' });
     await expect(refreshAll).toBeVisible();
-    // The hint used to live in a native `title=`, which touch can never reveal.
     await expect(refreshAll).not.toHaveAttribute('title');
     await expect(page.getByRole('tooltip')).toHaveCount(0);
 
@@ -169,18 +130,12 @@ test.describe('Refresh all on a touch device', () => {
     expect(box).not.toBeNull();
     const touchPoint = { x: box!.x + box!.width / 2, y: box!.y + box!.height / 2 };
 
-    // `page.touchscreen.tap()` is a tap, not a hold, so CDP drives the raw
-    // touch sequence: hold past Tooltip's 500ms long-press, then *cancel*
-    // rather than end it — a touchend synthesizes the click that would kick
-    // off the refresh this test is only trying to read about.
     const cdp = await page.context().newCDPSession(page);
     await cdp.send('Input.dispatchTouchEvent', {
       type: 'touchStart',
       touchPoints: [touchPoint],
     });
     try {
-      // `toHaveText` waits out the long-press delay on its own; `toBeVisible`
-      // is what makes it "reachable" rather than merely present.
       await expect(page.getByRole('tooltip')).toHaveText(REFRESH_ALL_HINT);
       await expect(page.getByRole('tooltip')).toBeVisible();
     } finally {

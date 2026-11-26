@@ -14,7 +14,6 @@ const GAPS = {
   omegaOnly: false,
 } as const;
 
-/** @summary A Popular fit row's can-fly verdict for the active Character (#6011). */
 const meta = {
   title: 'fittings/PopularFitVerdict',
   component: PopularFitVerdict,
@@ -32,25 +31,20 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** @summary Every skill the fit needs is trained. */
 export const CanFly: Story = {};
 
-/** @summary Skills to train first, counted as the editor's Missing skills chip counts them. */
 export const Missing: Story = {
   args: { verdict: GAPS },
 };
 
-/** @summary An Alpha who needs a skill past the Alpha cap. */
 export const OmegaOnly: Story = {
   args: { verdict: { ...GAPS, skills: GAPS.skills.slice(0, 1), omegaOnly: true } },
 };
 
-/** @summary A type's requirements couldn't be read: never shown as flyable. */
 export const Unknown: Story = { args: { verdict: { kind: 'unknown' } } };
 
 const NO_NAMES = new Map<number, string>();
 
-/** @summary In a row at phone width: the verdict keeps its width; the title truncates first. A module the pilot can't use is tinted. */
 export const InRowsAtPhoneWidth: Story = {
   render: () => (
     <ul className="w-[358px] space-y-1">

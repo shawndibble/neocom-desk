@@ -1,4 +1,3 @@
-// readBook for one Miner (issue #5258): which documents one Miner's page reads.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 type Data = Record<string, unknown>;
@@ -109,10 +108,10 @@ beforeEach(async () => {
   store.docs.set(`${BOOK}/dismissals/d1`, { id: 'd1' });
   store.docs.set(`${BOOK}/declarations/x1`, { id: 'x1', statementId: 's-new' });
   store.docs.set(`${BOOK}/declarations/x2`, { id: 'x2', statementId: 's-other' });
-  obs('o1', 1, '2026-07-10'); // before the book: never read
+  obs('o1', 1, '2026-07-10');
   obs('o2', 1, '2026-09-10');
   obs('o3', 2, '2026-09-12');
-  obs('o4', 9, '2026-09-12'); // someone else's
+  obs('o4', 9, '2026-09-12');
 });
 
 describe('readBook for one Miner', () => {
@@ -142,11 +141,10 @@ describe('readBook for one Miner', () => {
 
   it('reads a solo Miner by its character, from the book’s start', async () => {
     store.docs.delete(`${BOOK}/miners/m1`);
-    obs('o5', 5, '2026-07-30', 98000099); // a guest's last row, before the book
+    obs('o5', 5, '2026-07-30', 98000099);
     obs('o6', 5, '2026-06-01', 98000099);
     store.reads.length = 0;
     const read = await readMiner('solo:5');
-    // Mining before the book owes nothing, and none is read.
     expect(read!.observed).toEqual([]);
     expect(store.reads.filter((p) => p.includes('/observed/'))).toEqual([]);
   });
@@ -183,13 +181,11 @@ describe('readBook for one Miner', () => {
     });
     const d = (await readMiner('m1'))!;
     expect(d.disputes?.map((x) => x.id)).toEqual(['q1']);
-    // By Miner, as the page's other records: another Miner's dispute is never read.
     expect(store.reads).not.toContain(`${BOOK}/disputes/q2`);
     expect(d.uncounted?.map((x) => x.id)).toEqual(['u1']);
   });
 });
 
-/** The fields a read filled in, `state`'s included: what a page can join. */
 function fieldsOf(data: object): string[] {
   const state = (data as { state: object }).state;
   return [

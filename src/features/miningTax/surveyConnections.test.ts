@@ -122,7 +122,6 @@ describe('refreshSurveyConnection', () => {
   it('reads what is stored, so a tab still holding a replaced connection cannot write it back', async () => {
     const running = connection({ untilMs: Date.now() + 3_600_000 });
     await startSurveyConnection({ ...running, surveyId: 'other' });
-    // Another tab's view of the list, from before 'other' replaced it.
     useSurveyConnections.setState({ value: [running] });
     await refreshSurveyConnection({ ...running, untilMs: running.untilMs + 60_000 });
     expect(useSurveyConnections.getState().value.map((c) => c.surveyId)).toEqual(['other']);
@@ -245,7 +244,6 @@ describe('applySurveyConnections', () => {
       expect(await applySurveyConnections([ledger(50)], NOW)).toEqual([]);
       expect((await db.miningTaxAssignments.get('dflt'))?.payeeId).toBe('landlord');
 
-      // Paid: a payment linked to its Payee reached its day (decision 20261120-235011).
       await db.miningTaxAssignments.put(madeByDefault([{ typeId: ORE, quantity: 50 }]));
       await db.miningTaxPaymentLinks.put({
         id: 'journal:1',

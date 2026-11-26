@@ -64,7 +64,6 @@ describe('loadTypeDetail', () => {
       packagedVolume: 2500,
     });
 
-    // No ESI handler: an ESI read would fail the test on the unhandled request.
     expect(await loadTypeDetail(RIFTER)).toEqual({
       description: 'Baked.',
       volume: 27289,

@@ -10,11 +10,6 @@ import { overdueTarget, type ResolveTarget } from './resolve/targets';
 
 const k = (key: string) => `miningTax.corpBook.declare.${key}`;
 
-/**
- * What the member told the corporation about a Late notice, and its answer (#6206). A rejection
- * reads the officer's reason and their next step word for word: the member is never left with
- * "ask someone" (decision 20261116-194150).
- */
 export function CorpDeclarationStatus({
   declaration,
   corpName,
@@ -43,11 +38,6 @@ export function CorpDeclarationStatus({
   );
 }
 
-/**
- * A book row's declaration slot (#6206): what the member told the corporation about the day's
- * Late notice, and Resolve while they may say it (the same dialog as every other problem, so the
- * corporation's tax contact is mailed too). Nothing without a Late notice.
- */
 export function CorpDeclareSlot({
   view,
   onResolve,

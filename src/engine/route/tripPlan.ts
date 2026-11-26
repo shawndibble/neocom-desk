@@ -1,14 +1,3 @@
-/**
- * A trip through several Stops (issue #2475): the Legs flown between them, and
- * — when asked — the stop order with the lowest total route cost.
- *
- * Every cost here comes from the same search, under the same options, that
- * draws a leg (`routeSweepFrom`), so an optimized order and the legs it is
- * flown with always agree: under Prefer shorter that is the fewest jumps, and
- * under a security preference it is the preference's own cost, not raw jumps.
- * Anything the leg search learns — Avoided Systems today, wormhole edges in
- * the graph later — reaches the ordering with no change here.
- */
 import {
   routeSweepFrom,
   type FindJumpRouteOptions,
@@ -17,22 +6,17 @@ import {
   type RouteSweep,
 } from './jumpRoute';
 
-/** The most stops a trip takes after its start: Held-Karp stays instant to here. */
 export const MAX_STOPS = 10;
 
-/** One pair's route: its preference-weighted cost and its jumps. */
 export interface RouteCost {
   cost: number;
   jumps: number;
 }
 
-/** `[i][j]` is the route from point i to point j; `null` when no stargate route joins them. */
 export type RouteCostMatrix = readonly (readonly (RouteCost | null)[])[];
 
 export interface StopOrderOptions {
-  /** The trip ends back at its start, and that last leg counts. */
   returnToStart?: boolean;
-  /** The final stop is the real destination: only the stops before it move. */
   keepLastStopLast?: boolean;
 }
 
@@ -47,24 +31,13 @@ export interface TripLeg {
 }
 
 export interface TripPlan {
-  /** In flying order; with Return to start, the last leg comes home. */
   legs: TripLeg[];
-  /** Set only when optimizing changed the order: the new order and the jumps either way. */
   reordered: { stops: number[]; typedJumps: number; jumps: number } | null;
-  /** A stop no stargate route reaches: its legs have no route and the order cannot be optimized. */
   unreachable: boolean;
 }
 
-/**
- * Below this, two orders' costs are a tie. Costs are sums of 0.9, 1 and
- * exp(0.15 × penalty) steps, plus 1e12 per Avoided System entered — so a real
- * difference is never this small, while rounding on a sum near 1e13 can
- * reach a few thousandths. A relative tolerance would swamp real differences
- * there, so this one is absolute.
- */
 const TIE = 1e-2;
 
-/** One sweep per point, and the matrix read off them — the legs reuse the sweeps. */
 function sweepPoints(
   graph: JumpGraph,
   points: readonly number[],
@@ -82,7 +55,6 @@ function costTo(sweep: RouteSweep, graph: JumpGraph, to: number): RouteCost | nu
   return { cost, jumps };
 }
 
-/** The total of flying `order` from point 0, or `null` when a leg has no route. */
 function orderTotal(
   matrix: RouteCostMatrix,
   order: readonly number[],
@@ -100,13 +72,6 @@ function orderTotal(
   return { cost, jumps };
 }
 
-/**
- * The visiting order of points 1…n, starting from point 0, with the lowest
- * total cost — exact, by Held-Karp over the stops free to move. The typed
- * order (1, 2, …, n) wins any tie, so an order only changes for a real saving.
- *
- * `null` when some pair has no route: no order can fly them all.
- */
 export function optimizeStopOrder(
   matrix: RouteCostMatrix,
   options: StopOrderOptions = {}
@@ -120,7 +85,6 @@ export function optimizeStopOrder(
   const cost = (from: number, to: number) => matrix[from][to]?.cost ?? Number.POSITIVE_INFINITY;
   const last = keepLastStopLast ? n : null;
   const free = last === null ? typed : typed.slice(0, -1);
-  /** What the trip still costs after the free stops, ending at `stop`. */
   const tail = (stop: number) => {
     const end = last ?? stop;
     return (last === null ? 0 : cost(stop, last)) + (returnToStart ? cost(end, 0) : 0);
@@ -174,13 +138,6 @@ export function optimizeStopOrder(
   return last === null ? order : [...order, last];
 }
 
-/**
- * The legs of a trip from `start` through `stops`, in the typed order or the
- * cheapest one. Legs are drawn from the very sweeps the costs come from.
- *
- * A stop no stargate route reaches leaves the trip in its typed order, with
- * that stop's legs as `no-route`, and optimizing off until it is removed.
- */
 export function planTrip(
   graph: JumpGraph,
   start: number,

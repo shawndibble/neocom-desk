@@ -40,7 +40,6 @@ describe('BuildPlanAutoBuildControl', () => {
 
     expect(screen.queryByText('Manufacturing')).not.toBeInTheDocument();
     const reactionsChip = screen.getByText('no reactions');
-    // Plain text, not a chip: it cannot be clicked, so it must not look like a toggle.
     expect(reactionsChip.tagName).not.toBe('BUTTON');
     fireEvent.pointerMove(reactionsChip);
     expect(await screen.findByRole('tooltip')).toHaveTextContent(

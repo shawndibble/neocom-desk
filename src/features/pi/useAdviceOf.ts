@@ -1,15 +1,3 @@
-/**
- * The PI tabs' advice for one `PlanAdviceInput`, built off the main thread
- * where the browser has a Worker and on the page where it has not (jsdom, a
- * failed worker). Same answer either way: both run `buildPlanAdvice`.
- *
- * An answer already in hand (a tab switch back) is returned on the first
- * render. While a new input's answer is on its way, the previous answer stays
- * if it was built from the same colonies (a preference, market or route
- * change) or the same Character's colonies read again (`snapshotLineage`: a page
- * refresh), so the board does not blank and lose its place; for any other
- * input it is `pending`, never another Character's figures.
- */
 import { useEffect, useMemo, useState } from 'react';
 import { buildSharedPlanAdvice } from './planAdviceModel';
 import type { PlanAdvice, PlanAdviceInput } from './planAdvice/types';
@@ -27,10 +15,8 @@ export type AdviceOf =
 const PENDING: AdviceOf = { status: 'pending' };
 const FAILED: AdviceOf = { status: 'error' };
 
-/** The newest ready answer per snapshot lineage: what a pending input falls back to. */
 const lastReadyOf = new WeakMap<object, AdviceOf>();
 
-/** One result object per advice, so a caller's memo keyed on it holds across renders. */
 const readyOf = new WeakMap<PlanAdvice, AdviceOf>();
 
 function ready(advice: PlanAdvice): AdviceOf {
@@ -53,7 +39,6 @@ function peeked(input: PlanAdviceInput): AdviceOf | null {
   return 'advice' in known ? ready(known.advice) : FAILED;
 }
 
-/** Null input (still loading upstream) is `pending`. */
 export function useAdviceOf(input: PlanAdviceInput | null): AdviceOf {
   const onPage = !planAdviceWorkerAvailable();
   const pageResult = useMemo(() => (onPage && input ? runOnPage(input) : null), [onPage, input]);

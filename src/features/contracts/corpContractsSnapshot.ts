@@ -11,21 +11,14 @@ import { loadGrantedScopes } from '@/app/grantedScopes';
 const SCOPE = ESI_REGISTRY.getCorporationContracts.scope;
 
 export interface CorpContractsSnapshot {
-  /** Null when the corporation is unknown or the read is not allowed. */
   corporationId: number | null;
   contractsResult: CachedResult<Contract[]> | null;
-  /** The grant lapsed or was never given: Grant access fixes it. */
   needsReauth: boolean;
   truncated: boolean;
   names: Map<number, string>;
   receiverCategories: Map<number, NameCategory>;
 }
 
-/**
- * The Contracts page's Corp view: the corporation's contracts, gated on the scope
- * alone. ESI names no role for this route, so a member with no corp role reads
- * it too (decision 20261020-215532); the read is never made without the grant.
- */
 export async function loadCorpContractsSnapshot(
   characterId: number,
   signal: RouteSnapshotSignal

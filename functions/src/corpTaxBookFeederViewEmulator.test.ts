@@ -1,5 +1,3 @@
-// The moon owner's view against the Firestore emulator (issue #4512, spec #4504).
-// Runs only under `npm run test:rules` at the repo root; a plain `npm test` skips it.
 import type { Caller } from './actorAuth.js';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { clearEmulator, emulatorDb as db, emulatorSuite } from './testSupport/emulator.js';
@@ -46,15 +44,14 @@ const FEEDER = 98000002;
 const T0 = Date.parse('2026-10-18T12:00:00Z');
 const KEY = Buffer.alloc(32, 7);
 const COLLECTOR_CEO = 1;
-const PLAYER = 11; // the signed-in player
-const ALT = 12; // the Accountant alt that logs in for the mining scope
+const PLAYER = 11;
+const ALT = 12;
 const FEEDER_DIRECTOR = 13;
 const FEEDER_NOBODY = 14;
 const FEEDER_JUNIOR = 15;
 const COLLECTOR_JUNIOR = 16;
 
 let ledger: 'ok' | 'forbidden' = 'ok';
-/** The accounting corporation's wallet journal, as ESI returns it. */
 let journalRows: unknown[] = [];
 const revoked: string[] = [];
 const identities = new Map<number, CorpIdentity>();
@@ -111,7 +108,6 @@ const deps = (): FeederGrantDeps => ({
     if (!identity) throw new Error('no identity');
     return identity;
   },
-  // Every type: 10 ISK buy at Jita 4-4 on the day the ledger row is dated.
   openPrices: async () => ({
     dates: ['2026-10-18'],
     stations: { '60003760': { buy: [10], sell: [null] } },
@@ -130,7 +126,6 @@ const bookDeps = (): BookDeps => {
     openPrices: d.openPrices,
   };
 };
-/** ESI's universe/names stand-in: player corporations are 98xxxxxx, id 5 is nobody. */
 const idCategory = async (id: number) =>
   id === 5 ? undefined : id >= 98_000_000 && id < 99_000_000 ? 'corporation' : 'character';
 const who = (id: number): Caller => ({ uid: `char:${id}`, ownerHash: `h${id}` });
@@ -206,10 +201,8 @@ emulatorSuite('moon owner view', () => {
       schemaVersion: 1,
       status: 'active',
       requestedRatePct: 6,
-      // The grant-time rate is a request: nothing accrues until a rate is agreed (#6209).
       effectiveRatePct: null,
       accruedIsk: 0,
-      // The first pull's day is not Billable yet, so nothing waits as pending either.
       pendingValueIsk: 0,
       minedVolume: 100,
       minedValueIsk: 1000,
@@ -244,7 +237,6 @@ emulatorSuite('moon owner view', () => {
       const firstStatus = await status();
       expect((await mirror().doc(`ready_${FEEDER}`).get()).exists).toBe(true);
 
-      // Back to a feeder from before the mirror: no documents, no marker.
       await db.recursiveDelete(mirror());
       expect((await mirror().get()).empty).toBe(true);
       await rebuildFeederView(bookDeps(), COLLECTOR, FEEDER);
@@ -252,7 +244,6 @@ emulatorSuite('moon owner view', () => {
       expect(await status()).toEqual(firstStatus);
       expect((await mirror().doc(`ready_${FEEDER}`).get()).exists).toBe(true);
 
-      // Now served from the mirror alone.
       await rebuildFeederView(bookDeps(), COLLECTOR, FEEDER);
       expect(await stable()).toEqual(first);
     });
@@ -263,7 +254,6 @@ emulatorSuite('moon owner view', () => {
       await rebuildFeederView(bookDeps(), COLLECTOR, FEEDER);
       expect((await summary())?.minedVolume).toBe(150);
 
-      // The book's own sync later records the same row without a feeder.
       const own: Partial<typeof ROW> = { ...ROW, quantity: 200 };
       delete own.sourceCorporationId;
       await mergeObservedInto(bookDeps(), COLLECTOR, [own as typeof ROW]);
@@ -307,7 +297,6 @@ emulatorSuite('moon owner view', () => {
       canView: true,
       expiresAt: T0 + 24 * 3_600_000,
     });
-    // never an officers doc: that would unlock the raw book
     expect(
       (await collectorBook().collection('officers').doc(`char:${FEEDER_DIRECTOR}`).get()).exists
     ).toBe(false);
@@ -339,7 +328,6 @@ emulatorSuite('moon owner view', () => {
   it('request rate: records a requested entry, and an agreed rate keeps winning', async () => {
     await save(await newInvite(), 6);
     await requestFeederRate(deps(), who(FEEDER_DIRECTOR), { ...asDirector, pct: 7 });
-    // A request never takes effect on its own (#6209).
     expect(await summary()).toMatchObject({ requestedRatePct: 7, effectiveRatePct: null });
     expect((await feederRecord())?.ownerRateHistory?.map((e) => e.pct)).toEqual([6, 7]);
 
@@ -410,7 +398,6 @@ emulatorSuite('moon owner view', () => {
       { ...asDirector, payee, notify: true },
       idCategory
     );
-    // The accounting corporation's officers with book access hear about it.
     expect(out).toEqual({ ok: true, changed: true, at: T0, recipients: [COLLECTOR_CEO] });
     const rec = (await feederRecord()) as (FeederRecord & { payeeHistory?: unknown }) | undefined;
     expect(rec?.payee).toEqual(payee);
@@ -448,7 +435,6 @@ emulatorSuite('moon owner view', () => {
         { ...asCollector(), payee: corp, notify: true },
         idCategory
       );
-      // The moon owner's CEO, the old payee (none: the corporation itself) and the new one's CEO.
       expect(out).toEqual({
         ok: true,
         changed: true,
@@ -466,7 +452,6 @@ emulatorSuite('moon owner view', () => {
       });
 
       const player = { kind: 'character' as const, id: 77 };
-      // A client that cannot mail is told nobody's ids.
       const quiet = await setFeederPayee(
         deps(),
         who(FEEDER_DIRECTOR),
@@ -474,7 +459,6 @@ emulatorSuite('moon owner view', () => {
         idCategory
       );
       expect(quiet).toMatchObject({ changed: true, recipients: [] });
-      // Back on the accounting side: the old payee (the player) and the new one's CEO are told.
       const back = await setBookFeederPayee(
         ceoDeps(),
         who(COLLECTOR_CEO),
@@ -578,7 +562,6 @@ emulatorSuite('moon owner view', () => {
   it('payee: the moon owner call refuses a junior, a nobody and anyone outside it', async () => {
     await save(await newInvite());
     const payee = { kind: 'corporation' as const, id: 98000009 };
-    // An accounting officer sets it through its own call (`setBookFeederPayee`), not this one.
     for (const id of [FEEDER_JUNIOR, FEEDER_NOBODY, COLLECTOR_CEO]) {
       expect(
         await reason(
@@ -591,7 +574,6 @@ emulatorSuite('moon owner view', () => {
         )
       ).toBe('not-your-feeder');
     }
-    // The accounting corporation naming itself: no moon owner by that id.
     expect(
       await reason(
         setFeederPayee(
@@ -616,7 +598,6 @@ emulatorSuite('moon owner view', () => {
       leftAt: T0,
       history: [{ collectorCorporationId: COLLECTOR, leftAt: T0 }],
     });
-    // joined and left the same day: no day was ever covered
     expect(await summary()).toMatchObject({ status: 'left', leftAt: T0, coverageFrom: null });
     const out = await getFeederViewAccess(deps(), who(FEEDER_DIRECTOR), asDirector);
     expect(out.collectorCorporationId).toBe(COLLECTOR);
@@ -626,7 +607,6 @@ emulatorSuite('moon owner view', () => {
     const OTHER = 98000050;
     await save(await newInvite(), 6);
     await leaveFeeder(deps(), who(FEEDER_DIRECTOR), asDirector);
-    // Joins another accounting corporation.
     await db.collection('corps').doc(String(OTHER)).set({ active: true, corporationName: 'Other' });
     await db
       .collection('corps')
@@ -659,7 +639,6 @@ emulatorSuite('moon owner view', () => {
       previousCollectorIds: [COLLECTOR],
     });
 
-    // Leaving the second keeps the first.
     await leaveFeeder(deps(), who(FEEDER_DIRECTOR), asDirector);
     const doc = (await db.collection('corpTaxBookFeederPrevious').doc(String(FEEDER)).get()).data();
     expect(doc).toMatchObject({ collectorCorporationId: OTHER, leftAt: T0 });
@@ -677,7 +656,6 @@ emulatorSuite('moon owner view', () => {
     await dismissFeederHistory(deps(), who(FEEDER_DIRECTOR), previous);
     expect((await feederRecord())?.viewDismissedAt).toBe(T0);
 
-    // A corporation that never handled it resolves nothing.
     expect(
       await reason(
         getFeederViewAccess(deps(), who(FEEDER_DIRECTOR), {
@@ -700,7 +678,6 @@ emulatorSuite('moon owner view', () => {
 
     it("keeps the first system a miner's own ledger placed it in, on the record and the view", async () => {
       await save(await newInvite());
-      // Someone with no row at that refinery teaches nothing.
       await learn(901, 30000142);
       expect((await feederRecord())?.refinerySystems).toBeUndefined();
 
@@ -708,7 +685,6 @@ emulatorSuite('moon owner view', () => {
       expect((await feederRecord())?.refinerySystems).toEqual({ [String(REFINERY)]: 30002187 });
       expect(await viewSystem()).toBe(30002187);
 
-      // A later report never moves it.
       await learn(900, 30000142);
       expect((await feederRecord())?.refinerySystems).toEqual({ [String(REFINERY)]: 30002187 });
       const audit = await collectorBook().collection('audit').get();
@@ -756,7 +732,6 @@ emulatorSuite('moon owner view', () => {
       });
       expect(await viewLabel()).toBe('Back again');
 
-      // A clear from either side drops it: the chain falls back.
       await setOwnRefineryLabel(deps(), who(FEEDER_DIRECTOR), {
         ...asDirector,
         structureId: REFINERY,
@@ -816,7 +791,6 @@ emulatorSuite('moon owner view', () => {
     await dismissFeederHistory(deps(), who(FEEDER_DIRECTOR), asDirector);
     expect((await summary())?.dismissedAt).toBe(T0);
   });
-  // Issue #4622: the copy a miner's personal tab reads holds coverage and the read clock only.
   const memberCopy = async () =>
     (await collectorBook().collection('feederCoverage').doc(String(FEEDER)).get()).data();
 
@@ -837,12 +811,10 @@ emulatorSuite('moon owner view', () => {
   it('member copy: leaving ends the coverage there too', async () => {
     await save(await newInvite());
     await leaveFeeder(deps(), who(FEEDER_DIRECTOR), asDirector);
-    // joined and left the same day: the one period covered nothing and is gone
     expect(await memberCopy()).toEqual({ coveragePeriods: [], lastReadWellAt: T0 });
   });
 });
 
-// Paying a moon owner (#4514): what the wallet journal says, read by the server, matched once.
 emulatorSuite('moon owner payouts (emulator)', () => {
   const officer = { corporationId: COLLECTOR, accessToken: `roles-${COLLECTOR_CEO}` };
   const payoutDeps = () => ({ ...bookDeps(), esi: esi() });
@@ -850,10 +822,6 @@ emulatorSuite('moon owner payouts (emulator)', () => {
     (
       await collectorBook().collection('feeders').doc(String(FEEDER)).collection('payouts').get()
     ).docs.map((d) => ({ id: d.id, ...d.data() }));
-  /**
-   * A corporation wallet "Give ISK" to the moon owner corporation (its payee when none is set),
-   * with the payout reference the pay dialog writes unless another reason is given (#6209).
-   */
   const giveIsk = (
     id: number,
     amount: number,
@@ -893,7 +861,6 @@ emulatorSuite('moon owner payouts (emulator)', () => {
       { id: 'j1_510', amount: 3_000_000, notAPayout: true, unconfirmed: true, journalRef: 510 },
     ]);
     expect((await feederRecord())?.payoutTotals).toEqual({ count: 0, amount: 0 });
-    // Read again: the same journal row is never recorded twice.
     await reconcileFeederPayoutsCall(payoutDeps(), who(COLLECTOR_CEO), officer);
     expect(await payouts()).toHaveLength(1);
     await markFeederPayout(bookDeps(), who(COLLECTOR_CEO), {

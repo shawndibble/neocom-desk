@@ -33,12 +33,6 @@ interface PlanResolutionInput {
   refreshTick: number;
 }
 
-/**
- * The plan's data pipeline: market snapshots, recipe lookup, the one
- * `resolveBuildPlan` pass, and everything derived from its result — the
- * input-cost move, the owned stock's sale value, price readiness and the
- * Materials table's rows.
- */
 export function usePlanResolution({
   plan,
   catalog,
@@ -89,25 +83,6 @@ export function usePlanResolution({
     craftScopeList
   );
 
-  /**
-   * The whole plan, resolved in one pass by `resolveBuildPlan` — the same
-   * call Compare and every Group Rollup make, so this page cannot price a
-   * plan differently from them. Everything the page reads off it:
-   *
-   * - `result`/`error`: the Results panel and materials table.
-   * - `makeOrBuyContext`: every make-or-buy verdict; null until live prices
-   *   land (a fee-free quote would call almost everything worth building).
-   * - `resolvedMe`/`resolvedTe`: the tier Blueprint Acquisition resolved for
-   *   the plan's own product. `plan.me`/`plan.te` stay whatever they
-   *   last were (Setup no longer edits them); every reader below uses the
-   *   resolved pair, so there is exactly one number in play.
-   * - `materialPrices`: the plan's price basis — both sides come from the
-   *   snapshot already in hand, so toggling it re-computes, never refetches.
-   *
-   * One memo, one fresh tier pool: the top-level claim and the tree's nested
-   * claims share it, and a re-run of this memo starts from nothing rather
-   * than re-claiming against copies a previous run already took.
-   */
   const { resolved, depth, resolveAt, resolveQuantitiesAt } = useResolvedPlan({
     plan,
     hub,

@@ -1,32 +1,3 @@
-/**
- * Skill Plan editor's narrow-viewport tap targets.
- *
- * Back-to-plan-list link (issue #1095): below `lg` the
- * plan list is not on screen at all, so this link is the only way back to
- * it — and it was a bare `inline-block text-xs text-accent hover:underline`
- * anchor, a ~16px-tall tap target on exactly the viewport where it matters
- * most.
- *
- * Asserted on the rendered bounding box rather than the class string; see
- * `loyaltyStoreNarrow.spec.ts` for why.
- *
- * The plan is seeded straight into IndexedDB rather than created through the
- * "New plan" flow — same raw-`indexedDB` precedent as
- * `industryRecordsNarrow.spec.ts`, run after `loginAndSelectCharacter` so the
- * app's Dexie schema has already opened the stores.
- *
- * Priority pill (issue #1106): the pill is a per-entry control on the mobile
- * meta line, and was a bare `px-1` button around 11px text. The priority
- * column is off by default (`columnPreference.ts`), so the run seeds both the
- * plan entry and that preference — same raw-`indexedDB` route as the plan
- * itself, into the `settings` store `useLocalSetting` reads.
- *
- * Plan Milestone (GLOSSARY.md, issue #1406): "Add milestone" is a per-row
- * control reachable at the same narrow viewport as the priority pill above,
- * and naming one there is what makes it show up as the plan header's "Next
- * milestone" chip — the one thing this file's other tests don't cover
- * (control sizing, not the milestone feature's own round trip).
- */
 import type { Page } from '@playwright/test';
 import { test, expect, PHONE, DESKTOP } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
@@ -34,9 +5,7 @@ import { CHARACTER_ID, SKILL } from './support/fixtureData';
 
 const PLAN_ID = 'e2e-skill-plan-1';
 const PLAN_NAME = 'Narrow viewport plan';
-/** Mirrors `COLUMN_VISIBILITY_SETTING_KEY` in `columnPreference.ts`. */
 const COLUMN_VISIBILITY_KEY = 'planColumnVisibility.v2';
-/** Untrained in the fixture, and its own prereq chain is empty, so one entry stays one row. */
 const PLAN_ENTRY = { skillTypeID: SKILL.spaceshipCommand, targetLevel: 1 };
 
 interface SeedEntry {
@@ -44,7 +13,6 @@ interface SeedEntry {
   targetLevel: number;
 }
 
-/** One record straight into a Dexie store — both seeds below are one `put`. */
 async function putRecord(
   page: Page,
   store: string,
@@ -80,10 +48,6 @@ async function seedPlan(page: Page, entries: SeedEntry[] = []): Promise<void> {
   });
 }
 
-/**
- * Turn the priority column on. It is off by default — an editing control, not
- * a readout — so without this the pill never renders.
- */
 async function seedPriorityColumn(page: Page): Promise<void> {
   await putRecord(page, 'settings', {
     key: COLUMN_VISIBILITY_KEY,
@@ -135,15 +99,8 @@ test('the back-to-plan-list link stays absent at and above lg (1280px), where th
   await page.goto(`./skills/plans/${PLAN_ID}`);
   await page.setViewportSize(DESKTOP);
 
-  // Anchor on the editor having actually rendered before asserting an
-  // absence: `toHaveCount(0)` alone also passes on the loading spinner, or on
-  // the `<Navigate to="/skills/plans">` the route falls back to if the seeded
-  // plan never landed — neither of which says anything about the gate.
   await expect(page.getByPlaceholder('Search skills…')).toBeVisible();
 
-  // Gated on `!isDesktop`: the plan list itself is in the sidebar here, so
-  // there is no box to size — pinned so the restyling above cannot quietly
-  // start rendering a second route back to a list already in view.
   await expect(page.getByRole('link', { name: 'Back to plans' })).toHaveCount(0);
 });
 
@@ -151,10 +108,6 @@ test('the entry priority pill is a full sm-tier tap target (36px) at 390px', asy
   await signInAndGoto(page);
   await seedPlan(page, [PLAN_ENTRY]);
   await seedPriorityColumn(page);
-  // Sized before the first paint, unlike the back-link tests above: the pill
-  // renders in *both* layouts, so `toBeVisible` would also pass on the desktop
-  // row this project's 1280px default viewport would draw first, and the
-  // one-shot `evaluate` below would measure that row.
   await page.setViewportSize(PHONE);
   await page.goto(`./skills/plans/${PLAN_ID}`);
 
@@ -169,8 +122,6 @@ test('the entry priority pill is a full sm-tier tap target (36px) at 390px', asy
     };
   });
   expect(box.triggerHeight).toBeGreaterThanOrEqual(36);
-  // The visible chip stays the size of the attribute badge beside it — only
-  // the hit area around it grew.
   expect(box.chipHeight).toBeLessThan(24);
 });
 
@@ -186,25 +137,14 @@ test('the entry priority pill keeps its pointer-sized box at and above md (1280p
   const pill = page.getByRole('button', { name: /priority, /i });
   await expect(pill).toBeVisible();
 
-  // The desktop row lays the pill out inline beside `sm`-tier controls, so a
-  // touch-tier box here would push that row's height out.
   const height = await pill.evaluate((el) => el.getBoundingClientRect().height);
   expect(height).toBeLessThan(24);
 });
 
-/**
- * Skill injectors panel (issue #1408): the tools pane collapses into a single
- * `Disclosure` below `lg`, so this exercises both that collapse and the panel
- * itself — a stubbed Fuzzwork price for Large Skill Injector (typeId 40520)
- * so the price row renders a real figure instead of "no sell orders".
- */
 test('the Skill injectors panel renders with a priced Large Skill Injector at 390px', async ({
   page,
 }) => {
   await signInAndGoto(page);
-  // Level 4, not the other tests' level 1: a level-1 rank-1 skill needs only
-  // 250 SP, comfortably under the fixture's 500 unallocated SP, so the panel
-  // would read "already covered" instead of exercising the priced path below.
   await seedPlan(page, [{ skillTypeID: SKILL.spaceshipCommand, targetLevel: 4 }]);
   await page.route('https://market.fuzzwork.co.uk/**', async (route) => {
     await route.fulfill({
@@ -225,9 +165,6 @@ test('the Skill injectors panel renders with a priced Large Skill Injector at 39
   await page.getByRole('button', { name: /^assumptions/i }).click();
   await expect(page.getByRole('heading', { name: 'Skill injectors' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Large Skill Injector' })).toBeVisible();
-  // IskAmount's visually hidden text carries the exact figure the compact
-  // shorthand elides — the stubbed sell price. One injector needed, so the
-  // per-injector and total rows both read 700,000,000 ISK.
   await expect(page.locator('.sr-only', { hasText: /^\s*700,000,000\.00 ISK$/ })).toHaveCount(2);
 });
 
@@ -250,16 +187,6 @@ test("naming a milestone from an entry row shows it as the header's next milesto
   await expect(page.getByText('Fly Loki').first()).toBeVisible();
 });
 
-/**
- * Long Plan Milestone name overflow (issue #2094): a name at the
- * `MAX_MILESTONE_NAME_LENGTH` (60-char) cap used to grow the header's "Next
- * milestone" chip wider than the viewport, and squeeze the entry row's own
- * skill name down to just its level numeral. Both now truncate/reflow
- * instead — asserted here against Gallente Drone Specialization (29 chars,
- * the same "long skill name" fixture #1716's test above uses) so the fix
- * holds for the long-milestone-name + long-skill-name combination the issue
- * calls out, not just a short skill name.
- */
 test('a long milestone name does not overflow the header chip or squeeze the entry row at 390px', async ({
   page,
 }) => {
@@ -290,11 +217,6 @@ test('a long milestone name does not overflow the header chip or squeeze the ent
     name: 'More actions for Gallente Drone Specialization IV',
   });
   await expect(removeButton).toBeVisible();
-  // The plan holds one row per level and the phone folds levels of one skill
-  // under the first row, which alone names the skill (#6562); the row that
-  // carries the milestone (level IV) shows just its numeral. So the name to
-  // keep un-squeezed is the group's skill link, and the milestone row's
-  // numeral must stay visible beside the long milestone name.
   const nameLink = page.getByRole('link', { name: 'Gallente Drone Specialization' }).first();
   await expect(nameLink).toBeVisible();
   const nameWidth = await nameLink.evaluate((el) => el.getBoundingClientRect().width);
@@ -305,13 +227,6 @@ test('a long milestone name does not overflow the header chip or squeeze the ent
   expect(numeralWidth).toBeGreaterThan(4);
 });
 
-/**
- * Plan row level numeral (issue #1716): the row's level numeral used to sit
- * inside the same truncating span as the skill name, so a long name clipped
- * it away — exactly the piece of information that disambiguates "level III"
- * from "level IV". Gallente Drone Specialization (29 chars) truncates at
- * 390px; the numeral now lives in its own `shrink-0` sibling span.
- */
 test('a long skill name still shows its full level numeral at 390px', async ({ page }) => {
   await signInAndGoto(page);
   await seedPlan(page, [{ skillTypeID: SKILL.gallenteDroneSpecialization, targetLevel: 4 }]);
@@ -330,10 +245,6 @@ test('a long skill name still shows its full level numeral at 390px', async ({ p
   const right = await numeral.evaluate((el) => el.getBoundingClientRect().right);
   expect(right).toBeLessThanOrEqual(PHONE.width);
 
-  // Drones V is an untrained prereq the plan engine inserts ahead of the
-  // entry above — same truncate+numeral shape as an entry row (PrereqRow),
-  // and its numeral is short enough to be a free check that fix applies
-  // there too.
   const prereqPromote = page.getByRole('button', { name: 'Add Drones V to the plan' });
   await expect(prereqPromote).toBeVisible();
   const prereqRow = page.locator('li', { has: prereqPromote });
@@ -346,9 +257,6 @@ test('the header progress chips wrap at 390px without horizontal scroll', async 
   await page.setViewportSize(PHONE);
   await page.goto(`./skills/plans/${PLAN_ID}`);
 
-  // The Skills sub-nav also has a "Trained" tab (a link), and the (hidden)
-  // desktop rail lists Skills › Trained, so match the chip's own label span
-  // inside the page.
   await expect(page.getByRole('main').locator('span', { hasText: /^Trained$/ })).toBeVisible();
   const overflow = await page.evaluate(
     () => document.documentElement.scrollWidth - document.documentElement.clientWidth
@@ -356,11 +264,6 @@ test('the header progress chips wrap at 390px without horizontal scroll', async 
   expect(overflow).toBeLessThanOrEqual(0);
 });
 
-/**
- * What-if chip (issue #1711): a hypothetical implant lens re-costs every
- * headline number, so the summary says so beside them — visible on a phone,
- * where the lens control itself sits inside the collapsed tools disclosure.
- */
 test('a non-Current what-if lens shows a chip in the header strip at 390px', async ({ page }) => {
   await signInAndGoto(page);
   await putRecord(page, 'skillPlans', {
@@ -378,18 +281,12 @@ test('a non-Current what-if lens shows a chip in the header strip at 390px', asy
   await expect(page.getByTestId('what-if-chip')).toContainText(
     /^What-if \+5(Saves .+ vs current|Costs .+ vs current|Same as current)$/
   );
-  // A StatChip never wraps inside itself, so the page must not scroll sideways.
   const overflow = await page.evaluate(
     () => document.documentElement.scrollWidth - document.documentElement.clientWidth
   );
   expect(overflow).toBeLessThanOrEqual(0);
 });
 
-/**
- * Plan editor reorganisation: Skills to buy is an output, so it must not be
- * the last thing in the tools. Asserted as invariants (no overlap, no
- * horizontal overflow, reachable without opening anything), not pixel offsets.
- */
 test('Skills to buy has its own visible row at 390px, without opening Plan tools', async ({
   page,
 }) => {
@@ -404,7 +301,6 @@ test('Skills to buy has its own visible row at 390px, without opening Plan tools
     'aria-expanded',
     'false'
   );
-  // On the first screen, above the entry list.
   const box = await row.evaluate((el) => el.getBoundingClientRect());
   expect(box.bottom).toBeLessThan(PHONE.height);
   expect(box.height).toBeGreaterThanOrEqual(36);
@@ -417,8 +313,6 @@ test('Skills to buy has its own visible row at 390px, without opening Plan tools
   );
   expect(overflows).toBe(false);
 
-  // The expanded row and Plan tools are separate blocks: the row's whole
-  // panel ends before Plan tools starts.
   const rowPanelBottom = await row.evaluate((el) => {
     let node: Element | null = el;
     while (node && !node.matches('section')) node = node.parentElement;
@@ -452,8 +346,6 @@ test('Skills to buy sits under Attributes near the top of the sidebar at 1280px,
       })
     )
   );
-  // Strictly stacked in that order, no overlap, and Skills to buy within the
-  // first screen rather than ~1,070px down.
   expect(s.top).toBeGreaterThan(a.bottom);
   expect(m.top).toBeGreaterThan(s.bottom);
   expect(s.top + s.scrollTop).toBeLessThan(DESKTOP.height);

@@ -1,21 +1,3 @@
-/**
- * The Overview: the pilot's own summary of what matters to them.
- *
- * A grid of widgets the pilot chose, sized and ordered (`features/overview/
- * widgets`), each drawn as a Number or a List and each in one of five states.
- * It replaces a fixed board of thirteen domain cards plus an alerts column;
- * everything on the page is now the pilot's choice, and the default is only a
- * starting point.
- *
- * This route is wiring. It waits for every store it reads to hydrate (so the
- * first-run prompt never flashes before the saved layout has loaded), decides
- * which layout to draw (the saved one, a migration of the old hidden-card and
- * card-order settings for a returning pilot, or the first-run prompt), mounts
- * the page's reads once above the grid, and hands the header its controls.
- *
- * Scoped to the active Character; each widget's own menu may widen it to All
- * characters, honoured by the kinds whose reads can sum.
- */
 import {
   lazy,
   Suspense,
@@ -100,12 +82,10 @@ interface BoardProps {
   layout: OverviewLayout;
 }
 
-/** Everything below the providers: the header, sub-nav and grid. */
 function Board({ characterId, layout }: BoardProps) {
   const edit = useOverviewEdit();
   const { editing } = edit;
   const isPhone = useIsPhone();
-  // The header's phone layout follows the CSS `md` break, which is wider than `isPhone`.
   const narrow = useIsNarrow();
   const [galleryOpen, setGalleryOpen] = useState(false);
   const [rolesOpen, setRolesOpen] = useState(false);
@@ -170,8 +150,6 @@ export function Overview() {
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
   const stored = useOverviewLayout((state) => state.value);
   const setLayout = useOverviewLayout((state) => state.setValue);
-  // The old board's two settings: read for a returning pilot's first layout.
-  // Only their read side is kept.
   const hidden = useOverviewHiddenCards((state) => state.value);
   const order = useOverviewCardOrder((state) => state.value);
 
@@ -182,11 +160,8 @@ export function Overview() {
   );
   const hydrated = activeHydrated && storesHydrated;
   const returning = isReturningPilot(hidden, order);
-  // An absent layout is a first run only once a second device's pull has had its say.
   const firstRunReady = useFirstRunReady(hydrated);
 
-  // A returning pilot with no saved layout gets their old board, as widgets,
-  // drawn at once and saved once.
   const migrated = useMemo(
     () =>
       hydrated && firstRunReady && stored === null && returning
@@ -220,7 +195,6 @@ export function Overview() {
   }
   if (activeCharacterId === null) return <Navigate to="/characters" replace />;
 
-  // No layout yet and not sure there is none: wait for the first pull rather than ask.
   if (layout === null && !firstRunReady) {
     return (
       <Centered>

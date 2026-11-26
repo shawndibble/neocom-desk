@@ -1,6 +1,5 @@
 import type { VettingAnswer } from '@/engine/vetting';
 
-/** A corp's questions with what the pilot answered, each question as it read when answered. */
 export function VettingAnswerList({ answers }: { answers: readonly VettingAnswer[] }) {
   return (
     <dl className="space-y-3 text-sm">

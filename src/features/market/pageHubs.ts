@@ -1,26 +1,8 @@
-/**
- * Page hubs (issue #6523): a Trade Hub for one page area, overriding the
- * Global hub (`useMarketHub`) there only. `sync.pageHubs` is one synced map
- * `area -> hub id`, account-wide, last write wins like every synced setting.
- * A page with no entry prices at the Global hub, so with an empty map every
- * page prices exactly as before; whether an entry exists is the whole state —
- * there is no separate "use the page's hub" flag to disagree with it.
- *
- * Removing an entry rewrites the map without it, never deletes the key. The
- * edits below are pure; the store-touching actions live in `hub.ts`, beside
- * the Global hub they fall back to.
- */
 import type { TFunction } from 'i18next';
 import { createSyncedSetting } from '@/lib/useSyncedSetting';
 import { getTradeHub } from '@/market/hubs';
 import type { HubId } from './characterHubs';
 
-/**
- * The page areas a pilot can give a hub of their own, in the order Settings
- * lists them. An area joins once its pages read `useHubFor` (issue #6523 moves
- * them one slice at a time), so Settings never offers an entry that does
- * nothing; an entry for an area this build does not list is kept, unread.
- */
 export const PAGE_HUB_AREAS = [
   'fittings',
   'skills',
@@ -38,7 +20,6 @@ export const PAGE_HUB_AREAS = [
 
 export type PageHubArea = (typeof PAGE_HUB_AREAS)[number];
 
-/** Each area's player-facing name, as literal keys so a dead-key scan sees them. */
 const AREA_NAME_KEYS = {
   fittings: 'pageHubs.area.fittings',
   skills: 'pageHubs.area.skills',
@@ -57,22 +38,10 @@ const AREA_NAME_KEYS = {
 export function pageHubAreaName(t: TFunction, area: PageHubArea): string {
   return t(AREA_NAME_KEYS[area]);
 }
-/**
- * The stored map, as stored: `area -> value`. Read an area through `ownChoice`,
- * never by indexing, since a key or value this build does not know (a newer
- * build's area, a future value such as Closest) is kept as it came.
- */
 export type PageHubMap = Readonly<Record<string, string>>;
 
 export const PAGE_HUBS_SETTING_KEY = 'sync.pageHubs';
 
-/**
- * A stored map. Pulled from other devices, maybe newer builds, so an entry
- * this build cannot use is **kept**, not dropped: the map is written back
- * whole on the next edit, and dropping it would erase a newer build's entry
- * on every device. Only a non-string value is discarded. `ownChoice` decides what
- * an entry means here; one it cannot read leaves that page on Global.
- */
 export function parsePageHubs(raw: unknown): PageHubMap | null {
   if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return null;
   const out: Record<string, string> = {};
@@ -82,13 +51,10 @@ export function parsePageHubs(raw: unknown): PageHubMap | null {
   return out;
 }
 
-/** A page entry's value besides a hub: the hub nearest the active Character (`closestHub.ts`). */
 export const CLOSEST = 'closest';
 
-/** What a page (or the Global hub) is set to: a Trade Hub, or Closest. */
 export type HubChoice = HubId | typeof CLOSEST;
 
-/** `area`'s own entry, when it names a Trade Hub this build knows or Closest; else `undefined` (Global). */
 export function ownChoice(map: PageHubMap, area: PageHubArea): HubChoice | undefined {
   const value = map[area];
   if (value === CLOSEST) return CLOSEST;
@@ -103,13 +69,6 @@ export const usePageHubs = createSyncedSetting<PageHubMap>({
 
 export const PARKED_PAGE_HUBS_SETTING_KEY = 'sync.pageHubsParked';
 
-/**
- * Page hubs set aside (issue #6531): a page switched to App setting in its hub
- * popover keeps its own hub here, so switching back restores it. Only Settings'
- * Remove forgets one. Its own map, not a flag beside `sync.pageHubs`: older
- * builds read `sync.pageHubs` alone, and an entry left there would keep a page
- * the pilot switched to App setting on its own hub in those builds.
- */
 export const useParkedPageHubs = createSyncedSetting<PageHubMap>({
   key: PARKED_PAGE_HUBS_SETTING_KEY,
   defaultValue: {},
@@ -127,10 +86,6 @@ export function dropPageHub(map: PageHubMap, area: PageHubArea): PageHubMap {
   return rest;
 }
 
-/**
- * `area`'s own entry right now, `undefined` on Global (or before page hubs
- * are read): for non-React code that only differs from today with an entry.
- */
 export function pageHubEntry(area: PageHubArea): HubChoice | undefined {
   return ownChoice(usePageHubs.getState().value, area);
 }

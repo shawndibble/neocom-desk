@@ -1,4 +1,3 @@
-/** Cells the LP Store landing's two tables share (`useLpLandingColumns.tsx`). */
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { DataTableDenseCell } from '@/components/ui';
@@ -7,7 +6,6 @@ import { cx } from '@/lib/cx';
 import type { NearestStation } from './lpStoreSnapshot';
 import { tagWordClassName } from './offerRowDisplay';
 
-/** A word, not just a colour, for a militia store (DESIGN.md §7). */
 export function FactionWarfareTag() {
   const { t } = useTranslation();
   return (
@@ -17,11 +15,6 @@ export function FactionWarfareTag() {
   );
 }
 
-/**
- * A name over its nearest station: "Jita · 3 jumps" under it on desktop, a
- * bare "3j" after it on the phone card's meta line. `label` defaults to the
- * station's system, for a column that is the station.
- */
 export function NearestStationCell({
   nearest,
   systemName,

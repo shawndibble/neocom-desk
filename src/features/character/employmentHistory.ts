@@ -1,9 +1,3 @@
-/**
- * Fetch + cache layer for the Employment History view: a character's
- * corporation history. Public endpoint (`corporationhistory` has no scope in
- * the ESI spec) — no auth-failure state to expose, so `loadWithCache`, not
- * the `-Status` variant.
- */
 import { getCharacterCorporationHistory, type CorporationHistoryEntry } from '@/esi/endpoints';
 import { conditionalFetch, loadWithCache, type CachedResult } from '@/esi/cache';
 import { isNpcCorporationId } from '@/esi/entityIds';
@@ -23,34 +17,16 @@ export interface EmploymentHistoryRow {
   recordId: number;
   corporationId: number;
   startDate: string;
-  /** Seconds spent at this corp: gap to the next record, or to `now` for the current one. */
   tenureSeconds: number;
-  /** Whether this is the most recent (current) employer. */
   ongoing: boolean;
-  /**
-   * An NPC corporation: where a pilot sits while idle or passes through between
-   * player corps, so it says nothing about their career. Never `returned` or
-   * `shortStay`, and left out of the summary's count and longest stay.
-   */
   npc: boolean;
-  /** The pilot was in this corporation in an earlier record too. */
   returned: boolean;
-  /** Stayed under `SHORT_STAY_SECONDS`; never the ongoing stint, which isn't over yet. */
   shortStay: boolean;
-  /**
-   * `tenureSeconds` over the longest player-corp stint's (every stint's when
-   * there is none), capped at 1; sizes the card's bar. A long idle spell in an
-   * NPC corp would otherwise shrink every real stint to a sliver.
-   */
   tenureRatio: number;
 }
 
 export const SHORT_STAY_SECONDS = 14 * 86_400;
 
-/**
- * Most-recent first. `now` is a parameter so the current corp's still-ongoing
- * tenure is deterministic and testable rather than reading the clock inline.
- */
 export function deriveEmploymentHistoryRows(
   entries: readonly CorporationHistoryEntry[],
   now: number
@@ -78,16 +54,12 @@ export function deriveEmploymentHistoryRows(
 }
 
 export interface EmploymentSummary {
-  /** Now minus the earliest start: how long the pilot has existed on record. */
   timeInGameSeconds: number;
-  /** Distinct player corporations, so a return counts once and NPC corps not at all. */
   corporationCount: number;
   currentTenureSeconds: number;
-  /** The longest single player-corp stint; a tie goes to the more recent one. */
   longest: { corporationId: number; seconds: number } | null;
 }
 
-/** Headline figures for the tiles above the timeline. `rows` is most-recent first. */
 export function deriveEmploymentSummary(
   rows: readonly EmploymentHistoryRow[],
   now: number

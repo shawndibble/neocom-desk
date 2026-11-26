@@ -30,7 +30,6 @@ const incursion = {
   state: 'established',
 };
 
-/** A stored baseline: nothing in range, from Jita, N = 5. */
 const quietBaseline: StoredNearby = {
   incursion: { frame: { originSystemId: JITA, withinJumps: 5 }, inRange: [] },
   skyhook: { frame: { originSystemId: JITA, withinJumps: 5 }, inRange: [] },
@@ -121,7 +120,6 @@ describe('runNearbyPhase', () => {
       state: { phone: { characters: { '1': quietBaseline }, pushed: { [key]: NOW + 1 } } },
     });
     expect((await run(s)).pushesSent).toBe(0);
-    // The edge is still consumed.
     expect(s.states.phone.characters['1'].incursion?.inRange).toHaveLength(1);
   });
 
@@ -154,7 +152,6 @@ describe('runNearbyPhase', () => {
   });
 
   it('uses the device’s own N and Travel Settings', async () => {
-    // N = 1: Perimeter is one jump from Jita, with an unrelated Avoided System.
     const s = setup({
       devices: [
         device({

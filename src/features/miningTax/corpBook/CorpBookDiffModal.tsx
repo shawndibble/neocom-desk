@@ -15,9 +15,7 @@ interface Props {
   view: BookRowView;
   systemName: string;
   typeNames: ReadonlyMap<number, string>;
-  /** Opens Resolve on this day: "I don't owe this" sends the dispute. Absent: not offered. */
   onResolve?: () => void;
-  /** Opens the member's own entry for the day, to bring it in line with the book. Absent: none lines up. */
   onFixRecords?: () => void;
 }
 
@@ -26,11 +24,6 @@ const quantityOf = (
   id: number
 ) => lines?.find((l) => l.typeId === id)?.quantity;
 
-/**
- * "Compare with the book" (D28): the member's own record next to the book's,
- * with what differs marked — quantity, rate and the tax that follows. Opens
- * from the row detail, never inline.
- */
 export function CorpBookDiffModal({
   open,
   onClose,
@@ -62,20 +55,6 @@ export function CorpBookDiffModal({
           0
         );
   const bookTax = view.billed;
-  /**
-   * Only a book that bills MORE than the member's own record is worth an officer's time: the
-   * other way round the book's lower figure is what they owe, and the old copy sent them to
-   * argue for a bigger bill.
-   *
-   * Read the direction from the two numbers `disputeOf` itself compared — the ones the headline
-   * below prints — never from the Tax row. `personalTax` prices the member's WHOLE entry while
-   * `billed` is this book's share of a day several books can split, so the two are not
-   * comparable; and `personalTax` is undefined whenever the member allocated the day at more
-   * than one rate or none, which is exactly when the Tax row reads "—".
-   *
-   * `undefined` where quantity and rate both differ: they can pull opposite ways (less ore at a
-   * higher rate), so the net is not knowable here and the copy makes no claim.
-   */
   const bookAsksMore =
     dispute === undefined || (dispute.quantity && dispute.rate)
       ? undefined
@@ -112,7 +91,6 @@ export function CorpBookDiffModal({
           <tbody className="divide-y divide-line">
             {view.oreLines.map((line) => {
               const you = quantityOf(view.personalOreLines, line.typeId);
-              // Only a book that records more than the member mined differs: less is just the bill.
               const differsHere = line.quantity > (you ?? 0);
               return (
                 <tr key={line.typeId}>
@@ -173,8 +151,6 @@ export function CorpBookDiffModal({
                   : t('miningTax.corpBook.disputed.both')}
             </p>
             {view.state === 'billed' && (
-              // The one line the member is here for, so it carries the weight. When the book bills more, the two ways out sit right under it: take the book's
-              // figure (fix my records) or dispute it (Resolve).
               <p className="font-semibold text-text">
                 {bookAsksMore === undefined
                   ? t('miningTax.corpBook.diff.raiseBoth', { corp: view.corpName })

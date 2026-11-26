@@ -53,7 +53,6 @@ describe('netOfReprocessingTax', () => {
 
 describe('facilityBaseYieldFor', () => {
   it("works the facility's base yield out of the total the EVE client shows", () => {
-    // The client: 51% base x 1.08 x 1.15 x 1.1 = 69.7%; typing 69.7% gets the 51% back.
     const skills = 1.08 * 1.15 * 1.1;
     expect(facilityBaseYieldFor(0.697, skills)).toBeCloseTo(0.51, 3);
   });

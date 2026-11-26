@@ -1,8 +1,3 @@
-/**
- * A hull's bonuses as the game lists them: "<Skill> bonuses (per skill
- * level):" per skill, then "Role bonus:", each line's value and unit bold.
- * `tone` picks the hover card's ISIS colours or the app's own.
- */
 import { useTranslation } from 'react-i18next';
 import { cx } from '@/lib/cx';
 import type { ShipTreeTrait } from '@/sde/types';

@@ -1,12 +1,3 @@
-/**
- * The hauling order books job for the GitHub Actions runner
- * (`scripts/public-data/hauling-books.mjs`, `.github/workflows/public-data-hauling-books.yml`).
- * Streams EVE Ref's latest market-order snapshot and writes each Trade Hub station's best
- * price levels per type to R2 (`hauling-books/<stationId>.json`), where the hauling scan builds
- * its order-book pass from them with no ESI request. Its last-run record (the snapshot it
- * published, so an unchanged one is skipped) is the R2 object `hauling-books-state/last-run.json`.
- * Touches no Firestore.
- */
 import { gzipSync } from 'node:zlib';
 import { ESI_USER_AGENT } from './esiClient.js';
 import { HaulingBookFold } from './haulingBooks.js';
@@ -18,7 +9,6 @@ export const HAULING_BOOKS_R2_PREFIX = 'hauling-books/';
 export const HAULING_BOOKS_STATE_R2_KEY = 'hauling-books-state/last-run.json';
 export const MARKET_ORDERS_LATEST_URL =
   'https://data.everef.net/market-orders/market-orders-latest.v3.csv.bz2';
-/** A hub with fewer types than this means a broken snapshot: publish nothing and let the objects age. */
 export const MIN_TYPES_PER_HUB = 1000;
 
 const BOOK_HEADERS = {
@@ -36,7 +26,6 @@ export interface PublicHaulingBooksDeps {
   get: R2Get;
   put: R2Put;
   now?: () => number;
-  /** Test seams: the snapshot's publish time (a HEAD request) and the download-and-fold. */
   publishedAtImpl?: (url: string) => Promise<number | null>;
   foldUrlImpl?: typeof foldOrderBooksUrl;
 }
@@ -54,7 +43,6 @@ async function fetchPublishedAt(url: string): Promise<number | null> {
   }
 }
 
-/** Publishes the hub books; false when the snapshot is the one already published. Throws when nothing was published. */
 export async function publishHaulingBooks(deps: PublicHaulingBooksDeps): Promise<boolean> {
   const now = deps.now ?? Date.now;
   let state: { asOf?: unknown } | null = null;
@@ -63,11 +51,9 @@ export async function publishHaulingBooks(deps: PublicHaulingBooksDeps): Promise
   } catch (error) {
     console.warn('Hauling books state read failed', { error: String(error) });
   }
-  // Checked before the 20 MB download: most runs find the snapshot they already published.
   const headPublishedAt = await (deps.publishedAtImpl ?? fetchPublishedAt)(
     MARKET_ORDERS_LATEST_URL
   );
-  // Not newer than the last publish (a CDN may serve a stale HEAD): never overwrite newer data with older.
   if (
     headPublishedAt !== null &&
     typeof state?.asOf === 'number' &&
@@ -107,7 +93,6 @@ export async function publishHaulingBooks(deps: PublicHaulingBooksDeps): Promise
       failures.push(`${hub.id}: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
-  // The record is only kept for a complete publish, so a later run repeats a partial one.
   if (failures.length > 0) {
     throw new Error(
       `Hauling books: ${failures.length} hubs failed to write: ${failures.join('; ')}`

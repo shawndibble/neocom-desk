@@ -111,7 +111,6 @@ describe('BiggerChainsPanel', () => {
 
   it('recommends nothing when no chain beats the one-planet picks, and keeps those chains one click away', async () => {
     const user = userEvent.setup();
-    // The fixture's colonies earn 5,000 + 1,000 a day after their rebuild.
     state({ colonies: onColonies(4_000), newPlanets: null });
     renderPanel();
     expect(screen.getByText(/The 1 chain your planets can make doesn't beat/)).toBeInTheDocument();
@@ -139,7 +138,6 @@ describe('BiggerChainsPanel', () => {
 
 describe('BiggerChainsPanel: what if I add a planet?', () => {
   const CAMERA_DRONES = 2345;
-  // The fixture's colonies are Barren; the chains a Lava planet adds.
   const onBarren = {
     ...advice,
     chainColonies: [{ planetId: 1, planetType: 'barren', ratePerEcu: new Map() }],
@@ -182,7 +180,6 @@ describe('BiggerChainsPanel: what if I add a planet?', () => {
     expect(card).toHaveTextContent(/on Hek VI and a new Lava planet/);
     expect(card).toHaveTextContent(/a new Lava planet → Hek VI: not known yet/);
     expect(card).toHaveTextContent(/Haul900 m³\/wk/);
-    // Hek VI after its rebuild, plus a free slot at the best one-planet recipe for the new planet.
     expect(card).toHaveTextContent(
       /more than these 2 planets earn on their best one-planet picks \(5.9K 5,900 ISK\/day\)/
     );

@@ -81,7 +81,6 @@ const fitting: Fitting = {
 
 const profile: PilotProfile = { skillLevels: new Map(), implantTypeIds: [], boosterTypeIds: [] };
 
-/** A variant's stats by the type swapped into slot 0; `compare` pairs them with `baseStats`. */
 function evaluator(afterFor: (typeId: number | undefined) => FittingStats): VariantEvaluator {
   return {
     fitting,
@@ -164,8 +163,6 @@ describe('useModuleVariations', () => {
     );
     await waitFor(() => expect(result.current.rows[0].delta).not.toBeNull());
 
-    // A Character switch (a new evaluator, same Fitting/slot) must not keep
-    // showing the previous Character's results while its own are in flight.
     rerender(evaluator(() => ({ ...baseStats, ehp: 26000 })));
     expect(result.current.rows[0].delta).toBeNull();
     await waitFor(() =>
@@ -213,7 +210,6 @@ describe('useModuleVariations', () => {
   });
 
   describe('between variant calculations', () => {
-    /** Both siblings (101, 102) in the high rack, so there are two variants to compare. */
     const twoSiblings: FittingCatalogue = {
       ...catalogue,
       rackOf: { ...catalogue.rackOf, '102': 'high' },
@@ -223,7 +219,6 @@ describe('useModuleVariations', () => {
       [102, { fitsHull: true, canFly: true }],
     ]);
 
-    /** Each `compare` waits until the test opens it, so the run can be stepped one variant at a time. */
     function gatedCompare(variants: VariantEvaluator, ehp: number) {
       const gates: (() => void)[] = [];
       variants.compare = vi.fn(
@@ -285,7 +280,6 @@ describe('useModuleVariations', () => {
       await waitFor(() => expect(staleGates).toHaveLength(1));
       const signal = vi.mocked(stale.compare).mock.calls[0][1];
 
-      // A Character switch mid-run: the old run must not go on to its second variant.
       rerender(current);
       expect(signal?.aborted).toBe(true);
       staleGates[0]();

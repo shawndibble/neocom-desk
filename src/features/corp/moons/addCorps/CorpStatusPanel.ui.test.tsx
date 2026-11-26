@@ -49,7 +49,6 @@ describe('CorpStatusPanel', () => {
     expect(
       screen.getByText('Removing keeps its past mining and billing records.')
     ).toBeInTheDocument();
-    // The corp with its own book gets words only: no button, and never a "Move it" action.
     expect(screen.queryByRole('button', { name: /Emberlight Group/ })).toBeNull();
     expect(screen.queryByRole('button', { name: /Move it/ })).toBeNull();
     await userEvent.click(
@@ -125,7 +124,6 @@ describe('CorpStatusPanel', () => {
         onRemove={() => Promise.resolve(true)}
       />
     );
-    // Only the own corp counts as needing the player.
     expect(screen.getByText('Needs you (1)')).toBeInTheDocument();
     expect(
       screen.getByText(
@@ -159,7 +157,6 @@ describe('CorpStatusPanel', () => {
     expect(screen.getByText('Needs you (1)')).toBeInTheDocument();
     expect(screen.getByText('No chunk ore')).toBeInTheDocument();
     expect(screen.getByText(/Each chunk's ore isn't shown/)).toBeInTheDocument();
-    // Names who to log in as, so a CEO of many corps knows which character each one needs.
     expect(screen.getByText('CEO: Mira Voss')).toBeInTheDocument();
     await userEvent.click(
       screen.getByRole('button', { name: 'Grant again for Sable Ridge Extraction' })

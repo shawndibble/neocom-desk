@@ -1,9 +1,3 @@
-// SRP file-claim: the real SrpKillmailSource. Killmail and hull group from public
-// ESI (no token), the killmail's value from zKillboard (third party, fails soft), and the Jita
-// Appraisal value from Fuzzwork's station aggregates, the same price source the Appraisal tab
-// uses (ADR 0002). Every request names us; zKillboard and Fuzzwork get one polite call each and
-// are never retried.
-
 import { HttpsError } from 'firebase-functions/v2/https';
 import { ESI_BASE, ESI_USER_AGENT, esiGet } from './esiClient.js';
 import { throwForEsi } from './esiThrow.js';
@@ -13,14 +7,12 @@ import { chunk } from './chunk.js';
 
 const ZKILL_API = 'https://zkillboard.com/api/killID';
 const FUZZWORK_AGGREGATES = 'https://market.fuzzwork.co.uk/aggregates/';
-/** Jita IV - Moon 4 - Caldari Navy Assembly Plant, the Appraisal tab's Jita. */
 export const JITA_STATION_ID = 60003760;
 const FUZZWORK_BATCH = 200;
 const MAX_APPRAISAL_TYPES = 1000;
 
 async function esiKillmailGet(url: string, fetchImpl: typeof fetch): Promise<unknown> {
   const got = await esiGet(url, { fetchImpl });
-  // ESI answers 422 for a malformed killmail hash: the same "no such killmail".
   const missing = got.kind === 'not-found' || (got.kind === 'error' && got.status === 422);
   if (missing) {
     throw new HttpsError('not-found', 'ESI has no such killmail', { reason: 'killmail-not-found' });
@@ -73,10 +65,8 @@ export function parseEsiKillmail(killmailId: number, body: unknown): EsiKillmail
   };
 }
 
-/** A type's group never changes, and the source is built per call, so the answers outlive it. */
 const shipGroupByTypeId = new Map<number, number>();
 
-/** Tests only: the cache is module state, so a test that fakes ESI starts it empty. */
 export function clearShipGroupCache(): void {
   shipGroupByTypeId.clear();
 }
@@ -90,7 +80,7 @@ export function srpKillmailSource(fetchImpl: typeof fetch = fetch): SrpKillmailS
           headers: { 'User-Agent': ESI_USER_AGENT, Accept: 'application/json' },
           signal: AbortSignal.timeout(10_000),
         });
-        if (!res.ok) return none; // 429 included: no retry, the Appraisal step covers it
+        if (!res.ok) return none;
         const entry = ((await res.json()) as unknown[])?.[0] as
           { zkb?: { hash?: unknown; totalValue?: unknown } } | undefined;
         const hash = entry?.zkb?.hash;
@@ -126,7 +116,7 @@ export function srpKillmailSource(fetchImpl: typeof fetch = fetch): SrpKillmailS
     },
 
     async jitaValue(items) {
-      if (items.size > MAX_APPRAISAL_TYPES) return null; // a partial total would underpay
+      if (items.size > MAX_APPRAISAL_TYPES) return null;
       const typeIds = [...items.keys()];
       let total = 0;
       try {

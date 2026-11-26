@@ -16,20 +16,11 @@ import { cx } from '@/lib/cx';
 import { PledgeBar } from './PledgeBar';
 import { formatQuantity } from './requestFormat';
 
-/** A delivered amount typed in: a whole number from 0 (clears it) up to the Pledge. */
 function parseDelivered(text: string, max: number): number | null {
-  // 0 clears it, and so do "00" and "000": parseQuantity wants a positive number.
   const value = parseLocalizedNumber(text) === 0 ? 0 : parseQuantity(text);
   return value !== null && value <= max ? value : null;
 }
 
-/**
- * One line of a Request in its side panel: the line, its stacked bar, the
- * over-pledge note, and (for a Member who can Pledge) an inline quantity field
- * with Pledge, or Update pledge and Withdraw once pledged. Pledges reserve
- * nothing, so an over-pledge only prints the note. The requester gets
- * `canPledge={false}` and sees the line and bar alone.
- */
 export function PledgeRow({
   line,
   spec,
@@ -45,26 +36,20 @@ export function PledgeRow({
   onSaveDelivered,
 }: {
   line: RequestLine;
-  /** "BPC, runs 10, ME 10" for a blueprint line, else empty. */
   spec: string;
   progress: LineProgress;
-  /** This Member's own Pledge on the line, if any. */
   own: { quantity: number; delivered: number; manual?: number } | undefined;
   stale: boolean;
   canPledge: boolean;
   busy: boolean;
   onPledge: (quantity: number) => void;
   onWithdraw: () => void;
-  /** BPC attributes that differ from the ask on contracts counted toward this Pledge. */
   flags?: readonly DeliveryFlag[];
-  /** Offer a typed delivered amount: the Member cannot have it marked from contracts. */
   manualEntry?: boolean;
-  /** Save what the Member typed; 0 clears it. */
   onSaveDelivered?: (amount: number) => void;
 }) {
   const { t } = useTranslation();
   const [text, setText] = useState(String(defaultPledgeQuantity(progress, own?.quantity)));
-  // A saved Pledge changes the field's starting point: follow it (adjusting state while rendering).
   const [seenOwn, setSeenOwn] = useState(own?.quantity);
   if (seenOwn !== own?.quantity) {
     setSeenOwn(own?.quantity);

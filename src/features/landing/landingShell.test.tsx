@@ -7,18 +7,6 @@ import en from '@/i18n/locales/en.json';
 import { LANDING_SHELL_ID } from '@/app/landingShell';
 import { Login } from '@/routes/Login';
 
-/**
- * The prerendered landing hero (`src/app/landingShell.ts`) is the real `Login`
- * render, cut down to what the first screen shows: the sticky header and the
- * hero. The live Overview demo is the next section, so it stays out (its
- * countdowns change by the minute, and it is a separate chunk anyway). Kept as a file snapshot that
- * `vite.config.ts` injects into `index.html`, so any change to the hero fails
- * here until the snapshot is regenerated: `npx vitest run
- * src/features/landing/landingShell.test.tsx -u`.
- *
- * Wrapped in `inert`: its buttons look real but do nothing until React takes
- * over, so they must not take focus or a click that is then lost.
- */
 const HEADING = `${en.login.heading} ${en.login.headingAccent}`;
 
 async function landingShellHtml(): Promise<string> {
@@ -63,7 +51,6 @@ describe('landing shell', () => {
       shell.querySelector('img[src="/landing/megathron.webp"]')?.getAttribute('fetchpriority')
     ).toBe('high');
     expect(shell.querySelector('[aria-labelledby="login-preview-label"]')).toBeNull();
-    // Cloned beside #root, so an id here would clash with React's own.
     expect(shell.querySelectorAll(`[id]:not(#${LANDING_SHELL_ID})`)).toHaveLength(0);
   });
 });

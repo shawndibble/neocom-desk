@@ -39,7 +39,6 @@ const emptyState = (over: Partial<BookState> = {}): BookState => ({
   ...over,
 });
 
-/** A late notice sent to a Miner: the code it printed is theirs. */
 const owing = (minerId: string): LateNotice => ({
   id: `s-${minerId}`,
   minerId,
@@ -156,9 +155,7 @@ describe('syncCorpTaxBook', () => {
     const upload = vi.mocked(d.uploadSync).mock.calls[0][1];
     expect(upload.observed).toHaveLength(1);
     expect(upload.extractions).toHaveLength(1);
-    // Known from the ledger, and its Miner owes, so the donation is credited to that Miner.
     expect(upload.donations?.[0]).toMatchObject({ refId: 9 });
-    // The server places the donation itself; a Miner this tab named would be ignored.
     expect(upload.donations?.[0]?.minerId).toBeUndefined();
     expect(out).toMatchObject({
       kind: 'synced',
@@ -169,7 +166,6 @@ describe('syncCorpTaxBook', () => {
   });
 
   it('leaves a known miner’s donation for the server to place (#6207)', async () => {
-    // Character 7 mined on 2026-07-19 and has no Statement: miners often pay the day they mine.
     const d = deps({
       loadDonations: async () => [
         { refId: 9, division: 1, characterId: 7, amount: 5, at: '2026-07-19T00:00:00.000Z' },
@@ -181,7 +177,6 @@ describe('syncCorpTaxBook', () => {
   });
 
   it('leaves a donation for the server to place even when its Miner owes nothing (#6300)', async () => {
-    // Billed through the day they mined, and paid in full: nothing owed, no ore unbilled.
     const billed = owing('solo:7');
     const d = deps({
       readBookState: async () =>
@@ -248,7 +243,6 @@ describe('syncCorpTaxBook', () => {
       readBookState: async () =>
         emptyState({
           miners: [{ id: 'm1', mainCharacterId: 7, characterIds: [7, 8] }] as BookState['miners'],
-          // Billed through the day mined before the donation: nothing was unbilled when they paid.
           notices: [owing('m1')],
           payments: [
             {
@@ -285,13 +279,10 @@ describe('syncCorpTaxBook', () => {
         }),
     });
     await run(d);
-    // Character 7 mined on the day character 8 paid; the ledger only showed it on this sync.
     expect(d.assignPayment).toHaveBeenCalledWith(5, CORP, 'j1_1', 'm1');
   });
 
   describe('moon owner mining the book bills (stored rows, not this read)', () => {
-    // A book that bills from 2026-07-01 and whose only refinery read holds nothing for character
-    // 7: their ore was all mined at a moon owner's refinery, stored tagged with that owner.
     const FEEDER = 98000002;
     const fed = (date: string, characterId = 7) => ({
       ...row(characterId, date),
@@ -333,7 +324,6 @@ describe('syncCorpTaxBook', () => {
           book([
             held('j5_1', '2026-07-02T22:38:44.000Z'),
             held('j5_2', '2026-07-14T18:28:44.000Z'),
-            // Paid before the book bills from: still credited to the Miner, the book ignores it.
             held('j5_0', '2026-06-21T17:38:23.000Z'),
           ]),
       });
@@ -512,9 +502,7 @@ describe('syncCorpTaxBook', () => {
           payments: [
             pay('j1_1', 8, '2026-07-01T00:00:00Z'),
             pay('j1_2', 8, '2026-07-02T00:00:00Z'),
-            // Before the lock date on 2026-07-20 (2026-05-01): assigning it is refused for good.
             pay('j1_0', 8, '2026-04-30T00:00:00Z'),
-            // Its Miner's account is closed.
             pay('j1_3', 9, '2026-07-03T00:00:00Z'),
           ],
         }),
@@ -579,7 +567,6 @@ describe('syncCorpTaxBook', () => {
     expect(d.loadEsiExtractions).not.toHaveBeenCalled();
     expect(d.loadDonations).not.toHaveBeenCalled();
     expect(out).toMatchObject({ kind: 'synced', missing: ['ore', 'donations'] });
-    // So members' "not credited" notes do not count this sync as one the donation missed.
     expect(vi.mocked(d.uploadSync).mock.calls[0][1].donationsRead).toBe(false);
   });
 

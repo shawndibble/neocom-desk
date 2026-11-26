@@ -9,7 +9,6 @@ interface Row {
   id: string;
   amount: number;
 }
-// 12 rows: the largest amounts sit at the end, past the first page of ten.
 const rows: Row[] = Array.from({ length: 12 }, (_, i) => ({ id: `r${i + 1}`, amount: i + 1 }));
 const columns: DataTableColumn<Row>[] = [
   { id: 'id', header: 'Id', primary: true, render: (r) => r.id },

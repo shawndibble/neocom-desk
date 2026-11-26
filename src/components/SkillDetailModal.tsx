@@ -1,22 +1,3 @@
-/**
- * Shared skill detail lookup (GLOSSARY.md round 49): description, price,
- * prerequisites (trained vs. still needed), what each level unlocks (skills, ships,
- * modules and other items) and Add to Skill Plan for one skill, opened
- * from any feature that renders a skill name via
- * `openSkillDetailModal`/`useSkillDetailModal` (`stores/skillDetailModal.ts`).
- * Mounted once in `App.tsx`, same "always mounted, driven by a global
- * signal" shape as `PublicInfoModal` — needed here for the same reason: the
- * trigger comes from several unrelated features (Skills, Skill Plan Editor)
- * rather than one route that already owns local `selected` state.
- *
- * Self-fetches the SDE skill catalog and the active character's trained
- * skills (via `correctedSkills.ts`, same source Skills/Plan Editor read, so
- * a level the training queue already finished but /skills hasn't caught up
- * to still shows as trained here) from just a typeID, so callers don't need
- * to have either loaded already — `buildSkillRequirements`
- * (features/skills/skillRequirements.ts) already does the trained-vs-needed
- * comparison, this just supplies its inputs.
- */
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, EmptyState, Modal, Spinner } from '@/components/ui';
@@ -44,7 +25,6 @@ type ModalState =
   | {
       status: 'ready';
       data: SkillRequirements;
-      /** With `trainedSkills`: `SkillPlanAdd`'s inputs. */
       engineSkills: ReadonlyMap<number, EngineSkill>;
       trainedSkills: ReadonlyMap<number, TrainedSkill>;
     };
@@ -58,10 +38,7 @@ export function SkillDetailModal() {
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
 
   const [state, setState] = useState<ModalState>(IDLE);
-  // Loaded beside the skill, not before it: the description and prerequisites never wait on item data.
   const itemUnlocks = useItemUnlocks(request?.typeID ?? null);
-  // Bumped by "Try again" to re-run the load effect in place — the page's
-  // own Refresh sits behind the modal overlay, out of reach.
   const [attempt, setAttempt] = useState(0);
   const [resultRef, armRetryFocus] = useRetryFocus(
     state.status === 'error'
@@ -163,7 +140,6 @@ export function SkillDetailModal() {
           />
         ) : (
           <div className="space-y-3">
-            {/* What the skill does leads: it's what a click on a skill name is asking. */}
             <div className="space-y-1">
               {state.data.description && (
                 <p className="text-sm whitespace-pre-line text-text">{state.data.description}</p>

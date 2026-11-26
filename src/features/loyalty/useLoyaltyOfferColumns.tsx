@@ -18,13 +18,6 @@ import {
 } from '@/features/loyalty/offerRowDisplay';
 import type { LoyaltyOfferRow } from '@/features/loyalty/offerRows';
 
-/**
- * The offers table's columns: the identity column (never hidden) plus the optional
- * columns the picker controls, in `LOYALTY_STORE_OFFERS_COLUMN_IDS` order.
- * `optionalColumns` is the full set, for the picker. Memoized so the `sortValue`s
- * `DataTable` keys its sort on keep their identity across renders (a keystroke in the
- * search box re-renders the page).
- */
 export function useLoyaltyOfferColumns({
   lpBasis,
   concord,
@@ -37,9 +30,7 @@ export function useLoyaltyOfferColumns({
   concord: ConcordRate | null;
   concordPending: boolean;
   isColumnVisible: (id: LoyaltyStoreOffersColumnId) => boolean;
-  /** The pilot's LP: an offer they cannot yet afford says how much is missing. */
   playerLp?: number | null;
-  /** The table's active sort column: on a phone its value is the card's bold figure. */
   sortColumnId?: string;
 }) {
   const { t } = useTranslation();
@@ -53,8 +44,6 @@ export function useLoyaltyOfferColumns({
         : row.profit.iskPerLp,
     [lpBasis, concord]
   );
-  // The phone card's bold figure follows the sort when the sorted column is one of the
-  // three; sorting by name, or by a column the picker has hidden, leaves it on ISK / LP.
   const cornerId: LoyaltyStoreOffersColumnId =
     LOYALTY_STORE_OFFERS_COLUMN_IDS.find((id) => id === sortColumnId && isColumnVisible(id)) ??
     'iskPerLp';
@@ -68,12 +57,9 @@ export function useLoyaltyOfferColumns({
         align: 'right',
         width: '12ch',
         headerClassName: 'whitespace-nowrap',
-        // Unavailable sorts last, apart from a real zero.
         stackAffix: { after: t('loyaltyStore.perDayAffix') },
         cardCorner: cornerId === 'sellsPerDay',
         sortValue: (row) => row.sellsPerDay ?? undefined,
-        // Amber on a phone's meta line, where the name has no room for the "Low volume" tag
-        // (the table keeps the tag beside the name); the screen-reader text below says it.
         cellClassName: (row) =>
           `tabular-nums${isPhone && cornerId !== 'sellsPerDay' && isLowVolume(row) ? ' text-warning!' : ''}`,
         render: (row) => {
@@ -120,14 +106,12 @@ export function useLoyaltyOfferColumns({
         width: '14ch',
         headerClassName: 'whitespace-nowrap',
         stackAffix: { after: ` ${t('loyaltyStore.iskPerLpUnit')}` },
-        // The phone's dense card has no header row: the bold figure sits at the title line's right.
         cardCorner: cornerId === 'iskPerLp',
         sortValue: (row) => shownIskPerLp(row) ?? undefined,
         cellClassName: (row) => `font-semibold tabular-nums ${iskPerLpTone(shownIskPerLp(row))}`,
         render: (row) => {
           if (lpBasis === 'concord' && concordPending) return '—';
           if (lpBasis === 'concord' && !concord) {
-            // The phone's corner is one unwrapped line beside the name: a dash there, the sentence in the table.
             return (
               <>
                 <span className="max-sm:hidden">{t('loyaltyStore.noConcordExchange')}</span>
@@ -148,17 +132,12 @@ export function useLoyaltyOfferColumns({
     }),
     [t, lpBasis, concord, concordPending, shownIskPerLp, cornerId, isPhone]
   );
-  // A phone shows low volume as the sells/day cell's amber, so the name's tag is redundant
-  // there, unless the picker has hidden that cell or it is the card's bold corner figure.
   const phoneWarnsInSells = isPhone && isColumnVisible('sellsPerDay') && cornerId !== 'sellsPerDay';
   const itemColumn = useMemo<DataTableColumn<LoyaltyOfferRow>>(
     () => ({
       id: 'item',
       header: t('loyaltyStore.colItem'),
       primary: true,
-      // The one width-less column. A windowed table lays out fixed, where it
-      // takes what the sized columns leave and its floor is `minWidth` (the
-      // two-line name + cost cell), so the table scrolls in its wrapper below it.
       minWidth: '14rem',
       sortValue: (row) => row.itemName,
       render: (row) => (
@@ -172,8 +151,6 @@ export function useLoyaltyOfferColumns({
     }),
     [t, phoneWarnsInSells, isPhone, playerLp]
   );
-  // The dense phone card prints every non-title cell on its meta line, so the price
-  // the table keeps under the name becomes a cell of its own there.
   const costColumn = useMemo<DataTableColumn<LoyaltyOfferRow>>(
     () => ({
       id: 'cost',

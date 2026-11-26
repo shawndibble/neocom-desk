@@ -1,8 +1,3 @@
-/**
- * The turn-in stories' amber mark: the presentational `PermissionCellMark`,
- * since the views there take every read already made (`GrantCellMark` wires
- * it up in the app).
- */
 import { useTranslation } from 'react-i18next';
 import { PermissionCellMark } from '@/components/ui';
 

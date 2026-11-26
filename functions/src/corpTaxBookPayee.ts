@@ -1,10 +1,3 @@
-// A moon owner's payee (issues #4619, #4653, spec #4504): either side's officers name it, the last
-// edit wins. The accounting corporation's Accountant or higher (`setBookFeederPayee`) and the moon
-// owner's own CEO, Directors and Accountants (`setFeederPayee`), both with a live role check. Every
-// change stamps `payeeChangedAt` (engine `withPayee`, which the removal's payee link reads) and
-// appends `payeeHistory` (payout matching), records who set it, and names whom the changing
-// officer's client mails: the other side. Failures carry a stable `reason`; no player-facing text.
-
 import { fail, type Caller } from './actorAuth.js';
 import { HttpsError } from 'firebase-functions/v2/https';
 import { record } from './communities.js';
@@ -48,13 +41,10 @@ function parsePayee(data: unknown): Payee {
   return { kind, id };
 }
 
-/** The changing officer's client can mail (#4653): only then does the answer name whom to tell. */
 const parseNotify = (data: unknown): boolean => record(data).notify === true;
 
-/** The moon owner's own officer names its payee. */
 export interface SetFeederPayeeInput extends FeederCall {
   payee: Payee;
-  /** Absent: false. */
   notify?: boolean;
 }
 
@@ -62,10 +52,8 @@ export function parseSetFeederPayeeInput(data: unknown): SetFeederPayeeInput {
   return { ...parseFeederCall(data), payee: parsePayee(data), notify: parseNotify(data) };
 }
 
-/** The accounting corporation's officer names a moon owner's payee. */
 export interface SetBookFeederPayeeInput extends FeederTargetCall {
   payee: Payee;
-  /** Absent: false. */
   notify?: boolean;
 }
 
@@ -74,14 +62,11 @@ export function parseSetBookFeederPayeeInput(data: unknown): SetBookFeederPayeeI
 }
 
 export type PayeeSetResult =
-  /** The payee named is the one already in force: nothing written, nobody told. */
   | { ok: true; changed: false; recipients: [] }
   | {
       ok: true;
       changed: true;
-      /** When it changed (ms), the stamp on the record: one mail per change and recipient. */
       at: number;
-      /** Character ids the changing officer's client mails (the other side); empty unless `notify`. */
       recipients: number[];
     };
 
@@ -97,18 +82,11 @@ interface PayeeWrite {
   side: PayeeSetBy['side'];
 }
 
-/**
- * One write for either side: the id is checked against ESI first (#4621), then the payee, its
- * stamp, history and who set it go in one transaction with the audit entry. Returns the payee
- * in force before and the change's time, or null when nothing changed.
- */
 async function writePayee(
   deps: BookDeps,
   w: PayeeWrite,
   idCategory: IdCategoryLookup
 ): Promise<{ before: Payee | undefined; at: number } | null> {
-  // The id must be the kind it claims (#4621): a character stored as a corporation would send
-  // payouts and the removal link to the wrong place. ESI down fails the call; nothing is written.
   if ((await idCategory(w.payee.id)) !== w.payee.kind) {
     fail(
       'invalid-argument',
@@ -123,7 +101,6 @@ async function writePayee(
     if (rec.status !== 'active' && rec.status !== 'pending-removal') {
       fail('failed-precondition', 'This moon owner has left', 'feeder-ended');
     }
-    // Unset means the moon owner corporation: naming it (or the standing payee) changes nothing.
     const current = rec.payee ?? { kind: 'corporation', id: w.feeder };
     if (current.kind === w.payee.kind && current.id === w.payee.id) return null;
     const now = deps.now();
@@ -148,10 +125,6 @@ async function writePayee(
 
 const without = (ids: readonly number[], callerId: number) => ids.filter((id) => id !== callerId);
 
-/**
- * The moon owner's CEO, Directors and Accountants (live role check). The accounting
- * corporation's officers with book access are told.
- */
 export async function setFeederPayee(
   deps: CorpSyncDeps,
   caller: Caller,
@@ -170,7 +143,6 @@ export async function setFeederPayee(
     side: 'moon-owner',
   };
   const out = await writePayee(book, write, idCategory).catch((err: unknown) => {
-    // The moon owner's officer only ever hears that it is not handled any more.
     const reason = err instanceof HttpsError ? (err.details as { reason?: string }) : undefined;
     if (reason?.reason === 'no-feeder' || reason?.reason === 'feeder-ended') {
       fail('failed-precondition', 'This corporation is not feeding a book', 'not-your-feeder');
@@ -182,10 +154,6 @@ export async function setFeederPayee(
   return { ok: true, changed: true, at: out.at, recipients: without(officers, ctx.callerId) };
 }
 
-/**
- * The accounting corporation's Accountant or higher (live role check). The moon owner's CEO
- * and both the old and the new payee are told (engine `moonOwnerMailRecipients`).
- */
 export async function setBookFeederPayee(
   deps: BookDeps,
   caller: Caller,

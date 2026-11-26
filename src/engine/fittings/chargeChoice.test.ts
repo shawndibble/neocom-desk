@@ -155,7 +155,6 @@ describe('sortGroups', () => {
   });
 
   it('sorts by damage at a distance when one is set', () => {
-    // At 40 km Antimatter (15 km optimal, 18 km falloff) barely lands.
     expect(sortGroups(groups, 'damage', 40_000).map((g) => g.baseTypeId)).toEqual([1, 2]);
   });
 });
@@ -224,9 +223,8 @@ describe('quickPicks', () => {
 
   it('picks max damage, max reach and best value among usable charges', () => {
     const picks = quickPicks(all, null)!;
-    expect(picks.maxDamage.typeId).toBe(3); // CN beats FN on price at equal damage
-    expect(picks.maxRange.typeId).toBe(1); // Spike is skill-locked
-    // Within 10% of 437: only the navy charges; CN is cheaper per minute.
+    expect(picks.maxDamage.typeId).toBe(3);
+    expect(picks.maxRange.typeId).toBe(1);
     expect(picks.bestValue?.typeId).toBe(3);
   });
 

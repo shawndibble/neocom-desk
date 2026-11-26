@@ -55,7 +55,6 @@ describe('buildSkillBoard', () => {
   it('counts trained (level 1+) of total, and skills with a higher queued level', () => {
     const [gunnery, command] = board();
     expect(gunnery).toMatchObject({ total: 3, trained: 2, queued: 1 });
-    // Spaceship Command is injected at 0, which is not trained yet.
     expect(command).toMatchObject({ total: 2, trained: 0, queued: 0 });
   });
 
@@ -103,7 +102,6 @@ describe('boardCsvGroups', () => {
       ['Sharpshooter', 0, null, false, null],
       ['Small Hybrid Turret', 3, 8000, true, 5],
     ]);
-    // With nothing trained the whole catalog is still there.
     expect(boardCsvGroups(board({ trained: new Map() })).flatMap((g) => g.skills)).toHaveLength(5);
   });
 });

@@ -43,22 +43,12 @@ describe('SkillPlans editor: plan header (#21)', () => {
     renderSkillsRoutes();
     await screen.findByText('Your entries');
 
-    // Skill count: distinct skills in the computed queue (Gunnery,
-    // Spaceship Command), matching the same set totalSeconds times.
     expect(within(header()).getByText('2')).toBeInTheDocument();
     expect(await within(header()).findByText('Remap savings')).toBeInTheDocument();
     expect(within(header()).queryByText('None')).not.toBeInTheDocument();
   });
 
   it('omits the savings badge entirely when the plan has no remaps to spend', async () => {
-    // Otherwise the header asserts "Remap savings: None" — remapping cannot
-    // help this plan — while the Actions panel below it says the opposite:
-    // the derived remap budget shows remaps to spend. Remaps Available is
-    // live-ESI now (#1412), not plan.remapCount — and with live ESI readable
-    // the budget can never actually be 0 (a `timedRemap` slot always covers
-    // an on-cooldown yearly remap, per #1404), so 0-remaps-to-spend can only
-    // happen on the offline/no-scope fallback: ESI attributes unreadable and
-    // the plan's stored `remapCount` itself 0.
     server.use(
       http.get(`https://esi.evetech.net/characters/${CHAR_ID}/attributes`, () =>
         HttpResponse.error()
@@ -68,9 +58,6 @@ describe('SkillPlans editor: plan header (#21)', () => {
     goToPlanEditor();
     renderSkillsRoutes();
     await openPlanTools();
-    // The fallback text proves attributes have finished loading (unreadable)
-    // and the "no remaps" state was reached deliberately, so the header has
-    // had its chance to render a badge and chose not to.
     await screen.findByText(
       "Remaps: 0 (saved with this plan, because your attributes didn't load)"
     );
@@ -80,11 +67,6 @@ describe('SkillPlans editor: plan header (#21)', () => {
   });
 
   it('omits the savings badge while a Booster is active until "Optimize remaps" supplies a real answer', async () => {
-    // Booster-aware costing can take seconds of synchronous time (a Booster
-    // expiring mid-plan defeats placeRemaps' aggregation) — far too slow to
-    // run live in a useMemo. The header must never show a number computed
-    // without the active Booster once one is on, so it shows nothing until
-    // the explicit, Booster-aware "Optimize remaps" click supplies one.
     const user = userEvent.setup();
     await db.skillPlans.add(seedTwoSkillPlan());
     goToPlanEditor();
@@ -116,7 +98,6 @@ describe('SkillPlans editor: remaps available from ESI', () => {
   beforeEach(async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     vi.setSystemTime(new Date('2026-08-29T12:00:00Z'));
-    // A typed-in accelerator lives in Dexie, shared across plans: one test's must not leak into the next.
     await db.characterAccelerators.clear();
   });
   afterEach(() => {
@@ -134,9 +115,6 @@ describe('SkillPlans editor: remaps available from ESI', () => {
       )
     );
     const user = userEvent.setup();
-    // Seed a plan so the editor (and its hint) is visible before creating:
-    // the hint appearing proves the ESI attributes have loaded, so the "New
-    // plan" that follows (from the list) is guaranteed to see the prefill value.
     await db.skillPlans.add(seedPlan());
     goToPlanEditor();
     renderSkillsRoutes();
@@ -149,9 +127,6 @@ describe('SkillPlans editor: remaps available from ESI', () => {
     await user.click(screen.getByRole('link', { name: 'Back to plans' }));
     await user.click(await screen.findByRole('button', { name: 'New plan' }));
     await openPlanTools();
-    // Not user-editable anymore, but still seeded once at creation
-    // (offline-fallback `remapCount`) from live ESI: the yearly remap is on
-    // cooldown, so only the 2 bonus remaps count.
     expect(
       await screen.findByText('Remaps: 2 bonus · yearly remap from 2027-01-15')
     ).toBeInTheDocument();
@@ -182,8 +157,6 @@ describe('SkillPlans editor: remaps available from ESI', () => {
     await user.click(screen.getByRole('link', { name: 'Back to plans' }));
     await user.click(await screen.findByRole('button', { name: 'New plan' }));
     await openPlanTools();
-    // The cooldown date is already past, so the new plan's derived display
-    // counts the yearly remap as ready too (1 bonus + yearly = 2 available).
     expect(await screen.findByText('Remaps: 1 bonus · yearly remap ready')).toBeInTheDocument();
   });
 });
@@ -194,9 +167,9 @@ describe('SkillPlans editor: suggest reorder', () => {
     await db.skillPlans.add(
       seedPlan({
         entries: [
-          { skillTypeID: 1, targetLevel: 3 }, // Gunnery (perception/willpower)
-          { skillTypeID: 3, targetLevel: 1 }, // Spaceship Command (intelligence/memory)
-          { skillTypeID: 4, targetLevel: 1 }, // Small Projectile Turret (perception/willpower)
+          { skillTypeID: 1, targetLevel: 3 },
+          { skillTypeID: 3, targetLevel: 1 },
+          { skillTypeID: 4, targetLevel: 1 },
         ],
       })
     );
@@ -211,8 +184,6 @@ describe('SkillPlans editor: suggest reorder', () => {
     await user.click(screen.getByRole('button', { name: 'Accept' }));
 
     const stored = await db.skillPlans.get('plan-1');
-    // Gunnery's three levels stay together and in order; the reorder moves
-    // the other two skills around that block.
     expect(stored?.entries).toEqual([
       { skillTypeID: 1, targetLevel: 1 },
       { skillTypeID: 1, targetLevel: 2 },
@@ -241,8 +212,6 @@ describe('SkillPlans editor: suggest reorder', () => {
     const toolbar = screen.getByRole('button', { name: 'Optimize' }).closest('section')!;
     await clickOptimizeMode(user, 'Reorder only');
 
-    // Additive: the reorder-preview modal (asserted elsewhere above) still
-    // opens — this only checks the new beside-the-button confirmation.
     expect(await within(toolbar).findByRole('status')).toHaveTextContent('Reorder suggested');
   });
 });
@@ -258,10 +227,6 @@ describe('SkillPlans editor: what-if implants and booster', () => {
 
     const queuePanel = (await screen.findByText('Your entries')).closest('section')!;
     await within(queuePanel).findAllByRole('listitem');
-    // Scoped to PlanHeader's own "Training time" chip by its unique label,
-    // not a bare duration-shaped regex: the header also carries a Remap
-    // savings chip once a plan has savings to show, and both render
-    // duration-shaped text, so an unscoped `/^\d+[dhm]/` match is ambiguous.
     const durationHeader = () =>
       screen.getByText('Training time').parentElement!.querySelector('span:last-child')!;
     const durationBefore = durationHeader().textContent;
@@ -287,11 +252,8 @@ describe('SkillPlans editor: what-if implants and booster', () => {
     expect(screen.queryByLabelText('Days')).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Add accelerator' }));
-    // `find`, not `get`: the Booster is saved on the plan now, so the row
-    // travels through Dexie and back before the time-left field exists.
     await screen.findByLabelText('Days');
 
-    // A lapsed accelerator is not running: reopening on one offers "Add" again.
     await db.characterAccelerators.put({
       id: String(CHAR_ID),
       characterId: CHAR_ID,
@@ -317,9 +279,6 @@ describe('SkillPlans editor: what-if implants and booster', () => {
 
     const queuePanel = (await screen.findByText('Your entries')).closest('section')!;
     await within(queuePanel).findAllByRole('listitem');
-    // See the sibling "recomputes training time..." test above: scoped to
-    // PlanHeader's own "Training time" chip, since an unscoped duration
-    // regex can also match its Remap savings chip.
     const durationHeader = () =>
       screen.getByText('Training time').parentElement!.querySelector('span:last-child')!;
     const durationBefore = durationHeader().textContent;
@@ -339,7 +298,6 @@ describe('SkillPlans editor: what-if implants and booster', () => {
     const first = renderSkillsRoutes();
     await openPlanTools();
     await openAssumptions();
-    // The previous test's last keystroke can still be landing its write in Dexie: start from none.
     await db.characterAccelerators.clear();
     await screen.findByRole('button', { name: 'Add accelerator' });
 
@@ -350,7 +308,6 @@ describe('SkillPlans editor: what-if implants and booster', () => {
 
     await waitFor(async () => {
       const stored = await db.skillPlans.get('plan-1');
-      // The running accelerator is the Character's, shared with the Characters table.
       const accelerator = await db.characterAccelerators.get(String(CHAR_ID));
       const left = (accelerator?.expiresAt ?? 0) - Date.now();
       expect({
@@ -360,8 +317,6 @@ describe('SkillPlans editor: what-if implants and booster', () => {
       }).toEqual({ implants: { kind: 'preset', preset: '+5' }, bonus: 3, fiveDaysLeft: true });
     });
 
-    // The reported bug: reopening the page put every control back to its
-    // default and quietly re-costed the plan.
     first.unmount();
     renderSkillsRoutes();
     await openPlanTools();

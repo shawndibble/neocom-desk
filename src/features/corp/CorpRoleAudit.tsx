@@ -1,15 +1,3 @@
-/**
- * The Roles tab of `/corp/members` (issue #4613): who holds a sensitive role, and
- * what changed lately. The game client has no audit view of this.
- *
- * Mounted only while the tab is open and only for a Director whose grant holds
- * `read_titles`, so it reads on its own and never touches the roster read: the
- * roster baseline (`rosterState`) is recorded by the Members tab alone.
- *
- * Only sensitive roles (`engine/corp/roleAudit.ts`) are shown; there is no "all
- * roles" toggle. History is what ESI keeps, about a month, so the last
- * `HISTORY_DAYS` days show and anything older waits behind "Show older".
- */
 import { useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -40,7 +28,6 @@ import { loadCorporationId } from './boardData';
 import { CharacterRowMenu } from './corpRowMenus';
 import { loadRoleAudit, type RoleAuditData } from './roleAudit';
 
-/** Days of history shown before "Show older". */
 const HISTORY_DAYS = 30;
 
 interface RoleAuditSnapshot {
@@ -156,14 +143,12 @@ function HistoryTable({ rows }: { rows: readonly HistoryRow[] }) {
   );
 }
 
-/** The page's tab bar, and the ids its panel is linked by. */
 export interface MembersTabsSlot {
   bar: ReactNode;
   tabsId: string;
   tabId: string;
 }
 
-/** The tab's content region (a11y: `role="tabpanel"` named by its tab); a bare fragment with no tabs. */
 export function MembersTabPanel({
   slot,
   children,
@@ -179,7 +164,6 @@ export function MembersTabPanel({
   );
 }
 
-/** The Roles tab. `tabs` is the page's tab bar, drawn under the header like the Members tab's. */
 export function CorpRoleAudit({ tabs }: { tabs: MembersTabsSlot }) {
   const { t } = useTranslation();
   const snapshot = useRouteSnapshot<RoleAuditSnapshot>(loadSnapshot, undefined, {

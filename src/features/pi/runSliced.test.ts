@@ -14,7 +14,7 @@ describe('runSliced', () => {
       [1, 2, 3],
       (n) => {
         seen.push(n);
-        now += SLICE_MS; // every item uses a whole slice
+        now += SLICE_MS;
         return n !== 2;
       },
       (landed, done) => slices.push([landed, done])

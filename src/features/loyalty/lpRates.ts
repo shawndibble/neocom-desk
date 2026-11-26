@@ -1,8 +1,3 @@
-/**
- * The rate each store's LP is priced at, wherever LP is priced: the pilot's
- * own **LP Value** when they've set one (for every store), else that store's
- * market LP Value at the Trade Hub being priced at (`marketLpValue.ts`).
- */
 import { blueprintLpRate, lpRate, type LpRate } from '@/engine/loyalty/marketLpValue';
 import type { TradeHub } from '@/market/hubs';
 import { useLpValue } from './lpValue';
@@ -11,13 +6,10 @@ import { loadMarketLpValues } from './marketLpValue';
 async function ownLpValue(): Promise<number> {
   try {
     await useLpValue.getState().hydrate();
-  } catch {
-    // An unreadable setting is the default rate, as everywhere else.
-  }
+  } catch {}
   return useLpValue.getState().value;
 }
 
-/** `lpRate` for each of `corporationIds` at `hub`; a null rate for a store nothing prices. */
 export async function loadLpRates(
   corporationIds: Iterable<number>,
   hub: TradeHub
@@ -28,7 +20,6 @@ export async function loadLpRates(
   return (corporationId) => lpRate(own, market.get(corporationId) ?? null);
 }
 
-/** The rate a blueprint's LP is priced at (`blueprintLpRate`): the pilot's own, else free. */
 export async function loadBlueprintLpRate(): Promise<LpRate> {
   return blueprintLpRate(await ownLpValue());
 }

@@ -1,15 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
 import Dexie from 'dexie';
 
-/**
- * The version that adds `esiCacheMeta` must not walk `esiCache` in an
- * `upgrade()`: that would deserialize every cached value — megabytes of
- * assets and journal — inside the open, before first render. Meta for rows
- * that predate it is backfilled lazily by `esi/cache.ts` instead.
- */
 describe('adding esiCacheMeta to an existing database', () => {
   it('opens without backfilling meta and leaves every cached value intact', async () => {
-    // The v18 shape, as a returning user's browser has it.
     const old = new Dexie('neocom');
     old.version(18).stores({
       characters: 'characterId, corporationId',

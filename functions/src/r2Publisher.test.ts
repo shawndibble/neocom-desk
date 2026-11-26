@@ -36,7 +36,6 @@ function recorder(failOn?: (key: string) => boolean): { puts: Put[]; put: R2Put 
   };
 }
 
-/** One plain type and one blueprint type, so the two groups get a shard each. */
 const rows = [row(), row({ contractId: 2, typeId: 999, isBlueprintCopy: true, me: 1, te: 2 })];
 const INDEX_KEY = 'contract-offers/index.json';
 const shardPuts = (puts: Put[]) => puts.filter((p) => p.key.startsWith('contract-offers/bundles/'));
@@ -46,7 +45,6 @@ interface WrittenIndex {
   bundles: { blueprints: string[]; others: string[] };
 }
 
-/** A put that records keys and keeps the last index written. */
 function indexRecorder(failOn?: (key: string) => boolean) {
   const puts: Put[] = [];
   let index: WrittenIndex | null = null;

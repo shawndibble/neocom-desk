@@ -16,7 +16,6 @@ import { OwnShipPicker } from './OwnShipPicker';
 
 afterEach(cleanup);
 
-/** Opens the field the way a pilot does: by pressing the ship's name. */
 async function openField(user: ReturnType<typeof userEvent.setup>) {
   await user.click(await screen.findByRole('button', { name: /^Your ship:/ }));
   return screen.getByRole('combobox', { name: 'Your ship' });
@@ -48,7 +47,6 @@ describe('OwnShipPicker', () => {
     expect(onChange).toHaveBeenCalledWith(33153);
     expect(screen.queryByRole('option')).toBeNull();
     expect(screen.queryByRole('combobox')).toBeNull();
-    // Focus returns to the name, so a keyboard pilot keeps their place.
     expect(screen.getByRole('button', { name: /^Your ship:/ })).toHaveFocus();
   });
 

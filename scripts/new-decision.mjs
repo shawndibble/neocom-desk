@@ -1,11 +1,4 @@
 #!/usr/bin/env node
-// Create a new scope-decision file under docs/context/decisions/.
-//
-// The filename is a timestamp, never a sequence number: several /next-ticket
-// agents run in parallel, and any "next number" scheme has them all claim the
-// same one. See docs/context/decisions/README.md.
-//
-//   node scripts/new-decision.mjs "mail subject/sender search" --issue 416
 
 import { writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import path from 'node:path';
@@ -16,7 +9,6 @@ const DIR = path.join(ROOT, 'docs/context/decisions');
 const argv = process.argv.slice(2);
 const issueFlag = argv.indexOf('--issue');
 const issue = issueFlag >= 0 ? argv[issueFlag + 1] : null;
-// Everything that is not the flag or its value is the title.
 const title = argv
   .filter((a, i) => !a.startsWith('--') && !(issueFlag >= 0 && i === issueFlag + 1))
   .join(' ')

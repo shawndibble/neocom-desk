@@ -10,7 +10,6 @@ vi.mock('./surveyHistory', () => ({ noteSurvey }));
 
 const ready = (owner: string | null) => ({ ok: true, owner });
 let n = 0;
-/** A fresh id each test: the claim checks each Survey once per page load. */
 function started(): string {
   const id = `claim${n++}`;
   noteStartedHere(id);

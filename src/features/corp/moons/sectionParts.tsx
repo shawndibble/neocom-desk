@@ -1,9 +1,3 @@
-/**
- * The pieces the Corp Tax Book's entity pages are stacked from: a header
- * with the big number first, sections with a count in the title,
- * and the place line. They compose `Panel`, `CollapsiblePanel`,
- * `Button` and the link classes; nothing here is a new primitive.
- */
 import { useMemo, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -22,7 +16,6 @@ import { cx } from '@/lib/cx';
 import { tapTargetClassName, useCards } from './sectionHelpers';
 import { usePaged } from './usePaged';
 
-/** Yellow badge after a station name the viewer's character cannot dock at to read for itself. */
 export function UndockableChip() {
   const { t } = useTranslation();
   return (
@@ -32,10 +25,6 @@ export function UndockableChip() {
   );
 }
 
-/**
- * Where a day or a moon happened: the moon once (a link when it has a page), then only the
- * station under it, so the system name is never said twice.
- */
 export function PlaceCell({
   refinery,
   moon,
@@ -46,13 +35,9 @@ export function PlaceCell({
 }: {
   refinery: string;
   moon: string | undefined;
-  /** The moon's page, when it has one. */
   to?: string;
-  /** The refinery's page (#6348): the refinery name leads and links there, the moon is dim text under it. */
   refineryTo?: string;
-  /** Moon in the accent colour without a link: the row it sits in is the link. */
   accent?: boolean;
-  /** The station has a name (read by someone who can dock) but the viewer cannot dock there. */
   undockable?: boolean;
 }) {
   const place = splitPlace(refinery, moon);
@@ -102,7 +87,6 @@ export function PlaceCell({
   );
 }
 
-/** The one-glance header of an entity page: the big number first, then the facts. */
 export function EntityHeader({
   label,
   value,
@@ -142,12 +126,6 @@ export function EntityHeader({
   );
 }
 
-/**
- * One section of an entity page: a count in the title, the newest ten rows, a ghost
- * "Load older" in the foot and, once everything is shown, an end line. On a phone the caret
- * folds the section and a folded one still says what is inside. The page is one scroll of
- * these; there are no inner tabs.
- */
 export function BookSection<T>({
   title,
   noun,
@@ -164,24 +142,17 @@ export function BookSection<T>({
   children,
 }: {
   title: string;
-  /** What "Load older" and the end line name: "days", "payments". */
   noun: string;
-  /** What the section says with no rows; "No {noun}." when left out. */
   empty?: string;
   rows: readonly T[];
-  /** The title's count when it is not the rows shown (a filtered list). */
   count?: number;
   meta?: ReactNode;
   actions?: ReactNode;
-  /** Controls over the rows (filter chips), shown even when the filter leaves none. */
   toolbar?: ReactNode;
   phone: boolean;
   startOpen?: boolean;
-  /** One line shown while folded on a phone. */
   summary?: ReactNode;
-  /** Columns whose `sortValue` orders the whole list before it is paged. */
   sortColumns?: readonly DataTableColumn<T>[];
-  /** The rows to print, plus the sort props to hand the table. */
   children: (
     shown: readonly T[],
     table: {
@@ -194,7 +165,6 @@ export function BookSection<T>({
   const { t } = useTranslation();
   const [open, setOpen] = useState(startOpen);
   const [sort, setSort] = useState<DataTableSort | null>(null);
-  // Sorting only the loaded page would miss the older rows, so order everything, then page.
   const sorted = useMemo(() => {
     const column = sortColumns?.find((c) => c.id === sort?.columnId);
     return sort && column ? sortRows(rows, column, sort.direction) : rows;

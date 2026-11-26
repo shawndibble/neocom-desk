@@ -1,17 +1,3 @@
-/**
- * Row components for the Assets drill-down (issue #148 follow-up).
- *
- * Every row here obeys one layout rule, which is the whole point of the
- * rework: below `md`, nothing is laid out in fixed-width columns that a 390px
- * screen cannot honour (the one md+ exception is an item row's figure cells,
- * see `ItemRow`). A row is a name that truncates and one wrapping metadata
- * line beneath it — item count, ISK value, security, jumps — rendered once
- * (no `sm:hidden`/`hidden sm:flex` duplicate pair), so the page never
- * scrolls sideways and never puts the same text in the DOM twice at any
- * width. Below `md` the numbers that used to be fixed-width columns
- * (`w-14`/`w-16`/`w-20`) wrap with everything else.
- */
-
 import { fixed1 } from '@/lib/fixedFormat';
 import { formatCount } from '@/lib/formatCount';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
@@ -50,22 +36,13 @@ import type { Translate } from '@/lib/translate';
 import type { DataTableSort } from '@/components/ui';
 import type { LevelSortColumn } from './assetLevelSort';
 
-/* ------------------------------------------------------------------ badges */
-
-/** A navigating row's trailing caret (§6c): faint at rest, accent while the row's link is hovered or focused. */
 const rowCaretClassName =
   'shrink-0 text-text-faint group-hover:text-accent group-focus-visible:text-accent';
 
 interface SecurityValueProps {
-  /** Undefined while still resolving, null when unresolvable — renders nothing either way. */
   security: number | null | undefined;
 }
 
-/**
- * A solar system's security status on the game's own scale
- * (`securityStatusColor`). The number is always spelled out rather than
- * reduced to a coloured dot — DESIGN.md §7, colour is never the only signal.
- */
 export function SecurityValue({ security }: SecurityValueProps) {
   if (security === null || security === undefined) return null;
   const value = fixed1(security);
@@ -82,15 +59,11 @@ export function SecurityValue({ security }: SecurityValueProps) {
 interface JumpsAwayTextProps {
   result: JumpsAwayResult | undefined;
   t: Translate;
-  /** The place counted to; when given, a known count opens the route to it. Leave out inside a link — a button can't nest in one. */
   locationId?: number;
-  /** The page's own route picker, carried into the route the count opens. */
   preference?: RoutePreferenceKind | null;
-  /** Extra classes for the route link, e.g. a touch-target box. */
   linkClassName?: string;
 }
 
-/** Renders nothing until its route call settles — a progressive enhancement, never load-blocking. */
 export function JumpsAwayText({
   result,
   t,
@@ -114,8 +87,6 @@ export function JumpsAwayText({
     );
   }
   return (
-    // Plain Tooltip, not HintText: this sits inside a row link, where a focusable,
-    // tap-to-toggle trigger would fight the navigation.
     <Tooltip content={t(`assets.jumpsAway.unknownReason.${result.reason}`)}>
       <span className="pointer-events-auto relative z-10 tabular-nums">
         <span aria-hidden="true">{t('assets.jumpsAway.unknown')}</span>
@@ -129,7 +100,6 @@ interface CharacterBadgeProps {
   characterName: string;
 }
 
-/** Marks a row as belonging to a Character other than the active one. */
 export function CharacterBadge({ characterName }: CharacterBadgeProps) {
   return (
     <span className="ml-1.5 shrink-0 rounded-xs bg-panel-2 px-1 py-0.5 text-[0.6875rem] text-text-dim">
@@ -143,7 +113,6 @@ interface BlueprintBadgeProps {
   t: Translate;
 }
 
-/** Per kind: the visible abbreviation, the full name a screen reader hears, and its hue (DESIGN.md §1 "Blueprints"). */
 const BLUEPRINT_BADGE: Record<BlueprintKind, { label: string; name: string; className: string }> = {
   original: {
     label: 'assets.blueprintBadge.original.label',
@@ -157,12 +126,6 @@ const BLUEPRINT_BADGE: Record<BlueprintKind, { label: string; name: string; clas
   },
 };
 
-/**
- * Marks a blueprint stack as a **BPO** or a **BPC** (GLOSSARY.md) — the one
- * distinction the item name can't carry, since a copy shares its original's
- * typeID and name. The written label, not the colour, is the signal
- * (DESIGN.md §7); a screen reader hears the full name instead of the letters.
- */
 export function BlueprintBadge({ kind, t }: BlueprintBadgeProps) {
   const badge = BLUEPRINT_BADGE[kind];
   return (
@@ -178,14 +141,10 @@ export function BlueprintBadge({ kind, t }: BlueprintBadgeProps) {
   );
 }
 
-/* ------------------------------------------------------------- location row */
-
 interface LocationRowProps {
   href: string;
   label: string;
-  /** The pilot's Place Nickname (personal Assets only): shown first, the real label dim beneath. */
   nickname?: string;
-  /** The station or structure id: what Set waypoint and the jump count's route go to. */
   locationId: number;
   security: number | null | undefined;
   jumpsAway: JumpsAwayResult | undefined;
@@ -193,9 +152,7 @@ interface LocationRowProps {
   estimatedValue: number;
   pinState: PinState;
   onTogglePin: () => void;
-  /** Set when this "location" is really an orphan group — an asset whose parent wasn't in the fetch. */
   unresolvedParent?: boolean;
-  /** Corp assets has no pinning concept (no device-local "current owner" to pin per) — hides the pin control entirely rather than rendering one nothing can toggle meaningfully. */
   showPin?: boolean;
   selectMode: boolean;
   selectionState: SelectionState;
@@ -203,11 +160,6 @@ interface LocationRowProps {
   t: Translate;
 }
 
-/**
- * One location in the root list. The whole row is the link into it — a 64px
- * target rather than a chevron a thumb has to find — with the pin as the one
- * independently-focusable control beside it.
- */
 export function LocationRow({
   href,
   label,
@@ -245,7 +197,6 @@ export function LocationRow({
           />
         </span>
       )}
-      {/* The whole row is the link into it: a stretched, empty link behind the content, so the jump count can be a link of its own rather than nested in this one. */}
       <Link
         to={href}
         aria-label={label}
@@ -321,23 +272,16 @@ export function LocationRow({
   );
 }
 
-/* ----------------------------------------------------------- container row */
-
 interface ContainerRowProps {
   href: string;
   label: string;
-  /** The player's in-game name: shown first, `label` (the type) dim beneath. */
   gameName?: string;
   itemCount: number;
   estimatedValue: number;
-  /** The ship's or container's type: its icon leads the row. Bays have none. */
   typeId?: number;
   characterBadge: string | null;
-  /** The station the container sits in: its menu sets a waypoint there. Null when unknown. */
   stationId: number | null;
-  /** More menu entries after the place actions (a ship's Open in Fittings). */
   extraItems?: ReactNode;
-  /** A bay (Cargo Hold/Drone Bay/Fitting) has no asset of its own — plain text, not a heading, same as a station's `h2`/an item's plain name. A ship or container names a real, ownable entity and gets an `h3`, same distinction the tree view made. */
   named: boolean;
   selectMode: boolean;
   selectionState: SelectionState;
@@ -345,7 +289,6 @@ interface ContainerRowProps {
   t: Translate;
 }
 
-/** A ship, bay or container inside the current level — descends one more step. */
 export function ContainerRow({
   href,
   label,
@@ -431,42 +374,22 @@ export function ContainerRow({
   );
 }
 
-/* ---------------------------------------------------------------- item row */
-
-/*
- * md+ column geometry for an item row. The label strip
- * (`ItemColumnLabels`) reads the same constants, so the labels sit over the
- * cells by construction rather than by two hand-matched sets of widths.
- * Below `md` none of these apply and the figures wrap as before.
- */
-/**
- * The name cell: capped at 24rem so the figures sit beside it instead of a
- * screen away at the panel's far edge, but free to shrink when the panel is
- * narrower. The menu slot sits at the row's far right, past the blank space.
- */
 const ITEM_NAME_CELL = 'md:min-w-40 md:flex-[0_1_24rem]';
 const ITEM_CELL = 'md:shrink-0 md:truncate md:text-right';
 const ITEM_QUANTITY_CELL = cx(ITEM_CELL, 'md:w-24');
 const ITEM_VOLUME_CELL = cx(ITEM_CELL, 'md:w-28');
 const ITEM_VALUE_CELL = cx(ITEM_CELL, 'md:w-24');
 const ITEM_COST_CELL = cx(ITEM_CELL, 'md:hidden lg:block lg:w-44');
-/** The row menu button's md+ box (`IconButton` size `row`, `md:size-7`), reserved even when the row has no menu. */
 const ITEM_MENU_SLOT = 'md:ml-auto md:flex md:w-7 md:shrink-0 md:justify-end';
 const ITEM_MENU_SPACER = 'md:w-7 md:shrink-0';
 
 interface ItemColumnLabelsProps {
-  /** Adds the Stock Cost Basis column. */
   showCost?: boolean;
   sort: DataTableSort | null;
   onSort: (column: LevelSortColumn) => void;
   t: Translate;
 }
 
-/**
- * The sortable label strip above a level's item rows, md+ only. Right-aligned
- * to the same cells `ItemRow` lays out; container rows in the same level keep
- * their own shape and simply have no figures under it.
- */
 export function ItemColumnLabels({ showCost = false, sort, onSort, t }: ItemColumnLabelsProps) {
   const column = (id: LevelSortColumn, label: string, cellClass: string) => {
     const active = sort?.columnId === id;
@@ -532,29 +455,19 @@ export function ItemColumnLabels({ showCost = false, sort, onSort, t }: ItemColu
 
 interface ItemRowProps {
   name: string;
-  /** The player's in-game name: shown first, `name` (the type) dim beneath. */
   gameName?: string;
   quantity: number;
   unitVolume: number | undefined;
   estimatedValue: number;
-  /** Tooltip note on the value. */
   valueHint?: string;
-  /** Drawn right after the value: a turn-in stack's `TurnInGlyph`. */
   afterValue?: ReactNode;
-  /** A contract ask estimate for a type with no market price; shown marked, not totalled. */
   askEstimate?: AskEstimateFigure;
-  /** Stock Cost Basis per unit; absent when the history does not cover every held unit. */
   stockUnitCost?: number;
-  /** The level offers the Stock Cost Basis column, so a row without one keeps its cell. */
   showStockCost?: boolean;
   characterBadge: string | null;
-  /** Set on a blueprint stack: a BPO or BPC badge beside the name. */
   blueprintKind?: BlueprintKind | null;
-  /** Makes the name a Market link (§6c); Show info stays in the row menu. */
   typeId?: number;
-  /** Set for a Mutated module only: Show info opens on its own Rolls. */
   itemId?: number;
-  /** Wraps the row in the shared item context menu — supplied by the route. */
   wrap: (children: ReactElement) => ReactNode;
   selectMode: boolean;
   selectionState: SelectionState;
@@ -562,14 +475,6 @@ interface ItemRowProps {
   t: Translate;
 }
 
-/**
- * An item's estimated value. Exactly 0 means "no estimate" (an unpriced type or
- * a blueprint copy without a valuation), so it reads as a dim dash with a
- * screen-reader "No estimate" rather than a green "0". `hint` (an abyssal
- * module's estimate note, or why it has none) joins the figure's own tooltip,
- * or gives the dash one; `inLink` keeps that dash tooltip reachable inside a
- * whole-row link (see JumpsAwayText).
- */
 function ValueFigure({
   value,
   hint,
@@ -579,7 +484,6 @@ function ValueFigure({
 }: {
   value: number;
   hint?: string;
-  /** A contract-only hull's ask median (issue #6431): shown marked, in place of the dash, never a total. */
   ask?: AskEstimateFigure;
   inLink?: boolean;
   t: Translate;
@@ -607,10 +511,6 @@ function ValueFigure({
   );
 }
 
-/**
- * What the held stack cost: the total, then the unit cost it was averaged to.
- * Only rendered when the history covers every held unit of the type.
- */
 function StockCostFigure({
   unitCost,
   quantity,
@@ -630,18 +530,6 @@ function StockCostFigure({
   );
 }
 
-/**
- * A leaf asset: name, then quantity/volume/value on one wrapping metadata
- * line. The fixed-width three-column layout this replaces (`Assets.tsx`'s
- * old `w-14`/`w-16`/`w-20` trio) is exactly what made the row unreadable
- * below ~500px — this reflows instead of clipping or scrolling sideways.
- *
- * Full item detail (icon, volume, location, jumps-away) lives behind the
- * row's menu's "Show info" action — right-click, or the More actions button
- * the menu publishes into the row — not on the row itself. With `typeId`
- * the name links to the item's Market listing; a link inside the menu's
- * trigger, so right-click and long-press still reach the menu from it.
- */
 export function ItemRow({
   name,
   gameName,
@@ -663,8 +551,6 @@ export function ItemRow({
   onToggleSelection,
   t,
 }: ItemRowProps) {
-  // A touch long-press opens the row menu; the lift that ends it must not
-  // also follow the name link.
   const guard = useLiftAfterHoldGuard();
   const volumeText =
     unitVolume === undefined ? t('assets.unknownValue') : formatUnitVolume(unitVolume);
@@ -679,10 +565,6 @@ export function ItemRow({
       )}
       {wrap(
         <div className="flex min-h-12 w-full min-w-0 items-center gap-2.5 py-1.5 pr-3">
-          {/* `md:contents` dissolves both wrappers at md+, so the name and the
-              three figures become direct cells of this flex row — one DOM,
-              two layouts (a stacked name + wrapping line below, a table row
-              above). */}
           <span className="flex min-w-0 flex-1 flex-col gap-0.5 md:contents">
             <span className={cx('flex min-w-0 items-center gap-2', ITEM_NAME_CELL)}>
               {typeId !== undefined && (
@@ -737,7 +619,6 @@ export function ItemRow({
                 className={cx(
                   estimatedValue === 0 ? 'text-text-faint' : 'text-isk-pos',
                   ITEM_VALUE_CELL,
-                  // Its own clip would cut the glyph's focus ring.
                   afterValue !== undefined && 'md:overflow-visible'
                 )}
               >
@@ -766,40 +647,23 @@ export function ItemRow({
   );
 }
 
-/* -------------------------------------------------------- search result row */
-
 interface SearchResultRowProps {
   name: string;
-  /** The player's in-game name: shown first, `name` (the type) dim beneath. */
   gameName?: string;
   quantity: number;
   estimatedValue: number;
-  /** Where this item lives, outermost first — the drill-down path it would take to reach it. */
   trail: readonly string[];
   security: number | null | undefined;
   href: string;
   characterBadge: string | null;
-  /** Set on a blueprint stack: a BPO or BPC badge beside the name. */
   blueprintKind?: BlueprintKind | null;
-  /** Tooltip note on the value. */
   valueHint?: string;
-  /** A contract ask estimate for a type with no market price; shown marked, not totalled. */
   askEstimate?: AskEstimateFigure;
-  /** Wraps the row in its item menu; its More actions button sits at the row's far right. */
   wrap: (children: ReactElement) => ReactElement;
-  /** Drawn after the row's link, before its More actions: a turn-in stack's `TurnInGlyph`. */
   afterLink?: ReactNode;
   t: Translate;
 }
 
-/**
- * A search hit. Search deliberately leaves the drill-down and reports across
- * every location at once — filtering only the level you happen to be standing
- * in would make "Search all characters" meaningless — so each hit has to say
- * where it lives, and links straight to that place. The whole row is that
- * link, so its name stays plain text; Show info, and the places the hit can
- * open, are in the row's menu at the far right.
- */
 export function SearchResultRow({
   name,
   gameName,
@@ -877,14 +741,11 @@ export function SearchResultRow({
   );
 }
 
-/* ---------------------------------------------------------------- section */
-
 interface SectionHeadingProps {
   children: ReactNode;
   tone?: 'default' | 'warning';
 }
 
-/** Splits a list into named runs — "Pinned", "All locations", "Location unresolved". */
 export function SectionHeading({ children, tone = 'default' }: SectionHeadingProps) {
   return (
     <div

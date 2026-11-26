@@ -11,21 +11,12 @@ import { SNAPSHOT_SOURCES } from '../eventEntries';
 import { is, shapeGuard } from '../snapshotShape';
 import { defineDomain } from './defineDomain';
 
-/* Whether a cerebral accelerator is running --------------------------------- */
-
 const isPresenceEntry = shapeGuard<AcceleratorPresenceEntry>({
   kind: is.oneOf(['typed', 'detected'] as const),
   bonus: is.number,
   expiresAtMs: is.number,
 });
 
-/**
- * What the app knows of the Character's accelerator right now: the typed-in
- * one while it runs, and the one the cached attribute sheet implies. Both are
- * local reads (Dexie and the ESI cache), so no scope and no fetch, and it only
- * runs while the app is open. A typed one that has run out is simply absent,
- * so the diff sees it go.
- */
 export const acceleratorEndedDomain = defineDomain<
   AcceleratorPresenceEntry,
   AcceleratorPresenceSnapshot,
@@ -42,8 +33,6 @@ export const acceleratorEndedDomain = defineDomain<
       entries.push({ kind: 'typed', bonus: record.bonus, expiresAtMs: record.expiresAt });
     }
     const detected = await readDetectedAccelerator(characterId);
-    // Cannot tell (nothing cached yet, or the read failed): skip the tick and keep the baseline,
-    // so an emptied cache never reads as a removed accelerator.
     if (detected === null) return null;
     if (detected.bonus !== null) {
       entries.push({ kind: 'detected', bonus: detected.bonus, expiresAtMs: 0 });

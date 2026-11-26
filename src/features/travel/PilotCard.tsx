@@ -1,10 +1,3 @@
-/**
- * One pilot of a Local list as a phone card (below `sm`): portrait, name and
- * corporation, the 30-day kill count as the one big number, the Threat badge
- * and standing, then kills by space as a stat strip. Washed by Threat level so
- * a Dangerous pilot stands out while scrolling (decision `20261008-225809`).
- * At `sm` and up the same rows are a table.
- */
 import { useTranslation } from 'react-i18next';
 import * as Icon from '@/components/ui/icons';
 import { CharacterAvatar } from '@/components/ui/CharacterAvatar';
@@ -28,7 +21,6 @@ import {
 } from './threatTone';
 import { formatNumber } from '@/lib/numberLocale';
 
-/** Where most of the recent kills were; the worse space wins a tie. Null with no recent kill that says where. */
 function mainSpaceOf(bySpace: KillSummary['bySpace']): KillSpace | null {
   let best: KillSpace | null = null;
   for (const space of ['nullsec', 'wormhole', 'lowsec', 'highsec'] as const) {
@@ -47,12 +39,9 @@ export function PilotCard({
 }: {
   row: PilotListRow;
   threat: ThreatLevel | 'pending' | null;
-  /** The Threat was moved one level by where you are or who is in Local. */
   adjusted?: 'down' | 'up' | null;
   spaces: readonly KillSpace[];
-  /** Hull names already joined for display; null when there are none to show. */
   flew: string | null;
-  /** Not in the previous Local paste. */
   isNew?: boolean;
 }) {
   const { t } = useTranslation();

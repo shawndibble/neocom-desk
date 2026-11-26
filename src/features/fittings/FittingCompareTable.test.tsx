@@ -29,7 +29,6 @@ describe('FittingCompareTable', () => {
 
   it('marks the best value with sr-only text, not colour alone', () => {
     render(<FittingCompareTable rows={ROWS} columns={COLUMNS} differencesOnly={true} />);
-    // The best cell's accessible text includes "(Best)" beyond the raw number.
     expect(screen.getByText('(Best)')).toBeInTheDocument();
   });
 

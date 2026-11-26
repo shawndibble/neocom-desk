@@ -12,7 +12,6 @@ import { CURRENT_QUEUE_HASH } from '@/features/skills/planner/currentQueueHash';
 import { formatDuration } from '@/lib/duration';
 import { formatTimestamp } from '@/lib/timestamp';
 
-/** What the card shows: a verdict, or one line saying why there is none. */
 export type CloneVerdictCardState =
   | { kind: 'note'; message: string }
   | {
@@ -47,10 +46,8 @@ function QueueBar({
 }: {
   label: string;
   segments: readonly VerdictSegment[];
-  /** Seconds the full bar width stands for: shared, so two bars compare by eye. */
   scale: number;
   names: ReadonlyMap<number, string>;
-  /** Sits on the line above the bar, beside the duration. */
   action?: ReactNode;
 }) {
   const { t } = useTranslation();
@@ -70,7 +67,6 @@ function QueueBar({
           {action}
         </span>
       </p>
-      {/* The bar's per-segment breakdown lives in tooltips a screen reader never reaches; this list carries it. */}
       <ol id={listId} className="sr-only">
         {segments.map((s, i) => (
           <li key={`${s.skillTypeID}-${i}`}>{segmentText(s)}</li>
@@ -116,7 +112,6 @@ function RouteButton({
   );
 }
 
-/** Above the clone list: which clone is best for the active queue, and whether to jump. */
 export function CloneVerdictCard({
   state,
   names,

@@ -19,7 +19,6 @@ describe('loadSharedPopsCached', () => {
     expect(await loadSharedPopsCached(0)).toEqual([POP]);
     expect(await loadSharedPopsCached(SHARED_POPS_CACHE_MS - 1)).toEqual([POP]);
     expect(fetchSharedPops).toHaveBeenCalledTimes(1);
-    // The Calendar asks for a fresher read than the poll needs.
     await loadSharedPopsCached(6 * MINUTE_MS, 5 * MINUTE_MS);
     expect(fetchSharedPops).toHaveBeenCalledTimes(2);
   });
@@ -33,10 +32,9 @@ describe('loadSharedPopsCached', () => {
     expect(fetchSharedPops).toHaveBeenCalledTimes(2);
     now += SHARED_POPS_CACHE_MS;
     await loadSharedPopsCached(now);
-    expect(fetchSharedPops).toHaveBeenCalledTimes(2); // held for the hour
+    expect(fetchSharedPops).toHaveBeenCalledTimes(2);
     now += HOUR_MS - SHARED_POPS_CACHE_MS;
     fetchSharedPops.mockResolvedValue([POP]);
-    // A Calendar read inside the hour still fetches, and a pop ends the back-off.
     expect(await loadSharedPopsCached(now - 1, 5 * MINUTE_MS)).toEqual([POP]);
     fetchSharedPops.mockResolvedValue([]);
     await loadSharedPopsCached(now - 1 + SHARED_POPS_CACHE_MS);

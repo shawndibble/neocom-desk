@@ -36,15 +36,8 @@ import { usePlanEditorData } from '@/features/skills/planner/usePlanEditorData';
 import { useCalendarWeekStart } from '@/features/character/calendarWeekStart';
 import { useTicker } from '@/lib/ticker';
 
-/** Countdown recompute cadence; the display is minute-grained, so 30s is fresh enough. */
 const TICK_MS = 30_000;
 
-/**
- * Where the Skills section opens (`/skills` redirects here): what the
- * character is training right now and what is queued behind it, with the
- * current Skill Plan and the attributes beside it (above it on a phone). A
- * plan's editor takes over from its own route (#158).
- */
 export function SkillPlans() {
   const { t } = useTranslation();
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
@@ -63,7 +56,6 @@ export function SkillPlans() {
     fetchedAt,
     fromCache,
   } = usePlanEditorData(activeCharacterId);
-  // The Character's typed-in accelerator, shared with the Characters table.
   const accelerator = useLiveQuery(
     () =>
       activeCharacterId === null
@@ -71,7 +63,6 @@ export function SkillPlans() {
         : db.characterAccelerators.get(acceleratorId(activeCharacterId)),
     [activeCharacterId]
   );
-  // Memoised: the list pane's per-plan costing re-runs when this changes.
   const scheduleInputs = useMemo(
     () =>
       catalog
@@ -98,12 +89,9 @@ export function SkillPlans() {
     ]
   );
   const queueResult = useSkillQueue(activeCharacterId ?? 0);
-  // Shared with every other 30 s clock on screen; paused while the tab is hidden.
   const nowMs = useTicker(TICK_MS);
   const timeZone = useTimeZone();
   const isDesktop = useIsDesktop();
-  // An injected booster: typed in and still running, or read off the attribute
-  // sheet (EVE gives its size but never its expiry, so the pilot sets that here).
   const injected = injectedAccelerator(accelerator, attributeBaseline, nowMs);
   const weekStart = useCalendarWeekStart((state) => state.value);
   useHydratedStore(useCalendarWeekStart);
@@ -118,8 +106,6 @@ export function SkillPlans() {
     [queueResult, nowMs, weekStart, timeZone]
   );
 
-  // The oldest of the sources that are actually the saved copy: a fresh queue
-  // must not date cached skills as "just now".
   const cachedAt = useMemo(() => {
     const times = [
       queueResult?.fromCache ? queueResult.fetchedAt.getTime() : null,
@@ -128,10 +114,6 @@ export function SkillPlans() {
     return times.length > 0 ? Math.min(...times) : null;
   }, [queueResult, fromCache, fetchedAt]);
 
-  // A skill plan pasted anywhere (`app/GlobalPasteRouter.tsx`) lands here: it
-  // gets a plan of its own and that plan's editor opens the Import dialog on
-  // the text. A fresh plan, never the pilot's existing one — importing appends
-  // to a plan, and which one was meant is not something a paste can say.
   const navigate = useNavigate();
   const location = useLocation();
   const importText = (location.state as Partial<SkillPlanImportState> | null)?.skillPlanImportText;
@@ -139,8 +121,6 @@ export function SkillPlans() {
   const remapCount = remapInfo?.available ?? 0;
   useEffect(() => {
     if (!hydrated || activeCharacterId === null || !importText) return;
-    // The state is spent only once the plan exists; the guard keeps a
-    // re-render in between from making a second plan.
     if (importedText.current === importText) return;
     importedText.current = importText;
     const plan = newPlan(activeCharacterId, t('plans.newPlanName'), remapCount);
@@ -153,13 +133,9 @@ export function SkillPlans() {
           state: { skillPlanImportText: importText } satisfies SkillPlanImportState,
         });
       })
-      // Storage refused the plan: stay on the list rather than loop or throw.
       .catch(() => undefined);
   }, [hydrated, activeCharacterId, importText, remapCount, navigate, t]);
 
-  // "Optimize queue": a plan made from the live skill queue with its best
-  // remaps placed, opened at once. One press, no dialog; Undo lands on the
-  // new plan's editor (a toast closes on a route change, so it is raised there).
   const cloneStates = useCloneStates((state) => state.value);
   useHydratedStore(useCloneStates);
   const optimizing = useRef(false);
@@ -204,7 +180,6 @@ export function SkillPlans() {
         } satisfies OptimizeQueueToastState,
       });
     } catch (err) {
-      // Malformed queue data or storage refusing the plan: say so, stay on the list.
       setNotice(t('plans.optimizeQueueFailed'));
       console.error(err);
     } finally {
@@ -235,17 +210,12 @@ export function SkillPlans() {
 
       <QueueStrip view={queueView} nowMs={nowMs} />
 
-      {/* The rail comes first in the DOM so a phone reads plan and attributes
-          above the queue; `lg:order-last` moves it to the right column. Sticky
-          there, so it stays beside a long queue. `lg:items-start` keeps the
-          shorter column from stretching to the row's height. */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_20rem] lg:items-start">
         <aside className="order-first space-y-3 lg:sticky lg:top-4 lg:order-last lg:space-y-4">
           <SkillPlanCard
             activeCharacterId={activeCharacterId}
             remapInfo={remapInfo}
             scheduleInputs={scheduleInputs}
-            // A phone has no Attributes panel to carry the button.
             onOptimizeQueue={isDesktop ? undefined : onOptimizeQueue}
             queueEmpty={queueEmpty}
           />

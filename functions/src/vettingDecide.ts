@@ -1,7 +1,3 @@
-// Vetting: the rules the store applies, without Firestore or ESI. Who may sign a review off and
-// what a sign-off does to it, what each caller is shown (a pilot's status, an officer's blind
-// view), how settings change, what the sweep does with a review, and the draft throttle.
-
 import { isFiniteNumber, isPlainRecord } from './guards.js';
 import {
   VETTING_DRAFT_HOURS,
@@ -42,8 +38,6 @@ import {
 } from './vettingTypes.js';
 import { DAY_MS, HOUR_MS } from './timeConstants.js';
 
-// --- Settings ---------------------------------------------------------------
-
 const WATCH_CATEGORIES = ['character', 'corporation', 'alliance'];
 
 function readInvites(raw: unknown): VettingInvite[] {
@@ -65,11 +59,6 @@ function readInvites(raw: unknown): VettingInvite[] {
   });
 }
 
-/**
- * The settings document as stored, or the defaults (off) for a corp that has none. Every read
- * goes through `normalizeVettingSettings`, so a document written before a setting existed reads
- * as that setting's default. The watchlist and the invites are the server's own, checked here.
- */
 export function readVettingSettings(data: unknown): StoredVettingSettings {
   const d = isPlainRecord(data) ? data : {};
   const watchlist = (Array.isArray(d.watchlist) ? (d.watchlist as unknown[]) : []).flatMap(
@@ -96,13 +85,10 @@ export function readVettingSettings(data: unknown): StoredVettingSettings {
   };
 }
 
-/** What a caller is sent: the settings without the server's own fields. */
 export function wireSettings(settings: StoredVettingSettings): VettingSettings {
-  // The normalizer returns the wire settings and nothing else: no invites, no corp name.
   return { ...normalizeVettingSettings(settings), watchlist: settings.watchlist };
 }
 
-/** The first of `names` that ESI resolved to nothing, compared as ESI does (case-blind). */
 export function unknownWatchName(
   names: readonly string[],
   resolved: readonly VettingWatchEntry[]
@@ -111,10 +97,6 @@ export function unknownWatchName(
   return names.find((name) => !known.has(name.toLowerCase()));
 }
 
-/**
- * The questions a patch leaves: its whole list, in its order. A question keeps its id only when
- * the corp already had one by that id (once per list); any other entry is new and gets one.
- */
 function patchedQuestions(
   held: readonly VettingQuestion[],
   sent: NonNullable<VettingSettingsPatch['questions']>,
@@ -130,10 +112,6 @@ function patchedQuestions(
   });
 }
 
-/**
- * `settings` with the patch applied, its numbers clamped by `normalizeVettingSettings`;
- * `watchlist-full` when the list would pass its cap. The invites are not a patch's to change.
- */
 export function applyVettingSettingsPatch(
   settings: StoredVettingSettings,
   patch: VettingSettingsPatch,
@@ -163,9 +141,6 @@ export function applyVettingSettingsPatch(
   return { ok: true, settings: { ...settings, ...next, watchlist } };
 }
 
-// --- Invites ----------------------------------------------------------------
-
-/** The invite `code` names, while it has not been revoked. */
 export function liveVettingInvite(
   settings: StoredVettingSettings,
   code: string | undefined
@@ -173,7 +148,6 @@ export function liveVettingInvite(
   return code === undefined ? undefined : settings.invites.find((held) => held.code === code);
 }
 
-/** Whether an apply link carrying `code` may start an application. */
 export function vettingInviteOk(
   settings: StoredVettingSettings,
   code: string | undefined
@@ -189,7 +163,6 @@ export function addVettingInvite(
   return { ok: true, settings: { ...settings, invites: [...settings.invites, invite] } };
 }
 
-/** Revoked: the code stops working; applications started with it keep the label they recorded. */
 export function withoutVettingInvite(
   settings: StoredVettingSettings,
   code: string
@@ -197,7 +170,6 @@ export function withoutVettingInvite(
   return { ...settings, invites: settings.invites.filter((held) => held.code !== code) };
 }
 
-/** `settings` with one more application counted against the invite `code`. */
 export function withVettingInviteUsed(
   settings: StoredVettingSettings,
   code: string
@@ -209,8 +181,6 @@ export function withVettingInviteUsed(
     ),
   };
 }
-
-// --- Known reviewers --------------------------------------------------------
 
 function readReviewers(data: unknown): StoredVettingReviewers['reviewers'] {
   const raw = isPlainRecord(data) && isPlainRecord(data.reviewers) ? data.reviewers : {};
@@ -236,10 +206,6 @@ function readReviewers(data: unknown): StoredVettingReviewers['reviewers'] {
 const reviewerSeenRecently = (lastSeenAt: number, now: number): boolean =>
   now - lastSeenAt < VETTING_REVIEWER_DAYS * DAY_MS;
 
-/**
- * The reviewers document after `seen` held a reviewer role now, without anyone not seen in
- * `VETTING_REVIEWER_DAYS`; null when it need not be written (the same entry, seen within the day).
- */
 export function seenVettingReviewer(
   data: unknown,
   seen: Pick<VettingActor, 'uid' | 'characterId' | 'ownerHash'>,
@@ -264,12 +230,6 @@ export function seenVettingReviewer(
   return { reviewers };
 }
 
-/**
- * The Characters to tell that a report was shared: reviewers seen in the last
- * `VETTING_REVIEWER_DAYS`, never one the report is about (`isSubject`: an entry stored without
- * its account is matched by character only). The most recently seen first, at most
- * `VETTING_NOTIFY_MAX` of them.
- */
 export function vettingSharedRecipients(
   data: unknown,
   review: StoredVettingReview,
@@ -281,9 +241,6 @@ export function vettingSharedRecipients(
   return [...new Set(told.map((entry) => entry.characterId))].slice(0, VETTING_NOTIFY_MAX);
 }
 
-// --- Log --------------------------------------------------------------------
-
-/** The log with one more entry, keeping the newest `VETTING_LOG_MAX`. */
 export function appendVettingLog(
   log: readonly VettingLogEntry[],
   entry: VettingLogEntry
@@ -291,7 +248,6 @@ export function appendVettingLog(
   return [...log, entry].slice(-VETTING_LOG_MAX);
 }
 
-/** Opening a report is logged once per reviewer per hour, so a reload does not flood the log. */
 export function shouldLogOpen(
   log: readonly VettingLogEntry[],
   characterId: number,
@@ -303,15 +259,8 @@ export function shouldLogOpen(
   );
 }
 
-// --- Sign-offs --------------------------------------------------------------
-
 const DECIDED = ['accepted', 'rejected'];
 
-/**
- * Whether the review is about this person: its pilot, a character read into it or on its
- * report, or another character of the EVE account one of those was read from. The subject may
- * neither read the report nor sign it off (`own-review`).
- */
 export function isSubject(
   review: StoredVettingReview,
   person: { characterId: number; ownerHash?: string }
@@ -322,17 +271,11 @@ export function isSubject(
     review.characters.some(
       (character) =>
         character.characterId === person.characterId ||
-        // Either side stored before its account was kept is matched by character only.
         (character.ownerHash !== undefined && character.ownerHash === person.ownerHash)
     )
   );
 }
 
-/**
- * Whether this reviewer is shut out of the decision: they asked for the review, or it is about
- * them (`isSubject`). The same person on another character of the same EVE account counts as
- * the requester.
- */
 export function isBarred(review: StoredVettingReview, reviewer: VettingActor): boolean {
   const asked = review.requestedBy;
   if (
@@ -344,7 +287,6 @@ export function isBarred(review: StoredVettingReview, reviewer: VettingActor): b
   return isSubject(review, reviewer);
 }
 
-/** One sign-off per person: a second character of the same account has already signed. */
 function hasSigned(review: StoredVettingReview, reviewer: VettingActor): boolean {
   return review.signOffs.some(
     (signOff) =>
@@ -354,15 +296,6 @@ function hasSigned(review: StoredVettingReview, reviewer: VettingActor): boolean
 
 export type SignOffRefusal = 'not-open' | 'barred' | 'already-signed';
 
-/**
- * A reviewer's sign-off recorded on an open review. Nothing is decided until `signOffsNeeded`
- * people have signed, whichever way: then the review is rejected if any of them said `no`, and
- * accepted otherwise. A `no` therefore closes nothing early, so that a review still open says
- * nothing about the sign-offs already on it (the blind second review). A decided review is kept
- * `VETTING_KEEP_DAYS` and then swept; an undecided one keeps the expiry its submit gave it.
- * `reasonShown` is the corp's `rejection.showReason` as the sign-off is made, stamped on it: a
- * note written while reasons were kept from pilots stays kept from them (`pilotStatus`).
- */
 export function decideSignOff(
   review: StoredVettingReview,
   reviewer: VettingActor,
@@ -408,14 +341,11 @@ export function decideSignOff(
   return { ok: true, review: next };
 }
 
-// --- Views ------------------------------------------------------------------
-
 function worstOf(assessment: VettingAssessment | null): VettingSeverity | undefined {
   if (!assessment || assessment.flags.length === 0) return undefined;
   return assessment.flags.some((flag) => flag.severity === 'critical') ? 'critical' : 'warning';
 }
 
-/** A queue row. `viewer` is the officer looking, for `yours`. */
 export function reviewSummary(
   id: string,
   review: StoredVettingReview,
@@ -436,14 +366,12 @@ export function reviewSummary(
     flags: review.assessment?.flags.length ?? 0,
     ...(worst ? { worst } : {}),
     missing: review.assessment?.checks.filter((check) => check.state === 'missing').length ?? 0,
-    // Every sign-off, not the yes count: that would give an open review's decisions away.
     signed: review.signOffs.length,
     needed: review.signOffsNeeded,
     yours: review.state === 'open' && !isBarred(review, viewer) && !hasSigned(review, viewer),
     readAt: review.readAt,
     createdAt: review.createdAt,
     decidedAt: review.decidedAt,
-    // The label only: the code is the corp's to hand out, not a row's to show.
     ...(review.invite ? { invite: review.invite.label } : {}),
     ...(review.requestedBy
       ? {
@@ -457,10 +385,6 @@ export function reviewSummary(
   };
 }
 
-/**
- * Records that the asking officer mailed the member the link. Only the officer who asked, only
- * while the member has not shared, and not again within `VETTING_MAIL_COOLDOWN_MS` of the last.
- */
 export function recordRequestMail(
   review: StoredVettingReview,
   actor: VettingActor,
@@ -472,7 +396,6 @@ export function recordRequestMail(
   if (
     !review.requestedBy ||
     (review.requestedBy.characterId !== actor.characterId &&
-      // An empty stored hash never matches by hash.
       !(review.requestedBy.ownerHash !== '' && review.requestedBy.ownerHash === actor.ownerHash))
   ) {
     return { ok: false, reason: 'not-asker' };
@@ -483,11 +406,6 @@ export function recordRequestMail(
   return { ok: true, review: { ...review, requestMail: { sentAt: now } } };
 }
 
-/**
- * The report as this officer may see it. Blind second review: another reviewer's decision and
- * note (and whether that note was written to be shown to the pilot) are left out (their name and
- * the time stay) until the viewer has recorded their own, or the review is decided. An open review's state gives nothing away either: see `decideSignOff`.
- */
 export function reviewView(
   id: string,
   review: StoredVettingReview,
@@ -523,22 +441,12 @@ export function reviewView(
     signOffs,
     log: review.log,
     deleteAt: review.deleteAt,
-    // Only when rows were kept: a review stored before that has nothing to browse.
     ...(review.rawCounts ? { rawCounts: review.rawCounts } : {}),
   };
 }
 
 const SHARED = ['open', ...DECIDED];
 
-/**
- * What the pilot sees of their own review: no flags, no sign-offs, only who opened it. What the
- * corp asks is read from its settings as they are now: the questions and unmet minimums of an
- * application (a promotion is asked neither), the contact once the report is shared, and for a
- * rejected review the corp's wording. Its reasons are not read from the settings as they are
- * now: they are the notes of the reviewers who said no while the corp showed reasons
- * (`reasonShown`, stamped by `decideSignOff`), so turning the setting on later reveals nothing
- * written before.
- */
 export function pilotStatus(
   id: string,
   review: StoredVettingReview,
@@ -604,9 +512,6 @@ export function pilotStatus(
   };
 }
 
-// --- The report -------------------------------------------------------------
-
-/** A declared character as the report keeps it: summary facts, never its dealings. */
 export function reportCharacter(
   input: VettingCharacterInput,
   corporationName: string
@@ -623,7 +528,6 @@ export function reportCharacter(
   };
 }
 
-/** The ids a report's flags name: evidence rows, and the `partyId`/`corporationId` facts. */
 export function referencedPartyIds(assessment: VettingAssessment): number[] {
   const ids = new Set<number>();
   for (const flag of assessment.flags) {
@@ -636,9 +540,6 @@ export function referencedPartyIds(assessment: VettingAssessment): number[] {
   return [...ids];
 }
 
-// --- Drafts and the sweep ---------------------------------------------------
-
-/** A review with one character taken out; an application's pilot moves to the next one left. */
 export function withoutCharacter(
   review: StoredVettingReview,
   characterId: number
@@ -662,42 +563,25 @@ export function withoutCharacter(
 export const draftExpiry = (now: number): number => now + VETTING_DRAFT_HOURS * HOUR_MS;
 export const requestExpiry = (createdAt: number): number =>
   createdAt + VETTING_REQUEST_KEEP_DAYS * DAY_MS;
-/** When a shared review nobody decides is deleted, counted from its submit. */
 export const openExpiry = (now: number): number => now + VETTING_OPEN_KEEP_DAYS * DAY_MS;
 
 const expired = (review: Partial<StoredVettingReview>, now: number): boolean =>
   isFiniteNumber(review.expiresAt) && review.expiresAt <= now;
 
-/**
- * A draft past its `VETTING_DRAFT_HOURS`. The sweep runs once a day, so until it does the
- * store treats such a draft as gone: what was read into it is never used again.
- */
 export function isExpiredDraft(review: Partial<StoredVettingReview>, now: number): boolean {
   return review.state === 'draft' && expired(review, now);
 }
 
-/**
- * A request still holding what a member read into it more than `VETTING_DRAFT_HOURS` ago. The
- * request itself lives on; the store drops the reads (`withoutInputs`) before using it.
- */
 export function hasExpiredInputs(review: Partial<StoredVettingReview>, now: number): boolean {
   return (
     review.state === 'requested' && (review.characters?.length ?? 0) > 0 && expired(review, now)
   );
 }
 
-/** A request with what was read into it dropped: the sweep's `clear-inputs`. */
 export function withoutInputs(review: StoredVettingReview): StoredVettingReview {
   return { ...review, characters: [], expiresAt: requestExpiry(review.createdAt) };
 }
 
-/**
- * What the daily sweep does with a review whose `expiresAt` has passed. A draft goes after
- * `VETTING_DRAFT_HOURS`; a requested or declined review 30 days after it was asked for; a
- * shared one nobody decided `VETTING_OPEN_KEEP_DAYS` after its submit; a decided one at
- * `deleteAt`. A requested review still holding what a member read into it loses only that
- * after `VETTING_DRAFT_HOURS`, so raw rows never outlive a draft.
- */
 export function decideVettingSweep(
   review: Partial<StoredVettingReview>,
   now: number
@@ -716,7 +600,6 @@ export interface DraftThrottle {
   count: number;
 }
 
-/** Fixed one-day window; a refused start is not counted, so hammering never extends the lockout. */
 export function nextDraftSlot(
   state: DraftThrottle | undefined,
   now: number
@@ -728,19 +611,15 @@ export function nextDraftSlot(
   return { allowed: true, state: { windowStart: state.windowStart, count: state.count + 1 } };
 }
 
-/** The sign-offs a review of this kind needs under these settings. */
 export function signOffsNeeded(settings: VettingSettings, kind: VettingKind): number {
   return settings.signOffs[kind];
 }
-
-// --- The public corp lookup --------------------------------------------------
 
 export interface TimedEntry<T> {
   at: number;
   value: T;
 }
 
-/** What `rememberTimed` kept under `key`, while it is younger than `ttlMs`. */
 export function recallTimed<K, T>(
   cache: Map<K, TimedEntry<T>>,
   key: K,
@@ -751,7 +630,6 @@ export function recallTimed<K, T>(
   return held && now >= held.at && now - held.at < ttlMs ? held : undefined;
 }
 
-/** Keeps `value` under `key`, dropping the oldest entries so the map holds at most `max`. */
 export function rememberTimed<K, T>(
   cache: Map<K, TimedEntry<T>>,
   key: K,

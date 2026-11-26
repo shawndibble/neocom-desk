@@ -1,18 +1,8 @@
-/**
- * A Character's cerebral accelerator (GLOSSARY.md **Accelerator**): what the
- * pilot typed in, else what the attribute sheet implies. Pure.
- *
- * No ESI endpoint says an accelerator is running, so the only way to know when
- * it ends is the pilot's own answer. A typed-in one wins while it has not run
- * out; once it has, it counts as gone (the stored record is deleted by
- * `features/accelerator`) and detection from the attribute sheet applies again.
- */
 import { HOUR_MS } from '@/lib/age';
 import type { DeadlineSeverity } from './character/severity';
 
 export interface TypedAccelerator {
   bonus: number;
-  /** Epoch ms it runs out. */
   expiresAt: number;
 }
 
@@ -21,7 +11,6 @@ export type ResolvedAccelerator =
   | { kind: 'detected'; bonus: number }
   | { kind: 'none' };
 
-/** Whether a typed-in accelerator is still running at `nowMs`. */
 export function isAcceleratorLive(
   record: Pick<TypedAccelerator, 'expiresAt'> | null | undefined,
   nowMs: number
@@ -43,13 +32,8 @@ export function resolveAccelerator(
   return { kind: 'none' };
 }
 
-/** How far ahead of its end a running accelerator is worth a warning: only then can a new one be queued up. */
 const ACCELERATOR_WARNING_HOURS = 2;
 
-/**
- * An accelerator can't be stacked or replaced until it ends, so days of warning
- * are noise; it only turns `warning` inside the last `ACCELERATOR_WARNING_HOURS`.
- */
 export function acceleratorSeverity(remainingMs: number): DeadlineSeverity {
   return remainingMs <= ACCELERATOR_WARNING_HOURS * HOUR_MS ? 'warning' : 'clear';
 }

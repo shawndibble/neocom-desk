@@ -1,9 +1,3 @@
-/**
- * A jump count that opens the route it counts: Route Safety to that system,
- * from the Character's current system. `JumpsLink` is for a row that already
- * holds the destination's solar system; `PlaceJumpsLink` for one that holds
- * only a station or structure id, resolved on click (`useViewRoute`).
- */
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -13,7 +7,6 @@ import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { routeToHref } from './routeSafetyLink';
 import { useViewRoute } from './useViewRoute';
 
-/** A row's own click (open detail, select) must not fire when the count is the target. */
 const stop = (event: { stopPropagation: () => void }) => event.stopPropagation();
 
 export function JumpsLink({
@@ -25,13 +18,9 @@ export function JumpsLink({
   children,
 }: {
   systemId: number;
-  /** The route ends at this station, not just its system. */
   stationId?: number | null;
-  /** Accessible name, when the bare count isn't one ("5 jumps — open route safety"). */
   label?: string;
-  /** Where the count starts, when that isn't the Character's current system. */
   fromId?: number | null;
-  /** The page's own route picker, when the count was worked out under it. */
   preference?: RoutePreferenceKind | null;
   children: ReactNode;
 }) {

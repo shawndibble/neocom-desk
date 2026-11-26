@@ -7,50 +7,15 @@ import { CraftScopeChips, BuildStrategySelect } from './autoBuildShared';
 import { DialogFooter } from '@/components/ui/DialogFooter';
 
 interface AutoBuildControlProps {
-  /**
-   * This plan's own material tree's deepest level with a recipe
-   * (`maxAutoBuildDepth`). 0 means nothing in the tree has a recipe, so there is
-   * nothing to auto-build; otherwise Auto Build always walks the whole tree,
-   * the same as the single-plan control (issue #798 dropped the depth
-   * choice — see the decision file).
-   */
   maxDepth: number;
-  /**
-   * Production methods currently eligible to auto-build (issue #698's
-   * `craftScope`) — the same answer the recursive engine and the manual
-   * per-item toggle use, so this chip row can never promise more than an
-   * Auto Build pass will actually apply. Manufacturing is always eligible
-   * and isn't shown as a chip (issue #778 — every Auto Build pass always
-   * includes it); Reactions lights up only when Include Reactions is on (or
-   * the plan's own activity is a reaction).
-   */
   scope: readonly MakeMethod[];
-  /** Not ready to apply: gated on a previous Apply's own market fetch still being in flight. */
   disabled?: boolean;
-  /** Pre-fills Build Strategy (issue #696's Build Group default); defaults to `'cost-effective'` when absent. */
   initialStrategy?: BuildStrategy;
-  /** Names the affected plan count in the overwrite confirmation. */
   confirmMessage?: string;
   onApply: (options: { strategy: BuildStrategy }) => void;
-  /** Group-planning tools shown at the end of the same row (Retarget, copy shopping list). */
   trailing?: ReactNode;
 }
 
-/**
- * Auto Build (issue #695): the Build Group's own one-shot bulk build/buy
- * control, applied once per member (`autoBuildGroup.ts`). Picks a Build
- * Strategy, then — behind a generic overwrite confirmation, never a computed
- * preview (that would require running the walk twice per press) —
- * overwrites every member's `buildHere` to match, always across each
- * member's own whole tree (issue #798 dropped the depth choice — see
- * the decision file). The single-plan equivalent is
- * `BuildPlanAutoBuildControl.tsx`, which applies without confirmation; the
- * Build Strategy select and Craft Scope chips both controls share live in
- * `autoBuildShared.tsx`. Craft Scope's Manufacturing chip is always lit;
- * Reactions lights up exactly when `scope` includes it (issue #698 —
- * Include Reactions on, or a member's own activity is a reaction), else it
- * reads the same reserved-and-disabled way it always has.
- */
 export function AutoBuildControl({
   maxDepth,
   scope,

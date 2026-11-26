@@ -5,14 +5,6 @@ import { minerIdsOf, settleMiner } from './miners';
 import { placeOfFor } from './place';
 import type { MinerSettlement, OpenSet, OpenSetInput } from './types';
 
-/**
- * A book's open set (ADR 0032): its unbilled and unpaid side, settled from the rows and
- * records the reader holds. Coverage first, so a moon owner's day outside it owes nothing and
- * never holds a miner's day (#4618); a covered day its ledger was not read well after is not
- * Billable yet (#4622). Then each day's charge, the last Billable day, and each Miner's
- * Running account. The officer's view and the member's
- * overlay all read this one settlement, so they cannot drift apart.
- */
 export function settleOpenSet(input: OpenSetInput): OpenSet {
   const placeOf = placeOfFor(input.placement, input.entries);
   const clock = {
@@ -35,7 +27,6 @@ export function settleOpenSet(input: OpenSetInput): OpenSet {
     ...(input.lastSyncedAt !== undefined ? { lastSyncedAt: input.lastSyncedAt } : {}),
     ...(input.graceHours !== undefined ? { graceHours: input.graceHours } : {}),
   });
-  // A miner at a moon owner that cannot be read is held from its first unread day (#6209).
   const holds = staleOwnerHolds(input.entries, clock, billableThrough);
 
   const minerIds = minerIdsOf(input, charges);

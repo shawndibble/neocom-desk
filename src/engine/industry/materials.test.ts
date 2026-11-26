@@ -28,15 +28,12 @@ describe('materialModifier', () => {
   });
 
   it('stacks structure and rig bonuses multiplicatively', () => {
-    // 0.9 * 0.99 (Raitaru 1%) * 0.98 (T1 rig 2% hisec) = 0.87318
     expect(materialModifier(10, raitaruT1Hi)).toBeCloseTo(0.87318, 12);
   });
 
   it('scales rig bonus by security band', () => {
-    // T1 rig lowsec: 2% * 1.9 = 3.8% -> 0.962 rig factor
     const lowsec: FacilityContext = { ...raitaruT1Hi, security: 'lowsec' };
     expect(materialModifier(0, lowsec)).toBeCloseTo(0.99 * 0.962, 12);
-    // T2 rig nullsec: 2.4% * 2.1 = 5.04% -> 0.9496 rig factor
     const nullT2: FacilityContext = {
       facility: FACILITY_PRESETS.sotiyo,
       rigFit: ['meT2', 'none', 'none'],
@@ -60,8 +57,6 @@ describe('materialModifier', () => {
   });
 
   it('scales reactor rig bonus by the reaction security table, not the manufacturing one', () => {
-    // Tatara T2 rig nullsec: 2.4% * 1.1 (reaction table) = 2.64% -> 0.9736,
-    // vs. manufacturing's 2.4% * 2.1 = 5.04% -> 0.9496 for the same rig level.
     const tataraT2Null: FacilityContext = {
       facility: FACILITY_PRESETS.tatara,
       rigFit: ['meT2', 'none', 'none'],
@@ -76,7 +71,6 @@ describe('materialModifier', () => {
       rigFit: ['meT1', 'none', 'none'],
       security: 'lowsec',
     };
-    // 2% * 1 (reaction lowsec multiplier) = 2% -> 0.98
     expect(materialModifier(0, athanorT1Low)).toBeCloseTo(0.98, 12);
   });
 
@@ -98,7 +92,6 @@ describe('effectiveMaterialQuantity', () => {
   });
 
   it('rounds per job, not per run', () => {
-    // qty 34 at ME10: 30.6/run -> 31 for one run, but 306 (not 310) for ten
     expect(effectiveMaterialQuantity(34, 1, 0.9)).toBe(31);
     expect(effectiveMaterialQuantity(34, 10, 0.9)).toBe(306);
   });
@@ -110,9 +103,7 @@ describe('effectiveMaterialQuantity', () => {
   });
 
   it('rounds to 2 decimals before applying ceil', () => {
-    // 211 * 0.891 = 188.001 -> round2 = 188.00 -> ceil = 188 (not 189)
     expect(effectiveMaterialQuantity(211, 1, 0.891)).toBe(188);
-    // 2500 * 0.87318 = 2182.95 -> 2183
     expect(effectiveMaterialQuantity(2500, 1, 0.87318)).toBe(2183);
   });
 
@@ -145,7 +136,7 @@ describe('effectiveMaterials', () => {
     const out = effectiveMaterials(bp, 10, 10, npc);
     expect(out).toEqual([
       { typeID: 34, baseQuantity: 25000, quantity: 22500 },
-      { typeID: 35, baseQuantity: 10, quantity: 10 }, // qty-1: floored at 1/run
+      { typeID: 35, baseQuantity: 10, quantity: 10 },
     ]);
   });
 });

@@ -11,14 +11,9 @@ const TONE: Record<FitSkillVerdict['kind'], PillTone> = {
   unknown: 'neutral',
 };
 
-/** "Gunnery V", or the type id when the skill catalog doesn't list it. */
 const skillLine = ({ name, skillTypeID, targetLevel }: MissingSkill) =>
   `${name ?? `#${skillTypeID}`} ${romanLevel(targetLevel)}`;
 
-/**
- * A Popular fits row's can-fly verdict as a tinted pill: §6c's computed-verdict
- * cue. "Missing N skills" names them on hover, or on tap under a finger.
- */
 export function PopularFitVerdict({ verdict }: { verdict: FitSkillVerdict | undefined }) {
   const { t } = useTranslation();
   if (verdict === undefined) return null;
@@ -38,7 +33,6 @@ export function PopularFitVerdict({ verdict }: { verdict: FitSkillVerdict | unde
   const lines = verdict.skills.map(skillLine);
   return (
     <Tooltip content={lines.join('\n')} openOnTap>
-      {/* The list reaches screen readers as the label; the bubble is for sight. */}
       <span
         role="img"
         aria-label={t('fittings.popular.verdict.missingNamed', {
@@ -53,11 +47,6 @@ export function PopularFitVerdict({ verdict }: { verdict: FitSkillVerdict | unde
   );
 }
 
-/**
- * A row's verdict where it can open: a warning button, "3 skills · 26d 10h"
- * behind §6c's leading caret (expands in place), listing the skills under the
- * row. Any other verdict is the plain pill, which never opens.
- */
 export function FitVerdictControl({
   verdict,
   seconds,
@@ -65,7 +54,6 @@ export function FitVerdictControl({
   onToggle,
 }: {
   verdict: FitSkillVerdict | undefined;
-  /** Training left; absent until the skill schedule is read. */
   seconds: number | undefined;
   expanded: boolean;
   onToggle: () => void;

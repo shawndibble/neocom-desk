@@ -2,16 +2,8 @@ import { useTranslation } from 'react-i18next';
 import { hudLabelClassName } from './hudLabel';
 import { cx } from '@/lib/cx';
 
-/** One lock bracket at a corner of the reticle. */
 const BRACKET = 'absolute size-6 border-warning sm:size-10';
 
-/**
- * The hero's targeting reticle: the Megathron render locked inside range
- * rings, with two HUD read-outs naming what the app does with it (lg up).
- * Decorative and hidden from assistive tech: the heading and tagline beside it
- * say the same in words. The ship is the page's largest paint, so it loads
- * eagerly at high priority (#3926) and decodes with the frame (#3950).
- */
 export function HeroReticle({ className }: { className?: string }) {
   const { t } = useTranslation();
   return (
@@ -62,7 +54,6 @@ export function HeroReticle({ className }: { className?: string }) {
   );
 }
 
-/** A HUD read-out box pinned beside the reticle; only from lg, where there is room. */
 function ReadOut({
   className,
   titleClassName,

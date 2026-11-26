@@ -35,28 +35,16 @@ import { loadBlueprintShare, saveBlueprintShare } from './shareSelection';
 import { useBlueprintCopies, usePlaceLabels } from './useBlueprintPlaces';
 import { useOwnedBlueprintTypes } from './useOwnedBlueprintTypes';
 
-/** The next element, else the previous, among those still on the page: where focus goes when a row's control goes away. */
 function neighbours<K>(keys: readonly K[], index: number, refs: Map<K, HTMLButtonElement>) {
   const after = keys.slice(index + 1);
   const before = keys.slice(0, index).reverse();
   return [...after, ...before].map((key) => () => refs.get(key) ?? null);
 }
 
-/** The deferred-commit id of "stop sharing all"; only one is ever pending. */
 const STOP_ALL_ID = 'stop-all';
 
 const NO_STATUS: ReadonlyMap<number, TypeStatus> = new Map();
 
-/**
- * The Blueprints tab's My sharing (issue #3599 follow-up): what this
- * Character shares, one row per blueprint with Stop sharing. "Share all my
- * blueprints" is a standing switch, so a blueprint acquired later is shared
- * too; under it a revoke is an exclusion. Add blueprints opens a dialog to
- * share one blueprint type, or (switch off) every blueprint at a station or
- * structure as a standing rule; shared locations are listed here, and a
- * blueprint shared only through one says so instead of offering Stop sharing.
- * Every change is saved on this device and then published.
- */
 export function ShareBlueprintsTab({
   characterId,
   communityId,
@@ -68,7 +56,6 @@ export function ShareBlueprintsTab({
   const owned = useOwnedBlueprintTypes(characterId);
   const copies = useBlueprintCopies(characterId);
   const [savedShare, setShare] = useState<BlueprintShare | null>(null);
-  // Stopping everything shows at once but writes after its Undo toast, so Undo is just not writing.
   const pendingOff = useDeferredCommits();
   const stoppingAll = pendingOff.hiddenIds.has(STOP_ALL_ID);
   const share = useMemo(
@@ -80,7 +67,6 @@ export function ShareBlueprintsTab({
   const [failed, setFailed] = useState(false);
   const [published, setPublished] = useState<PublishResult | null>(null);
 
-  /** Shows a publish's result unless a later publish has been asked for since. */
   const report = useCallback((result: Promise<PublishResult>) => {
     const mine = ++publishes.current;
     void result.then((value) => {
@@ -93,9 +79,6 @@ export function ShareBlueprintsTab({
     void loadBlueprintShare(characterId, communityId).then((saved) => {
       if (cancelled) return;
       setShare(saved);
-      // Opening the tab checks what the Community holds against this device, so
-      // blueprints left out show up here without waiting for a change. Nothing
-      // is chosen, nothing to check.
       if (saved.choice.all || saved.choice.allowed.size > 0 || saved.locations.size > 0)
         report(publishSharedLibrary(characterId, communityId));
     });
@@ -105,8 +88,6 @@ export function ShareBlueprintsTab({
   }, [characterId, communityId, report]);
 
   const types = useMemo(() => (owned.status === 'ready' ? owned.owned : []), [owned]);
-  // Without cached assets nothing is placed (and nothing publishes): every type
-  // still gets a status from the by-type choice.
   const placed = useMemo(
     () =>
       copies.status === 'ready'
@@ -133,7 +114,6 @@ export function ShareBlueprintsTab({
     () => (copies.status === 'ready' ? { status: 'ready', counts: places } : copies),
     [copies, places]
   );
-  // Under share-all location rules are moot (and turning it on clears them).
   const sharedLocations = useMemo(
     () => (share && !share.choice.all ? [...share.locations].sort((a, b) => a - b) : []),
     [share]
@@ -148,9 +128,6 @@ export function ShareBlueprintsTab({
     .filter((type) => status.get(type.typeId)?.direct)
     .map((type) => type.typeId);
 
-  // Saves run one after another, each from the choice the one before left, so
-  // two quick clicks never build from the same base and a failed save rolls
-  // back exactly its own change.
   const latest = useRef<BlueprintShare | null>(null);
   const queue = useRef<Promise<void>>(Promise.resolve());
   const publishes = useRef(0);
@@ -172,7 +149,6 @@ export function ShareBlueprintsTab({
       setShare(next);
       try {
         await saveBlueprintShare(characterId, communityId, next);
-        // Never rejects: 'unavailable' means nothing reached the Community this time.
         report(publishSharedLibrary(characterId, communityId));
       } catch {
         latest.current = base;
@@ -183,8 +159,6 @@ export function ShareBlueprintsTab({
     return queue.current;
   }
 
-  // Until the places load, a blueprint shared only through a location would
-  // read as not shared: wait rather than flash "No blueprints shared yet".
   if (owned.status === 'loading' || share === null || copies.status === 'loading') {
     return <Spinner size="sm" label={t('communities.share.loading')} />;
   }
@@ -280,7 +254,6 @@ export function ShareBlueprintsTab({
             return (
               <li key={type.typeId} className="flex items-center gap-2 py-1 text-xs">
                 <BlueprintName name={type.name} via={entry?.via ?? []} labels={labels} />
-                {/* Shared only through a location: stopping that location is the way out. */}
                 {entry?.direct && (
                   <Button
                     size="sm"
@@ -289,7 +262,6 @@ export function ShareBlueprintsTab({
                       else stopButtons.current.delete(type.typeId);
                     }}
                     onClick={() => {
-                      // The button goes (and usually its row): focus the next Stop sharing.
                       const index = stoppable.indexOf(type.typeId);
                       focusAfterCommit(
                         ...neighbours(stoppable, index, stopButtons.current),

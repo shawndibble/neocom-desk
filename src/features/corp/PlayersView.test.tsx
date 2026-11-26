@@ -180,7 +180,6 @@ describe('PlayersView', () => {
     renderView();
     await menuOf('Kestrel Vane');
     await userEvent.click(await screen.findByRole('menuitem', { name: 'Change main' }));
-    // Outside characters are not offered while the Player has a corp member.
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).queryByText('Outer Rim Vane')).not.toBeInTheDocument();
     await userEvent.click(within(dialog).getByRole('button', { name: 'Vane Hauler' }));

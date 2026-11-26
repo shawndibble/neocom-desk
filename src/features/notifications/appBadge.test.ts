@@ -36,7 +36,6 @@ async function seed(characterId: number, eventId: string) {
   });
 }
 
-/** Seeding writes entries, and every write refreshes the badge — so forget those calls. */
 async function storePrefs(value: unknown) {
   await db.settings.put({ key: NOTIFICATION_PREFS_SETTING_KEY, value });
   useNotificationPreferences.setState({ value: DEFAULT_NOTIFICATION_PREFERENCES, hydrated: false });

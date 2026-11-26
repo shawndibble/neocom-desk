@@ -24,8 +24,6 @@ describe('renderWording', () => {
 });
 
 describe('SHARED_NOTIFICATION_WORDING', () => {
-  // Seven here; five of them are also what the Scheduled Push path renders.
-  // The two planetary events are live-path only — see the module comment.
   it('carries exactly the seven events whose live copy lives in one place', () => {
     expect(Object.keys(SHARED_NOTIFICATION_WORDING).sort()).toEqual(
       [

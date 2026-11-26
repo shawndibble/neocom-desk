@@ -1,10 +1,3 @@
-/**
- * "What if my skills were…": the skills the stats are worked out under — the
- * pilot's own, all untrained (All 0) or all at V — with single skills set to
- * a level on top (`engine/fittings/skillOverrides.ts`). For the session only,
- * and never the fit checks or the Missing Skills chip, which stay on the
- * Character's real skills.
- */
 import { useMemo, useState } from 'react';
 import { useKeyedLoad } from '@/lib/useAsyncLoad';
 import { useTranslation } from 'react-i18next';
@@ -29,7 +22,6 @@ import { useSkillOverrides } from './statsConditions';
 
 const BASES: readonly SkillBase[] = ['character', 'all0', 'allV'];
 const LEVELS = [0, 1, 2, 3, 4, 5];
-/** Search results shown at once — enough to pick from, never a 500-row list. */
 const MATCHES_SHOWN = 12;
 
 function useSkillCatalogue(enabled: boolean): SkillType[] | null {
@@ -148,7 +140,6 @@ function CustomLevelsModal({ open, onClose }: { open: boolean; onClose: () => vo
   );
 }
 
-/** The select's value for "Custom levels…": an action, never stored — the base stays what it was. */
 const CUSTOM_ENTRY = 'custom';
 
 export function SkillOverridesControl() {
@@ -175,7 +166,6 @@ export function SkillOverridesControl() {
           else setSkills({ ...skills, base: value as SkillBase });
         }}
       >
-        {/* The label sits in the trigger, so the settings strip fits one line. */}
         <SelectTrigger aria-label={label} size="sm" active={overridden} className="min-w-0 flex-1">
           <span className="min-w-0 truncate">
             <span className="text-text-dim">{label}: </span>

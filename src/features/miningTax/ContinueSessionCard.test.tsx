@@ -5,7 +5,6 @@ import '@/i18n';
 import { ContinueSessionCard } from './ContinueSessionCard';
 import type { SessionContinuation } from './sessionContinuation';
 
-/** Only the fields the card reads; the rest of a ledger row is irrelevant here. */
 const CONTINUATION = {
   next: {
     key: 'next',
@@ -37,7 +36,6 @@ function renderCard() {
 }
 
 describe('ContinueSessionCard', () => {
-  // Issue #3525: the ore names on the same line are links, so the system is too.
   it('links the system in the bold line to Route Safety', () => {
     renderCard();
     const links = screen.getAllByRole('link', { name: 'Jita' });

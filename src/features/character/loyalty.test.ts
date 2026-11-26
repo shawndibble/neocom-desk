@@ -168,7 +168,6 @@ describe('combineLoyaltyStatuses', () => {
     expect(combined.reauthCharacterIds).toEqual([3]);
     expect(combined.result).toEqual({
       data: [{ corporation_id: 1000035, loyalty_points: 150 }],
-      // As fresh as the stalest list in the sum.
       fetchedAt: at('2026-10-21T08:00Z'),
       fromCache: true,
       truncated: false,

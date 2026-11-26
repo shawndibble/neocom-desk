@@ -1,9 +1,3 @@
-/**
- * Market Browser's All regions choice: the selected item's book fanned out
- * over every Market Region (or only those in Jump Range), merged into one.
- * Its own file so the Current System / stargate mocks below don't leak into
- * the main Market suite.
- */
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
 import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -89,8 +83,6 @@ vi.mock('@/sde/loadMarketSde', () => ({
   loadAttributeDictionary: vi.fn(async () => ({})),
 }));
 
-// The Jump Range's origin and distances. No game location unless a test says
-// otherwise, so a range reads "set your system" and restricts nothing.
 const loadCharacterSolarSystemId = vi.fn<(characterId: number) => Promise<number | null>>();
 vi.mock('@/features/character/location', () => ({
   loadCharacterSolarSystemId: (characterId: number) => loadCharacterSolarSystemId(characterId),
@@ -127,7 +119,6 @@ const ORDERS_BY_REGION: Record<number, unknown[]> = {
   [HEIMATAR]: [sellOrder(3, 1_200_000, 1035466617946, RENS)],
 };
 
-/** Every region's book, by path pattern; `failing` regions answer 404. */
 function regionOrdersHandler(hits: Map<number, number>, failing: readonly number[] = []) {
   return http.get(`${ESI_BASE_URL}/markets/:regionId/orders`, ({ params }) => {
     const regionId = Number(params.regionId);
@@ -139,19 +130,11 @@ function regionOrdersHandler(hits: Map<number, number>, failing: readonly number
   });
 }
 
-// Rifter is listed everywhere, so the tree's no-orders cue (#6200) stays off.
 const server = setupServer(marketTypesHandler([RIFTER]));
 
 beforeAll(async () => {
   server.listen({ onUnhandledRequest: 'error' });
-  // One throwaway render, so no test pays for the first one (the pattern
-  // `IndustryPlanPage.test.tsx` documents): a worker's first render —
-  // compiling the lazy route chunk, warming jsdom and React — cost several
-  // seconds on top of a warm render and landed on whichever test ran first,
-  // timing out its first `findBy` under load. Done here under the hook's
-  // own budget.
   await routeChunks.loadMarket();
-  // The same signed-in Character every test seeds (the App puts the page behind one).
   await db.characters.put({ characterId: 1, name: 'Pilot One', ownerHash: 'oh', addedAt: 0 });
   loadCharacterSolarSystemId.mockResolvedValue(null);
   localJumpDistances.mockResolvedValue({ kind: 'unknown' });
@@ -212,7 +195,6 @@ describe('Market Browser: All regions', () => {
     expect(await within(sellTable).findByText('1,000,000')).toBeInTheDocument();
     expect(within(sellTable).getByText('1,100,000')).toBeInTheDocument();
     expect(within(sellTable).getByText('1,200,000')).toBeInTheDocument();
-    // The note sits behind the scope bar's info tip.
     await userEvent
       .setup({ delay: null })
       .hover(screen.getByRole('button', { name: 'What else this covers' }));
@@ -263,17 +245,13 @@ describe('Market Browser: All regions', () => {
     const sellTable = await screen.findByRole('table', { name: 'Sell Orders' });
     expect(await within(sellTable).findByText('1,100,000')).toBeInTheDocument();
     expect(within(sellTable).getByText('1,000,000')).toBeInTheDocument();
-    // Each row's own distance from Jita, not only the "within 5" filter that
-    // let both of these through — default sort is price ascending.
     const sellRows = within(sellTable).getAllByRole('row');
     const jumpsCell = (row: HTMLElement) => row.querySelector('[data-label="Jumps"]');
     expect(within(jumpsCell(sellRows[1]) as HTMLElement).getByText('0')).toBeInTheDocument();
     expect(within(jumpsCell(sellRows[2]) as HTMLElement).getByText('4')).toBeInTheDocument();
-    // Never fired while the range was still resolving, and never since.
     expect(hits.get(HEIMATAR)).toBeUndefined();
     expect(hits.get(THE_FORGE)).toBe(1);
     expect(hits.get(DOMAIN)).toBe(1);
-    // The "only this region is checked" hint would be false in All regions.
     expect(screen.queryByText('Only orders in this region are checked.')).not.toBeInTheDocument();
   });
 
@@ -294,8 +272,6 @@ describe('Market Browser: All regions', () => {
     renderMarketRoute();
 
     const sellTable = await screen.findByRole('table', { name: 'Sell Orders' });
-    // Amarr's order isn't at the hub station: only a range that drops the
-    // hub's one-station filter shows it.
     expect(await within(sellTable).findByText('1,100,000')).toBeInTheDocument();
     expect(within(sellTable).getByText('1,000,000')).toBeInTheDocument();
     expect(within(sellTable).queryByText('1,200,000')).not.toBeInTheDocument();
@@ -303,7 +279,6 @@ describe('Market Browser: All regions', () => {
     expect(hits.get(HEIMATAR)).toBeUndefined();
     expect(hits.get(THE_FORGE)).toBe(1);
     expect(hits.get(DOMAIN)).toBe(1);
-    // The note sits behind the scope bar's info tip.
     await userEvent
       .setup({ delay: null })
       .hover(screen.getByRole('button', { name: 'What else this covers' }));
@@ -319,9 +294,7 @@ describe('Market Browser: All regions', () => {
     window.history.pushState({}, '', '/market/browser');
     renderMarketRoute();
 
-    // Always on the page, under the search box: no funnel click needed.
     const distance = await screen.findByRole('combobox', { name: 'Distance' });
-    // No range: the book reads the header's hub, so that is what it says.
     expect(distance).toHaveTextContent('Jita');
     expect(screen.queryByRole('button', { name: /Change current system/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^Security/ })).not.toBeInTheDocument();
@@ -329,7 +302,6 @@ describe('Market Browser: All regions', () => {
     await user.click(distance);
     await user.click(await screen.findByRole('option', { name: 'Within 5 jumps' }));
 
-    // The origin appears beside it, still without opening the funnel.
     expect(screen.getByRole('button', { name: /Change current system/ })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Filters' }));
     expect(screen.getByRole('button', { name: /^Security/ })).toBeInTheDocument();
@@ -337,19 +309,10 @@ describe('Market Browser: All regions', () => {
 
   it('with a persisted Jump Range and no matching query param, fetches only the in-range regions from the first request', async () => {
     await db.settings.put({ key: ACTIVE_CHARACTER_KEY, value: 1 });
-    // Seeded in Dexie, store left unhydrated (as `beforeEach` sets it) — the
-    // realistic "fresh page load" shape. Setting `hydrated: true` directly
-    // would skip the read this test exists to cover, and the gate it verifies
-    // (`filters.hydrated` gating `useOrderBookFetch.ts`) would
-    // pass even if deleted.
     await db.settings.put({
       key: BROWSER_FILTER_SETTING_KEY,
       value: { ...DEFAULT_BROWSER_FILTER_SETTING, jumps: '5' },
     });
-    // Delays only this store's read, past the point the network effect would
-    // otherwise fire on the pre-hydration default — without the
-    // `browserFilterSettingHydrated` gate this asserts on, that race would
-    // fire the wide, unfiltered fan-out first.
     const realGet = db.settings.get.bind(db.settings);
     vi.spyOn(db.settings, 'get').mockImplementation((async (key: string) => {
       if (key === BROWSER_FILTER_SETTING_KEY) await new Promise((r) => setTimeout(r, 50));
@@ -366,14 +329,12 @@ describe('Market Browser: All regions', () => {
     });
     const hits = new Map<number, number>();
     server.use(regionOrdersHandler(hits));
-    // No `browser.jumps` in the URL: the persisted filter is what applies.
     window.history.pushState({}, '', `/market/browser?type=${RIFTER}&region=all`);
     renderMarketRoute();
 
     const sellTable = await screen.findByRole('table', { name: 'Sell Orders' });
     expect(await within(sellTable).findByText('1,100,000')).toBeInTheDocument();
     expect(within(sellTable).getByText('1,000,000')).toBeInTheDocument();
-    // Never fired for the out-of-range region, not even once before narrowing.
     expect(hits.get(HEIMATAR)).toBeUndefined();
     expect(hits.get(THE_FORGE)).toBe(1);
     expect(hits.get(DOMAIN)).toBe(1);

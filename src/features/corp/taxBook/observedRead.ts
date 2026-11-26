@@ -1,10 +1,3 @@
-/**
- * Reads an officer's `observed` rows through this device's Dexie copy
- * (ADR 0031): nothing when the collection's stamp is unchanged, the rows
- * written since the watermark otherwise, the whole collection when no copy
- * can be trusted. The rules check (`gate`) settles before any copy is handed
- * out, and a refusal wipes the copy.
- */
 import { collection, getDocs, query, Timestamp, where } from 'firebase/firestore/lite';
 import type { Firestore } from 'firebase/firestore/lite';
 import type { ObservedRow } from '@/engine/corpTaxBook/types';
@@ -27,7 +20,6 @@ import {
 const isDenied = (error: unknown) =>
   String((error as { code?: unknown } | null)?.code ?? '').endsWith('permission-denied');
 
-/** Dexie being unavailable (private window, blocked) costs the copy, never the read. */
 const quietly = async <T>(work: () => Promise<T>): Promise<T | undefined> => {
   try {
     return await work();
@@ -43,7 +35,6 @@ function toStored(docs: { id: string; data: () => unknown }[]): StoredObserved<u
   });
 }
 
-/** The held copy's rows, validated on the way out as the member's reads are: a malformed one is dropped. */
 const rowsOf = (held: readonly StoredObserved<unknown>[]): ObservedRow[] =>
   held.flatMap((r) => readObservedRow(r.row as Record<string, unknown>) ?? []);
 
@@ -52,7 +43,6 @@ export async function readObservedRows(
   characterId: number,
   corporationId: number,
   version: string | undefined,
-  /** The officer-only probe: its failure means the rules refuse this Character. */
   gate: Promise<unknown>,
   now = Date.now(),
   bookCreatedAt?: number

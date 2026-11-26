@@ -1,44 +1,3 @@
-/**
- * One row per open market order, with every judgement already made — the
- * seam between the pure engines under `src/engine/market` and the panel that
- * renders the Market Orders page. The panel should never re-derive a badge
- * or a sort order from raw ESI shapes; it reads `OpenOrderRow` fields and
- * renders them.
- *
- * Two data-layer inputs are ONLY ever imported as types here (`import type`)
- * even though their runtime bodies touch Dexie/fetch: `OpenOrdersSnapshot`
- * and `OrderCostBasis`. A value import would drag those dependencies into
- * this module and its test environment, breaking the "pure engines/features
- * stay pure" rule this file exists to uphold for the panel.
- *
- * The one non-obvious derivation is `worstScope`: the deep (system/region)
- * check, when it has run for an order, wins outright over the cheap station
- * check — even when the deep check found nothing. It saw the real order
- * book; the station tier only ever saw one aggregated price. A `??` chain
- * between the two would let a "checked, clean" deep result fall through to
- * a stale station read, which is wrong in exactly the case that matters most
- * (the deep check just proved the order is fine).
- *
- * Exception: a TRUNCATED deep result (the region book had more pages than
- * were fetched) that found nothing is not proof of a clean order — it is
- * only proof that nothing was found in the pages actually seen. In that one
- * case a clean-but-truncated deep result must not suppress a real station
- * rival the cheap tier already found, so `worstScope` falls back to
- * `'station'` when `station.beatsMe` is true. A deep result that DID find a
- * rival despite being truncated still stands unconditionally — a positive
- * finding is trustworthy regardless of what the fetch missed.
- *
- * A second non-obvious bit: `MyOrder.systemId` (required by `findUndercut`
- * for its 'system' scope) is not carried on ESI's own order shape — only
- * `location_id`/`region_id` are. It is recovered from the deep-competition
- * list itself: a station belongs to exactly one system, so any competitor
- * (mine included — `loadRegionCompetition` does not filter out the caller's
- * own order) at the same `locationId` yields it. When that fails — no other
- * order at my station appears in the fetched book — the 'system' scope is
- * left OUT of `scopesChecked` rather than guessed at, matching `undercut.ts`'s
- * own "absent means not checked" convention instead of manufacturing a false
- * "checked, clean" for a scope this module could not actually resolve.
- */
 import type { OpenOrdersSnapshot, CharacterOpenOrders } from './openOrdersData';
 import type { CharacterModifiers } from '@/engine/industry/characterModifiers';
 import type { OrderCostBasis, WalletBasisGap } from './orderCostBasis';
@@ -70,31 +29,18 @@ import {
   type OrderProblemFacts,
 } from '@/engine/market/orderProblems';
 
-/**
- * One order from a player structure's own market book (issue #538). Carries
- * `typeId` because — unlike `CompetingOrder`, whose callers always fetch one
- * region book per `type_id` already — the structure-markets endpoint returns
- * every item at that location in one call, so this module must filter to
- * the order's own type before it can be treated as a plain `CompetingOrder`.
- */
 export interface StructureCompetitor extends CompetingOrder {
   typeId: number;
 }
 
-/** What the cheap, always-on station check found. Aggregates give a price but no order count, so this tier can never claim how many units a rival holds. */
 export interface StationTier {
-  /** Best rival price at my own station, or null when the station has no orders on my side. */
   bestPrice: number | null;
   beatsMe: boolean;
-  /** Magnitude of the difference between `bestPrice` and my price — populated whether or not it beats me (e.g. I may be the cheapest). Read together with `beatsMe`; never alone. */
   gapIsk: number;
-  /** `gapIsk` as a percentage of my own price. Same caveat as `gapIsk`. */
   gapPct: number;
-  /** Set when `bestPrice` beats me but equals one of the account's own other orders: an alt, not a competitor, so `beatsMe` is false. */
   ownRival?: OwnRival;
 }
 
-/** The account's own Character holding the order that is cheaper than this one. */
 export interface OwnRival {
   characterName: string;
   price: number;
@@ -112,130 +58,57 @@ export interface OpenOrderRow {
   volumeTotal: number;
   locationId: number;
   regionId: number;
-  /** Null for a player structure whose name is not resolved here. */
   stationName: string | null;
   issued: string;
   durationDays: number;
   expiry: OrderExpiry | null;
   floor: OrderFloor | null;
   costBasis: OrderCostBasis | null;
-  /** Why the wallet could not supply a cost basis, when the order was eligible for one. */
   walletGap?: WalletBasisGap | null;
   station: StationTier;
-  /** Another Character of this account already lists this cheaper (deep book first, else the station tier). Never a problem, so it only explains an otherwise healthy row. */
   ownRival?: OwnRival;
-  /** Present only when the deep (system/region) check has been run for this order. */
   deepUndercut: UndercutResult | null;
-  /** The tightest scope that beats me, from whichever tiers are known. */
   worstScope: UndercutScope | null;
   problem: OrderProblem;
   problems: OrderProblem[];
-  /** price x volumeRemain. */
   iskTiedUp: number;
   belowFloor: boolean;
-  /**
-   * This order reads `healthy` right now but has been undercut most of the
-   * time the page has watched it. Always false for an order
-   * whose current `problem` is anything worse than `healthy` — there the
-   * live status already prompts the same action, so the second read adds
-   * nothing — and false whenever the sample history is too thin to judge.
-   */
   frequentlyUndercut: boolean;
-  /**
-   * Nothing could tell whether anyone beats this order: the station's prices
-   * never loaded (Fuzzwork unreachable, e.g. offline) and no deeper book was
-   * read either. Such a row's `problem` says nothing about competition, so it
-   * must not read as "Healthy" / "nobody beats you", and must not be recorded
-   * as an undercut sample. Absent means checked.
-   */
   competitionUnchecked?: boolean;
-  /**
-   * The Active campaign Turn-in Reward per item for this order's type (issue
-   * #6708): ISK plus LP at LP Value. Absent when nothing turns it in. A sell
-   * order it beats reads `turnInPays`; a buy order keeps its state.
-   */
   turnInEach?: number;
 }
 
 export interface CharacterSkills {
   accountingLevel: number;
   brokerRelationsLevel: number;
-  /** Advanced Broker Relations (typeID 16597): +6 points/level to the 50% base Relist Discount. */
   advancedBrokerRelationsLevel: number;
-  /**
-   * The Character's skills + implants (issue #1284), for the "refine and
-   * sell the materials" exit — each order's own item picks its
-   * specialisation and whether the refining implant applies.
-   */
   modifiers: CharacterModifiers;
 }
 
 export interface BuildRowsInput {
   snapshot: OpenOrdersSnapshot;
   typeNames: ReadonlyMap<number, string>;
-  /** Keyed `${locationId}:${typeId}`. */
   stationPrices: ReadonlyMap<string, HubAggregate>;
-  /** Keyed orderId. */
   costBases: ReadonlyMap<number, OrderCostBasis>;
-  /** Keyed orderId. */
   walletBasisGaps?: ReadonlyMap<number, WalletBasisGap>;
-  /**
-   * Keyed orderId; only for orders whose region book has been fetched.
-   * `truncated` rides alongside `competitors` (not a parallel map) so a
-   * caller can never read one without the other.
-   */
   deepCompetition?: ReadonlyMap<
     number,
     { competitors: readonly CompetingOrder[]; truncated: boolean }
   >;
-  /**
-   * Keyed locationId (issue #538): one structure's whole market book, fetched
-   * once and shared by every order/type parked there — unlike the region
-   * book, ESI's structure-markets endpoint cannot be filtered by `type_id`,
-   * so every entry carries its own `typeId` and `buildRow` filters to the
-   * one it needs before merging into `deepUndercut`.
-   */
   structureCompetition?: ReadonlyMap<
     number,
     { competitors: readonly StructureCompetitor[]; truncated: boolean }
   >;
-  /** Keyed locationId; a missing entry renders as a player structure. */
   stationNames?: ReadonlyMap<number, string>;
-  /** Per character, since skills differ. Keyed characterId. */
   skillsByCharacter: ReadonlyMap<number, CharacterSkills>;
-  /**
-   * Each order's own standing toward its station's NPC owner (issue #1238),
-   * keyed orderId rather than locationId: two characters at the same station
-   * can hold different standings, and this is already per-order. Absent
-   * entry = standings assumed 0 (a player structure, an unresolved owner, or
-   * simply not yet resolved).
-   */
   standingsByOrder?: ReadonlyMap<number, ResolvedStandings>;
-  /**
-   * The owner's broker fee the pilot typed per player structure (issue
-   * #2911), keyed structure id. A structure with an entry is costed at the
-   * SCC surcharge plus that rate instead of NPC skill/standing rates; one
-   * without keeps NPC rules (the Order detail labels that as assumed).
-   */
   structureFees?: StructureFees;
   now: number;
-  /** Days without a sale, keyed orderId, when known. */
   daysWithoutSale?: ReadonlyMap<number, number>;
-  /**
-   * Rolling `OrderProblem` history per order id, oldest first
-   * (`features/market/orderProblemSamples.ts`). Absent means the history has
-   * not been read — every row then reports `frequentlyUndercut: false`,
-   * never a flag the samples cannot back up.
-   */
   problemSamples?: ReadonlyMap<number, readonly OrderProblemSample[]>;
-  /**
-   * The Active Turn-in Reward per item, keyed typeId (`TurnInOfferDetail.totalPerItem`).
-   * Absent or missing a type means no turn-in: the row reads as it would without one.
-   */
   turnInPerItem?: ReadonlyMap<number, number>;
 }
 
-/** The trap: my own order sits inside the aggregate, so a rival price EQUAL to mine is not beating me — only strictly better counts. */
 function buildStationTier(
   price: number,
   isBuyOrder: boolean,
@@ -249,7 +122,6 @@ function buildStationTier(
   const beatsPrice = isBuyOrder ? bestPrice > price : bestPrice < price;
   const gapIsk = Math.abs(bestPrice - price);
   const gapPct = price > 0 ? (gapIsk / price) * 100 : 0;
-  // A tie with one of the account's own orders reads as that alt (decision on #6432).
   const alt = beatsPrice ? ownAtStation.find((o) => o.price === bestPrice) : undefined;
   if (alt) {
     return {
@@ -263,21 +135,18 @@ function buildStationTier(
   return { bestPrice, beatsMe: beatsPrice, gapIsk, gapPct };
 }
 
-/** One of the account's own loaded orders, with who holds it. */
 interface OwnListing {
   orderId: number;
   characterName: string;
   price: number;
 }
 
-/** Own orders by `${locationId}:${typeId}:${side}` and by order id. */
 interface OwnOrderIndex {
   byOrderId: ReadonlyMap<number, OwnListing>;
   bySlot: ReadonlyMap<string, readonly OwnListing[]>;
   ids: ReadonlySet<number>;
 }
 
-/** The `(location, type, side)` slot an own order sits in; shared with the undercut notification. */
 export function ownSlotKey(locationId: number, typeId: number, isBuyOrder: boolean): string {
   return `${locationId}:${typeId}:${isBuyOrder ? 'buy' : 'sell'}`;
 }
@@ -302,13 +171,6 @@ function buildOwnOrderIndex(snapshot: OpenOrdersSnapshot): OwnOrderIndex {
   return { byOrderId, bySlot, ids: new Set(byOrderId.keys()) };
 }
 
-/**
- * Recovers my own order's systemId from the deep-competition list, since
- * ESI's own order shape never carries one. Tries an exact orderId match
- * first (my own order is very likely present in an unfiltered region book),
- * then falls back to any competitor sharing my station (same station, same
- * system, regardless of side or who holds it). Null when neither is found.
- */
 function deriveSystemId(
   orderId: number,
   locationId: number,
@@ -334,7 +196,6 @@ function buildDeepUndercut(
     orderId: order.order_id,
     price: order.price,
     locationId: order.location_id,
-    // Unused when 'system' is left out of scopesChecked below.
     systemId: systemId ?? 0,
     isBuyOrder,
   };
@@ -343,7 +204,6 @@ function buildDeepUndercut(
   return findUndercut(mine, competitors, scopesChecked, ownOrderIds);
 }
 
-/** The cheapest (best for the rival) own other-Character order in the fetched books that beats this one. */
 function findOwnRival(
   order: MarketOrder,
   isBuyOrder: boolean,
@@ -394,8 +254,6 @@ function buildRow(
 
   const deepEntry = deepCompetition?.get(order.order_id) ?? null;
   const structureEntry = structureCompetition?.get(order.location_id) ?? null;
-  // The structure book holds every item at that location — filter to this
-  // order's own type before it can stand alongside a region `CompetingOrder`.
   const structureCompetitors = structureEntry
     ? structureEntry.competitors.filter((c) => c.typeId === order.type_id)
     : [];
@@ -415,12 +273,6 @@ function buildRow(
     ]) ?? station.ownRival;
   const deepTruncated = (deepEntry?.truncated ?? false) || (structureEntry?.truncated ?? false);
 
-  // Deep check wins outright when it ran, even when it found nothing — it
-  // saw the real order book, the station tier only saw one aggregated
-  // price. `??` would wrongly resurrect a stale station read here. EXCEPT
-  // when the fetched book was truncated: a clean-but-truncated deep result
-  // is evidence of absence only for what it actually saw, so it must not
-  // suppress a real station rival the cheap tier already found.
   const worstScope: UndercutScope | null =
     deepUndercut !== null
       ? (deepUndercut.worst?.scope ?? (deepTruncated && station.beatsMe ? 'station' : null))
@@ -495,8 +347,6 @@ function buildRow(
     frequentlyUndercut:
       problem === 'healthy' &&
       wasFrequentlyUndercut(input.problemSamples?.get(order.order_id) ?? [], input.now),
-    // `loadStationBestPrices` returns an entry for every type of a station it
-    // reached (null prices for "no orders"), so a missing one is a failed read.
     competitionUnchecked: aggregate === undefined && deepUndercut === null,
     ...(turnInEach !== undefined ? { turnInEach } : {}),
   };
@@ -506,7 +356,6 @@ export function problemRank(problem: OrderProblem): number {
   return ORDER_PROBLEMS.indexOf(problem);
 }
 
-/** Worst-first, then biggest ISK tied up first, then orderId — so the order is stable and fully deterministic regardless of input order. */
 export function compareOpenOrderRowsWorstFirst(a: OpenOrderRow, b: OpenOrderRow): number {
   const rankDiff = problemRank(a.problem) - problemRank(b.problem);
   if (rankDiff !== 0) return rankDiff;
@@ -514,12 +363,6 @@ export function compareOpenOrderRowsWorstFirst(a: OpenOrderRow, b: OpenOrderRow)
   return a.orderId - b.orderId;
 }
 
-/**
- * One row per open order, across every character in `snapshot.entries`. A
- * character in `snapshot.skipped` simply has no entry to iterate — it
- * contributes no rows and nothing here needs to guard against it specially.
- * Sorted worst-first so the page's default order is already right.
- */
 export function buildOpenOrderRows(input: BuildRowsInput): OpenOrderRow[] {
   const rows: OpenOrderRow[] = [];
   const own = buildOwnOrderIndex(input.snapshot);
@@ -531,12 +374,6 @@ export function buildOpenOrderRows(input: BuildRowsInput): OpenOrderRow[] {
   return rows.sort(compareOpenOrderRowsWorstFirst);
 }
 
-/**
- * What a row is filed under: every `OrderProblem`, plus `notChecked` for
- * orders that read healthy only because nothing could check their
- * competition — kept apart from healthy so Fine (`orderUrgency.ts`) holds
- * only orders actually checked.
- */
 export type OrderGroupKey = OrderProblem | 'notChecked';
 
 export function orderGroupKey(row: OpenOrderRow): OrderGroupKey {
@@ -545,7 +382,6 @@ export function orderGroupKey(row: OpenOrderRow): OrderGroupKey {
     : row.problem;
 }
 
-/** Count per problem across `problems` (not `problem`), for filter chips, which overlap. Every OrderProblem key is present, even at 0. */
 export function openOrderProblemCounts(
   rows: readonly OpenOrderRow[]
 ): Record<OrderProblem, number> {
@@ -559,22 +395,15 @@ export function openOrderProblemCounts(
   return counts;
 }
 
-/**
- * Orders that read healthy only because nothing could check their competition
- * (`competitionUnchecked`). Surfaces that summarise order health count these
- * apart from the checked healthy ones instead of calling them healthy.
- */
 export function notCheckedCount(rows: readonly OpenOrderRow[]): number {
   return rows.filter((row) => row.competitionUnchecked === true && row.problem === 'healthy')
     .length;
 }
 
-/** Orders with a real problem: neither `healthy` nor only a turn-in that pays (never "needs you"). */
 export function needsAttentionCount(rows: readonly OpenOrderRow[]): number {
   return rows.filter((row) => isRealProblem(row.problem)).length;
 }
 
-/** Every order id across every Character's orders — the "never undercut an alt" set. */
 export function ownOrderIdSet(snapshot: OpenOrdersSnapshot): Set<number> {
   const ids = new Set<number>();
   for (const entry of snapshot.entries) {

@@ -24,7 +24,6 @@ function entry(date: string, qty: number, source: number | null = FEEDER) {
   } as unknown as ObservedMiningEntry;
 }
 
-/** Every ore unit is worth 1 ISK, so a day's value is its quantity. */
 const pricesOn = () => new Map<number, number>([[100, 1]]);
 
 function input(over: Partial<FeederAccrualInput> = {}): FeederAccrualInput {
@@ -219,7 +218,6 @@ describe('onPayList', () => {
 });
 
 describe('feederBillableRule', () => {
-  // 2026-10-10 closes at 2026-10-11T06:00Z with a 6h grace.
   const closes = Date.parse('2026-10-11T06:00:00.000Z');
 
   it('a day is Billable once a good read lands at or after it closes', () => {

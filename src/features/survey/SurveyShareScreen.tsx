@@ -1,12 +1,3 @@
-/**
- * The public page of a shared Survey, opened from `/s/<id>`: the same
- * board the Survey tab shows, with no login. Anyone holding the link can add a
- * scan (paste into the box, or press Ctrl+V anywhere on the page), so the
- * Survey carries on after the pilot who started it has left.
- *
- * `GlobalPasteRouter` lives in the signed-in shell, which this page sits
- * outside, so the page listens for a paste itself.
- */
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
@@ -42,26 +33,16 @@ import type { SurveyInfoShare, SurveyTaxShare } from './surveyStore';
 export function SurveyShareScreen({ shareId }: { shareId: string }) {
   const { t } = useTranslation();
   const { state, refresh } = useSurvey(shareId);
-  // A pasted scan of a different field waits for the pilot to log in (or open
-  // the app), where it starts their own survey: starting one needs a session.
   const [diverted, setDiverted] = useState(false);
   const characterId = useActiveCharacter((state) => state.activeCharacterId);
   const hydrated = useActiveCharacter((state) => state.hydrated);
-  // Who is signed in decides whether the starter edits here or in the app.
   useEffect(() => {
     if (!hydrated) void useActiveCharacter.getState().hydrate();
   }, [hydrated]);
-  // A first scan lacking an ore the survey shows, waiting for the pilot to
-  // confirm every section was expanded.
   const [checking, setChecking] = useState<{ text: string; ores: string[] } | null>(null);
-  // A signed-in pilot whose Character started the Survey manages it here as in the
-  // app: the details panel and setting scans aside. Anyone else sees the plain page.
   const characterNames = useCharacters().map((c) => c.name);
   const owned =
     characterId !== null && state.status === 'ready' && ownsSurvey(state.owner, characterNames);
-  // The device that started the Survey (`startedHere.ts`) manages it too, whether or
-  // not anyone is signed in: a Survey started with no account has no owner name for
-  // `owned` to match, and the pilot may have signed in since.
   const starter = !owned && hydrated && startedHere(shareId);
   const { setIgnored, failed: ignoreFailed } = useScanIgnore({
     id: shareId,
@@ -75,8 +56,6 @@ export function SurveyShareScreen({ shareId }: { shareId: string }) {
       const rejected = rejectScanText(text);
       if (rejected !== null) return rejected;
       try {
-        // Read fresh: the comparison is against the latest scan, which another
-        // pilot may have just added.
         const found = await loadSurvey(shareId, { fresh: true });
         if (!found.ok) return 'failed';
         const counted = countedScans(found.scans, found.ignored);
@@ -93,8 +72,6 @@ export function SurveyShareScreen({ shareId }: { shareId: string }) {
           return 'ok';
         }
         if (!confirmed && !hasSubmittedScan()) {
-          // Against the latest scan only: an ore an earlier scan showed but the
-          // latest already lacks is mined out, not a collapsed section.
           const ores = missingOres(latest?.rocks ?? null, parseSurveyScan(text) ?? []);
           if (ores.length > 0) {
             setChecking({ text, ores });
@@ -119,7 +96,6 @@ export function SurveyShareScreen({ shareId }: { shareId: string }) {
 
   const { trackedAdd, busy, error } = useScanFeedback(add);
 
-  // No `owned` here: the public page only offers it once the field is nearly done.
   const finish = useCallback(async (): Promise<boolean> => {
     if (state.status !== 'ready') return false;
     try {
@@ -251,7 +227,6 @@ export function SurveyShareScreen({ shareId }: { shareId: string }) {
   );
 }
 
-/** What the creator set: the location, notes, and the tax when the scans show a moon ore. Nothing set, no panel. */
 function SurveyInfoIfAny({
   info,
   tax,

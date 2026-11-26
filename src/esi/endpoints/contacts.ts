@@ -4,8 +4,6 @@ import type { EsiResult } from '../client';
 import type { TruncatableResult } from '../paginated';
 import type { EndpointOptions } from './options';
 
-// --- GET /characters/{character_id}/contacts (esi-characters.read_contacts.v1) ---
-
 export interface CharacterContact {
   contact_id: number;
   contact_type: 'character' | 'corporation' | 'alliance' | 'faction';
@@ -15,15 +13,12 @@ export interface CharacterContact {
   label_ids?: number[];
 }
 
-/** Paginated (X-Pages); see fetchAllPagesStatus. */
 export function getCharacterContacts(
   characterId: number,
   options: EndpointOptions = {}
 ): Promise<TruncatableResult<CharacterContact>> {
   return characterPages<CharacterContact>('getCharacterContacts', characterId, options);
 }
-
-// --- GET /characters/{character_id}/contacts/labels (esi-characters.read_contacts.v1) ---
 
 export interface CharacterContactLabel {
   label_id: number;
@@ -37,8 +32,6 @@ export function getCharacterContactLabels(
   return characterGet<CharacterContactLabel[]>('getCharacterContactLabels', characterId, options);
 }
 
-// --- GET /characters/{character_id}/standings/ (esi-characters.read_standings.v1) ---
-
 export interface CharacterStanding {
   from_id: number;
   from_type: 'agent' | 'npc_corp' | 'faction';
@@ -51,8 +44,6 @@ export function getCharacterStandings(
 ): Promise<EsiResult<CharacterStanding[]>> {
   return characterGet<CharacterStanding[]>('getCharacterStandings', characterId, options);
 }
-
-// --- GET /loyalty/stores/{corporation_id}/offers/ (public) ---
 
 export interface LoyaltyStoreRequiredItem {
   quantity: number;

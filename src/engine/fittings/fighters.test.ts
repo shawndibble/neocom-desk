@@ -3,15 +3,15 @@ import { fighterClass, isFighter, squadronSize, squadronsOf } from './fighters';
 
 describe('fighters', () => {
   it('knows a fighter’s class and squadron size', () => {
-    expect(fighterClass(23055)).toBe('light'); // Templar I
+    expect(fighterClass(23055)).toBe('light');
     expect(squadronSize(23055)).toBe(6);
-    expect(fighterClass(37599)).toBe('support'); // Cenobite I
+    expect(fighterClass(37599)).toBe('support');
     expect(squadronSize(37599)).toBe(3);
-    expect(fighterClass(32325)).toBe('heavy'); // Cyclops I
+    expect(fighterClass(32325)).toBe('heavy');
   });
 
   it('knows nothing of drones or structure fighters', () => {
-    expect(isFighter(2488)).toBe(false); // Warrior II
+    expect(isFighter(2488)).toBe(false);
     expect(isFighter(47035)).toBe(false);
     expect(fighterClass(2488)).toBeNull();
   });

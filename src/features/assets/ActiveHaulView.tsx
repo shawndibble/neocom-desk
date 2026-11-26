@@ -43,22 +43,11 @@ interface ActiveHaulViewProps {
   haul: ActiveHaul;
   onBack: () => void;
   onClear: () => void;
-  /** Saves the ticked Leg ids on the snapshot. */
   onProgress: (done: number[]) => void | Promise<void>;
-  /** Re-optimises what is left from where the pilot is; the caller saves a new snapshot. */
   onReplan: () => Promise<ReplanResult>;
-  /** The pilot's Current System; offers a tick, never makes one. */
   currentSystemId?: number | null;
 }
 
-/**
- * The active haul as a timeline, one section per Character: stops down a rail
- * and a block per Leg between them, with its distance, the security it flies
- * through (a strip with per-system kills), a done tick, waypoint and Route
- * Safety actions, and its cargo folded away (open on the next Leg). Route
- * Safety is the analyser; a Leg states the condition it flies through and
- * links there, so nothing here judges a route.
- */
 export function ActiveHaulView({
   haul,
   onBack,
@@ -70,10 +59,8 @@ export function ActiveHaulView({
   const { t } = useTranslation();
   const { plan, destination } = haul;
   const done = haul.doneLegIds ?? [];
-  // Memoised on the plan: the hook's effect re-runs when this array's identity changes.
   const allLegs = useMemo(() => plan.sections.flatMap((s) => s.legs), [plan]);
   const legRows = useHaulLegRows(allLegs);
-  // Each section's current Leg shows its cargo and the rest fold; a toggle flips that.
   const [flipped, setFlipped] = useState<ReadonlySet<string>>(new Set());
   const [marked, setMarked] = useState<{ n: number; before: number[] } | null>(null);
   const [replanNote, setReplanNote] = useState<string | null>(null);
@@ -335,16 +322,9 @@ function Section({
   );
 }
 
-/** Which fold a toggle belongs to: a Leg's hold, or what happens at the stop the Leg ends at. */
 const holdKey = (leg: HaulLeg) => `hold:${leg.id}`;
 const stopKey = (leg: HaulLeg) => `stop:${leg.id}`;
 
-/**
- * A place on the rail: the system in full, the station and moon on a dim
- * second line, and what the pilot does there (load, drop or take a ship) when
- * the Leg that ends here has something to do. The items to pick up or drop
- * unfold under that line, so the list sits where the pilot is standing.
- */
 function Stop({
   name,
   start,
@@ -356,11 +336,8 @@ function Stop({
   name: string;
   start?: boolean;
   last?: boolean;
-  /** Reached: the pilot has ticked the Leg that ends here (the start always is). */
   done?: boolean;
-  /** The stop the pilot is flying to next. */
   current?: boolean;
-  /** What happens here; absent at the start and where a flight just lands. */
   actionRow?: StopActionRowProps | null;
 }) {
   const { system, detail } = splitPlaceName(name);
@@ -385,13 +362,11 @@ function Stop({
 
 interface StopActionRowProps {
   action: StopAction;
-  /** The ending Leg's number, for the toggle's name. */
   n: number;
   expanded: boolean;
   onToggle: () => void;
 }
 
-/** The row for a Stop, or `null` where the Leg ending there has nothing to do. */
 function stopActionRow(
   action: StopAction | null,
   rest: Omit<StopActionRowProps, 'action'>
@@ -399,7 +374,6 @@ function stopActionRow(
   return action && { action, ...rest };
 }
 
-/** "Load 25 m³", "Drop 118.99 m³" or "Take Omen", opening to the items where there are some. */
 function StopActionRow({
   action,
   n,
@@ -483,7 +457,6 @@ function LegBlock({
   onTick: (checked: boolean) => void;
   rows: LegRows | undefined;
   capacityM3: number;
-  /** The Character's legs, for what is already in the hold. */
   legs: readonly HaulLeg[];
 }) {
   const { t } = useTranslation();
@@ -491,9 +464,6 @@ function LegBlock({
   const condition = rows?.status === 'ready' ? legCondition(rows.rows) : null;
   const destination = splitPlaceName(leg.to.name).system;
   const hold = legHold(legs, leg);
-  // The heading says what this Leg is: the trip out to a ship or load while the hold is empty, a
-  // flight of that ship, or a haul of what is already aboard (a later pickup in a trip, or the
-  // delivery). What happens at its end is the next Stop's to say.
   const ships = leg.ships?.join(', ');
   const heading = ships
     ? t(leg.kind === 'pickup' ? 'assets.movePlan.haul.travel' : 'assets.movePlan.haul.fly', {
@@ -565,7 +535,6 @@ function LegBlock({
         </div>
       </div>
       {rows?.status === 'ready' && <HaulStrip rows={rows.rows} />}
-      {/* A flight has no hold to show: the pilot flies the ship itself. */}
       {!leg.ships &&
         (carried > 0 ? (
           <>
@@ -610,7 +579,6 @@ function LegBlock({
             )}
           </>
         ) : (
-          // Nothing aboard, so nothing to open: what loads at the end is the next Stop's.
           <div className="flex min-h-9 items-center border-t border-dashed border-line pt-2 text-sm text-text-dim">
             {t('assets.movePlan.haul.carryEmpty')}
           </div>
@@ -619,10 +587,8 @@ function LegBlock({
   );
 }
 
-/** Items shown before the rest fold into a count: a freighter's hold can hold hundreds of types. */
 const ITEMS_SHOWN = 6;
 
-/** What a load is made of, biggest by volume first. */
 function ItemList({ items }: { items: readonly HaulStack[] }) {
   const { t } = useTranslation();
   const [all, setAll] = useState(false);

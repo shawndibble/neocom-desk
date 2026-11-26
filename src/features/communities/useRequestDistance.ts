@@ -7,28 +7,17 @@ import type { CurrentSystemState } from '@/features/route/currentSystem';
 import { loadJumpGraph } from '@/sde/jumpGraph';
 import { usePlaceIndex } from './usePlaceIndex';
 
-/** What knowing where the pilot is takes: the Character's location Permission. */
 export const LOCATION_ENDPOINTS: readonly EsiEndpointId[] = ['getCharacterLocation'];
 
-/** Why distance cannot be used: the Permission is missing, or the Character's location is not known. */
 export type DistanceUnavailable = 'permission' | 'location';
 
 export type RequestDistance =
   | { status: 'loading' }
   | { status: 'unavailable'; reason: DistanceUnavailable }
-  /** Where the pilot is is known; the map is read once a distance is asked for. */
   | { status: 'idle' }
   | { status: 'failed' }
   | { status: 'ready'; jumpsOf: (locationText: string) => number | null };
 
-/**
- * Jumps from the viewer's Character to a Request's place (issue #3811). The
- * Character's current system comes from the existing location read (cached,
- * never polled); the stargate map and the system/region names are read only
- * once `wanted` (a distance was chosen), so a board nobody filters by distance
- * pays for neither. Every way of not knowing is its own state, because the
- * board must say why distance is off, never quietly ignore it.
- */
 export function useRequestDistance(
   characterId: number,
   current: CurrentSystemState,
@@ -47,8 +36,6 @@ export function useRequestDistance(
     | null
   >(null);
 
-  // Where to measure from: the pilot's pick, else the game's location (the
-  // shared Current System, as every Jump Range filter reads it).
   const systemId = current.loaded ? current.systemId : undefined;
 
   useEffect(() => {

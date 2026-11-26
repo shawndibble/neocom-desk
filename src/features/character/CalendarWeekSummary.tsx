@@ -1,9 +1,3 @@
-/**
- * "Next 7 days" under the Calendar Map: how many of each clock fall in the coming week.
- * Fills the space below the grid and answers "what kind of week is this" before the
- * pilot reads the rail. Counts honour the hidden-kind filter (the caller passes the
- * filtered board); a quiet week renders nothing.
- */
 import { useTranslation } from 'react-i18next';
 import { Panel } from '@/components/ui';
 import { KIND_TEXT } from '@/components/ui/kindTone';

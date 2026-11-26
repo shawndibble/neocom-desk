@@ -14,7 +14,6 @@ import { DividedList } from '@/components/ui/DividedList';
 
 const k = (key: string) => `corpTaxBook.moons.moonOwners.pay.${key}`;
 
-/** "Pay" a moon owner: Settle up's shell with one row, no per-entry ticks. */
 export function PayMoonOwnerDialog({
   ownerName,
   payee,
@@ -25,12 +24,9 @@ export function PayMoonOwnerDialog({
   onRecord,
 }: {
   ownerName: string;
-  /** Who the ISK goes to (a corporation or a player), with the name to show. */
   payee: { id: number; name: string };
-  /** Accrued minus paid, unrounded; what the before and after lines read. */
   balance: number;
   period: { from: string; to: string } | undefined;
-  /** Add a payment by hand: no figure to send, the amount is typed. */
   manual?: boolean;
   onClose: () => void;
   onRecord: (payout: {
@@ -49,7 +45,6 @@ export function PayMoonOwnerDialog({
   const typed = different ? unmaskNumber(sentText) : undefined;
   const amount = different ? Math.round(typed ?? 0) : whole;
   const reason = payoutReason(t(k('reasonPrefix')), period);
-  // Before reads the balance as it stands, a credit included; only the amount to send floors at 0.
   const shown = (b: ReturnType<typeof balanceAfter>) =>
     b.kind === 'credit' ? t(k('afterCredit'), { amount: isk(b.isk) }) : isk(b.isk);
   const beforeText = shown(balanceAfter(balance, 0));

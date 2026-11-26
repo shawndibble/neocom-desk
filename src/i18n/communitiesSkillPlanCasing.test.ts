@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import en from './locales/en.json';
 
-/** The glossary term is Skill Plan; the Communities tab label is the one sentence-case exception. */
 const HYBRID = /Skill plans?/;
 
 function collectStrings(node: unknown, path: string, out: [string, string][]) {

@@ -1,9 +1,3 @@
-/**
- * Each market-wide scan candidate's tier and category, for the scan's
- * filters: its meta group from `market/variations.json` and its root Market
- * Group from `market/groups.json`. Both are small, lazily loaded market files
- * the scan fetches alongside its prices.
- */
 import {
   productCategory,
   productTier,

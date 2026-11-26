@@ -4,10 +4,6 @@ import { utcDay, utcDaysBetween } from '@/engine/localDay';
 import { isk, shortDate } from './moonsFormat';
 import { useBook } from './useBook';
 
-/**
- * A Miner's running account in words (#6294): "Owes X (N days, oldest D)" or "Paid through D";
- * a dash when they have neither paid nor owed a day yet.
- */
 export function AccountStatus({ account }: { account: RunningAccountStatus | undefined }) {
   const { t } = useTranslation();
   if (account?.owes)
@@ -29,7 +25,6 @@ export function AccountStatus({ account }: { account: RunningAccountStatus | und
   return <>—</>;
 }
 
-/** The date of a Miner's oldest unpaid day and its age, or "Paid through D" when nothing is owed. */
 export function OldestUnpaid({ account }: { account: RunningAccountStatus }) {
   const { t } = useTranslation();
   const { view } = useBook();

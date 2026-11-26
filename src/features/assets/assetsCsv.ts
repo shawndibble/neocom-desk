@@ -3,32 +3,21 @@ import type { CharacterAsset } from '@/esi/endpoints';
 import { assetStackValue } from '@/engine/assetTree';
 import { assetHolderChain, locationLabel } from './assetsLogic';
 
-/** One row per matched asset, with everything the Assets page shows or tips about it. */
 export interface AssetCsvRow {
-  /** The immediate parent's label: the station, or the container or ship the item sits in. */
   location: string;
-  /** The whole way down: station or structure, then each container or ship, outermost first. */
   locationPath: string;
-  /** The station or structure the item is in somewhere; blank for an item in space. */
   place: string;
-  /** The solar system, when it could be read. */
   system: string;
-  /** The Character who owns the item: the page lists other Characters' assets while a search runs. */
   character: string;
   name: string;
-  /** The in-game name the player gave this ship or container; blank when it has none. */
   gameName: string;
   quantity: number;
-  /** The Place Nickname for the root station or structure; empty where none is set. */
   nickname: string;
-  /** ISK per unit; null when no price is known (a blueprint copy has its own value). */
   unitPrice: number | null;
-  /** The stack's estimated value, the figure the page totals. */
   totalValue: number | null;
   unitVolume: number | null;
   totalVolume: number | null;
   blueprint: 'BPO' | 'BPC' | null;
-  /** ESI's `location_flag`: the hangar, bay or slot the item sits in. */
   locationFlag: string;
   itemId: number;
   typeId: number;
@@ -39,36 +28,21 @@ export interface AssetCsvGroup {
   entries: readonly { asset: CharacterAsset; name: string; gameName?: string }[];
 }
 
-/** What a row is read against: the page's own lookups, so the file says what the page says. */
 export interface AssetCsvContext {
   assetsByItemId: Map<number, CharacterAsset>;
   typeNames: ReadonlyMap<number, string>;
-  /** In-game names of ships and containers, by item id. */
   gameNames: Readonly<Record<number, string>>;
   locationNames: ReadonlyMap<number, string>;
-  /** System name by station or structure id. */
   systemNameByLocationId: ReadonlyMap<number, string>;
   priceByTypeId: ReadonlyMap<number, number>;
-  /** A blueprint copy's or abyssal module's own value, by item id. */
   itemValueByItemId: ReadonlyMap<number, number>;
   volumeByTypeId: ReadonlyMap<number, number>;
-  /** Null until the blueprint type list is read. */
   blueprintTypeIds: ReadonlySet<number> | null;
-  /** Place Nicknames by station or structure id. */
   placeNicknames: Readonly<Record<number, string>>;
-  /** The owning Character's name, by item id. */
   characterNameOf: (itemId: number) => string;
   t: CsvTranslate;
 }
 
-/**
- * Flattens the Assets page's location groups into export rows, preserving
- * group order (already sorted by label) and within-group order (already
- * sorted by name) — the same order the page renders. Callers should build
- * these from the full matched set, not the render-capped subset: the render
- * cap is a UI performance guard, not a data limit, and export must not
- * silently drop rows the page merely chose not to paint.
- */
 export function assetCsvRows(
   groups: readonly AssetCsvGroup[],
   ctx: AssetCsvContext
@@ -84,7 +58,6 @@ export function assetCsvRows(
       const inSpace = rootLocationType === 'solar_system';
       const rootLabel = locationLabel(
         rootLocationId,
-        // A parent ESI never returned as an asset is a structure the list has no row for.
         rootLocationType === 'item' ? 'other' : rootLocationType,
         ctx.locationNames,
         assetsByItemId,

@@ -1,52 +1,29 @@
-/**
- * Every Character's contact list side by side: who each of them knows, and
- * where they disagree.
- *
- * The question this answers is one no single-character view can: you blocked a
- * scammer on your main three months ago and never did it on the hauler alt
- * that actually accepts the contracts.
- *
- * A convenience layer over the existing per-character loader, in the same
- * shape as `roster.ts` — cache-only by default, live on request, never a
- * reimplementation of read-through.
- */
 import { db } from '@/db';
 import { readCachedRows } from '@/esi/cache';
 import type { CharacterContact } from '@/esi/endpoints';
 import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
 import { loadContacts } from './contacts';
 
-/** One character's list, as the merge below wants it. */
 export interface CharacterContactList {
   characterId: number;
   name: string;
   contacts: readonly CharacterContact[];
-  /** This character's own fetch stopped short (pages missing) — see `CachedResult.truncated`. */
   truncated: boolean;
-  /** A saved copy exists (only a successful fetch writes one), so an empty list is really empty, not unloaded. */
   read: boolean;
 }
 
 export interface ContactHolder {
   characterId: number;
   name: string;
-  /** That character's own entry — its standing, and its blocked/watched flags. */
   contact: CharacterContact;
 }
 
 export interface AcrossCharactersRow {
   contactId: number;
   contactType: CharacterContact['contact_type'];
-  /** In the order the characters were supplied, so every row reads the same way. */
   held: ContactHolder[];
   missing: { characterId: number; name: string }[];
-  /** Distinct standings, ascending. One value means every holder agrees. */
   standings: number[];
-  /**
-   * Not every character holds it, or the holders set it differently. Always
-   * false for a single character: one list cannot disagree with itself, and a
-   * pilot flying one character should not be shown a column of warnings.
-   */
   disagrees: boolean;
 }
 
@@ -54,10 +31,6 @@ function rowKey(contact: CharacterContact): string {
   return `${contact.contact_type}:${contact.contact_id}`;
 }
 
-/**
- * Pure. Ids are only unique within a type, so rows are keyed on the pair —
- * the same collision `buildContactStandingIndex` guards against.
- */
 export function mergeContactsAcrossCharacters(
   lists: readonly CharacterContactList[]
 ): AcrossCharactersRow[] {
@@ -93,7 +66,6 @@ export function mergeContactsAcrossCharacters(
   return rows;
 }
 
-/** A character with no cached contacts reads as an empty list, not as absent — it is a gap. */
 async function loadCacheOnly(
   characters: readonly { characterId: number; name: string }[]
 ): Promise<CharacterContactList[]> {
@@ -110,11 +82,6 @@ async function loadCacheOnly(
   }));
 }
 
-/**
- * One entry per character, capped the way every other fan-out is. A character
- * whose fetch fails keeps whatever the loader could read from cache, and an
- * outright failure leaves it an empty list rather than sinking the page.
- */
 async function loadLive(
   characters: readonly { characterId: number; name: string }[]
 ): Promise<CharacterContactList[]> {
@@ -131,14 +98,11 @@ async function loadLive(
       list.contacts = cached?.data ?? [];
       list.truncated = cached?.truncated ?? false;
       list.read = cached !== null;
-    } catch {
-      // Stays empty, which the merge reports as a gap rather than hiding.
-    }
+    } catch {}
   });
   return lists;
 }
 
-/** Every Character on the device, in the order they were added. */
 export async function loadContactsAcrossCharacters(opts?: {
   live?: boolean;
 }): Promise<CharacterContactList[]> {

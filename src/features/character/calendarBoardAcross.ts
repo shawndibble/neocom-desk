@@ -1,12 +1,3 @@
-/**
- * The Calendar board of every Character as one (the Calendar widget on All characters).
- *
- * Pure, so the folding is tested apart from the reads. Two kinds of clock merge differently:
- * a Character's own (events, queue, jobs, colonies, dens, contracts, orders, accelerator) are
- * named by their Character, and what two of them can both see (an invited event, a contract
- * between them) is listed once; a corporation's (structures, moons, corp jobs, pops, skyhooks)
- * is the same read through every Character, so it is listed once and belongs to no Character.
- */
 import type {
   BoardCalendarEventSource,
   BoardClockSource,
@@ -21,7 +12,6 @@ export interface CharacterCalendarBoard {
   data: CalendarBoardData;
 }
 
-/** The first of each id, in order. */
 function distinct<T>(items: readonly T[], idOf: (item: T) => string | number): T[] {
   const seen = new Set<string | number>();
   return items.filter((item) => {
@@ -32,13 +22,11 @@ function distinct<T>(items: readonly T[], idOf: (item: T) => string | number): T
   });
 }
 
-/** A list read by no Character stays undefined: unreadable is not the same as empty. */
 function union<T>(lists: readonly (readonly T[] | undefined)[]): T[] | undefined {
   const read = lists.filter((list): list is readonly T[] => list !== undefined);
   return read.length === 0 ? undefined : read.flat();
 }
 
-/** How committed an RSVP is: the answer an event two of the Characters share is kept at. */
 const RESPONSE_RANK: Record<CalendarResponse, number> = {
   accepted: 3,
   tentative: 2,
@@ -46,7 +34,6 @@ const RESPONSE_RANK: Record<CalendarResponse, number> = {
   declined: 0,
 };
 
-/** One entry per event: the Characters were each invited, so the most committed answer stands. */
 function distinctEvents(events: readonly BoardCalendarEventSource[] | undefined) {
   if (!events) return undefined;
   const best = new Map<string, BoardCalendarEventSource>();
@@ -77,7 +64,6 @@ type SharedList =
   | 'skyhookRaids';
 
 export function mergeCalendarBoards(boards: readonly CharacterCalendarBoard[]): CalendarBoardData {
-  /** A Character's own clocks, named. A queue slot is "0" for every Character, so a queue's ids are prefixed. */
   const own = <K extends ClockList>(key: K, prefixIds = false) =>
     union(
       boards.map(({ characterId, name, data }) =>
@@ -134,7 +120,6 @@ export function mergeCalendarBoards(boards: readonly CharacterCalendarBoard[]): 
     orderExpiries: dedupe(own('orderExpiries')),
     accelerator: own('accelerator'),
     readableKinds: [...readable],
-    // A sign-in is asked for only where no Character could read the kind.
     reauthKinds: [...new Set(boards.flatMap(({ data }) => data.reauthKinds))].filter(
       (kind) => !readable.has(kind)
     ),

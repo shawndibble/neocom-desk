@@ -41,7 +41,6 @@ vi.mock('@/sync', () => ({
   subscribeSyncStatus: (listener: (s: unknown) => void) => mockSubscribe(listener),
 }));
 
-// Warming itself is `routeWarm.test.ts`'s subject; Layout only owns the wiring.
 vi.mock('./routeWarm', () => ({ warmRoute: vi.fn() }));
 const mockedWarmRoute = vi.mocked((await import('./routeWarm')).warmRoute);
 
@@ -57,8 +56,6 @@ function renderLayout() {
       <Routes>
         <Route element={<Layout />}>
           <Route path="/overview" element={<div>page content</div>} />
-          {/* The "More" sheet links to /wallet; without a route for it, clicking
-              through logs React Router's "No routes matched" console error. */}
           <Route path="/wallet" element={<div>wallet page</div>} />
         </Route>
       </Routes>
@@ -66,12 +63,6 @@ function renderLayout() {
   );
 }
 
-/**
- * The `/characters` stub used by `renderLayoutWithRoutes`, extended to show
- * the `from` location state a switch-character link carries (#1764) — a
- * sibling `<p>` rather than folding it into "characters page"'s own text, so
- * the shortcut tests' exact `findByText('characters page')` still matches.
- */
 function CharactersPageStub() {
   const location = useLocation();
   const from = (location.state as { from?: string } | null)?.from;
@@ -83,7 +74,6 @@ function CharactersPageStub() {
   );
 }
 
-/** For the shortcut tests below, which need more than one destination route. */
 function renderLayoutWithRoutes(initialEntry = '/overview') {
   return render(
     <MemoryRouter initialEntries={[initialEntry]}>
@@ -101,10 +91,7 @@ function renderLayoutWithRoutes(initialEntry = '/overview') {
           />
           <Route path="/market" element={<div>market page</div>} />
           <Route path="/characters" element={<CharactersPageStub />} />
-          {/* `/*`: Settings' tabs are real path segments (ADR 0015), so `,`'s
-              target has to match this route too, not just the bare path. */}
           <Route path="/settings/*" element={<div>settings page</div>} />
-          {/* `?` lands on Help › Shortcuts. */}
           <Route path="/help/*" element={<div>help page</div>} />
         </Route>
       </Routes>
@@ -120,17 +107,12 @@ beforeEach(async () => {
   mockIsSyncConfigured.mockReset();
   useAuthFailure.setState({ failure: null });
   useActiveCharacter.setState({ activeCharacterId: null, hydrated: true });
-  // The ~95% case: a Character with no corporation role at all.
   mockedCorpAccess.mockReturnValue(corpAccess('none'));
   await db.tokens.clear();
   await db.characters.clear();
-  // Module-scope singleton: a bar chosen by one test must not reach the next.
   useMobileTabs.setState({ value: DEFAULT_MOBILE_TABS, hydrated: true });
-  // Likewise the Recent row: one test's visits must not show up as another's links.
   useRecentNav.setState({ value: [], hydrated: true });
-  // These tests list the whole rail: every page shows, as for a new pilot.
   useHiddenNav.setState({ value: [], hydrated: true });
-  // No newer build waiting unless a test says so.
   useUpdateStatus.setState({ status: 'unknown', build: null, found: 0 });
 });
 
@@ -138,7 +120,6 @@ describe('Layout sync status dot', () => {
   it('is hidden when sync is unconfigured', () => {
     mockIsSyncConfigured.mockReturnValue(false);
     renderLayout();
-    // The shell's always-mounted notice regions exist but stay empty.
     for (const region of screen.getAllByRole('status')) expect(region).toBeEmptyDOMElement();
   });
 
@@ -185,9 +166,7 @@ describe('Layout mobile "More" sheet (UX-REVIEW #4)', () => {
     for (const label of ['Wallet', 'Assets', 'Mail', 'Calendar', 'Contracts']) {
       expect(within(sheet).getByRole('link', { name: label })).toBeInTheDocument();
     }
-    // Desktop-only for now: Orders has no primary tab-bar slot to spare here.
     expect(within(sheet).queryByRole('link', { name: 'Orders' })).not.toBeInTheDocument();
-    // Overview tabs now, reached from the Overview page rather than the sheet.
     expect(within(sheet).queryByRole('link', { name: 'Clones' })).not.toBeInTheDocument();
     expect(within(sheet).queryByRole('link', { name: 'Employment' })).not.toBeInTheDocument();
   });
@@ -201,7 +180,6 @@ describe('Layout mobile "More" sheet (UX-REVIEW #4)', () => {
     await user.click(within(mobileNav).getByRole('button', { name: 'More' }));
     const sheet = screen.getByRole('dialog', { name: 'More' });
 
-    // Alerts is the header bell's, in neither the bar nor the sheet.
     expect(within(sheet).queryByRole('link', { name: 'Alerts' })).not.toBeInTheDocument();
 
     const labels = ['PI', 'Wallet', 'Assets', 'Contracts', 'Mail', 'Calendar', 'Contacts'];
@@ -236,11 +214,8 @@ describe('Layout mobile "More" sheet (UX-REVIEW #4)', () => {
 
     expect(settings).toHaveAttribute('href', '/settings');
     expect(character).toHaveAttribute('href', '/characters');
-    // Settings and the Character are plain links now, not a disclosure — no
-    // submenu to expand.
     expect(within(sheet).queryByRole('button', { name: 'Pilot One' })).not.toBeInTheDocument();
 
-    // Reading order: ..., Contacts, Help, Settings, Character — the rail's order.
     expect(contacts.compareDocumentPosition(help) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(help.compareDocumentPosition(settings) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(
@@ -350,11 +325,9 @@ describe('Layout nav marks routes the character cannot use', () => {
         'true'
       )
     );
-    // Granted, so unmarked — and so is every ungated route.
     expect(within(rail).getByRole('link', { name: 'Mail' })).not.toHaveAttribute('data-locked');
     expect(within(rail).getByRole('link', { name: 'Market' })).not.toHaveAttribute('data-locked');
     expect(within(rail).getByRole('link', { name: 'Overview' })).not.toHaveAttribute('data-locked');
-    // The explanation is a Tooltip, not a native title.
     await userEvent.setup().hover(within(rail).getByRole('link', { name: 'Assets' }));
     expect(await screen.findByRole('tooltip')).toHaveTextContent('Needs a new login');
   });
@@ -386,8 +359,6 @@ describe('Layout desktop rail domain grouping', () => {
     const trigger = await screen.findByRole('link', { name: 'Pilot One' });
 
     const rail = screen.getAllByRole('navigation')[0];
-    // The trigger must follow the nav landmark in document order — it is
-    // pinned under the groups, not stacked above them.
     expect(rail.compareDocumentPosition(trigger) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
@@ -402,8 +373,6 @@ describe('Layout desktop rail domain grouping', () => {
     useActiveCharacter.setState({ activeCharacterId: CHARACTER_ID, hydrated: true });
     renderLayout();
 
-    // Both left the scrollable nav proper; the footer is now their only
-    // pointer affordance on desktop.
     const rail = screen.getAllByRole('navigation')[0];
     expect(within(rail).queryByRole('link', { name: 'Characters' })).not.toBeInTheDocument();
     expect(within(rail).queryByRole('link', { name: 'Settings' })).not.toBeInTheDocument();
@@ -412,8 +381,6 @@ describe('Layout desktop rail domain grouping', () => {
     const character = await screen.findByRole('link', { name: 'Pilot One' });
     expect(settings).toHaveAttribute('href', '/settings');
     expect(character).toHaveAttribute('href', '/characters');
-    // Clicking the character no longer opens a menu — it goes straight to
-    // the Characters page, with Settings sitting just above it.
     expect(
       settings.compareDocumentPosition(character) & Node.DOCUMENT_POSITION_FOLLOWING
     ).toBeTruthy();
@@ -436,9 +403,6 @@ describe('Layout desktop rail domain grouping', () => {
     renderLayout();
 
     const rail = screen.getByRole('navigation', { name: 'Main navigation' });
-    // A page row is its link (the caret beside it is a button); the last child
-    // is the rail editor's button, not a page.
-    // Each labelled group wraps its pages in a role=group div: flatten those.
     const items = Array.from(rail.children)
       .flatMap((el) => (el.getAttribute('role') === 'group' ? Array.from(el.children) : [el]))
       .filter((el) => el.tagName !== 'BUTTON')
@@ -449,9 +413,6 @@ describe('Layout desktop rail domain grouping', () => {
       );
     expect(items).toEqual([
       'Overview',
-      // Characters and Settings moved to the pinned character menu; Clones and
-      // Employment History became Overview tabs; Market joined Economy, which
-      // emptied General out of existence.
       '[Progression]',
       'Skills',
       'Industry',
@@ -495,7 +456,6 @@ describe('Layout runtime auth-failure notice', () => {
     renderLayout();
 
     expect(screen.getByText(/: log in again$/)).toBeInTheDocument();
-    // Still on the page: a refused request is not a reason to move the user.
     expect(screen.getByText('page content')).toBeInTheDocument();
   });
 
@@ -586,9 +546,6 @@ describe('Layout keyboard shortcuts (issue #25)', () => {
     renderLayoutWithRoutes();
     await screen.findByText('overview page');
 
-    // `{Shift>}?{/Shift}`, not a bare '?': user-event's US keymap has no
-    // entry for '?', so a bare press dispatches `shiftKey: false` and would
-    // pass even with `allowsShift` deleted — testing nothing.
     await user.keyboard('{Shift>}?{/Shift}');
     expect(await screen.findByText('help page')).toBeInTheDocument();
   });
@@ -642,16 +599,10 @@ describe('Layout keyboard shortcuts (issue #25)', () => {
     renderLayoutWithRoutes();
     await screen.findByText('overview page');
 
-    // Shift no longer blocks every press — only `?` opted in — so Shift+C has
-    // to stay an ordinary capital C rather than becoming a second way to
-    // reach the character switcher.
     await user.keyboard('g{Shift>}c{/Shift}');
     expect(screen.queryByText('characters page')).not.toBeInTheDocument();
   });
 
-  // Two overlays `dialog[open]` cannot match: the Compare drawer, a plain
-  // <section> that opts in (features/market/CompareDrawer.tsx), and a Radix
-  // Popover, which puts the role on a plain div.
   it.each([
     ['an overlay that marked itself', 'section', KEYBOARD_OVERLAY_ATTRIBUTE, ''],
     ['a Radix popover', 'div', 'role', 'dialog'],
@@ -664,9 +615,6 @@ describe('Layout keyboard shortcuts (issue #25)', () => {
     overlay.setAttribute(attribute, attributeValue);
     document.body.append(overlay);
 
-    // `finally`: RTL's cleanup only unmounts React trees, and OVERLAY_SELECTOR
-    // matches anywhere in the document — a node leaked by a failed assertion
-    // would silently green every shortcut test after it.
     try {
       await user.keyboard('gc');
       expect(screen.queryByText('characters page')).not.toBeInTheDocument();
@@ -692,9 +640,6 @@ describe('Layout keyboard shortcuts (issue #25)', () => {
     renderLayoutWithRoutes();
     await screen.findByText('overview page');
 
-    // Stands in for one of those primitives: none force-mount while closed
-    // (`components/ui/DropdownMenu.tsx` et al.), so an open one is exactly
-    // this — a `role="menu"`/`role="listbox"` element present in the DOM.
     const menu = document.createElement('div');
     menu.setAttribute('role', 'menu');
     document.body.appendChild(menu);
@@ -707,13 +652,6 @@ describe('Layout keyboard shortcuts (issue #25)', () => {
   });
 });
 
-/**
- * AC1: the Corp nav entry exists only for a Character whose Corp Access is
- * `ready`, and in the other three states it does not render *at all* — no
- * link, no lock marker. Corp UI hides rather than locks (GLOSSARY.md round 35),
- * because what stands in the way is an in-game role only CCP can grant and no
- * re-login can produce.
- */
 describe('Layout corp nav entry', () => {
   it.each(['unknown', 'none', 'roles-without-grant'] as const)(
     'renders nothing for a %s character — not even a locked link',
@@ -725,13 +663,6 @@ describe('Layout corp nav entry', () => {
     }
   );
 
-  /**
-   * The corporation id is part of the gate, not an extra — the same
-   * composition `owner.ts` makes for the Personal / Corporation switch. It is
-   * written by the public-info read, so on a cold device it is simply absent,
-   * and an entry into a section with no corporation behind it must not be on
-   * screen yet.
-   */
   it('renders nothing for a ready character whose corporation is not yet known', async () => {
     mockIsSyncConfigured.mockReturnValue(false);
     mockedCorpAccess.mockReturnValue(corpAccess('ready'));
@@ -756,28 +687,14 @@ describe('Layout corp nav entry', () => {
     renderLayout();
     const link = await screen.findByRole('link', { name: 'Corp Board' });
     expect(link).toHaveAttribute('href', '/corp');
-    // No lock marker: there is no state in which this renders and is unusable,
-    // so the amber dot would offer a re-login for a role nobody can grant here.
     expect(link).not.toHaveAttribute('data-locked');
   });
 });
 
-/**
- * jsdom implements no Web Animations API, so `animate` is stubbed and these
- * assert what the route fade (`useFadeOnChange`) is responsible for: that it fires on a real route
- * change, stays quiet when only the query changed, honours reduced motion, and
- * — the reason it animates in place rather than re-keying the outlet — never
- * costs the route its component instance.
- */
 describe('Layout route fade', () => {
   let animate: ReturnType<typeof stubAnimate>['animate'];
   let reduceMotion: boolean;
 
-  /**
-   * A splat route, which is the case that made a `key` untenable: `/assets`
-   * and `/assets/60003760` are one match, and Assets keeps its search,
-   * filters and selection across the drill-down.
-   */
   function renderRoutes(initial: string) {
     const mounts: string[] = [];
     function Page({ name }: { name: string }) {
@@ -814,8 +731,6 @@ describe('Layout route fade', () => {
     mockedCorpAccess.mockReturnValue(corpAccess('none'));
     reduceMotion = false;
     animate = stubAnimate().animate;
-    // Only the reduced-motion query is steered; every other query Layout asks
-    // (the `md` breakpoint behind the More sheet) keeps the setup's default.
     stubViewport((media) => (media.includes('prefers-reduced-motion') ? reduceMotion : false));
   });
 
@@ -835,8 +750,6 @@ describe('Layout route fade', () => {
     const user = userEvent.setup();
     renderRoutes('/overview');
     animate.mockClear();
-    // The shape an in-page filter produces — re-fading the whole view for a
-    // filter keystroke is the churn this guards against.
     await user.click(screen.getByRole('link', { name: 'filter overview' }));
     expect(animate).not.toHaveBeenCalled();
   });
@@ -851,11 +764,6 @@ describe('Layout route fade', () => {
     expect(animate).not.toHaveBeenCalled();
   });
 
-  /**
-   * The regression an earlier `key={location.pathname}` introduced: six
-   * `ROUTE_ELEMENTS` entries match more than one pathname, and remounting on
-   * a drill-down discards the route's own state and re-runs its loader.
-   */
   it('keeps the route mounted when the pathname changes inside one match', async () => {
     const user = userEvent.setup();
     const { mounts } = renderRoutes('/assets');
@@ -863,7 +771,6 @@ describe('Layout route fade', () => {
     await user.click(screen.getByRole('link', { name: 'drill down' }));
     expect(await screen.findByText('assets page')).toBeInTheDocument();
     expect(mounts).toEqual(['assets']);
-    // Still fades, though — it is a navigation, just not a new instance.
     expect(animate).toHaveBeenCalled();
   });
 
@@ -879,13 +786,6 @@ describe('Layout route fade', () => {
   });
 });
 
-/**
- * Only the wiring is asserted here — which gestures count as intent, and that
- * the Character's stored grant reaches `warmRoute` — because what warming then
- * does with it (filtering on the loader's endpoints, skipping an already-warm
- * route, deduping, swallowing failures) is `routeWarm.test.ts`'s subject and
- * does not want restating per link.
- */
 describe('Layout intent warming', () => {
   beforeEach(() => {
     mockIsSyncConfigured.mockReturnValue(false);
@@ -894,13 +794,6 @@ describe('Layout intent warming', () => {
     mockedWarmRoute.mockClear();
   });
 
-  /**
-   * The grant arrives from Dexie a tick after mount, and the handler reads
-   * whatever is current when the gesture happens — so these wait for it to
-   * land before hovering, which is also what a real pointer does.
-   * `/assets` is scope-gated, so its lock marker appearing is the signal that
-   * scopes have resolved to something.
-   */
   async function renderWithGrant(scopes: string[]) {
     await db.tokens.put({
       characterId: CHARACTER_ID,
@@ -925,19 +818,12 @@ describe('Layout intent warming', () => {
     ]);
   });
 
-  // Tabbing to a link is the same declaration of intent as pointing at it.
   it('warms on keyboard focus too', async () => {
     await renderWithGrant([]);
     screen.getAllByRole('link', { name: 'Wallet' })[0].focus();
     expect(mockedWarmRoute).toHaveBeenCalledWith('/wallet', CHARACTER_ID, []);
   });
 
-  /**
-   * The grant, not the route's lock, is what `warmRoute` filters on — an
-   * `UNGATED` route can still compose scope-gated reads. Passing `undefined`
-   * through matters just as much: it is how the first frames of a cold load
-   * report "not known yet", which must refuse rather than warm blindly.
-   */
   it('passes an unknown grant through as undefined rather than as empty', async () => {
     const user = userEvent.setup();
     useActiveCharacter.setState({ activeCharacterId: null, hydrated: false });
@@ -997,7 +883,6 @@ describe("Layout mobile tab bar follows the pilot's choice", () => {
     await user.click(within(mobileNav).getByRole('button', { name: 'More' }));
     const sheet = screen.getByRole('dialog', { name: 'More' });
 
-    // The sheet covers the bar, so it is the whole map: replaced and chosen alike.
     for (const name of ['Skills', 'Industry', 'Market', 'Overview', 'Wallet', 'Assets', 'Mail']) {
       expect(within(sheet).getByRole('link', { name })).toBeInTheDocument();
     }
@@ -1011,7 +896,6 @@ describe("Layout mobile tab bar follows the pilot's choice", () => {
       ownerHash: 'oh',
       addedAt: 0,
     });
-    // A token granting nothing: every scope-gated route is locked.
     await db.tokens.put({
       characterId: CHARACTER_ID,
       accessToken: 'a',
@@ -1027,8 +911,6 @@ describe("Layout mobile tab bar follows the pilot's choice", () => {
     renderLayout();
 
     const mobileNav = screen.getByRole('navigation', { name: 'Mobile navigation' });
-    // Promoting a gated route into the bar used to hide its marker entirely:
-    // the bar did not draw one, and the sheet's bar-page tiles were dropped.
     await waitFor(() =>
       expect(within(mobileNav).getByRole('link', { name: 'Assets' })).toHaveAttribute(
         'data-locked',
@@ -1075,8 +957,6 @@ describe('Layout Characters switch carries the page it started from (#1764)', ()
     await user.click(within(mobileNav).getByRole('button', { name: 'More' }));
     const sheet = screen.getByRole('dialog', { name: 'More' });
 
-    // Only the dedicated portrait+name row reaches /characters — not a second, plain-text row
-    // (the ordinary sheet rows loop would otherwise also list it, named "Characters").
     const characterLinks = within(sheet)
       .getAllByRole('link')
       .filter((link) => link.getAttribute('href') === '/characters');

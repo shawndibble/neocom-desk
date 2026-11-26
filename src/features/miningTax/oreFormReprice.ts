@@ -1,14 +1,3 @@
-/**
- * Re-prices a character's Outstanding Assignments when the Ore Form setting
- * differs from the form they were priced under (decision 20261006-185915).
- * Paid, dismissed and needs-review ones are frozen on purpose: invoice
- * semantics, and the pilot already decided what to do with them.
- *
- * Run on every snapshot load after `reconcileAssignments`, so a flip made on
- * another device (the setting syncs) catches up here too. A record whose ore
- * has no price right now is left as it is and retried next load, never
- * overwritten with zero.
- */
 import { db, type MiningTaxAssignmentRecord } from '@/db';
 import { scheduleSync } from '@/sync';
 import { computeAssignmentValue } from '@/engine/miningTax/valuation';
@@ -20,7 +9,6 @@ import { putAssignments } from './storedAssignments';
 
 export async function repriceForOreForm(
   characterId: number,
-  /** What is paid, off the Payees' accounts: a paid day's bill stays as it was priced. */
   accounts: Pick<PayeeRunningAccounts, 'statusOf'>
 ): Promise<void> {
   const compressed = await readCompressedOre();
@@ -56,14 +44,9 @@ export async function repriceForOreForm(
         overrides
       );
       updates.push({ assignment, estimatedValue, taxOwed });
-    } catch {
-      // No prices reachable right now: keep the old value, retry next load.
-    }
+    } catch {}
   }
   if (updates.length === 0) return;
-  // Prices were awaited above, so each row is re-read and only written if it is
-  // still the Outstanding record we priced: a pay, a sync pull, a coalesce or a
-  // delete in between wins over this write.
   let wrote = false;
   await db.transaction('rw', db.miningTaxAssignments, db.settings, async () => {
     for (const { assignment, estimatedValue, taxOwed } of updates) {

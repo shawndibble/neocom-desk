@@ -5,16 +5,6 @@ import { askToCopyPrefill, type AskToCopyOffer } from '@/engine/communities/askT
 import { ComposeRequestDialog } from './ComposeRequestDialog';
 import { DialogFooter } from '@/components/ui/DialogFooter';
 
-/**
- * "Ask <name> to copy" from a Community Offer row of BPC Sourcing (issue
- * #3813): the Requests tab's own compose dialog, opened in place with one BPC
- * line of that blueprint (quantity 1, no runs/ME/TE ask). Posting is the
- * dialog's own: same callable and caps as the Requests tab; the holder is not
- * mailed, they see it on the board like everyone else. A Member who shares the blueprint in several
- * Communities picks which one it is posted to first; the Offer's one
- * Community goes straight to compose. The Request lands on that Community's
- * board; this page has no board to refresh.
- */
 export function AskToCopyDialog({
   characterId,
   offer,
@@ -77,13 +67,11 @@ export function AskToCopyDialog({
       communityId={chosen}
       prefill={askToCopyPrefill(offer, blueprintName)}
       onClose={onClose}
-      // no board on this page
       onPosted={() => undefined}
     />
   );
 }
 
-/** The small dialog the choice, the wait and the failure share. */
 function AskToCopyShell({
   holderName,
   onClose,

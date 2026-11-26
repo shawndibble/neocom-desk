@@ -11,7 +11,6 @@ import { IN_GAME_FITTING_DESCRIPTION_MAX } from './saveToEve';
 import { useFittingSkillGaps } from './useFittingSkillGaps';
 import { fixed1 } from '@/lib/fixedFormat';
 
-/** One resource meter: what is used of what the hull has, red-flagged past the limit. */
 function Meter({
   label,
   used,
@@ -25,7 +24,6 @@ function Meter({
 }) {
   const { t } = useTranslation();
   const over = used > total;
-  // A unitless meter (calibration) leaves no gap where the unit would go.
   const reading = (key: string) =>
     t(key, { used: formatCompactNumber(used), total: formatCompactNumber(total), unit: unit ?? '' })
       .replace(/\s+/g, ' ')
@@ -57,7 +55,6 @@ function Meter({
   );
 }
 
-/** CPU, powergrid, calibration and drone bandwidth: what the fit asks of the hull. */
 export function FitMeters({ stats }: { stats: FittingStats }) {
   const { t } = useTranslation();
   return (
@@ -106,7 +103,6 @@ function PreviewFacts({ items }: { items: { label: string; value: string }[] }) 
   );
 }
 
-/** Damage: the totals, the missile/turret and drone split, and every weapon with its ammo. */
 export function OffensePanel({
   stats,
   typeName,
@@ -180,7 +176,6 @@ export function OffensePanel({
   );
 }
 
-/** Resists per layer, EHP, and how the ship moves and sits on the capacitor. */
 export function DefensePanel({ stats }: { stats: FittingStats }) {
   const { t } = useTranslation();
   const rows: ResistRow[] = [
@@ -224,13 +219,11 @@ export function DefensePanel({ stats }: { stats: FittingStats }) {
   );
 }
 
-/** Said when some fitted type's skill requirements couldn't be loaded: not "can fly", not "nothing missing". */
 export function SkillsUnknownNote() {
   const { t } = useTranslation();
   return <p className="text-xs text-text-dim">{t('fittings.start.preview.skillsUnknown')}</p>;
 }
 
-/** Whether the Character can fly it, and what is missing with the time to train it. */
 export function SkillsPanel({
   fitting,
   characterId,
@@ -249,7 +242,6 @@ export function SkillsPanel({
     return <p className="text-xs text-text-dim">{t('fittings.start.preview.calculating')}</p>;
   }
   if (gaps.missing.length === 0) {
-    // "Nothing missing" only counts when every requirement was actually read.
     return gaps.unknown ? (
       <SkillsUnknownNote />
     ) : (
@@ -269,14 +261,8 @@ export function SkillsPanel({
   );
 }
 
-/**
- * A fitting's notes: editable for a saved one (kept when the field loses
- * focus), read-only for an In-game one's description.
- */
 export function NotesPanel({ text, onSave }: { text: string; onSave?: (text: string) => void }) {
   const { t } = useTranslation();
-  // `null` until the player types: what shows is then the saved text, so a
-  // synced change to the notes is never overwritten by a stale copy.
   const [draft, setDraft] = useState<string | null>(null);
   if (draft !== null && draft === text) setDraft(null);
   if (onSave === undefined) return <p className="text-sm whitespace-pre-wrap">{text}</p>;

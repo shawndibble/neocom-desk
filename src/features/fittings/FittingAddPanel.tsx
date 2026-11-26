@@ -51,33 +51,18 @@ interface FittingAddPanelProps {
   fitting: Fitting;
   catalogue: FittingCatalogue | null;
   target: AddTarget | null;
-  /** The engine, pilot and catalogue for fit checks; null while any of them loads. */
   context: FittingContext | null;
   onAdd: (typeId: number, rack: CandidateRack) => void;
-  /** Drops the chosen slot, so the browser shows every rack again. */
   onClearTarget?: () => void;
-  /** Index-parallel to `fitting.modules` — which charges each fitted module takes. */
   moduleResults?: FittingModuleResult[] | null;
-  /** The Charges tab: load a charge into every fitted module that takes it. */
   onLoadCharge?: (chargeTypeId: number) => void;
-  /** The Cargo tab: puts `quantity` of any item in the hold. */
   onAddCargo?: (typeId: number, quantity: number) => void;
-  /** Items drag onto the Ring's slots and the List's racks (pointer only — scope decision `20260924-205720`). */
   dragToRing?: boolean;
-  /** The hull takes drones (`showsDrones`) — else there is no Drones tab. */
   showDrones?: boolean;
-  /** How many more of a drone the bay holds; absent before the ship data. */
   droneRoomFor?: (typeId: number) => number;
-  /** Whether the rack has a slot a click would fill (a chosen slot counts); absent before the ship data. */
   slotFreeFor?: (rack: FittingSlotKind) => boolean;
-  /**
-   * Hover/focus a Modules row to preview the whole-Fitting change of adding
-   * it. Absent (no evaluator yet, or a touch device — nothing about the
-   * editor changes there) turns the preview off.
-   */
   preview?: {
     variants: VariantEvaluator | null;
-    /** The Fitting with the module added where a click would put it; null when a click adds nothing. */
     build: (fitting: Fitting, typeId: number, rack: CandidateRack) => Fitting | null;
   };
 }
@@ -91,11 +76,6 @@ const RACK_LABEL_KEY: Record<CandidateRack, string> = {
   drone: 'fittings.add.rack.drone',
 };
 
-/**
- * The icon and i18n keys for each toggle — CCP's own in-game art (scope
- * decision `20260927-104252`), copied from the EVE University wiki into
- * `public/images/fitting/` rather than linked.
- */
 const FIT_FILTERS: readonly {
   kind: FitFilterKind;
   icon: string;
@@ -122,10 +102,6 @@ const FIT_FILTERS: readonly {
   },
 ];
 
-/**
- * The in-game fitting window's rack icons, from the EVE University wiki.
- * Subsystems have none, so theirs stays a text chip.
- */
 const SLOT_ICONS: Partial<Record<FittingSlotKind, string>> = {
   high: '/images/fitting/slot-high.png',
   medium: '/images/fitting/slot-medium.png',
@@ -138,13 +114,10 @@ interface ItemRowProps {
   rack: CandidateRack;
   check: CandidateCheck | null;
   placeable: boolean;
-  /** Why this can't go on the ship, in plain words — a yellow triangle beside the row tells them. */
   problems: string[];
-  /** A click would add nothing (no bay room, no free slot): the row is greyed. */
   blocked: boolean;
   draggable: boolean;
   onAdd: (typeId: number, rack: CandidateRack) => void;
-  /** Hover or focus on the row sets it; leaving or blurring clears (null). */
   onPreview?: (typeId: number | null) => void;
 }
 
@@ -182,15 +155,12 @@ function ItemRow({
         onPreview ? (event) => (touched.current = event.pointerType === 'touch') : undefined
       }
       onKeyDown={onPreview ? () => (touched.current = false) : undefined}
-      // A tap focuses the row too, and touch gets no preview.
       onFocus={onPreview ? () => !touched.current && onPreview(entry.typeId) : undefined}
       onBlur={onPreview ? () => onPreview(null) : undefined}
       className={`flex items-center ${draggable ? 'cursor-grab active:cursor-grabbing' : ''}`}
     >
       <button
         type="button"
-        // aria-disabled, not disabled: adding into the last free slot greys the
-        // row while it holds focus, and a native disabled button drops it.
         aria-disabled={!placeable || blocked || undefined}
         onClick={() => {
           if (placeable && !blocked) onAdd(entry.typeId, rack);
@@ -230,15 +200,6 @@ function ItemRow({
   );
 }
 
-/**
- * The module browser (scope decision `20260924-215855`, mockup A): Modules,
- * Charges and Drones tabs; with a slot chosen, a banner naming it. Browsing
- * lists only the market groups holding something that fits the open ship —
- * every fittable item is checked against the hull once (`useHullFit`) — and
- * the chosen slot; a search lists matches straight. Items click to add, or
- * drag onto the Ring. The Charges tab loads a charge into every fitted
- * module that takes it.
- */
 export function FittingAddPanel({
   fitting,
   catalogue,
@@ -259,8 +220,6 @@ export function FittingAddPanel({
   const tabsId = useTabsId();
   const [query, setQuery] = useState('');
   const [fitsSlot, setFitsSlot] = useState(true);
-  // The three in-game icon toggles (hull, resources, skills) — all on by
-  // default, so the result list starts exactly as restrictive as before they existed.
   const [fitFilters, setFitFilters] = useState<ReadonlySet<FitFilterKind>>(
     () => new Set(FIT_FILTER_KINDS)
   );
@@ -274,7 +233,6 @@ export function FittingAddPanel({
   const [metaGroupId, setMetaGroupId] = useState<number | null>(null);
   const [toggled, setToggled] = useState<ReadonlySet<number>>(new Set());
 
-  // The tab follows the target (a drone target opens Drones), until the pilot picks one.
   const targetTab: BrowserTab =
     target?.kind === 'drone' ? 'drones' : target?.kind === 'cargo' ? 'cargo' : 'modules';
   const [pickedTab, setPickedTab] = useState<BrowserTab>(targetTab);
@@ -319,16 +277,12 @@ export function FittingAddPanel({
         className={`${inlineLinkClassName} min-h-9 text-left text-xs`}
         onClick={() => {
           setFitFilters(relaxed);
-          // This button goes away with the filters it lifts; focus follows to the search.
           searchRef.current?.focus();
         }}
       >
         {t('fittings.add.hiddenByFilters', { count: hiddenByFilters })}
       </button>
     ) : null;
-  // The market roots ("Ship Equipment", …) are a click nobody needs: the
-  // browser starts at their categories, as the game's does. A few categories
-  // (a chosen slot narrows it this far) start open; a click flips any node.
   const top = tree
     .flatMap((node) =>
       node.items.length === 0 && node.children.length > 0 ? node.children : [node]
@@ -377,8 +331,6 @@ export function FittingAddPanel({
   function row(entry: CandidateEntry) {
     const rack = catalogue!.rackOf[String(entry.typeId)];
     const check = hullFit?.get(entry.typeId) ?? null;
-    // The Hull filter can be off, so a row the hull refuses outright can be
-    // on screen — it stays visible (asked for, in that case) but never addable.
     const fitsHull = check?.fitsHull !== false;
     const noRoom =
       rack === 'drone'
@@ -400,8 +352,6 @@ export function FittingAddPanel({
         entry={entry}
         rack={rack}
         check={check}
-        // Not gated on a free slot: a full rack's item still drags into the cargo
-        // (or onto a slot, replacing it); a click with no room adds nothing.
         placeable={fitsHull && context !== null}
         problems={problems}
         blocked={noRoom}

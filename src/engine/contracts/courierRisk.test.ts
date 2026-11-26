@@ -25,7 +25,6 @@ function station(overrides: Partial<CourierEndpoint> = {}): CourierEndpoint {
   };
 }
 
-/** Not in `stations.json`, which holds every NPC station — so a player structure by elimination. */
 const STRUCTURE: CourierEndpoint = {
   locationId: 1035466617946,
   name: null,
@@ -38,7 +37,6 @@ const STRUCTURE: CourierEndpoint = {
   hasStargates: null,
 };
 
-/** The snapshot could not be read at all. Opposite conclusion, same missing fields. */
 const UNREADABLE: CourierEndpoint = { ...STRUCTURE, resolution: 'unknown' };
 
 function haul(origin: CourierEndpoint, destination: CourierEndpoint): CourierRouteRow {
@@ -76,21 +74,14 @@ describe('courierRisks', () => {
   });
 
   it('flags a delivery to a player structure', () => {
-    // Docking there needs access the issuer controls and nothing local can
-    // check. The collateral is what is at stake if the hauler cannot dock.
     expect(kinds(station(), STRUCTURE)).toContain('player-structure');
   });
 
   it('does not flag a player structure the haul is picked up from', () => {
-    // A pickup that cannot be reached simply is not accepted; it is the
-    // *delivery* that is paid for with collateral already put up.
     expect(kinds(STRUCTURE, station())).not.toContain('player-structure');
   });
 
   it('never calls an unreadable snapshot a player structure', () => {
-    // "We could not read our own station table" is not "this is a player
-    // structure" — and getting that backwards would flag every haul on the
-    // board as a scam risk the first time the snapshot fails to load.
     expect(kinds(station(), UNREADABLE)).toEqual([]);
   });
 
@@ -101,14 +92,11 @@ describe('courierRisks', () => {
   });
 
   it('flags a haul posted in wormhole space even when nothing places its ends', () => {
-    // A J-space pickup is a player structure, so the endpoint carries no
-    // system and no band. The contract's own region still says where it is.
     const wormholeSide: CourierEndpoint = { ...STRUCTURE, regionId: 11000031 };
     expect(kinds(wormholeSide, station())).toContain('no-gate-route');
   });
 
   it('says nothing about gate routes when the endpoint is simply unplaced', () => {
-    // Unplaced is not unreachable: a structure in Jita is perfectly reachable.
     expect(kinds(station(), STRUCTURE)).not.toContain('no-gate-route');
   });
 
@@ -119,11 +107,6 @@ describe('courierRisks', () => {
   });
 
   it('does not add a sovereignty note to a place no gate reaches', () => {
-    // Thera is wormhole space with four NPC stations and no stargates, and
-    // `classifySpace` bands wormhole space by the `J######` name — so Thera
-    // falls through to its raw security and reads nullsec. Printing both would
-    // tell the hauler the trip depends on sovereignty, standings or a jump
-    // network, none of which is true of anywhere a gate cannot reach.
     const thera = station({
       locationId: 60015148,
       systemName: 'Thera',
@@ -152,8 +135,6 @@ describe('blocksCompletion', () => {
   });
 
   it('leaves nullsec alone, which is ordinary well-paid work', () => {
-    // Hiding legitimate nullsec hauls behind a safety control would quietly
-    // remove a real market rather than protect anyone.
     expect(blocksCompletion(['nullsec'])).toBe(false);
     expect(blocksCompletion([])).toBe(false);
   });
@@ -178,8 +159,6 @@ describe('completableCourierRoutes', () => {
   });
 
   it('keeps a haul whose snapshot simply could not be read', () => {
-    // Excluding it would turn one failed file read into a board that hides
-    // most of its rows and never says why.
     const unreadable = { ...haul(station(), UNREADABLE), contractId: 5 };
     expect(completableCourierRoutes([unreadable]).map((r) => r.contractId)).toEqual([5]);
   });
@@ -187,8 +166,6 @@ describe('completableCourierRoutes', () => {
 
 describe('asksFarMoreCollateralThanReward', () => {
   it('fires from fifty times the reward in collateral, not below it', () => {
-    // Issue #1720: the threshold is set well clear of ordinary high-value
-    // freight — a 1B load paying 25M is 40x, and is honest work.
     expect(HIGH_COLLATERAL_RATIO).toBe(50);
     expect(asksFarMoreCollateralThanReward(49.9)).toBe(false);
     expect(asksFarMoreCollateralThanReward(50)).toBe(true);
@@ -202,7 +179,6 @@ describe('asksFarMoreCollateralThanReward', () => {
   });
 
   it('says nothing about a haul whose ratio cannot be stated', () => {
-    // A haul paying nothing has no ratio — unknowable, not infinite.
     expect(asksFarMoreCollateralThanReward(null)).toBe(false);
   });
 

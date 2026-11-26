@@ -90,7 +90,6 @@ describe('useFittingEvaluation', () => {
     await waitFor(() => expect(result.current.variants).not.toBeNull());
 
     await result.current.variants!.compare(addModule(RIFTER, 'medium', 0, 438));
-    // Main stats, the variant's baseline, and the variant itself.
     expect(calls()).toHaveLength(3);
     for (const [, pilot] of calls()) {
       expect(pilot.implantTypeIds).toEqual([19540]);
@@ -108,7 +107,6 @@ describe('useFittingEvaluation', () => {
   it('waits for the stored Damage Profile, then measures every evaluation against it', async () => {
     damage.hydrated = false;
     const { result, rerender } = render({ fitting: RIFTER });
-    // Mounted, so the effect that would start a calculation has run and returned early.
     expect(engine.computeFittingStats).not.toHaveBeenCalled();
     expect(result.current.variants).toBeNull();
 
@@ -118,7 +116,6 @@ describe('useFittingEvaluation', () => {
     await result.current.variants!.compare(addModule(RIFTER, 'medium', 0, 438));
 
     expect(calls().map((call) => call[3])).toEqual([GURISTAS, GURISTAS, GURISTAS]);
-    // Variations compare without overheat; the main stats keep it.
     expect(calls().map((call) => call[4]?.overheated)).toEqual([undefined, false, false]);
   });
 
@@ -126,7 +123,6 @@ describe('useFittingEvaluation', () => {
     const { result, rerender } = render({ fitting: RIFTER, implantBasis: 'fitting' });
     await waitFor(() => expect(result.current.variants).not.toBeNull());
     const variants = result.current.variants!;
-    // A re-render (another module's Variations opened) keeps the same evaluator.
     rerender({ fitting: RIFTER, implantBasis: 'fitting' });
     expect(result.current.variants).toBe(variants);
 
@@ -144,9 +140,7 @@ describe('useFittingEvaluation', () => {
     await waitFor(() => expect(result.current.stats).not.toBeNull());
     await result.current.variants!.compare(addModule(RIFTER, 'medium', 0, 438));
     await evaluateFitting(SLASHER, CLONE, GURISTAS, { weatherTypeId: 47390, overheatAll: false });
-    // Main stats, the variant's baseline, the variant, and another Fitting.
     expect(calls().map((call) => call[4]?.weatherTypeId)).toEqual([47390, 47390, 47390, 47390]);
-    // The stats say which weather they were worked out in, so a heading can't name another.
     expect(result.current.statsWeatherTypeId).toBe(47390);
 
     engine.computeFittingStats.mockClear();
@@ -173,7 +167,6 @@ describe('useFittingEvaluation', () => {
       [[3300, 4]],
       [[3300, 4]],
     ]);
-    // The fit checks still run on the Character's real skills.
     expect(result.current.variants!.profile.skillLevels).not.toEqual(new Map([[3300, 4]]));
     useSkillOverrides.setState({ skills: { base: 'character', levels: {} } });
   });
@@ -219,7 +212,6 @@ describe('useFittingEvaluation', () => {
     );
     const edited = addModule(RIFTER, 'medium', 0, 438);
     rerender({ fitting: edited, implantBasis: 'fitting' });
-    // The bars keep the old numbers; what belongs to this exact Fitting waits.
     expect(result.current.stats).toEqual(statsFor(RIFTER));
     expect(result.current.currentStats).toBeNull();
     expect(result.current.price).not.toBeNull();

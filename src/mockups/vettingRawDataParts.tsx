@@ -30,7 +30,6 @@ import {
 import { NewComponent } from './NewComponent';
 import { PILOTS, ROWS, SOURCE_IDS, SOURCE_LABEL, type SourceId } from './vettingRawDataFixtures';
 
-/** Mockup links go nowhere: keep the page where it is. */
 const stay = (e: { preventDefault: () => void }) => e.preventDefault();
 
 interface SourceLine {
@@ -43,10 +42,6 @@ const LINES: SourceLine[] = SOURCE_IDS.map((id) => ({
   rows: ROWS[id].length,
 }));
 
-/**
- * The report's "Data we read": one row per source with how many rows were read. A row opens that source's browser (row click and accent name, DESIGN
- * section 6c: no separate Open button).
- */
 export function DataWeReadPanel() {
   const columns: DataTableColumn<SourceLine>[] = [
     {
@@ -94,7 +89,6 @@ export function DataWeReadPanel() {
   );
 }
 
-/** Under the flag list: each flag's rows in the data, one link per flag. In the build this is a link inside each flag's own disclosure. */
 export function FlagDataLinks() {
   return (
     <NewComponent name="FlagDataLinks">
@@ -121,7 +115,6 @@ export function FlagDataLinks() {
   );
 }
 
-/** Loads the flagged review from the in-memory fixture: the real flags, characters and decision rail. */
 function useFlaggedReview(): VettingReview | null {
   const [review, setReview] = useState<VettingReview | null>(null);
   useEffect(() => {
@@ -132,7 +125,6 @@ function useFlaggedReview(): VettingReview | null {
   return review;
 }
 
-/** The report page with the new section, the real flags and rail around it. */
 export function ProposedReport({ children }: { children?: ReactNode }) {
   const review = useFlaggedReview();
   if (review === null || review.assessment === null)
@@ -197,10 +189,6 @@ const READS: { name: string; note?: string }[] = [
   { name: 'Skills', note: 'Every trained skill' },
 ];
 
-/**
- * The member's "What you share" with the new truth in it: the rows are kept after Send, how long,
- * and who can open them. Same two-column shape as today's `VettingConsentTerms`.
- */
 export function ProposedConsentTerms() {
   return (
     <NewComponent name="ConsentTermsKept">
@@ -258,7 +246,6 @@ export function ProposedConsentTerms() {
   );
 }
 
-/** The member's /vetting consent step with Share and Decline under the terms. */
 export function ProposedMemberConsent() {
   return (
     <div className="mx-auto max-w-page space-y-4 px-4 py-4">

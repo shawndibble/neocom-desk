@@ -1,21 +1,5 @@
 import { idSetKey } from '@/lib/idSetKey';
 import { useKeyedLoad } from '@/lib/useAsyncLoad';
-/**
- * Bigger chains (Plan) and what-if chains (Plan, the Map), priced off the main
- * render. Mounted only while the pilot hauls between planets, so nothing here
- * runs (no route counting, no solver) for anyone else.
- *
- * Each candidate runs the Goal Planner's solver a few dozen times, so they
- * are worked through one layout at a time between frames (`runSliced`, as
- * `useChainEstimates` does), and kept for the last set of assumptions: leaving
- * Plan and coming back does not price them again.
- *
- * `useWhatIfChains` prices the same chains with planet types added, for what
- * is asked for: a type alone (Plan: every type the pilot does not run, one at
- * a time) or a set of types added together (the Map: every ticked what-if
- * planet). Cached by inputs and `whatIfKey`: a tab with the same inputs as the
- * other reuses its figures.
- */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { JumpsFn, PlannerColony, PlanetType } from '@/engine/pi/goalTypes';
 import type { PiData } from '@/sde/types';
@@ -36,16 +20,12 @@ import type { PlanAdvice } from './planAdviceModel';
 import { runSliced } from './runSliced';
 
 export interface BiggerChainsEstimateState {
-  /** Every candidate priced so far, by typeId. */
   estimates: ReadonlyMap<number, BiggerChainEstimates>;
-  /** P3s and P4s the pilot's planet types can make. */
   candidateCount: number;
-  /** Still pricing (or still counting jumps). */
   pending: boolean;
 }
 
 let cached: { key: string; results: Map<number, BiggerChainEstimates> } | null = null;
-/** What-if chains by `whatIfKey` of the types added, per set of inputs: Plan's and the Map's may differ. */
 const whatIfCache = new Map<string, Map<string, Map<number, BiggerChainEstimates>>>();
 const WHAT_IF_CACHE_SIZE = 4;
 
@@ -60,17 +40,14 @@ function whatIfResultsFor(key: string): Map<string, Map<number, BiggerChainEstim
   }
   return byType;
 }
-/** The last jump count, so coming back to Plan neither recounts nor waits. */
 let cachedPairs: { key: string; byPair: Map<string, number | null> } | null = null;
 
-/** Test seam: forget every priced chain and counted jump. */
 export function resetBiggerChains(): void {
   cached = null;
   whatIfCache.clear();
   cachedPairs = null;
 }
 
-/** The solver reads these fields; `ratePerEcu` is a Map, so it is spelled out. */
 export function coloniesKey(colonies: readonly PlannerColony[]): string {
   return JSON.stringify(
     colonies.map((c) => [
@@ -88,11 +65,6 @@ export function coloniesKey(colonies: readonly PlannerColony[]): string {
   );
 }
 
-/**
- * Jumps between the pilot's colony systems under the Route Safety basis, as
- * the Goal Planner counts them. `undefined` while counting; a function once
- * known (a pair with no route answers null, never zero).
- */
 function useColonyJumps(
   systemOf: ReadonlyMap<number, number>,
   enabled: boolean
@@ -103,7 +75,6 @@ function useColonyJumps(
   const basis = useSharedJumpBasis();
   const systemKey = idSetKey(systemOf.values());
   const wanted = `${basis.key}|${systemKey}`;
-  // Another hook on the page may have counted them already: read that, don't recount.
   const counted = cachedPairs?.key === wanted;
   const count = useCallback(async () => {
     const ids = systemKey === '' ? [] : systemKey.split(',').map(Number);
@@ -140,15 +111,12 @@ function useColonyJumps(
 
 export interface ChainInputs {
   colonies: readonly PlannerColony[];
-  /** The pilot's planet types, sorted. */
   types: PlanetType[];
   free: number;
   jumps: JumpsFn | undefined;
-  /** The colonies, the assumptions, the jumps, the types and the free slots; null while counting jumps, or off. */
   key: string | null;
 }
 
-/** What both hooks price from, keyed once per input. Nothing is counted or keyed while `enabled` is off. */
 export function useChainInputs(
   advice: PlanAdvice,
   pi: PiData | null,
@@ -165,7 +133,6 @@ export function useChainInputs(
     [colonies]
   );
   const free = advice.slots.free;
-  // Both keys stringify price books and colonies: once per input, not once per slice's re-render.
   const basisKey = useMemo(
     () => (enabled && pi ? chainBasisKey(advice.chainBasis, pi) : null),
     [enabled, advice.chainBasis, pi]
@@ -187,10 +154,8 @@ export function useBiggerChains(advice: PlanAdvice, pi: PiData): BiggerChainsEst
     if (key === null) return;
     if (cached?.key !== key) cached = { key, results: new Map() };
     const results = cached.results;
-    // One unit is one layout of one product: the solver on real colonies can take a while.
     const todo = candidates
       .filter((typeId) => !results.has(typeId))
-      // The cheap layout first, so a run cut short drops at most one solver result.
       .flatMap((typeId) => [
         { typeId, layout: 'new' as const },
         { typeId, layout: 'colonies' as const },
@@ -212,7 +177,6 @@ export function useBiggerChains(advice: PlanAdvice, pi: PiData): BiggerChainsEst
       },
       () => setVersion((v) => v + 1)
     );
-    // `key` stands for the inputs.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
 
@@ -234,30 +198,19 @@ export function useBiggerChains(advice: PlanAdvice, pi: PiData): BiggerChainsEst
 }
 
 export interface WhatIfChainsState {
-  /** Each asked-for type or set priced so far, by `whatIfKey`: its chains by typeId (empty when it makes none possible). */
   byType: ReadonlyMap<string, ReadonlyMap<number, BiggerChainEstimates>>;
-  /** Something asked for is still being priced (or jumps are still being counted). */
   pending: boolean;
 }
 
-/** Nothing asked for, nothing priced. */
 export const NO_WHAT_IF_CHAINS: WhatIfChainsState = { byType: new Map(), pending: false };
 
 type WhatIfUnit =
   { key: string; typeId: number; layout: 'new' | 'colonies' } | { key: string; layout: 'done' };
 
-/** A planet type priced alone, or a set of them priced as one planet each, together. */
 export type WhatIfAsk = PlanetType | readonly PlanetType[];
 
 export const NO_TYPES: readonly PlanetType[] = [];
 
-/**
- * The Bigger chains each of `wanted` would make possible: a planet type alone,
- * or a set of types added together (one new planet of each). Nothing runs (no
- * route counting, no solver) while `wanted` is empty, so a caller turns it off
- * by asking for nothing. An ask lands whole, never one chain at a time, so its
- * line does not grow while it is priced.
- */
 export function useWhatIfChains(
   advice: PlanAdvice,
   pi: PiData | null,
@@ -290,12 +243,10 @@ export function useWhatIfChains(
         partial.set(unit.key, chains);
         if (unit.layout === 'done') {
           byType.set(unit.key, chains);
-          // Another set of inputs may have evicted this one mid-run: put it back.
           if (whatIfCache.get(key) !== byType) whatIfCache.set(key, byType);
           return true;
         }
         const entry = chains.get(unit.typeId) ?? { colonies: null, newPlanets: null };
-        // Sorted, so each added planet keeps the id `whatIfPlanetId` gives it.
         const added = whatIfTypesOf(unit.key);
         if (unit.layout === 'new') {
           entry.newPlanets = estimateOnNewPlanetsWith(
@@ -324,7 +275,6 @@ export function useWhatIfChains(
         if (landed) setVersion((v) => v + 1);
       }
     );
-    // `key` stands for the inputs, `wantedKey` for what is asked for.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, wantedKey]);
 

@@ -1,9 +1,3 @@
-/**
- * The prices behind Contracts › Item search's Below market view (#3989): the
- * default Trade Hub's price, on the chosen side of the book, for every market
- * line of a candidate contract, and the abyssal lookup. The valuation itself is
- * the pure `engine/contracts/belowMarket.ts`.
- */
 import { useEffect, useMemo, useState } from 'react';
 import {
   belowMarketContracts,
@@ -22,11 +16,9 @@ import { getHubPricesWithStatus } from '@/market/prices';
 interface BelowMarketPricingRead {
   pricing: BelowMarketPricing;
   hub: TradeHub;
-  /** Fuzzwork did not answer for some types: those lines count as no market. */
   unreachable: boolean;
 }
 
-/** Which side of the hub book values the market part; sell orders is what a pilot makes listing the loot. */
 export const DEFAULT_BELOW_MARKET_SIDE: PriceSide = 'sell';
 
 export const useBelowMarketSide = createLocalSetting<PriceSide>({
@@ -48,7 +40,6 @@ async function loadBelowMarketPricing(
   for (const [typeId, aggregate] of books) {
     prices.set(typeId, side === 'buy' ? aggregate.buyMax : aggregate.sellMin);
   }
-  // No hub lists PLEX; the slide-over prices it from its own market, on the sell side only.
   if (side === 'sell' && plexPrice !== null) prices.set(PLEX_TYPE_ID, plexPrice);
   return { pricing: { prices, plexPrice, isAbyssalType }, hub, unreachable };
 }
@@ -61,10 +52,8 @@ export type BelowMarketState =
       status: 'ready';
       contracts: readonly BelowMarketContract[];
       hub: TradeHub;
-      /** The side of the book `contracts` are valued on. */
       side: PriceSide;
       unreachable: boolean;
-      /** False while a re-price of newer rows is still running behind these contracts. */
       current: boolean;
     };
 
@@ -80,12 +69,6 @@ interface PricedRows {
   result: BelowMarketPricingRead;
 }
 
-/**
- * The Below market contracts of `rows`, which must be the whole snapshot.
- * Re-priced whenever the rows, the PLEX price, the side or the Contracts hub
- * (`useHubFor('contracts')`, the hub its detail panel prices at) change; the last answer stays
- * on screen until the next lands, and through a failed re-price.
- */
 export function useBelowMarket(
   rows: readonly PublicContractOfferRow[],
   enabled: boolean,
@@ -113,7 +96,6 @@ export function useBelowMarket(
     };
   }, [enabled, rows, plexPrice, side, hub, hubHydrated]);
 
-  // Keyed on the read alone: newer rows arriving must not re-run the valuation over the old ones.
   const contracts = useMemo(
     () =>
       read !== null && read !== 'failed'
@@ -131,7 +113,6 @@ export function useBelowMarket(
 
   return useMemo<BelowMarketState>(() => {
     if (!enabled) return IDLE;
-    // Enabled with no rows: the snapshot read came back empty-handed.
     if (rows.length === 0 || read === 'failed') return FAILED;
     if (read === null || contracts === null) return PRICING;
     return {

@@ -1,14 +1,3 @@
-// mutaplasmids.json from CCP's `dynamicItemAttributes.jsonl` (no Fuzzwork table
-// has it): result type, bases, and per-attribute `min`/`max` multipliers on the
-// base's value. `highIsGood` is resolved here (row override, else the
-// attribute's) so the app never needs the dogma table; `attributeNames` gives
-// the internal names Pyfa's EFT blocks use.
-
-/**
- * @param {Array<{_key: number, attributeIDs: Array<{_key: number, min: number, max: number, highIsGood?: boolean}>, inputOutputMapping: Array<{applicableTypes: number[], resultingType: number}>}>} rows
- *   parsed `dynamicItemAttributes.jsonl` records
- * @param {Map<number, {name: string, highIsGood: boolean}>} attributes dogma attribute id -> internal name and direction
- */
 export function bakeMutaplasmids(rows, attributes) {
   const mutaplasmids = {};
   const attributeNames = {};
@@ -45,11 +34,6 @@ export function bakeMutaplasmids(rows, attributes) {
   };
 }
 
-/**
- * Dogma attribute id -> `{name, highIsGood}` from CCP's `dogmaAttributes.jsonl`
- * records — the second input `bakeMutaplasmids` takes. `name` is the internal
- * one (`capacitorNeed`), not the display name.
- */
 export function dogmaAttributeInfo(records) {
   return new Map(
     records.map((r) => [r._key, { name: r.name, highIsGood: r.highIsGood !== false }])

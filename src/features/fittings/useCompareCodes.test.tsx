@@ -16,8 +16,6 @@ function useCodesAndNavigate() {
 }
 
 describe('useCompareCodes', () => {
-  // The router commits a location change inside a transition, so a second add can run before the
-  // first one has rendered — it must still build on it rather than on the codes last rendered.
   it('an updater builds on a write that has not rendered yet', () => {
     const { result } = renderHook(() => useCompareCodes(), {
       wrapper: wrapperAt('/compare'),

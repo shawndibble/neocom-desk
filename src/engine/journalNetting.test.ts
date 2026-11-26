@@ -5,7 +5,7 @@ import { classifyJournal, journalCoverage, type OwnedJournalEntry } from './jour
 
 const A = 1001;
 const B = 1002;
-const C = 1003; // tracked, but its journal is missing
+const C = 1003;
 const CORP = 98000001;
 const STRANGER = 2112345678;
 

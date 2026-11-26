@@ -12,11 +12,9 @@ import { fixtureView, nameOf } from './ownerViewFixtures';
 
 const Router = ({ children }: { children: ReactNode }) => <MemoryRouter>{children}</MemoryRouter>;
 const JITA = 30000142;
-/** Resolved names: the miners, the moon owner corporation (98) and one system. */
 const resolved = (id: number) =>
   id === 98 ? 'Ashfall Mining Collective' : id === JITA ? 'Jita' : nameOf(id);
 
-/** Refinery 10 carries a label, 11 only its system, 12 nothing at all. */
 function chainView(): FeederView {
   const base = fixtureView();
   return {
@@ -92,7 +90,6 @@ describe("moon owner's own page: refinery labels (#4640)", () => {
       expect(screen.getByRole('alert')).toHaveTextContent('This connection has already ended.')
     );
     expect(screen.queryByText('This moon owner has left')).toBeNull();
-    // The field reopens with what was typed.
     expect(screen.getByRole('textbox', { name: 'Refinery label' })).toHaveValue('X');
   });
 

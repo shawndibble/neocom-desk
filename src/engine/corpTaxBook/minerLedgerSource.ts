@@ -1,8 +1,3 @@
-/**
- * A Corp Tax Book Miner's account as the one Payee ledger reads it (decision 20261120-235011,
- * "A Payee ledger"): the officer's Miner page and a pilot's own ledger list the same rows from
- * the same Running account. Pure: names come from the caller.
- */
 import { adjustmentLineKey } from '../../../functions/src/corpTaxBookLateNotice';
 import type {
   LedgerCharge,
@@ -19,32 +14,22 @@ import { addLines } from '../miningTax/oreLines';
 import { utcDayOf } from '../localDay';
 
 export interface MinerLedgerNames {
-  /** A Character's name; absent when unknown. */
   character: (characterId: number) => string | undefined;
-  /** Where a mined line was: its moon, else its refinery; absent when unknown. */
   place?: (line: BillableLine) => string | undefined;
-  /** Where a payment sits in the corp wallet, by its id; absent for one recorded by hand. */
   walletHref?: (paymentId: string) => string | undefined;
 }
 
-/** What the book records beside a Miner's account; both lists hold every Miner's. */
 export interface MinerLedgerBook {
   adjustments?: readonly Adjustment[];
   writeOffs?: readonly RecordedWriteOff[];
 }
 
-/**
- * A Miner's days the book has not billed yet, as ledger charges: each open row the member's overlay
- * shows (an estimate, or the part of one credit already paid), so today's mining is listed. Named
- * by its refinery, else by `systemName`.
- */
 export function openDayCharges(
   rows: readonly BookRowView[],
   corporationId: number,
   minerId: string,
   systemName: (solarSystemId: number) => string | undefined
 ): LedgerCharge[] {
-  // A day credit paid part of is split in two rows; the ledger lists it as the one day it is.
   const byId = new Map<string, LedgerCharge>();
   for (const view of rows) {
     if (!view.open || view.corporationId !== corporationId || view.minerId !== minerId) continue;
@@ -94,7 +79,6 @@ export function minerLedgerSource(
         ore: l.oreLines,
       };
     });
-  // The account bills the corrections in `lines`; one an officer undid stays, struck through.
   const corrections = (book.adjustments ?? [])
     .filter(
       (a) =>
@@ -124,7 +108,6 @@ export function minerLedgerSource(
       ...(p.notTaxAmount ? { notTax: p.notTaxAmount } : {}),
     };
   });
-  // A write-off on or before the checkpoint is in its balance already: it forgives no later day.
   const writeOffs = (book.writeOffs ?? [])
     .filter((w) => w.minerId === minerId && (!cp || utcDayOf(w.at) > cp.through))
     .map((w): LedgerWriteOff => ({

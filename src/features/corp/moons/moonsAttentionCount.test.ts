@@ -1,5 +1,3 @@
-// The Moons nav dot's background recount (#6208) must not load market prices on every
-// 30-minute poll: it reuses the prices this session already holds for the book.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { BookRead } from '../taxBook/bookRead';
 
@@ -89,7 +87,6 @@ describe('loadNeedsYouCount', () => {
   });
 
   it('loads again when the held prices skip a day the book mined, or were loaded on another day', async () => {
-    // The Moons page's windowed load prices only days from its `from`.
     await loadBookPrices(book(), '2026-11-05');
     await loadNeedsYouCount(7, 98000001);
     expect(loadDatedUnitPricesByHub).toHaveBeenCalledTimes(2);

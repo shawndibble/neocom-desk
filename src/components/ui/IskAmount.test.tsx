@@ -8,7 +8,6 @@ import { RowTappableContext } from './tooltipHold';
 
 const EXACT = '1,284,500,000.00 ISK';
 
-/** The focusable trigger — the shorthand on screen, the exact figure in hidden text inside it. */
 function trigger(exact = EXACT) {
   return screen.getByText(exact, { selector: '.sr-only' }).parentElement as HTMLElement;
 }

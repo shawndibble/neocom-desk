@@ -22,11 +22,6 @@ const INSTRUCTION_KEYS = {
   'android-firefox': 'pwa.installAndroidFirefoxCta',
 } as const satisfies Record<Exclude<InstallPromptVariant, 'none' | 'native'>, string>;
 
-/**
- * Counts pathname changes (tabs are pathnames) up to the threshold. The
- * landing page is not a visit; a `replace` is a redirect (bare page path →
- * default tab), so one tap that redirects counts once.
- */
 function useCountPageVisits() {
   const { pathname } = useLocation();
   const navigationType = useNavigationType();
@@ -34,7 +29,6 @@ function useCountPageVisits() {
   const hydrated = useHydratedStore(useInstallPromptPageVisits);
   const lastPathname = useRef(pathname);
 
-  // Ref untouched until hydrated, so a move during the first read still counts.
   useEffect(() => {
     if (!hydrated || pathname === lastPathname.current) return;
     lastPathname.current = pathname;
@@ -45,18 +39,6 @@ function useCountPageVisits() {
   return { pageVisits: value, hydrated };
 }
 
-/**
- * One-time, phones-and-tablets-only install CTA: uses the native
- * `beforeinstallprompt` event where Android Chromium fires it, otherwise
- * shows instructions for this browser's own menu on iOS and Firefox for
- * Android, which never fire the event. Shown once ever per device —
- * accepting or dismissing either variant permanently suppresses it
- * (GLOSSARY.md "Install Prompt"; decision 20261002-165619).
- *
- * Mounted in `Layout`: never on `/login`, `/callback` or public share pages,
- * and only after a few page visits. The native event usually fires before
- * `Layout` mounts, hence the boot-time `useInstallApp` store.
- */
 export function InstallPrompt() {
   const { t } = useTranslation();
   const { value: seen, setValue } = useInstallPromptSeen();
@@ -76,12 +58,7 @@ export function InstallPrompt() {
         })
       : 'none';
 
-  // Eligibility above is unchanged; this only decides whether the shared
-  // bottom slot is this banner's to use right now (issue #1124).
   const hasSlot = useOnboardingBannerSlot('install', variant !== 'none');
-  // Both, not just the slot: registration happens in an effect, so the store
-  // still says "eligible" for the one commit after a dismissal flips
-  // `variant` back to 'none'.
   const shown = variant !== 'none' && hasSlot;
   useStickyClearance(bannerRef, 'onboarding-banner', { enabled: shown });
   if (!shown) return null;

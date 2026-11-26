@@ -1,14 +1,3 @@
-/**
- * Names for a pushed EVE notification, resolved inside the service worker
- * (ADR 0020). The app's own lookup (`eveNotificationNames.ts`) reads Dexie and
- * goes through the authenticated ESI client; the worker has neither the tokens
- * nor any reason to carry that code. This is the public half only: one
- * `POST /universe/names` for the ids the body would name, raced against the
- * same `RESOLUTION_BUDGET_MS` the app uses. A structure's name needs a
- * character token, so it is left out and the renderer says `structure #<id>`.
- *
- * Never rejects. Anything missing falls back to an id or a neutral phrase.
- */
 import { parseEveNotificationPayload } from '@/engine/eveNotificationPayload';
 import type { EveNotificationFire } from '@/engine/notificationDiffs';
 import { COMPATIBILITY_DATE } from '@/esi/compatibilityDate';
@@ -51,11 +40,6 @@ export async function resolvePushNames(
   }
 }
 
-/**
- * Public names for ids a server-pushed event names (issue #5121: a lost
- * hull and its system), one `POST /universe/names`, within the budget. Never
- * rejects; an id it could not name is simply absent.
- */
 export async function resolvePublicNames(
   ids: readonly number[],
   fetchImpl: typeof fetch = fetch

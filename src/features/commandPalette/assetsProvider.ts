@@ -1,13 +1,3 @@
-/**
- * The Command Palette's Assets group: every item the pilot's Characters own,
- * one row per type, searchable by name. Selecting one opens the Assets page
- * already searching for it.
- *
- * Cache-only end to end, like the Contacts group — the asset lists are the
- * ones the Assets page (and Build Plan stock detection) already cached, and
- * names come from the SDE snapshot and the name cache. Opening the palette
- * never costs a request, and never trips the re-auth banner for an alt.
- */
 import { db } from '@/db';
 import { characterIdsWithScopes } from '@/app/characterIdsWithScopes';
 import { readCachedRows } from '@/esi/cache';
@@ -27,9 +17,7 @@ export interface PaletteAssetHolder {
 export interface PaletteAsset {
   readonly typeId: number;
   readonly name: string;
-  /** Summed across every holder. */
   readonly quantity: number;
-  /** Every Character holding some, in the order the Characters were added. */
   readonly holders: readonly PaletteAssetHolder[];
 }
 
@@ -39,10 +27,6 @@ export interface CharacterAssetList {
   readonly assets: readonly CharacterAsset[];
 }
 
-/**
- * Pure. Every Character's stacks, merged into one row per type. A type with
- * no known name cannot be searched for, so it is dropped.
- */
 export function buildPaletteAssets(
   lists: readonly CharacterAssetList[],
   names: ReadonlyMap<number, string>
@@ -72,10 +56,6 @@ export function buildPaletteAssets(
   });
 }
 
-/**
- * The Assets page searching for `name` — across every Character unless the
- * active one is the only holder, so an alt-only item never opens an empty search.
- */
 export function assetsHref(
   name: string,
   holderIds: readonly number[],
@@ -88,11 +68,6 @@ export function assetsHref(
 
 const ASSETS_SCOPES = requiredScopesForEndpoints(['getCharacterAssets']);
 
-/**
- * The cached assets of every Character whose grant covers them. No request,
- * even for a lapsed list — a Character without the scope contributes nothing,
- * so with no grant anywhere the group never shows.
- */
 export async function loadPaletteAssets(): Promise<PaletteAsset[]> {
   const [characters, grantedIds] = await Promise.all([
     db.characters.toArray(),
@@ -117,11 +92,9 @@ export async function loadPaletteAssets(): Promise<PaletteAsset[]> {
 
 export interface PaletteAssetsScope {
   readonly total: number;
-  /** Characters the group cannot read: no grant, or nothing cached yet. */
   readonly missing: readonly string[];
 }
 
-/** Cache-only, like `loadPaletteAssets`. Who the Assets group leaves out. */
 export async function loadPaletteAssetsScope(): Promise<PaletteAssetsScope> {
   const [characters, grantedIds] = await Promise.all([
     db.characters.toArray(),
@@ -147,22 +120,14 @@ export async function loadPaletteAssetsScope(): Promise<PaletteAssetsScope> {
 }
 
 export interface AssetsProviderOptions {
-  /** `loadPaletteAssetsScope()`'s answer; the group's readout. */
   readonly scope?: PaletteAssetsScope;
-  /** `loadPaletteAssets()`'s answer, kept live while the palette is open; empty until it lands. */
   readonly assets: readonly PaletteAsset[];
   readonly activeCharacterId: number | null;
   readonly navigate: (path: string) => void;
-  /** The row's sublabel: each holder's quantity. */
   readonly describe: (asset: PaletteAsset) => string;
-  /** The trailing hint: the total owned. */
   readonly quantityHint: (quantity: number) => string;
 }
 
-/**
- * Synchronous over the already-loaded list, so no keystroke waits on (or
- * shows "Searching…" for) anything, and an empty list hides the group.
- */
 export function createAssetsProvider({
   scope,
   assets,
@@ -174,7 +139,6 @@ export function createAssetsProvider({
   return {
     id: 'assets',
     labelKey: 'commandPalette.groups.assets',
-    // After Characters, before Market Items.
     order: 3,
     scope:
       scope && scope.total > 0

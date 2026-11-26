@@ -68,10 +68,6 @@ describe('addCharacter', () => {
   });
 
   it('does not backfill a Character that was already on this device', async () => {
-    // Re-authenticating an existing Character — a re-grant for new scopes, or
-    // a sold Character coming back under a new ownerHash whose Editable Data
-    // `handleOwnerHashChange` has just purged on purpose. Re-seeding here
-    // would undo that purge.
     await db.characters.put(characterRecord(2));
     mocks.completeLogin.mockResolvedValue(characterRecord(2));
 
@@ -98,9 +94,6 @@ describe('addCharacter', () => {
   });
 
   it('backfills even with sync unconfigured — the copy is a local Dexie write', async () => {
-    // `isSyncConfigured()` gates operations that talk to a backend. This one
-    // does not: an account-wide pin is just as much the new Character's on a
-    // device that never syncs.
     await db.characters.put(characterRecord(1));
     mocks.completeLogin.mockResolvedValue(characterRecord(2));
 
@@ -124,9 +117,6 @@ describe('addCharacter', () => {
   });
 
   it('never lets a failed backfill cost the user their login', async () => {
-    // The login has already completed and the token is stored by this point.
-    // Throwing here would send the callback route to its error panel for a
-    // Character that is, in fact, signed in.
     await db.characters.put(characterRecord(1));
     mocks.completeLogin.mockResolvedValue(characterRecord(2));
     mocks.backfillAccountWideData.mockRejectedValue(new Error('Dexie is having a day'));

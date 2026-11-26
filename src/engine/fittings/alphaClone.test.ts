@@ -29,7 +29,6 @@ const DRONES = 3436;
 
 const SKILLS = new Map([
   skill(GALLENTE_CRUISER, 4, [{ typeID: SPACESHIP_COMMAND, level: 3 }]),
-  // Alphas can't train it at all: no cap.
   skill(HEAVY_ASSAULT_CRUISERS, undefined, [{ typeID: GALLENTE_CRUISER, level: 5 }]),
   skill(SPACESHIP_COMMAND, 4),
   skill(MEDIUM_DRONE_OPERATION, 4, [{ typeID: DRONES, level: 5 }]),

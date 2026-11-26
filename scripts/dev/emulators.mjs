@@ -1,11 +1,4 @@
 #!/usr/bin/env node
-// `npm run emulators` (issue #4190): builds functions/ and starts the Auth,
-// Firestore and Functions emulators under a `demo-` project id, so nothing can
-// touch a real Firebase project. Needs a Java runtime (the Firestore emulator
-// is a JAR). `mintFirebaseToken` throws at cold start without EVE_CLIENT_ID and
-// the emulator's function discovery does not read functions/.env here, so this
-// passes it through the environment: EVE_CLIENT_ID if set, else the root
-// .env.local / .env VITE_EVE_CLIENT_ID (the dev EVE application the app uses).
 
 import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';

@@ -43,7 +43,6 @@ import { useMoonOwnersInput } from './useMoonOwners';
 
 const BACK = '/corp/moons/moon-owners';
 
-/** A moon owner's page at `/corp/moons/moon-owners/:id`, wired to the book. */
 export function MoonOwnerDetail({ id }: { id: string }) {
   const { t } = useTranslation();
   const { names, canEdit, characterId, corporationId, reload, data, view } = useBook();
@@ -70,9 +69,7 @@ export function MoonOwnerDetail({ id }: { id: string }) {
     detail.payee.kind === 'character'
       ? names.character(detail.payee.id)
       : names.corporation(detail.payee.id);
-  // The server takes a payee only while the moon owner is active or being removed.
   const payeeOpen = feeder?.status === 'active' || feeder?.status === 'pending-removal';
-  // The moon owner changed who gets paid (#4653): a strip until dismissed.
   const notice = payeeChangeNotice({
     payee: feeder?.payee,
     payeeSetBy: feeder?.payeeSetBy,
@@ -218,7 +215,6 @@ export function MoonOwnerDetail({ id }: { id: string }) {
                 payee,
                 canSendMail(grantedScopes)
               );
-              // After the save, and never awaited: the change does not wait on the mail.
               if (out.changed && out.at !== undefined) {
                 const at = out.at;
                 void queueOfficerMail({
@@ -254,7 +250,6 @@ export function MoonOwnerDetail({ id }: { id: string }) {
                 ? agreedRateChange(deriveOwnerRateHistory(feeder), pct, new Date(), asOf)
                 : undefined;
               await setFeederRate(characterId, corporationId, corp, pct, asOf);
-              // After the save, and never awaited: the rate change does not wait on the mail.
               if (change && accountingName) {
                 void mailRateChange({
                   grantedScopes,
@@ -279,7 +274,6 @@ export function MoonOwnerDetail({ id }: { id: string }) {
             afterEdit(async () => {
               const mode = on ? 'settled-otherwise' : 'normal';
               await setFeederMode(characterId, corporationId, corp, mode, on ? note : undefined);
-              // A switch (not a note edit) is mailed to the moon owner (#6209); never awaited.
               if (on !== settled && accountingName && !detail.row.sameOwner) {
                 void mailModeChange({
                   grantedScopes,

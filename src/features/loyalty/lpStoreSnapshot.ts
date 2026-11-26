@@ -1,26 +1,11 @@
-/**
- * Reads the LP Store offers snapshot (issue #2873): every LP corporation's
- * offers and station systems, published daily by the `public-data-lp-store` GitHub Actions job as one
- * object in Cloudflare R2 (docs/context/decisions/20261018-201511-moving-the-daily-snapshots-to-r2.md). Public and unauthenticated, so the page works with no
- * Firebase session.
- *
- * ESI's offers carry no home station, so a corporation is as far as its
- * nearest station: the snapshot lists every system it has one in.
- *
- * Cache-through like the contract snapshots (global key, a window matched to
- * the backend's cadence, a lapsed copy served while the next read runs), with
- * `null` for "unavailable" so the page shows its unavailable state.
- */
 import { loadWithCache, GLOBAL_CACHE_CHARACTER_ID } from '@/esi/cache';
 import type { R2Snapshot, R2SnapshotRead } from '@/features/contractSearch/r2Snapshot';
 import { R2_SNAPSHOT_ORIGIN, fetchJson } from '@/features/contractSearch/r2OfferSnapshot';
 import type { LoyaltyStoreOffer } from '@/esi/endpoints';
 import { HOUR_MS } from '@/lib/age';
 
-/** `[offerId, typeId, quantity, iskCost, lpCost, requiredItems: [typeId, quantity][]]` */
 export type LpSnapshotOffer = [number, number, number, number, number, [number, number][]];
 
-/** One corporation's row of the LP offers snapshot. */
 export interface LpSnapshotStore {
   corporationId: number;
   systemIds: number[];
@@ -32,7 +17,6 @@ export interface NearestStation {
   jumps: number;
 }
 
-/** The station system with the fewest jumps; null when none is reachable or distances are not known yet. */
 export function nearestStation(
   systemIds: readonly number[],
   jumps: ReadonlyMap<number, number> | null
@@ -65,10 +49,8 @@ export function toStoreOffer(offer: LpSnapshotOffer): LoyaltyStoreOffer {
 
 const SNAPSHOT_URL = `${R2_SNAPSHOT_ORIGIN}/lp-store-offers/snapshot.json`;
 const CACHE_KEY = 'lpStoreOffersR2';
-/** The backend republishes once a day. */
 const STALE_AFTER_MS = 12 * HOUR_MS;
 
-/** The fields the search reads unguarded; a row without them would throw in a render. */
 function isStoreRow(value: unknown): value is LpSnapshotStore {
   if (typeof value !== 'object' || value === null) return false;
   const row = value as Record<string, unknown>;
@@ -79,7 +61,6 @@ function isStoreRow(value: unknown): value is LpSnapshotStore {
   );
 }
 
-/** The object as `functions/src/r2DailySnapshots.ts` writes it, or `null` when it is not that shape. */
 export function parseLpStoreSnapshot(raw: unknown): R2Snapshot<LpSnapshotStore> | null {
   if (typeof raw !== 'object' || raw === null) return null;
   const { lastSyncedAt, rows } = raw as Record<string, unknown>;

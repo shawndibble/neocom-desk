@@ -35,7 +35,6 @@ describe('editorGridClass with Improve open', () => {
       expect(open).not.toContain('justify-center');
       expect(open).toContain('justify-start');
       expect(editorGridClass('docked', view, false, true)).not.toContain('26rem');
-      // Same width shut or open, so opening Improve never resizes the stats.
       expect(editorGridClass('slideOut', view, false)).toContain('_22rem]');
     }
   });
@@ -73,7 +72,6 @@ describe('leftColumn', () => {
   });
 
   it('gives Improve the docked browser column: the browser steps aside, nothing is pushed', () => {
-    // Improve is a column in the page itself, not an overlay the page must clear.
     expect(leftColumn('docked', false, true)).toEqual({
       ...base,
       addMode: 'slideOut',
@@ -83,7 +81,6 @@ describe('leftColumn', () => {
   });
 
   it('on a narrower desktop, Improve puts the stats above the editor beside it', () => {
-    // The column leaves no room for both side by side; the stats are what Improve changes.
     expect(leftColumn('slideOut', true, true)).toEqual({
       addMode: 'slideOut',
       addOpen: false,

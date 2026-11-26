@@ -3,15 +3,12 @@ import { Panel, textActionClassName } from '@/components/ui';
 import { CharacterAvatar } from '@/components/ui/CharacterAvatar';
 import { cx } from '@/lib/cx';
 
-/** The consent terms panel below carries this id, so the intro can lead to it. */
 export const CONSENT_ANCHOR = 'vetting-consent';
 
 interface RequestIntroProps {
-  /** The officer who asked; absent on a request older than the field. */
   asker: { characterId: number; name: string } | undefined;
   role: string;
   corporationName: string;
-  /** Characters on this device that already work without another sign-in, of `total`. */
   ready: number;
   total: number;
 }
@@ -33,10 +30,6 @@ function Step({ n, title, children }: { n: number; title: string; children: stri
   );
 }
 
-/**
- * The top of a member's `/vetting` page: who asked and for what in a sentence, the three steps,
- * and four plain facts, leading to the full consent terms further down.
- */
 export function RequestIntro({ asker, role, corporationName, ready, total }: RequestIntroProps) {
   const { t } = useTranslation();
   const first = asker?.name.split(' ')[0];

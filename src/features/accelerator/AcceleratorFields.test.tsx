@@ -41,7 +41,6 @@ describe('AcceleratorFields once a time is set', () => {
     expect(screen.getByLabelText('Hours')).toHaveValue('2');
     expect(screen.getByLabelText('Minutes')).toBeInTheDocument();
 
-    // Tabbing between the boxes keeps them open; leaving the group reads as text again.
     await user.tab();
     expect(screen.getByLabelText('Hours')).toHaveFocus();
     await user.clear(screen.getByLabelText('Hours'));
@@ -56,7 +55,6 @@ describe('AcceleratorFields once a time is set', () => {
 
     await user.type(screen.getByLabelText('Days'), '1');
     expect(screen.getByLabelText('Days')).toHaveFocus();
-    // The rest of the form stays open while the first entry is still being made.
     await user.tab();
     await user.tab();
     await user.tab();

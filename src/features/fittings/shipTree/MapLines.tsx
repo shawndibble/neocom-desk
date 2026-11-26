@@ -1,9 +1,3 @@
-/**
- * The map's SVG layer: the pirate classes' thin links to their parent
- * empires, every class connector (unlit first, lit pipes over them), the
- * gold Ω hexagons, and the capsule root. The layout is already in world
- * coordinates, so everything is drawn as given.
- */
 import { useMemo } from 'react';
 import type { ShipTreeEdge, ShipTreeLayout } from '@/engine/shipTree/types';
 import { CAPSULE_ICON_URL } from './shipTreeAssets';

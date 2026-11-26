@@ -18,18 +18,11 @@ interface Props {
   payments: readonly MadePayment[];
   bookCorporationId: number;
   corpName: string;
-  /** The billed period's first day: payments before it cannot be for it. */
   since: string;
-  /** The chosen payments, by journal ref. */
   chosen: ReadonlySet<number>;
   onChange: (chosen: ReadonlySet<number>, transfers: ClaimedTransfer[]) => void;
 }
 
-/**
- * "Which payment was it?" (resolving in the app): the member's own outgoing payments around the
- * billed period, each labelled by who got it. What they tick is what the declaration carries;
- * the rest of their wallet stays on this device.
- */
 export function TransferPicker({
   payments,
   bookCorporationId,

@@ -58,7 +58,6 @@ function plan(overrides: Partial<BuildPlanRecord> & { id: string }): BuildPlanRe
 
 describe('fallbackFacility', () => {
   it('never offers a facility that cannot host the activity', () => {
-    // An NPC station cannot run a reaction and a refinery cannot manufacture.
     expect(fallbackFacility('manufacturing')).toBe('npcStation');
     expect(fallbackFacility('reaction')).toBe('athanor');
   });
@@ -76,8 +75,6 @@ describe('mostRecentlyUpdatedPlan', () => {
   });
 
   it('keeps the first of a tie, which is why Fit Import stamps its hull newer', () => {
-    // The comparison is a strict `>`, so plans written in one batch with one
-    // `Date.now()` all tie and array order — effectively UUID order — decides.
     const first = plan({ id: 'a', updatedAt: 100 });
     const second = plan({ id: 'b', updatedAt: 100 });
     expect(mostRecentlyUpdatedPlan([first, second])).toBe(first);
@@ -93,8 +90,6 @@ describe('newBuildPlan — assumed ME and TE', () => {
   });
 
   it('still quotes an owned blueprint at its real research', () => {
-    // The assumption fills the gap where there is nothing to read; it never
-    // overrides a real value in either direction.
     const created = newBuildPlan(1, entry(), owned(), null, DEFAULT_ACTIVITY_FACILITY_DEFAULTS, {
       assumedMe: 2,
     });
@@ -109,8 +104,6 @@ describe('newBuildPlan — assumed ME and TE', () => {
   });
 
   it('quotes a blueprint the character does not own at the assumed TE (#634)', () => {
-    // The commonest unowned case is an invented BPC with no decryptor —
-    // ME2/TE4 — and quoting its time at 0 moves job time and ISK/hour.
     const created = newBuildPlan(1, entry(), null, null, DEFAULT_ACTIVITY_FACILITY_DEFAULTS, {
       assumedMe: 2,
       assumedTe: 4,
@@ -128,8 +121,6 @@ describe('newBuildPlan — assumed ME and TE', () => {
   });
 
   it('assumes ME and TE independently', () => {
-    // They are separate preferences: a pilot who set one and not the other
-    // must not have the unset half quietly follow the set one.
     const created = newBuildPlan(1, entry(), null, null, DEFAULT_ACTIVITY_FACILITY_DEFAULTS, {
       assumedTe: 4,
     });
@@ -180,8 +171,6 @@ describe('newBuildPlan — overrides', () => {
   });
 
   it('omits buildGroupId entirely for an ungrouped plan', () => {
-    // Absent rather than undefined: Firestore rejects undefined at any depth,
-    // and the sync spec omits the key on absence.
     const created = newBuildPlan(1, entry(), null, null, DEFAULT_ACTIVITY_FACILITY_DEFAULTS);
     expect('buildGroupId' in created).toBe(false);
   });
@@ -213,9 +202,6 @@ describe('newBuildPlan — carried defaults', () => {
   } as const;
 
   it('carries hub and price basis from the last plan, but not its location, once a plan page set one', () => {
-    // The location is the remembered default's alone now: the last plan
-    // *updated* is not necessarily the last place the pilot *set*, and an
-    // edit to runs on an old plan used to pull every new plan back there.
     const previous = plan({
       id: 'p',
       facility: 'raitaru',
@@ -240,8 +226,6 @@ describe('newBuildPlan — carried defaults', () => {
   });
 
   it('starts at the remembered location, build system and picked place included', () => {
-    // The bug that prompted it: a pilot who picked their Azbel in Badivefi
-    // saw every new plan open at the hub's system with no build location.
     const previous = plan({ id: 'p', facility: 'raitaru', hubId: 'amarr' });
     const created = newBuildPlan(1, entry(), null, previous, {
       manufacturing: BADIVEFI_AZBEL,
@@ -261,9 +245,6 @@ describe('newBuildPlan — carried defaults', () => {
   });
 
   it('carries the last plan’s whole location until a plan page has set one (upgrade path)', () => {
-    // A record no plan page wrote is a Settings-era one, or the untouched
-    // default. Preferring it would drop a pilot who has used one Azbel for
-    // months back to an NPC station on the first plan after the update.
     const previous = plan({
       id: 'p',
       facility: 'raitaru',
@@ -304,7 +285,6 @@ describe('newBuildPlan — carried defaults', () => {
   });
 
   it('starts in highsec when the remembered record names no band', () => {
-    // A record written by Settings before locations were remembered.
     const created = newBuildPlan(1, entry(), null, null, {
       manufacturing: { facility: 'azbel', rigFit: EMPTY_RIG_FIT, facilityTaxPct: null },
       reaction: DEFAULT_REACTION_FACILITY_DEFAULTS,
@@ -315,8 +295,6 @@ describe('newBuildPlan — carried defaults', () => {
   });
 
   it('refuses a facility from a plan of the other activity', () => {
-    // A Raitaru cannot host a reaction, so the hardcoded fallback wins over
-    // the pilot's own most recent plan here.
     const previous = plan({ id: 'p', facility: 'raitaru' });
     const created = newBuildPlan(
       1,
@@ -326,8 +304,6 @@ describe('newBuildPlan — carried defaults', () => {
       DEFAULT_ACTIVITY_FACILITY_DEFAULTS
     );
     expect(created.facility).toBe('athanor');
-    // The fallback brings its own empty fit rather than the rejected
-    // facility's rigs, which the new facility could not host anyway.
     expect(created.rigFit).toEqual(EMPTY_RIG_FIT);
   });
 });
@@ -345,10 +321,6 @@ describe('newBuildPlan — a default per activity', () => {
   } as const;
 
   it('starts a reaction plan at the reaction default, not the manufacturing one', () => {
-    // The engine already treats a reaction-activity plan's own facility as its
-    // Reaction Location (`IndustryInputs.reactionFacility` is absent for one,
-    // reusing the plan's own facility instead), so the Settings-level Reaction
-    // Location is the same fact and seeds it here.
     const created = newBuildPlan(1, entry('reaction'), null, null, {
       manufacturing: RIGGED_AZBEL,
       reaction: RIGGED_TATARA,
@@ -369,9 +341,6 @@ describe('newBuildPlan — a default per activity', () => {
   });
 
   it('takes a plan-page default over the most recent plan of the same activity', () => {
-    // Reversed from #456/#460, where the last plan won: the default *is* the
-    // last place the pilot set from a plan page, so it is already the more
-    // deliberate answer of the two.
     const previous = plan({ id: 'p', facility: 'athanor', rigLevel: 'none', facilityTaxPct: 9 });
     const created = newBuildPlan(1, entry('reaction'), null, previous, {
       manufacturing: DEFAULT_FACILITY_DEFAULTS,
@@ -382,9 +351,6 @@ describe('newBuildPlan — a default per activity', () => {
   });
 
   it('falls back when a default names a facility its own activity cannot host', () => {
-    // The picker cannot produce this and `normalizeFacilityDefaults` resets
-    // it, but a device on an older build can still push one through sync, so
-    // the guard stays the thing that actually enforces it.
     const created = newBuildPlan(1, entry('manufacturing'), null, null, {
       manufacturing: RIGGED_TATARA,
       reaction: DEFAULT_REACTION_FACILITY_DEFAULTS,
@@ -394,8 +360,6 @@ describe('newBuildPlan — a default per activity', () => {
   });
 
   it('carries none of a refused default’s location either', () => {
-    // The place belongs to the refused facility; naming it on the fallback
-    // would label a job whose numbers came from somewhere else.
     const created = newBuildPlan(1, entry('manufacturing'), null, null, {
       manufacturing: {
         ...RIGGED_TATARA,
@@ -415,7 +379,6 @@ describe('newBuildPlan — a default per activity', () => {
 
 describe('newBuildPlan — seeded ME/TE (#637)', () => {
   it('opens at the seeded research, over an owned copy at different research', () => {
-    // The pilot is quoting a copy they might buy, not the one in the hangar.
     const created = newBuildPlan(1, entry(), owned(), null, DEFAULT_ACTIVITY_FACILITY_DEFAULTS, {
       me: 4,
       te: 12,
@@ -434,16 +397,11 @@ describe('newBuildPlan — seeded ME/TE (#637)', () => {
       te: 0,
       runs: 1,
     });
-    // Seeded 0 is a real answer about a real copy, not a missing one — an
-    // unresearched BPC must not fall through to either assumption (#634).
     expect(created.me).toBe(0);
     expect(created.te).toBe(0);
   });
 
   it('writes the seed back verbatim, so a seeded plan matches its own seed', () => {
-    // `Industry`'s create-if-missing effect stops re-firing only once the plan
-    // it wrote matches the seed it was given: were these ever to disagree it
-    // would write a plan on every render.
     const seed = { me: 7, te: 14, runs: 3 };
     const created = newBuildPlan(1, entry(), owned(), null, DEFAULT_ACTIVITY_FACILITY_DEFAULTS, {
       ...seed,

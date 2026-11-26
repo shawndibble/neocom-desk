@@ -77,12 +77,6 @@ describe('occurrenceKey', () => {
   });
 
   it('gives skillQueueEnding a different key for the same tail re-armed at a different lead time, so a lower-then-raised threshold re-fires as a new occurrence', () => {
-    // The re-arm case `diffSkillQueueEnding` documents: fire once at 24h,
-    // drop below the window at 6h (no fire), raise back to 24h before the
-    // tail finishes (fires again, per its own window-crossing rule). Without
-    // `thresholdMs` in the key, that second, genuinely new fire would
-    // compute the identical key to the first and get dropped as already
-    // delivered.
     const base: NotificationFire = {
       eventId: 'skillQueueEnding',
       characterId: 7,
@@ -160,7 +154,6 @@ describe('occurrenceKey', () => {
       expiryTimeMs: T0,
     };
     expect(occurrenceKey(fire, T0)).toEqual(occurrenceKey({ ...fire }, T0));
-    // The 12h and 24h warnings for the same program are distinct occurrences.
     expect(occurrenceKey(fire, T0)).not.toEqual(
       occurrenceKey({ ...fire, thresholdMs: 12 * 3_600_000 }, T0)
     );
@@ -181,12 +174,6 @@ describe('occurrenceKey', () => {
     expect(occurrenceKey(newEvent, T0)).not.toEqual(occurrenceKey(starting, T0));
   });
 
-  /**
-   * The copy a calendar alert carries grew a name and a start time; its
-   * identity did not. A key that moved with the copy would file a second feed
-   * row for an occurrence already synced under the old one, and re-announce it
-   * on every device that pulls.
-   */
   it('keys calendar events on identity alone — the name and start time do not move them', () => {
     const named: NewCalendarEventFire = {
       eventId: 'newCalendarEvent',
@@ -262,8 +249,6 @@ describe('occurrenceKey', () => {
       typeId: 34,
       quantity: 100,
     };
-    // Same occurrence, so the same row: the Scheduled Push backend and this
-    // device must agree on the key without agreeing on the rendered wording.
     expect(occurrenceKey(fire, T0)).toEqual(
       occurrenceKey({ ...fire, typeId: 35, quantity: 999 }, T0)
     );
@@ -286,8 +271,6 @@ describe('occurrenceKey', () => {
       timestamp: '2024-01-01T00:00:00Z',
     };
     expect(occurrenceKey(fire, T0)).toEqual(occurrenceKey({ ...fire }, T0 + 1000));
-    // functions/src/eveNotificationPush.ts derives this key server-side (#3756)
-    // and pins the same literal in its own test; the two must stay equal.
     expect(occurrenceKey(fire, T0)).toBe('7:eveNotification:321');
   });
 
@@ -375,8 +358,6 @@ describe('occurrenceKey', () => {
       fuelExpiresMs: T0 + 86_400_000,
     };
     expect(occurrenceKey(fire, T0)).toEqual(occurrenceKey({ ...fire }, T0 + 1000));
-    // A refuel starts a new countdown — a genuinely distinct occurrence, not
-    // a re-observation of the same one.
     expect(occurrenceKey(fire, T0)).not.toEqual(
       occurrenceKey({ ...fire, fuelExpiresMs: fire.fuelExpiresMs + 1 }, T0)
     );
@@ -404,9 +385,7 @@ describe('occurrenceKey', () => {
       journalEntryId: 4242,
       dateMs: T0,
     };
-    // The same entry seen on two polls a day apart is one occurrence, not two.
     expect(occurrenceKey(fire, T0)).toEqual(occurrenceKey(fire, T0 + 86_400_000));
-    // Two entries that happen to move the same amount are two occurrences.
     expect(occurrenceKey(fire, T0)).not.toEqual(
       occurrenceKey({ ...fire, journalEntryId: 4243 }, T0)
     );
@@ -437,11 +416,9 @@ describe('occurrenceKey', () => {
       thresholdIsk: 1_000_000,
       journalEntryId: 42,
     };
-    // Same real time, different entries — two distinct occurrences, not one.
     expect(occurrenceKey(transactionAbove, T0)).not.toEqual(
       occurrenceKey({ ...transactionAbove, journalEntryId: 43 }, T0)
     );
-    // Same entry, different poll time — the same occurrence.
     expect(occurrenceKey(transactionAbove, T0)).toEqual(
       occurrenceKey({ ...transactionAbove }, T0 + 60_000)
     );
@@ -471,11 +448,8 @@ describe('occurrenceKey', () => {
       targetPrice: 5,
       direction: 'above',
     };
-    // Same real occurrence, different poll time.
     expect(occurrenceKey(fire, T0)).toEqual(occurrenceKey({ ...fire, price: 7 }, T0 + 60_000));
-    // A different target price is a genuinely different occurrence.
     expect(occurrenceKey(fire, T0)).not.toEqual(occurrenceKey({ ...fire, targetPrice: 10 }, T0));
-    // A different direction is a genuinely different occurrence.
     expect(occurrenceKey(fire, T0)).not.toEqual(occurrenceKey({ ...fire, direction: 'below' }, T0));
   });
 
@@ -489,15 +463,10 @@ describe('occurrenceKey', () => {
       price: 100,
       rivalPrice: 95,
     };
-    // Same real occurrence, different poll time and a different rival price
-    // (both are only copy — the identity is the order and its own price).
     expect(occurrenceKey(fire, T0)).toEqual(
       occurrenceKey({ ...fire, rivalPrice: 90 }, T0 + 60_000)
     );
-    // A relist at a new price is a genuinely different occurrence — the
-    // anti-flap key, not a bucket (owner decision #4, issue #1423).
     expect(occurrenceKey(fire, T0)).not.toEqual(occurrenceKey({ ...fire, price: 105 }, T0));
-    // A different order is obviously a different occurrence.
     expect(occurrenceKey(fire, T0)).not.toEqual(occurrenceKey({ ...fire, orderId: 457 }, T0));
   });
 });
@@ -556,8 +525,6 @@ describe('occurrenceFiredAt', () => {
   });
 
   it('falls back to the poll time for a fire that carries no time of its own', () => {
-    // A market order fill: ESI order history records no fill time, so when
-    // the poller noticed it is the only time there is.
     const fire: MarketOrderNotificationFire = {
       eventId: 'marketOrderFilled',
       characterId: 7,

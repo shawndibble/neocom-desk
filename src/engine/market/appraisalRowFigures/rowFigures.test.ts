@@ -17,7 +17,6 @@ const refineWins = (row: AppraisalRow, basis: RefineBasis = 'buy') =>
   refine(row, basis).verdict === 'refine';
 
 describe('the refine verdict (issue #1048)', () => {
-  /** A priced row carrying a refine comparison; overrides say what the case is. */
   function row(overrides: Partial<AppraisalRow> = {}): AppraisalRow {
     return {
       typeId: 1,
@@ -41,11 +40,6 @@ describe('the refine verdict (issue #1048)', () => {
   });
 
   it('values the leftover units the refine path still holds, at the sell-as-is price', () => {
-    // The worked example from issue #1048, at live Jita prices: 999 Mercoxit
-    // III-Grade refines 900 units for 15,436,890 and leaves 99 to sell at
-    // 16,000 each, beating 15,984,000 sold as-is by 1,036,890 ISK. Comparing
-    // the refine total alone against the full quantity would have called this
-    // for selling and cost the player that difference.
     const paste = row({
       quantity: 999,
       buyTotal: 15_984_000,
@@ -66,8 +60,6 @@ describe('the refine verdict (issue #1048)', () => {
   });
 
   it('does not call a tie for refining: below one batch, both paths are the same goods', () => {
-    // Nothing refines, so the leftover is the whole paste and the two sides
-    // are exactly equal. A tie is not a win.
     const partBatch = row({
       quantity: 99,
       buyTotal: 1_584_000,
@@ -186,7 +178,6 @@ describe('the figures on each price basis', () => {
     materialPrices: { 34: 5 },
     materialSellPrices: { 34: 8 },
   };
-  // 10 portions x floor(400 x 0.5) = 2,000 Tritanium; 50 units left over.
   const item = (): AppraisalItem => ({
     typeId: 1230,
     name: 'Veldspar',
@@ -199,7 +190,6 @@ describe('the figures on each price basis', () => {
   it('picks the refine figure, the as-is total and the verdict by basis', () => {
     const row = buildAppraisal([item()], 100).rows[0];
     const on = (basis: RefineBasis) => rowFigures(row, basis, null);
-    // The figure shown is the minerals plus the 50 leftover units at the basis's as-is unit price.
     expect(on('buy').refine.minerals).toBe(row.refineTotal);
     expect(on('buy').refine.withLeftover).toBeCloseTo(9_000 + 50 * 10, 6);
     expect(on('sell').refine.withLeftover).toBeCloseTo(14_400 + 50 * 14, 6);
@@ -207,7 +197,6 @@ describe('the figures on each price basis', () => {
     expect(on('buy').asIs.total).toBe(10_500);
     expect(on('sell').asIs.total).toBe(14_700);
     expect(on('split').asIs.total).toBe(12_600);
-    // Buy: 9,000 + 50 x 10 = 9,500 against 10,500. Sell: 14,400 + 50 x 14 = 15,100 against 14,700.
     expect(on('buy').refine.verdict).toBe('sellAsIs');
     expect(on('sell').refine.verdict).toBe('refine');
   });
@@ -234,14 +223,12 @@ describe('the figures on each price basis', () => {
         [{ ...item(), refine: computeAppraisalRefine({ ...untaxed, materialSellPrices }) }],
         100
       ).rows[0];
-    // (10,000 + 16,000) / 2 of minerals, plus 50 leftover units at the split unit price of 12.
     expect(rowFigures(at({ 34: 8 }), 'split', null).refine.withLeftover).toBeCloseTo(
       13_000 + 50 * 12,
       6
     );
     const oneSided = at({});
     expect(rowFigures(oneSided, 'split', null).refine.withLeftover).toBeUndefined();
-    // The minerals 10,000 plus the 50 leftover units at 10 each.
     expect(rowFigures(oneSided, 'buy', null).refine.withLeftover).toBeCloseTo(10_500, 6);
   });
 

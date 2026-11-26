@@ -76,7 +76,6 @@ describe('parseSrpSettingsPatch', () => {
     expect(
       fails({ hullRules: [{ scope: 'hull', id: 1, kind: 'pay-fixed', iskAmount: 0.5 }] })
     ).toMatch(/iskAmount/);
-    // A legacy stored pct is ignored, not refused.
     expect(
       parseSrpSettingsPatch({
         hullRules: [{ scope: 'hull', id: 1, kind: 'pay-percent', pct: 120 }],

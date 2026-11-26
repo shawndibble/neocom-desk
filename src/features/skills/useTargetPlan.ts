@@ -1,8 +1,3 @@
-/**
- * Which Skill Plan Fit Check / the Market skill chip Add into. Deliberately
- * different from per-click plan submenu (removed) — a one-off
- * pick doesn't suit a panel where "Add" repeats.
- */
 import { useCallback } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, type SkillPlanRecord } from '@/db';
@@ -20,35 +15,19 @@ import {
 import { useHydratedStore } from '@/lib/useHydratedStore';
 
 export interface AddEntriesResult {
-  /** The plan `entries` were merged into — existing, or newly created and named `newPlanName`. */
   planId: string;
-  /** That plan's name, straight from the transaction — no separate lookup a caller could race against its own live query for. */
   planName: string;
-  /**
-   * The subset of `entries` not already covered by an existing row at that
-   * level (`addEntry`'s rule, applied cumulatively) — what a caller's
-   * Undo should pass back to `removeEntries`.
-   */
   added: readonly PlanEntry[];
 }
 
 export interface TargetPlan {
-  /** Every plan this Character has, for a picker to list — `undefined` while loading. */
   plans: readonly SkillPlanRecord[] | undefined;
-  /** The resolved target, or `null` when the Character has no plan yet. */
   targetPlanId: string | null;
-  /** Explicit choice, for a 2+-plan picker; persists as the remembered default. */
   setTargetPlanId: (planId: string) => void;
-  /**
-   * Merges `entries` into the target plan (creating one first, named
-   * `newPlanName`, if the Character has none yet) and remembers the choice.
-   */
   addEntries: (entries: readonly PlanEntry[], newPlanName: string) => Promise<AddEntriesResult>;
-  /** Removes exactly these entries from a plan — undoes an `addEntries` call. */
   removeEntries: (planId: string, entries: readonly PlanEntry[]) => Promise<void>;
 }
 
-/** The target plan's own entries, or `[]` before it resolves or when the Character has none yet — the "is this already planned?" lookup every `TargetPlan` consumer otherwise re-derives inline. */
 export function targetPlanEntries(
   target: Pick<TargetPlan, 'plans' | 'targetPlanId'>
 ): readonly PlanEntry[] {
@@ -84,18 +63,11 @@ export function useTargetPlan(characterId: number | null): TargetPlan {
         return { planId: '', planName: '', added: [] };
       }
 
-      // Re-queries plans fresh inside the transaction rather than trusting
-      // `plans`/`targetPlanId` from render (`useLiveQuery`, can still read
-      // zero plans for a moment after a concurrent Add just created one) —
-      // otherwise two rapid Add clicks each see "no plan yet" and both create one.
       const result = await db.transaction('rw', db.skillPlans, async () => {
         const existing = await db.skillPlans.where('characterId').equals(characterId).toArray();
         const selected = selectTargetPlanId(existing, targetPlanIdFor(stored, characterId));
         const current =
           existing.find((p) => p.id === selected) ?? newPlan(characterId, newPlanName);
-        // Tracked alongside the reduce, not a length diff after it: an
-        // in-batch duplicate must also be excluded from `added`, or Undo
-        // would remove a row that was never its own.
         const added: PlanEntry[] = [];
         const merged = entries.reduce<SkillPlanEditable>((acc, entry) => {
           const next = { ...acc, ...addEntry(acc, entry) };
@@ -120,8 +92,6 @@ export function useTargetPlan(characterId: number | null): TargetPlan {
       await db.transaction('rw', db.skillPlans, async () => {
         const plan = await db.skillPlans.get(planId);
         if (!plan) return;
-        // Through `removeEntry`, not a bare entries filter: Remap Markers
-        // after a removed entry shift back with it, overrides and all.
         const edited = entries.reduce<SkillPlanEditable>(
           (acc, e) => ({ ...acc, ...removeEntry(acc, e.skillTypeID, e.targetLevel) }),
           plan

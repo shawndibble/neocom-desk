@@ -1,14 +1,3 @@
-/**
- * The nested station → hangar / container tree behind the owned-stock scope
- * picker (issue #2941), and the selection rules that go with it. Pure: the
- * picker only draws what `buildScopeTree` returns and calls the `toggle*`
- * helpers, so the rules are tested here rather than through a popover.
- *
- * A station is selected whole (`locations`) or narrowed to hangar divisions /
- * containers (`hangars` / `containers`). A whole station can still carry the
- * legacy `excludedContainers` (issue #2869), which shows as a partial state.
- */
-
 import {
   ownedStockLocationKey,
   type DetectedOwnedStockMap,
@@ -19,14 +8,12 @@ import {
 export interface ScopeTreeContainer {
   containerId: number;
   typeId: number;
-  /** Corp hangar division the container sits in, when known. */
   hangar?: number;
 }
 
 export interface ScopeTreeStation {
   key: string;
   location: OwnedStockLocation;
-  /** Corp hangar divisions holding stock here, ascending. Empty for personal stock. */
   hangars: number[];
   containers: ScopeTreeContainer[];
 }
@@ -35,7 +22,6 @@ export type ScopeCheckState = 'checked' | 'partial' | 'empty';
 
 type SelectedScope = Extract<OwnedStockScope, { mode: 'selected' }>;
 
-/** Every station holding detected stock, with the hangars and containers under it. */
 export function buildScopeTree(stock: DetectedOwnedStockMap): ScopeTreeStation[] {
   const stations = new Map<string, ScopeTreeStation>();
   for (const entry of stock.values()) {
@@ -149,7 +135,6 @@ function build(
   };
 }
 
-/** Checked → cleared; partial or empty → the whole station, everything under it. */
 export function toggleStation(
   scope: OwnedStockScope | undefined,
   station: ScopeTreeStation
@@ -176,11 +161,6 @@ export function toggleContainer(
   return build(s.locations, s.hangars ?? [], toggled(s.containers), s.excludedContainers ?? []);
 }
 
-/**
- * Unchecking a hangar under a whole station narrows the station to the other
- * hangars (and the containers outside this one): a whole station cannot say
- * "all but one division" any other way.
- */
 export function toggleHangar(
   scope: OwnedStockScope | undefined,
   station: ScopeTreeStation,

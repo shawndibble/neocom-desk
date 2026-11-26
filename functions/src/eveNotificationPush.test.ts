@@ -49,7 +49,6 @@ describe('buildPushes', () => {
   });
 
   it('occurrence key matches the Foreground Poller derivation', () => {
-    // Same literal pinned in src/engine/occurrenceKey.test.ts ("keys eveNotification").
     expect(eveNotificationOccurrenceKey(7, 321)).toBe('7:eveNotification:321');
   });
 });

@@ -79,7 +79,6 @@ describe('ProjectedEffectsPanel', () => {
 
     await user.click(screen.getByRole('button', { name: 'One more Logi Caracal' }));
     expect(screen.getByText('2 ships')).toBeInTheDocument();
-    // Each ship's reps land.
     expect(screen.getByRole('status')).toHaveTextContent('2');
 
     await user.click(screen.getByRole('button', { name: 'Stop projecting Logi Caracal' }));

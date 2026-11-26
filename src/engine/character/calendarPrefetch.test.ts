@@ -30,7 +30,6 @@ describe('selectCalendarEventsToPrefetch', () => {
   });
 
   it('keeps one that started hours ago while the calendar still shows it, but not an old one', () => {
-    // The window is `calendarRetention`'s own (two weeks from the start).
     expect(pick([event(1, NOW - 5 * HOUR_MS), event(2, NOW - 15 * DAY_MS)])).toEqual([1]);
   });
 

@@ -1,6 +1,5 @@
 import { db, type CharacterRecord, type TokenRecord } from '@/db';
 
-/** Adds a character row. `overrides` replaces any default field. */
 export async function seedCharacter(
   characterId: number,
   name = `Pilot ${characterId}`,
@@ -15,7 +14,6 @@ export async function seedCharacter(
   });
 }
 
-/** Adds a token row holding `scopes`. `overrides` replaces any default field. */
 export async function seedGrant(
   characterId: number,
   scopes: readonly string[],

@@ -8,7 +8,6 @@ import {
 
 describe('tacticalModesFor', () => {
   it('lists a Tactical Destroyer’s modes, Defense first', () => {
-    // Svipul: Defense, Propulsion, Sharpshooter.
     expect(tacticalModesFor(34562)).toEqual([34564, 34566, 34570]);
     expect(defaultTacticalMode(34562)).toBe(34564);
   });
@@ -21,7 +20,6 @@ describe('tacticalModesFor', () => {
 
 describe('tacticalModeKind', () => {
   it('names each mode by its kind, as its SDE type name does', () => {
-    // Svipul Defense / Propulsion / Sharpshooter Mode; Anhinga Primary Mode.
     expect(tacticalModeKind(34564)).toBe('defense');
     expect(tacticalModeKind(34566)).toBe('propulsion');
     expect(tacticalModeKind(34570)).toBe('sharpshooter');

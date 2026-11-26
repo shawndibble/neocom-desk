@@ -88,10 +88,6 @@ describe('useResolvedCharacterFilter', () => {
     expect(result.current).toBe('all');
   });
 
-  // Regression test for issue #675 (React error #185, commit c39a9e7): a
-  // caller that feeds the resolved filter into an effect's dependency array
-  // must not have that effect re-fire on every render just because
-  // `resolveCharacterFilter('current', ...)` allocates a fresh Set per call.
   it('does not re-fire a downstream effect on every render (issue #675 regression)', () => {
     const effect = vi.fn();
     const { rerender } = renderHook(

@@ -14,7 +14,6 @@ import type { ComparedBuildRow } from './useComparedBuildResults';
 interface GroupMembersPanelProps {
   plans: readonly BuildPlanRecord[];
   rowByPlanId: ReadonlyMap<string, ComparedBuildRow>;
-  /** Opens one member on its own, the way clicking it in the list would. */
   onOpenPlan: (planId: string) => void;
 }
 

@@ -9,32 +9,16 @@ import { memoByRow } from '@/lib/memoByRow';
 import { auctionKindLabel, flagLabel, flagMultiple, flagReferencePrice } from './contractFlagText';
 import type { ContractFlag } from '@/engine/contracts/contractFlags';
 
-/** The panel's own spellings, so the export names things the way the table does. */
 export interface ContractSearchCsvLookups {
   typeName: (typeId: number) => string;
   regionName: (regionId: number) => string;
-  /** `null` for an offer not (yet) placed in a system. */
   systemName: (row: PublicContractOfferRow) => string | null;
-  /** `null` when unreachable, unplaced or still resolving. */
   jumps: (row: PublicContractOfferRow) => number | null;
-  /** ISK per PLEX, folded into a PLEX-asking row's price; `null` leaves that price blank. */
   plexPrice: number | null;
-  /** The system's security status, or `null` when unplaced or still resolving. */
   security: (row: PublicContractOfferRow) => number | null;
-  /** The price flag the table marks the row with (overpriced, copy above original), or `null`. */
   flagFor: (row: PublicContractOfferRow) => ContractFlag | null;
 }
 
-/**
- * CSV columns for Contract Search's items table, in table order. Price is the
- * table's asking price (an auction's buyout when it has one), blank for an
- * unpriced barter — its 0 ISK is the absence of a price, not a price
- * (issue #1080). A PLEX ask is counted into Price at `plexPrice` and also
- * listed raw in its own column, so the figure can be re-derived. The expiry is epoch ms in the row, handed on as an ISO UTC
- * timestamp so it lands as a date. Every column the table can show is here
- * whichever the picker has ticked, plus the facts it keeps in sub-lines and
- * marks: auction kind, system security and the price flag with its multiple.
- */
 export function contractSearchCsvColumns(
   t: CsvTranslate,
   lookups: ContractSearchCsvLookups
@@ -61,7 +45,6 @@ export function contractSearchCsvColumns(
       value: (row) => new Date(row.dateExpired).toISOString(),
     },
     {
-      // An auction's price is a starting bid unless the seller set a buyout.
       header: t('contracts.typeAuction'),
       value: (row) => (row.isAuction ? auctionKindLabel(t, row.buyout) : null),
     },

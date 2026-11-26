@@ -13,8 +13,6 @@ import { Callback } from './Callback';
 import { resetCallbackRunsForTests } from './callbackRun';
 import { assignLocation } from '@/app/navigation';
 
-// `beginAddCharacterLogin` ends in a real top-level navigation; jsdom cannot
-// perform one, and the assertion here is which URL it was sent, not the trip.
 vi.mock('@/app/navigation', () => ({ assignLocation: vi.fn() }));
 const alertsApi = vi.hoisted(() => ({
   saveAlertGrantRemote:
@@ -66,7 +64,6 @@ beforeEach(async () => {
   useActiveCharacter.setState({ activeCharacterId: null, hydrated: false });
 });
 
-/** One pending round trip, in the layout `startLogin` writes. */
 function stashLogin(state: string): void {
   sessionStorage.setItem(
     `neocom.sso.pkce.${state}`,
@@ -79,24 +76,20 @@ function stashLogin(state: string): void {
   stashIntent();
 }
 
-/** What `startLogin` leaves behind so a failed callback can restart the same login. */
 function stashIntent(scopes: string[] = ['esi-skills.read_skills.v1']): void {
   sessionStorage.setItem('neocom.sso.intent', JSON.stringify(scopes));
 }
 
-/** An intent to retry, and the automatic restart already spent on it. */
 function exhaustedBudget(): void {
   stashIntent();
   sessionStorage.setItem('neocom.sso.autoRetries', '1');
 }
 
-/** Stands in for Settings → Notifications: shows the router state the callback hands it. */
 function AlertsLanding() {
   const state = useLocation().state as { alertsGrant?: { status: string } } | null;
   return <div>settings landing: {state?.alertsGrant?.status ?? 'none'}</div>;
 }
 
-/** An Alerts Grant round trip for `expectedCharacterId`, in the layout `startAlertsLogin` writes. */
 function stashAlertsLogin(state: string, expectedCharacterId: number): void {
   sessionStorage.setItem(
     `neocom.sso.pkce.${state}`,
@@ -177,9 +170,6 @@ describe('Callback, Alerts Grant round trip (ADR 0020)', () => {
 });
 
 describe('Callback remounted mid-login', () => {
-  // A route remount (App's Suspense is keyed on the number format, which loads after the first
-  // paint) mounts a fresh Callback while the first one's exchange is in flight. It must wait for
-  // that login, not try to spend the one-time PKCE stash again.
   function renderRemountable(search: string) {
     const tree = (key: string) => (
       <MemoryRouter initialEntries={[`/callback${search}`]}>
@@ -196,8 +186,6 @@ describe('Callback remounted mid-login', () => {
   }
 
   it('waits for the login in flight with no error panel, then keeps the page it came from', async () => {
-    // The reported case: the automatic restart is already spent, so a second run would have
-    // stopped on the spent stash and shown "already used" until the first one landed.
     let release!: () => void;
     const held = new Promise<void>((resolve) => (release = resolve));
     server.use(
@@ -293,11 +281,6 @@ describe('Callback', () => {
   });
 
   it('gives the newly-added Character the account-wide pins the account holds (#432)', async () => {
-    // End to end through the real route: an existing Character holds an
-    // account-wide station pin, and the Character signing in here has never
-    // been on this device. Round 7's fan-out wrote that pin only for the
-    // Characters known at the time, so without the backfill the new one lands
-    // without it.
     await db.characters.put({
       characterId: 90_000_001,
       name: 'Existing Pilot',
@@ -320,16 +303,12 @@ describe('Callback', () => {
         characterId: CHAR_ID,
         locationId: 60_003_760,
         scope: 'account',
-        // Carried, not restamped — a `Date.now()` here would out-rank any
-        // tombstone this Character holds on another device.
         updatedAt: 12_345,
       });
     });
   });
 
   it('restarts the sign-in once rather than dead-ending (#649)', async () => {
-    // No Pending Login: this callback cannot complete. The user asked not to be
-    // shown a panel they cannot act on, so the route retries by itself.
     stashIntent();
     renderCallback('?code=good-code&state=state-1');
 
@@ -339,8 +318,6 @@ describe('Callback', () => {
   });
 
   it('stops after one automatic restart instead of looping (#649)', async () => {
-    // The retry leaves for SSO and comes back here; unbudgeted, that is a
-    // redirect loop between the app and EVE that the user cannot interrupt.
     exhaustedBudget();
     renderCallback('?code=good-code&state=state-1');
 
@@ -349,8 +326,6 @@ describe('Callback', () => {
   });
 
   it('restarts the login that was actually asked for, not a plain re-auth (#649)', async () => {
-    // /callback serves every entry point. Retrying a corp grant as a base
-    // re-auth would succeed while silently not granting corp access.
     stashIntent(['esi-skills.read_skills.v1', 'esi-corporations.read_divisions.v1']);
     renderCallback('?code=good-code&state=state-1');
 
@@ -378,8 +353,6 @@ describe('Callback', () => {
   });
 
   it('still reports the failure to a user who already has Characters (#649)', async () => {
-    // Landing them on /characters would hide that the Character they were
-    // adding is not there — the failure is the thing they need to see.
     await db.characters.put({
       characterId: 90_000_001,
       name: 'Existing Pilot',
@@ -393,7 +366,6 @@ describe('Callback', () => {
   });
 
   it('a post-login hiccup does not put an error over a signed-in Character (#649)', async () => {
-    // The token is in Dexie by now; nothing after it may claim the login failed.
     stashLogin('state-1');
     vi.spyOn(useActiveCharacter.getState(), 'setActiveCharacter').mockRejectedValueOnce(
       new Error('dexie is unhappy')
@@ -432,7 +404,6 @@ describe('Callback', () => {
   });
 
   it('words a lost race apart from a spent link (#649)', async () => {
-    // A second round trip still pending means this callback lost a race.
     exhaustedBudget();
     stashLogin('other-state');
     renderCallback('?code=good-code&state=state-1');
@@ -468,7 +439,6 @@ describe('Callback', () => {
     renderCallback('?code=good-code&state=state-1');
 
     expect(await screen.findByText(/you're offline — the connection dropped/i)).toBeInTheDocument();
-    // The automatic restart would have navigated to SSO (the browser's offline page).
     expect(assignLocation).not.toHaveBeenCalled();
 
     await userEvent.click(screen.getByRole('button', { name: /try again/i }));

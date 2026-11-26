@@ -38,24 +38,15 @@ const STATUS_TONE: Record<Contract['status'], string> = {
 };
 
 interface Options {
-  /** The party a row is read relative to; null when unknown. */
   ownerOf: (contract: Contract) => number | null;
-  /** That owner's own contact list. */
   standingIndexFor: (ownerId: number) => ContactStandingIndex;
-  /** Adds the Character column (All characters): who the contract belongs to. */
   characterNameOf: ((contract: Contract) => string) | null;
   issuerNames: ReadonlyMap<number, string>;
   receiverCategories: ReadonlyMap<number, NameCategory>;
   issuerAffiliations: ReadonlyMap<number, CharacterAffiliation>;
-  /** Opens the detail modal from the identity column. */
   onOpen: (contract: Contract) => void;
 }
 
-/**
- * The History table's columns: the identity column (never hidden — it opens
- * the detail modal) plus the optional ones the picker controls, in
- * `CONTRACTS_HISTORY_COLUMN_IDS` order.
- */
 export function useContractsHistoryColumns({
   ownerOf,
   standingIndexFor,
@@ -79,7 +70,6 @@ export function useContractsHistoryColumns({
     },
     [ownerOf, receiverCategories]
   );
-  /** The standing of `id` on the contact list of whoever this row is read for. */
   const standingFor = useCallback(
     (contract: Contract, id: number) => {
       const owner = ownerOf(contract);
@@ -99,13 +89,11 @@ export function useContractsHistoryColumns({
         width: '16ch',
         className: 'whitespace-nowrap',
         sortValue: (contract) => t(CONTRACT_TYPE_KEY[contract.type]),
-        // Off the phone card: an untitled contract's title line already says its type.
         render: (contract) => <span data-dense-omit>{t(CONTRACT_TYPE_KEY[contract.type])}</span>,
       },
       status: {
         id: 'status',
         header: t('contracts.status'),
-        // "Finished (Contractor)" plus the lapsed-offer glyph.
         width: '24ch',
         className: 'font-semibold whitespace-nowrap',
         cellClassName: (contract) => STATUS_TONE[contract.status],
@@ -153,8 +141,6 @@ export function useContractsHistoryColumns({
         },
         render: (contract) => {
           const receiver = receiverFor(contract);
-          // No receiver (a public contract nobody took): the phone card's meta
-          // line leaves the placeholder dash off rather than print a bare "—".
           if (receiver === null)
             return (
               <span className="text-text-dim" data-dense-omit>
@@ -174,10 +160,8 @@ export function useContractsHistoryColumns({
         id: 'price',
         header: t('contracts.price'),
         align: 'right',
-        // `IskAmount` renders the compact figure ("999.99B"); the exact one rides its tooltip.
         width: '12ch',
         className: 'tabular-nums whitespace-nowrap',
-        // The dense phone card's headline figure, beside the title.
         cardCorner: true,
         sortValue: (contract) => contractAmount(contract),
         render: (contract) => {
@@ -188,11 +172,9 @@ export function useContractsHistoryColumns({
       issued: {
         id: 'issued',
         header: t('contracts.issued'),
-        // Date only ("10/23/2026"); the time rides a tooltip.
         width: '12ch',
         className: 'whitespace-nowrap text-text-dim',
         sortValue: (contract) => new Date(contract.date_issued).getTime(),
-        // Off the phone card: its day section header already says it.
         render: (contract) => (
           <span data-dense-omit>
             <ContractDateCell iso={contract.date_issued} timeZone={timeZone} />
@@ -202,10 +184,8 @@ export function useContractsHistoryColumns({
       expires: {
         id: 'expires',
         header: t('contracts.expires'),
-        // A courier's "Due 10/23/2026 · in 123d 23h" is the longest text.
         width: '30ch',
         className: 'whitespace-nowrap text-text-dim',
-        // An accepted courier's clock is delivery, not the accept-by expiry.
         sortValue: (contract) =>
           courierDeliveryDeadlineMs(contract) ?? new Date(contract.date_expired).getTime(),
         render: (contract) => {
@@ -213,7 +193,6 @@ export function useContractsHistoryColumns({
           if (deadlineMs === null)
             return (
               <span>
-                {/* Phone card only: its meta line has no column labels. */}
                 <span className="sm:hidden">{t('contracts.expiresAffix')}</span>
                 <ContractDateCell iso={contract.date_expired} timeZone={timeZone} />
               </span>
@@ -243,9 +222,6 @@ export function useContractsHistoryColumns({
                 )
               )}
             >
-              {/* Phone only: the status tone as a dot, so a scan down the card
-                  list reads outcome without the Status column (which the
-                  picker can hide). The word stays on the meta line. */}
               <span
                 aria-hidden="true"
                 className={cx(
@@ -256,8 +232,6 @@ export function useContractsHistoryColumns({
               <ContractIdentity contract={contract} characterId={ownerOf(contract)} />
             </button>
           );
-          // A title is the only free-text (so truncatable) identity; the full
-          // text reaches the tooltip on hover and touch-and-hold.
           return contract.title ? <Tooltip content={contract.title}>{opener}</Tooltip> : opener;
         },
       },

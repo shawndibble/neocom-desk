@@ -1,9 +1,3 @@
-/**
- * The hull picker's can-fly marks (issue #6011): each hull's Ship Tree status
- * for the active Character, from the Ship Tree's own data and rules — never a
- * second skill check. `null` until the tree and the Character's skills have
- * loaded: the picker lists hulls without marks rather than wait for them.
- */
 import { useCallback, useMemo } from 'react';
 import { classNeedsOmega } from '@/engine/shipTree/rules';
 import type { ShipTreeHullStatus } from '@/engine/shipTree/types';
@@ -12,7 +6,6 @@ import { useShipTreeData } from './shipTree/useShipTreeData';
 
 export interface HullFlyMark {
   status: ShipTreeHullStatus;
-  /** An Alpha can't fly it yet, and its class needs skills past the Alpha cap. */
   needsOmega: boolean;
 }
 

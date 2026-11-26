@@ -177,9 +177,8 @@ describe('marketTrend builder', () => {
     expect(long.chart.summary).toContain('summarySmoothed');
     expect(raw.chart.summary).not.toContain('summarySmoothed');
     const tail = long.chart.series[0]!.values.slice(7).map((x) => x ?? 0);
-    expect(Math.max(...tail) - Math.min(...tail)).toBeLessThan(5); // raw swings by 20 points
+    expect(Math.max(...tail) - Math.min(...tail)).toBeLessThan(5);
     expect(long.chart.series[0]!.values[0]).toBe(0);
-    // Tooltip is the day's own price, not the average.
     expect(long.chart.tips!.at(-1)!.rows[0]!.value).toContain('"price":"100"');
   });
 

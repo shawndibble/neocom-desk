@@ -35,28 +35,6 @@ import { goalAvailability } from '@/engine/fittings/improve';
 import type { Fitting } from '@/engine/fittings/types';
 import type { CandidateRack } from '@/engine/fittings/candidates';
 
-/**
- * Runs the real, pinned `@eveshipfit/dogma-engine` + `@eveshipfit/sde`
- * (ADR 0016) against a real fit, end to end through this app's own mapping
- * and stats-extraction code — the AC #1531 asks for ("a known Fitting...
- * matching a reference"). The reference values below are not from Pyfa or
- * eveship.fit (this run has no way to reach either live); they are this
- * exact pinned engine's own output for this exact fit, computed once via a
- * direct run of the packages installed here and pinned in `package.json`, so
- * this test is really validating that `fitMapper`/`pilotProfile`/`stats`
- * build the engine the *input* it expects and read its *output* correctly —
- * the layer this ticket actually adds. Whether the engine's own math matches
- * a third-party tool is ADR 0016's bet, not this seam's.
- *
- * Regenerate the expected values (log `stats` from a run of this file) if
- * `@eveshipfit/dogma-engine`/`@eveshipfit/sde` are ever bumped — they must be
- * bumped together (ADR 0016), and either can shift these numbers.
- *
- * Item and skill type ids below were looked up against Fuzzwork's
- * `invTypes.csv`/`dgmTypeAttributes.csv` on 2026-09-24 (the same source
- * `scripts/build-sde.mjs` bakes from), not recalled from memory.
- */
-
 const VEXOR_NAVY_ISSUE = 17843;
 const NEUTRON_BLASTER_CANNON_II = 3186;
 const ANTIMATTER_CHARGE_M = 230;
@@ -70,12 +48,10 @@ const RIFTER = 587;
 const REACTIVE_ARMOR_HARDENER = 4403;
 const CARACAL = 621;
 const LIGHT_ARMOR_MAINTENANCE_BOT_I = 23711;
-// Fractured Skies (game build 3693310): a new hull, a synchronizer rig and a module of its set.
 const HERALD = 97793;
 const PENITENCE = 97904;
 const MEDIUM_FEDERATION_NAVY_SYNCHRONIZER = 96128;
 const FEDERATION_NAVY_MAGNETIC_FIELD_STABILIZER = 15895;
-// Looked up by exact name in `public/data/types.json`, 2026-10-25.
 const VEDMAK = 47270;
 const HEAVY_ENTROPIC_DISINTEGRATOR_II = 47918;
 const VOID_M = 12789;
@@ -83,16 +59,13 @@ const BUZZARD = 11192;
 const CORE_PROBE_LAUNCHER_I = 17938;
 const HEAVY_MISSILE_LAUNCHER_II = 2410;
 const SCOURGE_HEAVY_MISSILE = 209;
-// Looked up by exact name in `public/data/types.json`, 2026-09-29.
 const OMEN = 2006;
-// Looked up by exact name in `public/data/types.json`, 2026-10-25.
 const LIGHT_MISSILE_LAUNCHER_II = 2404;
 const VENTURE = 32880;
 const MINER_I = 483;
 const HEAVY_PULSE_LASER_II = 3520;
 const MULTIFREQUENCY_M = 254;
 const SCORCH_M = 12818;
-// Looked up by exact name in the pinned `sde.dat`, 2026-09-25.
 const HURRICANE = 24702;
 const MAELSTROM = 24694;
 const HULK = 22544;
@@ -113,7 +86,6 @@ const MEDIUM_REMOTE_CAPACITOR_TRANSMITTER_II = 12221;
 const STASIS_WEBIFIER_II = 527;
 const WARP_SCRAMBLER_II = 448;
 const MULTISPECTRUM_ECM_II = 2567;
-// Looked up by exact name in the pinned `sde.dat`, 2026-09-25.
 const TRACKING_DISRUPTOR_II = 2109;
 const OPTIMAL_RANGE_DISRUPTION_SCRIPT = 29005;
 const REMOTE_SENSOR_DAMPENER_II = 1969;
@@ -129,29 +101,27 @@ const AFTERBURNER_1MN_II = 438;
 const CLAYMORE = 22468;
 const SKIRMISH_COMMAND_BURST_II = 43556;
 const RAPID_DEPLOYMENT_CHARGE = 42840;
-/** Leadership, Skirmish Command, Command Burst Specialist, Wing/Fleet Command, Command Ships. */
 const SVIPUL = 34562;
 const SVIPUL_PROPULSION_MODE = 34566;
 const STANDARD_BLUE_PILL_BOOSTER = 9950;
 const TEMPLAR_I = 23055;
 const CENOBITE_I = 37599;
-/** Fighters, Light Fighters, Support Fighters, Fighter Hangar Management. */
 const FIGHTER_SKILL_IDS = [23069, 40572, 40573, 24613];
 const COMMAND_SKILL_IDS = [3348, 3349, 3354, 11574, 24764, 23950];
 
 const PARTIAL_SKILLS = new Map([
-  [3332, 3], // Gallente Cruiser
-  [3426, 3], // CPU Management
-  [3413, 3], // Power Grid Management
-  [3318, 2], // Weapon Upgrades
-  [3394, 2], // Hull Upgrades
-  [3392, 3], // Mechanics
-  [3436, 3], // Drones
-  [3442, 1], // Drone Interfacing
-  [3301, 3], // Small Hybrid Turret
-  [3304, 2], // Medium Hybrid Turret
-  [3419, 2], // Shield Management
-  [3425, 1], // Shield Upgrades
+  [3332, 3],
+  [3426, 3],
+  [3413, 3],
+  [3318, 2],
+  [3394, 2],
+  [3392, 3],
+  [3436, 3],
+  [3442, 1],
+  [3301, 3],
+  [3304, 2],
+  [3419, 2],
+  [3425, 1],
 ]);
 
 function vexorNavyIssueFit(): Fitting {
@@ -290,7 +260,6 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
       );
     };
 
-    // A Warrior II is a light drone, 5 Mbit/s; Drones V controls five, Drones III three.
     expect(read(allV)).toEqual({ maxActiveDrones: 5, droneBandwidthByType: { [WARRIOR_II]: 5 } });
     expect(read(partial).maxActiveDrones).toBe(3);
     expect(read(noDrones).maxActiveDrones).toBe(0);
@@ -310,7 +279,6 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
     );
 
     expect(stats.unknownItemTypeIds).toEqual([999_999_999]);
-    // The rest of the fit still calculated — same as the clean-fit case above.
     expect(stats.cpuTotal).toBeCloseTo(437.5, 6);
     expect(stats.droneDps).toBeCloseTo(124.578, 2);
   });
@@ -346,7 +314,6 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
       return extractFittingStats(withIt.items, calculation.ship.attributes, calculation.items);
     };
     const clear = read();
-    // Firestorm (infernal_weather_1 / _3): thermal resist penalty, +50% armor HP.
     const firestorm1 = read(47390);
     const firestorm3 = read(47392);
 
@@ -354,12 +321,10 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
     expect(firestorm3.armor.hp).toBeCloseTo(clear.armor.hp * 1.5, 6);
     expect(firestorm1.armor.thermalResonance).toBeGreaterThan(clear.armor.thermalResonance);
     expect(firestorm3.armor.thermalResonance).toBeGreaterThan(firestorm1.armor.thermalResonance);
-    // Other damage types untouched.
     expect(firestorm3.armor.kineticResonance).toBeCloseTo(clear.armor.kineticResonance, 6);
   });
 
   it('gives every weather the bonus and the level-scaled penalty the picker names', () => {
-    // A Rifter with a loaded 200mm AutoCannon II (2889, EMP S 12608), so Dark's range penalty shows.
     const fitting: Fitting = {
       name: 'Rifter',
       shipTypeId: RIFTER,
@@ -380,24 +345,19 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
     const ratio = (weatherTypeId: number, pick: (r: ReturnType<typeof read>) => number) =>
       pick(read(weatherTypeId)) / pick(clear);
 
-    // Dark: +50% velocity; turret optimal −30% at 1, −70% at 3.
     expect(ratio(47378, (r) => r.stats.navigation.maxVelocity)).toBeCloseTo(1.5, 6);
     expect(ratio(47378, (r) => r.optimal)).toBeCloseTo(0.7, 6);
     expect(ratio(47380, (r) => r.optimal)).toBeCloseTo(0.3, 6);
-    // Electrical: recharge time halved; EM resonance ×1.3 at 1, ×1.7 at 3 (resists −30 / −70%).
     expect(ratio(47381, (r) => r.stats.capacitorRechargeTime)).toBeCloseTo(0.5, 6);
     expect(ratio(47381, (r) => r.stats.armor.emResonance)).toBeCloseTo(1.3, 6);
     expect(ratio(47383, (r) => r.stats.armor.emResonance)).toBeCloseTo(1.7, 6);
-    // Exotic: +50% scan resolution; kinetic resists down.
     expect(ratio(47384, (r) => r.stats.targeting.scanResolution)).toBeCloseTo(1.5, 6);
     expect(ratio(47384, (r) => r.stats.armor.kineticResonance)).toBeCloseTo(1.3, 6);
-    // Gamma: +50% shield HP; explosive resists down.
     expect(ratio(47387, (r) => r.stats.shield.hp)).toBeCloseTo(1.5, 6);
     expect(ratio(47387, (r) => r.stats.shield.explosiveResonance)).toBeCloseTo(1.3, 6);
   });
 
   it("reads the hull's own resists, not the Damage Control modifier attributes", () => {
-    // A bare Rifter: every hull since 2021 has a flat 33% structure resist.
     const fitting: Fitting = {
       name: 'Bare Rifter',
       shipTypeId: RIFTER,
@@ -418,7 +378,6 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
     expect(stats.hull.thermalResonance).toBeCloseTo(0.67, 4);
     expect(stats.hull.kineticResonance).toBeCloseTo(0.67, 4);
     expect(stats.hull.explosiveResonance).toBeCloseTo(0.67, 4);
-    // A frigate warps at 5 AU/s; the base-speed attribute alone reads 1 on every hull.
     expect(stats.navigation.warpSpeed).toBeCloseTo(5, 6);
   });
 
@@ -453,7 +412,6 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
       [NEUTRON_BLASTER_CANNON_II, 3],
       [WARRIOR_II, 5],
     ]);
-    // The ship's own damagePerSecondWithoutReload covers turrets and drones alike.
     expect(offense.dps).toBeCloseTo(calculation.ship.attributes.get(-12)!.value, 6);
     expect(offense.weapons[1].dps).toBeCloseTo(124.578, 2);
     expect(offense.weapons[0].dps).toBeCloseTo(40.32, 2);
@@ -500,8 +458,6 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
     ]) {
       const { offense, calculation } = offenseOf(fit(ship, weapon, charge));
       const read = (id: number) => calculation.items[0].attributes.get(id)?.value ?? 0;
-      // The engine fills in a weapon's magazine, not only a booster's or AAR's
-      // — in single precision (160 antimatter rounds read 159.9999976).
       const shots = Math.round(read(-8));
       expect(shots).toBeGreaterThan(1);
       const firing = (shots * read(51)) / 1000;
@@ -516,7 +472,6 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
       expect(offense.sustainedDps).toBeCloseTo(guns.dps * duty + drones.dps, 6);
     }
 
-    // A frequency crystal is never spent per shot, damaged kind (Scorch) or not.
     for (const crystal of [MULTIFREQUENCY_M, SCORCH_M]) {
       const { offense } = offenseOf(fit(OMEN, HEAVY_PULSE_LASER_II, crystal));
       expect(offense.weapons[0].dps).toBeGreaterThan(0);
@@ -552,10 +507,7 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
       null
     );
     const [row] = offense.weapons;
-    // The engine's DPS is fully spooled: the first cycle's, times 1 + the
-    // 2.125 maximum bonus. Both modules' unspooled figures sum.
     expect(row.spool?.unspooledDps).toBeCloseTo(row.dps / 3.125, 6);
-    // 2.125 / 0.07 a cycle = 31 cycles of 3.96 s.
     expect(row.spool?.secondsToFull).toBeCloseTo(31 * 3.96, 6);
   });
 
@@ -582,13 +534,10 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
     );
     const rah = extractModuleResult(calculation.items[0]);
 
-    // Pinned from a direct run of the engine (2026-09-24). Uniform and
-    // unadapted, the same fit reads 2481.9 total / 901.9 armor.
     expect(stats.ehp).toBeCloseTo(4619.06, 1);
     expect(stats.shield.ehp).toBeCloseTo(514.29, 1);
     expect(stats.armor.ehp).toBeCloseTo(3234.13, 1);
     expect(stats.hull.ehp).toBeCloseTo(870.65, 1);
-    // All the RAH's 60% shifted into EM.
     expect(rah.adaptedResonances?.emResonance).toBeCloseTo(0.4, 4);
     expect(rah.adaptedResonances?.thermalResonance).toBeCloseTo(1, 4);
     expect(extractModuleResult(calculation.items[1])).not.toHaveProperty('adaptedResonances');
@@ -622,29 +571,21 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
     const budget = extractCapacitorBudget(dogmaFit.items, calculation.items, ship);
     const tank = extractTank(dogmaFit.items, calculation.items, ship, stats);
 
-    // Peak recharge is 2.5 × capacity over the recharge time, in seconds.
     expect(budget.peakRecharge).toBeCloseTo(
       (2.5 * stats.capacitorCapacity) / (stats.capacitorRechargeTime / 1000),
       6
     );
-    // Two Cap Booster 400s a load (40 m3 of 16 m3 charges), one every 12 s,
-    // then a 10 s reload: 800 GJ every 34 s. The engine's own net peak load
-    // (-4) and delta (-5) count the booster at 400 every 12 s, no reload.
     const reloadShortfall = 400 / 12 - 800 / 34;
     expect(budget.boosterInjection).toBeCloseTo(800 / 34, 6);
     expect(budget.drain - budget.boosterInjection - budget.nosferatuGain).toBeCloseTo(
       read(-4) + reloadShortfall,
       6
     );
-    // The Medium Energy Nosferatu II's 36 GJ every 5 s.
     expect(budget.nosferatuGain).toBeCloseTo(36 / 5, 6);
-    // The engine's delta counts the nosferatu as income; ours does not.
     expect(budget.delta).toBeCloseTo(read(-5) - reloadShortfall - budget.nosferatuGain, 6);
 
-    // The remote armor repairer repairs someone else: the local tank has no armor.
     expect(tank.burst.armor).toBe(0);
     expect(tank.burst.shield).toBeGreaterThan(0);
-    // Passive regeneration peaks at 2.5 × shield HP over the shield recharge time.
     expect(tank.passiveShield).toBeCloseTo((2.5 * stats.shield.hp) / (read(479) / 1000), 6);
   });
 
@@ -680,16 +621,12 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
     };
     const tech1 = figuresWith(CAP_BOOSTER_400);
     const navy = figuresWith(NAVY_CAP_BOOSTER_400);
-    // Both inject 400 GJ; the Navy charge is 12 m3 to the Tech I's 16, so 3 fit in 40 m3, not 2.
     expect(tech1.figures).toMatchObject({ injection: 400, boostsPerLoad: 2 });
     expect(navy.figures).toMatchObject({ injection: 400, boostsPerLoad: 3 });
-    // A 12 s cycle and a 10 s reload: 800 GJ every 34 s against 1200 every 46.
     expect(tech1.figures!.gjPerSecond).toBeCloseTo(800 / 34, 6);
     expect(navy.figures!.gjPerSecond).toBeCloseTo(1200 / 46, 6);
-    // The capacitor is the stats panel's own headline.
     expect(tech1.figures!.capacitor).toEqual(tech1.stats.capacitor);
 
-    // An ancillary shield booster burns the same charges but injects nothing: no guide for it.
     const ancillary: Fitting = {
       name: 'Integration Test Caracal ancillary',
       shipTypeId: CARACAL,
@@ -749,7 +686,6 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
       NAVY_CAP_BOOSTER_400,
     ])[0]!;
 
-    // The stats headline: the same fit in the same weather.
     const weathered = withWeather(fittingToDogmaFit(fitting, pilot), ELECTRICAL_1);
     const calculation = calculate(weathered);
     const stats = extractFittingStats(
@@ -758,7 +694,6 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
       calculation.items
     );
     expect(under.cap!.capacitor).toEqual(stats.capacitor);
-    // Without the weather the guide answered for a different capacitor.
     expect(under.cap!.capacitor).not.toEqual(clear.cap!.capacitor);
   });
 
@@ -785,18 +720,10 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
       calculation.items,
       calculation.ship.attributes
     );
-    // Three 12 m3 charges in 40 m3, 12 s apart, then 10 s reloading.
     expect(budget.boosterInjection).toBeCloseTo(1200 / 46, 6);
   });
 
   it('never calls a fit stable that its cap booster only holds up by never reloading', () => {
-    // Medium Capacitor Booster II + Navy Cap Booster 400, a shield booster and
-    // two neutralizers: the engine counts the booster at 33.3 GJ/s with no
-    // reload and says stable; averaged over its reload (26.1) the cap drains.
-    // (`SUPPORT_SKILL_IDS` is a blind id range that also holds Cap Batteries,
-    // 3488 and 3496; engines before 14.0 applied them as if fitted, puffing
-    // the capacitor to 4785 GJ. At the true 1562.5 the old five-and-four
-    // neutralizer pair both drain.)
     const caracal = (neuts: number): Fitting => ({
       name: 'Integration Test Caracal booster-dependent',
       shipTypeId: CARACAL,
@@ -843,7 +770,6 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
       )
     );
 
-    // One still holds, at the level the reload-averaged drain settles at.
     const one = run(1);
     expect(one.budget.delta).toBeGreaterThan(0);
     expect(one.stats.capacitor.stable).toBe(true);
@@ -915,7 +841,6 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
       'warpDisruption',
       'ecm',
     ]);
-    // The engine's outgoing projections carry the same figures it hands a target.
     const outgoing = calculation.outgoing?.effects ?? [];
     const projected = (typeId: number, attributeId: number) => {
       const effect = outgoing.find((e) => e.type_id === typeId);
@@ -931,9 +856,7 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
       6
     );
     expect(support.neutralizer).toBeCloseTo(projected(MEDIUM_ENERGY_NEUTRALIZER_II, -66)!, 6);
-    // A Medium Energy Nosferatu II drains 36 GJ every 5 s.
     expect(support.nosferatu).toBeCloseTo(36 / 5, 6);
-    // Stasis Webifier II −60%, Warp Scrambler II two points.
     expect(support.rows.find((row) => row.kind === 'web')?.amount).toBeCloseTo(60, 6);
     expect(support.rows.find((row) => row.kind === 'warpDisruption')?.amount).toBe(2);
     expect(support.rows.find((row) => row.kind === 'ecm')?.amount).toBeGreaterThan(0);
@@ -966,8 +889,6 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
       row.kind,
       row.effects.map((e) => [e.effect, Number(e.amount.toFixed(1))]),
     ]);
-    // Before: the scripted disruptor, the dampener and the guidance
-    // disruptor each read one zeroed attribute and had no row at all.
     expect(shape).toEqual([
       [
         'trackingDisruptor',
@@ -1042,7 +963,6 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
   });
 
   it('counts an empty missile launcher, not an empty probe launcher, as an unloaded weapon', async () => {
-    // `computeFittingStats` reads the SDE's type list to tell which charges deal damage.
     const types = await readFile(new URL('../../../public/data/types.json', import.meta.url));
     const realFetch = fetch;
     vi.stubGlobal('fetch', async (input: RequestInfo | URL) =>
@@ -1093,7 +1013,6 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
     const crystal = mine(hulk([strip(0, SIMPLE_ASTEROID_MINING_CRYSTAL_TYPE_A_II)]));
     expect(bare.rows).toHaveLength(1);
     expect(bare.perSecond).toBeGreaterThan(0);
-    // The crystal raises the yield and the residue chance alike.
     expect(crystal.perSecond).toBeGreaterThan(bare.perSecond);
     expect(crystal.wastePct).toBeGreaterThan(bare.wastePct);
     expect(crystal.rows[0].chargeTypeId).toBe(SIMPLE_ASTEROID_MINING_CRYSTAL_TYPE_A_II);
@@ -1104,14 +1023,12 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
     const drones = withDrones.rows.find((row) => row.isDrone);
     expect(drones?.count).toBe(5);
     expect(withDrones.perSecond).toBeCloseTo(bare.perSecond + drones!.perSecond, 9);
-    // Left in the bay, they mine nothing.
     expect(
       mine(hulk([strip(0)], [{ typeId: MINING_DRONE_II, quantity: 5, state: 'online' }])).perSecond
     ).toBeCloseTo(bare.perSecond, 9);
   });
 
   it('backs the crystal guide: A keeps the most per rock, B mines fastest, C empties the rock', () => {
-    // Looked up by exact name in `public/data/types.json`, 2026-10-03.
     const [SIMPLE_B_II, SIMPLE_C_II] = [60283, 60284];
     const figures = (chargeTypeId: number) => {
       const fitting: Fitting = {
@@ -1134,21 +1051,17 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
     const b = figures(SIMPLE_B_II);
     const c = figures(SIMPLE_C_II);
 
-    // B: A's yield a cycle on a shorter cycle, so more a second, with more residue.
     expect(b.cycleSeconds).toBeLessThan(a.cycleSeconds);
     expect(b.m3PerSecond * b.cycleSeconds).toBeCloseTo(a.m3PerSecond * a.cycleSeconds, 6);
     expect(b.m3PerSecond).toBeGreaterThan(a.m3PerSecond);
     expect(b.residueChance).toBeGreaterThan(a.residueChance);
-    // A keeps the most of what leaves the rock.
     expect(a.m3PerSecond / a.removedM3s).toBeGreaterThan(b.m3PerSecond / b.removedM3s);
-    // C: little yield, but the rock empties fastest.
     expect(c.m3PerSecond).toBeLessThan(a.m3PerSecond);
     expect(c.removedM3s).toBeGreaterThan(b.removedM3s);
     expect(c.residueMultiplier).toBeGreaterThan(1);
   });
 
   it('reads fleet boosts off an Orca and a Vulture, each skill moving the figure it should', () => {
-    // Looked up by exact name in `public/data/types.json`, 2026-09-30.
     const ORCA = 28606;
     const VULTURE = 22446;
     const MINING_FOREMAN_BURST_II = 43551;
@@ -1207,7 +1120,6 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
     expect(burst.chargeTypeId).toBe(MINING_LASER_FIELD_ENHANCEMENT_CHARGE);
     expect(none.stats.compressors).toHaveLength(1);
     expect(none.stats.core?.fuelPerCycle).toBeGreaterThan(0);
-    // The strengths are what the engine itself hands a fleet.
     expect(burst.strengths).toEqual(none.outgoing.map((buff) => Math.abs(buff.value)));
 
     const moved = (skill: number) => fleetAt(orca, [skill]).stats;
@@ -1224,7 +1136,6 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
       none.stats.core!.fuelPerCycle
     );
 
-    // A combat burst reads the same way; its buff is negative, so the size is reported.
     const shield = fleetAt(vulture, []);
     expect(shield.outgoing[0]!.value).toBeLessThan(0);
     const shieldBurst = shield.stats.bursts[0]!;
@@ -1237,7 +1148,6 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
       shieldBurst.durationSeconds
     );
 
-    // No charge: a burst with nothing to hand out.
     const bare = fleetAt(
       {
         ...orca,
@@ -1284,8 +1194,6 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
     ]);
     expect(loaded.tank.ancillary[0].empty).toBeCloseTo(dry.tank.burst.armor, 6);
     expect(dry.tank.ancillary[0].loaded).toBeCloseTo(loaded.tank.burst.armor, 6);
-    // 0.32 m³ of paste at 0.01 m³, four a cycle: 8 cycles (9 s each, skills
-    // taking a quarter off 12 s), then 60 s reloading.
     expect(loaded.tank.sustained.armor).toBeCloseTo((loaded.tank.burst.armor * 72) / 132, 6);
 
     const asb = {
@@ -1311,7 +1219,6 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
       const calculation = calculate(dogmaFit);
       return extractLockedTargets(calculation.ship.attributes, calculation.character.attributes);
     };
-    // A Maelstrom locks 7; Target Management (3429) / Advanced (3430) add one a level to two.
     expect(locks([])).toEqual({ ship: 7, pilot: 2, effective: 2 });
     expect(locks([[3429, 1]])).toEqual({ ship: 7, pilot: 3, effective: 3 });
     expect(
@@ -1336,7 +1243,6 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
     expect(caracal.sensor.strength).toBeGreaterThan(0);
     expect(caracal.holds.cargo).toBeGreaterThan(0);
     expect(caracal.jumpDrive).toBeNull();
-    // A Hulk has a mining hold; a Thanatos (carrier) a fleet hangar and a jump drive.
     expect(read(HULK).holds.miningHold).toBe(11500);
     const thanatos = read(THANATOS);
     expect(thanatos.holds.fleetHangar).toBeGreaterThan(0);
@@ -1427,23 +1333,19 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
       projectedTypeIds: [],
     });
 
-    // Damage multiplier (64): Surgical Strike, the Rifter's bonus, two Gyrostabilizers.
     const damage = rows.find((row) => row.attributeId === 64)!;
     expect(damage.value).toBeGreaterThan(damage.base);
     const kinds = damage.sources.map((source) => [source.kind, source.typeId]);
     expect(kinds).toContainEqual(['skill', 3315]);
     expect(kinds).toContainEqual(['item', GYROSTABILIZER_II]);
-    // The second Gyrostabilizer is stacking-penalised.
     expect(
       damage.sources.some(
         (source) => source.typeId === GYROSTABILIZER_II && source.penalty !== null
       )
     ).toBe(true);
-    // Rate of fire (51): Rapid Firing.
     expect(rows.find((row) => row.attributeId === 51)!.sources).toContainEqual(
       expect.objectContaining({ kind: 'skill', typeId: 3310 })
     );
-    // Nothing negative: the patched, derived ids are never listed.
     expect(rows.every((row) => row.attributeId > 0)).toBe(true);
   });
 
@@ -1472,10 +1374,8 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
         [3315, 5],
       ])
     );
-    // Rapid Firing (rate of fire) and Surgical Strike (damage) on the gun.
     expect(trained).toContain(3310);
     expect(trained).toContain(3315);
-    // Untrained skills give no modifiers — why the panel looks at All V.
     const untrained = sourcesUnder(new Map([[3300, 5]]));
     expect(untrained).not.toContain(3315);
   });
@@ -1536,13 +1436,10 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
       cargo: [],
     });
     expect(booster.projection.buffs.length).toBeGreaterThan(0);
-    // Rapid Deployment: the afterburner's speed bonus is up.
     expect(speed(booster.ship)).toBeGreaterThan(speed(alone));
   });
 
   it('takes in a stack of repair drones as many times as the stack is big', () => {
-    // Since engine v14 a stack projects as one effect with a quantity; that
-    // quantity has to survive the round trip through our own shape.
     const allV = buildAllVProfile(SUPPORT_SKILL_IDS);
     const targetFit = fittingToDogmaFit(
       { name: 'Rifter', shipTypeId: RIFTER, modules: [], drones: [], cargo: [] },
@@ -1578,9 +1475,6 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
     expect(hull(bare(HERALD))).toBe(1100);
     expect(hull(bare(PENITENCE))).toBe(2400);
 
-    // The Federation Navy Synchronizer's hull bonus is 5%, +1% for every
-    // Federation Navy module fitted — online or not, as pyfa v2.70.0 has it —
-    // on the Vexor Navy Issue's untrained 3000 hull.
     expect(hull(bare(VEXOR_NAVY_ISSUE))).toBe(3000);
     const vexor = (stabilizers: number, state: 'online' | 'offline'): Fitting => ({
       name: 'V',
@@ -1626,9 +1520,7 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
       return extractFittingStats(dogmaFit.items, calculation.ship.attributes, calculation.items);
     };
     const bare = calculate({ ship: { type_id: SVIPUL }, items: [] }).ship.attributes;
-    // Defense Mode by default: a third off incoming damage on every layer.
     expect(read(svipul()).shield.emResonance).toBeCloseTo(bare.get(271)!.value * (2 / 3), 6);
-    // Propulsion Mode: more agile, no resist bonus.
     expect(read(svipul(SVIPUL_PROPULSION_MODE)).navigation.agility).toBeLessThan(
       read(svipul()).navigation.agility
     );
@@ -1644,7 +1536,6 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
       ...(sideEffects ? { boosterSideEffects: sideEffects } : {}),
     });
     const rifter = { name: 'R', shipTypeId: RIFTER, modules: [], drones: [], cargo: [] };
-    // Its Shield Capacity side effect: −20% with no Neurotoxin skills.
     expect(read(rifter, bluePill([2737])).shield.hp).toBeCloseTo(
       read(rifter, bluePill()).shield.hp * 0.8,
       6
@@ -1675,7 +1566,6 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
     expect(fighters.light).toEqual({ used: 1, total: 3 });
     expect(fighters.support).toEqual({ used: 1, total: 2 });
     expect(fighters.dps).toBeGreaterThan(0);
-    // Offense rows add up to the engine's own fighter DPS; the bay squadron doesn't fight.
     const offense = extractOffense(
       fitting.fighters!.map((f) => ({
         typeId: f.typeId,
@@ -1690,7 +1580,6 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
     expect(offense.weapons).toEqual([
       expect.objectContaining({ typeId: TEMPLAR_I, count: 6, isFighter: true }),
     ]);
-    // Applied DPS takes the launched squadron at the same DPS, its attack all EM.
     const applied = extractAppliedDpsInputs(
       dogmaFit.items,
       calculation.items,
@@ -1708,7 +1597,6 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
   it('reads applied-DPS inputs: running turrets, loaded launchers, launched drones only', () => {
     const vexor = vexorNavyIssueFit();
     vexor.drones = [{ typeId: WARRIOR_II, quantity: 5, state: 'active' }];
-    // Drone Avionics (3437) V adds 5 km a level to the 20 km base.
     const vexorFit = fittingToDogmaFit(vexor, buildAllVProfile([...ALL_TEST_SKILL_IDS, 3437]));
     const vexorCalc = calculate(vexorFit);
     const vexorInputs = extractAppliedDpsInputs(
@@ -1725,9 +1613,7 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
     expect(blaster.optimalSigRadius).toBe(40000);
     expect(warriors.speed).toBeGreaterThan(0);
     expect(warriors.optimalSigRadius).toBe(25);
-    // The Warriors' DPS reconciles with the ship-level drone DPS the engine reports.
     expect(warriors.dps).toBeCloseTo(vexorCalc.ship.attributes.get(-14)?.value ?? 0, 3);
-    // Control range is a character attribute, not a ship one.
     expect(vexorInputs.droneControlRange).toBe(45000);
 
     const caracal: Fitting = {
@@ -1759,22 +1645,18 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
       caracalCalc.items,
       caracalCalc.character.attributes
     );
-    // Pinned from a direct run of the engine (2026-09-24), no skills.
     expect(caracalInputs.weapons).toEqual([
       {
         kind: 'missile',
         dps: expect.closeTo(13.07, 2),
-        // The launcher's magazine, then its reload: the share it spends firing.
         reloadDuty: expect.closeTo(0.9785, 3),
         range: expect.closeTo(4730 * 6.5, 0),
         explosionRadius: expect.closeTo(140, 3),
         explosionVelocity: expect.closeTo(85, 3),
         damageReductionFactor: expect.closeTo(0.682, 3),
-        // Scourge is all kinetic.
         damage: { em: 0, thermal: 0, kinetic: 1, explosive: 0 },
       },
     ]);
-    // Antimatter splits thermal and kinetic; Warriors are all explosive.
     expect(blaster.damage?.thermal).toBeGreaterThan(0);
     expect(blaster.damage?.kinetic).toBeGreaterThan(0);
     expect(blaster.damage?.em).toBe(0);
@@ -1783,27 +1665,13 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
   });
 });
 
-/**
- * Every skill this fit's items or the partial-skills scenario reference, for
- * an "All V" profile scoped to this test rather than the app's full ~511-
- * skill catalog (`public/data/skills.json`) — the production All-V builder
- * (`buildAllVProfile`) is exercised with the real catalog by its own unit
- * test; what matters here is that a skill relevant to this specific fit
- * lands in the engine's `character.skills` map correctly.
- */
 const ALL_TEST_SKILL_IDS = [...PARTIAL_SKILLS.keys()];
 
-/** Every skill from 3300 to 3499 — the core ship, weapon, engineering and electronics skills — for the support and tank fits. */
 const SUPPORT_SKILL_IDS = Array.from({ length: 200 }, (_, i) => 3300 + i);
 
-/** The core skills plus the mining ones outside 3300-3499 (Mining Barge, Exhumers). */
 const MINING_SKILL_IDS = [...SUPPORT_SKILL_IDS, 17940, 22551];
 
-// Runs on the engine and SDE loaded once for the whole file.
 describe('mutated (abyssal) modules (real WASM + real pinned SDE)', () => {
-  // Heavy Abyssal Energy Neutralizer (47832) made from a Heavy Gremlin
-  // Compact Energy Neutralizer (16475) with a Gravid mutaplasmid (47831) —
-  // the rolls of a live ESI dynamic item (contract item 1054645434634).
   const HEAVY_GREMLIN_NEUT = 16475;
   const HEAVY_ABYSSAL_NEUT = 47832;
   const NO_SKILLS = {
@@ -1843,9 +1711,8 @@ describe('mutated (abyssal) modules (real WASM + real pinned SDE)', () => {
         attributes: { 6: 419.25, 54: 15680, 97: 591.36 },
       },
     });
-    expect(attr(rolled, 6)).toBeCloseTo(419.25, 6); // capacitorNeed, rolled
-    expect(attr(rolled, 97)).toBeCloseTo(591.36, 6); // energyNeutralizerAmount, rolled
-    // Not rolled here: the Heavy Gremlin's own 32 tf.
+    expect(attr(rolled, 6)).toBeCloseTo(419.25, 6);
+    expect(attr(rolled, 97)).toBeCloseTo(591.36, 6);
     expect(attr(rolled, 50)).toBeCloseTo(32, 6);
   });
 
@@ -1868,8 +1735,6 @@ describe('mutated (abyssal) modules (real WASM + real pinned SDE)', () => {
   });
 
   it('states a mutated drone from its base, with its roll as the base value', () => {
-    // Light Mutated Drone (60478) from a Hobgoblin I (2454), Exigent Light
-    // Drone Firepower: damageMultiplier (64) rolled to 2.1.
     const droneFit = (drone: Fitting['drones'][number]): Fitting => ({
       name: 'Drone',
       shipTypeId: VEXOR_NAVY_ISSUE,
@@ -1890,7 +1755,6 @@ describe('mutated (abyssal) modules (real WASM + real pinned SDE)', () => {
         mutation: { baseTypeId: 2454, mutaplasmidTypeId: 60461, attributes: { 64: 2.1 } },
       })
     )!;
-    // The hull's own bonus applies on top of either: base 1.6 -> plain, 2.1 -> rolled.
     expect(rolled / plain).toBeCloseTo(2.1 / 1.6, 6);
   });
 
@@ -1917,15 +1781,12 @@ describe('mutated (abyssal) modules (real WASM + real pinned SDE)', () => {
       });
     const forged = await computeFittingStats(mutated({ ...rolls, 73: 1 }), NO_SKILLS);
     expect(forged).toEqual(await computeFittingStats(mutated(rolls), NO_SKILLS));
-    expect(forged.cpuUsed).toBeCloseTo(32, 6); // the base's own: the mutation got through
+    expect(forged.cpuUsed).toBeCloseTo(32, 6);
   });
 });
 
 describe('hull fit pre-filter (real WASM + real pinned SDE)', () => {
-  // A Rifter (frigate), a Loki (Tech 3: no hi/med/low slots until subsystems
-  // are fitted) and a Bestower (an industrial).
   const HULLS = [587, 29990, 1944];
-  // Modules and drones of every rack, from the same ids the tests above use.
   const ITEMS: [CandidateRack, number][] = [
     ['high', NEUTRON_BLASTER_CANNON_II],
     ['medium', MULTISPECTRUM_SHIELD_HARDENER_II],
@@ -1944,10 +1805,6 @@ describe('hull fit pre-filter (real WASM + real pinned SDE)', () => {
     }
   });
 
-  // The skill-free shortcut against the full check, over a spread of the real
-  // catalogue (every 9th fittable item), for a pilot with every skill, one
-  // with a few, and one with none: same answer for everything that goes on
-  // the hull, and nothing left out that does.
   describe('checkHullCandidate against the full check', async () => {
     const slots = JSON.parse(
       await readFile(new URL('../../../public/data/fittingSlots.json', import.meta.url), 'utf8')
@@ -1969,9 +1826,6 @@ describe('hull fit pre-filter (real WASM + real pinned SDE)', () => {
         const typeId = Number(id);
         const full = engine.checkOneCandidate(hull, rack, typeId, skills);
         const fast = engine.checkHullCandidate(hull, rack, typeId, skills);
-        // An item the hull refuses outright only needs to agree on that —
-        // `fast` answers it from the no-skill bare check (the Hull icon
-        // filter's only consumer), not the full skills-aware run `full` is.
         if (full.fitsHull) expect({ typeId, fast }).toEqual({ typeId, fast: full });
         else expect({ typeId, fast: fast.fitsHull }).toEqual({ typeId, fast: false });
       }
@@ -1986,7 +1840,6 @@ describe('hull fit pre-filter (real WASM + real pinned SDE)', () => {
 });
 
 describe('Tech 3 cruiser subsystems (real WASM + real pinned SDE)', () => {
-  // Looked up by exact name in `public/data/types.json`, 2026-10-25.
   const TENGU = 29984;
   const TENGU_SUBSYSTEMS = [45625, 45590, 45603, 45614];
 

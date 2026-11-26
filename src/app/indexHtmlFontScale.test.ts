@@ -3,12 +3,6 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import indexHtml from '/index.html?raw';
 import { FONT_SCALE_MIRROR_KEY, FONT_SCALE_STEPS } from '@/lib/fontScale';
 
-/**
- * The pre-paint font-scale script in `index.html` runs before any bundle, so
- * it cannot import `fontScale.ts` — it carries its own copy of the key and the
- * step list. This runs the script as shipped against each case, so the copy
- * cannot drift from the store that writes the mirror.
- */
 function bootScript(): string {
   const match = /<script id="font-scale-boot">([\s\S]*?)<\/script>/.exec(indexHtml);
   if (match === null) throw new Error('index.html has no #font-scale-boot script');
@@ -16,7 +10,6 @@ function bootScript(): string {
 }
 
 function runBootScript(): void {
-  // Indirect eval: the script runs at global scope, as a classic <script> does.
   (0, eval)(bootScript());
 }
 

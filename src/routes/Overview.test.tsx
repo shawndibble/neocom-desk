@@ -49,7 +49,6 @@ const FIXTURE_SKILLS: SkillType[] = [
   },
 ];
 
-// The Calendar widget's board reads Shared Pops through a callable: no Firebase here.
 vi.mock('@/sync/sharedPops', () => ({ fetchSharedPops: async () => [] }));
 
 vi.mock('@/sde/loadMarketSde', () => ({
@@ -80,9 +79,6 @@ const skillsPayload = {
   unallocated_sp: 12_000,
 };
 
-// Relative to the instant the suite runs: the board feeds this into
-// `selectActiveEntryFromSorted(..., Date.now())`, so a fixed pair of dates would
-// eventually fall out of the window and the entry would stop being "active".
 const queuePayload = [
   {
     skill_id: 3300,
@@ -185,9 +181,6 @@ const CALENDAR_SCOPE = 'esi-calendar.read_calendar_events.v1';
 
 beforeAll(async () => {
   server.listen({ onUnhandledRequest: 'error' });
-  // One throwaway render, so no test pays for the worker's first page render
-  // (lazy route chunks, jsdom, React warm-up) inside a short `findBy` wait.
-  // The one App-level test's graph and shell chunk load here too.
   await Promise.all([routeChunks.loadOverview(), routeChunks.loadLayout(), import('@/app/App')]);
   await db.characters.put({ characterId: CHAR_ID, name: 'Pilot One', ownerHash: 'oh', addedAt: 1 });
   await db.tokens.put({
@@ -256,7 +249,6 @@ async function storedKinds(): Promise<string[] | undefined> {
   return (row?.value as OverviewLayout | undefined)?.widgets.map((w) => w.kind);
 }
 
-/** The Overview page on its own route, with no App boot or signed-in shell. */
 const renderOverviewRoute = () => renderPageRoute('/overview', <Overview />);
 
 describe('Overview widget grid', () => {
@@ -306,9 +298,6 @@ describe('Overview widget grid', () => {
     await waitFor(async () => expect(await storedKinds()).toEqual(['wallet', 'training']));
   });
 
-  // The one App-level test of the Overview route: it mounts at /overview inside
-  // the signed-in shell, its rail link current. Every other Overview test
-  // renders the page on its own (`renderOverviewRoute`).
   it('draws the saved layout: the wallet figure, and the skill training now, at /overview inside the shell', async () => {
     await seedLayout(widget('a', 'wallet', { size: 'S' }), widget('b', 'training', { size: 'S' }));
     const { App } = await import('@/app/App');
@@ -318,7 +307,6 @@ describe('Overview widget grid', () => {
     expect(await within(wallet).findByText('1.2M')).toBeInTheDocument();
     const training = await widgetCard('Training');
     expect(await within(training).findByText(/Gunnery/)).toBeInTheDocument();
-    // Nothing on the board carries a New tag: every widget is new.
     expect(screen.queryByText('New')).not.toBeInTheDocument();
     const rail = (await screen.findAllByRole('navigation'))[0];
     const links = await within(rail).findAllByRole('link', { name: 'Overview' });
@@ -330,11 +318,9 @@ describe('Overview widget grid', () => {
     const { unmount } = renderOverviewRoute();
     await widgetCard('Wallet');
     expect(await screen.findByRole('button', { name: /Data updated/ })).toBeInTheDocument();
-    // A Net Worth widget reads recorded history, which is not a cached read.
     expect(screen.queryByText('Showing cached data')).not.toBeInTheDocument();
     unmount();
 
-    // The saved balance answers when ESI cannot.
     await db.esiCache.put({
       characterId: CHAR_ID,
       key: 'wallet:balance',
@@ -354,7 +340,6 @@ describe('Overview widget grid', () => {
     renderOverviewRoute();
     const next = await screen.findByRole('link', { name: /next skill finishes/i });
     expect(next).toHaveAttribute('href', '/skills/plans');
-    // A real button-styled link, not static text.
     expect(next).toHaveClass('border', 'rounded-xs');
   });
 
@@ -393,7 +378,6 @@ describe('Overview widget grid', () => {
 
     const mail = await widgetCard('Mail');
     expect(await within(mail).findByText('Docking fee')).toBeInTheDocument();
-    // The headline is on screen in the List view too.
     expect(within(mail).getByText('3')).toBeInTheDocument();
   });
 
@@ -413,10 +397,8 @@ describe('Overview widget grid', () => {
     renderOverviewRoute();
 
     const coming = await widgetCard('Calendar');
-    // No events on the calendar, but the skill queue is a Calendar clock too.
     expect(await within(coming).findByText('Type #3300 V')).toBeInTheDocument();
 
-    // Its own Types filter: switching the skill queue off hides the row, on this widget only.
     await user.click(within(coming).getByRole('button', { name: 'Settings for Calendar' }));
     const types = await screen.findByRole('menuitem', { name: 'Types' });
     types.focus();
@@ -454,7 +436,6 @@ describe('Overview widget grid', () => {
     await seedLayout(widget('w', 'training', { size: 'S', scope: 'all' }));
     renderOverviewRoute();
 
-    // Training's queue is one Character's, so it says it is still one Character's.
     const training = await widgetCard('Training');
     expect(await within(training).findByText('Pilot One only')).toBeInTheDocument();
   });
@@ -470,12 +451,9 @@ describe('Overview widget grid', () => {
     renderOverviewRoute();
 
     await widgetCard('Wallet');
-    // The page alone (the shell's rail and top bar are not mounted), so
-    // `screen` holds only the page's own header and content.
     expect(screen.queryByRole('button', { name: /character: /i })).not.toBeInTheDocument();
     expect(screen.queryByText('Total SP')).not.toBeInTheDocument();
     expect(screen.queryByText('Unallocated SP')).not.toBeInTheDocument();
-    // No header Refresh; the data age sits on the tab row, not beside the name.
     expect(screen.queryByRole('button', { name: 'Refresh' })).not.toBeInTheDocument();
     const heading = screen.getByRole('heading', { level: 1 });
     const dataAge = await screen.findByRole('button', { name: /Data updated/ });
@@ -495,13 +473,8 @@ describe('Overview widget grid', () => {
   });
 });
 
-/*
- * `vitest.setup.ts` stubs `matchMedia` to never match, so everything above
- * renders the wide grid; a phone has to be asked for.
- */
 describe('Overview widget grid on a phone', () => {
   beforeEach(() => {
-    // The widget fold reads the phone query; the header reads the `md` one.
     stubViewport((query) => query === PHONE_QUERY || query === NARROW_QUERY);
   });
 

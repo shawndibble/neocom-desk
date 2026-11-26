@@ -7,13 +7,6 @@ interface GroupCraftedPanelProps {
   catalog: BlueprintCatalog;
 }
 
-/**
- * A material this group's own build tree fully produces (see
- * `useGroupBuyRows`) was never bought at all, so it lives alongside Members
- * rather than inside the buy table — the two panels together are "what this
- * group is made of," split by whether a plan is another member or a material
- * it manufactures directly.
- */
 export function GroupCraftedPanel({ craftedTypeIds, catalog }: GroupCraftedPanelProps) {
   const { t } = useTranslation();
   return (

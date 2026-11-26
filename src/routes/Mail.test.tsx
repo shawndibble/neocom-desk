@@ -38,16 +38,11 @@ vi.mock('@/sde/loadSde', () => ({
 }));
 
 installMailHarness();
-// The one App-level test below: its graph and shell chunk load here, under the
-// hook's own budget, not inside the test's findBy.
 beforeAll(async () => {
   await Promise.all([import('@/app/App'), loadLayout()]);
 }, 30_000);
 
 describe('Mail', () => {
-  // The one App-level test of the Mail route: it mounts at /mail inside the
-  // signed-in shell, its rail link current. Every other Mail test renders the
-  // page on its own (`renderMailRoute`).
   it('lists headers newest first with resolved sender names, at /mail inside the shell', async () => {
     const { App } = await import('@/app/App');
     render(<App />);
@@ -60,16 +55,12 @@ describe('Mail', () => {
   });
 
   it('renders no reading-pane header until a mail is selected, at desktop widths (issue #2104)', async () => {
-    // 1024px and 1440px both satisfy the desktop breakpoint (min-width: 64rem)
-    // the acceptance criteria are asserted at.
     useDesktopViewport();
     const user = userEvent.setup();
     renderMailRoute();
     await screen.findByText('Fleet up!');
     expect(screen.queryByRole('button', { name: 'Reply' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Forward' })).not.toBeInTheDocument();
-    // Only the page's own top header should exist — the empty reading pane
-    // must not render a second, actionless header bar above the empty state.
     expect(document.querySelectorAll('header')).toHaveLength(1);
     expect(screen.getByText('No message open')).toBeInTheDocument();
 
@@ -108,7 +99,6 @@ describe('Mail', () => {
     await screen.findByText('Fleet up!');
     expect(screen.getByText('No message open')).toBeInTheDocument();
     expect(screen.getByText('Select a message from the list to read it.')).toBeInTheDocument();
-    // Header Compose plus the reading pane's own.
     const buttons = screen.getAllByRole('button', { name: 'Compose' });
     expect(buttons).toHaveLength(2);
     await user.click(buttons[1]!);
@@ -130,7 +120,6 @@ describe('Mail', () => {
     renderMailRoute();
     await user.click(await screen.findByText('Fleet up!'));
     expect(await findUndockBody()).toBeInTheDocument();
-    // `<b>now</b>` renders as bold, not as literal tags.
     expect(screen.getByText('now').tagName).toBe('STRONG');
   });
 
@@ -175,15 +164,10 @@ describe('Mail', () => {
     await waitFor(() => expect(screen.getByLabelText('Subject')).toHaveFocus());
 
     await user.click(screen.getByRole('button', { name: 'Cancel' }));
-    // The Reply button unmounts while composing and remounts fresh once
-    // Cancel closes it — re-query rather than reusing the pre-compose element.
     await waitFor(() => expect(screen.getByRole('button', { name: 'Reply' })).toHaveFocus());
   });
 
   it('Reply opened before the body loads still focuses the compose box, not the reader heading', async () => {
-    // Reply renders from the header alone, so a quick pilot can open it while
-    // the body is still loading — the reader heading's focus-on-load must not
-    // then take focus from the compose box that mounts alongside it.
     let releaseBody: () => void = () => {};
     const bodyGate = new Promise<void>((resolve) => {
       releaseBody = resolve;
@@ -205,8 +189,6 @@ describe('Mail', () => {
     await user.click(await screen.findByText('Fleet up!'));
     await user.click(await screen.findByRole('button', { name: 'Reply' }));
 
-    // The compose box mounts with the body, on the same commit as the
-    // reader heading the body's arrival would otherwise focus.
     releaseBody();
     expect(await findUndockBody()).toBeInTheDocument();
     await waitFor(() => expect(screen.getByLabelText('Subject')).toHaveFocus());
@@ -264,7 +246,6 @@ describe('Mail', () => {
     );
     renderMailRoute();
     expect(await screen.findByText('Showing saved data.')).toBeInTheDocument();
-    // getByText: exactly one — the note beside the data, no full banner over it.
     expect(screen.getByText(/: log in again$/)).toBeInTheDocument();
     expect(await screen.findByText('Fleet up!')).toBeInTheDocument();
   });
@@ -307,8 +288,6 @@ describe('Mail', () => {
   );
 
   it('falls back to the unknown-sender label when a header has no sender', async () => {
-    // `cond && map.get(x) ?? fallback` yields `false` for a missing sender,
-    // and React renders `false` as nothing — the label never appeared.
     server.use(
       http.get(`https://esi.evetech.net/characters/${CHAR_ID}/mail`, () =>
         HttpResponse.json([
@@ -354,29 +333,22 @@ describe('Mail', () => {
   it('shows an Inbox/Corp/Alliance/Sent toggle group, all on, with unread counts from /mail/labels', async () => {
     renderMailRoute();
     const group = await screen.findByRole('group', { name: 'Mail folders' });
-    // No synthetic "All": every folder selected is what All used to mean.
     expect(within(group).getAllByRole('button')).toHaveLength(4);
-    // The count reads as "2 unread" rather than a bare "2", and a folder with
-    // nothing unread carries no number at all — Sent reports zero forever, so
-    // dimming or badging it would be permanent noise.
     for (const name of ['Inbox 1 unread', 'Corp 2 unread', 'Alliance', 'Sent']) {
       expect(within(group).getByRole('button', { name })).toHaveAttribute('aria-pressed', 'true');
     }
-    // The figure is still on screen for everyone else.
     expect(within(group).getByRole('button', { name: /^Corp/ })).toHaveTextContent('2');
   });
 
   it('keeps several folders on at once, folding an uncategorized header into Inbox', async () => {
     const user = userEvent.setup();
     renderMailRoute();
-    await screen.findByText('Fleet up!'); // corp
-    expect(screen.getByText('Market report')).toBeInTheDocument(); // no labels -> inbox
+    await screen.findByText('Fleet up!');
+    expect(screen.getByText('Market report')).toBeInTheDocument();
 
     const group = screen.getByRole('group', { name: 'Mail folders' });
     const inbox = within(group).getByRole('button', { name: /^Inbox/ });
 
-    // Turning one folder off leaves every other folder on — the whole point of
-    // toggles over tabs.
     await user.click(inbox);
     expect(inbox).toHaveAttribute('aria-pressed', 'false');
     expect(screen.getByText('Fleet up!')).toBeInTheDocument();
@@ -396,7 +368,6 @@ describe('Mail', () => {
 
     expect(screen.getByText('No folders selected')).toBeInTheDocument();
     expect(screen.queryByText('Fleet up!')).not.toBeInTheDocument();
-    // The controls that undo this must not vanish with the rows.
     expect(within(group).getAllByRole('button')).toHaveLength(4);
 
     await user.click(screen.getByRole('button', { name: 'Show all folders' }));
@@ -418,7 +389,6 @@ describe('Mail', () => {
     expect(search).toHaveFocus();
   });
 
-  /** Turns every folder chip off except `keep`. */
   it('says a folder is empty, with no action, when it holds no mail (issue #3972)', async () => {
     const user = userEvent.setup();
     renderMailRoute();
@@ -450,7 +420,6 @@ describe('Mail', () => {
     const user = userEvent.setup();
     renderMailRoute();
     await screen.findByText('Fleet up!');
-    // Inbox holds only the read "Market report".
     await onlyFolders(user, ['Inbox']);
     await user.click(screen.getByRole('button', { name: 'Hide read' }));
     expect(await screen.findByText('No unread mail')).toBeInTheDocument();
@@ -518,7 +487,6 @@ describe('Mail', () => {
   it('gives a row its folder and unread state in words, not colour alone', async () => {
     renderMailRoute();
     await screen.findByText('Fleet up!');
-    // 'Fleet up!' is corp + unread; 'Market report' is inbox + read.
     expect(screen.getByRole('button', { name: /^Fleet up!.*Corp.*Unread/s })).toBeInTheDocument();
     const read = screen.getByRole('button', { name: /^Market report/s });
     expect(read).toHaveAccessibleName(expect.stringContaining('Inbox'));
@@ -535,7 +503,7 @@ describe('Mail', () => {
             subject: 'Contract terms',
             timestamp: '2026-08-04T00:00:00Z',
             is_read: true,
-            labels: [2], // Sent
+            labels: [2],
             recipients: [{ recipient_id: 90000003, recipient_type: 'character' }],
           },
           {
@@ -544,7 +512,7 @@ describe('Mail', () => {
             subject: 'Fleet doctrine',
             timestamp: '2026-08-05T00:00:00Z',
             is_read: true,
-            labels: [2], // Sent
+            labels: [2],
             recipients: [
               { recipient_id: 90000003, recipient_type: 'character' },
               { recipient_id: 90000002, recipient_type: 'character' },
@@ -558,8 +526,6 @@ describe('Mail', () => {
     expect(row).toHaveTextContent('Corp Recruiter');
     expect(row).not.toHaveTextContent('Fleet Commander');
 
-    // More than one recipient collapses to the first plus a count — a row has
-    // one line for them.
     expect(screen.getByRole('button', { name: /^Fleet doctrine/s })).toHaveTextContent(
       'Corp Recruiter +1 more'
     );

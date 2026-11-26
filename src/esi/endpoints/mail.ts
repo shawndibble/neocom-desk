@@ -3,15 +3,11 @@ import { esiFetch } from '../client';
 import type { EsiResult } from '../client';
 import type { EndpointOptions } from './options';
 
-// --- GET /characters/{character_id}/mail (esi-mail.read_mail.v1) ---
-
-/** One entry in a recipients list (mail header or body). */
 export interface MailRecipient {
   recipient_id: number;
   recipient_type: 'alliance' | 'character' | 'corporation' | 'mailing_list';
 }
 
-/** Mail header: up to the 50 most recent, per ESI. */
 export interface MailHeader {
   mail_id: number;
   from?: number;
@@ -22,11 +18,6 @@ export interface MailHeader {
   recipients?: MailRecipient[];
 }
 
-/**
- * `lastMailId` cursors older mail past ESI's 50-most-recent cap ("mails with
- * ID lower than this"), user-triggered per "load more" click rather than
- * auto-walked like `getCharacterWalletTransactions` (issue #161).
- */
 export function getCharacterMailHeaders(
   characterId: number,
   options: EndpointOptions & { lastMailId?: number } = {}
@@ -40,9 +31,6 @@ export function getCharacterMailHeaders(
   });
 }
 
-// --- GET /characters/{character_id}/mail/{mail_id} (esi-mail.read_mail.v1) ---
-
-/** Mail body. Note: uses `read`, distinct from the header's `is_read`. */
 export interface MailBody {
   from?: number;
   subject?: string;
@@ -65,9 +53,6 @@ export function getCharacterMail(
   });
 }
 
-// --- GET /characters/{character_id}/mail/labels (esi-mail.read_mail.v1) ---
-
-/** One of the character's mail labels — the four built-in System Labels plus any Custom Labels (out of scope for v1, see engine/mail.ts). */
 export interface MailLabel {
   label_id: number;
   name?: string;
@@ -87,9 +72,6 @@ export function getCharacterMailLabels(
   return characterGet<MailLabels>('getCharacterMailLabels', characterId, options);
 }
 
-// --- GET /characters/{character_id}/mail/lists (esi-mail.read_mail.v1) ---
-
-/** One mailing list the character belongs to — resolves a mailing_list recipient's real name (issue #416), in place of a generic fallback. */
 export interface MailingList {
   mailing_list_id: number;
   name: string;
@@ -102,9 +84,6 @@ export function getCharacterMailingLists(
   return characterGet<MailingList[]>('getCharacterMailingLists', characterId, options);
 }
 
-// --- PUT /characters/{character_id}/mail/{mail_id}/ (esi-mail.organize_mail.v1) ---
-
-/** Marks a mail read (or unread). Answers 204 No Content on success. */
 export function putCharacterMail(
   characterId: number,
   mailId: number,
@@ -120,22 +99,13 @@ export function putCharacterMail(
   });
 }
 
-// --- POST /characters/{character_id}/mail/ (esi-mail.send_mail.v1) ---
-
-/** What a Reply/Forward send actually posts. */
 export interface MailSendBody {
   recipients: MailRecipient[];
   subject: string;
   body: string;
-  /**
-   * ISK the pilot approved to pay a recipient's contact charge (CSPA) — not
-   * offered by this app (mail-reply-and-forward decision: no CSPA support).
-   * Always omitted; kept on the type for fidelity to ESI's own request shape.
-   */
   approved_cost?: number;
 }
 
-/** Answers the new mail's id on success. */
 export function postCharacterMail(
   characterId: number,
   mail: MailSendBody,

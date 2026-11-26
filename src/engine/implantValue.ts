@@ -1,11 +1,8 @@
-/** Pure helpers for the Clones page: what a set of implants is worth, and how far the jump cooldown has run. */
 import { parseInstant } from './esiInstant';
 import { HOUR_MS } from '@/lib/age';
 
 export interface ImplantValue {
-  /** ISK of the priced implants. */
   total: number;
-  /** Implants with no price: the total is a floor, never silently complete. */
   unpriced: number;
 }
 
@@ -23,7 +20,6 @@ export function sumImplantValue(
   return { total, unpriced };
 }
 
-/** Share (0..1) of the cooldown already elapsed; 1 when there is nothing to wait for. */
 export function cooldownProgress(
   lastCloneJumpDate: string | null | undefined,
   cooldownHours: number,

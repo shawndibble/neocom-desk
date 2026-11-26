@@ -1,8 +1,3 @@
-/**
- * The officer queue: a summary line, Pending / Owed / History, the
- * claim tables with their per-row and bulk actions, the claim detail and the activity feed. Pure
- * view of what `useSrpQueue` loaded; every change goes through its callables and reloads.
- */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { GrantNote } from '@/app/GrantNote';
@@ -73,7 +68,6 @@ type Ready = Extract<SrpQueueState, { status: 'ready' }>;
 const COPIED_MS = 2500;
 const QUEUE_TABS: readonly QueueTab[] = ['pending', 'owed', 'history'];
 
-/** Whether the row earns a menu: the detail's Change amount exists only for a claim with a figure. */
 function claimRowHasMenu(claim: SrpClaim): boolean {
   return (claim.state === 'pending' || claim.state === 'approved') && claim.amount !== null;
 }
@@ -107,23 +101,19 @@ export function OfficerQueue({ data, ready }: { data: SrpQueueData; ready: Ready
     [history]
   );
   const rows = tab === 'pending' ? split.pending : tab === 'owed' ? split.owed : closed;
-  // An officer's own claims are decided by another officer, so bulk skips them.
   const isOwn = (c: SrpClaim) => selfCharacterId != null && c.characterId === selfCharacterId;
   const selectable = (
     tab === 'pending' ? rows.filter(canBulkApprove) : tab === 'owed' ? rows : []
   ).filter((c) => !isOwn(c));
-  // Ticks belong to the rows they were made on: a claim another officer closed drops off.
   const ticked = pruneSelection(selection, selectable);
   const owed = sumAmounts(split.owed);
   const open = [...ready.claims, ...closed].find((c) => c.killmailId === openId) ?? null;
 
-  // History is read the first time its tab opens, not with the queue.
   const loadHistory = data.loadHistory;
   useEffect(() => {
     if (tab === 'history' && history.status === 'idle') loadHistory();
   }, [tab, history.status, loadHistory]);
 
-  // The phone's SegmentedControl has no tab to name a tabpanel; the queue still animates.
   const {
     ref: fadeRef,
     className: panelRing,
@@ -142,7 +132,6 @@ export function OfficerQueue({ data, ready }: { data: SrpQueueData; ready: Ready
     setSelection([]);
   };
 
-  /** Runs one officer change; a refusal becomes a line, never an unhandled rejection. */
   const run = useCallback(
     async (action: () => Promise<string>) => {
       setBusy(true);
@@ -178,14 +167,12 @@ export function OfficerQueue({ data, ready }: { data: SrpQueueData; ready: Ready
     isk: formatIsk(o.amount ?? 0),
   });
 
-  /** Mails the pilots the result, best effort, and returns the result line with what happened to the mail. */
   const withMail = async (
     head: string,
     kind: 'approved' | 'rejected',
     decided: DecidedClaim[]
   ): Promise<string> => {
     const mail = await mailResult(kind, decided);
-    // A run with no pilots (every claim refused) says nothing about the grant: leave the note be.
     if (groupByPilot(decided).length > 0) setMailMissing(mail.missingScope);
     return withMailSummary(t, head, mail);
   };
@@ -255,7 +242,6 @@ export function OfficerQueue({ data, ready }: { data: SrpQueueData; ready: Ready
     busy,
   };
 
-  // The phone card has no such columns; only the desktop Pending table picks them.
   const picking = tab === 'pending' && !phone;
   const pendingAll = pendingColumns(ctx);
   const pickable = Object.fromEntries(
@@ -410,7 +396,6 @@ export function OfficerQueue({ data, ready }: { data: SrpQueueData; ready: Ready
           ) : (
             <div className="overflow-x-auto">
               <DataTable
-                // A tab's columns differ, so a sort must not carry over to the same id on another tab.
                 key={tab}
                 label={t(`srp.officer.title.${tab}`)}
                 columns={columns}
@@ -420,7 +405,6 @@ export function OfficerQueue({ data, ready }: { data: SrpQueueData; ready: Ready
                 selectedRowKey={openId}
                 stackLayout={phone ? 'dense' : 'labelled'}
                 mobileSort
-                // Phone: tick box, title, amount and ⋮ share line one (Hauling's card).
                 className="dt-dense-tight"
                 rowContextMenu={
                   tab === 'history'
@@ -499,7 +483,6 @@ export function OfficerQueue({ data, ready }: { data: SrpQueueData; ready: Ready
         danger={false}
         cancelLabel={t('common.cancel')}
         onConfirm={async () => {
-          // A refusal becomes the toast (`run`), so the dialog always closes.
           if (paying) await markPaid(paying);
         }}
         onClose={() => setPaying(null)}

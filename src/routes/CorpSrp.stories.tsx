@@ -23,7 +23,6 @@ import {
 } from '@/storybook/srpMemberFixture';
 import { CorpSrp } from './CorpSrp';
 
-/** Ship group names ESI answers on `/universe/groups/{id}`; any other group reads "Ship group <id>". */
 const SHIP_GROUPS: Record<number, string> = {
   25: 'Frigate',
   26: 'Cruiser',
@@ -97,7 +96,6 @@ const routes = (): FixtureRoute[] => [
   },
 ];
 
-/** Seeds the sample Characters into one SRP-fixture corporation, so the page has a corporation to read. */
 const seedCorporation = async () => {
   await Promise.all(
     SAMPLE_CHARACTERS.map((c) =>
@@ -106,21 +104,14 @@ const seedCorporation = async () => {
   );
 };
 
-/** Every corp scope, so a Director is `ready` rather than asked to grant more. */
 const SCOPES = [...new Set(Object.values(CORP_SCOPES_FOR_CAPABILITY).flat())];
 
 interface SettingsStart {
   role: SrpFixtureRole;
   start: 'never-on' | 'configured';
-  /** The corp's Doctrine Fits: the sample three (default) or none. */
   doctrines?: 'sample' | 'empty';
 }
 
-/**
- * Both SRP stand-ins, in place before the page's own load effects run (a layout effect), fresh per
- * story so a change never leaks into the next. The member backend answers every story (it also
- * feeds the nav probe); the settings backend only the officer stories (`parameters.srpSettings`).
- */
 function SampleSrp({
   children,
   member,
@@ -152,7 +143,6 @@ const withSampleSrp: Decorator = (Story, context) => (
   </SampleSrp>
 );
 
-/** An officer story: the Settings tab, with every corp scope so the Director is `ready`. */
 const settingsParams = (
   mode: SrpFixtureRole,
   start: SettingsStart['start'],
@@ -179,20 +169,14 @@ type Story = StoryObj<typeof meta>;
 
 const phone = { viewport: { value: 'phone390', isRotated: false } } as const;
 
-// Officer views (Director or Accountant with Corp Access): Settings, beside the Queue.
-/** @summary SRP never turned on: one "Turn on SRP" action. */
 export const FirstTime: Story = { parameters: settingsParams('director', 'never-on') };
 
-/** @summary The first-time state in the phone shell. */
 export const FirstTimePhone: Story = { ...FirstTime, globals: phone };
 
-/** @summary A Director's settings: percents, Hull Rules (only classes with a rule), claim window, Fleet or FC. */
 export const Configured: Story = { parameters: settingsParams('director', 'configured') };
 
-/** @summary The same settings in the phone shell: classes collapsed, one line per rule. */
 export const ConfiguredPhone: Story = { ...Configured, globals: phone };
 
-/** @summary Adding a class: Cruiser opened, then "destroyer" searched and the class added, which lists its row with Pay: corp percent. */
 export const ExpandedWithSearch: Story = {
   ...Configured,
   play: async ({ canvasElement }) => {
@@ -210,7 +194,6 @@ export const ExpandedWithSearch: Story = {
   },
 };
 
-/** @summary Invalid input: a percent over 100 and a window of 0 days, so the bar names the problems and Save is inert. */
 export const Validation: Story = {
   ...Configured,
   play: async ({ canvasElement }) => {
@@ -224,7 +207,6 @@ export const Validation: Story = {
   },
 };
 
-/** @summary Doctrine Fits panel and the Hurricane hull rule with its fit ticked: Add from my Fittings, Paste EFT, one Delete per row. */
 export const DoctrineFits: Story = {
   ...Configured,
   play: async ({ canvasElement }) => {
@@ -234,15 +216,12 @@ export const DoctrineFits: Story = {
   },
 };
 
-/** @summary The Doctrine Fits panel and hull-rule ticks in the phone shell. */
 export const DoctrineFitsPhone: Story = { ...DoctrineFits, globals: phone };
 
-/** @summary No Doctrine Fits yet: the empty line and the two add buttons. */
 export const DoctrineFitsEmpty: Story = {
   parameters: settingsParams('director', 'configured', 'empty'),
 };
 
-/** @summary Paste EFT with a line the catalog does not know: it is listed as not part of the fit, and the fit can still be added. */
 export const PasteEftUnresolved: Story = {
   ...Configured,
   play: async ({ canvasElement }) => {
@@ -257,10 +236,8 @@ export const PasteEftUnresolved: Story = {
   },
 };
 
-/** @summary Paste EFT in the phone shell. */
 export const PasteEftUnresolvedPhone: Story = { ...PasteEftUnresolved, globals: phone };
 
-/** @summary Delete a Doctrine Fit: the confirm says filed claims keep their result. */
 export const DeleteDoctrineFit: Story = {
   ...Configured,
   play: async ({ canvasElement }) => {
@@ -269,8 +246,6 @@ export const DeleteDoctrineFit: Story = {
   },
 };
 
-/** @summary A CEO whose corp's SRP is owned by another Director: the Reclaim SRP row. */
 export const CeoReclaim: Story = { parameters: settingsParams('ceo-not-owner', 'configured') };
 
-/** @summary An Accountant opens SRP: the nav lists it, Settings says it is for Directors. */
 export const AccountantView: Story = { parameters: settingsParams('accountant', 'configured') };

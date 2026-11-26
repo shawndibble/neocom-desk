@@ -1,55 +1,31 @@
-// Whose money a donation is (decision 20261120-235011): the one matching rule for the client and
-// the Cloud Functions (decision 20261117-230113), dependency-free so both import it.
-//
-// A sender the book knows (grouped, or seen mining: never "has paid before") pays their own
-// Miner, whatever code the reason names. Any other donation is named by the Reason codes it
-// carries: each Miner's own code (`minerPaymentCode`, for the Miner, each id folded into it and
-// each of its Characters' solo ids) and every code a Late notice printed. With no code, a payer
-// known only by an earlier payment keeps the Miner that payment named. A code held by two Miners,
-// a reason naming two, or a payer whose payments named two, is ambiguous: it goes to an officer's
-// review and is never claimed automatically. A code only says whose money it is; it pays that
-// Miner's oldest day.
-
 import { isLocked } from './corpTaxBookCheckpoint.js';
 import { minerPaymentCode, paymentCode } from './corpTaxBookLateNotice.js';
 
-/** A Miner grouping, with the ids folded into it (`aliases`) and when it was first made. */
 export interface MatchMiner {
   id: string;
   characterIds: readonly number[];
   aliases?: readonly string[];
   createdAt?: string;
-  /** Set once an officer closed the Miner's account: it takes no more money. */
   closedAt?: string | null;
-  /** Characters that left this grouping, by the day they left: it still bills them before it. */
   leftOn?: Readonly<Record<number, string>>;
 }
 
-/** Whether the book holds this Miner as closed: money is never placed on one. */
 const isClosed = (minerId: string, miners: readonly MatchMiner[]): boolean =>
   miners.some((m) => m.id === minerId && m.closedAt != null);
 
-/**
- * The order groupings are ranked in when a Character is stored in more than one: the earliest
- * made wins (one made before `createdAt` existed counts as earliest), then the lower id.
- */
 export const earlierGrouping = (
   a: Pick<MatchMiner, 'id' | 'createdAt'>,
   b: Pick<MatchMiner, 'id' | 'createdAt'>
 ): number => (a.createdAt ?? '').localeCompare(b.createdAt ?? '') || a.id.localeCompare(b.id);
 
-/** A Reason code: `MT` and six base-36 characters, standing on its own. */
 const CODE_TOKEN = /(?<![0-9A-Za-z])MT[0-9A-Z]{6}(?![0-9A-Za-z])/gi;
 
-/** The Reason codes a donation's reason carries, upper-cased, once each. */
 export function codesIn(reason: string | undefined): string[] {
   return [...new Set((reason ?? '').match(CODE_TOKEN)?.map((c) => c.toUpperCase()) ?? [])];
 }
 
-/** The id of the Miner a Character is on its own (no grouping holds it). */
 export const soloMinerId = (characterId: number): string => `solo:${characterId}`;
 
-/** The Character a solo Miner id names; undefined for a grouping's id. */
 export function soloCharacterId(minerId: string): number | undefined {
   const solo = /^solo:(\d+)$/.exec(minerId);
   return solo ? Number(solo[1]) : undefined;
@@ -66,11 +42,6 @@ const groupingHolds = (
     : m.characterIds.includes(characterId);
 };
 
-/**
- * The Miner a Character is billed under: its earliest grouping, else a Miner of its own. With a
- * `date`, a grouping the Character left on or before that day no longer holds it, and one it left
- * after that day still does.
- */
 export function minerIdFor(
   characterId: number,
   miners: readonly Pick<MatchMiner, 'id' | 'characterIds' | 'createdAt' | 'leftOn'>[],
@@ -83,7 +54,6 @@ export function minerIdFor(
   return best?.id ?? soloMinerId(characterId);
 }
 
-/** Where a stored Miner id lives now: its grouping, the group a solo id or an absorbed id folded into. */
 export function currentMinerOf(minerId: string, miners: readonly MatchMiner[]): string {
   if (miners.some((m) => m.id === minerId)) return minerId;
   const folded = miners.find((m) => m.aliases?.includes(minerId));
@@ -92,14 +62,8 @@ export function currentMinerOf(minerId: string, miners: readonly MatchMiner[]): 
   return character !== undefined ? minerIdFor(character, miners) : minerId;
 }
 
-/** Code → the Miners that hold it: one is whose money it is, more is ambiguous. */
 export type CodeOwners = ReadonlyMap<string, readonly string[]>;
 
-/**
- * Every code the book recognises and whose it is: each notice's printed code (or the one its id
- * hashes to), and the own code of each Miner, its aliases, its Characters' solo ids and every
- * other Miner id the book knows.
- */
 export function codeOwners(
   notices: readonly { id: string; minerId: string; code?: string }[],
   miners: readonly MatchMiner[],
@@ -125,9 +89,7 @@ export function codeOwners(
 export interface MatchBook {
   miners: readonly MatchMiner[];
   codes: CodeOwners;
-  /** Characters the book has seen mine: a sender among them is their own Miner. */
   minedCharacterIds: ReadonlySet<number>;
-  /** Per payer, the Miner ids their earlier payments named. */
   paidBefore?: ReadonlyMap<number, readonly string[]>;
 }
 
@@ -136,7 +98,6 @@ export type DonationOwner =
   | { kind: 'ambiguous'; minerIds: string[] }
   | { kind: 'unmatched' };
 
-/** One Miner, or the Miners it could be. */
 function ownerOfNamed(named: ReadonlySet<string>, by: 'code' | 'payer'): DonationOwner | undefined {
   const ids = [...named].sort();
   if (ids.length === 0) return undefined;
@@ -145,12 +106,10 @@ function ownerOfNamed(named: ReadonlySet<string>, by: 'code' | 'payer'): Donatio
     : { kind: 'ambiguous', minerIds: ids };
 }
 
-/** Whose money one donation is. */
 export function donationOwner(
   donation: { characterId: number; reason?: string; at?: string },
   book: MatchBook
 ): DonationOwner {
-  // The donation's own day: a Character that left a grouping on a date still bills it before then.
   const day = donation.at?.slice(0, 10);
   const grouped = book.miners.some((m) => groupingHolds(m, donation.characterId, day));
   if (grouped || book.minedCharacterIds.has(donation.characterId))
@@ -166,18 +125,12 @@ export function donationOwner(
   return ownerOfNamed(coded, 'code') ?? ownerOfNamed(payer, 'payer') ?? { kind: 'unmatched' };
 }
 
-/** What resolving puts on a stored donation: its Miner, or the review an ambiguous one waits for. */
 export type ResolvedOwner =
   | { minerId: string }
   | { reviewReason: 'ambiguous'; ambiguousMinerIds: string[] }
   | { reviewReason: 'account-closed' }
   | Record<string, never>;
 
-/**
- * The book the resolver reads, from what either side loaded: the groupings, every Late notice
- * (its code), the Characters seen mining what the book bills, the Miner ids it holds a record of
- * (a recorded account, a billed-by pointer), and the Miners each payer's earlier payments named.
- */
 export function matchBookOf(input: {
   miners: readonly MatchMiner[];
   notices: readonly { id: string; minerId: string; code?: string }[];
@@ -197,7 +150,6 @@ export function matchBookOf(input: {
   };
 }
 
-/** A stored payment, as a re-match reads it. */
 export interface UnmatchedCandidate {
   id: string;
   characterId?: number;
@@ -208,12 +160,6 @@ export interface UnmatchedCandidate {
   reviewReason?: string;
 }
 
-/**
- * The Unmatched payments that now have a Miner, oldest first: a sender or code the book has come
- * to know since. One already placed, marked not tax, or held for an officer as ambiguous is left,
- * and so is one assigning would refuse for good: dated before the lock date on `today`, or whose
- * Miner's account is closed. So a caller's loop never meets a refusal it can only repeat.
- */
 export function rematchUnmatched(
   payments: readonly UnmatchedCandidate[],
   book: MatchBook,
@@ -240,10 +186,6 @@ export function rematchUnmatched(
     });
 }
 
-/**
- * What resolving puts on one stored donation: its Miner, or the review it waits for. A Miner whose
- * account is closed takes no money: the donation waits as `account-closed` for an officer.
- */
 export function ownerFields(
   donation: { characterId: number; reason?: string; at?: string },
   book: MatchBook
@@ -258,7 +200,6 @@ export function ownerFields(
   return {};
 }
 
-/** The most donations into other divisions a sync notes (#6207). */
 export const UNCOUNTED_LIMIT = 20;
 
 export interface UncountedDonation {
@@ -270,7 +211,6 @@ export interface UncountedDonation {
   at: string;
 }
 
-/** A donation into a division the book does not read, as the journal gave it. */
 type ElsewhereDonation = {
   refId: number;
   division: number;
@@ -280,11 +220,6 @@ type ElsewhereDonation = {
   reason?: string;
 };
 
-/**
- * The donations into divisions the book does not read that look like tax (#6207): one carrying a
- * code the book knows, one an officer has to place, or one whose sender's Miner mined what the book
- * bills (`mined`, `minedSinceStart`). Newest first, at most `UNCOUNTED_LIMIT`.
- */
 export function noteUncountedDonations(
   donations: readonly ElsewhereDonation[],
   book: MatchBook,

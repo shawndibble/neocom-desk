@@ -1,15 +1,9 @@
-/**
- * The Items page's Asset Category and Blueprints picks, remembered per device
- * (issue #5601). Device-local view preference, never synced. Stored as the
- * URL's own strings (`cat` absent = All, `''` = None), so one codec reads both.
- */
 import { createLocalSetting } from '@/lib/useLocalSetting';
 import { BLUEPRINT_KINDS, type BlueprintKind } from './assetCategoryFilter';
 
 export const ASSET_KIND_SETTING_KEY = 'assetsKindFilter';
 
 export interface AssetKindPreference {
-  /** The `cat` URL string; null is All. */
   cat: string | null;
   bp: BlueprintKind;
 }

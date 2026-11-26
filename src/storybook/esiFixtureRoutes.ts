@@ -6,14 +6,7 @@ import {
   sampleWalletJournal,
 } from './sampleData';
 
-/**
- * ESI answers for the signed-in Character's wallet pages, built from
- * `sampleData`. A page story that reads another endpoint adds its route here
- * (or passes `routes` to the shell decorator): until it does, the request is
- * recorded as unexpected and `src/test/storySmoke.tsx` fails.
- */
 export function walletFixtureRoutes(): FixtureRoute[] {
-  // Every sample Character answers alike: the net worth view reads the whole roster.
   const own = String.raw`^/characters/\d+`;
   const at = (tail: string) => new RegExp(`${own}${tail}$`);
   return [
@@ -24,8 +17,6 @@ export function walletFixtureRoutes(): FixtureRoute[] {
     },
     { path: at('/wallet/transactions'), respond: () => ({ body: [] }) },
     { path: at('/loyalty/points'), respond: () => ({ body: SAMPLE_LOYALTY_POINTS }) },
-    // Public corporation info: the LP-store prefetch and corp-name lookups ask for any corporation,
-    // and a late one from an earlier story must not land as an unfixtured request.
     {
       path: /^\/corporations\/\d+$/,
       respond: ({ url }) => {

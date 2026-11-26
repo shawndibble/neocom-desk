@@ -11,10 +11,6 @@ import {
 } from './materialsEditSession';
 import type { MaterialTableRow } from './subBuildPlan';
 
-/**
- * A plan's rows and stored Have counts, as a test drives them: `owned` is what
- * the plan stores, and each row's remainder follows from it.
- */
 interface World {
   quantity: Record<number, number>;
   owned: Record<number, number | undefined>;
@@ -38,12 +34,10 @@ function rowsOf(world: World): MaterialTableRow[] {
   });
 }
 
-/** A step: either an edit-session event, or the plan's store changing underneath it. */
 type Step =
   | EditSessionEvent
   | { type: 'store'; owned?: Record<number, number | undefined>; built?: number[] };
 
-/** Plays steps the way the table does: after every step, the session observes what renders. */
 function play(world: World, steps: readonly Step[]): MaterialsEditSession {
   let session = observe(INITIAL_EDIT_SESSION, world);
   for (const step of steps) {
@@ -69,7 +63,6 @@ function observe(session: MaterialsEditSession, world: World): MaterialsEditSess
   });
 }
 
-/** Focus entering a section holds the rows it is showing right now. */
 function focus(errand: MaterialErrand, typeIDs: number[]): EditSessionEvent {
   return { type: 'focusEntered', errand, typeIDs };
 }
@@ -296,8 +289,6 @@ describe('reduceEditSession: toasts and their undo', () => {
     {
       name: 'a row edit whose move lands after a later bulk action leaves the bulk toast up',
       steps: [
-        // Clicking "Use all" blurs the Have field (its commit) and the
-        // section, then the click lands, then the Have write does.
         focus('toBuy', [TRITANIUM, PYERITE]),
         { type: 'haveCommitted', typeID: TRITANIUM, before: undefined, after: 100 },
         { type: 'focusLeft' },

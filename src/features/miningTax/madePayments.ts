@@ -1,23 +1,3 @@
-/**
- * The payments a pilot has already made, gathered for the reverse settle-up
- * flow (issue #540) and normalized into one `MadePayment` shape so the matcher
- * and the dialog see a single kind of thing.
- *
- * Two sources, and only two:
- *
- * - **Wallet journal**, the primary one. `PAYMENT_REF_TYPES` already covers
- *   `contract_price` and friends, so *accepting the landlord's ISK contract*
- *   arrives here for free — no contract-specific handling needed for it.
- * - **Contracts**, purely for payment **in kind**: an `item_exchange` contract
- *   the pilot issued at no price, i.e. ore handed over instead of ISK. Its
- *   cargo is deliberately never priced (no `getCharacterContractItems` call) —
- *   the decision doc rules out a second valuation model beside the Jita
- *   snapshot Assignments already carry, so the amount is confirmed by the pilot.
- *
- * Both reads degrade quietly. Neither scope is in `ROUTE_REQUIREMENTS` for
- * `/mining` (that table gates the whole page), so a pilot without them —
- * or offline — simply gets no suggestions rather than an error.
- */
 import type { Contract, WalletJournalEntry } from '@/esi/endpoints';
 import type { EsiEndpointId } from '@/esi/registry';
 import { loadWalletJournalHistory } from '@/features/character/wallet';
@@ -28,14 +8,12 @@ import { formatLocalDate } from '@/lib/localDate';
 import type { MadePayment } from './paymentLinks';
 import { PAYMENT_REF_TYPES } from './paymentMatches';
 
-/** A contract that has actually gone through — a cancelled or expired one paid nothing. */
 const COMPLETED_CONTRACT_STATUSES = new Set<Contract['status']>([
   'finished',
   'finished_issuer',
   'finished_contractor',
 ]);
 
-/** Outgoing hand-made ISK movements: the journal half of "what have I paid?". */
 export function fromJournal(
   entries: readonly WalletJournalEntry[],
   characterId: number
@@ -52,21 +30,12 @@ export function fromJournal(
       characterId,
       date: entry.date,
       amount: Math.abs(entry.amount ?? 0),
-      // Read off the raw ref_type here, where it is still available, rather
-      // than recovered downstream from the humanized label — that would make a
-      // domain fact hostage to a wording change.
       method: entry.ref_type.startsWith('contract_') ? 'contract' : 'donation',
       ...(entry.second_party_id !== undefined ? { counterpartyId: entry.second_party_id } : {}),
       label: humanizeRefType(entry.ref_type),
     }));
 }
 
-/**
- * Payment in kind: an item-exchange contract this character issued to a named
- * assignee for no ISK. `price` is what the *acceptor* pays the issuer, so a
- * zero-price contract from us is us giving something away — the shape of
- * handing over ore as tax.
- */
 function fromContracts(contracts: readonly Contract[], characterId: number): MadePayment[] {
   return contracts
     .filter(
@@ -83,17 +52,13 @@ function fromContracts(contracts: readonly Contract[], characterId: number): Mad
       refId: contract.contract_id,
       characterId,
       date: contract.date_completed ?? contract.date_issued,
-      // Never priced from the cargo — see the module comment.
       amount: null,
       method: 'contract' as const,
       counterpartyId: contract.assignee_id,
-      // The pilot's own contract title, or nothing — a translated fallback for
-      // an untitled contract belongs in the view, not in this loader.
       label: contract.title?.trim() ?? '',
     }));
 }
 
-/** How one read went: fine, never attempted for want of a Permission, or hit some other error. */
 export type MadePaymentSourceStatus = 'ok' | 'skipped-no-permission' | 'failed';
 
 export interface MadePaymentSources {
@@ -107,7 +72,6 @@ export interface MadePaymentsResult {
   sources: MadePaymentSources[];
 }
 
-/** The endpoints a Character's skipped sources need granted — what a Grant note asks for. */
 export function missingPaymentEndpoints(sources: MadePaymentSources): EsiEndpointId[] {
   return [
     ...(sources.journal === 'skipped-no-permission' ? ['getCharacterWalletJournal' as const] : []),
@@ -115,26 +79,12 @@ export function missingPaymentEndpoints(sources: MadePaymentSources): EsiEndpoin
   ];
 }
 
-/**
- * Every payment the given characters have made recently, newest first, with
- * recipient names resolved so a suggestion can say who the ISK went to, plus
- * per-character source statuses so the UI can tell a missing Permission from
- * "nothing found" and from a transient error.
- *
- * Never rejects: a failed or unauthorized read for one character contributes
- * nothing and leaves the rest intact.
- */
 export async function loadMadePaymentsWithStatus(
   characterIds: readonly number[]
 ): Promise<MadePaymentsResult> {
   const perCharacter = await Promise.all(
     characterIds.map(async (characterId) => {
       const [journal, contracts] = await Promise.all([
-        // The history read, not ESI's ~30-day window: a donation the corp never credited, and a
-        // payment nothing is linked to, are exactly the ones still unresolved weeks later. On
-        // the live window they stopped being evidence the day ESI forgot them — the warning
-        // vanished and the debt stayed. Same statuses, same shape, plus the archive this call
-        // has been filling all along.
         loadWalletJournalHistory(characterId).catch(() => null),
         loadContracts(characterId).catch(() => null),
       ]);
@@ -165,17 +115,10 @@ export async function loadMadePaymentsWithStatus(
   };
 }
 
-/** Just the payments, for callers that don't care why a list is short. */
 export async function loadMadePayments(characterIds: readonly number[]): Promise<MadePayment[]> {
   return (await loadMadePaymentsWithStatus(characterIds)).payments;
 }
 
-/**
- * A payment's own date as a local calendar date, falling back to today.
- * A contract carries `date_completed ?? date_issued` straight from ESI, so an
- * unparseable value would otherwise reach `formatLocalDate` as an Invalid Date
- * and write nonsense into a synced record.
- */
 export function paidOnFromIso(isoDate: string): string {
   const parsed = new Date(isoDate);
   return formatLocalDate(Number.isNaN(parsed.getTime()) ? new Date() : parsed);

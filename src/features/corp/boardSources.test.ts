@@ -20,10 +20,6 @@ const STRUCTURE: CorporationStructure = {
 };
 
 describe('structureName', () => {
-  /**
-   * AC4: corp structures carry their own `name`, so there is no bulk-resolution
-   * dance here — that is only needed for character ids.
-   */
   it('uses the endpoint’s own name field', () => {
     expect(structureName(STRUCTURE)).toBe('Nakugard - Home');
   });
@@ -38,11 +34,6 @@ describe('structureStateLabel', () => {
     expect(structureStateLabel('armor_reinforce')).toBe('armor reinforce');
   });
 
-  /**
-   * The reason this is not a lookup table: CCP extends the state enum without
-   * notice, and a table would render tomorrow's state as a blank in front of
-   * the one manager whose structure is in it.
-   */
   it('says something true about a state this app has never heard of', () => {
     expect(structureStateLabel('quantum_vulnerable')).toBe('quantum vulnerable');
   });
@@ -55,20 +46,11 @@ describe('toBoardStructures', () => {
     expect(source.name).toBe('Nakugard - Home');
   });
 
-  /**
-   * The one field whose absence carries meaning: ESI drops `fuel_expires` once
-   * the structure has run dry, and the engine reads `null` as "already past",
-   * not "no clock".
-   */
   it('passes an absent fuel_expires through as null', () => {
     const [source] = toBoardStructures([{ ...STRUCTURE, fuel_expires: undefined }]);
     expect(source.fuelExpiresMs).toBeNull();
   });
 
-  /**
-   * A NaN deadline would sort unpredictably and compare false against every
-   * threshold, so it must never reach the engine.
-   */
   it('turns an unparseable timestamp into null rather than NaN', () => {
     const [source] = toBoardStructures([{ ...STRUCTURE, state_timer_end: 'not a date' }]);
     expect(source.stateTimerEndMs).toBeNull();
@@ -101,11 +83,6 @@ describe('toBoardExtractions', () => {
     expect(source.chunkArrivalMs).toBe(Date.parse('2026-09-08T00:00:00Z'));
   });
 
-  /**
-   * The extraction endpoint returns ids and no names at all, so the refinery's
-   * name is borrowed from the structure list. That list can be missing, and the
-   * moon id says more than a blank row.
-   */
   it('falls back to the moon id when the structure list has no name for it', () => {
     const [source] = toBoardExtractions([extraction], new Map());
     expect(source.subject).toBe('Moon 40000001');
@@ -140,7 +117,6 @@ describe('toBoardJobs', () => {
     expect(source.status).toBe('ready');
   });
 
-  /** Research and copying jobs have no product — the blueprint is the subject. */
   it('falls back to the blueprint for an activity with no product', () => {
     const [source] = toBoardJobs(
       [{ ...job, activity_id: 5, product_type_id: undefined }],
@@ -153,10 +129,6 @@ describe('toBoardJobs', () => {
     expect(toBoardJobs([job], new Map())[0].subject).toBe('#500');
   });
 
-  /**
-   * Which statuses count is a ranking decision and lives in the engine — the
-   * adapter's job is shape, so it hands every job over.
-   */
   it('passes non-ready jobs through, leaving the filter to the engine', () => {
     expect(toBoardJobs([{ ...job, status: 'active' }], new Map())).toHaveLength(1);
   });
@@ -166,6 +138,3 @@ describe('toBoardJobs', () => {
     expect(jobTypeIds([{ ...job, product_type_id: undefined }])).toEqual([1001]);
   });
 });
-
-// The wallet-division join is `divisions.test.ts` (#298); the board reads that
-// module rather than a second one of its own.

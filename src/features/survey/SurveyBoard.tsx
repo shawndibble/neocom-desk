@@ -1,12 +1,3 @@
-/**
- * The Survey board: one panel with progress, the chart and the headline
- * numbers, what the caller puts under it (the moon tax), then what's left by ore. Shared by the Mining › Survey
- * tab and the public `/s/<id>` page, so both read and behave the same; the
- * caller supplies the scans and what "add a scan" does.
- *
- * Laid out as the chart-led mockup: the percent leads, the legend and charts come next, and the big stat tiles sit
- * under the chart they summarise.
- */
 import {
   Children,
   Fragment,
@@ -59,38 +50,19 @@ const LazySurveyCharts = lazyNamed(() => import('./SurveyCharts'), 'SurveyCharts
 
 interface SurveyBoardProps {
   scans: SurveyScan[];
-  /** Ids of the scans the owner set aside: they stay out of the totals and the chart. */
   ignored?: ReadonlySet<string>;
-  /** Offered to the survey's owner only: sets a scan aside or takes it back. Absent, the board is read-only. */
   onSetIgnored?: (scanId: string, ignored: boolean) => void;
-  /** Where the survey is mined, for the chat message's location row; null when none is set. */
   location?: string | null;
-  /** The survey's short link; null until it has been stored. */
   url: string | null;
-  /** Epoch ms the link stops working; null until stored. */
   expiresAt: number | null;
-  /**
-   * Marks the field cleared; resolves false when it couldn't be stored. The scanner has nothing to copy once the
-   * last rock is gone, so this is how a Survey ends. Offered to the owner always, and to anyone once it is nearly
-   * done (`canFinishSurvey`); absent, the board has no such control.
-   */
   onFinish?: () => Promise<boolean>;
-  /** The viewer started this survey, which lets them finish it at any point. */
   owned?: boolean;
-  /** Quiet controls at the foot of the panel, e.g. "New survey". */
   footerActions?: ReactNode;
-  /** A section under the panel, before the ores, e.g. the moon tax; gets the same summary. */
   afterPanel?: (summary: SurveySummary) => ReactNode;
-  /** Under the empty state's hint, before any scan is pasted: where a template is picked to start from. */
   emptyExtra?: ReactNode;
-  /**
-   * The panel's title; the public page sets one that doesn't repeat its page
-   * heading, and the Survey tab passes the pilot's own name for it.
-   */
   panelTitle?: ReactNode;
 }
 
-/** What the copy button last copied, shown on it for two seconds. */
 function useCopyOutcome(): [CopyOutcome, (next: CopyOutcome) => void] {
   const [outcome, setOutcome] = useState<CopyOutcome>(null);
   const timer = useRef<number | undefined>(undefined);
@@ -123,7 +95,6 @@ export function SurveyBoard({
   const scans = useMemo(() => countedScans(allScans, ignored), [allScans, ignored]);
   const oreNames = useMemo(() => scans.flatMap((s) => s.rocks.map((r) => r.ore)), [scans]);
   const orePrices = useOrePrices(oreNames);
-  // The scanner's own ISK column is not trusted: rocks are valued at market.
   const summary = useMemo(
     () => summarizeSurvey(priceScans(scans, orePrices.prices), orePrices.prices),
     [scans, orePrices.prices]
@@ -131,17 +102,14 @@ export function SurveyBoard({
   const [outcome, setOutcome] = useCopyOutcome();
   const now = useNow();
   const chatOptions = useSurveyChatOptions((state) => state.value);
-  // Copying happens outside the config dialog, so the saved choices load with the board.
   useHydratedStore(useSurveyChatOptions);
   const [configuring, setConfiguring] = useState(false);
   const [howToOpen, setHowToOpen] = useState(false);
   const [finishing, setFinishing] = useState<'idle' | 'busy' | 'failed'>('idle');
   const [view, setView] = useState<SurveyChartView>('ore');
   const views = summary === null ? ['ore' as const] : availableChartViews(summary);
-  // A hub change can leave nothing priced; the chart falls back to Ore left.
   const effectiveView = views.includes(view) ? view : 'ore';
 
-  // Every scan, so a removed one can be restored; the chart and totals use `scans`.
   const scanList = onSetIgnored !== undefined && allScans.length > 0 && (
     <SurveyScanList scans={allScans} ignored={ignored} onSetIgnored={onSetIgnored} />
   );
@@ -175,14 +143,12 @@ export function SurveyBoard({
   }
 
   function copy(what: 'chat' | 'link', text: string) {
-    // Started inside the click so the browser still counts it as the user's gesture.
     writeToClipboard(text).then(
       () => setOutcome({ what, result: 'copied' }),
       () => setOutcome({ what, result: 'failed' })
     );
   }
 
-  // The copy button sits in the panel header, on a phone too.
   const copyButton = (current: SurveySummary, link: string) => (
     <div className="flex items-center gap-2">
       <SurveyHubSelect />
@@ -327,7 +293,6 @@ export function SurveyBoard({
         />
       )}
 
-      {/* Last on the page, and only for the owner (no `onSetIgnored` otherwise). */}
       {scanList}
     </div>
   );

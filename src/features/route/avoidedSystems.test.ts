@@ -6,10 +6,6 @@ describe('parseAvoidedSystems', () => {
     expect(parseAvoidedSystems([30002813, 30045328])).toEqual([30002813, 30045328]);
   });
 
-  /*
-   * Another device, possibly an older build, wrote what comes back from sync.
-   * A bad entry costs only itself, not the whole list.
-   */
   it('drops duplicates and anything that is not a positive integer id', () => {
     expect(parseAvoidedSystems([30002813, 30002813, 'Uedama', -1, 0, 1.5, null, 30045328])).toEqual(
       [30002813, 30045328]

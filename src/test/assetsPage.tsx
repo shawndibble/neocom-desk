@@ -15,10 +15,6 @@ import { Assets } from '@/routes/Assets';
 import { mswServer } from '@/test/msw';
 import { renderPageRoute } from '@/test/renderPage';
 
-// Shared harness for the Assets route tests (src/routes/Assets*.test.tsx), one
-// file per concern so CI runs them in parallel. The `vi.mock` calls stay in each
-// test file (vitest hoists them per file); their factories live in assetsMocks.tsx.
-
 export const CHAR_ID = 91;
 export const JITA = 'Jita IV - Moon 4 - Caldari Navy Assembly Plant';
 export const STRUCTURE = 'Structure #1000000000001';
@@ -61,23 +57,13 @@ export const server = mswServer(
       system_id: 30000142,
     })
   ),
-  // Security status (issue #148): every test's default station resolves to
-  // this system, so its security fetch needs a default handler too, the same
-  // way the station name lookup just above does.
   http.get('https://esi.evetech.net/universe/systems/30000142', () =>
     HttpResponse.json({ system_id: 30000142, name: 'Jita', security_status: 0.9459 })
   ),
-  // This character's token predates esi-universe.read_structures.v1 (see the
-  // token fixture below), so ESI 403s — the structure falls back to its bare
-  // id label rather than triggering a re-auth banner.
   http.get('https://esi.evetech.net/universe/structures/1000000000001', () =>
     HttpResponse.json({ error: 'Forbidden' }, { status: 403 })
   ),
   http.get('https://esi.evetech.net/markets/prices', () => HttpResponse.json([])),
-  // Jumps-away (issue #87): the active character starts in Jita's system
-  // (30000142, same as the fixture station above), and any route call that
-  // does end up needed (e.g. cross-character search reaching a different
-  // system) gets a harmless generic route so no test has to know about it.
   http.get(`https://esi.evetech.net/characters/${CHAR_ID}/location`, () =>
     HttpResponse.json({ solar_system_id: 30000142 })
   ),
@@ -96,8 +82,6 @@ async function resetSession() {
   useActiveCharacter.setState({ activeCharacterId: null, hydrated: false });
   usePublicInfo.setState({ byCharacterId: {} });
   useCompareSet.setState({ items: [] });
-  // Module-scope store, so a sort chosen by one test would otherwise be the
-  // starting order of the next one.
   useAssetSort.setState({ value: DEFAULT_ASSET_SORT, hydrated: false });
   useDefaultCharacterFilter.setState({ value: 'current', hydrated: false });
   useCharacterFilterPicks.setState({ value: {}, hydrated: false });
@@ -114,28 +98,14 @@ async function resetSession() {
   window.history.pushState({}, '', '/assets');
 }
 
-/**
- * The Assets page on its own route, without App's boot or the signed-in shell
- * (`renderPageRoute`). What nearly every Assets test renders; only the
- * App wiring tests (Assets.test.tsx's "App wiring" block) render `<App />`.
- */
 export function renderAssetsRoute() {
   return renderPageRoute('/assets', <Assets />);
 }
 
-/**
- * Registers the cold-render warm-up and the per-test session reset (the MSW server's own lifecycle comes from `mswServer`). Call once at module scope of each Assets test file.
- * `warmApp` warms a full `<App />` render instead, for a file that keeps App-level tests.
- */
 export function installAssetsHarness({ warmApp = false }: { warmApp?: boolean } = {}): void {
   beforeAll(async () => {
-    // One throwaway render, so no test pays for the first one. A worker's first
-    // render — compiling the route chunks, warming jsdom and React — lands on
-    // whichever test runs first and can outlast its `findByText` under parallel
-    // load. Done here under the hook's own budget.
     await routeChunks.loadAssets();
     await resetSession();
-    // App is imported only here, so a file without App-level tests never loads its graph.
     const App = warmApp ? (await import('@/app/App')).App : null;
     const { unmount } = App ? render(<App />) : renderAssetsRoute();
     await screen.findByText(JITA, undefined, { timeout: 25_000 });
@@ -150,7 +120,6 @@ export function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-/** Opens the Tools (⋯) menu and picks one of its toggles. */
 export async function clickTool(
   user: ReturnType<typeof userEvent.setup>,
   name: string
@@ -159,7 +128,6 @@ export async function clickTool(
   await user.click(await screen.findByRole('menuitemcheckbox', { name }));
 }
 
-/** Tools, then Export table, then Download CSV. */
 export async function downloadCsv(user: ReturnType<typeof userEvent.setup>): Promise<void> {
   fireEvent.pointerDown(screen.getByRole('button', { name: 'Tools' }), {
     button: 0,
@@ -171,25 +139,18 @@ export async function downloadCsv(user: ReturnType<typeof userEvent.setup>): Pro
   await user.keyboard('{Enter}');
 }
 
-/** Clicks the link into a location or container by its (partial) label. */
 export async function openLocation(
   user: ReturnType<typeof userEvent.setup>,
   name: string | RegExp
 ): Promise<void> {
   const matcher = typeof name === 'string' ? new RegExp(escapeRegExp(name)) : name;
-  // Every test opens a location first, and a loaded CI worker can take longer
-  // than the 5s default to paint the first row (a flake once hit the "no bulk
-  // Add to Compare" test). A wait that returns the moment the link renders, not
-  // a longer test budget.
   await user.click(await screen.findByRole('link', { name: matcher }, { timeout: 15_000 }));
 }
 
-/** The single back control in the breadcrumb header — steps up exactly one level. */
 export async function goBack(user: ReturnType<typeof userEvent.setup>): Promise<void> {
   await user.click(await screen.findByRole('button', { name: /back one level/i }));
 }
 
-/** Every top-level location label currently on screen, in DOM order. */
 export function locationOrder(): string[] {
   return screen
     .getAllByText(new RegExp(`^(${JITA}|${STRUCTURE})$`))

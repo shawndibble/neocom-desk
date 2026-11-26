@@ -1,15 +1,3 @@
-/**
- * The fix list's table columns: Item, What's wrong, Do this and ISK tied up
- * always; the five `OPEN_ORDER_COLUMN_IDS` between Do this and ISK tied up
- * when the Columns menu turns them on. Every figure is in full ISK
- * (`formatMarketIsk`) except the ISK tied up total (`IskAmount`).
- *
- * A buy order an Active campaign turn-in pays more than its bid, or a sell
- * order it beats whose column an undercut won, keeps its state and gets a dim
- * `TurnInGlyph` after its price (after Do this while the Price column is off);
- * it and a sell order's "Turn in instead" open the order's Order Detail, which
- * shows the turn-in (#6708).
- */
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { IskAmount, type DataTableColumn } from '@/components/ui';
@@ -27,10 +15,8 @@ import { orderTurnInGlyph } from './orderTurnIn';
 import { formatOrderFloorPrice, formatOrderRemaining } from './orderRowFormat';
 import { WorkThroughTableSlot } from './WorkThroughControls';
 
-/** Expiry reads in the warning colour from the day the order files as expiring. */
 const EXPIRES_SOON_DAYS = DEFAULT_PROBLEM_THRESHOLDS.expiringWithinDays;
 
-/** "Jita IV - Moon 4 - Caldari Navy Assembly Plant" -> "Jita IV"; the full name is in the detail. */
 function stationShortName(name: string): string {
   const dashIndex = name.indexOf(' - ');
   return dashIndex === -1 ? name : name.slice(0, dashIndex);
@@ -45,13 +31,10 @@ const figure = {
 } as const;
 
 export interface OpenOrderTableColumns {
-  /** Fixed + visible optional columns, table order. */
   columns: DataTableColumn<OpenOrderRow>[];
-  /** The optional columns, for `ColumnPickerMenu`'s labels. */
   optional: Record<OpenOrderColumnId, DataTableColumn<OpenOrderRow>>;
 }
 
-/** A row whose turn-in pays more but its column says something else (`orderTurnInGlyph`): the glyph that opens it. */
 function turnInGlyph(row: OpenOrderRow, onOpenTurnIn?: (row: OpenOrderRow) => void) {
   return (
     orderTurnInGlyph(row) &&
@@ -64,10 +47,8 @@ export function useOpenOrderTableColumns({
   visible,
   onOpenTurnIn,
 }: {
-  /** More than one Character has orders: tag each row with its owner. */
   showCharacter: boolean;
   visible: readonly OpenOrderColumnId[];
-  /** Opens a row's turn-in in its Order Detail: "Turn in instead" and a buy order's glyph. */
   onOpenTurnIn?: (row: OpenOrderRow) => void;
 }): OpenOrderTableColumns {
   const { t } = useTranslation();
@@ -102,7 +83,6 @@ export function useOpenOrderTableColumns({
         id: 'problem',
         header: t('market.orders.fixList.colProblem'),
         className: 'whitespace-nowrap',
-        // Worst first, the fix list's own order.
         sortValue: (row) => problemRank(row.problem),
         sortFirst: 'asc',
         render: (row) => {
@@ -167,8 +147,6 @@ export function useOpenOrderTableColumns({
         id: 'floor',
         header: t('market.orders.floorLabel'),
         ...figure,
-        // Sorted by the exact break-even, unaffected by the rounded-up figure
-        // the cell shows (issue #1421).
         sortValue: (row) => row.floor?.relist,
         render: (row) =>
           row.floor ? (

@@ -15,12 +15,6 @@ vi.mock('@/sde/loadSde', () => ({
 const PLANETS_SCOPE = 'esi-planets.manage_planets.v1';
 const ACTIVE_ID = 90;
 
-/**
- * No handlers at all, with `onUnhandledRequest: 'error'`: any ESI call this
- * module makes fails the test outright. That is the point — the roster's
- * whole contract is that it costs zero live calls on page open, and a test
- * that merely handled a 403 gracefully would pass while the fan-out lived on.
- */
 mswServer();
 
 afterEach(() => {
@@ -140,8 +134,6 @@ describe('loadPiRosterSnapshot', () => {
 
     const snapshot = await loadPiRosterSnapshot(ACTIVE_ID);
 
-    // The msw server has no handlers and errors on any request, so reaching
-    // here at all proves the scopeless Character was never fetched.
     expect(snapshot.skipped).toEqual([{ characterId: 93, name: 'Scopeless Alt' }]);
     expect(snapshot.notLoaded).toEqual([]);
     expect(snapshot.colonies).toHaveLength(1);
@@ -178,10 +170,8 @@ describe('loadPiRosterSnapshot', () => {
     await addCharacter(ACTIVE_ID, 'Active Pilot', [PLANETS_SCOPE]);
     await addCharacter(91, 'Old List', [PLANETS_SCOPE]);
     await addCharacter(92, 'Old Detail', [PLANETS_SCOPE]);
-    // 91: the planet list is the stale read, its detail is recent.
     await writeCached(91, 'planets', [planet(40000001), planet(40000002)], threeDaysOld);
     await writeCached(91, 'planet:40000001', extractorDetail(1), hourOld);
-    // 92: the other way round — one detail row is older than the list.
     await writeCached(92, 'planets', [planet(40000003), planet(40000004)], hourOld);
     await writeCached(92, 'planet:40000003', extractorDetail(3), hourOld);
     await writeCached(92, 'planet:40000004', extractorDetail(4), threeDaysOld);

@@ -15,8 +15,6 @@ import { is, shapeGuard } from '../snapshotShape';
 import { defineDomain } from './defineDomain';
 import { currentThresholds } from './shared';
 
-/* Incursions: within N jumps ------------------------------------------------- */
-
 const isIncursionAlertEntry = shapeGuard<IncursionAlertEntry>({
   constellationId: is.number,
   stagingSystemId: is.number,
@@ -26,16 +24,6 @@ const isIncursionAlertEntry = shapeGuard<IncursionAlertEntry>({
   withinJumps: is.number,
 });
 
-/**
- * An Incursion coming within the pilot's N jumps (issue #3542). One cached
- * read of the public feed and of the location, and one local pass over the
- * stargate graph under Route Safety's jump basis — never a route call per
- * Incursion. Every Incursion in the feed is kept, near or not, each with the
- * origin and N it was counted under, so the diff can tell a changed frame
- * from an Incursion coming into range. An input it cannot read skips the
- * poll (`null`) rather than writing a baseline that would make the next good
- * poll look like a burst of new arrivals.
- */
 export const incursionDomain = defineDomain<
   IncursionAlertEntry,
   IncursionAlertSnapshot,
@@ -56,8 +44,6 @@ export const incursionDomain = defineDomain<
     const basis = await loadJumpBasis();
     const distances = await localJumpDistances(originSystemId, basis.rules, basis.network);
     if (distances.kind === 'unknown') return null;
-    // Counted exactly as Route Safety's Incursions panel counts them
-    // (`buildIncursionRows`): a state ESI adds later is dropped, not stored.
     return feed.entries
       .filter((entry) => (INCURSION_STATES as readonly unknown[]).includes(entry.state))
       .map((entry) => ({

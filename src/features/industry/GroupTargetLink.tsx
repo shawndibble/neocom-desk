@@ -7,19 +7,10 @@ import { getTradeHub } from '@/market/hubs';
 
 interface GroupTargetLinkProps {
   plan: Parameters<typeof planMatchesSnapshot>[0];
-  /** The plan's group's last Retarget, or `null` for an ungrouped plan or one whose group has none yet. */
   snapshot: BuildGroupSnapshot | null;
   onApply: () => void;
 }
 
-/**
- * The group's last Retarget offered beside a plan's own hub/facility/
- * security/build-system controls (issue #632) — usable any time, not only
- * when the plan is created, so a plan unchecked at Retarget time (or one
- * whose pilot changed their mind) can still pick up the group's target
- * later. Mirrors `OwnedStockHint`: renders nothing once there is nothing
- * left to offer.
- */
 export function GroupTargetLink({ plan, snapshot, onApply }: GroupTargetLinkProps) {
   const { t } = useTranslation();
   if (snapshot === null || planMatchesSnapshot(plan, snapshot)) return null;

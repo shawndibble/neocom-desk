@@ -1,8 +1,3 @@
-/**
- * Adapts SDE skill data (src/sde) to the shapes src/engine expects. Not
- * memoized: callers hold the result in component state, and memoizing here
- * would leak one test's fixture into the next.
- */
 import { loadSkills } from '@/sde/loadSde';
 import type { SkillType } from '@/sde/types';
 import type { CharacterAttributes, CharacterSkill } from '@/esi/endpoints';
@@ -12,11 +7,8 @@ import type { Attributes, EngineSkill, Implants, SkillUnlock, TrainedSkill } fro
 import type { SkillLevels } from '@/engine/industry/types';
 
 export interface SkillCatalog {
-  /** All skills, keyed by typeID, in the shape src/engine consumes. */
   engineSkills: Map<number, EngineSkill>;
-  /** Raw SDE rows, keyed by typeID (name/groupName for display). */
   bySkillTypeID: Map<number, SkillType>;
-  /** Reverse of prereqs: for a skill, every skill it unlocks and the level needed. Built once. */
   unlocksByTypeID: Map<number, SkillUnlock[]>;
 }
 
@@ -43,7 +35,6 @@ export async function loadSkillCatalog(): Promise<SkillCatalog> {
   return { engineSkills, bySkillTypeID, unlocksByTypeID: buildUnlockIndex(engineSkills) };
 }
 
-/** ESI trained-skills rows -> engine TrainedSkill map, keyed by typeID. */
 export function toTrainedSkillsMap(skills: readonly CharacterSkill[]): Map<number, TrainedSkill> {
   const map = new Map<number, TrainedSkill>();
   for (const skill of skills) {
@@ -52,36 +43,12 @@ export function toTrainedSkillsMap(skills: readonly CharacterSkill[]): Map<numbe
   return map;
 }
 
-/**
- * ESI trained-skills rows -> plain typeID->level record, for a job-eligibility
- * check (active_skill_level, not trained_skill_level — level in effect, which
- * can read lower than trained under an alpha clone or a lapsed skill).
- */
 export function toAccountSkillLevels(skills: readonly CharacterSkill[]): SkillLevels {
   const levels: SkillLevels = {};
   for (const skill of skills) levels[skill.skill_id] = skill.active_skill_level;
   return levels;
 }
 
-/**
- * ESI character attributes -> the engine's base sheet (drops remap-metadata
- * fields), classified by `deriveAttributeBaseline`.
- *
- * ESI's /characters/{id}/attributes reports *effective* values, but the engine
- * expects base + remap only — computeSchedule and the optimizer add implants
- * themselves. Pass the character's implant bonuses to subtract them back out;
- * otherwise they'd count twice, inflating the baseline past anything a remap
- * can reach (UX-REVIEW #2's "Savings: 0m" contradiction).
- *
- * That subtraction is not the whole story: an in-game cerebral accelerator is
- * baked into the same values, and ESI exposes no endpoint that would say so.
- * What is left after implants therefore still has to be checked against EVE's
- * legal space, which is what `deriveAttributeBaseline` does — recovering a
- * uniform accelerator when one explains the excess, and reporting the sheet as
- * `impossible` when nothing does. The old `Math.max(17, ...)` floor clamp went
- * with it: flooring an over-subtracted attribute turned a misread into a
- * plausible-looking sheet, which is the failure mode this replaces.
- */
 export function toAttributeBaseline(
   attrs: CharacterAttributes,
   implants: Implants = {}

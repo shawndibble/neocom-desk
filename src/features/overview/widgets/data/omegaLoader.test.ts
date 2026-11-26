@@ -84,7 +84,6 @@ describe('loadOmegaWidget', () => {
     expect(data.journalFetchedAt).toEqual({ [A]: 5_000, [B]: 9_000 });
     expect(data.plex).toEqual({ price: 2_000_000, fetchedAt: 7_000 });
     expect(data.coverage[A]).toEqual({ since: Date.parse('2026-08-01T00:00:00Z'), gaps: [[1, 2]] });
-    // No recorded window: the oldest line held stands in.
     expect(data.coverage[B]).toEqual({ since: Date.parse(DATE), gaps: [] });
     expect(data.loadedIds).toEqual([A, B]);
     expect(seen.options).toEqual({ typeNames: false });

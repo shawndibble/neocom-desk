@@ -1,9 +1,3 @@
-/**
- * The Characters table's Accelerator cell: whether the Character has a
- * cerebral accelerator running, the typed-in countdown when the pilot gave
- * one, and a pencil that opens the shared editor. A guess from the attribute
- * sheet says "Yes" without a countdown (no ESI endpoint knows when it ends).
- */
 import { useTranslation } from 'react-i18next';
 import { IconButton } from '@/components/ui';
 import { HintText } from '@/components/ui/HintText';

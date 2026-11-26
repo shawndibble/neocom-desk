@@ -1,11 +1,3 @@
-/**
- * The Corp Tax Book's stored documents as the member's reader parses them (issue #4065): each
- * `read...` takes one Firestore doc's plain data and returns the engine's shape, or null when it
- * is malformed. Pure: the member's reader (`corpBookStore.ts`) fetches, this parses. The officer's
- * reader (`bookClient.ts`, `bookRead/`) keeps the stored shape as written (it trusts what the
- * server wrote under the officer rules) and shares the settings parser, `parseBookSettings`
- * (`bookDocs.ts`), with this one.
- */
 import { NOTICE_ID_FIELD } from '../../../functions/src/corpTaxBookLateNotice';
 import {
   checkpointProblems,
@@ -22,7 +14,6 @@ import type { ToleranceExemption } from './toleranceExemptions';
 
 type Data = Record<string, unknown>;
 
-/** A donation of the member's own that no Miner has been credited with yet — theirs to claim. */
 export interface ClaimablePayment {
   id: string;
   characterId: number;
@@ -30,49 +21,36 @@ export interface ClaimablePayment {
   at: string;
 }
 
-/**
- * A donation of the member's own the sync held for an officer's review (#6207) because their
- * Miner seemed to owe nothing: the book holds the ISK without counting it. The donor may say it
- * was tax (`claimCorpTaxBookPayment` with `inReview`).
- */
 export interface InReviewPayment {
   id: string;
   characterId: number;
   amount: number;
   at: string;
-  /** The corporation's wallet journal ref (from the payment id `j{division}_{refId}`). */
   refId?: number;
-  /** What the donor wrote on it. */
   reason?: string;
 }
 
-/** What the book holds of a donation, for telling one it holds from one it does not hold yet. */
 export interface HeldPayment {
   characterId: number;
   amount: number;
   at: string;
   notTaxAmount?: number;
-  /** A donation the sync read from the wallet, or a hand record an officer dated. */
   source?: 'donation' | 'manual';
 }
 
-/** A moon owner's coverage and read clock as the miner reads them: never a name, payee or rate. */
 export interface MemberFeederCoverage {
   corporationId: number;
   coveragePeriods: { from: string; to?: string }[];
   lastReadWellAt?: string;
 }
 
-/** The book's settings doc; `null` when it is not an active book, or is still in its setup window (D24: then nothing changes). */
 export function readBookSettings(corporationId: number, d: Data | undefined, now = Date.now()) {
   if (!d || d.active !== true) return null;
   const settings = parseBookSettings(d);
-  // A freshly turned-on book is still being set up (rates, sync, payment matching): members see nothing yet.
   if (settings.membersSeeFrom !== undefined && now < settings.membersSeeFrom) return null;
   if (!settings.startDate) return null;
   const syncedAt = num(settings.lastSync?.at);
   const divisionNames = settings.divisionNames ?? {};
-  // Absent on a book no sync has stamped since the record began: the engine then uses lastSync.
   const donationsReadAt = d.donationsReadAt === null ? null : num(d.donationsReadAt);
   const checked: { donationsCheckedAt?: string | null } =
     donationsReadAt === undefined
@@ -100,7 +78,6 @@ export function readBookSettings(corporationId: number, d: Data | undefined, now
   };
 }
 
-/** A payment doc: `Matched` ones credit a Miner, the rest are claimable by their donor. */
 export function readPayment(
   id: string,
   d: Data
@@ -124,8 +101,6 @@ export function readPayment(
   };
   const minerId = str(d.minerId);
   if (!minerId) {
-    // Only a donation can be claimed, and not one an officer has marked "not tax" in full
-    // or one the sync held for an officer's review (#6207).
     const tax = d.source === 'donation' && (notTaxAmount ?? 0) < amount;
     const claimable =
       tax && d.reviewReason === undefined ? { id, characterId, amount, at } : undefined;
@@ -154,7 +129,6 @@ export function readPayment(
       at,
       source: d.source === 'manual' ? 'manual' : 'donation',
       ...(notTaxAmount !== undefined ? { notTaxAmount } : {}),
-      // An officer's note on a payment recorded by hand: the Miner reads it beside the payment.
       ...(str(d.note) ? { note: str(d.note)! } : {}),
     },
   };
@@ -195,7 +169,6 @@ const DECLARATION_KINDS: readonly Declaration['kind'][] = [
   'another-way',
 ];
 
-/** A declaration on one of the member's own late notices (#6206). */
 export function readMemberDeclaration(id: string, d: Data): Declaration | null {
   const noticeId = str(d[NOTICE_ID_FIELD]);
   const kind = str(d.kind) as Declaration['kind'] | undefined;
@@ -224,7 +197,6 @@ export function readMemberDeclaration(id: string, d: Data): Declaration | null {
             at: rAt,
             ...(reason !== undefined ? { reason } : {}),
             ...(nextStep !== undefined ? { nextStep } : {}),
-            // Only whether the book itself confirmed it (0): the member needs no officer's id.
             ...(by === 0 ? { by } : {}),
           },
         }
@@ -232,7 +204,6 @@ export function readMemberDeclaration(id: string, d: Data): Declaration | null {
   };
 }
 
-/** A Miner's `leftOn` map (character id → day it left), or nothing when there is none. */
 function readLeftOn(raw: unknown): Record<number, string> | undefined {
   if (!raw || typeof raw !== 'object') return undefined;
   const entries = Object.entries(raw).filter(
@@ -257,7 +228,6 @@ export function readMiner(id: string, d: Data): Miner | null {
   };
 }
 
-/** `corps/{book}/feederCoverage/{corp}`, written by the server (#4622). */
 export function readFeederCoverage(id: string, d: Data): MemberFeederCoverage | null {
   const corporationId = Number(id);
   if (!Number.isSafeInteger(corporationId) || corporationId <= 0) return null;
@@ -295,7 +265,6 @@ export function readAdjustment(id: string, d: Data): Adjustment | null {
   };
 }
 
-/** The `reversed` stamp an officer's undo leaves on a record: who, when and why. */
 function reversedOf(raw: unknown): { reversed?: { by: number; at: string; reason: string } } {
   if (typeof raw !== 'object' || raw === null) return {};
   const r = raw as Data;
@@ -318,7 +287,6 @@ export function readWriteOff(id: string, d: Data): RecordedWriteOff | null {
   };
 }
 
-/** `toleranceExemptions`: an officer set how much of one Miner's day shortfall the book forgives. */
 export function readToleranceExemption(id: string, d: Data): ToleranceExemption | null {
   const minerId = str(d.minerId);
   const date = str(d.date);
@@ -335,10 +303,6 @@ export function readToleranceExemption(id: string, d: Data): ToleranceExemption 
   };
 }
 
-/**
- * A Miner's closed-through checkpoint as the book stores it (`accountCheckpoints/{minerId}`,
- * readable by the Miner); null for anything that does not add up (`checkpointProblems`).
- */
 export function readCheckpoint(id: string, d: Data): RunningAccountCheckpoint | null {
   const through = str(d.through);
   const credit = num(d.credit);

@@ -15,7 +15,6 @@ describe('alertTopic', () => {
   });
 
   it('falls back to "other" for a group that has no chip, so no row is left without a topic', () => {
-    // An EVE notification outside the structure prefixes, and an event missing from the chip table.
     expect(alertTopic('eveType:CorpAllBillMsg')).toBe('other');
     expect(alertTopic('event:shipLost')).toBe('other');
     expect(alertTopic('event:notARealEvent')).toBe('other');

@@ -51,7 +51,6 @@ describe('getVariationRows', () => {
     };
     const index = buildVariationIndex(types, META_GROUP_NAMES);
     const typesByGroup = new Map<number, MarketTypeEntry[]>();
-    // 588 has no entry in typesById — unpublished, so it's skipped rather than fabricated.
     const typesById = new Map<number, MarketTypeEntry>([[587, type(587, 'Rifter', 2)]]);
     const result = getVariationRows(index, typesByGroup, typesById, type(587, 'Rifter', 2));
     expect(result.rows).toEqual([]);

@@ -17,7 +17,6 @@ describe('StartPlanButton', () => {
     await userEvent.click(busy);
     expect(onStart).toHaveBeenCalledTimes(1);
 
-    // Navigating away: stays busy until the page it leaves unmounts.
     finish(true);
     await Promise.resolve();
     expect(screen.getByRole('button', { name: 'Starting…' })).toHaveAttribute(

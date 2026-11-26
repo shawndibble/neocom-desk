@@ -53,9 +53,6 @@ describe('resolveOwnerStandings', () => {
 
   it('matches by from_id alone, ignoring from_type, since EVE id ranges never overlap', () => {
     const standings: CharacterStandingEntry[] = [
-      // Mismatched on purpose: an id that is really a corp id, tagged as
-      // 'faction' here. If matching ever started filtering on from_type,
-      // this would wrongly read as 0 instead of the real corp standing.
       { from_id: 1000003, from_type: 'faction', standing: 4 },
     ];
     expect(resolveOwnerStandings(1000003, null, standings)).toEqual({

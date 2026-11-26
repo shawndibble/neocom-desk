@@ -67,7 +67,6 @@ describe('groupTurnInPile', () => {
       ['Secure Strength Trader', 30045324],
       ['Trail of Silence Trader', 30002537],
     ]);
-    // 300 × 28,000 + 3 blocks × 4,000 LP × 800 = 8.4M + 9.6M
     expect(pile.groups[0]!.lines.map((l) => [l.name, l.reward.total])).toEqual([
       ['Shield Failover Report', 18_000_000],
       ['Federation Strategic Intel', 9_600_000],

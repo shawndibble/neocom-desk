@@ -19,7 +19,6 @@ function group(
   return groupMailByAge(items, (i) => i.timestamp, new Date(now), timeZone, weekStart);
 }
 
-/** Bucket of each item id, so one assertion reads every placement at once. */
 function bucketsById(
   items: readonly Item[],
   now: string,
@@ -32,7 +31,6 @@ function bucketsById(
   return out;
 }
 
-// 2026-10-16 is a Friday.
 const FRIDAY_NOON = '2026-10-16T12:00:00Z';
 
 describe('groupMailByAge', () => {
@@ -82,7 +80,6 @@ describe('groupMailByAge', () => {
   });
 
   it('keeps This week across a month edge rather than calling it Last month', () => {
-    // Thu 1 Oct 2026; the Monday-start week began Mon 28 Sep.
     expect(
       bucketsById(
         [item('mon', '2026-09-28T10:00:00Z'), item('sun', '2026-09-27T10:00:00Z')],
@@ -112,7 +109,6 @@ describe('groupMailByAge', () => {
     const mail = [item('m', '2026-10-15T20:00:00Z')];
     const now = '2026-10-16T09:00:00Z';
     expect(bucketsById(mail, now, 'UTC')).toEqual({ m: { kind: 'yesterday' } });
-    // Auckland is UTC+13 in October: the mail landed at 09:00 on the 16th, and it is now 22:00 the same day.
     expect(bucketsById(mail, now, 'Pacific/Auckland')).toEqual({ m: { kind: 'today' } });
   });
 

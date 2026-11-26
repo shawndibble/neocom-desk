@@ -1,11 +1,3 @@
-/**
- * Age-based pruning of per-id `esiCache` rows (cachePrune.ts).
- *
- * What these pin: only allowlisted per-id keys are ever deleted, only once
- * they are older than their rule's window, never a row refreshed between the
- * scan and the delete, and never by deserializing a cached value just to
- * learn its age.
- */
 import { DAY_MS } from '@/lib/age';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { db } from '@/db';
@@ -37,7 +29,6 @@ async function seed(characterId: number, key: string, fetchedAt: number, value: 
   await db.esiCache.put({ characterId, key, value, fetchedAt });
 }
 
-/** A row written before `esiCacheMeta` existed: value present, meta absent. */
 async function seedWithoutMeta(characterId: number, key: string, fetchedAt: number) {
   await seed(characterId, key, fetchedAt);
   await db.esiCacheMeta.delete([characterId, key]);
@@ -104,11 +95,6 @@ describe('pruneRuleFor', () => {
     expect(pruneRuleFor('pilot-id:blue tractor')?.maxAgeMs).toBe(STATIC_RETENTION_MS);
   });
 
-  /*
-   * A route asked around an avoid list is keyed by that list, and pod-kill
-   * avoidance changes it hourly — so those rows are rarely read twice and
-   * go after two days rather than thirty.
-   */
   it.each([
     'route:30000142:30002187:shortest:a3:1x2y3z',
     'route:30000142:30002187:avoid-highsec:p0:a165:k9d0ax',
@@ -131,7 +117,6 @@ describe('pruneRuleFor', () => {
   });
 
   it.each([
-    // Single-row-per-character keys: the user's main data, never age-pruned.
     'skills',
     'wallet',
     'assets',
@@ -141,18 +126,13 @@ describe('pruneRuleFor', () => {
     'mail:headers',
     'mail:labels',
     'mail:lists',
-    // Corp-owned rows have their own purge path.
     'corp:98000001:structures',
     'corp:98000001:name:1',
-    // PI rows are read cache-only by the alt-colony view; bounded by colonies.
     'planet:40000001',
     'planet-info:40000001',
     'schematic:66',
-    // Read cache-only (PI Advisor's alt colonies): nothing would refill it.
     'system:30000142',
-    // A citadel's name: ACL-gated, so a refetch after losing access is a 403.
     'structure:1035466617946',
-    // Near misses of allowlisted prefixes.
     'name:abc',
     'names:1',
     'type:34:extra',
@@ -239,7 +219,6 @@ describe('pruneEsiCache', () => {
     await seed(G, 'name:1', NOW - STATIC_RETENTION_MS - 1);
     await seed(G, 'name:2', NOW - STATIC_RETENTION_MS - 1);
 
-    // The refresh lands in the gap before the first delete chunk.
     const deleted = await pruneEsiCache({
       now: NOW,
       beforeChunk: () => seed(G, 'name:1', NOW, 'fresh'),
@@ -334,7 +313,6 @@ describe('pruneEsiCache', () => {
       await seedWithoutMeta(G, 'marketPrice:1:2', 0);
       const firstRunAt = NOW - MARKET_RETENTION_MS - 1;
 
-      // Old enough for the market window, not yet for the static one.
       expect(await pruneEsiCache({ now: NOW, firstRunAt })).toBe(1);
       expect(await keys()).toEqual([`${G}|name:1`, `${G}|skills`]);
     });
@@ -415,7 +393,6 @@ describe('runDailyEsiCachePrune', () => {
     await db.settings.put({ key: PRUNE_FIRST_RUN_KEY, value: NOW - STATIC_RETENTION_MS - 1 });
     await seedWithoutMeta(G, 'name:1', 0);
     await runDailyEsiCachePrune();
-    // That run still had one to delete, so the flag waits for the next.
     expect(await db.settings.get(PRUNE_LEGACY_CLEARED_KEY)).toBeUndefined();
 
     vi.spyOn(Date, 'now').mockReturnValue(NOW + PRUNE_MIN_INTERVAL_MS + 1);

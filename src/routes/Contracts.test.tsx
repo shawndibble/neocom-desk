@@ -39,28 +39,17 @@ vi.mock('@/sde/loadSde', () => ({
   loadMarketWideTrees: vi.fn(async () => ({})),
 }));
 
-// Turning `isSyncConfigured` on lets `App` fire a real sync at boot (and the
-// background sweep), which initializes Firebase; its heartbeat then opens
-// IndexedDB and can call back after jsdom has torn down ("self is not
-// defined", an unhandled error that fails the shard). The UI under test only
-// needs the flag, not a sync.
 vi.mock('@/sync', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/sync')>()),
   triggerSync: vi.fn(async () => {}),
   scheduleSync: vi.fn(),
 }));
 
-// Forced off so whether a sync backend is configured does not depend on
-// whether a `.env` happens to sit beside the checkout, which would make these
-// tests environment-dependent. The Search tab reads R2 and is not gated on it
-// (issue #4270).
 vi.mock('@/app/syncStatus', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/app/syncStatus')>();
   return { ...actual, isSyncConfigured: vi.fn(() => false) };
 });
 
-// The Search tab's loaders: no snapshot by default, so tests about the tab
-// strip and the character-contracts table never touch the network.
 const NO_SNAPSHOT = { cached: null, revalidating: false };
 const loadPublicContractOffers = vi.fn<(...args: unknown[]) => Promise<unknown>>(
   async () => NO_SNAPSHOT
@@ -74,15 +63,10 @@ const loadPublicCourierContracts = vi.fn<(...args: unknown[]) => Promise<unknown
 vi.mock('@/features/contractSearch/publicCourierContracts', () => ({
   loadPublicCourierContracts: (...args: unknown[]) => loadPublicCourierContracts(...args),
 }));
-// The Search tab's Jump Range filter reads this (`features/route/currentSystem.ts`).
-// Mocked rather than given an msw handler: `onUnhandledRequest: 'error'` below
-// would otherwise fail every case that mounts the Search tab, not only the
-// ones this file is actually about.
 vi.mock('@/features/character/location', () => ({
   loadCharacterSolarSystemId: vi.fn(async () => null),
 }));
 
-// The corp read is mocked: its own loaders have tests; here it only feeds the one History table.
 const loadCorpContractsSnapshot = vi.hoisted(() => vi.fn());
 vi.mock('@/features/contracts/corpContractsSnapshot', () => ({ loadCorpContractsSnapshot }));
 
@@ -122,7 +106,6 @@ const contractPage2 = [
   },
 ];
 
-/** Every filter now sits behind the funnel (FilterBar, issue #1282). */
 const server = setupServer(
   http.get(`https://esi.evetech.net/characters/${CHAR_ID}/contracts`, ({ request }) => {
     const page = new URL(request.url).searchParams.get('page');
@@ -133,21 +116,15 @@ const server = setupServer(
   http.post('https://esi.evetech.net/universe/names', () =>
     HttpResponse.json([{ id: 500001, name: 'Some Trader', category: 'character' }])
   ),
-  // No contacts and no affiliation by default — standing cross-reference
-  // tests below override these per-scenario.
   http.get(`https://esi.evetech.net/characters/${CHAR_ID}/contacts`, () => HttpResponse.json([])),
   http.post('https://esi.evetech.net/characters/affiliation', () => HttpResponse.json([]))
 );
 
 beforeAll(async () => {
   server.listen({ onUnhandledRequest: 'error' });
-  // Compile the lazy Layout chunk here, under the hook's own budget, for the
-  // App-level tests at the end: a worker's first `App` render pays for it and
-  // took seconds under parallel load on CI, past a findBy timeout.
   await routeChunks.loadLayout();
 });
 
-/** The Contracts page on its route, without App's boot or the signed-in shell. */
 function renderContracts() {
   return renderPageRoute('/contracts', <Contracts />);
 }
@@ -162,9 +139,6 @@ beforeEach(async () => {
   useActiveCharacter.setState({ activeCharacterId: null, hydrated: false });
   usePublicInfo.setState({ byCharacterId: {} });
   usePublicInfoModalStore.setState({ request: null });
-  // Module singleton, shared by every test in this file: without the reset a
-  // preference set by one test leaves the rest rendering UTC, and a leaked
-  // `hydrated: true` makes App's `hydrate()` early-return.
   useTimeFormat.setState({ value: DEFAULT_TIME_FORMAT, hydrated: false });
 
   await db.characters.put({ characterId: CHAR_ID, name: 'Pilot One', ownerHash: 'oh', addedAt: 1 });
@@ -176,9 +150,6 @@ beforeEach(async () => {
     scopes: ['esi-contracts.read_character_contracts.v1'],
   });
   await db.settings.put({ key: ACTIVE_CHARACTER_KEY, value: CHAR_ID });
-  // Search is the page's landing tab; every describe below this one is about
-  // the character's own contract history, so they deep-link straight to it.
-  // The tab-strip describe overrides this per test.
   window.history.pushState({}, '', '/contracts/history');
 });
 
@@ -230,20 +201,15 @@ describe('Contracts', () => {
     await screen.findByText('Rifter fit');
     const table = screen.getByRole('table', { name: 'Contracts' });
 
-    // The row's More-actions button draws an icon too; the cue is any other svg.
     const cue = (row: Element | null | undefined) =>
       row?.querySelector('svg:not(button svg)') ?? null;
 
     const freshRow = within(table).getByText('Rifter fit').closest('tr');
     expect(cue(freshRow)).not.toBeInTheDocument();
 
-    // Lapsed rows carry a non-color cue (icon + tooltip) rather than dimming
-    // the row's own text below AA (issue #1491).
     const staleRow = within(table).getByText('Lapsed offer').closest('tr');
     expect(cue(staleRow)).toBeInTheDocument();
 
-    // Finished, with a deadline in the past — not flagged (issue: was
-    // status-blind, so almost every completed contract dimmed).
     const finishedRow = within(table).getAllByText('Courier')[0].closest('tr');
     expect(cue(finishedRow)).not.toBeInTheDocument();
   });
@@ -385,7 +351,6 @@ describe('Contracts', () => {
     await user.click(await screen.findByRole('button', { name: 'Rifter fit' }));
     const dialog = await screen.findByRole('dialog', { name: /Item Exchange/ });
     expect(within(dialog).getByText('Rifter fit')).toBeInTheDocument();
-    // The row menu's "Copy contract ID" moved here: the modal is where the ID is read.
     expect(within(dialog).getByRole('button', { name: 'Copy contract ID' })).toBeInTheDocument();
   });
 
@@ -475,8 +440,6 @@ describe('Contracts market/issuer links and filters (issue #417)', () => {
     const table = screen.getByRole('table', { name: 'Contracts' });
     expect(within(table).getAllByText('Courier')[0]).toBeInTheDocument();
 
-    // The phone chip row (jsdom has no CSS to hide it), not the filter popover.
-    // The status chips sit behind the funnel; a phone-only copy of them is gone.
     await user.click(screen.getByRole('button', { name: /^Filters/ }));
     await user.click(screen.getByRole('button', { name: 'Outstanding' }));
 
@@ -502,8 +465,6 @@ describe('Contracts market/issuer links and filters (issue #417)', () => {
     renderContracts();
     await screen.findByText('Rifter fit');
 
-    // The phone chip row (jsdom has no CSS to hide it), not the filter popover.
-    // The status chips sit behind the funnel; a phone-only copy of them is gone.
     await user.click(screen.getByRole('button', { name: /^Filters/ }));
     await user.click(screen.getByRole('button', { name: 'Outstanding' }));
     await user.type(
@@ -616,7 +577,6 @@ describe('Contact standing cross-reference', () => {
     renderContracts();
     await screen.findByText('Rifter fit');
     const table = screen.getByRole('table', { name: 'Contracts' });
-    // Both fixture contracts share issuer_id 500001 — both rows carry the tag.
     expect(
       within(table).getAllByRole('img', { name: 'Your contact: Terrible standing (-10)' })
     ).toHaveLength(2);
@@ -629,14 +589,6 @@ describe('Contact standing cross-reference', () => {
     expect(within(table).queryByRole('img')).not.toBeInTheDocument();
   });
 
-  /**
-   * The contacts scope may never have been granted at all (this route never
-   * asks for it) — a network failure on that one lookup must not take the
-   * whole page down with it, the same way an offline contracts fetch falls
-   * back to cache rather than failing the page (`loadPaginatedWithCacheStatus`
-   * catches internally; this proves the `Promise.all` alongside it inherits
-   * that, not just the contracts call on its own).
-   */
   it('still renders contracts when the contacts lookup itself fails', async () => {
     server.use(
       http.get(`https://esi.evetech.net/characters/${CHAR_ID}/contacts`, () => HttpResponse.error())
@@ -659,7 +611,6 @@ describe('Contact standing cross-reference', () => {
     renderContracts();
     await screen.findByText('Rifter fit');
     const table = screen.getByRole('table', { name: 'Contracts' });
-    // Both fixture contracts share issuer_id 500001 — both rows carry the tag.
     expect(
       within(table).getAllByRole('img', {
         name: 'Terrible standing (-10) — your entry on their corp, not on them',
@@ -699,14 +650,6 @@ describe('Contact standing cross-reference', () => {
   });
 });
 
-/**
- * Vitest pins `TZ=UTC` (vite.config.ts), under which
- * `formatTimestamp(d, 'UTC')` and `formatTimestamp(d)` are the same string —
- * so a Contracts page that ignored the preference outright would still pass
- * these. Both tests move the host zone off UTC for their duration, and the
- * guard assertion in each states that premise out loud so this can never
- * quietly go vacuous if the config's zone ever changes.
- */
 describe('Received by column', () => {
   const base = contractPage1[0];
   it('shows the acceptor, the offered-to assignee with a tag, and a dash for the pilot', async () => {
@@ -743,7 +686,6 @@ describe('Received by column', () => {
 });
 
 describe('Time format preference', () => {
-  /** The instant is fixed; only its rendering depends on the zone below. */
   const EXPIRES = new Date(contractPage1[0].date_expired);
   const ORIGINAL_TZ = process.env.TZ;
 
@@ -768,12 +710,6 @@ describe('Time format preference', () => {
     expect(within(table).queryByText(formatDateOnly(EXPIRES))).not.toBeInTheDocument();
   });
 
-  /**
-   * The column set is a `useMemo`. Mounting with the preference already set
-   * would pass even if `timeZone` were missing from its deps — the memo would
-   * simply have closed over the right zone once. Flipping it *after* mount is
-   * what actually proves the table re-renders instead of holding stale strings.
-   */
   it('reformats an already-rendered table when the pilot switches to EVE time', async () => {
     expect(formatDateOnly(EXPIRES, 'UTC')).not.toBe(formatDateOnly(EXPIRES));
 
@@ -782,9 +718,6 @@ describe('Time format preference', () => {
     const table = screen.getByRole('table', { name: 'Contracts' });
     expect(within(table).getByText(formatDateOnly(EXPIRES))).toBeInTheDocument();
 
-    // The store's own setter, exactly as a Settings control would call it —
-    // it takes the hydration generation, so the render's in-flight `hydrate()`
-    // cannot land afterwards and undo the choice.
     await act(async () => {
       await useTimeFormat.getState().setValue('eve');
     });
@@ -872,7 +805,6 @@ describe('Contracts All characters source', () => {
     server.use(
       http.get(`https://esi.evetech.net/characters/${ALT_ID}/contracts`, () =>
         HttpResponse.json([
-          // Also on Pilot One's list: one row, not two.
           contractPage1[0],
           { ...contractPage1[0], contract_id: 77, title: 'Alt trade' },
         ])
@@ -895,7 +827,6 @@ describe('Contracts All characters source', () => {
       ownerHash: 'o3',
       addedAt: 3,
     });
-    // No token: never granted the contracts scope, so "All" leaves it out.
     window.history.pushState({}, '', '/contracts/history?history.chars=all');
     renderContracts();
     expect(await screen.findByText('Alt trade')).toBeInTheDocument();
@@ -925,7 +856,6 @@ describe('Contracts All characters source', () => {
 });
 
 describe('Contracts row right-click (issue #676)', () => {
-  /** Right-clicks a contract row by its rendered title-cell text and returns the row. */
   async function openContractMenu(cellText: string) {
     await screen.findByText('Rifter fit');
     const table = screen.getByRole('table', { name: 'Contracts' });
@@ -953,7 +883,6 @@ describe('Contracts row right-click (issue #676)', () => {
     renderContracts();
     await openContractMenu('Rifter fit');
 
-    // Right-click may still offer the table's own Export; never row copies.
     expect(screen.queryByRole('menuitem', { name: 'Copy title' })).not.toBeInTheDocument();
     expect(screen.queryByRole('menuitem', { name: 'Copy contract ID' })).not.toBeInTheDocument();
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
@@ -974,7 +903,6 @@ describe('Contracts row right-click (issue #676)', () => {
 });
 
 describe('Contracts tab strip (issue #908)', () => {
-  // The loaders are mocked to read nothing, so the Search tab says R2 was unreachable.
   const SEARCH_UNAVAILABLE = "Can't reach contract search, and nothing is saved yet";
 
   it('lands on My contracts with no tab in the URL', async () => {
@@ -1025,8 +953,6 @@ describe('Contracts tab strip (issue #908)', () => {
   });
 
   it('reaches Item search even when this character has no contracts of its own', async () => {
-    // The empty-history state used to be the whole page; the Search tab reads
-    // a public snapshot and must not be gated behind it.
     server.use(
       http.get(`https://esi.evetech.net/characters/${CHAR_ID}/contracts`, () =>
         HttpResponse.json([], { headers: { 'X-Pages': '1' } })
@@ -1059,15 +985,8 @@ describe('Contracts tab strip (issue #908)', () => {
   });
 });
 
-/**
- * The Search tab's freshness badge and Refresh live on the *page* header, not
- * in the results panel — `ContractSearchPanel` reports them upward. Only a
- * route-level render proves that round trip: the panel's own suite stubs the
- * page header, so a callback that never fired would still pass there.
- */
 describe('Contracts Search tab page header', () => {
   const SYNCED_AT = Date.parse('2026-09-12T18:30:00Z');
-  /** No rows, so neither board pulls the SDE catalogue — the header is what is under test. */
   const EMPTY_SNAPSHOT = {
     cached: {
       data: { rows: [], lastSyncedAt: SYNCED_AT },
@@ -1092,13 +1011,11 @@ describe('Contracts Search tab page header', () => {
     window.history.pushState({}, '', '/contracts/search/items');
     const { container } = renderContracts();
 
-    // The panel drew this pair itself before; it now has to reach the route.
     await waitFor(() =>
       expect(
         container.querySelector(`time[datetime="${new Date(SYNCED_AT).toISOString()}"]`)
       ).not.toBeNull()
     );
-    // Enabled is the discriminating assertion: no reported status leaves it off.
     expect(screen.getByRole('button', { name: 'Refresh' })).not.toHaveAttribute('aria-disabled');
   });
 
@@ -1174,9 +1091,6 @@ describe('Issued / Expires date-only cells (issue #3105)', () => {
   });
 });
 
-// Every test above renders the page on its own route (`renderContracts`). This
-// one proves the App wiring that leaves out: /contracts mounts inside the
-// signed-in shell.
 describe('Contracts in the App', () => {
   it('opens /contracts/history inside the signed-in shell, its rail link current', async () => {
     render(<App />);

@@ -26,7 +26,6 @@ vi.mock('@/sde/loadSde', () => ({
     '420': 6,
     '28': 6,
   }),
-  // Orca left out on purpose: a hull with no baked mass.
   loadShipMass: async () => ({
     '1': ['Cenotaph', 419, 13_000_000],
     '3': ['Rapier', 833, 11_000_000],
@@ -79,7 +78,6 @@ describe('FleetBoard', () => {
     expect(industrial.textContent).toContain('Exhumer');
     expect(industrial.textContent).toContain('2 named OR:E');
     expect(industrial.textContent).toContain('23 km – 135 km');
-    // Drones are a role of their own, not left out.
     expect(screen.getByRole('region', { name: 'Drones and deployables' })).toBeTruthy();
   });
 
@@ -220,7 +218,6 @@ describe('the Full scan', () => {
 
   it("in wormhole space, names the hole each ship needs and the hulls' mass floor", async () => {
     const user = userEvent.setup();
-    // The drone (Infiltrator II) adds to neither the sizes nor the mass.
     render(
       <FleetBoard
         rows={[row(1, 10), row(3, 12), row(3, 14), row(4, 5), row(28606, 20), row(2175, 8)]}

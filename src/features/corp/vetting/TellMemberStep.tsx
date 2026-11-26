@@ -12,19 +12,13 @@ import type { RequestMailPreview } from './useVettingRequestMail';
 import { requestLink } from './vettingText';
 
 interface TellMemberStepProps {
-  /** The member's name. */
   name: string;
-  /** The asking officer, whose Character sends the mail. */
   officerId: number;
   officerName: string;
   send: () => Promise<MailRun>;
   preview: () => Promise<RequestMailPreview | null>;
 }
 
-/**
- * After "Ask for a review": the member sees the request only when they open Neocom Desk, so the
- * officer may mail them the link. Never automatic; the press is the consent.
- */
 export function TellMemberStep({
   name,
   officerId,
@@ -39,7 +33,6 @@ export function TellMemberStep({
   const [shown, setShown] = useState<RequestMailPreview | null>(null);
   const first = name.split(' ')[0] ?? name;
   const queued = run !== null && run.queued.length > 0;
-  // Nobody queued, nobody failed: this device had already queued this mail.
   const already =
     run !== null && !run.missingScope && run.queued.length === 0 && run.failed.length === 0;
   const sent = queued || already;
@@ -58,7 +51,6 @@ export function TellMemberStep({
       await writeToClipboard(requestLink());
       flash('copied');
     } catch {
-      // The clipboard was refused: nothing was copied, and the button says so.
       flash('failed');
     }
   };

@@ -24,7 +24,6 @@ interface PlanMaterialModalsProps {
   onSearchBpcSourcing: (blueprintTypeID: number) => void;
 }
 
-/** The three dialogs the Materials table opens: Buy ore, a built row's recipe, and the blueprint acquisition picker. */
 export function PlanMaterialModals({
   modals,
   result,

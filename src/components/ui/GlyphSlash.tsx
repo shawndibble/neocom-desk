@@ -1,7 +1,3 @@
-/**
- * A slash drawn over an icon: the mark's "off" state, so colour is never the only signal
- * (§6c). Sits in a `relative` wrapper around the glyph it crosses out.
- */
 export function GlyphSlash() {
   return (
     <svg

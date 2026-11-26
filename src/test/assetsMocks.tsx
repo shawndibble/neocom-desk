@@ -1,10 +1,6 @@
 import { vi } from 'vitest';
 import type { TypeMap } from '@/sde/types';
 
-// Shared mock factories for the Assets route tests (Assets*.test.tsx). Kept free
-// of app imports: a `vi.mock` factory imports this module while the app graph is
-// still loading, so it must not import the app back.
-
 export const TYPES: TypeMap = {
   '34': { name: 'Tritanium', groupID: 18, volume: 0.01 },
   '35': { name: 'Pyerite', groupID: 18, volume: 0.01 },
@@ -30,8 +26,6 @@ export const mutamarketMock = (original: typeof import('@/market/mutamarket')) =
   getAbyssalEstimate: abyssalEstimate,
 });
 
-// Show info's modal fetches the type's dogma/market data; a stub that names
-// its item is all the name-button tests need to see it opened.
 export const itemDetailModalMock = () => ({
   ItemDetailModal: ({ itemName }: { itemName: string }) => (
     <div role="dialog" aria-label={`Item detail: ${itemName}`} />
@@ -41,7 +35,6 @@ export const itemDetailModalMock = () => ({
 export const loadSdeMock = () => ({
   loadSkills: vi.fn(async () => []),
   loadTypes: vi.fn(async () => TYPES),
-  // Group 25 (Frigate) is in category 6, Ship.
   loadGroupCategories: vi.fn(async () => ({ '25': 6 })),
   loadBlueprints: vi.fn(async () => ({})),
   loadPi: vi.fn(async () => ({ schematics: {}, raw: [] })),
@@ -54,8 +47,6 @@ export const loadSdeMock = () => ({
   })),
 });
 
-// The Move tab reads hull capacities from the Fitting catalogue and the pilot's
-// skills; its own tests (MovePlanTab.test.tsx) cover that, these files only open the tab.
 export const fittingCatalogueMock = () => ({
   useFittingCatalogue: () => null,
   useFittingCatalogueFailed: () => false,
@@ -64,9 +55,6 @@ export const fittingPilotProfileMock = () => ({
   usePilotProfile: () => ({ profile: null, failed: false, retry: () => {} }),
 });
 
-// Only reached by the "View in Market" navigation test: Market Browser
-// lazy-loads its own SDE payloads on mount, which these files otherwise never
-// touch. Empty catalogues are enough to mount it without an unhandled fetch.
 export const loadMarketSdeMock = () => ({
   loadMarketGroups: vi.fn(async () => []),
   loadMarketTypes: vi.fn(async () => []),
@@ -78,8 +66,6 @@ export const loadMarketSdeMock = () => ({
     { id: 30002055, name: 'Far', security: 0.9, regionId: 10000002 },
     { id: 30002187, name: 'Amamake', security: 0.9, regionId: 10000002 },
   ]),
-  // Jita to Amamake: two jumps through low-sec Lowpoint, or three through
-  // high-sec Hed and Far. Prefer safer flies the three, Prefer shorter the two.
   loadSolarSystemJumps: vi.fn(async () => ({
     30000142: [30002054, 30002053],
     30002054: [30000142, 30002187],
@@ -92,7 +78,6 @@ export const loadMarketSdeMock = () => ({
   loadAttributeDictionary: vi.fn(async () => new Map()),
 });
 
-// The export tests read the rows handed to the export rather than a file.
 export const downloadCsvMock = (original: typeof import('@/lib/downloadCsv')) => ({
   ...original,
   exportRows: vi.fn(async () => {}),

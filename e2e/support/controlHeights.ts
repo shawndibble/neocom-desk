@@ -1,32 +1,8 @@
-/**
- * Inline controls in one row render at one height (DESIGN.md §3: "a toolbar
- * built from a single `size` value lines up by construction"). The rule kept
- * slipping anyway — a `Link` styled `buttonClassName({ size: 'sm' })` beside
- * a `SearchInput` (fixed `md`), a `FilterChip` (default `sm`) beside a
- * `NativeSelect` (default `md`) — because each control picks its own size and
- * nothing measured the row. jsdom has no layout, so this measures the real
- * boxes in the browser instead of reading props or classes, which also catches
- * hand-built controls.
- *
- * What counts: a visible, *boxed* control (a border or a fill — a ghost button
- * or a bare icon has no edge to misalign), at least 20px tall. Checkboxes,
- * radios, tabs, table headers and textareas (sized by their content) are not;
- * a bordered `role="group"` up to one touch control tall (a
- * `SegmentedControl`) counts as one control. What is compared: within each
- * flex row or grid, every control on one line, grouped by vertical overlap. A
- * child whose controls span several lines (a stacked form, a card) is a layout
- * of its own and is checked through its inner rows instead.
- *
- * Opt-out for a deliberate mismatch: `data-inline-height="exempt"` on the
- * control or any ancestor. Say why next to it.
- */
 import type { Page } from '@playwright/test';
 import { expect } from './testBase';
 
-/** Desktop pointer tier, then the phone's touch tier, where half the mismatches only show. */
 export const CONTROL_ROW_WIDTHS = [1280, 390] as const;
 
-/** Each row, inside `scope`, whose inline controls differ in height by more than 1px. */
 export async function findControlHeightMismatches(page: Page, scope: string): Promise<string[]> {
   return page.evaluate((scopeSelector) => {
     const CONTROL =
@@ -37,13 +13,10 @@ export async function findControlHeightMismatches(page: Page, scope: string): Pr
 
     const isBoxed = (el: Element): boolean => {
       if (el.closest('[data-inline-height="exempt"], [role="tablist"], table thead')) return false;
-      // Including a `role="combobox"` textarea: its height follows its lines.
       if (el.tagName === 'TEXTAREA') return false;
-      // Opacity and visibility on any ancestor too: a hover-revealed row action is not there yet.
       if (!el.checkVisibility({ opacityProperty: true, visibilityProperty: true })) return false;
       const rect = el.getBoundingClientRect();
       if (rect.width === 0 || rect.height < 20) return false;
-      // A bordered group taller than one touch control is a panel, not a SegmentedControl.
       if (el.matches('[role="group"], [role="radiogroup"]') && rect.height > 48) return false;
       const style = getComputedStyle(el);
       const bordered = parseFloat(style.borderTopWidth) > 0 && style.borderTopStyle !== 'none';
@@ -53,7 +26,6 @@ export async function findControlHeightMismatches(page: Page, scope: string): Pr
     };
 
     const controls = Array.from(root.querySelectorAll(CONTROL)).filter(isBoxed);
-    // A control nested in another counted control (an input's clear button) is the parent's part.
     const outermost = controls.filter(
       (el) => !controls.some((other) => other !== el && other.contains(el))
     );
@@ -78,7 +50,6 @@ export async function findControlHeightMismatches(page: Page, scope: string): Pr
         label: `${el.tagName.toLowerCase()}"${label}"`,
       };
     };
-    /** Boxes sharing a line: each one's middle falls inside another's span. */
     const byLine = (boxes: Box[]): Box[][] => {
       const lines: Box[][] = [];
       for (const box of boxes) {
@@ -93,8 +64,6 @@ export async function findControlHeightMismatches(page: Page, scope: string): Pr
     const mismatches = new Set<string>();
     const checkedRows = new Set<Element>();
     for (const control of outermost) {
-      // Walk every row ancestor: the mismatch may be between this control's
-      // wrapper and a sibling several levels up.
       for (let el = control.parentElement; el && el !== root.parentElement; el = el.parentElement) {
         if (checkedRows.has(el)) continue;
         const style = getComputedStyle(el);
@@ -109,7 +78,6 @@ export async function findControlHeightMismatches(page: Page, scope: string): Pr
         const boxes: Box[] = [];
         for (const child of Array.from(el.children)) {
           const inChild = outermost.filter((c) => child === c || child.contains(c)).map(boxOf);
-          // Controls on several lines: a layout of its own, checked through its inner rows.
           if (inChild.length > 0 && byLine(inChild).length === 1) boxes.push(...inChild);
         }
         for (const line of byLine(boxes)) {
@@ -124,11 +92,9 @@ export async function findControlHeightMismatches(page: Page, scope: string): Pr
   }, scope);
 }
 
-/** Fails, listing every row, when any inline controls in `scope` differ in height. */
 export async function expectInlineControlsAligned(
   page: Page,
   label: string,
-  // `body` by default: header actions and portalled sheets sit outside `main`.
   scope = 'body'
 ): Promise<void> {
   expect(

@@ -5,7 +5,6 @@ import { FITTING_RACKS, MUTAPLASMID_BASES } from './data/srpDoctrineData.js';
 const pub = (name: string) =>
   JSON.parse(readFileSync(new URL(`../../public/data/${name}`, import.meta.url), 'utf8'));
 
-// functions/ cannot import public/, so it keeps a compact copy (scripts/build-srp-doctrine-data.mjs).
 describe('srpDoctrineData copy', () => {
   it('matches public/data/fittingSlots.json (drones left out)', () => {
     const slots = pub('fittingSlots.json') as Record<string, string>;

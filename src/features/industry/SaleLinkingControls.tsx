@@ -24,19 +24,6 @@ import { useTimeZone } from '@/lib/timeFormat';
 import { formatDateOnly } from '@/lib/timestamp';
 import { DialogFooter } from '@/components/ui/DialogFooter';
 
-/**
- * The "Sold" split button — primary action Link Past Sale, plus an attached
- * chevron revealing Watch Open Order, Manual/Private Sale and Delete
- * Production Run — shared by `ProductionRunsPanel` and `ProductionLogPanel`'s
- * action columns. The delete item is the only way to drop a run from the
- * Logs tab, whose rows click through to the Build Plan rather than into an
- * edit modal; it says "Delete production run" rather than inventing a second
- * verb for the danger button already in that modal. An
- * optional refresh icon sits beside it for a run with an open watch; only
- * `ProductionRunsPanel`'s per-plan table passes one today, but it takes no
- * plan context, so `ProductionLogPanel` gets it for free by passing the
- * props through.
- */
 export function SoldSplitButton({
   onSold,
   onWatch,
@@ -52,9 +39,7 @@ export function SoldSplitButton({
   onSold: () => void;
   onWatch: () => void;
   onManual: () => void;
-  /** "Mark as lost" — books a Run Loss (issue #2851). */
   onLost: () => void;
-  /** The run's existing loss records; each gets an Edit/Remove item. */
   losses?: readonly ProductionLossRecord[];
   onEditLoss?: (loss: ProductionLossRecord) => void;
   onRemoveLoss?: (loss: ProductionLossRecord) => void;
@@ -99,9 +84,6 @@ export function SoldSplitButton({
               ];
             })}
             <DropdownMenuSeparator />
-            {/* `data-[highlighted]:text-danger` re-states the tone the shared item
-                style resets on hover/keyboard focus — the one item here that
-                destroys something should stay red while it's the active one. */}
             <DropdownMenuItem
               onSelect={onDelete}
               className="text-danger data-[highlighted]:text-danger"
@@ -197,12 +179,6 @@ function WatchPicker({
   );
 }
 
-/**
- * The three dialogs `useSaleLinking`'s state drives: the Link Past Sale/Watch
- * Open Order picker, the Manual/Private Sale form, and the delete
- * confirmation. One instance per panel that uses the hook — mount it once
- * alongside the table, not once per row.
- */
 export function SaleLinkingModals({ sale }: { sale: SaleLinking }) {
   const { t } = useTranslation();
   const quantityErrorId = useId();

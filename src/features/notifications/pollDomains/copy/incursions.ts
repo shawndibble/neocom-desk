@@ -8,6 +8,5 @@ export type { IncursionNames };
 export const incursionNearbyCopy: DomainCopy<IncursionNearbyFire, IncursionNames> = {
   poll: (fire, _character, names) =>
     incursionNearbyWording((key, vars) => i18n.t(key, vars), fire, names),
-  // The staging system: the alert opens Route Safety with it as the Stop.
   subjectOf: (fire) => fire.stagingSystemId,
 };

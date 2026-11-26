@@ -5,11 +5,6 @@ import { loadTypeNames } from '@/features/character/typeNames';
 
 const NONE: ReadonlyMap<number, string> = new Map();
 
-/**
- * Names for the minerals the items refine into, for the breakdown's table.
- * Empty until read; the breakdown falls back to "#id" for a name not here yet,
- * so a slow or failed read costs labels, never the figures.
- */
 export function useRefineMineralNames(
   items: readonly AppraisalItem[]
 ): ReadonlyMap<number, string> {
@@ -31,7 +26,6 @@ export function useRefineMineralNames(
       .then((names) => {
         if (!cancelled) setLoaded({ key, names });
       })
-      // Reported, not swallowed: the figures stand without names, but a failing read is worth knowing about.
       .catch((error: unknown) => captureException(error));
     return () => {
       cancelled = true;

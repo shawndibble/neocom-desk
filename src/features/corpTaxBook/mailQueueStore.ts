@@ -1,4 +1,3 @@
-/** Dexie persistence for the Corp Tax Book send queue (issue #4064): one row per mail. */
 import { db } from '@/db';
 import { isAlreadyQueued, type MailQueueItem } from '@/engine/corpTaxBook/mailQueue';
 
@@ -15,10 +14,6 @@ export async function nextOrder(): Promise<number> {
   return Math.max(last?.order ?? 0, 0) + 1;
 }
 
-/**
- * Adds mail to the queue, minus any a queued Late notice already covers.
- * Returns what was added and what was skipped.
- */
 export async function addToQueue(
   items: readonly MailQueueItem[]
 ): Promise<{ added: MailQueueItem[]; skipped: MailQueueItem[] }> {
@@ -46,7 +41,6 @@ export async function saveItems(items: readonly MailQueueItem[]): Promise<void> 
   await db.corpMailQueue.bulkPut([...items]);
 }
 
-/** Drops sent, logged mail (the "Done" run), keeping failures to retry and mail not yet logged. */
 export async function clearSent(corporationId?: number): Promise<void> {
   const rows = await listQueue(corporationId);
   await db.corpMailQueue.bulkDelete(

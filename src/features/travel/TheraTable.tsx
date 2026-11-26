@@ -1,20 +1,3 @@
-/**
- * Thera / Turnur's slim table of open holes (issue #2499): exit, security,
- * region, fits, life left and jumps, with the hub-side signature (select-all,
- * so one tap selects it to copy) in a narrow column. Clicking a row opens a line with the wormhole
- * type, both signatures and the exit's zKillboard page.
- *
- * Below `sm` each hole is one dense card (`DataTable`'s dense stack): exit and
- * hub badge with jumps on the right, then security, region, fits and life
- * left, then the signature pair with Use in route at its right end.
- *
- * Use in route (issues #2477, then the modal): a K-space row with a gate route
- * from the page's origin offers a `Button` that hands the row to `onUse`, which
- * pins the hole for the route's first leg — after the signature (and so on the
- * phone card's signature line), and on the expanded row.
- *
- * Conditions, never verdicts (decision `20260912-172628`).
- */
 import { ExternalLink } from '@/components/ui/ExternalLink';
 import { useTranslation } from 'react-i18next';
 import { SecurityStatus } from '@/components/SecurityStatus';
@@ -130,8 +113,6 @@ function useColumns(
       className: 'whitespace-nowrap tabular-nums',
       stackAffix: { after: t('travel.thera.lifeAffix') },
       sortValue: (row) => row.remainingMs,
-      // On the span, not the cell: the phone card's meta line sets its own
-      // dim colour on the cell.
       render: (row) => (
         <span className={cx(row.lifeWarning && 'font-semibold text-warning')}>
           {formatCountdown(row.remainingMs / 1000)}
@@ -153,8 +134,6 @@ function useColumns(
       id: 'signature',
       header: t('travel.thera.col.signature'),
       headerClassName: 'whitespace-nowrap',
-      // Trailing column: a tighter right edge keeps the table inside its panel
-      // at 1024px now that no header may wrap.
       className: 'w-0 pr-1 whitespace-nowrap',
       headerCellClassName: 'pr-1',
       stackEdge: 'below',
@@ -175,7 +154,6 @@ function JumpsCell({ row }: { row: TheraConnectionRow }) {
       return (
         <>
           {formatNumber(row.jumps.jumps)}
-          {/* The card has no Jumps header to say what the bare number is. */}
           <span className="sm:hidden">
             {' '}
             {t('travel.thera.jumpsUnit', { count: row.jumps.jumps })}
@@ -190,14 +168,8 @@ function JumpsCell({ row }: { row: TheraConnectionRow }) {
   }
 }
 
-/**
- * The hub-side signature, selected whole by one tap or click so it can be
- * copied by hand. On a phone card the exit-side signature follows it, so the
- * line reads as the pair.
- */
 function Signature({ row }: { row: TheraConnectionRow }) {
   return (
-    // A control of its own, so selecting the signature never opens the row.
     <span
       data-row-control
       className="font-mono text-sm whitespace-nowrap tabular-nums max-sm:mr-auto"
@@ -208,7 +180,6 @@ function Signature({ row }: { row: TheraConnectionRow }) {
   );
 }
 
-/** The expanded row: wormhole type, where to enter and leave, the exit's zKillboard page. */
 function HoleDetail({
   row,
   onUse,
@@ -260,10 +231,8 @@ export function TheraTable({
   label,
   onUse,
 }: {
-  /** Longest life first (`longestLifeFirst`): the stable jumps sort keeps it for ties. */
   rows: readonly TheraConnectionRow[];
   label: string;
-  /** Pins a row's hole on the route; absent where there is no route to pin it on. */
   onUse?: (row: TheraConnectionRow) => void;
 }) {
   'use memo';

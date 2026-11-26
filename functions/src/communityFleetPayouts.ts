@@ -1,11 +1,3 @@
-// Community Fleet Payouts (issue #4779): the pure half of the callables that
-// open, mark paid and remove a Fleet Payout. A Fleet Payout is a Member-owned
-// document under `communities/{id}/fleetPayouts/{payoutId}` with one Fleet
-// Share per pilot under `shares/{index}`. Named FleetPayout everywhere:
-// "Payout" already means a mining-tax thing. Creation is a callable because
-// the open-per-Member cap and the Member link cannot be done by rules. No
-// Firestore here; the admin-SDK half is communityFleetPayoutsStore.ts.
-
 import { HttpsError } from 'firebase-functions/v2/https';
 import { boundedString, docId, record } from './communities.js';
 import { intIn } from './inputParse.js';
@@ -13,7 +5,6 @@ import { intIn } from './inputParse.js';
 export const FLEET_PAYOUTS_COLLECTION = 'fleetPayouts';
 export const FLEET_SHARES_COLLECTION = 'shares';
 
-// Mirror src/engine/communities/fleetPayouts.ts.
 export const MAX_FLEET_SHARES = 250;
 export const MAX_PAYOUT_NAME_LENGTH = 60;
 export const MAX_PILOT_NAME_LENGTH = 40;
@@ -23,7 +14,6 @@ export const MAX_SHARE_WEIGHT = 1000;
 export const MAX_PAYOUT_ISK = 1_000_000_000_000_000;
 export const FLEET_PAYOUT_LIFETIME_DAYS = 30;
 export const FLEET_PAYOUT_LIFETIME_MS = FLEET_PAYOUT_LIFETIME_DAYS * 24 * 60 * 60 * 1000;
-/** An expired Fleet Payout is deleted this long after it expired. */
 export const FLEET_PAYOUT_EXPIRED_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 
 export type SplitRule = 'equal' | 'weighted';
@@ -112,7 +102,6 @@ export function parseSetFleetShareDoneInput(data: unknown): SetFleetShareDoneInp
   return { ...parseFleetPayoutIdInput(data), shareId: docId(d.shareId, 'shareId'), paid: d.paid };
 }
 
-/** The most the shares may add up to: the pile minus the hold-back, in whole ISK. */
 export function distributableIsk(totalIsk: number, holdBackPct: number): number {
   return Math.floor((totalIsk * (100 - holdBackPct)) / 100);
 }
@@ -120,11 +109,6 @@ export function distributableIsk(totalIsk: number, holdBackPct: number): number 
 export type CreateDecision =
   'ok' | 'shares-exceed-total' | 'duplicate-pilot' | 'too-many-open-payouts';
 
-/**
- * Cross-field checks on a parsed draft: shares fit the pile after the
- * hold-back, no pilot twice (same Character, or same name when unresolved),
- * and the caller's open Fleet Payouts (not expired) under the cap.
- */
 export function decideCreate(draft: FleetPayoutDraft, openCount: number): CreateDecision {
   const pilots = new Set<string>();
   let sum = 0;
@@ -156,7 +140,6 @@ export function decideOwnerAction(state: {
 
 export type SweepDecision = 'keep' | 'delete';
 
-/** Deleted a week after expiry; a malformed time is kept, never guessed. */
 export function decideFleetPayoutSweep(payout: { expiresAt: number }, now: number): SweepDecision {
   if (!Number.isFinite(payout.expiresAt)) return 'keep';
   return now - payout.expiresAt >= FLEET_PAYOUT_EXPIRED_RETENTION_MS ? 'delete' : 'keep';

@@ -1,7 +1,5 @@
-/** What the store view reads from the location state to draw its crumb back to the landing. */
 export interface LpSearchCrumbState {
   from: 'lp-search';
-  /** The landing's whole query string (view, search, filters), so Close rebuilds the view. */
   search: string;
 }
 

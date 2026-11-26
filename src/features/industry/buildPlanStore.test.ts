@@ -121,9 +121,6 @@ describe('applyBuildPlanChange', () => {
     });
 
     it('merges against the stored record, so a second edit cannot drop the first', async () => {
-      // Both edits are issued from the same rendered map (the empty one) — the
-      // real hazard when tabbing straight from a row's owned quantity into its
-      // override price, before the live query has re-emitted.
       await Promise.all([
         applyBuildPlanChange('p', {
           kind: 'sourcing',

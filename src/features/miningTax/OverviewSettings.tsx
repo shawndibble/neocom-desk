@@ -1,11 +1,3 @@
-/**
- * The Mining Yield Overview's page settings (issues #1278, #1279, #1280):
- * the date range, and the price basis and buyback rate inside a "Value"
- * menu. On a wide desktop the range and chart metric sit in the header and
- * the value settings in a popover; narrower, everything but the range moves
- * into one sheet behind a header gear, and narrower still the range joins
- * them (`OverviewTab`'s header).
- */
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -42,11 +34,9 @@ import { valueButtonLabel } from './basisLabel';
 interface RangeControlProps {
   value: MiningYieldRange;
   onChange: (range: MiningYieldRange) => void;
-  /** Full width with 36px tap targets — the phone layout. */
   fill?: boolean;
 }
 
-/** Segmented Date range buttons. Each range slices already-loaded rows, so switching never refetches. */
 export function RangeControl({ value, onChange, fill = false }: RangeControlProps) {
   const { t } = useTranslation();
   return (
@@ -67,11 +57,9 @@ export function RangeControl({ value, onChange, fill = false }: RangeControlProp
 interface ChartMetricControlProps {
   value: ChartMetric;
   onChange: (metric: ChartMetric) => void;
-  /** Full width with 36px tap targets — the phone layout. */
   fill?: boolean;
 }
 
-/** Segmented ISK / m³ / Count select for the Overview's two charts (issue #2160). */
 export function ChartMetricControl({ value, onChange, fill = false }: ChartMetricControlProps) {
   const { t } = useTranslation();
   return (
@@ -100,10 +88,6 @@ interface PriceBasisOptionsProps {
   onChange: (basis: PriceBasis) => void;
 }
 
-/**
- * Jita buy / Jita sell / Now. "Now" keeps whichever side was last picked, so
- * a pilot comparing "sell on the day" with "sell today" flips one choice.
- */
 export function PriceBasisOptions({ value, onChange }: PriceBasisOptionsProps) {
   const { t } = useTranslation();
   const current = choiceOf(value);
@@ -146,17 +130,9 @@ interface ShowRefiningToggleProps {
   onChange: (value: boolean) => void;
 }
 
-/**
- * "Show refining" switch (issue #1281): off for a pilot who never refines —
- * hides refined value everywhere on the page and in the detail modal, and
- * skips the ESI calls only refining needs (reprocessing material prices,
- * skills, implants).
- */
 export function ShowRefiningToggle({ value, onChange }: ShowRefiningToggleProps) {
   const { t } = useTranslation();
   return (
-    // A plain labelled checkbox, the app's one on/off control (Settings uses
-    // the same markup) — not a custom switch.
     <div className="space-y-1.5">
       <label className="flex min-h-9 cursor-pointer items-center gap-2 text-xs font-semibold md:min-h-0">
         <Checkbox checked={value} onChange={() => onChange(!value)} />
@@ -175,12 +151,10 @@ const triggerClassName = cx(
   focusRingClassName
 );
 
-/** Field-chrome caret: both triggers open a list of settings to pick from (§6c). */
 const triggerCaret = (
   <Icon.Expanded aria-hidden="true" size={Icon.ICON_SIZE.sm} className="shrink-0 text-text-faint" />
 );
 
-/** Desktop: the header's "VALUE  Jita buy" button and its popover. */
 export function ValueMenu({
   children,
   basis,
@@ -211,13 +185,6 @@ export function ValueMenu({
   );
 }
 
-/**
- * The view settings sheet: the Overview's view settings that don't fit the
- * header row, behind one icon-only gear in the ⋮'s slot (after Refresh). Its header shares a line with the
- * Character picker and never wraps, and a text trigger ("30d · Jita buy")
- * beside the range truncated the title at 1024. These are
- * view settings, not actions, so they live here, not in a ⋮.
- */
 export function SettingsSheet({ children }: { children: ReactNode }) {
   const { t } = useTranslation();
   const isPhone = useIsPhone();
@@ -231,8 +198,6 @@ export function SettingsSheet({ children }: { children: ReactNode }) {
         onClick={() => setOpen(true)}
         aria-haspopup="dialog"
       />
-      {/* A bottom sheet on a phone, a centred dialog from `sm` up — how
-          `PageSettingsModal` opens a page's settings. */}
       <Modal
         open={open}
         onClose={() => setOpen(false)}
@@ -250,13 +215,6 @@ interface BuybackRateInputProps {
   onChange: (rate: number) => void;
 }
 
-/**
- * The buyback rate percent field (issue #1280): same string-buffer idiom as
- * the Appraisal tab's price-percent field (`AppraisalPanel.tsx`) — the box
- * holds whatever is typed, and the setting only writes once what's typed
- * parses to a valid rate, so clearing the field to retype a number doesn't
- * get clobbered mid-edit.
- */
 export function BuybackRateInput({ value, onChange }: BuybackRateInputProps) {
   const { t } = useTranslation();
   const [text, setText] = useState(String(value));

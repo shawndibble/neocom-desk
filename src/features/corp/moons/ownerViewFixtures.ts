@@ -1,6 +1,5 @@
 import type { FeederView, FeederViewSummary } from '../taxBook/feederViewClient';
 
-/** Sample moon owner view for stories and tests; all names invented. */
 export const NAMES: Record<number, string> = {
   1: 'Varro Kestane',
   2: 'Tamsin Holloway',

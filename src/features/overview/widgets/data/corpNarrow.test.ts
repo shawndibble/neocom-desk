@@ -22,7 +22,6 @@ describe('narrowFeedsToCorporation', () => {
     } as unknown as Feeds;
     const out = narrowFeedsToCorporation(feeds, 2);
     expect(out.corpJobsAll?.data?.corporations.map((c) => c.corporationId)).toEqual([2]);
-    // The shared store is not touched.
     expect(feeds.corpJobsAll?.data?.corporations).toHaveLength(2);
   });
 
@@ -110,10 +109,8 @@ describe('narrowFeedsToCorporation', () => {
         partlyFailed: true,
       }),
     } as unknown as Feeds;
-    // Corporation 1 read fine; corporation 2 is the one that failed.
     expect(narrowFeedsToCorporation(feeds, 1).corpJobsAll?.data?.partlyFailed).toBe(false);
     expect(narrowFeedsToCorporation(feeds, 1).corpOrdersAll?.data?.partlyFailed).toBe(false);
-    // The failed one itself is absent, so it is flagged.
     expect(narrowFeedsToCorporation(feeds, 2).corpJobsAll?.data?.partlyFailed).toBe(true);
     expect(narrowFeedsToCorporation(feeds, 2).corpOrdersAll?.data?.partlyFailed).toBe(true);
   });

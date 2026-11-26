@@ -65,8 +65,6 @@ describe('reportFailure', () => {
   });
 
   it("skips Firestore Lite's fetch that never got a response, but not its server errors", () => {
-    // Lite maps the thrown fetch's missing `status` to `unknown` and its missing
-    // `statusText` into the message.
     const lite = (code: string, detail: string) =>
       Object.assign(new Error(`Request failed with error: ${detail}`), { code });
     reportFailure('sync', lite('unknown', 'undefined'));

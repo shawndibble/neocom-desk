@@ -12,7 +12,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** @summary Hairlines between roomy rows: a panel's main list. */
 export const Divided: Story = {
   render: (args) => (
     <div className="w-80">
@@ -28,7 +27,6 @@ export const Divided: Story = {
   ),
 };
 
-/** @summary Every value tone, and a long label that wraps instead of pushing the value off. */
 export const TonesAndLongLabel: Story = {
   render: (args) => (
     <div className="w-72">
@@ -43,7 +41,6 @@ export const TonesAndLongLabel: Story = {
   ),
 };
 
-/** @summary Tight rows with a dim aside and a status tone, for a sub-list. */
 export const PlainWithNotes: Story = {
   args: { variant: 'plain' },
   render: (args) => (

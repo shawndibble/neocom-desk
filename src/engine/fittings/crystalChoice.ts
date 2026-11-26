@@ -1,19 +1,8 @@
-/**
- * The Charge Picker's crystal guide: a mining laser's 66–72 crystals,
- * grouped by the ore family each is cut for (`Simple Asteroid`, `Rare
- * Moon` …) with its ores named, and each family's six crystals (Type A,
- * B, C, each Tech I and II) in one order so they read side by side.
- *
- * Pure. A crystal's family is in its name; the ores in each family are a
- * table here, since the SDE's type lists behind a crystal's "valid target
- * types" (attribute 3148) aren't in this app's data.
- */
 import type { ChargeChoice } from './chargeChoice';
 
 export type CrystalLetter = 'A' | 'B' | 'C';
 
 export interface CrystalName {
-  /** "Simple Asteroid", "Rare Moon", "Erratic Ore". */
   family: string;
   letter: CrystalLetter;
   techLevel: 1 | 2;
@@ -25,13 +14,10 @@ export interface CrystalChoice extends CrystalName {
 
 export interface CrystalFamilyGroup {
   family: string;
-  /** The ores it's cut for; empty where this app doesn't know them. */
   ores: readonly string[];
-  /** A I, A II, B I, B II, C I, C II — whichever the module takes. */
   crystals: CrystalChoice[];
 }
 
-/** Each family's ores, in the order the families come up in a belt, then moons. */
 export const CRYSTAL_FAMILY_ORES: Readonly<Record<string, readonly string[]>> = {
   'Simple Asteroid': ['Veldspar', 'Scordite', 'Pyroxeres', 'Plagioclase'],
   'Coherent Asteroid': ['Omber', 'Kernite', 'Jaspet', 'Hemorphite', 'Hedbergite'],
@@ -59,7 +45,6 @@ export function parseCrystal(name: string): CrystalName | null {
   };
 }
 
-/** The crystals among `choices`, by family (belt order, unknown families last). */
 export function groupCrystals(choices: readonly ChargeChoice[]): CrystalFamilyGroup[] {
   const byFamily = new Map<string, CrystalChoice[]>();
   for (const choice of choices) {

@@ -16,7 +16,6 @@ export function tierLabel(t: TFunction, choice: ChargeChoice): string {
   return t(choice.tier === 'tech2' ? 'fittings.chargePicker.tech2' : 'fittings.chargePicker.tech1');
 }
 
-/** A loadable row's accessible name: its cells run together otherwise. */
 export function rowLabel(
   t: TFunction,
   c: ChargeChoice,

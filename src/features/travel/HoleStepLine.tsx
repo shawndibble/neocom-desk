@@ -1,14 +1,3 @@
-/**
- * One jump through a Thera / Turnur hole on a Route Safety route (issue
- * #2476), drawn between its two systems: "Wormhole · Kihtaled → Thera ·
- * Warp to EPK-530 in Kihtaled · Q063 · fits Medium · 11h 17m left ·
- * EVE-Scout, 1m ago", and Copy for the signature. A phone card keeps what a
- * pilot needs in space: where to warp, size, life left and Copy.
- *
- * The signature is the one on the side being flown from — the exit's going
- * in, the hub's coming out. Conditions, never verdicts (decision
- * `20260912-172628`): size, life and age, never a judgement of the hole.
- */
 import { useEffect, useRef, useState } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import { Button, Tooltip } from '@/components/ui';
@@ -21,7 +10,6 @@ import { formatCountdown } from '@/lib/duration';
 import { MassNote } from './MassNote';
 import { routeSystemName } from './routeSystemName';
 
-/** A jump through a hole, between the two route systems it joins. */
 export interface HoleStep {
   from: RouteSafetyRow;
   to: RouteSafetyRow;
@@ -72,8 +60,6 @@ export function HoleStepLine({
       await writeToClipboard(signature);
       setCopied(true);
     } catch {
-      // No clipboard (permission, insecure context): select the signature so
-      // the pilot can copy it by hand.
       const node = signatureRef.current;
       if (node) window.getSelection()?.selectAllChildren(node);
     }

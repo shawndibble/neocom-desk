@@ -1,9 +1,3 @@
-/**
- * Device-local: which date range the Mining Yield Overview shows (issue
- * #1278). Silent page state, like the Tax tab's status filter — the range
- * control is its own display. Free to remember: every range slices the same
- * already-loaded rows, so none costs more than another.
- */
 import { createLocalSetting } from '@/lib/useLocalSetting';
 import { MINING_YIELD_RANGES, type MiningYieldRange } from '@/engine/miningTax/yieldRange';
 

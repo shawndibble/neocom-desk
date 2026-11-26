@@ -1,12 +1,3 @@
-/**
- * The Market Browser's Order Book body, under the scope bar: a summary strip
- * (best sell, best buy, spread), the hub comparison a Jump Range earns, and
- * the Sell and Buy cards — each its own card with its count and best price
- * in the heading, stacked Sell over Buy at every width and in every Location
- * Mode, so setting a range never moves anything. A phone shows one side at a
- * time behind a Sell | Buy toggle; the other card is only hidden by CSS, so a
- * width change never re-mounts a table.
- */
 import { fixedFormat, fixed1 } from '@/lib/fixedFormat';
 import { useMemo, useState } from 'react';
 import type { ReactElement, ReactNode, RefObject } from 'react';
@@ -52,11 +43,6 @@ export type BookSide = 'sell' | 'buy';
 
 const SEPARATOR = ' · ';
 
-/**
- * "−35%" / "+4.2%": a signed share, the sign never left to colour alone. Past
- * ten times over (a 2,600 buy in range against a 325,800 one at the hub) a
- * percentage stops reading as a number, so it says "125×" instead.
- */
 function signedPercent(ratio: number): string {
   if (ratio >= 9) return `${formatCount(1 + ratio)}×`;
   const share = Math.abs(ratio);
@@ -65,11 +51,6 @@ function signedPercent(ratio: number): string {
   return ratio > 0 ? `+${text}` : ratio < 0 ? `−${text}` : text;
 }
 
-/**
- * Best sell · best buy · spread, then "Turn in ~60K" when a Campaign
- * Objective takes the item (issue #6707): the figure opens `TurnInDetail` for
- * the active Character, its LP counted at the browsed hub's LP Value.
- */
 export function OrderBookSummaryStrip({
   bestSell,
   bestBuy,
@@ -78,16 +59,13 @@ export function OrderBookSummaryStrip({
 }: {
   bestSell: number | null;
   bestBuy: number | null;
-  /** The item on show; null while none is picked. */
   item: { typeId: number; name: string } | null;
-  /** The browsed hub, whose LP Value prices the turn-in's LP. */
   hub: TradeHub;
 }) {
   const { t } = useTranslation();
   const spread = priceComparison(bestBuy, bestSell);
   const turnIns = useTurnInOffers(hub);
   const offer = item === null ? null : (turnIns.data?.offerFor(item.typeId) ?? null);
-  // The phone's Sell | Buy toggle already carries both best prices; the turn-in stays.
   const phoneHidden = 'max-sm:hidden';
   return (
     <StatChips className={offer ? undefined : phoneHidden}>
@@ -132,25 +110,15 @@ export function OrderBookSummaryStrip({
 }
 
 export interface HubComparisonLineProps {
-  /** The header's hub system, or the picked region's name. */
   placeName: string;
-  /** The header scope's book for this item; `undefined` while it loads. */
   summary: OrderBookSummary | undefined;
   inRangeBestSell: number | null;
   inRangeBestBuy: number | null;
-  /** Jumps from the Current System to the hub; `null` for a region, or unknown. */
   jumps: number | null;
-  /** The hub station, so the jump count links to its route; `null` in Region mode. */
   stationId: number | null;
-  /** Clears the Jump Range, so the book reads the header's scope again. */
   onView: () => void;
 }
 
-/**
- * "Is the trip to the hub worth it?" — shown only while a Jump Range has
- * replaced the header's hub or region: that scope's best prices against the
- * best in range, signed, with the distance.
- */
 export function HubComparisonLine({
   placeName,
   summary,
@@ -182,7 +150,6 @@ export function HubComparisonLine({
             </dt>
             <dd className="m-0 whitespace-nowrap tabular-nums">
               {sell && sell.delta !== 0 && (
-                // Cheaper at the hub is the good news for a buyer.
                 <span className={sell.delta < 0 ? 'text-isk-pos' : 'text-isk-neg'}>
                   {signedPercent(sell.ratio)}
                 </span>
@@ -197,7 +164,6 @@ export function HubComparisonLine({
             </dt>
             <dd className="m-0 whitespace-nowrap tabular-nums">
               {buy && buy.delta !== 0 && (
-                // A higher buy at the hub is the good news for a seller.
                 <span className={buy.delta > 0 ? 'text-isk-pos' : 'text-isk-neg'}>
                   {signedPercent(buy.ratio)}
                 </span>
@@ -224,13 +190,6 @@ export function HubComparisonLine({
   );
 }
 
-/**
- * A phone's Sell | Buy switch: one side at a time, each segment carrying its
- * count and best price so the hidden side is never a blind guess. Built by
- * hand rather than as a `SegmentedControl` because each segment is two lines
- * (label and price); the on/off tint is still the shared toggle-chip one, with
- * the side's own colour only on its bottom edge.
- */
 export function BookSideToggle({
   side,
   onChange,
@@ -272,7 +231,6 @@ export function BookSideToggle({
             <span className="text-[0.6875rem] font-semibold tracking-widest uppercase">
               {t(`market.sideToggle.${segment.id}`, { count: segment.count })}
             </span>
-            {/* Exception: exact market price on a tap target; IskAmount would nest a tab stop. */}
             <span className={cx('text-sm tabular-nums', pressed ? 'font-semibold' : 'font-normal')}>
               {segment.best === null ? '—' : formatMarketIsk(segment.best)}
             </span>
@@ -285,13 +243,9 @@ export function BookSideToggle({
 
 export interface OrderSideCardProps {
   side: BookSide;
-  /** Every row on this side, best-first; the table sorts them all, then shows `rowCap` of them. */
   rows: readonly RegionOrder[];
-  /** Rows shown until "Show all"; cut after the sort, so a sort reaches rows beyond the first page. */
   rowCap?: number;
-  /** Every order on this side the table can show, for the heading and "Show all". */
   total: number;
-  /** Sells Hide bait sells keeps out of the table, stated so the book never silently loses rows. */
   hiddenBaitCount?: number;
   best: number | null;
   columns: readonly DataTableColumn<RegionOrder>[];
@@ -300,18 +254,13 @@ export interface OrderSideCardProps {
   columnsById: Record<MarketOrderColumnId, DataTableColumn<RegionOrder>>;
   onToggleColumn: (id: MarketOrderColumnId) => void;
   tableExport: UseTableExport<RegionOrder>;
-  /** Shown in place of the table when the side has no orders. */
   empty: ReactNode;
-  /** Whether a "Show all" button is due, and what it does. */
   onShowAll: (() => void) | null;
-  /** The side's `<h2>`, a focus target once "Show all" or a filter change unmounts the button. */
   headingRef?: RefObject<HTMLHeadingElement | null>;
   renderDetail: (order: RegionOrder) => ReactNode;
   rowContextMenu: (order: RegionOrder, tr: ReactElement) => ReactElement;
   rowClassName: (order: RegionOrder) => string | undefined;
-  /** The phone toggle hides the side it isn't showing. */
   hiddenOnPhone: boolean;
-  /** Two-line cards instead of columns: a phone, or a column too narrow for them. */
   cards: boolean;
 }
 
@@ -346,7 +295,6 @@ export function OrderSideCard({
   const headingFigures = useOrderHeadingFigures((state) => state.value);
   const setHeadingFigures = useOrderHeadingFigures((state) => state.setValue);
   useHydratedStore(useOrderHeadingFigures);
-  // Sums the whole side on screen (scope and filters already applied), not the capped page.
   const { units, value } = useMemo(() => {
     let u = 0;
     let v = 0;
@@ -372,7 +320,6 @@ export function OrderSideCard({
         : [...headingFigures, id]
     );
   const shownRows = useMemo(() => {
-    // Sorted here, before the cap, so a sort reaches the whole book; the table sorts the slice again (a no-op).
     const column = columns.find((c) => c.id === sort.columnId);
     const sorted = column ? sortRows(rows, column, sort.direction) : rows;
     return rowCap === undefined ? sorted : sorted.slice(0, rowCap);
@@ -386,7 +333,6 @@ export function OrderSideCard({
         hiddenOnPhone && 'max-sm:hidden'
       )}
     >
-      {/* Each export sits with the table it exports, beside its own heading. */}
       <div className="flex flex-wrap items-center justify-between gap-2 px-3 pt-2 pb-1">
         <div className="flex min-w-0 flex-wrap items-baseline gap-x-3">
           <h2
@@ -396,7 +342,6 @@ export function OrderSideCard({
             {name}
           </h2>
           <span className="text-xs text-text-dim tabular-nums">
-            {/* A phone's side toggle already carries the count and best price; the figures stay. */}
             <span className="max-sm:hidden">
               {t('market.sideSummary.orders', { count: total })}
             </span>
@@ -415,7 +360,6 @@ export function OrderSideCard({
               </span>
             )}
           </span>
-          {/* Every width, unlike the summary: a phone loses the rows too. */}
           {hiddenBaitCount > 0 && (
             <span className="text-xs text-text-dim tabular-nums">
               {t('market.sideSummary.baitHidden', { count: hiddenBaitCount })}
@@ -423,7 +367,6 @@ export function OrderSideCard({
           )}
         </div>
         <span className="flex items-center gap-1">
-          {/* As a card, the same picks choose what the card carries. */}
           <ColumnPickerMenu
             available={availableColumns}
             visible={visibleColumns}
@@ -456,17 +399,12 @@ export function OrderSideCard({
               virtualize="auto"
               rowKey={(o) => o.order_id}
               label={name}
-              // Two lines per order on a phone — station and price, then
-              // quantity, distance and security — a long book is scanned,
-              // not read.
               stackLayout="dense"
               stacked={cards}
               className="dt-actions-pinned-only"
               rowContextMenu={rowContextMenu}
               rowMoreActions
               rowClassName={rowClassName}
-              // Row click expands: the §6c leading caret on desktop (none on a card), so
-              // the ⋮ stays the one trailing control.
               expandableRow={{ renderDetail, leadingIcon: true }}
             />
           </div>

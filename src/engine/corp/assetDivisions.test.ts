@@ -14,11 +14,6 @@ describe('corpAssetGroupId', () => {
     expect(corpAssetGroupId('AssetSafety')).toBe('assetSafety');
   });
 
-  /**
-   * CCP extends `location_flag` without notice (round 39's `Structure_manager`
-   * lesson, applied here to a data value instead of a role string). An
-   * unrecognised flag must land in a visible bucket, never disappear.
-   */
   it('buckets an unrecognised flag as other rather than dropping it', () => {
     expect(corpAssetGroupId('SomeFutureFlag')).toBe('other');
     expect(corpAssetGroupId('CorpSAG8')).toBe('other');

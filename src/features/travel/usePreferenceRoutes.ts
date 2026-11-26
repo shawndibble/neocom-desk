@@ -1,9 +1,3 @@
-/**
- * The Route Safety page's preference cards (Safer / Shorter / Less secure):
- * the trip being shown, planned under each Route Preference. All three are
- * local graph plans (`planLocalTrip`), never an ESI call, so they follow the
- * trip as it changes. The active preference's card reads the drawn trip itself.
- */
 import { useEffect, useMemo, useState } from 'react';
 import type { RoutePreferenceKind } from '@/engine/route/jumpRoute';
 import {

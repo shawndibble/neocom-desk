@@ -35,19 +35,14 @@ describe('normalizeMilestones', () => {
 
   it('drops malformed rows rather than throwing', () => {
     const malformed = [
-      { id: 'a' }, // missing name/skillTypeID/level
-      { id: 'b', name: 'ok', skillTypeID: 1, level: 99 }, // level out of range
-      { id: 'c', name: 'ok', skillTypeID: '1', level: 1 }, // wrong type
+      { id: 'a' },
+      { id: 'b', name: 'ok', skillTypeID: 1, level: 99 },
+      { id: 'c', name: 'ok', skillTypeID: '1', level: 1 },
     ] as unknown as PlanMilestone[];
     expect(normalizeMilestones(malformed)).toEqual([]);
   });
 
   it('collapses two milestones sharing an anchor to the first, keeping it', () => {
-    // engine/skillPlanMilestones.ts looks a milestone up by this same
-    // (skillTypeID, level) pair — a second one at the same anchor (a sync
-    // race, or stale data from before addMilestone upserted) would otherwise
-    // be silently swallowed by that lookup, so it never gets a chance to be
-    // renamed or removed.
     const first = milestone({ id: 'm1', name: 'Fly Loki' });
     const second = milestone({ id: 'm2', name: 'Fly Something Else' });
     expect(normalizeMilestones([first, second])).toEqual([first]);

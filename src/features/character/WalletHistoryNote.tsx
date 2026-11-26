@@ -3,15 +3,9 @@ import type { WalletArchiveInfo } from '@/features/character/walletArchive';
 import { useTimeZone } from '@/lib/timeFormat';
 import { formatDateOnly } from '@/lib/timestamp';
 
-/**
- * The Journal's archive line: how far back the device holds history and any
- * stretch it never saw. Date ranges are set with From / To in the Journal's
- * Filters. Renders nothing before the first stored row.
- */
 export function WalletHistoryNote({ info }: { info: WalletArchiveInfo | undefined }) {
   const { t } = useTranslation();
   const timeZone = useTimeZone();
-  // On the Time format's clock, like the journal rows under it.
   const day = (ms: number) => formatDateOnly(new Date(ms), timeZone);
   if (!info || (info.since === null && !info.unconfirmed)) return null;
   return (

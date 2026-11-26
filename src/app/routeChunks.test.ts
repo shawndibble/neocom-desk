@@ -110,7 +110,6 @@ describe('isRouteChunkFailure', () => {
   });
 
   it("recognises the browser's own dynamic-import rejection, which reaches the boundary raw", () => {
-    // Chrome, Firefox and Safari word the same failure three ways.
     for (const message of [
       'Failed to fetch dynamically imported module: https://example.test/assets/DemoBoard-2uIGzk2r.js',
       'error loading dynamically imported module: https://example.test/assets/x.js',

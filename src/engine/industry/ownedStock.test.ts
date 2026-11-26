@@ -134,8 +134,6 @@ describe('detectOwnedStock', () => {
   it.each(['FleetHangar', 'ShipHangar', 'SpecializedOreHold', 'SpecializedFuelBay'])(
     'excludes stock in a ship %s, not just its cargo hold',
     (locationFlag) => {
-      // Otherwise minerals in a docked freighter's fleet hangar would count as
-      // station stock while the same minerals in its cargo hold did not.
       const ship = asset({ item_id: 45, type_id: 20185, is_singleton: true });
       const held = asset({
         item_id: 46,
@@ -219,8 +217,6 @@ describe('detectOwnedStock', () => {
   });
 
   it('attributes a stack whose parent is missing from the list to that parent id', () => {
-    // A personal-hangar division inside a player structure: ESI never returns
-    // the parent as its own asset row, but the stack is still owned stock.
     const orphan = asset({
       item_id: 90,
       type_id: TRITANIUM,
@@ -308,8 +304,6 @@ describe('detectOwnedStock with a corporation source (issue #798)', () => {
   });
 
   it('never collides a corp placement with a personal placement carrying the same numeric id at the same location', () => {
-    // Corporation 1 happens to share a numeric id with Character 1 here —
-    // the two must still be counted as distinct owners, not merged into one.
     const stock = detectOwnedStock(
       [
         source(1, [asset({ item_id: 303, type_id: TRITANIUM, quantity: 10 })]),
@@ -353,9 +347,6 @@ describe('collectStockLocations with a corporation source (issue #798)', () => {
 
 describe('suggestedOwnedQuantity', () => {
   it('clamps the detected total to what the job actually needs', () => {
-    // The field means "units this plan draws on", not "units owned in New
-    // Eden": storing the raw total would silently cover a bigger requirement
-    // if runs went up later.
     expect(suggestedOwnedQuantity(9000, 1000)).toBe(1000);
   });
 

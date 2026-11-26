@@ -1,9 +1,3 @@
-/**
- * The mixed-hub copy controls (issue #631). The rollup's per-hub split is
- * tested in `engine/industry/groupRollup.test.ts`; what is only testable here
- * is that each hub's button copies that hub's list and reports only itself as
- * copied — a single shared `copied` flag would say "copied" on all of them.
- */
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { NO_CHARACTER_MODIFIERS } from '@/engine/industry/characterModifiers';
 import { render, screen, waitFor, within } from '@testing-library/react';
@@ -22,7 +16,6 @@ import type { BuildGroup } from './buildGroups';
 import type { OwnedStockSnapshot } from './ownedStockDetection';
 import { useComparedBuildResults, type ComparedBuildRow } from './useComparedBuildResults';
 
-/** The toast's status region: the sr-only LiveStatus regions are empty here. Waits: the toast can land a render after the action. */
 async function toastStatus() {
   return waitFor(() => {
     const live = screen.getAllByRole('status').filter((el) => el.textContent);
@@ -58,9 +51,6 @@ const SNAPSHOT: OwnedStockSnapshot = {
 
 const GROUP: BuildGroup = { id: 'g1', name: 'Rifter fit' } as BuildGroup;
 
-// A two-level chain so depth has something to size to: every fixture
-// plan's `blueprintTypeID` is 1 (see `plan()` below), producing 100 from
-// material 2, and 2 is itself producible from 3 — depth 1.
 const PRODUCT_ENTRY: BlueprintCatalogEntry = {
   blueprintTypeID: 1,
   blueprint: {
@@ -132,12 +122,6 @@ function material(typeID: number, quantity: number, remaining = quantity): Mater
   };
 }
 
-/**
- * A material the plan is building rather than buying — `resolveMaterial`
- * would attach a real `subBuild`; the group panel only ever checks
- * `subBuilds.length > 0` (never opens the "Build it" modal from this list),
- * so a minimal stub is enough to exercise the built/bought branch.
- */
 function builtMaterial(typeID: number, quantity: number): MaterialCostLine {
   return {
     ...material(typeID, quantity),
@@ -166,9 +150,6 @@ function row(planId: string, materials: MaterialCostLine[]): ComparedBuildRow {
     planId,
     planName: `Plan ${planId}`,
     result: builtResult,
-    // The rollup reads `groupResult` (issue #697) — these fixtures have no
-    // owned-stock ledger in play, so the owned-disabled tree is the same
-    // materials the plan-level `result` already carries.
     groupResult: builtResult,
     loading: false,
     error: null,
@@ -302,8 +283,6 @@ describe('BuildGroupPanel — mixed-hub multibuy', () => {
   });
 
   it('waits for a hub’s own members, without holding up the other hub', () => {
-    // An unsettled member contributes nothing to the rollup, so Jita's list is
-    // short its units until Plan b lands — but Amarr's is already whole.
     configureClipboard(async () => {});
     mockedUseComparedBuildResults.mockReturnValue([
       row('a', [material(34, 100)]),
@@ -492,8 +471,6 @@ describe('BuildGroupPanel — Group Owned Overlay (issue #697)', () => {
     expect(onOwnedStockChange).toHaveBeenCalledWith({ 35: 7, 34: 50 });
   });
 
-  // Same confirmation a plan's own "Use all" / "Use none" gives (issue #2541):
-  // a count, and an Undo that puts the ledger back.
   it('confirms "Use none" with a toast whose Undo restores the ledger', async () => {
     const user = userEvent.setup();
     mockedUseComparedBuildResults.mockReturnValue([row('a', [material(34, 100)])]);
@@ -529,13 +506,8 @@ describe('BuildGroupPanel — built materials in the group needs list (issue #80
     mockedUseComparedBuildResults.mockReturnValue([row('a', [builtMaterial(999, 1)])]);
     renderPanel([plan('a', 'jita')]);
 
-    // The Crafted section is its own panel now, beside Members — not inside
-    // "Everything this group needs."
     expect(screen.getByText('Crafted in this group · 1')).toBeTruthy();
     expect(screen.getAllByText('Crafted')).toHaveLength(1);
-    // Nothing else to buy, but the Crafted panel already explains why — the
-    // "already owned" empty state would call a crafted material "owned,"
-    // the exact confusion the Crafted panel exists to avoid.
     const needsPanel = screen.getByText('Everything this group needs').closest('section')!;
     expect(
       within(needsPanel).queryByText('Nothing left to buy — every material is already owned.')
@@ -543,10 +515,6 @@ describe('BuildGroupPanel — built materials in the group needs list (issue #80
   });
 
   it('keeps a stray owned-stock ledger entry clearable after its material becomes fully crafted', async () => {
-    // The ledger entry (typeID 999) predates the built row covering all of
-    // it — a plausible sequence if a member's own build tree grew after the
-    // owned quantity was typed in. It has to stay reachable by "Use none"
-    // even though the Crafted section renders no input for it.
     const user = userEvent.setup();
     mockedUseComparedBuildResults.mockReturnValue([row('a', [builtMaterial(999, 1)])]);
     const onOwnedStockChange = vi.fn();
@@ -573,10 +541,6 @@ describe('BuildGroupPanel — built materials in the group needs list (issue #80
   });
 
   it('nets out the built portion when one member builds a type and another buys the same one', () => {
-    // Member a builds 10 of type 999 as its own sub-job; member b needs 5 more
-    // of the same type as a plain material. The group still has to buy 5 —
-    // neither "Crafted" (some of it genuinely isn't) nor "15 to buy" (10 of
-    // those 15 are already spoken for by a's build) is correct.
     mockedUseComparedBuildResults.mockReturnValue([
       row('a', [builtMaterial(999, 10)]),
       row('b', [material(999, 5)]),
@@ -597,7 +561,6 @@ describe('BuildGroupPanel — total volume (issue #874)', () => {
     renderPanel([plan('a', 'jita')]);
 
     const buyRow = screen.getByText('Tritanium').closest('tr')!;
-    // 100 x 0.01 m3 = 1 m3.
     expect(within(buyRow).getByText('1 m³')).toBeTruthy();
   });
 
@@ -615,19 +578,12 @@ describe('BuildGroupPanel — total volume (issue #874)', () => {
     ]);
     renderPanel([plan('a', 'jita')]);
 
-    // Only the Tritanium line (100 x 0.01 = 1 m3) is resolvable; Pyerite has
-    // no volume in CATALOG, so the total must reflect just that 1 m3 and say
-    // so is a lower bound, not silently a whole-group NaN or a bare "1 m³".
     expect(screen.getByText(/volume at least 1 m³/i)).toBeTruthy();
   });
 });
 
 describe('BuildGroupPanel — bulk owned-stock actions', () => {
   it('shows both bulk buttons even when neither has a row to act on', () => {
-    // Nothing detected and nothing in the ledger: both suggestion lists are
-    // empty, which used to render the toolbar with no buttons at all. The
-    // pair is fixed furniture now, so the row beneath the scope select does
-    // not appear and disappear as materials change.
     mockedUseComparedBuildResults.mockReturnValue([row('a', [material(34, 100)])]);
     renderPanel([plan('a', 'jita')]);
 

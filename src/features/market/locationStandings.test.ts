@@ -9,7 +9,6 @@ vi.mock('@/sde/npcStations', () => ({ lookupNpcStation: vi.fn() }));
 vi.mock('@/features/character/publicInfoData', () => ({ loadPublicCorporationInfo: vi.fn() }));
 
 const JITA_ID = 60003760;
-/** Any NPC station that is not a Trade Hub, so it takes the snapshot path. */
 const PERIMETER_STATION_ID = 60000004;
 const CALDARI_NAVY_ID = 1000035;
 const CALDARI_STATE_FACTION_ID = 500001;

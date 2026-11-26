@@ -7,20 +7,12 @@ import {
 } from '@/engine/corpTaxBook/personal';
 import type { OreLine } from '@/engine/miningTax/types';
 
-/** One of the miner's own Assignments, and the ore it keeps once the book's ore comes off. */
 export interface TakeoverStep {
   assignment: MiningTaxAssignmentRecord;
   before: readonly OreLine[];
   after: OreLine[];
 }
 
-/**
- * "Let the corporation bill it" (issue #4517), planned and not written: the miner's own
- * Assignments on the book row's day that give ore to the Payees the book names, and what each
- * keeps. A Conflict's plan covers every book contesting the day (`siblings`): each book's line
- * takes only from the Payees it names, one after another, so a day several corporations contest
- * comes off the right Payee for each, not greedily off whichever is first.
- */
 export function planTakeover(
   view: BookRowView,
   siblings: readonly BookRowView[],

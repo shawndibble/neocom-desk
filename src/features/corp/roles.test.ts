@@ -28,12 +28,6 @@ describe('loadCharacterRoles', () => {
     expect((await db.esiCache.get([CHAR_ID, 'corpRoles']))?.value).toEqual(payload);
   });
 
-  /**
-   * AC4: this endpoint has no role gate of its own, so a character with no
-   * roles gets a 200 with the arrays omitted — not a 403, and not an error
-   * surface. `needsReauth` staying false is the assertion that matters: a true
-   * here would paint a re-login banner over a perfectly healthy line member.
-   */
   it('treats a roleless character as an ordinary success, not a failure', async () => {
     server.use(
       http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/roles`, () => HttpResponse.json({}))
@@ -74,11 +68,6 @@ describe('corpWideRoles', () => {
     ]);
   });
 
-  /**
-   * The location-scoped grants open one office, not the corporation-wide
-   * endpoints the capabilities stand for — reading them here would hand a
-   * Station_Manager-at-HQ the whole corp structure list.
-   */
   it('ignores the location-scoped role lists', () => {
     expect(
       corpWideRoles({

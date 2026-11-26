@@ -51,8 +51,6 @@ function entry(
   };
 }
 
-// Ship 1 <- bp 100: 300 (component, bp 200) + 35. Component 300 <- 34
-// (Tritanium) — 34 only ever appears once 300 is built.
 const catalog: BlueprintCatalog = (() => {
   const entries = [
     entry(100, 1, [
@@ -87,7 +85,6 @@ function plan(overrides: Partial<BuildPlanRecord> = {}): BuildPlanRecord {
   };
 }
 
-/** The whole resolved tree's table rows for one plan — what both panels read. */
 function tableFor(p: BuildPlanRecord) {
   const { result } = resolveBuildPlan(
     p,
@@ -282,10 +279,6 @@ describe('ownedStockView', () => {
   });
 });
 
-// The owned-stock offer (`ownedStockOffer.ts`) through each of its two stores:
-// a plan's sourcing map, written through the same `applySourcingPatch` the
-// plan store folds a `sourcing` change with, and a Build Group's Group Owned
-// Overlay ledger, written the way `BuildGroupPanel` commits it.
 interface StoreUnderTest<S> {
   name: string;
   from: (owned: Record<number, number>) => S;
@@ -311,8 +304,6 @@ const planStore: StoreUnderTest<MaterialSourcingMap | undefined> = {
 
 const groupStore: StoreUnderTest<Record<number, number>> = {
   name: 'Group Owned Overlay',
-  // The overlay never holds a 0 (an empty count removes the entry), so a
-  // zeroed row is simply absent there.
   from: (owned) => Object.fromEntries(Object.entries(owned).filter(([, quantity]) => quantity > 0)),
   ownedFor: (ledger) => (typeID) => ledger[typeID],
   apply: (ledger, changes) => {
@@ -327,12 +318,12 @@ const STORES = [planStore, groupStore] as StoreUnderTest<unknown>[];
 describe.each(STORES)('owned-stock offer through $name', (store) => {
   const BLUEPRINT = 999;
   const rows = [
-    { typeID: 34, quantity: 500 }, // untouched, stock short of the need
-    { typeID: 35, quantity: 10 }, // zeroed by an earlier "Use none"
-    { typeID: 36, quantity: 10 }, // a stale typed count
-    { typeID: 37, quantity: 10 }, // already at its offer
-    { typeID: 38, quantity: 10 }, // stock well beyond the need
-    { typeID: 39, quantity: 10 }, // no stock detected, a typed count
+    { typeID: 34, quantity: 500 },
+    { typeID: 35, quantity: 10 },
+    { typeID: 36, quantity: 10 },
+    { typeID: 37, quantity: 10 },
+    { typeID: 38, quantity: 10 },
+    { typeID: 39, quantity: 10 },
     { typeID: BLUEPRINT, quantity: 1, acquisitionTier: { me: 0, te: 0 } },
   ];
   const owned = { 35: 0, 36: 3, 37: 10, 39: 7 };
@@ -377,8 +368,6 @@ describe.each(STORES)('owned-stock offer through $name', (store) => {
   });
 });
 
-// Each store keeps its own rule for an empty count, unchanged by sharing the
-// offer: a plan stores the 0 "Use none" writes, the overlay drops the entry.
 describe('"Use none" in each store', () => {
   const changes = [{ typeID: 34, from: 5, to: 0 }];
 

@@ -66,7 +66,6 @@ function stockOf(
 describe('consumedByJobs', () => {
   it('counts a job installed after the snapshot, with runs and ME from the job', () => {
     const out = consumedByJobs([job({ runs: 3, me: 10 })], snapshots, blueprintFor, CTX);
-    // 3 runs * 100 * 0.9 = 270; 3 * 10 * 0.9 = 27
     expect(out.map((c) => [c.typeID, c.quantity])).toEqual([
       [TRIT, 270],
       [PYER, 27],

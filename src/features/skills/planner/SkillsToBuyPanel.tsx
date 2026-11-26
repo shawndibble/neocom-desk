@@ -18,19 +18,9 @@ interface SkillsToBuyPanelProps {
   trainedSkills: ReadonlyMap<number, unknown>;
   trainedSkillsKnown: boolean;
   nameFor: (skillTypeID: number) => string;
-  /**
-   * Render as its own closed-by-default `Disclosure` row, the total beside
-   * the title, instead of as bare section content. Below `lg` the plan tools
-   * are one collapsed row, which would bury this list; this row sits outside
-   * them. The fetch, list, total and copy are this same component either way.
-   */
   collapsible?: boolean;
 }
 
-/**
- * "Skills to buy" tools-pane section (issue #2825): the plan's untrained
- * skills, each priced at the selected hub, with a total and a multibuy copy.
- */
 export function SkillsToBuyPanel({
   entries,
   trainedSkills,
@@ -42,7 +32,6 @@ export function SkillsToBuyPanel({
   const pricesUnavailableLabel = usePricesUnavailableLabel();
   const { hubId, hydrated: hubHydrated } = useHubFor('skills');
   const hub = getTradeHub(hubId) ?? DEFAULT_TRADE_HUB;
-  // The Skills page's price percent: the hub's and the region's sell prices alike.
   const percent = usePricePercentFor('skills');
 
   const typeIds = useMemo(
@@ -55,7 +44,6 @@ export function SkillsToBuyPanel({
     key: string;
     hub: Map<number, number | null>;
     region: Map<number, number | null>;
-    /** The hub lookup could not reach the price source, so "no price" means unknown. */
     unreachable: boolean;
   } | null>(null);
   useEffect(() => {
@@ -76,18 +64,15 @@ export function SkillsToBuyPanel({
         setPrices({ key, hub: hubMap, region: regionMap, unreachable });
       })
       .catch(() => {
-        // A failed fetch is flagged unreachable (shown as the prices-unavailable placeholder), never an endless "Loading".
         if (!cancelled) setPrices({ key, hub: new Map(), region: new Map(), unreachable: true });
       });
     return () => {
       cancelled = true;
     };
-    // typeIds is derived from typeKey
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hub, hubHydrated, typeKey, percent]);
 
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle');
-  // Bumped per copy so a second "copied" is announced again.
   const [copyCount, setCopyCount] = useState(0);
   const [expanded, setExpanded] = useState(false);
 
@@ -177,8 +162,6 @@ export function SkillsToBuyPanel({
     <>
       <Disclosure
         label={t('plans.skillsToBuy.title')}
-        // Plain text, not `IskAmount`: its tooltip trigger is a tab stop, and a
-        // second one inside the toggle button is nested interactive content.
         trailing={
           loaded && !unreachable && facts ? `${formatIskCompact(facts.total)} ISK` : undefined
         }
@@ -187,9 +170,6 @@ export function SkillsToBuyPanel({
       >
         <div className="p-3">{content}</div>
       </Disclosure>
-      {/* Closed, the row says how complete its total is; open, the list's own
-          "without a price" note says it. Outside the toggle so it stays out of
-          the button's accessible name. */}
       {!expanded && loaded && facts && (
         <p className="px-2.5 pt-1 pb-2 pl-7 text-[0.6875rem] text-text-dim">
           {t('plans.skillsToBuy.rowSummary', {

@@ -1,9 +1,3 @@
-// What the Corp Tax Book needs from ESI to trust an officer: the Character's
-// corporation and in-game roles, and the corporation's CEO (ADR 0023). The
-// caller's short-lived access token is used for these calls and dropped; it is
-// never stored or logged (ADR 0001, ADR 0010). Same identification headers as
-// every other ESI call (esiClient.ts).
-
 import { HttpsError } from 'firebase-functions/v2/https';
 import { ESI_BASE, esiGet } from './esiClient.js';
 import { throwForEsi } from './esiThrow.js';
@@ -54,7 +48,6 @@ export function esiIdentityReader(fetchImpl: typeof fetch = fetch): IdentityRead
   };
 }
 
-/** The public lookup of a corporation's CEO: no token, no scope. */
 export type CorporationCeoLookup = (corporationId: number) => Promise<number | undefined>;
 
 export function esiCorporationCeoLookup(fetchImpl: typeof fetch = fetch): CorporationCeoLookup {
@@ -65,15 +58,8 @@ export function esiCorporationCeoLookup(fetchImpl: typeof fetch = fetch): Corpor
   };
 }
 
-/** The public lookup of which corporation a Character is in: no token, no scope. */
 export type CorporationLookup = (characterId: number) => Promise<number>;
 
-/**
- * Asks the bulk affiliation endpoint, not `GET /characters/{id}/`: ESI caches that page for a
- * day, so a Character who just moved corporation still reads as the old one there, which
- * refused a CEO's freshly made corporation as "another corporation". Affiliation is the same
- * source the app's own pickers read.
- */
 export function esiCorporationLookup(fetchImpl: typeof fetch = fetch): CorporationLookup {
   return async (characterId) => {
     const { body } = throwForEsi(
@@ -91,13 +77,10 @@ export function esiCorporationLookup(fetchImpl: typeof fetch = fetch): Corporati
   };
 }
 
-/** What ESI calls an id (`character`, `corporation`, ...); undefined when ESI knows no such id. */
 export type IdCategoryLookup = (id: number) => Promise<string | undefined>;
 
-/** ESI's public `POST /universe/names/`: one id in, its category out. No token, no scope. */
 export function esiIdCategoryLookup(fetchImpl: typeof fetch = fetch): IdCategoryLookup {
   return async (id) => {
-    // ESI answers 404 when an id in the list is not a valid id.
     const got = await esiGet(`${ESI_BASE}/universe/names/`, { body: [id], fetchImpl });
     if (got.kind === 'not-found') return undefined;
     const { body } = throwForEsi(got);

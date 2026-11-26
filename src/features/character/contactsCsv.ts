@@ -13,7 +13,6 @@ function entityName(names: ReadonlyMap<number, string>, id: number): string {
   return names.get(id) ?? `#${id}`;
 }
 
-/** Own-corporation and own-alliance are only known for a character whose affiliation has loaded. */
 function ownable(
   contact: CharacterContact,
   affiliationRows: ReadonlyMap<number, ContactAffiliationRow>
@@ -23,10 +22,6 @@ function ownable(
   return row && row.corporationId !== null ? row : undefined;
 }
 
-/**
- * CSV columns for the Character tab: a fixed set, whatever the column picker shows, splitting the
- * table's Affiliation and flags cells. Title and score are blank until the public records are read.
- */
 export function contactsCsvColumns(
   t: CsvTranslate,
   names: ReadonlyMap<number, string>,
@@ -82,7 +77,6 @@ export function contactsCsvColumns(
   ];
 }
 
-/** CSV columns for the Across tab. Standings are `"Name: value"` pairs, so a row where alts disagree says which holds which. */
 export function contactsAcrossCsvColumns(
   t: CsvTranslate,
   names: ReadonlyMap<number, string>

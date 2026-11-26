@@ -35,20 +35,12 @@ import { OreIcon } from './OreIcon';
 import { formatCount } from '@/lib/formatCount';
 import type { TaxColumnId } from './taxColumns';
 
-/** The tick-box column (and History's matching spacer): little room left of the box, the date cell's own padding as the gap after it. */
 const SELECT_COLUMN_CLASS = 'w-9 pl-2 pr-0';
 
-/** Structural, not i18next's TFunction, so this stays easy to pass around without fighting its generics. */
 export function statusLabel(t: (key: string) => string, status: MiningTaxRowStatus): string {
   return t(`miningTax.status.${STATUS_LABEL_KEY[status]}`);
 }
 
-/**
- * The select column only shows with something selectable on screen
- * (nothing Outstanding to bulk-pay, nothing Unassigned to combine or
- * dismiss) — an always-blank leading column reads as unexplained
- * whitespace before Date. Both actions share one checkbox column.
- */
 export const isSelectableRow = (dr: DisplayRow) =>
   !isBookRow(dr) &&
   ((dr.status === 'outstanding' && dr.assignment !== null) || dr.status === 'unassigned');
@@ -59,7 +51,6 @@ interface UseTaxColumnsInput {
   showValueColumn: boolean;
   showCharacterColumn: boolean;
   showSelectColumn: boolean;
-  /** The optional columns the pilot has ticked; Date always shows. */
   visibleColumns: readonly TaxColumnId[];
   typeNames: ReadonlyMap<number, string> | undefined;
   systemSecurity: ReadonlyMap<number, number> | undefined;
@@ -71,17 +62,9 @@ interface UseTaxColumnsInput {
   systemName: (dr: DisplayRow) => string;
   payeeDisplayName: (dr: DisplayRow) => string;
   corpStateLabel: (corp: CorpRowInfo) => string;
-  /** `statusColumnWidthClass` for the rows on screen, both tables' together so their columns line up. */
   statusWidthClass: string;
 }
 
-/**
- * The Open and History tables' column sets. `allColumns` is every column on
- * offer at this width, `baseColumns` the ticked ones both tables share;
- * Open adds the select column, History an equal-width spacer so the two
- * fixed-layout tables line up. Memoised on what the cells actually read, so a
- * toast or dialog change hands the tables the very same arrays.
- */
 export function useTaxColumns({
   isPhone,
   showOreColumn,
@@ -105,11 +88,6 @@ export function useTaxColumns({
   return useMemo(() => {
     const systemSecurityOf = (dr: DisplayRow): number | undefined =>
       systemSecurity?.get(dr.row.entry.solarSystemId);
-    /**
-     * A cell's figure, with a combined row's per-day lines under it once
-     * expanded. Plain text otherwise: the dense phone card prints cells inline
-     * on its meta line, where a block would break the line apart.
-     */
     function withDayLines(
       dr: DisplayRow,
       main: ReactNode,
@@ -125,7 +103,6 @@ export function useTaxColumns({
       );
     }
 
-    /** A combined row's per-day lines, shown under its total when expanded (desktop only — the phone card keeps its two lines). */
     function dayLines(dr: DisplayRow, render: (member: GroupMember) => ReactNode) {
       if (!dr.groupMembers || !expandedCombined.has(dr.key)) return null;
       return allMembers(dr)
@@ -188,8 +165,6 @@ export function useTaxColumns({
         withDayLines(
           dr,
           estimatedValueOf(dr) <= 0 ? (
-            // Zero or unpriced: a muted dash, left off the phone card's meta line
-            // rather than printing "· — value" on every row.
             <span className="text-text-dim" data-dense-omit>
               <span aria-hidden="true">—</span>
               <span className="sr-only">{t('miningTax.noPriceLabel')}</span>
@@ -209,7 +184,6 @@ export function useTaxColumns({
               id: 'character',
               headerCellClassName: 'sm:w-28',
               header: t('miningTax.characterColumn'),
-              // Plain: the row opens the detail modal, which links the pilot (§6c).
               render: (dr: DisplayRow) => <span>{dr.row.characterName}</span>,
               sortValue: (dr: DisplayRow) => dr.row.characterName,
             } satisfies DataTableColumn<DisplayRow>,
@@ -221,7 +195,6 @@ export function useTaxColumns({
         header: t('miningTax.dateColumn'),
         headerTooltip: t('miningTax.dateEveHint'),
         className: 'whitespace-nowrap',
-        // Row opens its detail modal: the accent primary cell is the cue (§6c).
         cellClassName: () => 'text-accent',
         render: (dr) =>
           withDayLines(
@@ -233,8 +206,6 @@ export function useTaxColumns({
                   aria-expanded={expandedCombined.has(dr.key)}
                   aria-label={t('miningTax.combined.showDays', { date: dateLabel(dr) })}
                   onClick={() => toggleCombinedExpanded(dr.key)}
-                  // In the gutter left of the date, so a combined row's date
-                  // keeps the same left edge as every other row's.
                   className={cx(
                     'absolute top-0 -left-5 hidden size-5 items-center justify-center rounded-xs text-text-dim hover:text-accent sm:inline-flex',
                     interactiveClassName,
@@ -271,10 +242,6 @@ export function useTaxColumns({
       {
         id: 'payee',
         header: t('miningTax.payeeColumn'),
-        // The one column without a fixed width (both tables are `table-fixed`),
-        // so it takes whatever the others leave — room for "Bureau of Unified
-        // Harvesting" — and truncates rather than pushing Status off-screen at
-        // 1024px. `sm:`-scoped so the phone card shows the whole name.
         className: 'sm:truncate',
         render: (dr) => {
           const name = payeeDisplayName(dr);
@@ -283,8 +250,7 @@ export function useTaxColumns({
             : dr.corp?.kind === 'row' &&
                 dr.corp.view.open === true &&
                 dr.corp.view.structureId === undefined
-              ? // Ore no refinery has yielded the miner yet: said, not silently merged.
-                t('miningTax.corpBook.refineryNotRecorded')
+              ? t('miningTax.corpBook.refineryNotRecorded')
               : undefined;
           return (
             <HintText content={label ? `${name} · ${label}` : name} desktopOnly onlyWhenTruncated>
@@ -296,7 +262,6 @@ export function useTaxColumns({
         sortValue: (dr) => payeeDisplayName(dr),
       },
       ...(showOreColumn ? [oreColumn] : []),
-      // A phone card's meta line is already full; the value lives in the detail.
       ...(showValueColumn && !isPhone ? [valueColumn] : []),
       {
         id: 'taxOwed',
@@ -305,8 +270,6 @@ export function useTaxColumns({
         align: 'right',
         className: 'whitespace-nowrap',
         cardCorner: true,
-        // Owed is the figure the page is about; settled history recedes, and so does a day the
-        // Payee's book now decides: there is nothing for the pilot to do on it.
         cellClassName: (dr) =>
           dr.corp?.kind === 'row' && dr.corp.view.state === 'conflict'
             ? 'text-text-dim'
@@ -318,7 +281,6 @@ export function useTaxColumns({
                   ? 'text-text-dim font-normal'
                   : undefined,
         render: (dr) =>
-          // A Conflict owes nothing yet; it shows what the book bills, and when, if it is left.
           dr.corp?.kind === 'row' && dr.corp.view.state === 'conflict' ? (
             <span className="block">
               <span className="block">{`${formatIsk(dr.corp.view.billed)} ISK`}</span>
@@ -330,7 +292,6 @@ export function useTaxColumns({
             withDayLines(
               dr,
               dr.corp?.kind === 'row' && dr.corp.view.correction ? (
-                // A correction keeps the old figure on the line (#4622).
                 <CorpCorrectedAmount correction={dr.corp.view.correction}>
                   {`${formatIsk(taxOwedOf(dr))} ISK`}
                 </CorpCorrectedAmount>
@@ -352,12 +313,8 @@ export function useTaxColumns({
       {
         id: 'status',
         headerCellClassName: statusWidthClass,
-        // Centred on a table, where the pill would otherwise sit at the left of
-        // a column wider than it; the phone card places it on its own line.
         align: isPhone ? undefined : 'center',
         header: t('miningTax.statusColumn'),
-        // Closes the phone card's second line at its right edge, so every
-        // status sits in one column under the tax figure above it.
         stackEdge: 'end',
         render: (dr) =>
           dr.corp ? (
@@ -397,7 +354,6 @@ export function useTaxColumns({
               stackEdge: 'start',
               render: (dr: DisplayRow) =>
                 isSelectableRow(dr) ? (
-                  // The label is the 36px touch target on a coarse pointer; it grows the cell, never overlays a neighbour.
                   <label className={touchCheckboxLabelClassName}>
                     <Checkbox
                       aria-label={t('miningTax.selectRow', {
@@ -415,10 +371,6 @@ export function useTaxColumns({
       ...baseColumns,
     ];
 
-    // History has no checkboxes, but keeps an empty column the same width so
-    // its columns sit exactly under Open's (both tables are fixed-layout). Not
-    // on a phone: there it would be one more (empty) value on the card's meta
-    // line, opening it with a stray "·".
     const historyColumns: DataTableColumn<DisplayRow>[] = [
       ...(showSelectColumn && !isPhone
         ? [

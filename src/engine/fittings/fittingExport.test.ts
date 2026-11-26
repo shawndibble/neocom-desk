@@ -79,7 +79,6 @@ describe('fittingItemCounts', () => {
   });
 
   it('leaves out implants already in the clone, never a booster', () => {
-    // A set seeded from the clone (8, 9) with one implant and a booster added.
     const seeded: Fitting = { ...FITTING, implantSet: { implants: [8, 9, 11], boosters: [10] } };
     const counts = fittingItemCounts(seeded, [8, 9, 10]);
     expect(counts.has(8)).toBe(false);
@@ -252,7 +251,6 @@ describe('fittingToEveXml', () => {
 });
 
 describe('fittingToEft — mutated items (Pyfa layout)', () => {
-  // Pyfa layout: see the eftFit.ts header.
   const MUTA_NAMES: Record<number, string> = {
     587: 'Rifter',
     16475: 'Heavy Gremlin Compact Energy Neutralizer',

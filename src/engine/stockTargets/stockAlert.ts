@@ -1,29 +1,14 @@
-/**
- * The below-target alert: fires when an item's listed amount at a market drops
- * into Low, or from Low to Out, between two foreground polls, usually because
- * the pilot's orders sold.
- *
- * Edge-triggered like `diffPriceAlertTriggered`: a Low item stays Low for many
- * polls, so only the crossing reports. The identity is (list, type, Stock
- * Target) — an item the pilot just added or whose Stock Target they just
- * changed has no counterpart in the previous poll and stays quiet, because the
- * pilot is looking at that number as they set it.
- */
 import { stockStatus, type StockStatus } from './stockRows';
 
 export interface StockAlertEntry {
   listId: string;
   listName: string;
-  /** The market's station or structure: what the alert opens. */
   locationId: number;
   typeId: number;
   name: string;
   target: number;
-  /** Units listed at the market. Null when nothing is cached yet: never guessed as zero. */
   listed: number | null;
-  /** Units in the hangar at the market's station, for the alert to point at. */
   inHangar: number;
-  /** Units the market's running manufacturing and reaction jobs will deliver. Absent in snapshots saved before it existed. */
   inJobs?: number;
 }
 

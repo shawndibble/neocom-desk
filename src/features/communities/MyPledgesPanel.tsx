@@ -4,13 +4,6 @@ import { STALE_PLEDGE_DAYS, lineKey, type MyPledgeRow } from '@/engine/communiti
 import { cx } from '@/lib/cx';
 import { formatQuantity } from './requestFormat';
 
-/**
- * My pledges: every Pledge this Member holds on an open Request, newest first,
- * in the same slide-out shape as My sharing. A Pledge with no delivery after
- * 14 days is greyed and says so in words; nothing is released for it. Open
- * request closes this panel and opens that Request's side panel, where the
- * Pledge is changed or withdrawn.
- */
 export function MyPledgesPanel({
   open,
   rows,

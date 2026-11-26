@@ -1,28 +1,8 @@
-/**
- * One fitting's async compute (stats, can-fly…), cached per `Fitting`
- * object and invalidated only when `profile` itself changes — so adding a
- * third compare slot doesn't redo the first two, which are still the same
- * object reference. `compute` must be a stable, module-level function (not a
- * closure recreated every render), or this cache defeats itself.
- *
- * `context` is an optional second cache key (e.g. the Damage Profile stats are
- * measured under): a change to it recomputes like a change to `profile`. While
- * that recompute is in flight the Fitting's previous value stays in `values`
- * rather than blanking, so a table doesn't flash to a spinner on every switch.
- *
- * A compute that throws or resolves `null` is reported as failed, so the
- * caller can tell "still working" from "gave up" instead of waiting on it
- * forever. A failure is kept only until the next change to the compared
- * Fittings or the profile, which retries it — a passing network or SDE
- * error doesn't stick to that Fitting for the life of the page.
- */
 import { useEffect, useRef, useState } from 'react';
 import type { Fitting, PilotProfile } from '@/engine/fittings/types';
 
 export interface CompareAsyncResult<T> {
-  /** Index-parallel to `fittings`; `null` for an empty slot, one still loading, or one that failed. */
   values: readonly (T | null)[];
-  /** Index-parallel to `fittings`; `true` once that slot's compute has thrown or come back empty. */
   failed: readonly boolean[];
 }
 
@@ -53,10 +33,8 @@ export function useCompareAsync<T>(
     const snapshot = (): CompareAsyncResult<T> => {
       const entries = fittings.map(read);
       return {
-        // A stale entry (older profile/context) still shows until its recompute lands.
         values: fittings.map((fitting, i) => {
           const stale = fitting === null ? undefined : cache.get(fitting);
-          // Only a different context keeps its old value; a different pilot's numbers never do.
           const entry = entries[i] ?? (stale?.profile === profile ? stale : undefined);
           return entry && 'value' in entry ? entry.value : null;
         }),

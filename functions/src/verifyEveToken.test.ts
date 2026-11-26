@@ -48,7 +48,6 @@ async function makeToken(overrides: TokenOverrides = {}): Promise<string> {
   })
     .setProtectedHeader({ alg: 'RS256', kid: 'test-key' })
     .setIssuer(overrides.issuer ?? ISSUER)
-    // Real EVE tokens carry aud: [client_id, "EVE Online"].
     .setAudience(overrides.audience ?? [CLIENT_ID, 'EVE Online'])
     .setIssuedAt()
     .setExpirationTime(overrides.expiresAt ?? Math.floor(Date.now() / 1000) + 1200);
@@ -105,8 +104,6 @@ describe('verifyEveAccessToken', () => {
   });
 
   it('rejects a token minted for a different EVE application', async () => {
-    // Valid EVE token ("EVE Online" audience present), but issued to some
-    // OTHER app's client_id — must not mint a Firebase credential here.
     const token = await makeToken({ audience: ['other-apps-client-id', 'EVE Online'] });
     await expect(verifyEveAccessToken(token, opts)).rejects.toThrow(/client/i);
   });
@@ -124,8 +121,6 @@ describe('verifyEveAccessToken', () => {
   });
 
   it('accepts a token bound to any client_id in a multi-app allow list', async () => {
-    // Dev and prod builds register separate EVE applications (different
-    // callback URLs), so one deployed function must accept both client_ids.
     const otherAppOpts: VerifyOptions = { ...opts, clientIds: ['dev-app-id', CLIENT_ID] };
     const token = await makeToken({ audience: [CLIENT_ID, 'EVE Online'] });
     await expect(verifyEveAccessToken(token, otherAppOpts)).resolves.toMatchObject({
@@ -198,7 +193,6 @@ describe('verifyOptionsFromEnv', () => {
     delete process.env.EVE_CLIENT_ID;
     try {
       expect(() => verifyOptionsFromEnv()).toThrow(/EVE_CLIENT_ID/);
-      // Allowed, it fails closed: no client id is accepted, so no token verifies.
       const lenient = verifyOptionsFromEnv({ allowMissingClientId: true });
       expect(lenient.clientIds).toEqual([]);
       await expect(verifyEveAccessToken(await makeToken(), lenient)).rejects.toThrow(/client/i);
@@ -214,7 +208,6 @@ describe('verifyOptionsFromEnv', () => {
 
   it('accepts either app when EVE_CLIENT_ID lists dev and prod client_ids', async () => {
     const saved = process.env.EVE_CLIENT_ID;
-    // Whitespace around commas must be tolerated — it's a hand-edited env file.
     process.env.EVE_CLIENT_ID = ` ${CLIENT_ID} , prod-app-id `;
     try {
       const devToken = await makeToken({ audience: [CLIENT_ID, 'EVE Online'] });

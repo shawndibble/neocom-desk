@@ -1,15 +1,5 @@
 import type { Breadcrumb, Event as SentryEvent } from '@sentry/react';
 
-/**
- * Query/fragment parameter names that must never reach Sentry.
- *
- * `code`/`state`/`code_verifier` are the EVE SSO PKCE handshake: an error
- * thrown anywhere during `/callback?code=…&state=…` would otherwise ship a
- * live authorization code with the event, because Sentry stamps the current
- * URL onto every event and names the pageload span after it. The `*_token`
- * names cover the exchange responses themselves. CLAUDE.md: refresh tokens
- * live in Dexie only and never reach logs — Sentry is a log sink.
- */
 const SECRET_PARAMS = new Set([
   'code',
   'state',
@@ -23,33 +13,15 @@ const SECRET_PARAMS = new Set([
 
 const REDACTED = '[redacted]';
 
-/**
- * Matches one `?key=value` / `&key=value` / `#key=value` pair. The leading
- * separator is what keeps a path segment (`/code=1/`) and prose
- * (`invalid state=abc`) from being mistaken for a parameter, so this stays
- * safe to run over free text as well as over URLs.
- */
 const PARAM_RE = /([?&#])([^=&#?\s]+)=([^&#\s]*)/g;
 
-/** `Authorization: Bearer <token>` quoted in an error message. */
 const BEARER_RE = /(\bBearer\s+)[A-Za-z0-9._~+/=-]+/gi;
 
-/** A JWT: EVE SSO access and refresh tokens are three base64url segments. */
 const JWT_RE = /\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]*/g;
 
-/**
- * `refresh_token: abc`, `"access_token":"abc"` — a token field quoted as JSON
- * or prose in an error message or response body, where PARAM_RE's `?`/`&`
- * prefix does not apply.
- */
 const TOKEN_FIELD_RE =
   /(\b(?:access_token|refresh_token|id_token|client_secret|code_verifier)["']?\s*[:=]\s*["']?)[^\s"',&}]+/gi;
 
-/**
- * Redacts secret-bearing parameters anywhere in a string — a bare URL,
- * absolute or relative, or a URL embedded in an error message. Returns the
- * input unchanged when it carries nothing sensitive.
- */
 export function redactSecrets(value: string): string {
   return value
     .replace(PARAM_RE, (match, separator: string, key: string) =>
@@ -62,7 +34,6 @@ export function redactSecrets(value: string): string {
 
 const URL_BEARING_CRUMB_FIELDS = ['url', 'from', 'to'] as const;
 
-/** `beforeBreadcrumb`'s half: fetch/xhr crumbs carry `url`, navigation `from`/`to`. */
 export function scrubBreadcrumb(breadcrumb: Breadcrumb): Breadcrumb {
   const scrubbed: Breadcrumb = { ...breadcrumb };
   if (typeof scrubbed.message === 'string') scrubbed.message = redactSecrets(scrubbed.message);
@@ -76,12 +47,6 @@ export function scrubBreadcrumb(breadcrumb: Breadcrumb): Breadcrumb {
   return scrubbed;
 }
 
-/**
- * Span attributes are a flat bag of arbitrary keys, so this redacts every
- * string value rather than guessing at the URL-bearing names. That is safe
- * because `redactSecrets` only ever rewrites a `?`/`&`/`#`-prefixed parameter
- * whose name is in `SECRET_PARAMS`; anything else is returned untouched.
- */
 function redactAttributes<T extends Record<string, unknown>>(attributes: T): T {
   const redacted: Record<string, unknown> = { ...attributes };
   for (const [key, value] of Object.entries(redacted)) {
@@ -90,20 +55,8 @@ function redactAttributes<T extends Record<string, unknown>>(attributes: T): T {
   return redacted as T;
 }
 
-/**
- * `beforeSend`'s half. Generic over the event type because transactions need
- * this as much as errors do: the router integration names the span after the
- * route pattern, but `request.url` still carries the raw `/callback?code=…`.
- *
- * Covers every field the browser SDK fills with a URL or with text that may
- * quote one, rather than trusting any single one of them to be the only
- * carrier.
- */
 export function scrubEvent<E extends SentryEvent>(event: E): E {
   if (event.request) {
-    // `headers` matters as much as `url` here: the SDK copies `document.referrer`
-    // into `Referer`, so a client-side navigation away from `/callback` carries
-    // the authorization code into the *next* event, whose own URL is innocent.
     event.request = {
       ...event.request,
       ...(event.request.url ? { url: redactSecrets(event.request.url) } : {}),
@@ -122,12 +75,6 @@ export function scrubEvent<E extends SentryEvent>(event: E): E {
   }
   if (event.breadcrumbs) event.breadcrumbs = event.breadcrumbs.map(scrubBreadcrumb);
 
-  // Transactions, which `event.request.url` alone does not cover: the browser
-  // timing spans (`browser.request`, `browser.connect`, …) each describe
-  // themselves with the whole URL, and both the root span and every child
-  // repeat it under the `url.full` attribute. Verified by watching a real
-  // envelope — the error event was already clean here while the transaction
-  // was still shipping the raw query string.
   if (event.contexts?.trace?.data) {
     event.contexts = {
       ...event.contexts,

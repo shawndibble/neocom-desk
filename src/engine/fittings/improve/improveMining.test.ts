@@ -225,7 +225,6 @@ describe('crystalPlan', () => {
   const source = (minerTypeIds: number[]) => ({
     family: 'Simple Asteroid',
     minerTypeIds,
-    // Miner 1 takes crystal group 5; module 2 takes no charge.
     chargeGroupsOf: (typeId: number) => (typeId === 1 ? [5] : []),
     typeIdsInGroup: (group: number) => (group === 5 ? [10, 11, 12, 20] : []),
     nameOf: (typeId: number) => names[typeId],

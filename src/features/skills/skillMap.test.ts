@@ -77,9 +77,6 @@ describe('toAttributeBaseline', () => {
     });
   });
 
-  // ESI attribute values already include implant bonuses; the engine expects
-  // base + remap only (implants are applied separately by computeSchedule and
-  // the optimizer). Regression for UX-REVIEW #2's "Savings: 0m" contradiction.
   it('subtracts implant bonuses so the engine gets base attributes', () => {
     expect(
       toAttributeBaseline(
@@ -98,10 +95,6 @@ describe('toAttributeBaseline', () => {
     });
   });
 
-  // The reported bug. ESI bakes an in-game cerebral accelerator into the same
-  // values it bakes implants into, and nothing took it back out: the derived
-  // "base" sheet totalled 159 against EVE's 99-point budget, so no legal remap
-  // could beat it and the optimizer reported zero savings without saying why.
   it('recovers a cerebral accelerator baked into the ESI values', () => {
     expect(
       toAttributeBaseline(
@@ -151,8 +144,6 @@ describe('toAttributeBaseline', () => {
     });
   });
 
-  // The floor clamp this function used to apply turned an implant misread into
-  // a plausible-looking sheet. Reporting it is the point.
   it('reports a sheet it cannot explain rather than clamping it into range', () => {
     const result = toAttributeBaseline(
       {

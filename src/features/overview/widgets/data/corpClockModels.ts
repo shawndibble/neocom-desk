@@ -1,7 +1,3 @@
-/**
- * Corp clock builders: Due soon and Corp industry jobs.
- * Same contract as `models.ts`: pure, derived at render time.
- */
 import { worstSeverity, type DeadlineSeverity } from '@/engine/character/severity';
 import { mergeByCorporation } from '@/engine/corp/acrossCorps';
 import { mergeCorpBoards, type CorpBoardItem } from '@/engine/corp/board';
@@ -41,8 +37,6 @@ import type {
 } from './types';
 import type { Translate } from '@/lib/translate';
 
-// --- Due soon ---------------------------------------------------------------------
-
 function subjectOf(item: CorpBoardItem): string {
   return item.kind === 'jobDelivery' ? item.subject : shortStructureName(item.subject);
 }
@@ -70,7 +64,6 @@ function whatOf(item: CorpBoardItem, t: Translate): string {
   }
 }
 
-/** The board's own clock wording: nothing shorter than the cache window is ticked down. */
 function whenOf(item: CorpBoardItem, t: Translate): string {
   if (item.timing === 'untimed') return t('corp.board.noTimer');
   if (item.timing === 'passed') return t('corp.board.dry');
@@ -82,7 +75,6 @@ function whenOf(item: CorpBoardItem, t: Translate): string {
   return formatCountdown(remainingMs / 1000);
 }
 
-/** The Deadline Strip as day bars; absent when nothing lands in it. */
 function dayChart(
   t: Translate,
   items: readonly CorpBoardItem[],
@@ -122,28 +114,20 @@ function dayChart(
   };
 }
 
-/** How the read went, for the view: the feeds' state, and when the oldest read landed. */
 interface DeadlinesRead {
   loading: boolean;
-  /** A read failed while others answered: the rest draws, flagged. */
   error: boolean;
   fetched: readonly Date[];
   fromCache: boolean;
 }
 
-/**
- * The widget over a built board. `labels` names each row's corporation, given only when
- * the rows come from more than one.
- */
 function deadlinesView(
   board: readonly CorpBoardItem[],
   read: DeadlinesRead,
   { t, now, zone }: Pick<BuildContext, 't' | 'now' | 'zone'>,
   labels?: ReadonlyMap<number, CorpLabel>
 ): KindView {
-  // A finished job is "Ready to deliver" on Corp industry jobs, not a deadline.
   const items = board.filter((item) => item.kind !== 'jobDelivery');
-  // The board is already soonest-first; an offline service has no clock, so it is no deadline.
   const timed = items.filter((item) => item.timing !== 'untimed');
   const due = dueSoon(items, now);
   const dueTone = worstSeverity(
@@ -157,7 +141,6 @@ function deadlinesView(
   const corpOf = (item: CorpBoardItem) =>
     labels && item.corporationId !== undefined ? labels.get(item.corporationId) : undefined;
 
-  // Next is the soonest item still ahead; a dry or overdue one is listed, not "next".
   const next = timed.find((item) => item.timing === 'timed' && (item.deadlineMs ?? 0) > now);
   const secondary: NumberSecondary | undefined = next
     ? {
@@ -169,7 +152,6 @@ function deadlinesView(
     : undefined;
 
   const table: TableModel = {
-    // Fits the box rather than the size budget, so the chart's narrow side keeps "What" when it fits.
     fitWidth: true,
     columns: [
       {
@@ -186,7 +168,6 @@ function deadlinesView(
         label: t('overview.widgets.corpDeadlines.col.what'),
         priority: 2,
         minWidth: 80,
-        // Truncates instead of squeezing the subject when the box is tight.
         grow: true,
       },
       {
@@ -258,7 +239,6 @@ function deadlinesView(
   };
 }
 
-/** Due soon across every corporation the pilot's Characters can read: one deadline-ranked list. */
 function allCorpDeadlines(feeds: Feeds, ctx: BuildContext): KindView {
   const feed = feeds.corpDeadlinesAll;
   const data = feed?.data;
@@ -269,7 +249,6 @@ function allCorpDeadlines(feeds: Feeds, ctx: BuildContext): KindView {
   }));
   const readable = reads.filter(({ read }) => read.readable);
   if (readable.length === 0) {
-    // A read failed and none answered: Retry, not "your roles don't cover this".
     if (data.corporations.some((slice) => slice.failed)) {
       return blank(null, { ...statusOf(feed), error: true });
     }
@@ -294,7 +273,6 @@ function allCorpDeadlines(feeds: Feeds, ctx: BuildContext): KindView {
       fromCache: readable.some(({ read }) => read.fromCache),
     },
     ctx,
-    // One corporation's rows need no column naming it, unless they are a Feeder's from a book (#6116).
     readable.length > 1 || data.corporations.some((slice) => slice.moonChunks?.fromBook)
       ? data.labels
       : undefined
@@ -305,12 +283,9 @@ export const corpDeadlines: Builder = (feeds, ctx) => {
   if (ctx.scopeAll) return allCorpDeadlines(feeds, ctx);
   const { t, now } = ctx;
   const list = [feeds.structures, feeds.moonChunks, feeds.corpJobs] as const;
-  // A feed still on its first load: nothing to say until every read has an answer.
   const pending = list.find((feed) => !feed || (!feed.data && feed.loading));
-  // Towers only add clocks: a Character may not read them, so they wait for an answer but never block one.
   const towers = feeds.corpStarbases;
   const towersPending = towers && !towers.data && towers.loading ? towers : undefined;
-  // Raid windows are the same kind of extra: waited for, never blocking.
   const raids = feeds.corpSovereignty;
   const raidsPending = raids && !raids.data && raids.loading ? raids : undefined;
   const extraPending = towersPending ?? raidsPending;
@@ -343,7 +318,6 @@ export const corpDeadlines: Builder = (feeds, ctx) => {
     boardOf(read.sources, now),
     {
       loading: all.some((feed) => feed?.loading),
-      // Any failed read still draws what the other feeds gave, flagged as failed.
       error: all.some((feed) => Boolean(feed && !feed.data && feed.error)),
       fetched: read.fetched,
       fromCache: read.fromCache,
@@ -352,8 +326,6 @@ export const corpDeadlines: Builder = (feeds, ctx) => {
   );
 };
 
-// --- Corp industry jobs -----------------------------------------------------------
-
 interface JobFacts {
   job: CorporationIndustryJob;
   done: boolean;
@@ -361,21 +333,17 @@ interface JobFacts {
   label: string;
   installer: string;
   tone: DeadlineSeverity;
-  /** Read across several corporations: whose job it is. */
   corp?: CorpLabel;
 }
 
-/** Finished jobs first (oldest waiting first), then running ones by soonest end. */
 const byFinishedThenEnd = (a: JobFacts, b: JobFacts) =>
   Number(b.done) - Number(a.done) || a.endMs - b.endMs;
 
-/** Active and ready jobs, in `byFinishedThenEnd` order. */
 function jobFacts(data: CorpJobsFeed, t: Translate, now: number, corp?: CorpLabel): JobFacts[] {
   const facts = data.jobs
     .filter((job) => job.status === 'active' || job.status === 'ready')
     .map((job): JobFacts => {
       const endMs = Date.parse(job.end_date);
-      // ESI leaves a finished job `active` past its end, so the clock counts too.
       const done = job.status === 'ready' || now >= endMs;
       const name =
         (job.product_type_id === undefined ? undefined : data.typeNames.get(job.product_type_id)) ??
@@ -394,7 +362,6 @@ function jobFacts(data: CorpJobsFeed, t: Translate, now: number, corp?: CorpLabe
   return facts.sort(byFinishedThenEnd);
 }
 
-/** One corporation's jobs: the header scope, or All with one readable corporation. */
 function jobsOne(feed: FeedState<CorpJobsFeed> | undefined, ctx: BuildContext): KindView {
   const data = feed?.data ?? null;
   if (!data) return blank(null, statusOf(feed));
@@ -402,7 +369,6 @@ function jobsOne(feed: FeedState<CorpJobsFeed> | undefined, ctx: BuildContext): 
   return jobsView(jobFacts(data, ctx.t, ctx.now), feed, data, ctx);
 }
 
-/** Every readable corporation's jobs in one list (All scope), each row naming its corporation. */
 function jobsAcross(feeds: Feeds, ctx: BuildContext): KindView {
   const feed = feeds.corpJobsAll;
   const across = corpReads(feed, null, ctx.t, (one) => jobsOne(one, ctx));
@@ -423,7 +389,6 @@ function jobsAcross(feeds: Feeds, ctx: BuildContext): KindView {
 export const corpJobs: Builder = (feeds, ctx) =>
   ctx.scopeAll ? jobsAcross(feeds, ctx) : jobsOne(feeds.corpJobs, ctx);
 
-/** The widget over jobs already in order; a Corporation column when any names its corporation. */
 function jobsView(
   facts: readonly JobFacts[],
   feed: FeedState<unknown> | undefined,
@@ -434,7 +399,6 @@ function jobsView(
   const ready = facts.filter((f) => f.done);
   const running = facts.filter((f) => !f.done);
   const next = running[0];
-  // Under CCP's hour-long cache a finish time may already be past, so it is not ticked down.
   const left = (f: JobFacts) => {
     const remainingMs = f.endMs - now;
     return remainingMs < CORP_CACHE_WINDOW_MS
@@ -501,7 +465,6 @@ function jobsView(
           ? [{ key: 'corp', label: t('overview.widgets.corpJobs.col.corp'), priority: 4 }]
           : []),
         { key: 'ends', label: t('overview.widgets.corpJobs.col.ends'), align: 'end', priority: 1 },
-        // Product and time left are the row; who installed it and how read fine without at phone width.
         {
           key: 'installer',
           label: t('overview.widgets.corpJobs.col.installer'),

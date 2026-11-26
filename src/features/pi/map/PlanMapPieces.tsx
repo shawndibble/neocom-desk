@@ -1,4 +1,3 @@
-/** The pieces of the map panel: detail body, legend, picks strip, what-if line, board. */
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { formatList } from '@/lib/listFormat';
 import { Link } from 'react-router-dom';
@@ -26,7 +25,6 @@ import { planetName, VERDICT_TONE } from './mapText';
 import { buildProductDetail } from './productDetailModel';
 import type { PlanMapState } from './usePlanMapState';
 
-/** The detail panel's content: a colony's richness, the what-if planet, the traced product, or the empty hint. */
 export function PlanMapDetailBody({ s }: { s: PlanMapState }) {
   const { t } = useTranslation();
   const {
@@ -165,7 +163,6 @@ export function PlanMapDetailBody({ s }: { s: PlanMapState }) {
   return <p className="text-xs text-text-dim">{t('piMap.detail.empty', { context })}</p>;
 }
 
-/** What a tile's figure and marks mean, where the tiles are: the help drawer has the long form. */
 export function MapLegend({ s }: { s: PlanMapState }) {
   const { t } = useTranslation();
   const { marks, phone } = s;
@@ -176,7 +173,6 @@ export function MapLegend({ s }: { s: PlanMapState }) {
       aria-label={t('piMap.legend.label')}
       className={cx(
         'flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[0.6875rem] font-normal tracking-normal text-text-dim normal-case',
-        // Beside the title it gives way first and wraps, so "Planet map" never truncates.
         phone ? 'border-b border-line px-3 py-1.5' : 'min-w-0 flex-1 basis-0'
       )}
     >
@@ -278,7 +274,6 @@ export function PicksStrip({ s }: { s: PlanMapState }) {
                       ? formatIskCompactSigned(pick.perDay)
                       : formatIskCompact(pick.perDay)}
                     {t('piMap.perDaySuffix')}
-                    {/* A link cannot hold a focusable IskAmount; the tooltip below and this text carry the exact figure. */}
                     <span className="sr-only">
                       {' '}
                       {t('common.iskExact', { amount: formatIsk(pick.perDay, 0) })}
@@ -317,8 +312,6 @@ export function WhatIfLine({ s }: { s: PlanMapState }) {
   const { activeWhatIf, unlock, whatIfRecipe, previewed } = s;
   const active = activeWhatIf.size > 0 && unlock ? [...activeWhatIf].sort() : null;
   const best = whatIfRecipe ? ` ${t('piMap.whatIfBest', { name: whatIfRecipe.name })}` : '';
-  // Nothing shows until a what-if type is ticked or hovered. A hover floats over the board's top
-  // edge instead of taking a row, so hovering never shifts the page (#2796).
   return (
     <div className="relative text-xs text-text-dim" aria-live="polite" data-testid="map-whatif">
       {active && unlock ? (

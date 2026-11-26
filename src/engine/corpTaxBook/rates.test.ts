@@ -145,7 +145,6 @@ describe('per-refinery (structure) tier (#4621)', () => {
     pct: 8,
     effectiveFrom: '2026-07-01',
   };
-  // A moon owner's ledger-only row: no moon is ever known.
   const at = { ...ctx, moonId: undefined, feederId: FEEDER, structureId: REFINERY };
 
   it('prices a refinery with no known moon, beating the per-moon-owner rate', () => {

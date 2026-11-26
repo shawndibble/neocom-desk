@@ -1,16 +1,12 @@
-/** Sample data for the "Add my other corps" mockup; all names invented. */
 export type CorpState =
   'ready' | 'connected' | 'needs-sign-in' | 'needs-role' | 'own-book' | 'gone-quiet' | 'hidden';
 
 export interface MyCorp {
   id: number;
   name: string;
-  /** The account character that is CEO of the corp. */
   ceo: string;
-  /** Portrait id of the CEO character. Sample ids only. */
   ceoId: number;
   state: CorpState;
-  /** Open Athanors the book already reads (connected corps only). */
   refineries?: number;
 }
 
@@ -34,7 +30,6 @@ export const CORPS: MyCorp[] = [
 const set = (over: Record<number, Partial<MyCorp>>): MyCorp[] =>
   CORPS.map((c) => ({ ...c, ...over[c.id] }));
 
-/** The state right after a guided run of 12: mixed results. */
 export const RESULT_CORPS: MyCorp[] = set({
   11: { state: 'connected', refineries: 1 },
   12: { state: 'connected', refineries: 1 },
@@ -50,7 +45,6 @@ export const RESULT_CORPS: MyCorp[] = set({
   22: { state: 'connected', refineries: 1 },
 });
 
-/** Picker with two corps previously dismissed for good. */
 export const PICKER_CORPS: MyCorp[] = set({
   21: { state: 'hidden' },
   22: { state: 'hidden' },

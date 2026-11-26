@@ -1,9 +1,3 @@
-// Paying a moon owner (issue #4514, spec #4504): record a payout, mark a journal row "not a
-// payout", and attach the wallet journal's outgoing donation to the record by amount, date and
-// recipient (an unmatched one is recorded). Officer-only; the same live role check as the other
-// moon owner writes. Failures carry a stable `reason`; no player-facing text lives here.
-// Payouts never touch Tax Payment matching or Statements.
-
 import { utcDay } from './timeConstants.js';
 import { FieldValue } from 'firebase-admin/firestore';
 import { fail, type Caller } from './actorAuth.js';
@@ -42,18 +36,8 @@ import type { SyncEsi } from './corpTaxBookSyncEsi.js';
 
 export const PAYOUTS = 'payouts';
 
-/**
- * Bumped by every transaction that writes a moon owner's payouts. A payouts query does not lock
- * a document id that does not exist yet, so an officer's new record and a journal row created at
- * the same moment would both commit; writing this one field makes them conflict instead.
- */
 const PAYOUTS_WRITTEN_AT = 'payoutsWrittenAt';
 
-/**
- * What the moon owner has been paid, kept on its record and moved by the same transaction that
- * writes a payout (#5242): `count` and `amount` of every row not marked "not a payout". A record
- * without it (written before this field) is totalled once from its payouts, by the first write.
- */
 const PAYOUT_TOTALS = 'payoutTotals';
 
 export interface PayoutTotals {
@@ -79,27 +63,17 @@ function storedTotals(feeder: FirebaseFirestore.DocumentSnapshot): PayoutTotals 
     : undefined;
 }
 
-/** `date` moved by `days` (UTC calendar days), as YYYY-MM-DD. */
 function shiftDate(date: string, days: number): string {
   const d = new Date(`${date.slice(0, 10)}T00:00:00Z`);
   d.setUTCDate(d.getUTCDate() + days);
   return d.toISOString().slice(0, 10);
 }
 
-/**
- * The earliest payout day that can still link to a journal entry on `days` (engine
- * `PAYOUT_LINK_WINDOW_DAYS`): a payout's own journal ref is on its day or inside the same window,
- * so nothing older can attach, merge or already hold one of these entries.
- */
 const payoutFloor = (days: readonly string[]): string =>
   days.length === 0 ? '' : shiftDate([...days].sort()[0]!, -PAYOUT_LINK_WINDOW_DAYS);
 
 type Tx = FirebaseFirestore.Transaction;
 
-/**
- * Inside a transaction: the payouts a write must look at (only those on or after `floor` when the
- * record already keeps its totals, all of them when it does not), and the exact totals to move.
- */
 async function readForWrite(
   tx: Tx,
   feeder: FirebaseFirestore.DocumentSnapshot,
@@ -114,8 +88,6 @@ async function readForWrite(
   const stored = (await tx.get(col)).docs.map(storedPayout);
   return { stored, totals: totalPayouts(stored), backfill: true };
 }
-
-// --- Input -----------------------------------------------------------------
 
 export interface RecordPayoutInput extends FeederTargetCall {
   amount: number;
@@ -156,22 +128,15 @@ export function parseMarkPayoutInput(data: unknown): MarkPayoutInput {
   };
 }
 
-/**
- * The officer's browser sync asks the server to reconcile; the server reads the journal itself.
- * An `outgoing` list a client still sends is ignored: a client-fed row is not the journal.
- */
 export type ReconcilePayoutsInput = BookCall;
 
 export function parseReconcilePayoutsInput(data: unknown): ReconcilePayoutsInput {
   return parseBookCall(data);
 }
 
-// --- Calls -----------------------------------------------------------------
-
 const payoutsOf = (deps: BookDeps, collector: number, feeder: number) =>
   feederRef(deps.db, collector, feeder).collection(PAYOUTS);
 
-/** A moon owner record with its payee history (#4617; absent on older records). */
 type FeederWithPayees = FeederRecord & { payeeHistory?: PayeeChange[] };
 
 type StoredPayout = FeederPayout & { id: string; confirmedAt?: number };
@@ -182,11 +147,6 @@ const storedPayout = (d: FirebaseFirestore.QueryDocumentSnapshot): StoredPayout 
   id: d.id,
 });
 
-/**
- * "I've sent it" (or added by hand): records the payout at once. The journal attaches to it
- * later. When the journal already auto-recorded the same donation, the officer's record confirms
- * that row instead of counting the payment twice (#4617).
- */
 export async function recordFeederPayout(
   deps: BookDeps,
   caller: Caller,
@@ -202,7 +162,6 @@ export async function recordFeederPayout(
     if (!feederSnap.exists) fail('not-found', 'No such moon owner', 'no-feeder');
     const { stored, totals } = await readForWrite(tx, feederSnap, col, payoutFloor([input.date]));
     const merge = payoutToMerge(stored, input);
-    // A row waiting to be confirmed (#6209) starts counting once the officer says it was sent.
     const waiting = merge !== undefined && stored.find((p) => p.id === merge)?.unconfirmed === true;
     if (merge)
       tx.update(col.doc(merge), {
@@ -210,7 +169,6 @@ export async function recordFeederPayout(
         ...(waiting ? { notAPayout: false, unconfirmed: FieldValue.delete() } : {}),
       });
     else tx.create(fresh, payout);
-    // A merge confirms a row already counted; a new row, or a waiting one now counted, adds one.
     tx.update(feeder, {
       [PAYOUTS_WRITTEN_AT]: deps.now(),
       [PAYOUT_TOTALS]:
@@ -238,10 +196,6 @@ export async function recordFeederPayout(
   return { id };
 }
 
-/**
- * An officer says a detected (or recorded) row is, or is not, a payout. It keeps its journal ref
- * so it is never re-detected; a row waiting to be confirmed (#6209) is confirmed either way.
- */
 export async function markFeederPayout(
   deps: BookDeps,
   caller: Caller,
@@ -257,9 +211,7 @@ export async function markFeederPayout(
     const was = row.get('notAPayout') === true;
     const amount = Number(row.get('amount'));
     const known = storedTotals(feederSnap);
-    // +1 when the row starts counting, -1 when it stops, 0 when the mark did not change.
     const step = was === input.notAPayout ? 0 : input.notAPayout ? -1 : 1;
-    // No stored totals yet: total every payout as it will stand once this one is marked.
     const totals = known
       ? { count: known.count + step, amount: known.amount + step * amount }
       : totalPayouts(
@@ -287,20 +239,12 @@ export async function markFeederPayout(
   return { ok: true };
 }
 
-/** One moon owner's share of a book-wide reconcile: the journal entries the pass gave it. */
 export interface OwnerPayoutPlan {
   owner: Omit<OwnerOutgoing, 'payouts'>;
-  /** The entries planned for this owner, attached or recorded. */
   outgoing: OutgoingDonation[];
-  /** Of those, the refs planned as new payouts; a planned attach is never turned into one. */
   createRefs: number[];
 }
 
-/**
- * Read every moon owner's payouts and decide, book-wide, which journal entry belongs to whom
- * (a journal entry counts for one moon owner only; a donation to a payee two moon owners share is
- * left for an officer to add by hand). Writes nothing.
- */
 export async function planFeederPayouts(
   deps: BookDeps,
   collector: number,
@@ -308,8 +252,6 @@ export async function planFeederPayouts(
 ): Promise<OwnerPayoutPlan[]> {
   if (outgoing.length === 0) return [];
   const feeders = await bookRef(deps.db, collector).collection(FEEDERS).get();
-  // Only an owner some donation could go to (engine `payeeIdsAt`: its own corporation or any
-  // payee it ever named) can take one, so only those owners' payouts are read.
   const recipients = new Set(outgoing.map((d) => d.recipientId));
   const candidates = feeders.docs.flatMap((doc) => {
     const rec = doc.data() as FeederWithPayees;
@@ -318,7 +260,6 @@ export async function planFeederPayouts(
     return ids.some((id) => id !== undefined && recipients.has(id)) ? [{ rec, corporationId }] : [];
   });
   if (candidates.length === 0) return [];
-  // Only payouts near a journal entry's day can attach to it or already hold its ref.
   const floor = payoutFloor(outgoing.map((d) => d.at));
   const owners = await Promise.all(
     candidates.map(async ({ rec, corporationId }) => {
@@ -357,11 +298,6 @@ export async function planFeederPayouts(
   );
 }
 
-/**
- * Write one moon owner's planned share in a transaction that re-reads its payouts: an officer's
- * record that landed since the plan takes the journal entry instead of a second row, and an
- * entry another writer already used is skipped. Audited. Returns what it wrote.
- */
 export async function applyFeederPayoutPlan(
   deps: BookDeps,
   collector: number,
@@ -395,7 +331,6 @@ export async function applyFeederPayoutPlan(
       tx.update(col.doc(a.id), { status: 'matched', journalRef: a.journalRef });
     }
     for (const c of create) tx.create(col.doc(c.id), c.payout);
-    // A donation without the payout reference waits for an officer and counts for nothing yet.
     const counted = create.filter((c) => !c.payout.notAPayout);
     tx.update(feeder, {
       [PAYOUTS_WRITTEN_AT]: deps.now(),
@@ -419,12 +354,6 @@ export async function applyFeederPayoutPlan(
 
 const SCHEDULED_ACTOR: Actor = { characterId: null, name: 'Scheduled sync', via: SCHEDULED_VIA };
 
-/**
- * Attach the book's outgoing donations to its moon owners' payouts, and record the ones nobody
- * did. `outgoing` is always what the server itself read from the wallet journal: the scheduled
- * sync passes the journal it just read; the callable below reads it. Idempotent (a journal entry
- * counts once).
- */
 export async function reconcileFeederPayouts(
   deps: BookDeps,
   collector: number,
@@ -441,11 +370,6 @@ export async function reconcileFeederPayouts(
   return { attached, recorded };
 }
 
-/**
- * An officer's browser sync asks for a reconcile. The role is checked live and the server reads
- * the corporation's wallet journal with the officer's own token (each of the book's divisions),
- * so nothing a client says it sent is ever recorded as a journal payment.
- */
 export async function reconcileFeederPayoutsCall(
   deps: BookDeps & { esi?: SyncEsi },
   caller: Caller,

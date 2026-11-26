@@ -9,7 +9,6 @@ import {
 } from './navDestinations';
 import type { AppRoutePath } from './routeScopes';
 
-/** Echoes the key, so a label reads as the keys it was built from. */
 const t = (key: string) => key;
 const NO_LOCKS: ReadonlySet<AppRoutePath> = new Set();
 const ALL_CORP_VIEWS = {
@@ -130,14 +129,12 @@ describe('NAV_LOCK_PATHS', () => {
         '/calendar',
         '/contracts',
         '/contacts',
-        // Each page's sub-views, which the rail lists under the open page.
         '/clones',
         '/employment-history',
         '/srp',
         '/skills/plans',
         '/skills/trained',
         '/skills/certificates',
-        // Tabs of an ungated page that are only a re-login banner without their scope.
         '/market/orders',
         '/market/history',
         '/wallet/journal',
@@ -279,12 +276,9 @@ describe('listNavDestinations', () => {
         srpVisible,
         t,
       }).map((entry) => entry.path);
-    // An officer, even where SRP is still off.
     expect(list(true, false, true)).toContain('/corp/srp');
-    // A member of an SRP corp is not a door: their SRP is the Overview's sub-view.
     expect(list(false, true, false)).not.toContain('/corp/srp');
     expect(list(true, true, false)).not.toContain('/corp/srp');
-    // canManageSrp without Corp Access ready is not a door.
     expect(list(false, false, true)).not.toContain('/corp/srp');
     expect(list(true, true, true).filter((path) => path === '/corp/srp')).toHaveLength(1);
     expect(byPath('/corp/srp')).toMatchObject({ gating: 'corp', locked: false });
@@ -302,10 +296,8 @@ describe('listNavDestinations', () => {
         .filter((entry) => entry.pagePath === '/corp/srp' && entry.kind === 'tab')
         .map((entry) => entry.path);
     expect(tabs(true, true)).toEqual(['/corp/srp/queue', '/corp/srp/settings']);
-    // SRP off: Settings alone, so no tab bar and nothing listed under the page.
     expect(tabs(false, true)).toEqual([]);
     expect(tabs(true, false)).toEqual([]);
-    // An Accountant (no Director role): Settings is hidden, so the Queue alone draws no tab bar.
     expect(tabs(true, true, false)).toEqual([]);
   });
 

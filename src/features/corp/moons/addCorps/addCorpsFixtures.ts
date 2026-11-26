@@ -1,4 +1,3 @@
-/** Invented corporations for the Add my other corps stories and tests. */
 import {
   recordOutcome,
   startRun,
@@ -43,7 +42,6 @@ export const freshRun = (extra: { alertsFor?: number[] } = {}): AddCorpsRun =>
     ...extra,
   });
 
-/** Three connected and the second skipped: the dialog is on corp 5 (index 4). */
 export const midRun = (): AddCorpsRun => {
   let run = freshRun();
   run = recordOutcome(run, { kind: 'connected' });

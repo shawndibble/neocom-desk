@@ -14,8 +14,6 @@ function line(
     quantity,
     ownedQuantity,
     remainingQuantity: extra.remainingQuantity ?? quantity - ownedQuantity,
-    // `in`, not `??`: null is a meaningful value here (the member is building
-    // it), and `null ?? 10` would quietly turn every such case into a price.
     unitPrice: 'unitPrice' in extra ? (extra.unitPrice ?? null) : 10,
     lineCost: extra.lineCost ?? (quantity - ownedQuantity) * 10,
     unpriced: extra.unpriced ?? false,
@@ -62,10 +60,6 @@ function member(over: Partial<BuildGroupMember> = {}): BuildGroupMember {
 
 describe('rollUpBuildGroup — totals', () => {
   it('sums each member’s own materialCost and job fee into one total', () => {
-    // No ledger in play, so totalCost is exactly what summing each member's
-    // own totalCost would give — derived from materialCost + jobFee instead
-    // of member.totalCost directly (see module doc), since materialCost is
-    // where a group ledger's saving is deducted.
     const rollup = rollUpBuildGroup([
       member({
         planId: 'a',
@@ -80,10 +74,6 @@ describe('rollUpBuildGroup — totals', () => {
   });
 
   it('reports job fees as top-level only, since sub-job fees are already inside materialCost', () => {
-    // BuildResult.totalCost is materialCost + this job's own fee, with every
-    // descendant job's fee already rolled into materialCost. Summing
-    // jobFee.total across members is therefore NOT what the pilot pays in
-    // fees, and the field says so by its name.
     const rollup = rollUpBuildGroup([
       member({ planId: 'a', result: result({ jobFee: { total: 5 } as never }) }),
       member({ planId: 'b', result: result({ jobFee: { total: 7 } as never }) }),
@@ -116,8 +106,6 @@ describe('rollUpBuildGroup — totals', () => {
   });
 
   it('is unpriceable when any single member is', () => {
-    // One bad member taints the total: every figure below it is an
-    // understatement, so the flag has to survive members that priced fine.
     const rollup = rollUpBuildGroup([
       member({ planId: 'a', result: result({ unpriceable: true }) }),
       member({ planId: 'b', result: result() }),
@@ -141,17 +129,11 @@ describe('rollUpBuildGroup — material merging', () => {
     const trit = rollup.shoppingMaterials.find((m) => m.typeID === 34);
     expect(trit?.quantity).toBe(150);
     expect(trit?.remainingQuantity).toBe(150);
-    // Merged as-rounded: each member's job already rounded its own use, so a
-    // merged quantity is a sum and never a re-derivation from combined runs.
     expect(trit?.baseQuantity).toBe(150);
     expect(rollup.shoppingMaterials.find((m) => m.typeID === 35)?.quantity).toBe(20);
   });
 
   it('keeps the buy list and the display table as separate merges', () => {
-    // shoppingListMaterials drops built materials and returns leaves;
-    // materialTableRows keeps the built rows. Mixing them into one number
-    // double-counts whenever one member buys what another member's sub-build
-    // also consumes, so the two never meet.
     const rollup = rollUpBuildGroup([
       member({
         planId: 'a',
@@ -164,7 +146,6 @@ describe('rollUpBuildGroup — material merging', () => {
   });
 
   it('keeps the first real unit price, so a member building it cannot blank a bought row', () => {
-    // null means "this member builds it", not "this type has no price".
     const rollup = rollUpBuildGroup([
       member({ planId: 'a', shoppingMaterials: [line(34, 10, { unitPrice: null })] }),
       member({ planId: 'b', shoppingMaterials: [line(34, 10, { unitPrice: 6.5 })] }),
@@ -173,10 +154,6 @@ describe('rollUpBuildGroup — material merging', () => {
   });
 
   it('passes ownedQuantity/remainingQuantity through unmodified when no group ledger is given', () => {
-    // Members are re-resolved with owned-stock deduction disabled before
-    // reaching this function (issue #697), so ownedQuantity is normally 0 —
-    // but the merge itself stays a plain sum regardless of what it is handed;
-    // netting is the `ownedStock` option's job, not an implicit one.
     const rollup = rollUpBuildGroup([
       member({ planId: 'a', shoppingMaterials: [line(34, 100, { ownedQuantity: 100 })] }),
       member({ planId: 'b', shoppingMaterials: [line(34, 100, { ownedQuantity: 100 })] }),
@@ -204,22 +181,12 @@ describe('rollUpBuildGroup — group-owned ledger', () => {
     const trit = rollup.shoppingMaterials.find((m) => m.typeID === 34);
     expect(trit?.ownedQuantity).toBe(60);
     expect(trit?.remainingQuantity).toBe(40);
-    expect(trit?.lineCost).toBe(400); // 40 remaining x unitPrice 10 (see `line()`)
-    // The buy list is the cost authority: the 600 ISK the ledger saved on
-    // material 34 comes straight off materialCost, and totalCost is derived
-    // from the (now net) materialCost plus job fees rather than re-summed
-    // from each member's own (gross, owned-disabled) totalCost.
+    expect(trit?.lineCost).toBe(400);
     expect(rollup.materialCost).toBe(400);
     expect(rollup.totalCost).toBe(405);
   });
 
   it('adds the ledger saving back into profit, keeping it consistent with totalCost', () => {
-    // Member's own `profit` is computed against its own (owned-disabled)
-    // totalCost of 1005, e.g. revenue 1500 -> profit 495. The group ledger
-    // then saves 600 off materialCost/totalCost (as in the test above), so
-    // the internally-consistent group profit is 495 + 600 = 1095 — not the
-    // naive 495, which would leave `profit` and `totalCost` disagreeing
-    // about the same saving on the same rollup.
     const ownedStock = new Map([[34, 60]]);
     const rollup = rollUpBuildGroup(
       [
@@ -247,9 +214,6 @@ describe('rollUpBuildGroup — group-owned ledger', () => {
   });
 
   it('nets the display table too, but never lets it double a deduction already taken off the buy list', () => {
-    // material 999 here is a built row (unitPrice null) — present in the
-    // table but not the buy list, so its netting is display-only and must
-    // not touch `materialCost`.
     const ownedStock = new Map([
       [34, 50],
       [999, 1],
@@ -271,8 +235,7 @@ describe('rollUpBuildGroup — group-owned ledger', () => {
     const builtRow = rollup.tableMaterials.find((m) => m.typeID === 999);
     expect(builtRow?.ownedQuantity).toBe(1);
     expect(builtRow?.remainingQuantity).toBe(0);
-    expect(builtRow?.lineCost).toBe(0); // scaled proportionally from the prior lineCost
-    // Only the buy-list saving (material 34, 50 units x 10) comes off the total.
+    expect(builtRow?.lineCost).toBe(0);
     expect(rollup.materialCost).toBe(500);
   });
 
@@ -317,10 +280,6 @@ describe('rollUpBuildGroup — group-owned ledger', () => {
   });
 
   it('clears unpriceable once the ledger fully covers the one material that made a member unpriceable', () => {
-    // The member's own result is unpriceable against its owned-disabled tree
-    // (materialResolution.ts computes that before the ledger ever runs), but
-    // the ledger now covers the only unpriced material — the group total must
-    // not keep reporting a shortfall that no longer exists.
     const ownedStock = new Map([[34, 100]]);
     const rollup = rollUpBuildGroup(
       [
@@ -336,9 +295,6 @@ describe('rollUpBuildGroup — group-owned ledger', () => {
   });
 
   it('keeps unpriceable when the member’s own product has no price, regardless of the ledger', () => {
-    // `unpricedMaterials` empty alongside `unpriceable: true` means the
-    // product itself lacked a hub price (buildVsBuy.ts's !productPriced) — no
-    // ledger entry can fix that, so it must survive netting.
     const ownedStock = new Map([[34, 999]]);
     const rollup = rollUpBuildGroup(
       [
@@ -355,11 +311,6 @@ describe('rollUpBuildGroup — group-owned ledger', () => {
 });
 
 describe('rollUpBuildGroup — blueprint acquisition rows (issue #1776)', () => {
-  // The synthetic Blueprint Acquisition row `acquisitionMaterialFor` produces
-  // for an owned BPC/BPO: fully owned, one unit, nothing left to buy. Only
-  // `tableMaterials` carries the `acquisitionTier` marker in real data
-  // (`shoppingListMaterials`'s `costLine` strips it before it reaches this
-  // module) — this fixture mirrors that split.
   function acquisitionLine(
     typeID: number,
     extra: Partial<MaterialCostLine> = {}
@@ -375,8 +326,6 @@ describe('rollUpBuildGroup — blueprint acquisition rows (issue #1776)', () => 
       [
         member({
           planId: 'a',
-          // shoppingMaterials mirrors real data: same owned/remaining split,
-          // but no acquisitionTier field at all (costLine already stripped it).
           shoppingMaterials: [
             line(11185, 1, { ownedQuantity: 1, remainingQuantity: 0, lineCost: 0 }),
           ],
@@ -414,10 +363,6 @@ describe('rollUpBuildGroup — blueprint acquisition rows (issue #1776)', () => 
   });
 
   it('still skips netting when two members need the same blueprint typeID, even though the merge itself drops the marker', () => {
-    // mergeCostLines merges these two acquisition rows into one plain
-    // MaterialCostLine with no acquisitionTier (it doesn't spread the field) —
-    // the skip-set must come from each member's own tableMaterials, read
-    // before that merge, or this collision silently reopens issue #1776.
     const rollup = rollUpBuildGroup(
       [
         member({ planId: 'a', tableMaterials: [acquisitionLine(11185)] }),
@@ -430,9 +375,6 @@ describe('rollUpBuildGroup — blueprint acquisition rows (issue #1776)', () => 
     expect(bpcRow?.ownedQuantity).toBe(2);
   });
 
-  // The marker is what keeps "Use assets" off the row (issue #2541's
-  // owned-stock offer), so the merged row has to keep it — a group of two
-  // identical plans must not offer what a single one doesn't.
   it('keeps the Blueprint Acquisition marker on a row two members merge', () => {
     const rollup = rollUpBuildGroup([
       member({ planId: 'a', tableMaterials: [acquisitionLine(11185)] }),
@@ -454,8 +396,6 @@ describe('rollUpBuildGroup — mixed hubs', () => {
   });
 
   it('names every hub in a mixed group and refuses the single paste', () => {
-    // ISK still sums — a hub does not change what a number means — but
-    // multibuy is per-station, so one blob cannot be pasted anywhere.
     const rollup = rollUpBuildGroup([
       member({ planId: 'a', hubId: 'jita' }),
       member({ planId: 'b', hubId: 'amarr' }),
@@ -498,8 +438,6 @@ describe('rollUpBuildGroup — buy list per hub', () => {
   });
 
   it('accounts for every unit of the group buy list and no more', () => {
-    // The invariant that makes the split honest: pasting each block buys
-    // exactly what the group as a whole says it needs.
     const rollup = rollUpBuildGroup([
       member({ planId: 'a', hubId: 'jita', shoppingMaterials: [line(34, 100), line(35, 5)] }),
       member({ planId: 'b', hubId: 'amarr', shoppingMaterials: [line(34, 30)] }),
@@ -533,8 +471,6 @@ describe('rollUpBuildGroup — buy list per hub', () => {
   });
 
   it('still lists a hub whose materials are all owned, and leaves the gating to the caller', () => {
-    // Same rule as the group-wide control: the block exists so the hub is
-    // named, and the caller disables a copy that would write an empty string.
     const rollup = rollUpBuildGroup([
       member({ planId: 'a', hubId: 'jita', shoppingMaterials: [line(34, 100)] }),
       member({
@@ -549,7 +485,6 @@ describe('rollUpBuildGroup — buy list per hub', () => {
 });
 
 describe('rollUpBuildGroup — blueprints pooled across members', () => {
-  /** One member's blueprint row: `copies` bought at 100 ISK, `needed` runs from a `copyRuns`-run copy. */
   function bpRow(
     needed: number,
     copyRuns: number | null,
@@ -560,7 +495,6 @@ describe('rollUpBuildGroup — blueprints pooled across members', () => {
       ...line(7, copies || 1, {
         ownedQuantity: copies ? 0 : 1,
         remainingQuantity: copies,
-        // An owned-covered member's own line is free, as `resolveTierOption` reports it.
         unitPrice: copies ? 100 : 0,
         lineCost: copies * 100,
       }),
@@ -585,7 +519,6 @@ describe('rollUpBuildGroup — blueprints pooled across members', () => {
   }
 
   it('shares one blueprint copy across plans instead of buying one each', () => {
-    // Three plans of 100 runs from 500-run copies: 3 copies alone, 1 together.
     const rollup = groupOf([bpRow(100, 500, 1), bpRow(100, 500, 1), bpRow(100, 500, 1)]);
     const row = rollup.tableMaterials.find((m) => m.typeID === 7);
     expect(row).toMatchObject({ quantity: 1, remainingQuantity: 1, lineCost: 100 });
@@ -594,7 +527,6 @@ describe('rollUpBuildGroup — blueprints pooled across members', () => {
   });
 
   it('scales the pooled count with the runs the group needs', () => {
-    // Eight plans of 100 runs from 300-run copies: 800 runs is 3 copies, not 8.
     const rollup = groupOf(Array.from({ length: 8 }, () => bpRow(100, 300, 1)));
     expect(rollup.tableMaterials.find((m) => m.typeID === 7)).toMatchObject({
       quantity: 3,
@@ -603,7 +535,6 @@ describe('rollUpBuildGroup — blueprints pooled across members', () => {
   });
 
   it('spends an owned copy once for the whole group', () => {
-    // 500 owned runs; each plan wanting 400 thinks it is covered, together they are not.
     const rollup = groupOf([bpRow(400, 500, 0, 500), bpRow(400, 500, 0, 500)]);
     expect(rollup.tableMaterials.find((m) => m.typeID === 7)).toMatchObject({
       quantity: 1,
@@ -614,7 +545,6 @@ describe('rollUpBuildGroup — blueprints pooled across members', () => {
   });
 
   it('prices a copy from the tier, not from an owned-covered member that paid nothing', () => {
-    // A owns 10 runs and needs 5; B needs 15 — the group is 10 runs short.
     const rollup = groupOf([bpRow(5, 5, 0, 10), bpRow(15, 5, 2, 10)]);
     expect(rollup.tableMaterials.find((m) => m.typeID === 7)).toMatchObject({
       quantity: 2,

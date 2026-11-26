@@ -1,7 +1,3 @@
-/**
- * DESIGN.md §6c amber warning mark after a List row's name: a rule break points
- * at this module. The tooltip sends the pilot to the stats column's warning.
- */
 import { useTranslation } from 'react-i18next';
 import { HintText } from '@/components/ui/HintText';
 import * as Icon from '@/components/ui/icons';

@@ -7,7 +7,6 @@ import {
   type ProductionSaleLinkRecord,
 } from '@/db';
 
-// Stable empties: a fresh `[]` per render would churn every memo downstream.
 const NO_RUNS: ProductionRunRecord[] = [];
 const NO_SALE_LINKS: ProductionSaleLinkRecord[] = [];
 const NO_ORDER_WATCHES: ProductionOrderWatchRecord[] = [];
@@ -20,11 +19,6 @@ export interface ProductionLedger {
   losses: ProductionLossRecord[];
 }
 
-/**
- * Live Production Log reads for one Character: runs (all, or one Build Plan's
- * when `byPlanId` is set), sale links, order watches and losses. Each is a
- * stable empty array until Dexie answers.
- */
 export function useProductionLedger(
   characterId: number,
   options: { byPlanId?: string } = {}

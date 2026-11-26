@@ -17,7 +17,6 @@ vi.mock('../goalPlannerSnapshot', () => ({
     customsOverrides: {},
   }),
 }));
-// The shared inputs hook is the seam: it receives the preference each tab passes.
 vi.mock('../usePiAdviceInputs', () => ({
   usePiAdviceInputs: (_s: unknown, _c: number, preference: RebuildPreference) => {
     seen.push(preference);

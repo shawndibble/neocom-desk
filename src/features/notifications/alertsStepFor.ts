@@ -1,20 +1,8 @@
-/**
- * One Character's Alerts Grant sign-in, planned the way Settings' walk plans it
- * (`alertsNeeds`, `planAlertsWalk`), for the chains that ask outside Settings:
- * "Finish setting up" and the moon run's alerts step (issue #6103). Without
- * this they would ask for a default set, and a grant missing a scope a ticked
- * event needs costs the player a second sign-in from Settings.
- */
 import { loadGrantedScopes } from '@/app/grantedScopes';
 import { alertsNeeds, planAlertsWalk, type AlertsWalkStep } from './alertsNeeds';
 import { readAlertsGrants, readAlertsMail, readAlertsNearby } from './alertsGrant';
 import { useNotificationPreferences } from './preferencesStore';
 
-/**
- * `include` is what the caller has shown the player: mail is asked for only
- * where the permission was listed first (ADR 0030); a scope the grant already
- * holds is always kept.
- */
 export async function planAlertsStepFor(
   characterId: number,
   include: { location: boolean; mail: boolean }
@@ -30,6 +18,5 @@ export async function planAlertsStepFor(
     deviceScopes: new Map([[characterId, await loadGrantedScopes(characterId)]]),
   });
   const [step] = need ? planAlertsWalk([need], include) : [];
-  // Nothing ticked needs more: notifications alone, as the first-run offer asks.
   return step ?? { characterId, nearby: false, mail: false };
 }

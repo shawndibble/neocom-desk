@@ -15,7 +15,6 @@ async function openAndType(me: string, te: string, onApply = vi.fn()) {
 
 describe('RigMatchHelper', () => {
   it('applies the fit that makes the typed numbers', async () => {
-    // Nullsec: ME II 2.4 x 2.1 = 5.04, TE I 20 x 2.1 = 42.
     const { user, onApply } = await openAndType('5.04', '42');
     await user.click(screen.getByRole('button', { name: 'Use this fit' }));
     expect(onApply).toHaveBeenCalledTimes(1);
@@ -23,7 +22,6 @@ describe('RigMatchHelper', () => {
   });
 
   it('reads the tooltip lines as printed: a rig-less structure is its own hull bonus', async () => {
-    // Azbel hull: 1% material, 20% time, typed as the tooltips print them.
     const { user, onApply } = await openAndType('-1.0%', '-20.0%');
     await user.click(screen.getByRole('button', { name: 'Use this fit' }));
     expect([...onApply.mock.calls[0][0]]).toEqual(['none', 'none', 'none']);

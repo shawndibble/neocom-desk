@@ -1,47 +1,24 @@
-// Server-pushed Notification Events (issue #5121): the events a closed app can
-// be told about with no EVE token on the server. Pure: no Firestore, fetch or
-// FCM, so the parity test at the root (`src/functionsParity.test.ts`) can import
-// it next to the client's own diffs and Occurrence Keys.
-//
-// What a device registers for (ADR 0027; decision
-// 20261025-073433-server-pushed-events-community-triggers-polled-price-alerts):
-// per Character, the ids of the events it enabled for the browser channel
-// (`serverEvents`) and the inputs the server cannot read on its own
-// (`serverInputs`: the Quickbar's price targets and hub station, the nearby
-// alerts' jump limits). The community events need no inputs: the backend writes them.
-
 import { isPlainRecord } from './guards.js';
 import type { SCHEDULED_STOP_REASONS } from './corpTaxBookSyncEngine.js';
 
-/** The events a Firestore trigger pushes the moment the backend writes them. */
 export const COMMUNITY_EVENT_IDS = [
   'communityJoinRequest',
   'communityMemberJoined',
   'communityRequestPledged',
 ] as const;
 
-/** The events a `vettingCall` action pushes when it writes them (vettingStore.ts). */
 export const VETTING_EVENT_IDS = ['vettingShared'] as const;
 
-/** The events the scheduled Corp Tax Book sync pushes when it stops a book's schedule (corpSyncGrant.ts). */
 export const CORP_TAX_BOOK_EVENT_IDS = ['corpTaxBookSyncStopped'] as const;
 
-/** The events the 15-minute dispatch tick polls for (public market data). */
 export const POLLED_EVENT_IDS = ['priceAlertTriggered'] as const;
 export type PolledEventId = (typeof POLLED_EVENT_IDS)[number];
 
-/** Bounds a hostile or buggy upload; the real list is a handful. */
 export const MAX_SERVER_EVENTS = 50;
 const MAX_SERVER_EVENT_ID_LENGTH = 64;
-/** The Quickbar is short; this only bounds a bad upload. */
 export const MAX_PRICE_ALERTS = 100;
 const MAX_NAME_LENGTH = 200;
 
-/**
- * A Character's `serverEvents`: sorted, de-duplicated ids. Ids this server
- * does not handle are kept (a newer client's list is stored whole and simply
- * not acted on). Absent (an older client) stays absent.
- */
 export function parseServerEvents(raw: unknown, path: string): string[] | undefined {
   if (raw === undefined) return undefined;
   if (!Array.isArray(raw)) throw new Error(`${path}, if present, must be an array`);
@@ -58,23 +35,18 @@ export function parseServerEvents(raw: unknown, path: string): string[] | undefi
 
 export interface PriceAlertInput {
   typeId: number;
-  /** The Quickbar's own name for the item: the server has no SDE to name it. */
   name: string;
   targetPrice: number;
   direction: 'above' | 'below';
 }
 
 export interface ServerEventInputs {
-  /** The hub station the Quickbar prices at. Required with `priceAlerts`. */
   priceStationId?: number;
   priceAlerts?: PriceAlertInput[];
-  /** The Character's N for `incursionNearby` (issue #5122): jumps from its location that count as near. */
   incursionNearbyJumps?: number;
-  /** The Character's N for `skyhookRaidableNearby` (issue #5122). */
   skyhookRaidableNearbyJumps?: number;
 }
 
-/** The app's options top out at 20; anything sane fits. */
 const MAX_NEARBY_JUMPS = 100;
 const nearbyJumps = (value: unknown): value is number =>
   typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= MAX_NEARBY_JUMPS;
@@ -98,16 +70,11 @@ function parsePriceAlert(raw: unknown, path: string): PriceAlertInput {
   return { typeId, name, targetPrice, direction };
 }
 
-/** A Character's `serverInputs`. Unknown keys are ignored, so a newer client still registers. */
 export function parseServerInputs(raw: unknown, path: string): ServerEventInputs | undefined {
   if (raw === undefined) return undefined;
   if (!isPlainRecord(raw)) throw new Error(`${path}, if present, must be an object`);
   const { priceStationId, priceAlerts, incursionNearbyJumps, skyhookRaidableNearbyJumps } = raw;
   const inputs: ServerEventInputs = {};
-  // Lenient, unlike the rest of the registration: the alerts are the user's own
-  // Quickbar data (no cap, free-text names), and one odd item must not fail
-  // every Character's registration and Projection. A bad alert is dropped, the
-  // list is cut to the cap, and alerts without a station are not stored.
   if (Array.isArray(priceAlerts) && positiveInteger(priceStationId)) {
     const alerts = priceAlerts.flatMap((alert, i) => {
       try {
@@ -119,7 +86,6 @@ export function parseServerInputs(raw: unknown, path: string): ServerEventInputs
     inputs.priceStationId = priceStationId;
     inputs.priceAlerts = alerts.slice(0, MAX_PRICE_ALERTS);
   }
-  // Lenient like the price alerts: a bad N only loses that nearby alert.
   if (nearbyJumps(incursionNearbyJumps)) inputs.incursionNearbyJumps = incursionNearbyJumps;
   if (nearbyJumps(skyhookRaidableNearbyJumps)) {
     inputs.skyhookRaidableNearbyJumps = skyhookRaidableNearbyJumps;
@@ -127,11 +93,6 @@ export function parseServerInputs(raw: unknown, path: string): ServerEventInputs
   return inputs;
 }
 
-/**
- * The polled events any Character on a device enabled: stored on the
- * registration doc so the tick finds the devices it has work for with one
- * `array-contains-any` query instead of reading every device.
- */
 export function polledEventsOf(
   serverEventsByCharacter: Record<string, readonly string[]>
 ): string[] {
@@ -139,17 +100,10 @@ export function polledEventsOf(
   return POLLED_EVENT_IDS.filter((id) => all.has(id));
 }
 
-/** One Character's last readings on one device, stored on its registration doc. */
 export interface ServerEventBaseline {
-  /** The price-alert snapshot `diffPriceAlerts` compares the next reading with. */
   priceAlerts?: PriceAlertSnapshotEntry[];
 }
 
-/**
- * A stored baseline, keeping only the parts for events still enabled: an event
- * switched off and on again seeds afresh rather than announcing everything that
- * happened while it was off.
- */
 export function trimBaseline(raw: unknown, events: readonly string[]): ServerEventBaseline {
   if (!isPlainRecord(raw)) return {};
   const baseline: ServerEventBaseline = {};
@@ -158,9 +112,6 @@ export function trimBaseline(raw: unknown, events: readonly string[]): ServerEve
   }
   return baseline;
 }
-
-/* Fires: the same shapes the client's diffs emit (src/engine/notificationDiffs, ----- */
-/* src/engine/communities/communityAlert.ts), which the service worker renders.      */
 
 interface CommunityFireFields {
   characterId: number;
@@ -196,11 +147,6 @@ export interface PriceAlertTriggeredFire {
   direction: 'above' | 'below';
 }
 
-/**
- * A vetting report was shared with a corp: told to each reviewer (`characterId`) the overview
- * saw in the last 30 days. It names no pilot: a fire is kept in the reviewer's notification
- * feed, which outlives the pilot deleting their report.
- */
 export interface VettingSharedFire {
   eventId: 'vettingShared';
   characterId: number;
@@ -209,17 +155,8 @@ export interface VettingSharedFire {
   kind: 'application' | 'promotion';
 }
 
-/**
- * Why a stop is told: every stop reason but `book-off`, which an editor did on purpose
- * (client: `SyncStoppedAlertReason` in src/engine/corpTaxBook/syncStoppedAlert.ts).
- */
 export type SyncStoppedAlertReason = Exclude<(typeof SCHEDULED_STOP_REASONS)[number], 'book-off'>;
 
-/**
- * The scheduled sync stopped a corporation's Automatic sync: told to each of the book's editors
- * (`characterId`) seen in the last 30 days, and to the holder unless they lost the role or left.
- * `characterName` is the holder's, for the reason's wording; `stoppedAt` is the stored status's.
- */
 export interface CorpTaxBookSyncStoppedFire {
   eventId: 'corpTaxBookSyncStopped';
   characterId: number;
@@ -237,10 +174,7 @@ export type ServerEventFire =
   | VettingSharedFire
   | CorpTaxBookSyncStoppedFire;
 
-/* Price alerts: mirrors `diffPriceAlertTriggered` (src/engine/notificationDiffs/market.ts) */
-
 export interface PriceAlertSnapshotEntry extends PriceAlertInput {
-  /** Null when the hub has no sell order for it: never fires, never guessed. */
   price: number | null;
 }
 
@@ -251,11 +185,6 @@ function priceAlertCrossed(entry: PriceAlertSnapshotEntry): boolean {
     : entry.price <= entry.targetPrice;
 }
 
-/**
- * Fires per alert newly at or past its target: an edge on `(typeId,
- * targetPrice, direction)`, so a price that stays crossed fires once and an
- * edited target re-arms. No baseline fires nothing.
- */
 export function diffPriceAlerts(
   characterId: number,
   prev: readonly PriceAlertSnapshotEntry[] | undefined,
@@ -285,9 +214,6 @@ export function diffPriceAlerts(
   return fires;
 }
 
-/* Occurrence Key: mirrors src/engine/occurrenceKey.ts ------------------------------ */
-
-/** The Foreground Poller's Occurrence Key for the same fire; the parity test pins them. */
 export function serverEventOccurrenceKey(fire: ServerEventFire): string {
   switch (fire.eventId) {
     case 'communityJoinRequest':
@@ -307,26 +233,17 @@ export function serverEventOccurrenceKey(fire: ServerEventFire): string {
         ':'
       );
     case 'vettingShared':
-      // A review is shared once, so its id is the occurrence.
       return [fire.characterId, fire.eventId, fire.corporationId, fire.reviewId].join(':');
     case 'corpTaxBookSyncStopped':
-      // A schedule stops once; turned on again and stopped again is a later `stoppedAt`.
       return [fire.characterId, fire.eventId, fire.corporationId, fire.stoppedAt].join(':');
   }
 }
-
-/* Push payload --------------------------------------------------------------------- */
 
 const iskFormat = new Intl.NumberFormat('en-US', {
   minimumFractionDigits: 2,
   maximumFractionDigits: 2,
 });
 
-/**
- * Plain English for the floor: the service worker renders the fire with the
- * app's own copy (`src/features/notifications/serverEventCopy.ts`) and shows
- * this only if that fails. The server has no i18n catalog (ADR 0010).
- */
 function floorCopy(fire: ServerEventFire): { title: string; body: string } {
   switch (fire.eventId) {
     case 'communityJoinRequest':
@@ -362,7 +279,6 @@ function floorCopy(fire: ServerEventFire): { title: string; body: string } {
   }
 }
 
-/** The app's own reason wording (`notifications.fired.corpTaxBookSyncStopped.*`), plain. */
 function syncStoppedFloorBody(fire: CorpTaxBookSyncStoppedFire): string {
   const name = fire.characterName || 'The holder';
   switch (fire.reason) {
@@ -379,10 +295,6 @@ function syncStoppedFloorBody(fire: CorpTaxBookSyncStoppedFire): string {
   }
 }
 
-/**
- * The FCM data payload `pushHandler.ts` parses: the usual fields plus `fire`,
- * the raw fire as JSON, which the worker renders and keys the feed row by.
- */
 export function buildServerEventPush(fire: ServerEventFire, nowMs: number): Record<string, string> {
   const { title, body } = floorCopy(fire);
   return {

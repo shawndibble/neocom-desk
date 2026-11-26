@@ -97,7 +97,6 @@ describe('TravelSettingsPanel', () => {
     expect(threshold).toBeDisabled();
     await user.click(screen.getByRole('checkbox', { name: 'Systems with recent pod kills' }));
 
-    // Scoped to the warning's text: the rule fields also hold an always-mounted live region.
     await waitFor(() =>
       expect(screen.getAllByText(/kill report isn't available right now/)).toHaveLength(2)
     );

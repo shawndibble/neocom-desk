@@ -63,7 +63,6 @@ describe('enableWebPush', () => {
       new Map(),
       {
         eveTypesByCharacter: new Map([[1, ['StructureDestroyed']]]),
-        // Not empty: an empty map would wipe this device's server events (#5121).
         serverEventsByCharacter: new Map([
           [1, { serverEvents: ['priceAlertTriggered'], serverInputs: {} }],
         ]),
@@ -74,8 +73,6 @@ describe('enableWebPush', () => {
   });
 
   it('asks for permission before awaiting anything, so Safari still sees the tap', () => {
-    // Not awaited: the request must already be in flight when the call
-    // returns, i.e. no dynamic import or other await sits ahead of it.
     const pending = enableWebPush();
     expect(requestNotificationPermission).toHaveBeenCalled();
     return pending;

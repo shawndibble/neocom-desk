@@ -160,7 +160,6 @@ describe('OrderRowDetail', () => {
     it.each(['local', 'eve'] as const)('shows the %s day', (format) => {
       process.env.TZ = 'Pacific/Auckland';
       useTimeFormat.setState({ value: format, hydrated: true });
-      // Expires 2026-12-30T23:30Z: Dec 30 in UTC, Dec 31 in Auckland.
       const order = { ...ORDER, issued: '2026-10-01T23:30:00Z' };
       renderDetail({ order });
       const expires = new Date(Date.parse(order.issued) + 90 * 86_400_000);

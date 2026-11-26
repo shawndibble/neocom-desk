@@ -17,12 +17,6 @@ import {
   toCorpAssetInputs,
 } from './assets';
 
-/**
- * `loadTypeNames` reads the SDE snapshot off disk before it touches ESI and
- * has its own tests for that. Stubbing it keeps these cases about the label
- * loader's own name-resolution split, the same reason `members.test.ts`
- * stubs it.
- */
 vi.mock('@/features/character/typeNames', () => ({
   loadTypeNames: vi.fn(
     async (ids: readonly number[]) => new Map(ids.map((id) => [id, `Type ${id}`]))
@@ -47,7 +41,6 @@ function assetsUrl(corporationId: number) {
   return `${ESI_BASE_URL}/corporations/${corporationId}/assets`;
 }
 
-/** One row per hangar division, which is what makes a corp asset list corp-shaped. */
 const ASSETS: CorporationAsset[] = [
   {
     item_id: 1001,
@@ -81,7 +74,6 @@ describe('loadCorporationAssets', () => {
     expect(row?.value).toEqual(ASSETS);
   });
 
-  /** Issue #293's guarantee: hangar contents must never cross a corporation change. */
   it('never serves one corporation rows under another', async () => {
     await db.esiCache.put({
       characterId: CHAR_ID,
@@ -96,7 +88,6 @@ describe('loadCorporationAssets', () => {
     expect(result.cached).toBeNull();
   });
 
-  /** The key must also not collide with the character list's plain `assets` row. */
   it('does not write the character assets key', async () => {
     server.use(http.get(assetsUrl(CORP_ID), () => HttpResponse.json(ASSETS)));
 
@@ -112,8 +103,6 @@ describe('loadCorporationAssets', () => {
 
     const result = await loadCorporationAssets(CHAR_ID, CORP_ID);
 
-    // Director is the only role this endpoint accepts, so a 403 here is the
-    // commonest corp answer of all — and no login can change it.
     expect(result.needsReauth).toBe(false);
     expect(result.cached).toBeNull();
   });
@@ -212,17 +201,11 @@ describe('corp asset labels', () => {
 
     const locations = await resolveMissingLocationNames(CHAR_ID, assetPlaceIds(ASSETS));
 
-    // Both rows share location_id 60003760 — one distinct location, one call.
     expect(nameCalls).toBe(1);
     expect(batched).toEqual([60003760]);
     expect(locations.get(60003760)).toBe('Location 60003760');
   });
 
-  /**
-   * Same split as `features/corp/members.ts`'s `resolveLocationNames`:
-   * `/universe/names` 404s the whole batch on one bad id, and an Upwell
-   * structure has no bulk endpoint at all, so it is resolved on its own.
-   */
   it('resolves an Upwell structure separately from the bulk batch', async () => {
     const STRUCTURE_ID = 1035466617946;
     let structureCalls = 0;
@@ -251,7 +234,6 @@ describe('corp asset labels', () => {
     expect(locations.get(STRUCTURE_ID)).toBe('X-7OMU - Home Office');
   });
 
-  /** A structure the reading Character is not on the ACL for is simply absent, same as Assets. */
   it('leaves an unresolvable structure out of the map rather than throwing', async () => {
     const STRUCTURE_ID = 1035466617946;
     server.use(
@@ -266,14 +248,6 @@ describe('corp asset labels', () => {
     expect(locations.has(STRUCTURE_ID)).toBe(false);
   });
 
-  /**
-   * Issue #420: a large corp can hold assets scattered across many Upwell
-   * structures, each resolved with its own `/universe/structures/{id}` call
-   * (no bulk endpoint exists for them). A bare `Promise.all` over all of them
-   * risks 429s; `src/lib/concurrency.ts` is the repo's one fan-out policy for
-   * exactly this, so this pins the cap rather than trusting the shape of the
-   * code.
-   */
   it('caps the per-structure name-resolution fan-out instead of firing every request at once', async () => {
     const FLOOR = 1_000_000_000_000;
     const structureIds = Array.from({ length: ESI_FANOUT_CONCURRENCY + 5 }, (_, i) => FLOOR + i);
@@ -316,7 +290,6 @@ describe('corp asset labels', () => {
     await db.esiCache.bulkPut([
       { characterId: 0, key: 'name:60003760', value: 'Jita IV', fetchedAt: Date.now() },
     ] as never);
-    // `onUnhandledRequest: 'error'` fails the test on any request.
     const labels = await loadCorpAssetLabels(ASSETS);
     expect(labels.locations.get(60003760)).toBe('Jita IV');
   });

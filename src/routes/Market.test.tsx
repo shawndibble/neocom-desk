@@ -76,14 +76,13 @@ describe('Market Browser', () => {
 
     expect(screen.getAllByText('Type 3+ characters to search.').length).toBeGreaterThan(0);
     expect(screen.getByRole('button', SHIPS_GROUP)).toBeInTheDocument();
-    expect(screen.getByText('Ore')).toBeInTheDocument(); // full, unfiltered tree — still explicit about why
+    expect(screen.getByText('Ore')).toBeInTheDocument();
 
     await user.type(screen.getByRole('searchbox'), 'ft');
     expect(await screen.findByText('Rifter')).toBeInTheDocument();
     expect(screen.queryByText('Type 3+ characters to search.')).not.toBeInTheDocument();
   });
 
-  // The shell mounts its own (empty) notice regions too, so read them all.
   const statusTexts = () => screen.getAllByRole('status').map((node) => node.textContent);
 
   it('announces the match count, and a miss, through a status region (issue #3354)', async () => {
@@ -106,8 +105,6 @@ describe('Market Browser', () => {
     await user.type(await screen.findByRole('searchbox'), 'rift');
     expect(await screen.findByText('Rifter')).toBeInTheDocument();
 
-    // Collapsing "Ships" only hides its own contents — it must not touch the
-    // search filter, so it stays a no-op on which items matched.
     await user.click(screen.getByRole('button', SHIPS_GROUP));
     expect(screen.queryByText('Rifter')).not.toBeInTheDocument();
     expect(screen.getByRole('button', SHIPS_GROUP)).toBeInTheDocument();
@@ -180,7 +177,6 @@ describe('Market Browser', () => {
         'true'
       );
 
-      // Typing on is a new search: the flip is forgotten and Ore folds again.
       await user.clear(box);
       await user.type(box, 'phyr');
       await waitFor(() =>
@@ -196,8 +192,6 @@ describe('Market Browser', () => {
     window.history.pushState({}, '', '/market?group=4');
     renderMarketRoute();
 
-    // Group 4 ("Destroyers") sits under group 1 ("Ships") — both must expand
-    // for its items to show, with no click needed.
     expect(await screen.findByText('Merlin')).toBeInTheDocument();
     expect(screen.getByRole('button', SHIPS_GROUP)).toBeInTheDocument();
     expect(screen.getByText('Destroyers')).toBeInTheDocument();
@@ -226,7 +220,6 @@ describe('Market Browser', () => {
       window.history.pushState({}, '', '/market?group=3');
       renderMarketRoute();
 
-      // The list is read once Tritanium, absent from it too, carries the cue.
       expect(
         await screen.findByRole('button', { name: 'Tritanium No orders in The Forge' })
       ).toBeInTheDocument();
@@ -290,7 +283,6 @@ describe('Market Browser', () => {
 
     const sellTable = await screen.findByRole('table', { name: 'Sell Orders' });
     expect(within(sellTable).getByText('1,000,000')).toBeInTheDocument();
-    // The hub is one station, which the scope bar names: rows don't repeat it.
     expect(
       within(sellTable).queryByText('Jita IV - Moon 4 - Caldari Navy Assembly Plant', {
         exact: false,
@@ -319,10 +311,6 @@ describe('Market Browser', () => {
   });
 
   it('an ESI failure shows a failed state, not an empty book and not a spinner', async () => {
-    // `getOrderBook` throws on any ESI failure. The fetch effect once let
-    // that reject into nothing and spun forever; the fix after that read the
-    // failure as an empty book, telling the pilot nobody trades the item when
-    // the truth is the request never came back.
     server.use(
       http.get(`${ESI_BASE_URL}/markets/${RIFTER_REGION_ID}/orders`, () =>
         HttpResponse.json({ error: 'Rate limit exceeded' }, { status: 420 })
@@ -340,8 +328,6 @@ describe('Market Browser', () => {
   });
 
   it('a deep-linked item still loads its order book when the market catalogue fails', async () => {
-    // The book waits only on globalMarkets.json, never on the whole catalogue:
-    // a failed stations.json once left a selected item spinning forever.
     vi.mocked(loadNpcStations).mockRejectedValueOnce(new Error('network error'));
     server.use(ordersHandler({ count: 0 }));
     window.history.pushState({}, '', '/market?type=587');
@@ -479,7 +465,7 @@ describe('Price History tab (issue #11)', () => {
     await user.click(await screen.findByText('Rifter'));
     await screen.findByRole('table', { name: 'Sell Orders' });
     expect(screen.getByRole('tab', { name: 'Order Book', selected: true })).toBeInTheDocument();
-    expect(historyHits.count).toBe(0); // not fetched until the tab is opened
+    expect(historyHits.count).toBe(0);
 
     await user.click(screen.getByRole('tab', { name: 'Price History' }));
 
@@ -491,9 +477,6 @@ describe('Price History tab (issue #11)', () => {
     const historyHits = { count: 0 };
     server.use(
       ordersHandler({ count: 0 }),
-      // Tritanium's Variations table falls back to PLEX (same market group,
-      // fixtures above), whose order book lives at its own Global Market
-      // Region rather than Tritanium's.
       plexOrdersHandler({ count: 0 }),
       historyHandler(historyHits, RIFTER_REGION_ID, {
         587: [

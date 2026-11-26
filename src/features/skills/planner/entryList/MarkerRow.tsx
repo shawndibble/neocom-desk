@@ -9,28 +9,12 @@ import { DANGER_ICON_BUTTON, GRIP_BUTTON, useRowSortable } from './rowChrome';
 interface MarkerRowProps {
   id: string;
   markerIndex: number;
-  /** This marker's target attribute spread — a manual override, or "Optimize at my markers"' result, once either is known. */
   attributes?: Attributes;
-  /** The plan's implant lens, so the spread reads as the in-game remap screen does. */
   implants: Implants;
   onRemove: (markerIndex: number) => void;
-  /** Opens the manual attribute editor (RemapMarkerModal) for this marker. */
   onEdit: (markerIndex: number) => void;
 }
 
-/**
- * Remap Marker (GLOSSARY.md): accent divider row, draggable like an entry.
- * Once its target attributes are known (a manual edit, or an "Optimize at my
- * markers" run), the divider gives way to the spread itself and the "REMAP
- * MARKER" label drops out entirely — the numbers already say what this row
- * is, and repeating the label next to them read as clutter. A plain marker
- * (nothing known yet) keeps the dividers and the label, same as always.
- * Either way the label/spread is a real button, not a click handler on the
- * `<li>`, so it doesn't fight the drag handle or the remove button for the
- * row's clicks: clicking it opens the manual attribute editor.
- *
- * Memoized (#408) like EntryRow/PrereqRow.
- */
 export const MarkerRow = memo(function MarkerRow({
   id,
   markerIndex,

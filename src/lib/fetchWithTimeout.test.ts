@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_FETCH_TIMEOUT_MS, fetchWithTimeout } from './fetchWithTimeout';
 
-/** A fetch that never answers and rejects only when its signal aborts, as a real hung request does. */
 function hangingFetch() {
   return vi.fn(
     (_input: RequestInfo | URL, init?: RequestInit) =>

@@ -39,8 +39,6 @@ describe('getDeviceId', () => {
   });
 });
 
-// crypto.randomUUID is not guaranteed in every test/browser environment this
-// runs in (older WebViews) — this locks in the fallback path.
 describe('getDeviceId without crypto.randomUUID', () => {
   it('still mints a usable id', () => {
     const original = globalThis.crypto.randomUUID;

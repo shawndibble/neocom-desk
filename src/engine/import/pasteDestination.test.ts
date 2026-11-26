@@ -31,7 +31,6 @@ const SCAN = [
 
 describe('pasteDestination', () => {
   it('sends a scan with empty ore groups to the Survey tab, not the Appraisal', () => {
-    // The scanner prints a header for every grade, and some have no rocks.
     const scan = [
       'Scordite II-Grade',
       'Scordite II-Grade\t7,396\t1,109 m3\t128,000.00 ISK\t19 km',
@@ -135,7 +134,6 @@ describe('pasteDestination', () => {
   });
 
   describe('skill plans', () => {
-    // Skill books are market items too, so the catalogue knows the skill names.
     const WITH_BOOKS: PasteSources = {
       ...SOURCES,
       catalogue: new Map([

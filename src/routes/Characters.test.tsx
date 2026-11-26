@@ -62,10 +62,6 @@ vi.mock('@/features/character/removeCharacter', async (importOriginal) => ({
 mswServer(
   http.post('https://esi.evetech.net/characters/affiliation', async ({ request }) => {
     const ids = (await request.json()) as number[];
-    // Character 92 never resolves — same as ESI silently omitting an id it
-    // can't affiliate, rather than erroring the whole batch. Pilot Two's
-    // corp/alliance stay unresolved for the life of the test, same intent as
-    // the old per-character "simulate offline" mock this replaced.
     return HttpResponse.json(
       ids
         .filter((id) => id === 91)
@@ -98,7 +94,6 @@ beforeEach(async () => {
     value: DEFAULT_VISIBLE_CHARACTER_COLUMNS,
     hydrated: false,
   });
-  // Defaults already include `group`/`remove` — no migration needed in tests.
   useCharacterColumnsMigrated.setState({ value: true, hydrated: false });
   useSpExtractionMonitoringEnabled.setState({ value: false, hydrated: false });
   useSpFarmCharacters.setState({ value: [], hydrated: false });
@@ -113,7 +108,6 @@ beforeEach(async () => {
   ]);
 });
 
-/** Mirrors the router's query string into the DOM so a test can assert what the page wrote. */
 function LocationProbe() {
   const location = useLocation();
   return <output data-testid="location-search">{location.search}</output>;
@@ -168,7 +162,6 @@ function pilotAttentionEntry(
   };
 }
 
-/** Mocks the roster snapshot + attention loaders for `run`, restoring both spies whether it passes or throws. */
 async function withMockedRoster(
   roster: readonly RosterEntry[],
   attention: readonly AttentionEntry[],
@@ -247,12 +240,6 @@ describe('Characters', () => {
 
   it('shows one combined data-age badge per card — the oldest of the fetched fields, not one each', async () => {
     const now = Date.now();
-    // Pilot One: both fields cached, at deliberately different ages. Three
-    // badges in a row (one per stat) was the actual complaint (issue: "sync
-    // number listed 3 times") — the card now carries a single dot-only badge
-    // for the oldest of them, "3d ago" (in its tooltip, not visible text —
-    // see DataAgeBadge's `dotOnly`), not "5m ago" alongside it. Pilot Two:
-    // neither ever cached — never fetched, not a scope-not-granted 0.
     await db.esiCache.put({
       characterId: 91,
       key: 'skills',
@@ -268,8 +255,6 @@ describe('Characters', () => {
 
     renderCharacters();
     await screen.findByText('Pilot One');
-    // The roster snapshot load is async (`loadRosterSnapshot`); wait for it
-    // to land rather than asserting against the initial "—" render.
     await screen.findByText('12.3M');
 
     const pilotOneCard = screen.getByText('Pilot One').closest('li') as HTMLElement;
@@ -285,7 +270,6 @@ describe('Characters', () => {
     const walletChip = within(pilotTwoCard).getByText('ISK').parentElement as HTMLElement;
     expect(spChip).toHaveTextContent('—');
     expect(walletChip).toHaveTextContent('—');
-    // No fetchedAt at all for either field on Pilot Two — no badge, full stop.
     expect(within(pilotTwoCard).queryByText(/ago$/)).not.toBeInTheDocument();
   });
 
@@ -301,7 +285,6 @@ describe('Characters', () => {
       },
     ];
     await db.esiCache.put({ characterId: 91, key: 'skillqueue', value: entries, fetchedAt: now });
-    // Pilot Two has no cached queue at all — never fetched.
 
     renderCharacters();
     await screen.findByText('Pilot One');
@@ -318,7 +301,6 @@ describe('Characters', () => {
 
   it('warns on an idle queue the same as the characterNotTraining alert would, and ranks it with paused', async () => {
     await db.esiCache.put({ characterId: 91, key: 'skillqueue', value: [], fetchedAt: Date.now() });
-    // Pilot Two has no cached queue at all — 'unknown', not 'idle'.
 
     renderCharacters();
     await screen.findByText('Pilot One');
@@ -339,13 +321,11 @@ describe('Characters', () => {
   });
 
   it('sorts a muted-idle Character with unknown, not with paused, matching its own neutral tone', async () => {
-    // Pilot One: idle, but with the alert muted — should rank away from paused.
     await db.esiCache.put({ characterId: 91, key: 'skillqueue', value: [], fetchedAt: Date.now() });
     await useNotificationPreferences.getState().setValue({
       ...DEFAULT_NOTIFICATION_PREFERENCES,
       perCharacter: { 91: { characterNotTraining: { feed: false } } },
     });
-    // Pilot Two: genuinely paused — no date fields at all.
     await db.esiCache.put({
       characterId: 92,
       key: 'skillqueue',
@@ -369,8 +349,6 @@ describe('Characters', () => {
       .slice(1)
       .map((row) => within(row).getByText(/^Pilot (One|Two)$/).textContent);
     const ascending = trainingHeader.getAttribute('aria-sort') === 'ascending';
-    // Paused is rank 0, muted-idle now ranks with unknown (2) — paused comes
-    // first ascending, last descending, regardless of which the first click picks.
     expect(namesInOrder).toEqual(
       ascending ? ['Pilot Two', 'Pilot One'] : ['Pilot One', 'Pilot Two']
     );
@@ -396,7 +374,6 @@ describe('Characters', () => {
     renderCharacters();
     expect(await screen.findByText('Test Corp')).toBeInTheDocument();
     expect(screen.getByText('Test Alliance')).toBeInTheDocument();
-    // Pilot Two's fetch failed: corp and alliance both fall back to a dash.
     expect(screen.getAllByText('—').length).toBeGreaterThanOrEqual(2);
   });
 
@@ -475,11 +452,6 @@ describe('Characters', () => {
   });
 
   it('add character starts an ADD-A-CHARACTER login, not a re-auth', async () => {
-    // Not `beginEveLogin`: that unions with the active Character's grant, and
-    // the character arriving here is by definition somebody else (#295).
-    // Exact name, not a substring match: the split button's arrow half is
-    // also named "Add character options", which a loose /add character/i
-    // regex would match too.
     const { beginAddCharacterLogin } = await import('@/app/loginFlow');
     const user = userEvent.setup();
     renderCharacters();
@@ -498,7 +470,6 @@ describe('Characters', () => {
       expect(add).toHaveAttribute('aria-disabled', 'true');
       await user.click(add);
       expect(beginAddCharacterLogin).not.toHaveBeenCalled();
-      // The click above closed any bubble; re-enter for a fresh hover.
       await user.unhover(add);
       await user.hover(add);
       const bubble = (await screen.findAllByRole('tooltip')).at(-1);
@@ -584,20 +555,17 @@ describe('Characters', () => {
     const user = userEvent.setup();
     renderCharacters();
 
-    // Rename: Enter returns focus to that group's Rename button.
     await user.click(await screen.findByRole('button', { name: 'Rename group Alts' }));
     await user.type(screen.getByRole('textbox', { name: 'Rename group' }), '{Enter}');
     await waitFor(() =>
       expect(screen.getByRole('button', { name: 'Rename group Alts' })).toHaveFocus()
     );
 
-    // Moving the second group up makes "Move up" disabled: the sibling is focused.
     await user.click(screen.getByRole('button', { name: 'Move Mains up' }));
     await waitFor(() =>
       expect(screen.getByRole('button', { name: 'Move Mains down' })).toHaveFocus()
     );
 
-    // New group + Enter lands on the new group's heading; Escape on "New group".
     await user.click(screen.getByRole('button', { name: 'New group' }));
     await user.type(screen.getByRole('textbox', { name: 'New group name' }), 'Scouts{Enter}');
     await waitFor(() => expect(screen.getByRole('heading', { name: 'Scouts' })).toHaveFocus());
@@ -605,7 +573,6 @@ describe('Characters', () => {
     await user.type(screen.getByRole('textbox', { name: 'New group name' }), '{Escape}');
     await waitFor(() => expect(screen.getByRole('button', { name: 'New group' })).toHaveFocus());
 
-    // Deleting a group focuses the next group's heading.
     await user.click(screen.getByRole('button', { name: 'Delete group Mains' }));
     const dialog = await screen.findByRole('dialog', { name: 'Delete group' });
     await user.click(within(dialog).getByRole('button', { name: 'Delete group' }));
@@ -666,7 +633,6 @@ describe('Characters', () => {
       return screen.getAllByRole('button', { name: /^Select /i })[0]?.textContent ?? '';
     }
 
-    // Sort lives behind the funnel with the filters; the box stays open after.
     await user.click(screen.getByRole('button', { name: /^Filters/ }));
     await user.click(screen.getByRole('button', { name: /reverse sort direction/i }));
     await waitFor(() => expect(firstCardName()).toContain('Pilot Two'));
@@ -676,9 +642,6 @@ describe('Characters', () => {
   });
 
   it('floats starred characters to the top without disturbing the sort under them', async () => {
-    // Three, so the assertion can tell "starred first" apart from "reversed":
-    // by name ascending the wall reads One, Three, Two — starring Two must
-    // lift only Two and leave One before Three exactly as the sort had them.
     await db.characters.put({
       characterId: 93,
       name: 'Pilot Three',
@@ -695,9 +658,6 @@ describe('Characters', () => {
         .map((button) => button.textContent ?? '');
     }
 
-    // The name sort only takes hold once the async roster snapshot lands —
-    // before that the wall is in characterId order, which for these three
-    // happens to put Pilot One first too. Wait on the position that differs.
     await waitFor(() => expect(cardOrder()[1]).toContain('Pilot Three'));
     expect(cardOrder()[0]).toContain('Pilot One');
 
@@ -711,8 +671,6 @@ describe('Characters', () => {
       (value) => Array.isArray(value) && value.length === 1 && value[0] === 92
     );
 
-    // The same control unstars, and says so — the accessible name carries the
-    // direction of the press, not just which card it sits on.
     await user.click(screen.getByRole('button', { name: 'Unstar Pilot Two' }));
     await waitFor(() => expect(cardOrder()[0]).toContain('Pilot One'));
     await waitForSettingsValue(
@@ -722,9 +680,6 @@ describe('Characters', () => {
   });
 
   it('floats a star inside its own group section rather than out of it', async () => {
-    // The star raises the card where it already lives: no top-level "Starred"
-    // section, so the grouping and the star never disagree about where a
-    // character is. Pilot Three leads Alts; Pilot One stays down in Ungrouped.
     await db.characters.put({
       characterId: 93,
       name: 'Pilot Three',
@@ -750,7 +705,6 @@ describe('Characters', () => {
       expect(inAlts[0]).toHaveTextContent('Pilot Three');
       expect(inAlts[1]).toHaveTextContent('Pilot Two');
     });
-    // Still in its own section, not lifted into a starred one above it.
     expect(
       within(ungroupedSection).getByRole('button', { name: 'Select Pilot One' })
     ).toBeVisible();
@@ -760,9 +714,6 @@ describe('Characters', () => {
   });
 
   it('reads stars back from Dexie on load, not just within the session', async () => {
-    // Seeded as a raw settings row with the store left unhydrated — the path a
-    // reload actually takes. Seeding through `setValue` would apply the value
-    // directly and never exercise `hydrate`.
     await db.settings.put({ key: STARRED_CHARACTERS_SETTING_KEY, value: [92] });
     renderCharacters();
 
@@ -778,8 +729,6 @@ describe('Characters', () => {
     await db.settings.put({ key: STARRED_CHARACTERS_SETTING_KEY, value: { '92': true } });
     renderCharacters();
 
-    // The page renders, and every card is simply unstarred — a damaged row is
-    // not worth taking the roster down for.
     expect(await screen.findByRole('button', { name: 'Star Pilot One' })).toHaveAttribute(
       'aria-pressed',
       'false'
@@ -810,10 +759,6 @@ describe('Characters', () => {
     await user.click(within(dialog).getByRole('button', { name: 'Remove' }));
 
     await waitFor(() => expect(screen.queryByText('Pilot One')).not.toBeInTheDocument());
-    // Folded into waitFor rather than a bare `await db.characters.get(91)`:
-    // a raw Dexie read after the DOM settles still leaves room for a
-    // trailing live-query update (e.g. another mounted component reacting to
-    // the same deletion) to land outside `act`.
     await waitFor(async () => expect(await db.characters.get(91)).toBeUndefined());
     expect(screen.getByText('Pilot Two')).toBeInTheDocument();
   });
@@ -830,9 +775,6 @@ describe('Characters', () => {
     const dialog = await screen.findByRole('dialog', { name: 'Remove Pilot One?' });
     await user.click(within(dialog).getByRole('button', { name: 'Remove' }));
 
-    // findAll: Toast renders its message twice (visible span + live region), and
-    // the live region fills in a beat later — `findByText` throws on the
-    // two-match state and never recovers while the toast stays up.
     expect(
       (await screen.findAllByText('Could not remove Pilot One. Nothing was deleted — try again.'))
         .length
@@ -944,8 +886,6 @@ describe('Characters', () => {
     const user = userEvent.setup();
     renderCharacters();
     await screen.findByText('Pilot One');
-    // Pilot Two's public-info fetch fails (character 92 simulates offline),
-    // so only Pilot One ever gets a resolved corp name to search on.
     await screen.findByText('Test Corp');
 
     const search = screen.getByPlaceholderText('Search by name or corporation…');
@@ -980,9 +920,6 @@ describe('Characters', () => {
   });
 
   it('drops a star once its character no longer exists', async () => {
-    // Reconciled against the roster rather than hooked onto the remove button:
-    // a Character can also leave this device as a sold Character, which never
-    // presses that button (removeCharacter.ts's header).
     await useStarredCharacters.getState().setValue([91, 999]);
     renderCharacters();
     await screen.findByText('Pilot One');
@@ -1016,10 +953,6 @@ async function waitForSettingsValue(
   predicate: (value: unknown) => boolean,
   timeoutMs = 2000
 ): Promise<void> {
-  // A raw setTimeout poll here would race the component's own live-query
-  // subscription: the settings write lands, the component re-renders off
-  // it, and nothing wraps that update in act because this loop isn't part
-  // of React's test rendering. `waitFor` is — it wraps every retry.
   await waitFor(
     async () => {
       const record = await db.settings.get(key);
@@ -1086,7 +1019,6 @@ describe('Characters URL state', () => {
     await waitFor(() => expect(locationSearch()).toBe('?starred=1'));
     expect(screen.queryByText('Pilot One')).not.toBeInTheDocument();
     expect(screen.getByText('Pilot Two')).toBeInTheDocument();
-    // Sort never counts: only filters that hide someone do.
     expect(screen.getByRole('button', { name: 'Filters (1 active)' })).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Starred only' }));
@@ -1096,8 +1028,6 @@ describe('Characters URL state', () => {
   });
 
   it('applies funnel filters carried in the URL and explains an emptied wall', async () => {
-    // Nobody has alerts in this fixture, so the filter alone empties the wall
-    // — the "nothing matches" state must fire without any search text.
     renderCharacters('/characters?alerts=1');
     expect(
       await screen.findByText('No characters match this search or filter.')
@@ -1177,17 +1107,12 @@ describe('Characters table view', () => {
     renderCharacters();
     await user.click(await screen.findByRole('button', { name: 'Table' }));
 
-    // Net worth isn't one of the default-visible columns (ISK is).
     expect(
       within(screen.getByRole('table')).queryByRole('columnheader', { name: /net worth/i })
     ).not.toBeInTheDocument();
 
     await user.click(await screen.findByRole('button', { name: 'Columns' }));
     await user.click(await screen.findByRole('menuitemcheckbox', { name: 'Net worth' }));
-    // The menu stays open on purpose (multi-select — see the component's own
-    // comment), and Radix marks the rest of the page aria-hidden while it's
-    // open, which hides the table from every role query below. Close it
-    // first, the way a real reader would before looking back at the table.
     await user.keyboard('{Escape}');
 
     expect(
@@ -1198,7 +1123,6 @@ describe('Characters table view', () => {
       (value) => Array.isArray(value) && value.includes('netWorth')
     );
 
-    // Toggling it back off removes the column again.
     await user.click(await screen.findByRole('button', { name: 'Columns' }));
     await user.click(await screen.findByRole('menuitemcheckbox', { name: 'Net worth' }));
     await user.keyboard('{Escape}');
@@ -1208,12 +1132,6 @@ describe('Characters table view', () => {
   });
 
   it('the Columns picker never lets the last rendered column disappear, even when a stale spReady entry is lingering in storage', async () => {
-    // Repro: enable monitoring, check spReady (on top of the defaults),
-    // disable monitoring again (spReady stays in storage but stops
-    // rendering), then uncheck every other column one by one. The stored
-    // list still has >1 entries the whole time (spReady never leaves it),
-    // so a guard on the raw stored length alone would let the last
-    // *rendered* column vanish — this must block that last uncheck instead.
     await useSpExtractionMonitoringEnabled.getState().setValue(true);
     const user = userEvent.setup();
     renderCharacters();
@@ -1241,7 +1159,6 @@ describe('Characters table view', () => {
       await user.keyboard('{Escape}');
     }
 
-    // Only "Name" is left rendering. Unchecking it too must be a no-op.
     expect(within(screen.getByRole('table')).getByText('Pilot One')).toBeInTheDocument();
     await user.click(await screen.findByRole('button', { name: 'Columns' }));
     const nameItem = await screen.findByRole('menuitemcheckbox', { name: 'Name' });
@@ -1360,9 +1277,6 @@ describe('Characters table view', () => {
     renderCharacters();
     const refreshAll = await screen.findByRole('button', { name: /refresh all/i });
 
-    // A native `title=` has no touch gesture to reveal it at all. `Tooltip`
-    // reveals on hover, on keyboard focus, and on touch-and-hold, so the
-    // "may take a moment" warning reaches a phone pilot too.
     expect(refreshAll).not.toHaveAttribute('title');
 
     fireEvent.focus(refreshAll);
@@ -1374,10 +1288,6 @@ describe('Characters table view', () => {
   });
 
   it('an Open Jobs column shows free slots (max minus running), coloured red when every slot sits idle', async () => {
-    // Pilot One: Mass Production II (skill_id 3387) -> 1 base + 2 = 3
-    // manufacturing slots, none running -> 3 open (all of them). The old bug
-    // showed the running count (0) here; this pins the fixed "max - running"
-    // math, and that "fully open" reads as red (a call to action), not green.
     const roster: RosterEntry[] = [
       {
         characterId: 91,
@@ -1475,8 +1385,6 @@ describe('Characters table view', () => {
       const pilotRow = within(table).getByText('Pilot One').closest('tr');
       if (!pilotRow) throw new Error('expected a Pilot One row');
       const piCell = within(pilotRow).getAllByRole('cell')[piIndex];
-      // Visible to a sighted reader, not only a screen reader — colour alone
-      // must not be what distinguishes attention states (DESIGN.md §7).
       expect(piCell).toHaveTextContent('Expiring soon');
     } finally {
       snapshotSpy.mockRestore();
@@ -1500,9 +1408,6 @@ describe('Characters table view', () => {
         characterId: 91,
         jobCounts: { manufacturing: 0, science: 0, reaction: 0 },
         jobCountsFetchedAt: new Date(),
-        // The cached category can lag the clock — it only refreshes on a
-        // roster reload — so this asserts "expired wins" even when the last
-        // computed category was still `expiring-soon`, not `idle`.
         piAttention: 'expiring-soon',
         piSoonestExpiryMs: Date.now() - 3_600_000,
         piFetchedAt: new Date(),
@@ -1543,7 +1448,6 @@ describe('Characters table view', () => {
       STARRED_CHARACTERS_SETTING_KEY,
       (value) => Array.isArray(value) && value.includes(91)
     );
-    // Toggling the star must not also fire the row's own click-to-navigate.
     expect(screen.queryByText('overview page')).not.toBeInTheDocument();
   });
 
@@ -1603,17 +1507,8 @@ describe('Characters table view', () => {
 
       fireEvent.touchStart(trigger);
       fireEvent.touchEnd(trigger);
-      // Not `findByRole('tooltip')` — the "Table" toggle button leaves its
-      // own hover tooltip open from the click above, so more than one
-      // tooltip-role element exists; match this one by its content instead.
       expect(await screen.findByText('0/3 slots used')).toBeInTheDocument();
 
-      // The click a real tap produces (jsdom doesn't synthesize it itself —
-      // see Tooltip.test.tsx) — this is what would otherwise bubble to the
-      // row's own onRowClick. `userEvent.click`, not `fireEvent.click`: the
-      // row's select-and-navigate is fire-and-forget async, so only an
-      // interaction that awaits pending effects gives it a chance to run
-      // before the assertion below checks whether it did.
       await user.click(trigger);
 
       expect(screen.queryByText('overview page')).not.toBeInTheDocument();
@@ -1636,7 +1531,6 @@ describe('Characters table view', () => {
     await user.click(await screen.findByRole('button', { name: 'Table' }));
 
     const table = await screen.findByRole('table');
-    // No card-view section headings in table view (decision 20260927-071415).
     expect(screen.queryByRole('heading', { name: 'Alts' })).not.toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Ungrouped' })).not.toBeInTheDocument();
     expect(within(table).getByText('Pilot One')).toBeInTheDocument();
@@ -1675,7 +1569,6 @@ describe('Characters table view', () => {
     await user.click(await screen.findByRole('button', { name: 'Table' }));
     await screen.findByText('Pilot One');
 
-    // No trailing × column beside the ⋮: Remove lives in the menu.
     expect(
       within(screen.getByRole('table')).queryByRole('button', { name: 'Remove Pilot One' })
     ).not.toBeInTheDocument();
@@ -1753,10 +1646,6 @@ describe('Characters table view', () => {
   });
 
   it('the Training column counts down to the current skill finishing, not just the state label', async () => {
-    // This suite's shared beforeEach doesn't clear esiCache/tokens (other
-    // tests never collide on them) — this test and the PI one below both
-    // seed character 91, so each starts from a clean slate rather than
-    // risking the other's fixture still sitting in cache.
     await db.esiCache.clear();
     await db.tokens.clear();
     const now = Date.now();
@@ -1781,7 +1670,6 @@ describe('Characters table view', () => {
     const pilotRow = within(table).getByText('Pilot One').closest('tr');
     if (!pilotRow) throw new Error('expected a Pilot One row');
     const cell = within(pilotRow).getAllByRole('cell')[trainingIndex];
-    // ~90 minutes out: "1h 30m" (rounds down towards the minute the fixture landed on).
     const value = await within(cell).findByText(/^1h \d+m$/);
     expect(value).toHaveAttribute('tabIndex', '0');
   });
@@ -1843,7 +1731,6 @@ describe('Characters table view', () => {
     const pilotRow = within(table).getByText('Pilot One').closest('tr');
     if (!pilotRow) throw new Error('expected a Pilot One row');
     const cell = within(pilotRow).getAllByRole('cell')[piIndex];
-    // The countdown sits beside the attention word now (#1490), not alone.
     const value = await within(cell).findByText(/\d+h \d+m/);
     expect(value).toHaveAttribute('tabIndex', '0');
   });
@@ -1856,7 +1743,6 @@ describe('Characters table view', () => {
     await db.esiCache.clear();
     await db.tokens.clear();
     const now = Date.now();
-    // Pilot One: a Director with the whole corp grant. Pilot Two: no roles scope.
     await seedGrant(91, CORP_STANDING_SCOPES, { expiresAt: now + 6e5 });
     await seedGrant(92, [], { expiresAt: now + 6e5 });
     await writeCached(91, 'corpRoles', { roles: ['Director'] }, now);

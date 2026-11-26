@@ -53,10 +53,6 @@ describe('PlanHeader', () => {
       />
     );
 
-    // It stays pinned because the window can still scroll when the sidebar
-    // outgrows the viewport. What retires #221/#229 is that it is now the
-    // only pinned panel, so `top` is a static class rather than a number
-    // measured off the panel above it and kept in sync.
     const section = screen.getByRole('heading', { name: 'Plan summary' }).closest('section');
     expect(section).toHaveClass('lg:sticky', 'lg:top-0');
     expect(section?.getAttribute('style') ?? '').not.toMatch(/top/);
@@ -136,12 +132,6 @@ describe('PlanHeader', () => {
   });
 
   it('wraps whole chips onto a second line rather than crushing them into one', () => {
-    // Reported with all chips present: four chips is more than the strip
-    // fits beside the sidebar at some widths, and it used to answer that by
-    // refusing to wrap (`lg:flex-nowrap`) and scrolling sideways instead.
-    // StatChip is a fixed height, so the chips ahead of the scroll got
-    // squeezed until their labels broke over two lines inside a one-line
-    // row.
     render(
       <PlanHeader
         totalSeconds={1000}
@@ -159,8 +149,6 @@ describe('PlanHeader', () => {
 
     const strip = screen.getByText('16m').closest('div');
     expect(strip).toHaveClass('flex-wrap');
-    // A hidden sideways scroller would put stats off-screen with nothing to
-    // suggest going looking for them.
     expect(strip).not.toHaveClass('lg:flex-nowrap');
     expect(strip).not.toHaveClass('lg:overflow-x-auto');
   });

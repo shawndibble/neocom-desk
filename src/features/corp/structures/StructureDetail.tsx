@@ -1,9 +1,3 @@
-/**
- * One structure in full, beside the Structures table: every service and its
- * state, each clock in EVE time and local time, and a refinery's moon
- * extraction when the reader can read extractions. Entity links live here,
- * not in the row (DESIGN.md §6c restraint).
- */
 import { useTranslation } from 'react-i18next';
 import { Eyebrow, SlideOver, ValueList, ValueRow } from '@/components/ui';
 import type { StatChipTone } from '@/components/ui/statChipTone';
@@ -37,11 +31,9 @@ export interface StructureDetailProps {
   corp: CorpLabel | undefined;
   system: SolarSystemEntry | undefined;
   typeName: string | undefined;
-  /** The refinery's extraction, when the reader can read extractions and one is running. */
   extraction: BoardExtractionSource | undefined;
 }
 
-/** The instant in EVE time, with local time underneath. */
 function ClockLines({ ms }: { ms: number }) {
   const { t } = useTranslation();
   const date = new Date(ms);
@@ -64,7 +56,6 @@ function Clock({ ms, lead }: { ms: number | null; lead?: string }) {
   );
 }
 
-/** A clock's countdown, toned by its severity, and when it ends. */
 function ClockRow({ label, item }: { label: string; item: CorpBoardItem | undefined }) {
   const { t } = useTranslation();
   if (item === undefined) return null;

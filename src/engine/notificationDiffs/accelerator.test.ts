@@ -145,7 +145,6 @@ describe('diffAcceleratorEnded', () => {
     const first = diffAcceleratorEnded(7, typedLive, expired);
     const second = diffAcceleratorEnded(7, expired, sheetCaughtUp);
     expect(first).toHaveLength(1);
-    // Two fires, but one occurrence: the key is per Character per UTC day.
     const keys = [...first, ...second].map((fire) => occurrenceKey(fire, NOW + 3 * HOUR_MS));
     expect(new Set(keys).size).toBe(1);
   });

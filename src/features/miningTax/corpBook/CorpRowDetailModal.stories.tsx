@@ -5,10 +5,6 @@ import { ConflictNotice } from './ConflictNotice';
 import { CorpRowDetailModal } from './CorpRowDetailModal';
 import type { CorpRowInfo } from './corpRows';
 
-/**
- * A Corp Tax Book day's detail: the book's side as a few labelled facts, and on a
- * Conflict day the notice naming the clashing entry ahead of everything else.
- */
 const ZEO = 45490;
 const CORP_NAME = 'Brass Meridian Logistics';
 
@@ -52,7 +48,6 @@ function Story({
   } as unknown as DisplayRow;
   return (
     <>
-      {/* The modal portals out; this keeps the story root non-empty for screenshots. */}
       <div className="min-h-screen" />
       <CorpRowDetailModal
         open
@@ -93,7 +88,6 @@ const meta = {
 export default meta;
 type S = StoryObj<typeof meta>;
 
-/** @summary A Conflict day: which entry clashes, when it resolves, and the two ways to fix it. */
 export const Conflict: S = {
   args: {
     view: {
@@ -107,24 +101,20 @@ export const Conflict: S = {
   },
 };
 
-/** @summary A Billable day no Late notice asked for yet: what bills it and when the book last synced. */
 export const Billed: S = { args: { view: base } };
 
-/** @summary A dismissed day: what was originally billed and the corporation's reason. */
 export const Dismissed: S = {
   args: {
     view: { ...base, state: 'dismissed', taxOwed: 0, dismissalReason: 'Fleet op, corp-sanctioned' },
   },
 };
 
-/** @summary A paid day: its payments are in the Payee ledger, not on the day. */
 export const Paid: S = {
   args: {
     view: { ...base, state: 'paid', taxOwed: 0 },
   },
 };
 
-/** @summary A day two corporations' books both contest: one take-over does the split for both. */
 export const ConflictTwoBooks: S = {
   args: {
     view: {

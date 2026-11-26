@@ -13,18 +13,11 @@ import { is, shapeGuard } from '../snapshotShape';
 import { defineDomain } from './defineDomain';
 import { HOUR_MS, currentThresholds, resolveProjectionNames, universeTypeName } from './shared';
 
-/* Skill queue ---------------------------------------------------------------- */
-
 const isSkillQueueEntrySnapshot = shapeGuard<SkillQueueEntrySnapshot>({
   skillId: is.number,
   finishedLevel: is.number,
   queuePosition: is.number,
   finishMs: is.nullable(is.number),
-  // Optional in storage as well as on the wire: every snapshot written
-  // before `diffSkillQueueEnding` needed `endingLeadMs` (issue #1410) lacks
-  // the field, and those must stay readable rather than being discarded as a
-  // stale shape on the first poll after an update — the same
-  // `ColonyExtractorSnapshot.installTimeMs` precedent.
   endingLeadMs: is.optional(is.number),
 });
 
@@ -42,11 +35,6 @@ function toSkillQueueEntrySnapshot(
   };
 }
 
-/**
- * A skill's name from the bundled SDE first — no network, so a transient ESI
- * failure at fire time can't bake a bare `#3405` into the alert — then ESI for
- * a skill newer than the pinned SDE.
- */
 async function skillName(skillId: number): Promise<string | null> {
   const skills = await loadSkills().catch(() => []);
   return skills.find((skill) => skill.typeID === skillId)?.name ?? universeTypeName(skillId);
@@ -69,11 +57,6 @@ export const skillQueueDomain = defineDomain<
     return result.cached.data.map((entry) => toSkillQueueEntrySnapshot(entry, endingLeadMs));
   },
   toSnapshot: (entries, nowMs) => ({ entries: [...entries], nowMs }),
-  // The baseline's baked-in `endingLeadMs` stays as the diff needs it (the
-  // setting in force at load time); the Projection instead uses the current
-  // lead time, so a Settings change rebuilt from that baseline (issue #1248,
-  // `projectionRebuild.ts`) projects the new warning time, not the old one —
-  // the same split `colonyDomain.projection` documents in full.
   projection: async (characterId, characterName, snapshot, nowMs) => {
     const endingLeadMs = (await currentThresholds(characterId)).skillQueueEndingLeadHours * HOUR_MS;
     const entries = snapshot.entries.map((entry) => ({ ...entry, endingLeadMs }));

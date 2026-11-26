@@ -38,7 +38,6 @@ const review = (over: Partial<VettingReview> = {}): VettingReview => ({
   ...over,
 });
 
-/** The signed-in reviewer: Kestrel Vane in the rows below. */
 const REVIEWER = 6;
 
 function setup(
@@ -173,7 +172,6 @@ describe('VettingDecision', () => {
     });
     expect(screen.getByText('You cannot sign off this review.')).toBeInTheDocument();
     expect(screen.queryByText(/You asked for this review/)).toBeNull();
-    // The asker's row is theirs, not the caller's.
     const row = within(screen.getByText('Bram Soto').closest('li')!);
     expect(row.getByText('Asked for this review')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Approve' })).toBeNull();
@@ -235,7 +233,6 @@ const MINE = {
   note: '',
 } as const;
 
-/** The report page's part: the review the decision answers with replaces the one on screen. */
 function Deciding({
   settings,
   onMail,

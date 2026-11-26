@@ -28,7 +28,6 @@ const baseArgs: Omit<UseCompareRowsArgs, 'items' | 'enabled'> = {
   refreshTick: 0,
 };
 
-/** Minimal-but-complete RegionOrder, so each test only spells out what it cares about. */
 function regionOrder(overrides: Partial<RegionOrder>): RegionOrder {
   return {
     order_id: 1,
@@ -79,7 +78,6 @@ describe('useCompareRows', () => {
     await waitFor(() =>
       expect(mockedGetOrderBook).toHaveBeenCalledTimes(ORDER_BOOK_FANOUT_CONCURRENCY)
     );
-    // Release requests one by one; in flight never exceeds the cap.
     for (let released = 0; released < items.length; released += 1) {
       await waitFor(() => expect(pending.length).toBeGreaterThan(0));
       expect(mockedGetOrderBook.mock.calls.length - released).toBeLessThanOrEqual(
@@ -190,7 +188,6 @@ describe('useCompareRows', () => {
       availableVolume: 1,
     });
 
-    // The stale first call resolving afterward must not clobber the current rows.
     resolveFirst(orderBookResult([regionOrder({ order_id: 2, price: 999, volume_remain: 1 })]));
     await Promise.resolve();
     expect(result.current[0]?.summary?.bestSell).toBe(7);

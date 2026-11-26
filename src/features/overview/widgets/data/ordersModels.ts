@@ -1,7 +1,3 @@
-/**
- * Table and chart for the Open orders kind. Pure: order rows and a translate
- * function in, plain models out.
- */
 import type { DeadlineSeverity } from '@/engine/character/severity';
 import { ORDER_PROBLEMS, type OrderProblem } from '@/engine/market/orderProblems';
 import { notCheckedCount, type OpenOrderRow } from '@/features/market/openOrdersModel';
@@ -15,7 +11,6 @@ import type { Translate } from '@/lib/translate';
 
 const W = 'overview.widgets';
 
-/** ISK on the sell side: what is listed. A buy order's ISK is escrow, not stock for sale. */
 export function ordersListed(rows: readonly OpenOrderRow[]): number {
   return rows.reduce((sum, row) => (row.isBuyOrder ? sum : sum + row.iskTiedUp), 0);
 }
@@ -27,14 +22,12 @@ const PROBLEM_TONE: Record<OrderProblem, DeadlineSeverity> = {
   undercutRegion: 'warning',
   outbid: 'warning',
   expiringOrStale: 'watch',
-  // Not a fault in the listing: read like healthy, as the state chart files it.
   turnInPays: 'clear',
   healthy: 'clear',
 };
 
 const PROBLEM_RANK = new Map(ORDER_PROBLEMS.map((problem, i) => [problem, i]));
 
-/** `12.4` for 12.4, `5` for 5.0: a gap is read to a tenth of a percent at most. */
 function signedPercent(row: OpenOrderRow): string {
   const best = row.station.bestPrice;
   if (best === null) return UNKNOWN;
@@ -43,7 +36,6 @@ function signedPercent(row: OpenOrderRow): string {
   return `${row.price >= best ? '+' : '-'}${gap}%`;
 }
 
-/** vs best as a number: signed like the cell, so "+5%" orders above "-10%"; nothing with no rival price. */
 function vsBestSort(row: OpenOrderRow): number | undefined {
   const best = row.station.bestPrice;
   if (best === null) return undefined;
@@ -51,13 +43,11 @@ function vsBestSort(row: OpenOrderRow): number | undefined {
   return row.price >= best ? gap : -gap;
 }
 
-/** Red when a rival's price beats mine (an undercut or outbid); nothing otherwise, since being ahead needs no flag. */
 function vsBestCell(row: OpenOrderRow): TableCell {
   const text = signedPercent(row);
   return row.station.beatsMe ? { text, tone: 'bad' } : text;
 }
 
-/** "Jita IV - Moon 4 - Caldari Navy Assembly Plant" is "Jita IV" on a widget. */
 function shortStation(t: Translate, name: string | null): string {
   return name === null ? t(`${W}.orders.stationUnknown`) : (name.split(' - ')[0] ?? name);
 }
@@ -68,23 +58,14 @@ function expiresIn(t: Translate, row: OpenOrderRow, now: number): string {
   return formatCountdown((row.expiry.expiresAt - now) / 1000);
 }
 
-/** The Market orders page, the Character's own orders. */
 export const ORDERS_PAGE = '/market/orders';
 
-/**
- * Every open order as a record: the item and how many are left, which side,
- * the price, how far it sits from the best rival price at its station, when
- * it lapses and where. Worst problem first, then the most ISK tied up. The
- * slots used against the cap (when known) is the footer.
- */
 export function ordersTable(
   t: Translate,
   rows: readonly OpenOrderRow[],
   now: number,
   slots: { used: number; total: number } | null,
-  /** Corp view: who placed each order (by order id), as an extra column before the station. */
   issuedBy: ReadonlyMap<number, string> | null = null,
-  /** The Market orders page (and scope) a row opens on, with that order's modal. */
   page = ORDERS_PAGE
 ): TableModel {
   const sorted = [...rows].sort(
@@ -103,8 +84,6 @@ export function ordersTable(
       expiresIn(t, row, now),
       shortStation(t, row.stationName),
     ],
-    // Same order as the columns. The cells are compact text ("1.2M", "3d 4h"), so sorting
-    // reads these instead; a lapsed order still sorts by when it lapsed.
     sort: [
       row.typeName,
       t(`${W}.orders.${row.isBuyOrder ? 'sideBuy' : 'sideSell'}`),
@@ -117,7 +96,6 @@ export function ordersTable(
     to: openHref(page, row.orderId),
   }));
   if (issuedBy) {
-    // Before the station: the last cell and sort key of each row.
     tableRows.forEach((tableRow, i) => {
       const name = issuedBy.get(sorted[i]!.orderId);
       tableRow.cells.splice(-1, 0, name ?? UNKNOWN);
@@ -192,7 +170,6 @@ const STATE_PARTS: readonly {
   problems: readonly OrderProblem[];
   color: StackPart['color'];
 }[] = [
-  // A turn-in that pays more is no fault in the listing itself.
   { key: 'healthy', problems: ['healthy', 'turnInPays'], color: 'neutral' },
   {
     key: 'undercut',
@@ -204,14 +181,12 @@ const STATE_PARTS: readonly {
   { key: 'belowFloor', problems: ['belowFloor'], color: 's4' },
 ];
 
-/** One bar of order states, each order in exactly one (its worst problem); null with no orders. */
 export function ordersStateChart(
   t: Translate,
   rows: readonly OpenOrderRow[]
 ): StackChartModel | null {
   if (rows.length === 0) return null;
   const parts: StackPart[] = [];
-  // An unchecked order reads healthy only for want of data: its own part.
   const unchecked = notCheckedCount(rows);
   for (const state of STATE_PARTS) {
     let n = rows.filter((row) => state.problems.includes(row.problem)).length;

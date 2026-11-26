@@ -9,7 +9,6 @@ interface MailSelectionBarProps {
   onDelete: () => void;
 }
 
-/** Select mode's bar above the list: how many mails are ticked, and what to do with them. */
 export function MailSelectionBar({
   count,
   busy,

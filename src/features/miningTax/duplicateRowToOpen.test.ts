@@ -16,7 +16,6 @@ describe('duplicateRowToOpen', () => {
     expect(duplicateRowToOpen(['a1', 'a2'], rows)).toBe(rows[0]);
   });
 
-  // Its confirm unassigns the whole join, which is more than the link offers to drop.
   it('refuses a Combined Entry, so the button never promises less than it does', () => {
     expect(duplicateRowToOpen(['a1'], [combined('a1')])).toBeUndefined();
     const rows = [row('a1'), combined('a2')];

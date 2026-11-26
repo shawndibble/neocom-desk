@@ -8,7 +8,6 @@ import { seedPopSharing } from '../taxBook/popSharingCache';
 import { useEffect, useState } from 'react';
 import { installFixtureFetch } from '@/storybook/fixtureFetch';
 
-/** @summary The book's settings: dated rates (corp, Guest, Miner, moon, refinery), pricing, grace and late notices. */
 const meta = {
   title: 'corp/BookSettingsDialog',
   component: BookSettingsDialog,
@@ -26,23 +25,17 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** @summary A per-refinery rate on a moon owner's refinery, which has no moon to set a rate on. */
 export const RefineryRate: Story = {};
 
-/** @summary Billing tab: trade hub, Ore Form, grace, late notice rules, overdue and divisions. */
 export const Billing: Story = { args: { initialTab: 'billing' } };
 
-/** @summary Extractions tab: the chunk-rate fallback and each refinery's measured rate and field expiry. */
 export const Extractions: Story = { args: { initialTab: 'extractions' } };
 
-/** @summary Sharing tab: the Pop Sharing switch, the Sharing default and every moon the book handles, each opening its overrides. Saves apart from Save. */
 export const Sharing: Story = {
   args: { initialTab: 'sharing' },
   decorators: [
     (Story) => {
-      // Seeded before the tab mounts: its first read finds this, so no callable is needed.
       const [uninstall] = useState(() =>
-        // The tab asks ESI whether the corporation is in an alliance.
         installFixtureFetch([
           {
             path: /^\/corporations\/\d+$/,
@@ -80,10 +73,8 @@ export const Sharing: Story = {
   ],
 };
 
-/** @summary Access tab: the approval limit, who answers members' tax questions, Automatic sync, reclaiming and deleting the book. */
 export const Access: Story = { args: { initialTab: 'access' } };
 
-/** @summary Access tab with a mailing list named to answer members' tax questions (the default is the CEO). */
 export const TaxContactMailingList: Story = {
   args: { initialTab: 'access' },
   decorators: [

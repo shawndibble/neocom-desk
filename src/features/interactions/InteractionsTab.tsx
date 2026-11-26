@@ -1,11 +1,3 @@
-/**
- * Show Info › Interactions (lazy: `PublicInfoModal`). What this account has done
- * with the player the modal is open on, from one of three sources chosen with
- * the shared Character picker: This character, All characters, or the
- * Corporation (corp book, corp wallet, corp contracts, corp killmails: whatever
- * this account can already see on those pages). Chips show only what has
- * something to say; a row opens the page that holds the interaction.
- */
 import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -161,8 +153,6 @@ export default function InteractionsTab({
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
   const corporationId = useActiveCorporationId();
   const access = useCorpAccess();
-  // The corporation is offered to anyone holding a corp role, and shows what
-  // that role's pages show; no role, no option.
   const corpOffered = access.state === 'ready' && corporationId !== null;
   const [choice, setChoice] = useState<CharacterScopeChoice | null>(null);
   const scope: InteractionScope =

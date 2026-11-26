@@ -5,11 +5,6 @@ import { formatLocalDate } from '@/lib/localDate';
 import { useTimeZone } from '@/lib/timeFormat';
 import type { QueueView } from './queueView';
 
-/**
- * One line of figures for the whole in-game queue: how long it runs, when it
- * ends, how many levels are in it. No card: it is read-only, so a box would
- * promise a click (DESIGN.md §6c).
- */
 export function QueueStrip({ view, nowMs }: { view: QueueView; nowMs: number }) {
   const { t } = useTranslation();
   const timeZone = useTimeZone();

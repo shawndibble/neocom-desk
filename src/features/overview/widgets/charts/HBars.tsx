@@ -2,7 +2,6 @@ import { hbarPercent } from './geometry';
 import { CHART_COLOR } from './palette';
 import type { HBarsChartModel } from './types';
 
-/** Labelled horizontal bars, one row per item, each with its figure at the end. */
 export function HBars({ model, maxRows }: { model: HBarsChartModel; maxRows: number }) {
   return (
     <div aria-hidden="true" className="grid gap-1.5">

@@ -1,13 +1,3 @@
-/**
- * Corp Wallet on a phone (issue #2521): the Journal (shared with `/wallet`)
- * is a compare table, so it stays a plain table with its sort buttons in the
- * header and low-value columns hidden (Description, Balance).
- *
- * `/corp/wallet` needs a wallet-reading role (`canReadWallet` in
- * `engine/corpRoles.ts`), so the shared mock's default `{}` roles response is
- * overridden to `['Director']`, and the JWT carries the `corp` scope group
- * on top of the base fixture grant.
- */
 import { test, expect, PHONE, DESKTOP } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 import { CHARACTER_ID, CORPORATION_ID, CORPORATION_NAME, SCOPES } from './support/fixtureData';
@@ -28,7 +18,6 @@ const JOURNAL = [
     date: '2026-09-01T00:00:00Z',
     ref_type: 'corporate_reward_payout',
     description: 'Older huge payout',
-    // 15 digits: the long-value case must still fit the table cell.
     amount: 123456789012345,
     balance: 123456789013245,
   },
@@ -61,9 +50,6 @@ const TRANSACTIONS = [
 
 test.describe('Corp Wallet narrow tables', () => {
   test.beforeEach(async ({ page }) => {
-    // The `corp` scope group opens every corp capability, and
-    // `app/prefetch.ts` warms all of them at boot; anything this spec doesn't
-    // seed under `/corporations/{id}/` answers empty.
     await page.route('https://esi.evetech.net/**', async (route) => {
       const url = new URL(route.request().url());
       const path = url.pathname;
@@ -77,7 +63,6 @@ test.describe('Corp Wallet narrow tables', () => {
         return json({ wallet: [{ division: 1, name: 'Master Wallet' }] });
       }
       if (path === `${corp}/wallets/1/journal`) return json(JOURNAL);
-      // Cursored by `from_id`: a follow-up page must come back empty or the walk never ends.
       if (path === `${corp}/wallets/1/transactions` && !url.searchParams.has('from_id')) {
         return json(TRANSACTIONS);
       }
@@ -86,12 +71,6 @@ test.describe('Corp Wallet narrow tables', () => {
       await route.fallback();
     });
 
-    // `/corp/wallet` reads the corporation id only from Dexie, where the
-    // public-info read (`stores/publicInfo.ts` -> `recordCharacterCorporation`)
-    // writes it; the seeded character row has none and this page never makes
-    // that read itself, so with no id every corp read stays parked on "nothing
-    // cached". Overview's `CharacterHeader` makes it: its corporation name only
-    // shows once the id has been recorded.
     await signInAndGoto(page, './overview', [...SCOPES, ...scopesForGroup('corp')]);
     await expect(page.getByText(CORPORATION_NAME).first()).toBeVisible();
   });
@@ -100,10 +79,7 @@ test.describe('Corp Wallet narrow tables', () => {
     await page.setViewportSize(PHONE);
     await page.goto('./corp/wallet');
 
-    // One division: nothing to fold, so no caret.
     await expect(page.getByRole('button', { name: 'Show all divisions' })).toBeHidden();
-    // The shared journal table (also `/wallet`): dense cards under EVE-day headers,
-    // sorted from the phone picker rather than a header row.
     const table = page.getByRole('table', { name: 'Journal' });
     const rows = table.locator('tbody tr[data-row-key]');
     await expect(rows.first()).toBeVisible();
@@ -124,12 +100,6 @@ test.describe('Corp Wallet narrow tables', () => {
   });
 });
 
-/**
- * Divisions panel (issue #2593): seven division cards used to push the Journal
- * below the fold, so below `sm` the panel folds to the
- * selected division's name and balance; the caret lists every division and
- * picking one selects it and folds again. At 1280px nothing changes.
- */
 const LONG_NAME = 'Division name that runs on to forty ch';
 
 const WALLETS = [1, 2, 3, 4, 5, 6, 7].map((division) => ({
@@ -158,8 +128,6 @@ test.describe('Corp Wallet divisions panel (issue #2593)', () => {
       await route.fallback();
     });
 
-    // The corporation id is recorded by Overview's public-info read; see the
-    // sort-picker describe above.
     await signInAndGoto(page, './overview', [...SCOPES, ...scopesForGroup('corp')]);
     await expect(page.getByText(CORPORATION_NAME).first()).toBeVisible();
   });

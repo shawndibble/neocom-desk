@@ -44,9 +44,7 @@ describe('CompareAttributesMatrix', () => {
     expect(screen.getByText('Maximum Velocity')).toBeInTheDocument();
     expect(screen.getByText('1,200 HP')).toBeInTheDocument();
     expect(screen.getByText('250 m/sec')).toBeInTheDocument();
-    // Neither item's dogma attributes include the other's — one blank cell per row.
     expect(screen.getAllByText('—')).toHaveLength(2);
-    // Item names in the header link to the Market (§6c).
     expect(screen.getByRole('link', { name: 'Rifter' })).toHaveAttribute(
       'href',
       expect.stringContaining('/market/browser?')
@@ -68,7 +66,6 @@ describe('CompareAttributesMatrix', () => {
 
     expect(screen.getByText('Worth')).toBeInTheDocument();
     expect(screen.getByText('Estimated Price')).toBeInTheDocument();
-    // Shorthand on screen (#947); the exact figure is the accessible name.
     expect(screen.getByText('100.00 ISK', { selector: '.sr-only' })).toBeInTheDocument();
   });
 
@@ -109,7 +106,6 @@ describe('CompareAttributesMatrix', () => {
       'Structure',
     ]);
     for (const table of tables) expect(table).not.toHaveClass('dt-stack');
-    // The attribute column stays pinned while item columns scroll under it.
     expect(screen.getByText('Structure Hitpoints')).toHaveClass('sticky', 'left-0');
   });
 
@@ -126,7 +122,6 @@ describe('CompareAttributesMatrix', () => {
     const header = screen.getByRole('table', { name: 'Compared items' });
     expect(header).toHaveClass('sticky', 'top-0');
     expect(within(header).getByText('Rifter')).toBeInTheDocument();
-    // The category tables keep their own header for assistive tech, hidden from sight.
     expect(screen.getByRole('table', { name: 'Structure' })).toHaveClass('[&_thead]:sr-only');
   });
 
@@ -190,7 +185,6 @@ describe('CompareAttributesMatrix', () => {
     expect(screen.getByRole('checkbox', { name: 'Differences only' })).toBeChecked();
     expect(screen.getByText('Maximum Velocity')).toBeInTheDocument();
     expect(screen.queryByText('Structure Hitpoints')).not.toBeInTheDocument();
-    // A category left with nothing differing disappears entirely.
     expect(screen.queryByRole('table', { name: 'Structure' })).not.toBeInTheDocument();
     expect(screen.getByText('1 identical hidden')).toBeInTheDocument();
 

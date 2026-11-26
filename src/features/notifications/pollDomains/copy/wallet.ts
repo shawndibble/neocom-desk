@@ -13,6 +13,5 @@ export const walletCopy: DomainCopy<WalletNotificationFire, NoNames> = {
             amount: formatIsk(fire.amount, 2),
           }),
   }),
-  // The journal line that moved the balance.
   subjectOf: (fire) => fire.journalEntryId,
 };

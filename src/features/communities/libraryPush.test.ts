@@ -96,13 +96,11 @@ describe('publishSharedLibrary', () => {
     const second = publishSharedLibrary(1, 'c1');
     const third = publishSharedLibrary(1, 'c1');
     await Promise.all([first, second, third]);
-    // The first run, plus one shared by the two that arrived behind it.
     expect(getDoc).toHaveBeenCalledTimes(2);
   });
 
   it('publishes the rest and counts a blueprint whose place cannot be read', async () => {
     choice.current = { all: true, excluded: new Set() };
-    // Blueprint 100 sits in a readable station, 200 in a structure with no name.
     location.mockImplementation(async (_char: number, id: number) =>
       id === 60003760
         ? { name: 'Jita IV - Moon 4', systemId: 30000142 }
@@ -134,7 +132,6 @@ describe('publishSharedLibrary', () => {
     memberDoc({ ownerHash: 'owner-1' });
     await expect(publishSharedLibrary(1, 'c1')).resolves.toMatchObject({ outcome: 'full' });
     expect((setDoc.mock.calls[0]![1] as { items: unknown[] }).items).toEqual(published);
-    // Only the shared location is looked up, and its id is never published.
     expect(location.mock.calls.map((call) => call[1])).toEqual([60003760]);
     expect(JSON.stringify(setDoc.mock.calls[0]![1])).not.toContain('60003760');
   });
@@ -226,11 +223,9 @@ describe('removeSharedLibraries', () => {
       .mockResolvedValueOnce({ docs: [{ id: 'c1' }, { id: 'c2' }] })
       .mockResolvedValueOnce({ docs: [{ ref: 'r0' }, { ref: 'r1' }], size: 2 })
       .mockResolvedValueOnce({ docs: [{ ref: 'r2' }], size: 1 })
-      // the second listCommunityIds call inside the loop is not made: ids are read once
       .mockResolvedValue({ docs: [] });
     await removeSharedLibraries(1);
     expect(deleteDoc.mock.calls.map((c) => c[0])).toEqual(['r0', 'r1', 'r2']);
-    // Per Community: invalidate the hash, delete chunks, then zero the stamp.
     expect(updateDoc).toHaveBeenCalledTimes(4);
     expect(updateDoc.mock.calls[0]![1]).toMatchObject({ libraryHash: '', chunkCount: 2 });
     expect(updateDoc.mock.calls[1]![1]).toEqual({

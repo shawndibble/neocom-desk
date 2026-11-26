@@ -15,23 +15,13 @@ import { DividedList } from '@/components/ui/DividedList';
 interface BulkDismissDialogProps {
   open: boolean;
   onClose: () => void;
-  /** The still-unassigned rows the selection would dismiss — already filtered by `dismissableRows`. */
   rows: readonly DisplayRow[];
   systemNames: ReadonlyMap<number, string>;
-  /** Live Jita valuation of a row's unassigned residual — the route's own `estimatedValueOf`. */
   estimatedValueOf: (row: DisplayRow) => number;
   showCharacter: boolean;
   onDismissed: () => void;
 }
 
-/**
- * Confirms a bulk Dismiss (issue #539) — "I don't pay tax on these entries".
- *
- * Itemized with tick/untick and a running total, the same rule settle-up
- * established: never a blind mark-all. Dismissal is the one bulk action with no
- * Payee and no ISK figure to sanity-check afterwards, so this list is the only
- * place a mis-click gets caught.
- */
 export function BulkDismissDialog({
   open,
   onClose,

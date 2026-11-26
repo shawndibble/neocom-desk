@@ -141,7 +141,6 @@ describe('walletJournalCsvColumns', () => {
   it("names a daily goal payout's goal, falling back to the plain label", () => {
     const column = walletJournalCsvColumns(t).find((c) => c.header === 'wallet.dailyGoal')!;
     const goal = entry({ ref_type: 'daily_goal_payouts', reason: '1004953' });
-    // The test translator echoes its key, so an unnamed goal reads as the key.
     expect(column.value(goal)).toBe('wallet.dailyGoalNames.1004953');
     expect(column.value(entry())).toBeNull();
   });

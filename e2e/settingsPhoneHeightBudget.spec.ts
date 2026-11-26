@@ -1,15 +1,3 @@
-/**
- * Settings: every section stays within the phone height budget at 390px
- * (issue #4562). A phone screen is about 800px of content; a section is at
- * most about 1.5 screens (1200px) once its copy is trimmed, and the spec fails
- * above 1300px. Past that a section splits, or folds its secondary content by
- * default on a phone.
- *
- * Measured on the rendered section's own height, not a class string; see
- * `loyaltyStoreNarrow.spec.ts` for why.
- *
- * Uses the default seeded character with no Dexie overrides.
- */
 import { test, expect, PHONE, DESKTOP } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 
@@ -33,7 +21,6 @@ const SECTIONS = [
   'activity',
 ];
 
-/** Sections allowed past the limit, each with the reason. */
 const OVER_BUDGET: Record<string, string> = {};
 
 for (const section of SECTIONS) {
@@ -42,11 +29,9 @@ for (const section of SECTIONS) {
     await signInAndGoto(page, `./settings/${section}`);
     await page.waitForURL(new RegExp(`/settings/${section}$`));
     const content = page.locator('[data-settings-section]');
-    // Corporation is hidden for a Character with no Corp access.
     if (section === 'corporation' && (await content.count()) === 0) test.skip();
     await expect(content).toBeVisible();
     const measure = () => content.evaluate((el) => Math.round(el.getBoundingClientRect().height));
-    // Async panels settle: wait for two equal reads in a row.
     let previous = -1;
     await expect
       .poll(async () => {

@@ -1,13 +1,7 @@
-/**
- * BPC Sourcing's active filters — the pills `FilterBar` shows under the search
- * box while its controls are closed. Ids, values and a `clear` here; labels
- * are `BpcFilterBar`'s, which owns translation and region names.
- */
 import { SPACE_KINDS, type SpaceKind } from '@/engine/space';
 import { DEFAULT_JUMP_RANGE, type JumpRange } from '@/engine/route/jumpRange';
 import { DEFAULT_SOURCE_TOGGLES, type SourceToggle } from './bpcSourcingUrl';
 
-/** The URL-backed filter fields, as the panel's filter sheet edits them. */
 export interface BpcSourcingFilter {
   typeQuery: string;
   regionId: number | null;
@@ -19,7 +13,6 @@ export interface BpcSourcingFilter {
   hidePlex: boolean;
 }
 
-/** Everything the filter sheet sets: the fields plus Source, Space and Jump Range. */
 export interface BpcFilterState {
   filter: BpcSourcingFilter;
   sources: ReadonlySet<SourceToggle>;
@@ -27,11 +20,6 @@ export interface BpcFilterState {
   jumps: JumpRange;
 }
 
-/**
- * The pilot's own Exclude defaults (Settings › BPC Sourcing). Hiding auctions
- * when that is the pilot's default is not an active filter: it gets no chip,
- * and clearing a chip returns to the default rather than to "show".
- */
 export interface BpcHideDefaults {
   hideAuctions: boolean;
   hidePlex: boolean;
@@ -45,7 +33,6 @@ export type BpcFilterChip =
   | { id: 'sources'; value: SourceToggle[]; clear: Clear }
   | { id: 'space'; value: SpaceKind[]; clear: Clear };
 
-/** An Exclude pick: the `BpcSourcingFilter` flag it sets. */
 export type BpcExclude = 'hideAuctions' | 'hidePlex';
 
 type Clear = (state: BpcFilterState) => BpcFilterState;
@@ -61,11 +48,6 @@ function isDefaultSources(sources: ReadonlySet<SourceToggle>): boolean {
   );
 }
 
-/**
- * One chip per filter away from its default, in the filter sheet's order.
- * Never the search text: the search box above the chips already shows it,
- * and clearing it has its own control there.
- */
 export function bpcActiveFilterChips(
   state: BpcFilterState,
   hideDefaults: BpcHideDefaults
@@ -86,9 +68,6 @@ export function bpcActiveFilterChips(
     const value = filter[id].trim();
     if (value !== '') chips.push({ id, value, clear: (s) => withFilter(s, { [id]: '' }) });
   }
-  // Exclude is one control, so one chip naming its picks. A chip only ever
-  // says "hiding": set against a default of hiding, showing is the default
-  // and gets none — and its clear leaves that default alone.
   const excluded = (['hideAuctions', 'hidePlex'] as const).filter(
     (id) => filter[id] && !hideDefaults[id]
   );

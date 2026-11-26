@@ -15,10 +15,6 @@ describe('feedPurgeCutoff', () => {
   });
 
   it('reuses the retention the fired-projection purge already applies', () => {
-    // AC2 of #595: no third retention constant. The client's own
-    // FEED_SYNC_WINDOW_MS is the same 30 days but lives in the other package
-    // (functions/ cannot import from src/), so the two are kept equal by the
-    // comment at each declaration rather than by a shared module.
     expect(FIRED_RETENTION_MS).toBe(30 * 24 * 3_600_000);
   });
 });
@@ -37,9 +33,6 @@ describe('isPurgeableFeedRow', () => {
   });
 
   it('agrees with isPastRetention on both sides of the edge', () => {
-    // index.ts expresses this as a `where('firedAt', '<', cutoff)` filter,
-    // which cannot call isPastRetention — so the boundary is pinned here
-    // instead of being left to drift between the query and the predicate.
     for (const offset of [-1, 0, 1]) {
       const firedAt = NOW - FIRED_RETENTION_MS + offset;
       expect(isPurgeableFeedRow(firedAt, NOW)).toBe(isPastRetention(firedAt, NOW));

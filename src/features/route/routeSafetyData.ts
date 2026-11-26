@@ -1,13 +1,3 @@
-/**
- * What Route Safety reads besides the stargate graph (issue #2328): the last
- * hour of kills and jumps for the whole universe, and region names.
- *
- * Both activity feeds are one public call each for all of New Eden, so a
- * route of any length costs two requests — never one per system (decision
- * `20260912-165245`). They are cached globally rather than per Character:
- * the answer is the same for everyone. ESI refreshes them about hourly, so a
- * revalidation inside that hour is a cheap 304.
- */
 import {
   conditionalFetch,
   GLOBAL_CACHE_CHARACTER_ID,
@@ -29,10 +19,8 @@ const KILLS_CACHE_KEY = 'universe-system-kills';
 const JUMPS_CACHE_KEY = 'universe-system-jumps';
 
 export interface SystemActivity {
-  /** `null` when the feed could not be read and nothing was cached. */
   kills: ReadonlyMap<number, SystemKills> | null;
   jumps: ReadonlyMap<number, number> | null;
-  /** The older of the two feeds' ages, or `null` when neither arrived. */
   fetchedAt: Date | null;
 }
 
@@ -46,7 +34,6 @@ async function loadFeed<T>(
   );
 }
 
-/** Never rejects: a feed that cannot be read comes back `null`, never empty. */
 export async function loadSystemActivity(): Promise<SystemActivity> {
   const [kills, jumps] = await Promise.all([
     loadFeed<SystemKillsEntry[]>(KILLS_CACHE_KEY, (options) => getUniverseSystemKills(options)),
@@ -60,12 +47,6 @@ export async function loadSystemActivity(): Promise<SystemActivity> {
   };
 }
 
-/**
- * Pod kills by system over the kill feed's last hour — the same cached call
- * `loadSystemActivity` makes, without the jumps feed, for the pod-kill
- * avoidance rule (`features/route/routeRules.ts`). `null` when the feed
- * could not be read: an unread feed is not a quiet universe.
- */
 export async function loadPodKills(): Promise<ReadonlyMap<number, number> | null> {
   const kills = await loadFeed<SystemKillsEntry[]>(KILLS_CACHE_KEY, (options) =>
     getUniverseSystemKills(options)
@@ -73,12 +54,6 @@ export async function loadPodKills(): Promise<ReadonlyMap<number, number> | null
   return kills ? new Map(kills.data.map((entry) => [entry.system_id, entry.pod_kills])) : null;
 }
 
-/**
- * Region names for a route. `regions.json` carries only regions that hold a
- * market, so the rest go through the cached `resolveNames` (one batched call
- * the first time, none after, and the last names seen offline); a region
- * neither can name is simply absent, and the row shows a dash.
- */
 export async function loadRouteRegionNames(
   regionIds: readonly number[]
 ): Promise<ReadonlyMap<number, string>> {

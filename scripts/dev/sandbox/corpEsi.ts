@@ -1,20 +1,8 @@
-/**
- * Stage 3 sandbox data: the Corporation's own ESI reads (members, roles, member tracking,
- * titles, structures, divisions, wallet, assets, industry jobs). Structure ids and names match
- * the Corp Tax Book seed's refineries (scripts/dev/seed-corp-tax-book.mjs), so the moon pages
- * and these pages describe the same buildings. `corpAnswer` returns the JSON for a path, or
- * undefined when the path is not a corporation read this module owns.
- */
 import { CHARACTER_ID, CORPORATION_ID } from '../../../e2e/support/fixtureData';
 import { DAY_MS, HOUR_MS } from '../../../src/lib/age';
 import { iso, mix } from './gen';
 import playerGroups from './playerGroups.json' with { type: 'json' };
 
-/**
- * The Player-groups fixture (playerGroups.json, same ids as `seed-corp-tax-book.mjs --players`):
- * corp members that override or extend the generic roster. Characters outside the corp
- * (`playerGroups.outside`) are deliberately absent from every roster read.
- */
 interface FixtureMember {
   id: number;
   name: string;
@@ -31,7 +19,6 @@ const SYSTEMS = [30002187, 30002053, 30000144];
 const STATIONS = [60003760, 60008494];
 const SHIPS = [587, 24698, 638, 16240, 22544, 17476, 28606];
 
-/** The seed's six refineries plus two non-moon structures, so Structures shows more than drills. */
 export const STRUCTURES = [
   ...Array.from({ length: 6 }, (_, i) => ({
     id: 1_040_000_000_001 + i,
@@ -97,7 +84,6 @@ function memberTracking() {
       return {
         character_id: id,
         start_date: new Date(`${fixture.joined}T00:00:00Z`).toISOString(),
-        // Never seen: ESI omits the session dates, ship and location.
         ...(fixture.hoursAgo === null
           ? {}
           : {
@@ -179,10 +165,6 @@ const wallets = () =>
             : 0,
   }));
 
-/**
- * Journal refs 900001+ are the Corp Tax Book seed's donations, so a payment's wallet link
- * (`/corp/wallet?division=1&highlight=900001`) lands on a row. Only the ids match the seed.
- */
 function walletJournal() {
   return Array.from({ length: 24 }, (_, i) => ({
     id: 900_001 + i,
@@ -265,7 +247,6 @@ function industryJobs() {
 
 const CORP = `/corporations/${CORPORATION_ID}`;
 
-/** Static corp reads, by exact path. */
 const LISTS: Record<string, () => unknown> = {
   [`${CORP}/members`]: () => MEMBER_IDS,
   [`${CORP}/roles`]: roles,

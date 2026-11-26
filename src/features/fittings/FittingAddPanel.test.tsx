@@ -115,7 +115,6 @@ const catalogue: FittingCatalogue = {
   variations: { types: {}, metaGroups: {} },
 };
 
-/** `ready: false` is before the ship data: no fitting context yet. */
 function renderPanel({
   ready = true,
   ...overrides
@@ -136,7 +135,6 @@ function renderPanel({
 }
 
 describe('FittingAddPanel', () => {
-  // The hull check is shared and saved per hull and skills; each test answers it afresh.
   beforeEach(async () => {
     clearHullFitMemory();
     await db.hullFitCache.clear();
@@ -179,17 +177,11 @@ describe('FittingAddPanel', () => {
     });
     const { onAdd } = renderPanel();
 
-    // The hull check runs in the background; browsing waits for it. The
-    // skill filter starts on, hiding Damage Control II (no skills for it)
-    // until it's off.
-    // Pressed only once the hull check lands; before that it is disabled and
-    // a click does nothing (the CI flake this used to be).
     const skillFilter = await screen.findByRole('button', { name: 'Skills', pressed: true });
     expect(screen.queryByRole('button', { name: /Damage Control II/ })).not.toBeInTheDocument();
     await user.click(skillFilter);
     const dc2 = await screen.findByRole('button', { name: /Damage Control II/ });
     expect(screen.queryByRole('button', { name: /Afterburner/ })).not.toBeInTheDocument();
-    // Damage Control I doesn't fit the hull.
     expect(screen.queryByText('Damage Control I')).toBeNull();
     expect(
       within(dc2.closest('li')!).getByRole('button', { name: "Can't add: Missing skills" })
@@ -283,7 +275,6 @@ describe('FittingAddPanel', () => {
     );
     expect(await screen.findByRole('button', { name: /Damage Control II/ })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /hidden by filters/ })).not.toBeInTheDocument();
-    // The button left with the filter it lifted; focus lands in the search, not on the body.
     expect(screen.getByLabelText('Search items to add')).toHaveFocus();
   });
 
@@ -312,7 +303,6 @@ describe('FittingAddPanel', () => {
 
     expect(await screen.findByRole('button', { name: /Afterburners/ })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Damage Controls/ })).toBeInTheDocument();
-    // Structure modules never fit a ship, so their group never shows.
     expect(screen.queryByText('Structure Equipment')).toBeNull();
   });
 
@@ -346,7 +336,6 @@ describe('FittingAddPanel', () => {
 
     await user.click(await screen.findByRole('button', { name: 'Hull' }));
     expect(await screen.findByText('Structure Equipment')).toBeInTheDocument();
-    // Shown with the Hull filter off, but never addable — the hull refuses it outright.
     const anchoringArray = screen.getByRole('button', { name: /Anchoring Array/ });
     expect(anchoringArray).toHaveAttribute('aria-disabled', 'true');
     expect(
@@ -396,7 +385,6 @@ describe('FittingAddPanel', () => {
     const user = userEvent.setup();
     checkCandidates.mockImplementation(() => new Map());
     checkCharges.mockImplementation(() => new Set([501, 700]));
-    // Scourge shoots, so the launcher gets the Charge Picker; the cap booster's charge doesn't.
     compareCharges.mockImplementation(() => [
       {
         typeId: 501,
@@ -446,10 +434,8 @@ describe('FittingAddPanel', () => {
 
     await user.click(launcher);
     expect(launcher).toHaveAttribute('aria-expanded', 'false');
-    // Only the header is left, and it still says what the launchers fire.
     expect(screen.getAllByRole('button', { name: /Scourge Light Missile/ })).toEqual([launcher]);
     expect(launcher).toHaveTextContent('Scourge Light Missile');
-    // With no weapon section open, the picker's shared controls go too.
     expect(screen.queryByRole('button', { name: 'Usable' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Navy Cap Booster 400/ })).toBeInTheDocument();
 
@@ -458,7 +444,6 @@ describe('FittingAddPanel', () => {
   });
 
   describe('Charge Picker (a weapon group)', () => {
-    // Two railguns; Lead (long range), Antimatter and two navy versions, and a locked Spike.
     const rails: Fitting = {
       ...fitting,
       modules: [0, 1].map((slotIndex) => ({
@@ -542,8 +527,6 @@ describe('FittingAddPanel', () => {
       await user.click(screen.getByRole('tab', { name: 'Charges' }));
 
       const picks = screen.getByRole('group', { name: 'Quick picks' });
-      // Same damage, Caldari Navy is cheaper, so it wins; Spike is locked, so Lead reaches furthest.
-      // Within 10% of the top, it's also the cheapest per minute: best value too.
       expect(await within(picks).findAllByText('Caldari Navy Antimatter')).toHaveLength(2);
       expect(picks).toHaveTextContent(/Max range\s*Lead/);
       expect(screen.getByRole('button', { name: /^Antimatter, / })).toBeInTheDocument();
@@ -623,7 +606,6 @@ describe('FittingAddPanel', () => {
       screen.getByRole('button', { name: /^Navy Cap Booster 400, stable at 55%, 30 GJ\/s/ })
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Smallest stable/ })).toBeInTheDocument();
-    // The weapon picker's View/Sort controls aren't a cap booster's.
     expect(screen.queryByRole('button', { name: 'Usable' })).not.toBeInTheDocument();
   });
 
@@ -680,7 +662,6 @@ describe('FittingAddPanel', () => {
     const onAddCargo = vi.fn();
     renderPanel({ target: { kind: 'cargo' }, onAddCargo });
 
-    // A cargo target opens on the Cargo tab, which searches every market item.
     expect(screen.getByRole('tab', { name: 'Cargo', selected: true })).toBeInTheDocument();
     await user.type(screen.getByLabelText('Search items to put in the cargo hold'), 'Anchoring');
     const quantity = screen.getByLabelText('Quantity');

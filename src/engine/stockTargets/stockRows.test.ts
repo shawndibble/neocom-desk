@@ -108,12 +108,12 @@ describe('buildStockRows', () => {
 
   it('sorts worst first: out, low, ok, over, then dearest cost within a status', () => {
     const rows = buildStockRows([
-      input({ typeId: 1, target: 10, listed: 12 }), // over
-      input({ typeId: 2, target: 100, listed: 90 }), // ok, cost 10
-      input({ typeId: 3, target: 100, listed: 10 }), // low, cost 90
-      input({ typeId: 4, target: 100, listed: 10, price: 5 }), // low, cost 450
-      input({ typeId: 5, price: null }), // out, unpriced
-      input({ typeId: 6 }), // out, cost 10
+      input({ typeId: 1, target: 10, listed: 12 }),
+      input({ typeId: 2, target: 100, listed: 90 }),
+      input({ typeId: 3, target: 100, listed: 10 }),
+      input({ typeId: 4, target: 100, listed: 10, price: 5 }),
+      input({ typeId: 5, price: null }),
+      input({ typeId: 6 }),
     ]);
     expect(rows.map((r) => r.typeId)).toEqual([6, 5, 4, 3, 2, 1]);
   });

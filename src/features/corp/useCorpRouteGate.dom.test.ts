@@ -64,11 +64,6 @@ describe('useCorpRouteGate — no capability requirement', () => {
 });
 
 describe('useCorpRouteGate — with a capability requirement', () => {
-  /**
-   * `/corp/members` and `/corp/assets` each need one capability beyond plain
-   * `ready` — this is that second gate, folded into the same hook rather than
-   * re-derived at the call site.
-   */
   it('is denied when ready but the required capability is not held', () => {
     mockedAccess.mockReturnValue(accessOf('ready', { canReadWallet: true }));
     const { result } = renderHook(() =>

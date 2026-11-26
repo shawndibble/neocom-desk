@@ -111,7 +111,6 @@ describe('diffFittingStats', () => {
 
   it('compares a resonance at its displayed resist percentage, not the raw resonance', () => {
     const after: FittingStats = { ...base, armor: { ...base.armor, emResonance: 0.794 } };
-    // resistPct(0.8) rounds to 20, resistPct(0.794) rounds to 21 -> counts.
     const delta = diffFittingStats(base, after);
     expect(delta.changes).toEqual([{ key: 'armorEmResonance', before: 20, after: 21 }]);
   });

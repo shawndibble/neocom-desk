@@ -55,7 +55,7 @@ Everything around the feature pages: router and route table, the signed-in `Layo
 
 ## Routes (`src/app/App.tsx`)
 
-- `/` -> `Root` (`:229`): Character count unresolved or active-store not hydrated -> `BootScreen gate="root"`; 0 Characters -> `/login`; Characters but none active -> `/characters`; else `/overview`. Waits on the active-character store as well as the count, so a returning user is not bounced to `/characters` (comment above `Root`).
+- `/` -> `Root` (`:229`): Character count unresolved or active-store not hydrated -> `BootScreen gate="root"`; 0 Characters -> `/login`; Characters but none active -> `/characters`; else `/overview`. Waits on the active-character store as well as the count, so a returning user is not bounced to `/characters`.
 - `/login`, `/callback`: eager, outside the shell (`docs/features/auth-login.md`).
 - Under `RequireCharacter` -> `SignedInShell` (lazy `Layout`, preloaded at boot by `signedInShellHint`/`bootShellPreload`) -> every entry of `ROUTE_ELEMENTS` (`:151`) wrapped in `ScopeGate`, and `TabRoute` when the page is tabbed (`PAGE_TABS`, ADR 0015).
 - Outside the shell: `/share/fitting`, `/share/:shareId` (`:370`, no session needed), `/error` (`:372`), `*` -> `NotFound` (`:373`).

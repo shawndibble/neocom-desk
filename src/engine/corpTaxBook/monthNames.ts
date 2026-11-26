@@ -1,4 +1,3 @@
-/** Month abbreviations, January first, for EVE-time (UTC) date labels. */
 export const MONTHS: readonly string[] = [
   'Jan',
   'Feb',

@@ -1,10 +1,3 @@
-/**
- * A History row's identity: the contract's title, or — for an untitled
- * courier, which is most of them — its route (system to system), so three in-progress hauls
- * don't all read "Courier" (issue #1706). The names come from the same
- * resolver the detail modal uses. Until both resolve (or if either can't) the
- * generic type label stands, as before; collateral rides inline after it.
- */
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Tooltip } from '@/components/ui';
@@ -44,7 +37,6 @@ export function ContractIdentity({
     loadRoute
   ).data;
 
-  // A contract that is a buyback Quote's carries the Community mark (DESIGN.md 6c), not a column of its own.
   const cue = buyback && (
     <Tooltip content={buybackCueText(t, buyback)}>
       <span tabIndex={0} className="ml-1.5 inline-flex align-middle text-text-dim">

@@ -1,18 +1,6 @@
-/**
- * "My ships": every ship an account owns, assembled or packaged (one row per
- * packaged stack), found in a flat asset list, nested ones included.
- *
- * Which type is a ship is the caller's call (SDE category lookup — pure
- * engines don't fetch). Ships inside a Ship Maintenance Bay or fleet hangar
- * are found the same way as any nested asset; the asset tree itself only
- * models Cargo, Drone and Fitting bays.
- *
- * Pure: no fetch/DOM/Dexie.
- */
 import type { EngineAsset } from './assetTree';
 
 export interface OwnedAsset extends EngineAsset {
-  /** False for a stack of unassembled hulls; absent means assembled. */
   is_singleton?: boolean;
   characterId: number;
 }
@@ -21,18 +9,12 @@ export interface ShipRow {
   itemId: number;
   typeId: number;
   characterId: number;
-  /** The outermost location: the station, structure or solar system the ship sits in. */
   locationId: number;
   locationType: EngineAsset['location_type'];
-  /** Inside another owned asset (a ship's hold, a container). */
   inCargo: boolean;
-  /** Item ids of the owned assets holding this ship, outermost first. */
   trail: number[];
-  /** `location_flag` of what each trail entry directly holds (the next holder, or this ship last): the bay or hold it sits in. One per trail entry. */
   holderFlags: string[];
-  /** A stack of unassembled hulls (ESI `is_singleton === false`). */
   packaged: boolean;
-  /** 1 for an assembled ship; the stack size for a packaged one. */
   quantity: number;
 }
 

@@ -2,11 +2,6 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { Button } from './Button';
 import { Popover, PopoverContent, PopoverTrigger } from './Popover';
 
-/**
- * @summary Click-triggered panel with a `dialog` role for prose, figures or a small form (docs/adr/0004).
- * §6c: a trigger that opens one is field chrome with a trailing `CaretDown`, never a dotted
- * underline (that means "has a tooltip").
- */
 const meta = {
   title: 'ui/Popover',
   component: Popover,
@@ -30,7 +25,6 @@ const trigger = (
   </PopoverTrigger>
 );
 
-/** @summary Informational panel open: prose and figures, no commands (a menu role would promise arrow-key items). */
 export const Informational: Story = {
   args: {
     defaultOpen: true,
@@ -46,7 +40,6 @@ export const Informational: Story = {
   },
 };
 
-/** @summary A small form a menu cannot host: checkboxes that keep their own arrow keys. */
 export const WithForm: Story = {
   args: {
     defaultOpen: true,
@@ -66,7 +59,6 @@ export const WithForm: Story = {
   },
 };
 
-/** @summary `arrow`: a hint that names the control it sits beside points at it (the rail's update callout). */
 export const WithArrow: Story = {
   args: {
     defaultOpen: true,
@@ -87,5 +79,4 @@ export const WithArrow: Story = {
   },
 };
 
-/** @summary Closed at rest: the trigger alone. */
 export const Closed: Story = { args: { children: trigger } };

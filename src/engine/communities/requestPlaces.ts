@@ -1,13 +1,3 @@
-/**
- * Where a Community Request is, read from its location text (issue #3811).
- * The text stays free (a Request stores it as typed), but compose offers
- * systems and regions to pick, which write "System, Region" or "Region
- * (region)". Anything that reads back as one of those can be measured in
- * jumps; anything else (an older Request, a typed note) is simply not
- * measurable, which the board says rather than hides. Pure: the SDE snapshot
- * is passed in as plain lists.
- */
-
 export interface PlaceSystem {
   id: number;
   name: string;
@@ -50,7 +40,6 @@ export function buildPlaceIndex(
   };
 }
 
-/** What a system writes into the location field: its name and its region. */
 export function systemPlaceText(system: PlaceSystem, regionName: string | undefined): string {
   return regionName ? `${system.name}, ${regionName}` : system.name;
 }
@@ -59,7 +48,6 @@ export function regionPlaceText(name: string): string {
   return `${name} (region)`;
 }
 
-/** The system or region a location text names, or null when it names neither. */
 export function resolvePlace(text: string, index: PlaceIndex): Place | null {
   const trimmed = text.trim();
   if (trimmed === '') return null;
@@ -75,12 +63,10 @@ export function resolvePlace(text: string, index: PlaceIndex): Place | null {
 }
 
 export interface PlaceSuggestion {
-  /** What goes in the location field. */
   text: string;
   kind: Place['kind'];
 }
 
-/** Systems and regions whose name starts with, or else contains, the query; shortest names first. */
 export function searchPlaces(query: string, index: PlaceIndex, limit: number): PlaceSuggestion[] {
   const needle = query.trim().toLowerCase();
   if (needle === '') return [];
@@ -123,11 +109,6 @@ export function searchPlaces(query: string, index: PlaceIndex, limit: number): P
     .map(({ text, kind }) => ({ text, kind }));
 }
 
-/**
- * Jumps from where the pilot is (`distances`: jumps to every reachable system)
- * to a place: a system's own distance, or the nearest reachable system of a
- * region. Null when none of it can be reached by stargate.
- */
 export function jumpsToPlace(
   place: Place,
   distances: ReadonlyMap<number, number>,

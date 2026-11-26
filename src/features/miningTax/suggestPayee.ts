@@ -2,15 +2,11 @@ import type { MiningTaxAssignmentRecord, PayeeRecord } from '@/db';
 import { defaultPayeeForSystem } from '@/engine/miningTax/defaultSystems';
 
 export interface PayeeSuggestion {
-  /** The Payee to pre-select, or `undefined` when nothing in the pilot's own history points at one. */
   suggested: PayeeRecord | undefined;
-  /** Whether `suggested` is the Payee last used in this system (rather than its Default Payee) — only then may the UI say "last used here". */
   fromHistory: boolean;
-  /** Every Payee, best first: the suggestion, then by uses in this system, then by name. */
   ranked: PayeeRecord[];
 }
 
-/** Every system each Payee has been assigned in, learned from the pilot's own Assignments (dismissals and unknown Payees aside). */
 export function systemsByPayee(
   assignments: readonly MiningTaxAssignmentRecord[],
   payees: readonly PayeeRecord[]
@@ -26,29 +22,11 @@ export function systemsByPayee(
   return out;
 }
 
-/**
- * Which Payee a new Assignment in `solarSystemId` most likely belongs to
- * (scope decision 20261004, "suggest the Payee last used in the system").
- *
- * A Payee used to remember a single `systemId`, which cannot describe a
- * system three landlords share or a landlord with moons in three systems. The
- * pilot's own Assignments can: the one most recently mined in this system is
- * the best guess for the next, and how often each other Payee was used here
- * orders the rest. The system's Default Payee (`Payee.defaultSystems`) is the
- * last resort, used only when this system has no history at all. Still only
- * ever a pre-selection the pilot confirms, never an Assignment made on their
- * behalf (that is `defaultAssignments.ts`).
- */
 export function suggestPayeeForSystem(
   assignments: readonly MiningTaxAssignmentRecord[],
   payees: readonly PayeeRecord[],
   solarSystemId: number,
   characterId: number,
-  /**
-   * Duplicate records of one Payee mapped to its primary (`payeeDuplicateAliases`). `payees` is
-   * every stored record: history and Default Systems read all of them, the suggestion and the
-   * ranked list name one Payee per recipient.
-   */
   aliases: ReadonlyMap<string, string> = new Map()
 ): PayeeSuggestion {
   const canon = (id: string) => aliases.get(id) ?? id;

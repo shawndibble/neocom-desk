@@ -4,11 +4,6 @@ import { Checkbox } from '@/components/ui';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { hasShareSelections } from './shareSelection';
 
-/**
- * The logout question (issue #3600): also remove what these Characters shared
- * with their Communities? Shown only when one shares anything. The owner keeps
- * the checked state and defaults it to yes.
- */
 export function RemoveSharedOption({
   characterIds,
   checked,

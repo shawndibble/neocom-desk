@@ -29,7 +29,6 @@ const byType = (...ids: number[]): BlueprintShare => ({
   locations: new Set(),
 });
 const placeIdOf = (b: { location_id: number }) => b.location_id;
-/** Place 3 cannot be named (a structure this Character cannot read). */
 const placeOf = (placeId: number) => (placeId === 3 ? null : place);
 
 describe('splitSharedBlueprints', () => {

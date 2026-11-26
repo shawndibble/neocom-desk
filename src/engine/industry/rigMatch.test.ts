@@ -35,7 +35,6 @@ describe('matchRigFits', () => {
   });
 
   it('knows two ME rigs are not double the bonus (stacking)', () => {
-    // 2.4 + 2.4 * 0.869 = 4.4856 in highsec.
     const matches = matchRigFits({
       facility: 'azbel',
       security: 'highsec',

@@ -1,13 +1,6 @@
 import type { ReactNode } from 'react';
 import * as Icon from '@/components/ui/icons';
 
-/**
- * Which library icon stands for a skill group on its board tile. CCP's image
- * server renders every skill as the same book, so a skill's own icon cannot
- * tell groups apart; these are the app's own icons, matched by theme, with the
- * generic Skills icon for any group without a fitting one. Keyed by the SDE's
- * English group name.
- */
 const GROUP_ICONS: Readonly<Record<string, ReactNode>> = {
   'Spaceship Command': <Icon.Ships />,
   Subsystems: <Icon.Ships />,

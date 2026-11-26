@@ -3,7 +3,6 @@ import { describe, expect, it, vi } from 'vitest';
 vi.mock('@/sde/loadSde', () => ({
   loadTypes: () =>
     Promise.resolve({
-      // The slim snapshot carries only the assembled volume of a hull.
       '47466': { name: 'Praxis', groupID: 27, volume: 470_000 },
       '99999': { name: 'Odd ship', groupID: 27, volume: 470_000 },
       '34': { name: 'Tritanium', groupID: 18, volume: 0.01 },

@@ -1,13 +1,5 @@
-/**
- * ESI notification types the server has seen for each Character (issue #3755,
- * ADR 0020): `registerDevice` returns them and this device keeps the union, so
- * Settings -> Notifications can offer a toggle for a type next time it opens.
- * Device-local on purpose (`createLocalSetting`): the server is the source of
- * truth and re-sends the list on every upload.
- */
 import { createLocalSetting } from '@/lib/useLocalSetting';
 
-/** characterId (as a string) -> seen ESI types, sorted. */
 export type SeenEveTypes = Record<string, string[]>;
 
 export function parseSeenEveTypes(raw: unknown): SeenEveTypes | null {
@@ -20,11 +12,6 @@ export function parseSeenEveTypes(raw: unknown): SeenEveTypes | null {
   );
 }
 
-/**
- * Unions the server's list into what is stored, never removing a type — a
- * toggle that was offered must not vanish. Returns `current` itself when
- * nothing is new, so the caller can skip a write.
- */
 export function mergeSeenEveTypes(
   current: SeenEveTypes,
   incoming: Readonly<Record<string, readonly string[]>>
@@ -45,7 +32,6 @@ export const useSeenEveTypesStore = createLocalSetting<SeenEveTypes>({
   parse: parseSeenEveTypes,
 });
 
-/** Merges a registration response's `seenTypes` into the store. */
 export async function recordSeenEveTypes(
   incoming: Readonly<Record<string, readonly string[]>> | undefined
 ): Promise<void> {

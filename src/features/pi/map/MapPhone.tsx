@@ -1,9 +1,3 @@
-/**
- * The Map on a phone: the planet types as a grid of 36px toggles, then one
- * tier at a time as a list (a tier switcher), then the full map in a container
- * that scrolls sideways on its own. Tapping a product opens the bottom sheet;
- * tapping the one you traced again clears it.
- */
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -48,11 +42,8 @@ export interface MapPhoneProps {
   figureOf: (typeId: number) => ProductFigure;
   onPlanet: (type: PlanetType) => void;
   onProduct: (typeId: number) => void;
-  /** The product's PI detail URL: a row is a real link. */
   productHref: (typeId: number) => string;
-  /** The what-if line, picks and so on, rendered between the toggles and the list. */
   between: ReactNode;
-  /** The full map, rendered when asked for. */
   fullMap: ReactNode;
 }
 
@@ -166,7 +157,6 @@ export function MapPhone(props: MapPhoneProps) {
                 >
                   <TypeIcon typeId={product.typeId} size={64} width={28} height={28} />
                   <span className="min-w-0 flex-1">
-                    {/* The card's title carries the accent cue at rest (DESIGN.md §6c "Phone cards"). */}
                     <span className="block">
                       {rank !== undefined && (
                         <span className="mr-1.5 text-[0.6875rem] font-bold text-warning">

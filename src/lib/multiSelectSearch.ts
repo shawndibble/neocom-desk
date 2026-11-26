@@ -3,7 +3,6 @@ import type { ReactNode } from 'react';
 export interface MultiSelectOption<Id> {
   readonly id: Id;
   readonly label: string;
-  /** Decoration shown before the label (a colour swatch); not searched. */
   readonly swatch?: ReactNode;
 }
 
@@ -12,12 +11,6 @@ export interface MultiSelectGroup<Id> {
   readonly options: readonly MultiSelectOption<Id>[];
 }
 
-/**
- * Narrows each group's options to those whose label contains `query`
- * (case-insensitive). A group left with zero matches is dropped entirely —
- * shown empty reads as "nothing here" rather than "nothing matches."
- * With `matchHeadings`, a query naming the group's heading keeps all of its options.
- */
 export function filterMultiSelectGroups<Id>(
   groups: readonly MultiSelectGroup<Id>[],
   query: string,

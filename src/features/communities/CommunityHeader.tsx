@@ -6,18 +6,9 @@ import { communityBadgeClassName } from './communityBadge';
 import { communityInitials } from './communityInitials';
 import type { CommunityMember, CommunitySummary } from './communityStore';
 
-/** Portraits in the stack; the names line says how many more there are. */
 const PORTRAITS = 5;
-/** Names spelled out before "and N more". */
 const NAMED = 3;
 
-/**
- * The open Community's card (scope decision
- * `20261013-072418-communities-my-sharing-slide-out-and-community-header`):
- * its initials, name and the Admin badge for its admin, the first Members'
- * portraits and names, and the header's actions (Manage) in the top-right
- * corner. How many Members there are rides on the Members tab, not here.
- */
 export function CommunityHeader({
   community,
   admin,
@@ -25,9 +16,7 @@ export function CommunityHeader({
   actions,
 }: {
   community: CommunitySummary;
-  /** This Character admins it. */
   admin: boolean;
-  /** Null while the roster loads: the card shows the name alone. */
   members: readonly CommunityMember[] | null;
   actions?: ReactNode;
 }) {
@@ -41,9 +30,7 @@ export function CommunityHeader({
     .filter((id): id is number => id !== null);
 
   return (
-    // Manage stays top-right on a phone too; the name wraps beside it.
     <div className="flex items-start gap-3 rounded-xs border border-line bg-panel p-3 md:p-4">
-      {/* A grid, not a flex row: a stretched flex item doesn't derive its width from aspect-ratio, a grid item does. */}
       <div className="grid min-w-0 flex-1 grid-cols-[auto_minmax(0,1fr)] gap-3">
         <span
           aria-hidden="true"

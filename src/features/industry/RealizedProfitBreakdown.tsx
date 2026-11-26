@@ -13,21 +13,10 @@ interface RealizedProfitBreakdownProps {
   profit: RealizedProfitResult;
   accountingLevel: number;
   brokerRelationsLevel: number;
-  /** Standing toward the watched order's station owner. Absent/0 = standings assumed 0. */
   standing?: ResolvedStandings;
-  /** Net loss across the run's Run Loss records, shown apart from the profit. Absent/0 = no loss. */
   netLoss?: number;
 }
 
-/**
- * The realized counterpart to `CalculationBreakdown` (issue #824): restates a
- * logged Production Run's net profit as a rule plus that rule's own
- * confirmed-sale values, the same "rule then substituted numbers" layout
- * `CalculationBreakdown` uses for a Build Plan's forward estimate. A smaller
- * sibling rather than sharing that component outright — a run has five
- * figures to restate where the forward estimate also carries price bases,
- * job fee and material cost.
- */
 export function RealizedProfitBreakdown({
   open,
   onClose,

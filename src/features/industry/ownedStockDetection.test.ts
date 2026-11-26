@@ -18,7 +18,6 @@ const ASSET = {
   is_singleton: false,
 };
 
-/** Stands in for i18next: enough to tell which fallback key fired, with its id interpolated. */
 const t = (key: string, opts?: Record<string, unknown>) =>
   `${key}:${opts ? Object.values(opts).join(',') : ''}`;
 
@@ -53,8 +52,6 @@ describe('loadOwnedStockSnapshot', () => {
   });
 
   it('names both truncated and skipped Characters as incomplete, in one sorted list', async () => {
-    // Either kind of gap makes the totals a floor, and the UI names them
-    // together — a player only cares which Characters it could not see.
     loadAllCharactersAssets.mockResolvedValue({
       entries: [
         { characterId: 91, name: 'Zara Pilot', assets: [ASSET], truncated: true },
@@ -82,8 +79,6 @@ describe('stockLocationLabel', () => {
   });
 
   it('falls back to the id-based structure label for an unresolvable structure', () => {
-    // Structure names are ACL-checked and can fail even for a Character with
-    // assets sitting inside one.
     expect(
       stockLocationLabel(
         placement({ locationType: 'other', locationId: 1035466617946 }),

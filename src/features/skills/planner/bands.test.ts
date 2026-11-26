@@ -52,7 +52,7 @@ describe('bandStarts', () => {
   });
 
   it('a marker row does not start a band and does not reset the comparison', () => {
-    const rows = buildRows([entry(1), entry(2)], [1]); // marker between entry 1 and 2
+    const rows = buildRows([entry(1), entry(2)], [1]);
     const markerRow = rows.find((r) => r.kind === 'marker')!;
     const result = bandStarts(
       rows,

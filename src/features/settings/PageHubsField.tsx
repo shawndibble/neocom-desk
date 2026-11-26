@@ -1,14 +1,3 @@
-/**
- * Settings › Market defaults › Page hubs (issue #6523): the pages that price at
- * a Trade Hub of their own instead of the Global hub. One row per page, its hub
- * select and Remove; Add lists only the pages without one (a menu once there
- * are several, a plain button for one), and a new entry starts at the hub that
- * page uses now, so adding re-prices nothing. Remove puts the page back on the
- * Global hub, with Undo; focus moves to the next row, else the previous one,
- * else the Add control (DESIGN.md "Removing a row").
- *
- * The same entries the in-page `HubMenu` switches between Global and the page.
- */
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -38,7 +27,6 @@ import {
 import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
 import { HubSelect } from './TradeHubField';
 
-/** A removed page hub, and whether it was in use or set aside, so Undo puts it back where it was. */
 type Removed = { area: PageHubArea; hub: HubChoice; parked: boolean };
 
 function write(edit: (map: PageHubMap) => PageHubMap, parked = false) {
@@ -46,24 +34,16 @@ function write(edit: (map: PageHubMap) => PageHubMap, parked = false) {
   return store.setValue(edit(store.value));
 }
 
-/**
- * Reads settled stores; the caller waits for `usePageHubs`, `useParkedPageHubs`,
- * `useMarketHub` and `useGlobalClosest` to hydrate. Lists every page with a hub
- * of its own, in use or set aside by its popover's App setting (noted so); only
- * Remove here forgets one.
- */
 export function PageHubsField() {
   const { t } = useTranslation();
   const map = usePageHubs((state) => state.value);
   const parkedMap = useParkedPageHubs((state) => state.value);
   const globalHub = useMarketHub((state) => state.value);
-  // A new entry starts at what Global is set to, so adding re-prices nothing.
   const globalChoice: HubChoice = useGlobalClosest((state) => state.value) ? CLOSEST : globalHub;
   const [removed, setRemoved] = useState<Removed | null>(null);
   const removeRefs = useRef(new Map<PageHubArea, HTMLButtonElement>());
   const addRef = useRef<HTMLButtonElement>(null);
   const focusAfterCommit = useFocusAfterCommit();
-  // A hub in use wins over one set aside; only areas with either are listed, so `own(area)` is set for each.
   const parked = (area: PageHubArea) => !ownChoice(map, area);
   const own = (area: PageHubArea) => (ownChoice(map, area) ?? ownChoice(parkedMap, area))!;
   const hasOwn = (area: PageHubArea) => Boolean(ownChoice(map, area) ?? ownChoice(parkedMap, area));

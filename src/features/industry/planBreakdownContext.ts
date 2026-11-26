@@ -25,7 +25,6 @@ interface PlanBreakdownContextInput {
   boughtDepth: ReturnType<typeof usePlanMaterials>['boughtDepth'];
 }
 
-/** What the Calculation Breakdown modal needs to explain the plan's numbers. */
 export function planBreakdownContext({
   plan,
   catalog,

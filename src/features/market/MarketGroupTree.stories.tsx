@@ -20,7 +20,6 @@ const TYPES: MarketTypeEntry[] = [
   { typeId: 11942, name: 'Silver Magnate', marketGroupId: 1838, volume: 16_500 },
 ];
 
-/** The Forge lists every standard frigate and the Imp; neither Magnate has an order. */
 const LISTED = new Set([608, 603, 587, 33397]);
 const NO_ORDERS: NoOrdersCue = {
   regionName: 'The Forge',
@@ -43,12 +42,6 @@ function byGroup(types: readonly MarketTypeEntry[]) {
 const childrenByParent = byParent(GROUPS);
 const typesByGroup = byGroup(TYPES);
 
-/**
- * @summary The Market Browser's Market Group tree. With one region in scope, a
- * leaf whose item has no order anywhere in that region carries a muted "No
- * orders in {Region}" at its right edge; listed items show nothing, and no row
- * is dimmed.
- */
 const meta = {
   title: 'market/MarketGroupTree',
   component: MarketGroupTree,
@@ -77,23 +70,18 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** @summary A branch of listed and unlisted items in The Forge: only the two Magnates carry the cue. */
 export const MixedBranch: Story = {};
 
-/** @summary The selected row keeps its accent; the cue beside it stays muted. */
 export const SelectedUnlisted: Story = { args: { selectedTypeId: 11940 } };
 
-/** @summary Search results are the same rows, so a match with no orders says so too. */
 export const SearchResults: Story = {
   args: {
     filterResult: filterMarketTree(GROUPS, TYPES, 'magnate'),
   },
 };
 
-/** @summary While the region's list loads, it failed, or the scope spans regions: no cue at all. */
 export const NoCue: Story = { args: { noOrders: null } };
 
-/** @summary A narrow tree: the cue gives way before the item's name does. */
 export const Narrow: Story = {
   decorators: [
     (Story) => (

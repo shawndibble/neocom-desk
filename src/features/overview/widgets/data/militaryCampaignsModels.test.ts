@@ -97,12 +97,10 @@ describe('militaryCampaigns builder', () => {
     expect(rows.map((row) => row.key)).toEqual([`1:${FAILOVER.objectiveId}`, '1:mine']);
     expect(rows[0]!.badge).toBe('overview.menu.factionChoice.caldari');
     expect(rows[0]!.cells[0]).toContain('turnInTitle');
-    // One Character in view: "You hold".
     expect(rows[0]!.cells[1]).toContain('youHold');
     expect(rows[0]!.turnIn).toMatchObject({ name: 'Shield Failover Report', characterId: 1 });
     expect(rows[0]!.turnIn!.surfaceLine).toBe(rows[0]!.cells[1]);
     expect(rows[0]!.detail).toBeUndefined();
-    // A joined objective that is no turn-in opens nothing.
     expect(rows[1]!.turnIn).toBeUndefined();
     expect(rows[1]!.cells[1]).toContain('earnedBoth');
   });
@@ -112,9 +110,7 @@ describe('militaryCampaigns builder', () => {
     expect(view.number.rings?.map((ring) => ring.key)).toEqual(['camp-caldari', 'camp-minmatar']);
     expect(view.number.rings![0]!.donut).toMatchObject({ kind: 'donut', of: 4 });
     expect(view.number.rings![0]!.donut.parts[0]!.value).toBe(1);
-    // Every Character's held items are waiting: 650 × 60K.
     expect(view.number.secondary?.text).toContain('~39M');
-    // Several Characters in view: each turn-in names its holder.
     const second = view.table!.rows.find((row) => row.key === `2:${FAILOVER.objectiveId}`);
     expect(second?.cells[1]).toContain('holds');
   });
@@ -235,9 +231,7 @@ describe('militaryCampaigns builder', () => {
     ]);
     expect(rows[1]!.cells[1]).toContain('holds');
     expect(rows[1]!.turnIn).toMatchObject({ characterId: 3 });
-    // 650 × 60K.
     expect(view.number.secondary?.text).toContain('~39M');
-    // Still asks for the grant.
     expect(view.headerMark).toMatchObject({ characterId: 3 });
   });
 

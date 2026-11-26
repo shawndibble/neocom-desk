@@ -7,7 +7,6 @@ import {
   type FillBatchOutcome,
 } from './haulingFillStop';
 
-/** A batch that found more, with plenty of room left: the fill goes on. */
 const going: FillBatchOutcome = {
   batchInPress: 1,
   batchRows: 12,
@@ -78,7 +77,6 @@ describe('fillCanFindMore', () => {
     expect(fillCanFindMore({ ...room, reason: 'stopped', freeM3: 600 })).toBe(false);
     expect(fillCanFindMore({ ...room, reason: 'nothing-left' })).toBe(false);
     expect(fillCanFindMore({ ...room, reason: 'budget', binding: 'budget' })).toBe(false);
-    // A raised Max spend moves the binding: more is back.
     expect(fillCanFindMore({ ...room, reason: 'budget' })).toBe(true);
   });
 });

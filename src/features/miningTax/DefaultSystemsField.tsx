@@ -27,10 +27,6 @@ function DefaultSystemRow({ systemId, onRemove }: { systemId: number; onRemove: 
   );
 }
 
-/**
- * A Payee's Default Systems (GLOSSARY.md): the systems whose moon ore it collects, listed with a
- * remove action each and one picker to add another. Only edited here, in Manage Payees.
- */
 export function DefaultSystemsField({ systemIds, onChange }: DefaultSystemsFieldProps) {
   const { t } = useTranslation();
   const exclude = useMemo(() => new Set(systemIds), [systemIds]);

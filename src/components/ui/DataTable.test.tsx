@@ -115,8 +115,6 @@ describe('DataTable highlightRowKey', () => {
   });
 
   it('scrolls once the row arrives, not only when the key does', () => {
-    // The key is in the URL before the fetch resolves, so an effect keyed on
-    // the id alone would fire against an empty table and never run again.
     const scrollIntoView = vi
       .spyOn(Element.prototype, 'scrollIntoView')
       .mockImplementation(() => {});
@@ -162,7 +160,6 @@ describe('DataTable selectedRowKey', () => {
     const selected = document.querySelector('[data-row-key="2"]');
     const other = document.querySelector('[data-row-key="1"]');
     expect(selected).toHaveClass('border-l-2', 'border-l-accent', 'bg-panel-2');
-    // Same 2px edge on every row, transparent when unselected: no cell shifts.
     expect(other).toHaveClass('border-l-2', 'border-l-transparent');
     expect(other).not.toHaveClass('border-l-accent');
     expect(other).not.toHaveClass('bg-panel-2');
@@ -180,7 +177,6 @@ describe('DataTable selectedRowKey', () => {
     stubViewport(PHONE_QUERY);
     renderTable({ selectedRowKey: 2 });
     expect(screen.getByRole('table')).toHaveClass('dt-stacked');
-    // The card is the row itself (`display: flex` under `dt-stacked`).
     const card = document.querySelector('[data-row-key="2"]');
     expect(card).toHaveAttribute('aria-current', 'true');
     expect(card).toHaveClass('border-l-2', 'border-l-accent', 'bg-panel-2');
@@ -230,7 +226,6 @@ describe('DataTable lift-after-hold', () => {
       vi.advanceTimersByTime(700);
       fireEvent.click(row, { detail: 1 });
       expect(onRowClick).not.toHaveBeenCalled();
-      // The next ordinary tap still opens it.
       fireEvent.pointerDown(row, { pointerType: 'touch' });
       fireEvent.click(row, { detail: 1 });
       expect(onRowClick).toHaveBeenCalledTimes(1);
@@ -286,7 +281,6 @@ describe('DataTable', () => {
 
   it('renders one body row per item with the rendered cell content', () => {
     renderTable();
-    // Header row plus one row per item.
     expect(screen.getAllByRole('row')).toHaveLength(rows.length + 1);
     const cells = screen.getAllByRole('cell');
     expect(cells[0]).toHaveTextContent('Tritanium');
@@ -359,7 +353,6 @@ describe('DataTable', () => {
     const [, first, second] = screen.getAllByRole('row');
     expect(first).not.toHaveClass('opacity-50');
     expect(second).toHaveClass('opacity-50');
-    // Hover fill from docs/DESIGN.md §4 survives a rowClassName.
     expect(second).toHaveClass('hover:bg-panel-2');
   });
 
@@ -433,7 +426,6 @@ describe('DataTable', () => {
         'aria-sort',
         'ascending'
       );
-      // A row with no value is still last.
       expect(itemNames()).toEqual(['Bravo', 'Delta', 'Charlie', 'Alpha']);
     });
 
@@ -478,15 +470,12 @@ describe('DataTable', () => {
       const { rerender } = renderSortable({
         sort: { columnId: 'value', direction: 'desc' },
         onSortChange,
-        // Inert once controlled.
         defaultSort: { columnId: 'name', direction: 'asc' },
       });
       expect(itemNames()).toEqual(['Charlie', 'Delta', 'Bravo', 'Alpha']);
 
       await user.click(screen.getByRole('button', { name: 'Value' }));
-      // The active column toggles, whatever its first-click direction.
       expect(onSortChange).toHaveBeenCalledWith({ columnId: 'value', direction: 'asc' });
-      // Nothing moved: the parent owns the sort and has not changed it.
       expect(itemNames()).toEqual(['Charlie', 'Delta', 'Bravo', 'Alpha']);
 
       rerender(
@@ -514,7 +503,6 @@ describe('DataTable', () => {
           rows={sortRows}
           rowKey={(row) => row.id}
           label="Sortable"
-          // A new object every render, as `useUrlSort` hands out after any URL change.
           sort={{ columnId: 'value', direction: 'asc' }}
         />
       );
@@ -522,11 +510,9 @@ describe('DataTable', () => {
       const calls = sortValue.mock.calls.length;
       expect(calls).toBeGreaterThan(0);
 
-      // Rebuilt column objects around the same `sortValue`: no re-sort.
       rerender(table(columnsWith(sortValue)));
       expect(sortValue.mock.calls.length).toBe(calls);
 
-      // A genuinely different `sortValue` still re-sorts.
       rerender(table(columnsWith((row) => (row.value === undefined ? undefined : -row.value))));
       expect(itemNames()).toEqual(['Charlie', 'Delta', 'Bravo', 'Alpha']);
     });
@@ -654,7 +640,7 @@ describe('DataTable', () => {
       const onRowClick = vi.fn();
       renderTable({ onRowClick });
       const cells = screen.getAllByRole('cell');
-      await user.click(cells[1]); // the Amount cell, not just the first column
+      await user.click(cells[1]);
       expect(onRowClick).toHaveBeenCalledWith(rows[0]);
     });
 
@@ -670,8 +656,6 @@ describe('DataTable', () => {
       expect(onRowClick).toHaveBeenCalledWith(rows[0]);
     });
 
-    // A focusable control inside the row (a tooltip trigger, a link) owns its
-    // own Enter/Space; the row must not also activate from the bubbled key.
     it('ignores Enter/Space bubbling up from something focused inside the row', () => {
       const onRowClick = vi.fn();
       renderTable({ onRowClick });
@@ -681,8 +665,6 @@ describe('DataTable', () => {
       expect(onRowClick).not.toHaveBeenCalled();
     });
 
-    // A control inside a clickable row runs its own action only — by mouse
-    // and by keyboard — with no stopPropagation workaround on the page.
     describe('controls inside the row', () => {
       function renderWithControls(onRowClick: () => void, onStar: () => void) {
         const onTick = vi.fn();
@@ -746,8 +728,6 @@ describe('DataTable', () => {
         expect(onRowClick).not.toHaveBeenCalled();
       });
 
-      // React bubbles events through portals along the component tree, so a
-      // menu or modal opened from inside the row would otherwise reach it.
       it('a click inside something portaled out of the row does not reach the row', async () => {
         const user = userEvent.setup();
         const onRowClick = vi.fn();
@@ -764,8 +744,6 @@ describe('DataTable', () => {
         expect(onRowClick).not.toHaveBeenCalled();
       });
 
-      // Focusable only so the keyboard can reach a hover tooltip (an ISK
-      // figure) — it has no click action of its own.
       it('a click on a merely focusable span still runs the row', async () => {
         const user = userEvent.setup();
         const onRowClick = vi.fn();
@@ -845,7 +823,6 @@ describe('DataTable', () => {
         const before = drawn()[0]!.innerHTML;
         await user.click(screen.getAllByRole('cell')[0]!);
         expect(drawn()[0]!.innerHTML).not.toBe(before);
-        // Only the open card's chevron turned.
         expect(drawn()[1]!.innerHTML).toBe(before);
       });
 
@@ -914,10 +891,6 @@ describe('DataTable', () => {
     });
   });
 
-  // The collapse itself is CSS (`.dt-stacked`, src/styles/index.css) and jsdom
-  // loads no stylesheet, so these cover the markup that CSS depends on: where
-  // the labels come from, the opt-out hook, and the roles `display: block`
-  // would otherwise strip in a real browser.
   describe('responsive collapse', () => {
     it('carries each column header on its cells, for the stacked layout to print', () => {
       renderTable();
@@ -940,20 +913,17 @@ describe('DataTable', () => {
       const phone = renderTable();
       expect(screen.getByRole('table')).toHaveClass('dt-stacked');
       phone.unmount();
-      // A table that knows it has room keeps its columns even on a phone.
       const wide = renderTable({ stacked: false });
       expect(screen.getByRole('table')).not.toHaveClass('dt-stacked');
       wide.unmount();
       restoreViewport();
 
-      // jsdom's own `matchMedia` never matches: a desktop viewport.
       const desktop = renderTable();
       expect(screen.getByRole('table')).not.toHaveClass('dt-stacked');
       desktop.unmount();
       const forced = renderTable({ stacked: true });
       expect(screen.getByRole('table')).toHaveClass('dt-stack', 'dt-stacked');
       forced.unmount();
-      // Never cards without the stack layout to show them in.
       renderTable({ stacked: true, responsive: 'table' });
       expect(screen.getByRole('table')).not.toHaveClass('dt-stacked');
     });
@@ -981,8 +951,6 @@ describe('DataTable', () => {
       const [itemCell, amountCell] = screen.getAllByRole('cell');
       expect(amountCell).toHaveClass('dt-primary');
       expect(itemCell).not.toHaveClass('dt-primary');
-      // Still the second cell: the hoist is CSS `order`, not a DOM reorder,
-      // so the table's own reading order survives at every width.
       expect(amountCell).toHaveAttribute('data-label', 'Amount');
     });
   });
@@ -993,7 +961,6 @@ describe('DataTable opt-in phone features', () => {
     const { container } = render(
       <DataTable columns={sortColumns} rows={sortRows} rowKey={(row) => row.id} label="Values" />
     );
-    // The table is still the component's only root: no sort bar, no wrapper.
     expect(container.children).toHaveLength(1);
     expect(container.firstElementChild?.tagName).toBe('TABLE');
     expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
@@ -1093,8 +1060,6 @@ describe('DataTable opt-in phone features', () => {
       expect(table?.tagName).toBe('TABLE');
       expect(table).toHaveClass('mt-2');
       const select = screen.getByRole('combobox', { name: 'Sort by' });
-      // Only the sortable column, both directions (plus the unsorted placeholder),
-      // the numeric column's first-click direction (high to low) first.
       expect(
         Array.from((select as HTMLSelectElement).options)
           .filter((option) => !option.disabled)
@@ -1143,7 +1108,6 @@ describe('DataTable opt-in phone features', () => {
         'descending'
       );
 
-      // …and the other way round: a header click on the active column flips the picker.
       await user.click(screen.getByRole('button', { name: /Value/ }));
       expect(screen.getByRole('combobox', { name: 'Sort by' })).toHaveValue('value:asc');
       expect(screen.getByText('Sort: Value ↑')).toBeInTheDocument();
@@ -1198,7 +1162,6 @@ describe('DataTable opt-in phone features', () => {
       renderTable({ columns: denseColumns, stackLayout: 'dense', stackColumns: 2 });
       const table = screen.getByRole('table');
       expect(table).toHaveClass('dt-stack', 'dt-stack-dense');
-      // Dense replaces the 2-col card rather than stacking on it.
       expect(table).not.toHaveClass('dt-stack-2col');
       const [item, amount, id, corner] = screen.getAllByRole('cell');
       expect(item).toHaveClass('dt-primary');
@@ -1217,7 +1180,6 @@ describe('DataTable opt-in phone features', () => {
       renderTable({
         columns: [
           { id: 'pick', header: 'Pick', stackEdge: 'start', render: () => 'x' },
-          // The edge cell leads, so the title has to be named.
           { ...denseColumns[0]!, primary: true },
           ...denseColumns.slice(1),
           { id: 'qty', header: 'Qty', stackEdge: 'end', render: () => '5' },
@@ -1229,7 +1191,6 @@ describe('DataTable opt-in phone features', () => {
       expect(pick).not.toHaveClass('dt-meta');
       expect(qty).toHaveClass('dt-edge', 'dt-edge-end');
       expect(qty).not.toHaveClass('dt-meta');
-      // A leading edge cell is not the first meta cell: Amount still is.
       expect(item).toHaveClass('dt-primary');
       expect(amount).toHaveClass('dt-meta', 'dt-meta-first');
     });
@@ -1293,11 +1254,6 @@ describe('DataTable opt-in phone features', () => {
       expect(corner).not.toHaveClass('dt-corner-start');
     });
 
-    // The disclosure chevron (`expandableRow`) always clusters beside the
-    // actions button now — see the `disclosure` describe block below. This
-    // block only covers the corner's own `'start'` side and its interaction
-    // with that cluster (a table with all three: cardCorner, expandableRow,
-    // rowMoreActions — Hauling's own case).
     it('a start corner is not shifted by the actions+disclosure triple-collision rule (that rule targets the default right corner)', () => {
       renderTable({
         columns: cornerColumns,
@@ -1305,10 +1261,6 @@ describe('DataTable opt-in phone features', () => {
         expandableRow: { renderDetail: () => <div>detail</div> },
       });
       const corner = document.querySelector('td.dt-corner-start')!;
-      // jsdom doesn't compute the `@media (width < 40rem)` cascade, so this
-      // asserts the selector scope rather than a resolved `right` value:
-      // `:not(.dt-corner-start)` on the triple-collision rule means it can
-      // never match this cell regardless of viewport.
       expect(corner.matches('.dt-corner:not(.dt-corner-start)')).toBe(false);
     });
   });
@@ -1385,7 +1337,6 @@ describe('DataTable opt-in phone features', () => {
         expect(toggle.closest('tr')).toHaveClass('dt-group-header');
         expect(toggle.closest('td')).toHaveAttribute('colspan', '2');
         expect(toggle.closest('td')).not.toHaveAttribute('data-label');
-        // Group sits where its first member did; null and single-route rows ungrouped.
         expect(offerIds()).toEqual(['2', '4']);
         expect(screen.queryByRole('button', { name: /Dodixie/ })).not.toBeInTheDocument();
         expect(document.querySelector('tr[data-row-key="4"]')).not.toHaveClass('dt-group-member');
@@ -1397,7 +1348,6 @@ describe('DataTable opt-in phone features', () => {
         const toggle = screen.getByRole('button', { name: 'Jita→Amarr ×2' });
         await user.click(toggle);
         expect(toggle).toHaveAttribute('aria-expanded', 'true');
-        // Sorted asc: 3 (10), 2 (20), 4 (25), 1 (30) — group led by 3.
         expect(offerIds()).toEqual(['3', '1', '2', '4']);
         expect(document.querySelector('tr[data-row-key="3"]')).toHaveClass('dt-group-member');
         expect(document.querySelector('tr[data-row-key="1"]')).toHaveClass('dt-group-member');
@@ -1434,7 +1384,6 @@ describe('DataTable opt-in phone features', () => {
     it('folds a single row under its own header when minSize is 1', () => {
       renderOffers({ groupBy: { ...groupBy, allWidths: true, minSize: 1 } });
       expect(screen.getByRole('button', { name: 'Dodixie→Rens ×1' })).toBeInTheDocument();
-      // A null key still never groups.
       expect(offerIds()).toEqual(['2']);
     });
 
@@ -1446,14 +1395,12 @@ describe('DataTable opt-in phone features', () => {
           allWidths: true,
           minSize: 1,
           defaultExpanded: () => true,
-          // Smallest group first: the reverse of the sorted order.
           groupCompare: (a, b) => a.length - b.length,
         },
       });
       const headers = () =>
         [...document.querySelectorAll('.dt-group-header')].map((h) => h.textContent);
       expect(headers()).toEqual(['Dodixie→Rens ×1', 'Jita→Amarr ×2']);
-      // Members keep their sorted order inside the reordered group.
       expect(offerIds()).toEqual(['4', '2', '1', '3']);
       await user.click(screen.getByRole('button', { name: 'Dodixie→Rens ×1' }));
       expect(offerIds()).toEqual(['2', '1', '3']);
@@ -1560,9 +1507,7 @@ describe('DataTable virtualize', () => {
     const ids = mountedIds();
     expect(ids.length).toBeGreaterThan(0);
     expect(ids.length).toBeLessThan(100);
-    // Cheapest of all 1,000 leads, not the cheapest of some first slice.
     expect(ids[0]).toBe('1000');
-    // The spacer standing in for the unmounted rows is not a table row to AT.
     expect(screen.getAllByRole('row').length).toBe(ids.length + 1);
   });
 
@@ -1619,7 +1564,6 @@ describe('DataTable virtualize', () => {
     it('fixes the layout and sizes the header cells when windowed', () => {
       renderSized({ virtualize: true });
       expect(screen.getByRole('table')).toHaveClass('table-fixed');
-      // jsdom resolves `ch` to px on read; the written value is what ships.
       expect(screen.getByRole('columnheader', { name: 'Amount' }).getAttribute('style')).toContain(
         '12ch'
       );
@@ -1727,8 +1671,6 @@ describe('DataTable virtualize', () => {
     });
 
     it('leaves scroll anchoring on for a windowed table without expandable rows', () => {
-      // A newest-first ledger relies on it to hold the view when a refresh
-      // adds rows above the viewport.
       render(
         <DataTable
           label="Offers"
@@ -1744,15 +1686,13 @@ describe('DataTable virtualize', () => {
     });
 
     describe('with expandableRow', () => {
-      const ROW_HEIGHT = 29; // the default-density estimate, so unmeasured rows agree
+      const ROW_HEIGHT = 29;
       const DETAIL_HEIGHT = 300;
       let detailHeight = DETAIL_HEIGHT;
       const offsetHeight = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'offsetHeight')!;
       let scrollTo: ReturnType<typeof vi.spyOn>;
 
       beforeEach(() => {
-        // jsdom has no layout: a main row measures one line, an open detail
-        // far more. Everything else keeps the suite-wide stand-in.
         Object.defineProperty(HTMLElement.prototype, 'offsetHeight', {
           configurable: true,
           get(this: HTMLElement) {
@@ -1761,7 +1701,6 @@ describe('DataTable virtualize', () => {
             return offsetHeight.get!.call(this);
           },
         });
-        // Collapsing a row above the viewport moves the page by its delta.
         scrollTo = vi.spyOn(window, 'scrollTo').mockImplementation(((options: ScrollToOptions) => {
           Object.defineProperty(window, 'scrollY', {
             configurable: true,
@@ -1805,15 +1744,11 @@ describe('DataTable virtualize', () => {
         const detail = screen.getByText('Detail 1').closest('tr');
         expect(rowOf(1)?.nextElementSibling).toBe(detail);
         expect(detail?.nextElementSibling).toBe(rowOf(2));
-        // The detail is a row to AT too: counted, and indexed between its
-        // own row and the next.
         expect(screen.getByRole('table').getAttribute('aria-rowcount')).toBe('502');
         expect(rowOf(1)?.getAttribute('aria-rowindex')).toBe('2');
         expect(detail?.getAttribute('aria-rowindex')).toBe('3');
         expect(rowOf(2)?.getAttribute('aria-rowindex')).toBe('4');
 
-        // Scrolled past, the open row still takes its detail's height: every
-        // row below it sits that much lower.
         scrollPage(5_000);
         expect(mountedIds()).not.toContain('1');
         expect(spacerBefore()).toBe(firstMountedIndex() * ROW_HEIGHT + DETAIL_HEIGHT);
@@ -1826,22 +1761,16 @@ describe('DataTable virtualize', () => {
         scrollPage(5_000);
         expect(spacerBefore()).toBe(firstMountedIndex() * ROW_HEIGHT + DETAIL_HEIGHT);
 
-        // Opening another row closes the first, which isn't mounted to
-        // measure itself again.
         const target = Number(mountedIds()[5]);
         await user.click(rowOf(target)!.querySelector('td')!);
 
         expect(screen.queryByText('Detail 1')).toBeNull();
         expect(screen.getByText(`Detail ${target}`)).toBeInTheDocument();
         expect(spacerBefore()).toBe(firstMountedIndex() * ROW_HEIGHT);
-        // TanStack moved the page for that; the browser's scroll anchoring
-        // must not move it a second time for the spacer shrinking.
         expect(document.querySelector('tbody')?.className).toContain('[overflow-anchor:none]');
       });
 
       it('takes up a detail that grows while the page is scrolling', async () => {
-        // A ResizeObserver whose callbacks the test can fire: jsdom's stub
-        // never calls back.
         const observers: { callback: ResizeObserverCallback; targets: Element[] }[] = [];
         const original = globalThis.ResizeObserver;
         globalThis.ResizeObserver = class {
@@ -1864,8 +1793,6 @@ describe('DataTable virtualize', () => {
           const watcher = observers.find((o) => o.targets.includes(detail));
           expect(watcher).toBeDefined();
 
-          // Mid-scroll — TanStack's own measuring skips this — the detail's
-          // content arrives and it grows.
           scrollPage(10);
           detailHeight = 500;
           watcher!.callback([], watcher as unknown as ResizeObserver);
@@ -1908,14 +1835,12 @@ describe('DataTable virtualize', () => {
       const { rerender } = render(table(VIRTUALIZE_THRESHOLD));
       expect(mountedIds()).toHaveLength(VIRTUALIZE_THRESHOLD);
 
-      // A live refresh or a cleared filter pushes it over…
       rerender(table(VIRTUALIZE_THRESHOLD + 1));
       expect(mountedIds().length).toBeLessThan(100);
       expect(screen.getByRole('table').getAttribute('aria-rowcount')).toBe(
         String(VIRTUALIZE_THRESHOLD + 2)
       );
 
-      // …and a narrowing filter brings it back under.
       rerender(table(VIRTUALIZE_THRESHOLD));
       expect(mountedIds()).toHaveLength(VIRTUALIZE_THRESHOLD);
       const tableEl = screen.getByRole('table');
@@ -1951,7 +1876,6 @@ describe('DataTable virtualize', () => {
     describe('highlightRowKey', () => {
       let scrollTo: ReturnType<typeof vi.spyOn>;
       let scrollIntoView: ReturnType<typeof vi.spyOn>;
-      /** What a real scroll to `top` looks like to the page: `scrollY`, then a later `scroll` event. */
       const scrollPageTo = (top: number) => {
         Object.defineProperty(window, 'scrollY', { configurable: true, value: top });
         setTimeout(() => window.dispatchEvent(new Event('scroll')));
@@ -1959,8 +1883,6 @@ describe('DataTable virtualize', () => {
 
       beforeEach(() => {
         scrollIntoView = vi.spyOn(Element.prototype, 'scrollIntoView').mockImplementation(() => {});
-        // jsdom has no layout: stand in for a long page and for the browser
-        // moving it. TanStack clamps its target to the document's scroll height.
         Object.defineProperty(document.documentElement, 'scrollHeight', {
           configurable: true,
           value: 1_000_000,
@@ -2048,8 +1970,6 @@ describe('DataTable virtualize', () => {
 });
 
 describe('DataTable row memoization', () => {
-  // A plain log rather than `vi.fn`: this suite's config resets mock
-  // implementations between tests.
   let rendered: number[] = [];
   const renderItem = (row: Row) => {
     rendered.push(row.id);
@@ -2084,8 +2004,6 @@ describe('DataTable row memoization', () => {
           rows={tenRows}
           rowKey={byId}
           selectedRowKey={selected}
-          // Inline, as most callers pass it: rows reach it through a stable
-          // activator, so it mustn't cost a re-render of every row.
           onRowClick={() => {}}
         />
       </>

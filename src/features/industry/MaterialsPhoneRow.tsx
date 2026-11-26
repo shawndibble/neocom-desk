@@ -16,23 +16,15 @@ interface PhonePriceProps {
   sourcing: MaterialSourcingMap | undefined;
   pricesReady: boolean;
   nameFor: (typeID: number) => string;
-  /** The row's Depth Price walk; absent for a built row or one priced at the lowest sell. */
   depth: DepthPrice | undefined;
   editing: boolean;
   onEdit: (seed?: string) => void;
   onStopEditing: () => void;
-  /** Enter or Escape just closed the field: take focus back. */
   refocus: boolean;
   onRefocused: () => void;
-  /** The price field itself, shown while editing; `autoFocus` is true once the player asked to edit. */
   field: (autoFocus: boolean) => ReactNode;
 }
 
-/**
- * The card's price: "@ 4 ISK" with a faint pencil, which becomes the field
- * when tapped and goes back to text once focus leaves it. A row with no price
- * yet stays the field, since there is no number to show.
- */
 function PhonePrice({
   material,
   sourcing,
@@ -82,7 +74,6 @@ interface MaterialsPhoneRowProps {
   pricesReady: boolean;
   nameFor: (typeID: number) => string;
   depth: DepthPrice | undefined;
-  /** What building the row saves over buying, when the advice says it is cheaper. */
   savings: number | null;
   editingHave: boolean;
   editingPrice: boolean;
@@ -90,32 +81,19 @@ interface MaterialsPhoneRowProps {
   onStopEditingHave: () => void;
   onEditPrice: (seed?: string) => void;
   onStopEditingPrice: () => void;
-  /** Enter or Escape just closed that field: its value takes focus back. */
   refocusHave: boolean;
   refocusPrice: boolean;
   onRefocused: () => void;
-  /** Cells the table renders for both layouts, passed in as already-built nodes. */
   name: ReactNode;
   total: ReactNode;
   ownedHint: ReactNode;
   action: ReactNode;
-  /** The item menu's visible button, beside the total. */
   menu?: ReactNode;
   haveField: ReactNode;
   priceField: (autoFocus: boolean) => ReactNode;
-  /** The price field of a built row with an unpriced ingredient — the warning, not a price. */
   unpricedField: ReactNode;
 }
 
-/**
- * One phone card, read as the errand it is rather than as a row of unlabelled
- * columns: the name and what the line costs; then what to do — "Buy 317,000
- * @ 4 ISK", "Build", or nothing for stock already owned; then, small, how
- * that number came about — "Need 320,000 · Have 3,000". Every number carries
- * its own word, so no section needs a column header above its cards. Have and
- * price are edited in place (a faint pencil, §6c). No card box — rows are told
- * apart by a zebra tint, so the Materials panel is the only frame.
- */
 export function MaterialsPhoneRow({
   material,
   sourcing,
@@ -185,7 +163,6 @@ export function MaterialsPhoneRow({
         </span>
       </div>
 
-      {/* What to do about it. */}
       {building ? (
         <div className="flex items-baseline justify-between gap-2 text-xs">
           <span className="text-success">{t('industry.errands.buildColumn')}</span>
@@ -224,7 +201,6 @@ export function MaterialsPhoneRow({
         )
       )}
 
-      {/* How that number came about. */}
       {!tier && (
         <div className="flex flex-wrap items-center gap-x-1.5 text-xs text-text-dim tabular-nums">
           <span>
@@ -252,8 +228,6 @@ export function MaterialsPhoneRow({
         </div>
       )}
 
-      {/* Use what's in the hangar, switch build/buy, change the blueprint tier. */}
-      {/* `empty:hidden`: both nodes may render nothing, and an empty line would still take a gap. */}
       <div className="flex min-w-0 flex-wrap items-center gap-x-3 empty:hidden">
         {ownedHint}
         {action}

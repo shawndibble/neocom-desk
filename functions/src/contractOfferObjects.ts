@@ -1,12 +1,3 @@
-/**
- * Pure pieces of the R2 offers writer (ADR 0019, issue #3745): group rows by
- * item type, pack the types into content-addressed bundle shards (blueprint
- * types apart from the rest), and build the `index.json` that names, per type,
- * the shard holding it. A one-item read fetches one shard; a whole-snapshot
- * read fetches them all. Shards rather than an object per type because R2
- * bills every write, and ~30% of types change every half hour
- * (docs/context/decisions/20261104-065346-r2-snapshots-publish-few-big-objects-not-one.md).
- */
 import { createHash } from 'node:crypto';
 import { gzipSync } from 'node:zlib';
 import { buildContractOfferIndex, type PublicContractOfferRow } from './publicContracts.js';
@@ -14,13 +5,8 @@ import { buildContractOfferIndex, type PublicContractOfferRow } from './publicCo
 const BUNDLE_OBJECT_PREFIX = 'contract-offers/bundles/';
 export const R2_INDEX_KEY = 'contract-offers/index.json';
 
-/** Hex chars of the content hash kept in an object name. */
 const HASH_LENGTH = 16;
 
-/**
- * Uncompressed bytes per bundle shard (~80 KB gzipped): small enough for a
- * one-item read, few enough (~75) that a publish writes ~75 objects.
- */
 export const MAX_BUNDLE_BYTES = 1_000_000;
 
 export type BundleGroup = 'blueprints' | 'others';
@@ -28,18 +14,15 @@ export type BundleGroup = 'blueprints' | 'others';
 export interface BundleObjectPart {
   name: string;
   body: string;
-  /** The types whose rows this shard holds, ascending; a type is in exactly one shard. */
   typeIds: number[];
 }
 
-/** Every row, sharded: blueprint types (copies and originals) apart from the rest. */
 export type BundleObjects = Record<BundleGroup, BundleObjectPart[]>;
 
 export interface ContractOfferR2Index {
   lastSyncedAt: number;
   types: Record<string, { count: number; cheapest: number | null; objects: string[] }>;
   regionIds: number[];
-  /** Bundle shard names per group. */
   bundles: Record<BundleGroup, string[]>;
 }
 
@@ -51,14 +34,6 @@ function contentHash(body: string): string {
   return createHash('sha256').update(body).digest('hex').slice(0, HASH_LENGTH);
 }
 
-/**
- * The bundle shards. A type's rows are serialized and sorted, so a shard's body,
- * and so its name, is independent of row order. A type is a blueprint type when
- * any of its rows is a copy or carries ME/TE (only a blueprint does); all its
- * rows then go with it, so BPC Sourcing reads one group. Types go in id order
- * and a shard closes once past `maxBundleBytes`, so a type never straddles two
- * shards.
- */
 export function buildBundleObjects(
   rows: readonly PublicContractOfferRow[],
   { maxBundleBytes = MAX_BUNDLE_BYTES }: { maxBundleBytes?: number } = {}
@@ -104,7 +79,6 @@ export function gzipObjectBody(body: string): Buffer {
   return gzipSync(body);
 }
 
-/** The per-type facts of `buildContractOfferIndex`, plus the shard holding each type. */
 export function buildContractOfferR2Index(
   rows: readonly PublicContractOfferRow[],
   bundles: BundleObjects,

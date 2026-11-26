@@ -36,26 +36,17 @@ vi.mock('@/sde/loadSde', () => ({
 }));
 
 installContactsHarness();
-// The one App-level test below: its graph and shell chunk load here, under the
-// hook's own budget, not inside the test's findBy.
 beforeAll(async () => {
   await Promise.all([import('@/app/App'), loadLayout()]);
 }, 30_000);
 
 describe('Contacts', () => {
-  // The one App-level test of the Contacts route: it mounts at /contacts inside
-  // the signed-in shell, its rail link current. Every other Contacts test
-  // renders the page on its own (`renderContactsRoute`).
   it('lists contacts with resolved names, standings, and blocked/watched flags, at /contacts inside the shell', async () => {
     const { App } = await import('@/app/App');
     render(<App />);
     expect(await screen.findByText('Good Friend')).toBeInTheDocument();
     expect(screen.getByText('Neutral Corp')).toBeInTheDocument();
     expect(screen.getByText('Bad Alliance')).toBeInTheDocument();
-    // Flags are icons now; their meaning reaches a reader through the
-    // accessible name, not through a word in the cell. Each is rendered twice
-    // — beside the name for the phone card, in the Flags column for the table
-    // — and CSS shows exactly one (jsdom applies no CSS, so both are here).
     expect(screen.getAllByRole('img', { name: 'Watched' })).toHaveLength(2);
     expect(screen.getAllByRole('img', { name: 'Blocked' })).toHaveLength(2);
     const rail = (await screen.findAllByRole('navigation'))[0];
@@ -67,7 +58,6 @@ describe('Contacts', () => {
     renderContactsRoute();
     await screen.findByText('Good Friend');
 
-    // Scoped to the table: the same words label the type filter chips above it.
     const table = within(screen.getByRole('table', { name: 'Contacts' }));
     expect(table.getAllByText('Player').length).toBe(2);
     expect(table.getAllByText('Corp').length).toBe(2);
@@ -80,9 +70,6 @@ describe('Contacts', () => {
     renderContactsRoute();
     await screen.findByText('Good Friend');
 
-    // `.dt-stack` is the below-`sm` collapse. The Corp / Alliance column
-    // prints names too long to squeeze into a 390px row — see
-    // docs/context/decisions/20260912-210929-*.
     expect(screen.getByRole('table', { name: 'Contacts' })).toHaveClass('dt-stack');
   });
 
@@ -90,9 +77,7 @@ describe('Contacts', () => {
     renderContactsRoute();
     await screen.findByText('Good Friend');
 
-    // Good Friend's corp, which the contact row itself never names.
     expect(await screen.findByText('Home Corp')).toBeInTheDocument();
-    // Hostile Corp twice: its own contact row, and Stranger Pilot's corp line.
     expect(screen.getAllByText('Hostile Corp').length).toBe(2);
   });
 
@@ -101,8 +86,6 @@ describe('Contacts', () => {
     await screen.findByText('Neutral Corp');
 
     const table = within(screen.getByRole('table', { name: 'Contacts' }));
-    // Three from this column (Neutral Corp, Bad Alliance, Hostile Corp), and
-    // three more from Flags, which draws the same dash for an unflagged row.
     expect(table.getAllByText('—').length).toBe(6);
   });
 
@@ -118,9 +101,6 @@ describe('Contacts', () => {
     renderContactsRoute();
     await screen.findByText('Stranger Pilot');
 
-    // Stranger Pilot is 0 personally; Neutral Corp, which they fly for, is a
-    // contact too. The tag sits against the corp, not in the Standing column.
-    // Twice: Hostile Corp's own row, and the tag on Stranger Pilot's corp line.
     const tags = await screen.findAllByRole('img', { name: 'Bad standing (-5)' });
     expect(tags.length).toBe(2);
   });
@@ -225,7 +205,6 @@ describe('Contacts', () => {
     );
     renderContactsRoute();
     expect(await screen.findByText('Showing saved data.')).toBeInTheDocument();
-    // getByText: exactly one — the note beside the data, no full banner over it.
     expect(screen.getByText(/: log in again$/)).toBeInTheDocument();
     expect(await screen.findByText('Good Friend')).toBeInTheDocument();
   });
@@ -262,14 +241,12 @@ describe('Contacts', () => {
 describe('Contacts Title / Score column', () => {
   const NPC_AGENT = 3_008_416;
 
-  // Device-local and module-scoped: put the default back even when a test fails midway.
   afterEach(async () => {
     await act(() =>
       contactsCharacterColumnsStore.getState().setValue(DEFAULT_VISIBLE_CONTACTS_CHARACTER_COLUMNS)
     );
   });
 
-  /** Records every public-record read; each answers with a score, no title. */
   function recordPublicReads(): number[] {
     const ids: number[] = [];
     server.use(
@@ -311,7 +288,6 @@ describe('Contacts Title / Score column', () => {
     await screen.findByText('Good Friend');
     await user.click(screen.getByRole('button', { name: 'Columns' }));
     await user.click(screen.getByRole('menuitemcheckbox', { name: 'Title / Score' }));
-    // The picker stays open for another pick; close it so the table is back in reach.
     await user.keyboard('{Escape}');
     expect(await screen.findByRole('columnheader', { name: /Title \/ Score/ })).toBeInTheDocument();
     expect(await screen.findAllByText('1,240 points')).toHaveLength(2);
@@ -349,7 +325,6 @@ describe('Contacts row click', () => {
     expect(within(row).queryByRole('button', { name: /More actions/ })).not.toBeInTheDocument();
     fireEvent.contextMenu(row);
 
-    // Right-click may still offer the table's own Export; never Copy / Show info.
     expect(screen.queryByRole('menuitem', { name: 'Show info' })).not.toBeInTheDocument();
     expect(screen.queryByRole('menuitem', { name: 'Copy contact ID' })).not.toBeInTheDocument();
   });

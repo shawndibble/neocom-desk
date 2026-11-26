@@ -144,7 +144,7 @@ describe('buildFeederView', () => {
           row('2026-10-12', 10),
           row('2026-10-12', 5, { characterId: 901 }),
           row('2026-10-13', 4),
-          row('2026-10-05', 99), // before coverage
+          row('2026-10-05', 99),
         ],
         prices,
         payouts: [
@@ -169,7 +169,6 @@ describe('buildFeederView', () => {
     );
     const s = v.summary;
     expect(s.minedVolume).toBe(19);
-    // day 12: 15 x 100; day 13: 4 x 50 (sell fallback)
     expect(s.minedValueIsk).toBe(1700);
     expect(s.accruedIsk).toBe(170);
     expect(s.paidIsk).toBe(40);
@@ -184,7 +183,6 @@ describe('buildFeederView', () => {
     expect(s.rulesVersion).toBe(2);
     expect(s.pendingValueIsk).toBe(0);
     expect(v.days.map((d) => d.date)).toEqual(['2026-10-12', '2026-10-13']);
-    // The moon owner sees ore and quantity only: no value, rate or due (#5261).
     expect(v.days[0]).toEqual({
       date: '2026-10-12',
       lines: [
@@ -198,7 +196,6 @@ describe('buildFeederView', () => {
   });
 
   it('keeps unread days out of the accrual but still shows them', () => {
-    // Read well at 2026-10-13 05:00: day 12 closed at 13th 06:00 -> not billable
     const lastRead = Date.parse('2026-10-13T05:00:00Z');
     const v = buildFeederView(
       input({
@@ -326,7 +323,6 @@ describe('buildFeederView', () => {
       })
     );
     expect(v.summary.minedValueIsk).toBe(300);
-    // 10-15 has no saved price and no billed line: still unpriced.
     expect(v.summary.unpricedDays).toBe(1);
   });
 

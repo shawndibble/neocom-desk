@@ -14,8 +14,6 @@ import {
   startingRolls,
 } from './mutationEdit';
 
-// Shapes from public/data/mutaplasmids.json: Gravid / Decayed Heavy Energy
-// Neutralizer Mutaplasmid -> Heavy Abyssal Energy Neutralizer.
 const GRAVID = 47831;
 const DECAYED = 47829;
 const ABYSSAL_NEUT = 47832;
@@ -24,7 +22,7 @@ const NEUT_II = 12271;
 const CAP_NEED = 6;
 const POWER = 30;
 const RANGE = 54;
-const SIG = 552; // rolled, but the base carries none
+const SIG = 552;
 
 const DATA: MutaplasmidData = {
   attributeNames: { 6: 'capacitorNeed', 30: 'power', 54: 'maxRange', 552: 'signatureRadius' },
@@ -35,7 +33,6 @@ const DATA: MutaplasmidData = {
       attributes: [
         { id: CAP_NEED, min: 0.8, max: 1.3, highIsGood: false },
         { id: POWER, min: 0.85, max: 1.3, highIsGood: false },
-        // A range that leaves ×1 out: a base value clamps to its edge.
         { id: RANGE, min: 1.05, max: 1.3, highIsGood: true },
         { id: SIG, min: 0.9, max: 1.1, highIsGood: false },
       ],

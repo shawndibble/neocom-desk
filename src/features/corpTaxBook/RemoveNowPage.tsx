@@ -30,12 +30,6 @@ type State =
   | { status: 'done'; accounting: number; owner: number }
   | { status: 'failed' };
 
-/**
- * The payee's "Remove now" page, behind an EVE sign-in. It asks the server about the link
- * for each Character on this device and uses the first it will accept. Every reason the link
- * cannot be used (expired, already over, not this Character, or any other) reads the same
- * here: one neutral message, never why.
- */
 export function RemoveNowPage({ code }: { code: string }) {
   const { t } = useTranslation();
   const characters = useLiveQuery(async () =>
@@ -74,7 +68,6 @@ export function RemoveNowPage({ code }: { code: string }) {
     return () => {
       cancelled = true;
     };
-    // `ids` stands for the device's Characters: the list itself changes identity on every read.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ids, code, attempt]);
 
@@ -125,10 +118,6 @@ export function RemoveNowPage({ code }: { code: string }) {
   );
 }
 
-/**
- * What the payee sees, one screen per state. Presentational: the page decides which.
- * Every reason the link cannot be used is the one `unavailable` screen, never why.
- */
 export function RemoveNowView({
   screen,
   accounting,
@@ -143,7 +132,6 @@ export function RemoveNowView({
   screen: 'signed-out' | 'loading' | 'available' | 'done' | 'unavailable' | 'failed';
   accounting: string;
   owner: string;
-  /** When the pending removal takes effect, if known. */
   at?: number | null;
   working?: boolean;
   loggingIn?: boolean;

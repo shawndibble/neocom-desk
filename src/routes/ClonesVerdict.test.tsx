@@ -50,7 +50,6 @@ interface Scenario {
   jumpImplants: number[][];
   queue: () => unknown[];
   implantsStatus: number;
-  /** Reported intelligence: the 20 base plus whatever the worn implant adds. */
   intelligence: number;
 }
 
@@ -86,7 +85,6 @@ function clonesBody() {
         implants: scenario.jumpImplants[1] ?? [],
       },
     ],
-    // Off cooldown: the verdict compares against an immediate jump.
     last_clone_jump_date: '2020-01-01T00:00:00Z',
   };
 }
@@ -227,18 +225,14 @@ beforeEach(async () => {
 });
 
 const verdict = () => screen.findByRole('region', { name: 'Training verdict' });
-/** The card first shows a note while routes resolve, so wait for the real heading. */
 const verdictCard = async (heading: string) => {
   const card = await verdict();
   await within(card).findByText(heading);
   return card;
 };
 
-/** The Clones page on its own route, with no App boot or signed-in shell. */
 const renderClonesRoute = () => renderPageRoute('/clones', <Clones />);
 
-// The route chunk compiles here, under the hook's own budget, not inside the
-// first test's findBy.
 beforeAll(() => loadClones(), 30_000);
 
 describe('Clones training verdict', () => {
@@ -252,14 +246,12 @@ describe('Clones training verdict', () => {
     ).toBeInTheDocument();
     expect(within(card).getByRole('img', { name: /^Stay in this clone/ })).toBeInTheDocument();
     expect(within(card).getByRole('img', { name: /^Best alternative/ })).toBeInTheDocument();
-    // The queue is one link, not a skill-by-skill legend.
     expect(within(card).getByRole('link', { name: 'View queue' })).toHaveAttribute(
       'href',
       '/skills/plans#current-queue'
     );
     expect(within(card).queryByText(/^Queue: /)).not.toBeInTheDocument();
-    // The winning clone carries the badge, with its time and delta.
-    expect(await screen.findAllByText('Best for training')).toHaveLength(2); // sort tab + badge
+    expect(await screen.findAllByText('Best for training')).toHaveLength(2);
     expect(screen.getAllByText(/sooner/).length).toBeGreaterThan(1);
   });
 
@@ -343,7 +335,6 @@ describe('Clones training verdict', () => {
   });
 
   it('sorts the list and remembers the choice on the device', async () => {
-    // Clone 1: fast and near but cheap. Clone 2: slow, valuable, route unknown.
     scenario.jumpImplants = [[IMPLANT_INT5], [IMPLANT_PLAIN]];
     renderClonesRoute();
     await verdictCard('Worth a jump');
@@ -354,7 +345,7 @@ describe('Clones training verdict', () => {
     );
     const order = () =>
       Array.from(screen.getByRole('list', { name: 'Clones' }).querySelectorAll(':scope > li'))
-        .slice(1) // "Wearing now" stays pinned first
+        .slice(1)
         .map((li) => (/Intelligence Plus Five/.test(li.textContent ?? '') ? 'fast' : 'valuable'));
     expect(order()).toEqual(['fast', 'valuable']);
     fireEvent.click(within(group).getByRole('button', { name: 'Value' }));

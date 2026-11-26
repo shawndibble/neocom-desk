@@ -1,12 +1,3 @@
-/**
- * Wallet Journal "Transactions" link touch target (issue #1919): a bare
- * `text-xs` link in the Panel header `actions` (centred, so it does not
- * inherit the header's `min-h-9`) was ~14px tall. Fixed with
- * `inline-flex min-h-9 min-w-9 ... md:min-h-0 md:min-w-0`, the same
- * precedent as #1070 / #1077 / #1126.
- *
- * Also the journal as a plain phone table (was #2521's "Sort by" picker), below.
- */
 import { test, expect, PHONE, DESKTOP } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 import { CHARACTER_ID } from './support/fixtureData';
@@ -33,7 +24,6 @@ test('Journal "Transactions" link meets the 36px touch floor at 390px, without o
   );
   expect(overflow).toBeLessThanOrEqual(0);
 
-  // The journal's export button shares the header row.
   await expect(page.getByRole('button', { name: 'Export Journal' })).toBeVisible();
 });
 
@@ -64,11 +54,6 @@ test('Journal "Transactions" link rests in the accent colour at 1440px', async (
   expect(linkColor).toBe(accentColor);
 });
 
-/**
- * Journal on a phone: a ledger read across columns, so a plain table
- * (DESIGN.md §6c Restraint) with Balance off by default (`phoneOffByDefault`)
- * and the header sort buttons still on screen.
- */
 test.describe('Journal phone table', () => {
   const JOURNAL = [
     {
@@ -84,7 +69,6 @@ test.describe('Journal phone table', () => {
       date: '2026-09-02T00:00:00Z',
       ref_type: 'player_donation',
       description: 'Middle huge payout',
-      // 15 digits: the long-value case must still fit the table cell.
       amount: 123456789012345,
       balance: 123456789013245,
     },
@@ -107,8 +91,6 @@ test.describe('Journal phone table', () => {
   ];
 
   test.beforeEach(async ({ page }) => {
-    // Before signing in: boot prefetch reads the journal, and an empty answer
-    // from the shared mock would be cached as fresh.
     await page.route(
       (url) => url.pathname === `/characters/${CHARACTER_ID}/wallet/journal`,
       (route) =>
@@ -131,11 +113,9 @@ test.describe('Journal phone table', () => {
     expect(await rows.first().evaluate((tr) => getComputedStyle(tr).display)).toBe('flex');
     await expect(table.locator('.dt-group-header').first()).toContainText('EVE time');
 
-    // Cards always show the date; Balance rides on line two.
     const picker = page.getByRole('combobox', { name: 'Sort by' });
     await expect(picker).toBeVisible();
     await picker.selectOption('amount:desc');
-    // Amount sort is a flat list: no day headers.
     await expect(table.locator('.dt-group-header')).toHaveCount(0);
     await expectNoPageOverflow(page);
   });

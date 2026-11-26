@@ -69,13 +69,13 @@ describe('attributePairBandStarts', () => {
     const result = attributePairBandStarts(
       rows,
       catalog([skill(1, 'perception', 'willpower'), skill(3, 'perception', 'willpower')])
-    ); // skill 2 missing from catalog
+    );
     expect(result.size).toBe(1);
     expect(result.has(rows[1].id)).toBe(false);
   });
 
   it('a marker row does not start a band and does not reset the comparison', () => {
-    const rows = buildRows([entry(1), entry(2)], [1]); // marker between entry 1 and 2
+    const rows = buildRows([entry(1), entry(2)], [1]);
     const markerRow = rows.find((r) => r.kind === 'marker')!;
     const result = attributePairBandStarts(
       rows,

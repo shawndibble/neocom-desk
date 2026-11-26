@@ -108,12 +108,6 @@ describe('useCorpOwnedStockSource', () => {
     expect(result.current.available).toBe(true);
   });
 
-  /**
-   * The acceptance criterion this covers: "Switching which character is
-   * active while a plan is open re-resolves which corporation's assets are
-   * included (or clears them, if the newly active character isn't a
-   * Director)" (issue #798).
-   */
   it('re-resolves to the new corporation when the active character switches', async () => {
     const { result, rerender } = renderHook(() => useCorpOwnedStockSource());
     await waitFor(() => expect(result.current.corporationId).toBe(CORPORATION_ID));
@@ -167,7 +161,6 @@ describe('useCorpOwnedStockSource', () => {
     useActiveCharacter.setState({ activeCharacterId: OTHER_CHARACTER_ID, hydrated: true });
     rerender();
 
-    // The old character's source must not still be reported for the new one.
     expect(result.current.source).toBeNull();
 
     resolveNext({ cached: { data: [ASSET], truncated: false } });

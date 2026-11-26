@@ -15,20 +15,13 @@ export interface AddedToPlan {
 
 interface AddToPlanBarProps {
   target: TargetPlan;
-  /** Entries the target plan does not already cover; the button hides at zero. */
   unplannedCount: number;
-  /** The Add button's text when "Add all" doesn't fit (a single skill). */
   addLabel?: string;
   added: AddedToPlan | null;
   onAdd: () => void;
   onUndo: () => void;
 }
 
-/**
- * The "pick a Skill Plan, add the skills, undo" row Fit Check's Missing skills
- * popover and the industry skill-gate popover share. Renders nothing until the
- * Character's plans have loaded.
- */
 export function AddToPlanBar({
   target,
   unplannedCount,

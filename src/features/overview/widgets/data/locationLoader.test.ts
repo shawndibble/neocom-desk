@@ -50,7 +50,6 @@ describe('loadLocationWidget age', () => {
     const widget = await loadLocationWidget(CHARACTER_ID);
 
     expect(widget.shipTypeId).toBe(587);
-    // The older of the two rows, so the badge never flatters the stalest half.
     expect(widget.fetchedAt?.getTime()).toBe(shipAt);
   });
 

@@ -59,7 +59,7 @@ describe('loadNpcFactions', () => {
   it('serves a repeat lookup from the cache without touching the network', async () => {
     server.use(type(16938, 603), group(603, 'Deadspace Blood Raiders Battleship'));
     await loadNpcFactions([16938]);
-    server.resetHandlers(); // any request now is an unhandled-request error
+    server.resetHandlers();
     expect((await loadNpcFactions([16938])).get(16938)).toBe('Blood Raiders');
   });
 

@@ -1,67 +1,8 @@
-/**
- * Encodes a Fitting into the compact, versioned, URL-safe string that is
- * its Fitting Share Code (#1530) — hull, modules with slot/state/charge, drones with
- * active counts, fighters, cargo, an optional implant/booster set and (from
- * version 2, #1718) an optional fit name.
- *
- * Wire grammar, built as plain text before it's ever deflated:
- * `hull|modules|drones|fighters|cargo|implants|name` (version 1 stops after
- * `implants` — six parts, no name — and still decodes so every Fitting Share Code
- * already handed out keeps working). `name` is `encodeURIComponent`'d so it
- * can never contain the `|` separator, or empty when the fit has none.
- * hull/typeId/count/slot
- * fields all base36. `modules` is 5 `;`-joined categories, fixed order
- * high/mid/low/rig/subsystem; each category is a `,`-joined list of
- * `slot:typeId:state[:chargeTypeId]` (state one of `0`-`3` — see
- * `STATE_TOKENS`). `drones` is `,`-joined `typeId:count:active`; `fighters`
- * and `cargo` are `,`-joined `typeId:count`/`typeId:quantity` (a fighter
- * squadron in the bay adds `:0`); `implants` is
- * `implantIds:boosterIds` (each `,`-joined), or empty when no implant set is
- * carried at all. Two optional trailing sections follow, written only when
- * the Fitting has something to put in them, so a Fitting without either
- * encodes exactly as it did before they existed (and older builds still read
- * its link): `mode` — a Tactical Destroyer's mode type id, or empty — and
- * `boosterSideEffects` — the effect ids of the booster side effects switched
- * on, `,`-joined.
- *
- * Version 3 (mutated modules and drones) is version 2 plus a tenth section,
- * `mutations`, written — with `mode` and `boosterSideEffects` present, empty
- * or not, ahead of it — only when some module or drone carries an
- * `ItemMutation`. A Fitting with none still encodes as version 2, byte for
- * byte, so a build from before version 3 opens it; one with a mutation reads
- * as "unsupported version" there rather than silently dropping the rolls.
- * `mutations` is `,`-joined `target:base:mutaplasmid:rolls`: `target` names
- * the item by its position — a rack letter (`h`,`m`,`l`,`r`,`s`) or `d` for
- * a drone stack, then its base36 index in that section's own list — `base`
- * and `mutaplasmid` are base36 type ids, and `rolls` is `;`-joined
- * `attributeId=value` (id base36, value decimal, `quantiseRoll`ed), empty
- * when the rolls are unknown. A mutated drone stack is always one drone.
- * That text is then deflated with the platform's native
- * `CompressionStream('deflate-raw')` and base64url-encoded — no compression
- * library, per the Appraisal share decision this repo already follows
- * (`20260911-110045`).
- *
- * A decoded payload is fully player-controlled — pasted into chat, clicked by
- * a stranger — so decoding never throws: every field is validated, an
- * unsupported version comes back as its own typed reason (distinct from a
- * merely corrupt payload), and the decompressed size is capped so a forged
- * payload can't be a decompression bomb.
- *
- * Type IDs are carried as bare numbers, never checked against a catalog —
- * the same engine/feature split `market/appraisalSnapshot.ts` draws for its
- * `hub` field — so a type ID this build's bundled SDE doesn't recognise
- * still survives the round trip; rendering it as an "unknown item" is a
- * feature-layer concern.
- */
-
 export const FITTING_SHARE_VERSION = '2';
-/** The pre-name wire format; decode-only, never produced by `encodeFittingShare`. */
 export const LEGACY_FITTING_SHARE_VERSION = '1';
 
-/** Only for a Fitting with a mutated item; else `FITTING_SHARE_VERSION` (see the header). */
 export const MUTATED_FITTING_SHARE_VERSION = '3';
 
-/** A fit name past this is truncated on encode and rejected on decode. */
 export const MAX_FIT_NAME_LENGTH = 100;
 
 export type SlotCategory = 'high' | 'mid' | 'low' | 'rig' | 'subsystem';
@@ -81,7 +22,6 @@ const TOKEN_STATES: Record<string, ModuleState> = {
   '3': 'overload',
 };
 
-/** Wire twin of `ItemMutation`, restated so the codec imports nothing from the Fittings domain. */
 export interface ShareMutation {
   baseTypeId: number;
   mutaplasmidTypeId: number;
@@ -100,18 +40,12 @@ export interface FittingDrone {
   typeId: number;
   count: number;
   active: number;
-  /** Only on a stack of one: each mutated drone is its own item. */
   mutation?: ShareMutation;
 }
 
 export interface FittingFighter {
   typeId: number;
   count: number;
-  /**
-   * In the fighter bay rather than launched — written as a third `:0` field
-   * only when true, so a launched squadron (and every link from before the
-   * flag) reads `typeId:count` as it always did.
-   */
   inBay?: boolean;
 }
 
@@ -133,9 +67,7 @@ export interface FittingShareInput {
   cargo: readonly FittingCargoItem[];
   implantSet?: FittingImplantSet;
   name?: string;
-  /** A Tactical Destroyer's mode type id. */
   mode?: number;
-  /** Effect ids of the booster side effects switched on. */
   boosterSideEffects?: readonly number[];
 }
 
@@ -146,7 +78,6 @@ export interface DecodedFittingShare {
   fighters: FittingFighter[];
   cargo: FittingCargoItem[];
   implantSet?: FittingImplantSet;
-  /** Absent for version-1 payloads and for fits shared without a name. */
   name?: string;
   mode?: number;
   boosterSideEffects?: number[];
@@ -155,29 +86,20 @@ export interface DecodedFittingShare {
 export type EncodeFittingShareResult =
   { ok: true; payload: string } | { ok: false; reason: 'too-large' };
 
-/** Why a Fitting Share Code failed to decode. */
 export type ShareDecodeError = 'invalid' | 'unsupported-version';
 
 export type DecodeFittingShareResult =
   { ok: true; value: DecodedFittingShare } | { ok: false; reason: ShareDecodeError };
 
-/** Real hulls never approach these — they only bound a forged payload cheaply. */
 export const MAX_SLOTS_PER_CATEGORY = 8;
 export const MAX_DRONE_STACKS = 50;
 export const MAX_FIGHTERS = 50;
 export const MAX_CARGO_ITEMS = 500;
 export const MAX_IMPLANTS = 10;
 export const MAX_BOOSTERS = 10;
-/** Four side effects a booster, a booster a slot. */
 export const MAX_BOOSTER_SIDE_EFFECTS = 40;
-/** Rolls on one mutated item; a mutaplasmid rolls at most a handful. */
 export const MAX_MUTATED_ATTRIBUTES = 32;
 
-/**
- * A roll on the wire: 6 significant digits. The game shows at most 4–5, so the
- * error (< 5e-7) never changes a shown figure or roll quality, and a roll
- * costs a few characters rather than a float's 17.
- */
 export function quantiseRoll(value: number): number {
   return Number(value.toPrecision(6));
 }
@@ -190,7 +112,6 @@ const RACK_TARGETS: Record<SlotCategory, string> = {
   subsystem: 's',
 };
 const DRONE_TARGET = 'd';
-// Plain decimal or exponent notation, as `String(number)` writes a finite number.
 const ROLL_VALUE = /^-?(\d+(\.\d*)?|\.\d+)(e[+-]?\d+)?$/;
 
 function encodeMutation(target: string, mutation: ShareMutation): string {
@@ -203,21 +124,12 @@ function encodeMutation(target: string, mutation: ShareMutation): string {
   return `${target}:${mutation.baseTypeId.toString(36)}:${mutation.mutaplasmidTypeId.toString(36)}:${rolls}`;
 }
 
-/** A legitimate fit's body is well under 1KB even uncompressed; this only bounds a decompression bomb. */
 const MAX_DECOMPRESSED_BYTES = 65536;
 
 const BASE36_TOKEN = /^[0-9a-z]+$/;
 
-/**
- * `parseInt(str, 36)` parses a leading valid run and silently ignores
- * whatever follows (`parseInt('5.5', 36)` is `5`) — too lax for a decoder
- * that must reject any malformed or forged token outright.
- */
 function parseBase36(token: string): number | null {
   if (!BASE36_TOKEN.test(token)) return null;
-  // A long enough run of digits overflows parseInt's accumulator to
-  // Infinity rather than NaN — reject it explicitly rather than let it
-  // pass a bare `n > 0`/`n >= 0` check downstream.
   const n = parseInt(token, 36);
   return Number.isFinite(n) ? n : null;
 }
@@ -240,10 +152,6 @@ function base64urlEncode(bytes: Uint8Array): string {
 
 const BASE64URL_TOKEN = /^[A-Za-z0-9_-]+$/;
 
-// Bounds the base64url segment itself, before it's ever inflated — otherwise
-// a multi-megabyte forged payload gets fully `atob`'d and copied into a
-// `Uint8Array` before `MAX_DECOMPRESSED_BYTES` (which only caps the
-// *decompressed* size) ever gets a chance to reject it.
 const MAX_ENCODED_LENGTH = 20000;
 
 function base64urlDecode(str: string): Uint8Array | null {
@@ -263,11 +171,6 @@ function base64urlDecode(str: string): Uint8Array | null {
   }
 }
 
-// A `null` cap means "trusted input, drain to completion": the overload
-// below promises a non-null *resolution* — if the stream errors, the
-// returned promise rejects instead (still a sound promise of that type). A
-// numeric cap means "untrusted input": both a stream error and exceeding the
-// cap resolve to `null` rather than throwing.
 async function drain(stream: ReadableStream<Uint8Array>, maxOutputBytes: null): Promise<Uint8Array>;
 async function drain(
   stream: ReadableStream<Uint8Array>,
@@ -397,7 +300,6 @@ export async function encodeFittingShare(
   ];
   const sideEffects = input.boosterSideEffects ?? [];
   const mutated = mutations.length > 0;
-  // Trailing sections only when non-empty, or when v3's mutations follow them — see the header.
   if (input.mode !== undefined || sideEffects.length > 0 || mutated) {
     sections.push(input.mode === undefined ? '' : input.mode.toString(36));
   }
@@ -436,7 +338,6 @@ function parseDrones(raw: string): FittingDrone[] | null {
   return drones;
 }
 
-/** Shared shape behind both fighters (`typeId:count`) and cargo (`typeId:quantity`) — same grammar, different field name on the result. */
 function parseTypeIdCountPairs(
   raw: string,
   max: number
@@ -490,11 +391,7 @@ function parseTypeIdList(raw: string, max: number): number[] | null {
   return ids;
 }
 
-/** `undefined` means no implant set was carried at all; `null` means the field was malformed. */
 function parseImplantSet(raw: string): FittingImplantSet | undefined | null {
-  // Absent entirely (no implant set) vs. present-but-both-lists-empty (an
-  // explicit empty set) are different inputs on encode and must stay
-  // different on decode — only the former collapses to `undefined`.
   if (raw === '') return undefined;
   const fields = raw.split(':');
   if (fields.length !== 2) return null;
@@ -516,7 +413,6 @@ function parseName(raw: string): string | undefined | null {
   return name === '' ? undefined : name;
 }
 
-/** `undefined` for an absent/empty mode section; `null` when it's malformed. */
 function parseMode(raw: string | undefined): number | undefined | null {
   if (raw === undefined || raw === '') return undefined;
   return parseBase36Positive(raw);
@@ -540,11 +436,6 @@ function parseRolls(raw: string): Record<number, number> | null {
   return rolls;
 }
 
-/**
- * Attaches the `mutations` section's entries to the items they name, in
- * place. False on any malformed entry, an unknown or repeated target, or a
- * mutation on a drone stack of more than one.
- */
 function attachMutations(
   raw: string,
   modules: Record<SlotCategory, FittingModuleEntry[]>,
@@ -579,8 +470,6 @@ function attachMutations(
 
 function parseBody(body: string, version: string): DecodeFittingShareResult {
   const parts = body.split('|');
-  // Version 1: six sections. Version 2 adds the name, then the optional mode
-  // and booster side effects; version 3 the mutations after those.
   const named = version !== LEGACY_FITTING_SHARE_VERSION;
   const base = named ? 7 : 6;
   const trailing = version === MUTATED_FITTING_SHARE_VERSION ? 3 : named ? 2 : 0;

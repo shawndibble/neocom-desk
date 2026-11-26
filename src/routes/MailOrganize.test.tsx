@@ -119,11 +119,9 @@ describe('Mail organize', () => {
     await user.click(screen.getByRole('checkbox', { name: 'Select Market report' }));
     expect(screen.getByText('2 selected')).toBeInTheDocument();
 
-    // Fleet up! is unread, Market report already read: one write, not two.
     await user.click(screen.getByRole('button', { name: 'Mark read' }));
     await waitFor(() => expect(puts).toEqual([{ id: '1', body: { read: true } }]));
 
-    // The bar is disabled while the writes finish; the toast marks the batch fully settled.
     await screen.findByText('Marked 1 mail read');
     await waitFor(() => expect(screen.getByRole('button', { name: 'Delete' })).toBeEnabled());
     await user.click(screen.getByRole('button', { name: 'Delete' }));
@@ -174,7 +172,6 @@ describe('Mail organize', () => {
     const market = screen.getByText('Market report').closest('li') as HTMLElement;
     expect(within(fleet).getByText('Industry')).toBeInTheDocument();
     expect(within(market).getByText('Haulers')).toBeInTheDocument();
-    // The System Labels (Corp, Inbox) show as the folder, never as a tag; id 99 has no name.
     expect(within(fleet).queryAllByText('Corp').length).toBeLessThanOrEqual(1);
     expect(within(market).queryByText('99')).not.toBeInTheDocument();
   });
@@ -191,9 +188,6 @@ describe('Mail organize', () => {
     await user.click(screen.getByRole('button', { name: 'Mark read' }));
 
     expect(await screen.findByRole('button', { name: /Corp.*1 unread/ })).toBeInTheDocument();
-    // The count moves on the local mark, before the action's `finally` clears
-    // `busy`. Ending here let that state update land after teardown
-    // ("window is not defined"); the toast is posted after it.
     expect((await screen.findAllByText('Marked 1 mail read')).length).toBeGreaterThan(0);
   });
 
@@ -207,7 +201,6 @@ describe('Mail organize', () => {
     await user.click(await screen.findByRole('menuitem', { name: 'Mark as unread' }));
     const row = screen.getByText('Market report').closest('li') as HTMLElement;
     await waitFor(() => expect(within(row).getByText('Unread')).toBeInTheDocument());
-    // Nothing flips it back by itself.
     expect(puts).toHaveLength(1);
 
     await user.click(screen.getByText('Market report'));
@@ -274,7 +267,6 @@ describe('Mail organize', () => {
     const user = userEvent.setup();
     renderMailRoute();
     await user.click(await screen.findByText('Fleet up!'));
-    // Opening marks it read; its label shows on the row and in the reader.
     await waitFor(() => expect(puts).toEqual([{ id: '1', body: { read: true } }]));
     await waitFor(() => expect(screen.getAllByText('Haulers').length).toBe(2));
 
@@ -282,7 +274,6 @@ describe('Mail organize', () => {
     await user.click(await screen.findByRole('menuitem', { name: 'Mark as unread' }));
 
     await waitFor(() => expect(puts[1]).toEqual({ id: '1', body: { read: false } }));
-    // Same as the chip-count test: the toast is posted after `busy` clears.
     expect((await screen.findAllByText('Marked 1 mail unread')).length).toBeGreaterThan(0);
   });
 });

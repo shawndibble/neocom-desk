@@ -1,9 +1,3 @@
-/**
- * What the SRP killmail modals show (issue #5379): the killmail's facts on the left, its fit by slot
- * on the right with a doctrine mark per module, and above both whatever the caller puts there (the
- * pilot's payout, the officer's appraisal comparison). The modals around it are
- * `MemberKillmailModal` and `OfficerKillmailModal`.
- */
 import { type ReactNode } from 'react';
 import { useAsyncLoad } from '@/lib/useAsyncLoad';
 import { useTranslation } from 'react-i18next';
@@ -22,20 +16,17 @@ import { loadFittingSlots } from '@/sde/loadSde';
 import { useKillmailRead } from './useKillmailRead';
 import { useDoctrineTypeNames } from './useDoctrineTypeNames';
 
-/** The loss a killmail modal opens on. */
 export interface KillmailSubject {
   killmailId: number;
   killmailHash: string;
   hullTypeId: number;
   hullName: string;
   systemName: string;
-  /** Epoch ms. */
   killedAt: number;
 }
 
 export type Read<T> = 'loading' | 'failed' | T;
 
-/** Jita values of the lost ship, no cargo, and what zKillboard says the killmail was worth. */
 export interface FactValues {
   killmailValue: number | null;
   hullValue: number | null;
@@ -136,7 +127,6 @@ function slotLabel(t: ReturnType<typeof useTranslation>['t'], slot: FitSlot): st
   }
 }
 
-/** The SDE's rack for each module type; null once a read failed (the list then shows every slot item). */
 function useRackLookup(): ((typeId: number) => string | undefined) | null | undefined {
   const load = useAsyncLoad(loadFittingSlots);
   const slots =
@@ -199,7 +189,6 @@ function Fit({
   );
 }
 
-/** The killmail's facts beside its fit, with `top` above them. */
 export function SrpKillmailView({
   subject,
   check,
@@ -231,7 +220,6 @@ export function SrpKillmailView({
   );
 }
 
-/** "N modules off doctrine. You can still file; an officer will see this." for the pilot. */
 export function OffDoctrineLine({ check }: { check: DoctrineCheckRecord | undefined }) {
   const { t } = useTranslation();
   const count = offDoctrineCount(check);
@@ -244,7 +232,6 @@ export function OffDoctrineLine({ check }: { check: DoctrineCheckRecord | undefi
   );
 }
 
-/** The officer's appraisal comparison: the lost ship and fit against the nearest Doctrine Fit, no cargo. */
 export function AppraisalComparison({
   values,
 }: {

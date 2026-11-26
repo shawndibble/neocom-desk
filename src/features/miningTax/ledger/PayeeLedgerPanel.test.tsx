@@ -16,7 +16,6 @@ import {
 
 const renderPanel = (source: PayeeLedgerSource | null, lockDate?: string) =>
   render(
-    // An ore name links to its Market listing, so the panel needs a router.
     <MemoryRouter>
       <PayeeLedgerPanel
         open
@@ -51,7 +50,6 @@ describe('PayeeLedgerPanel', () => {
   it("keeps each row's balance the one after it in date order, only displayed in reverse", () => {
     renderPanel(CORP_BOOK_LEDGER);
     const shown = bodyRows().map((r) => within(r).getAllByRole('cell').at(-1)?.textContent);
-    // Owed reads with a minus, money ahead plain, nothing at zero.
     const inDateOrder = payeeLedger(CORP_BOOK_LEDGER).rows.map((r) =>
       r.balance > 0.005
         ? `−${formatIsk(r.balance)}`
@@ -92,7 +90,6 @@ describe('PayeeLedgerPanel', () => {
       </MemoryRouter>
     );
     await user.click(screen.getAllByText('Payment from Varro Kestane')[0]!);
-    // It says what Unlink does before the pilot presses it.
     expect(await screen.findByText(/Unlinking frees this payment/)).toBeInTheDocument();
     await user.click(await screen.findByRole('button', { name: 'Unlink' }));
     expect(onUnlinkPayment).toHaveBeenCalledWith(expect.any(String));
@@ -129,7 +126,6 @@ describe('PayeeLedgerPanel', () => {
       );
       const rows = bodyRows();
       const at = rows.findIndex((r) => r.textContent?.includes('Locked before'));
-      // Newest first: the open rows above the divider, the locked ones below.
       expect(rows[at - 1]).toHaveTextContent('2026-10-1');
       expect(rows[at + 1]).toHaveTextContent('2026-10-0');
     });
@@ -170,7 +166,6 @@ describe('PayeeLedgerPanel', () => {
     const cells = bodyRows().map((r) => within(r).getAllByRole('cell').at(-1)!);
     const balances = cells.map((c) => c.textContent);
     expect(balances.some((b) => /credit/i.test(b ?? ''))).toBe(false);
-    // The latest row, now on top, is the one that left the Payee paid ahead.
     expect(balances[0]).toBe('4,150,000');
     expect(cells[0]).toHaveClass('text-isk-pos');
     const owed = cells.find((c) => c.textContent?.startsWith('−'));
@@ -195,7 +190,6 @@ describe('PayeeLedgerPanel', () => {
         i === 0 ? { ...p, href: '/wallet/journal?highlight=42' } : p
       ),
     });
-    // The first payment in date order is the last one shown.
     await user.click(screen.getAllByText('Payment from Varro Kestane').at(-1)!);
     expect(screen.getByRole('link', { name: 'View the payment' })).toHaveAttribute(
       'href',

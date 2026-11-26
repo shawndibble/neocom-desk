@@ -74,9 +74,7 @@ describe('evaluateSkillGate', () => {
       { typeID: MOLECULAR_ENGINEERING, level: 3 },
     ];
     const skills: ReadonlyMap<number, SkillLevels> = new Map([
-      // Character 1: both unmet.
       [1, { [INDUSTRY]: 1, [MOLECULAR_ENGINEERING]: 0 }],
-      // Character 2: only one unmet.
       [2, { [INDUSTRY]: 5, [MOLECULAR_ENGINEERING]: 1 }],
     ]);
     const result = evaluateSkillGate(requirements, skills);
@@ -94,8 +92,8 @@ describe('evaluateSkillGate', () => {
       { typeID: CAPITAL_SHIP_CONSTRUCTION, level: 5 },
     ];
     const skills: ReadonlyMap<number, SkillLevels> = new Map([
-      [1, { [CAPITAL_SHIP_CONSTRUCTION]: 1 }], // gap 4
-      [2, { [CAPITAL_SHIP_CONSTRUCTION]: 3 }], // gap 2
+      [1, { [CAPITAL_SHIP_CONSTRUCTION]: 1 }],
+      [2, { [CAPITAL_SHIP_CONSTRUCTION]: 3 }],
     ]);
     const result = evaluateSkillGate(requirements, skills);
     expect(result.gated).toBe(true);

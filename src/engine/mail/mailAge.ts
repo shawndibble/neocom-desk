@@ -1,23 +1,11 @@
-/**
- * Mail list date sections: Today, Yesterday, This week,
- * Earlier this month, Last month, then one section per older month.
- *
- * Calendar days are read in the viewer's Time format zone (`undefined` =
- * device-local, `'UTC'` = EVE time), the same zone the rows print their date
- * in, so a mail never sits under a header its own date contradicts. Day math
- * runs on UTC day numbers built from that zone's calendar date, so DST shifts
- * can't move a boundary.
- */
 import type { WeekStart } from '@/lib/calendarGrid';
 import { DAY_MS } from '@/lib/age';
 
-/** "Earlier this month" covers the start of this week back to the 1st. */
 export type MailAgeBucket =
   | { kind: 'today' | 'yesterday' | 'thisWeek' | 'earlierThisMonth' | 'lastMonth' | 'undated' }
   | { kind: 'month'; year: number; month: number };
 
 export interface MailAgeSection<T> {
-  /** Stable per bucket, for React keys. */
   key: string;
   bucket: MailAgeBucket;
   items: T[];
@@ -34,9 +22,7 @@ const RANK = {
 } as const;
 
 interface CalendarDay {
-  /** Days since the epoch, for the zone's calendar date. */
   day: number;
-  /** year * 12 + zero-based month. */
   monthIndex: number;
 }
 
@@ -66,12 +52,6 @@ function bucketKey(bucket: MailAgeBucket): string {
     : bucket.kind;
 }
 
-/**
- * Groups `items` into date sections, newest section first. Items keep their
- * input order within a section, and each bucket appears at most once however
- * the input is ordered. A future timestamp (clock skew) counts as today; a
- * missing or unparseable one goes in a trailing `undated` section.
- */
 export function groupMailByAge<T>(
   items: readonly T[],
   timestampOf: (item: T) => string | undefined,
@@ -81,7 +61,7 @@ export function groupMailByAge<T>(
 ): MailAgeSection<T>[] {
   const calendarDayOf = calendarDayReader(timeZone);
   const today = calendarDayOf(now);
-  const weekday = new Date(today.day * DAY_MS).getUTCDay(); // 0 = Sunday
+  const weekday = new Date(today.day * DAY_MS).getUTCDay();
   const weekStartDay = today.day - ((weekday - (weekStart === 'sunday' ? 0 : 1) + 7) % 7);
 
   function bucketOf(timestamp: string | undefined): MailAgeBucket {

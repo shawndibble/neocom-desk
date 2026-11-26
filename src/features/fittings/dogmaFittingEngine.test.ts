@@ -23,7 +23,6 @@ vi.mock('@eveshipfit/dogma-engine', () => ({
   calculate: (fit: MockFit, options?: { validate?: boolean }) => calculateMock(fit, options),
   load_sde: (bytes: Uint8Array) => loadSdeMock(bytes),
 }));
-// Loaded alongside the engine; kept off the stubbed network these tests count.
 vi.mock('@/features/abyssal/mutaplasmidData', () => ({
   loadMutaplasmidLookup: () => Promise.reject(new Error('not in these tests')),
 }));
@@ -166,7 +165,7 @@ describe('loadDogmaEngine', () => {
     await loadDogmaEngine();
     await loadDogmaEngine();
 
-    expect(fetchMock).toHaveBeenCalledTimes(2); // wasm + sde, once each — not four times
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
   it('serves the second load from the Cache Storage entry the first load wrote, without refetching', async () => {
@@ -178,7 +177,7 @@ describe('loadDogmaEngine', () => {
 
     await loadAgain();
 
-    expect(fetchMock).toHaveBeenCalledTimes(2); // still just the first module's two fetches
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
   it('keys its cache on the pinned engine + SDE versions, so a bump is a fresh fetch', async () => {
@@ -300,7 +299,6 @@ describe('loadDogmaEngine stall detection', () => {
     vi.unstubAllGlobals();
   });
 
-  /** Rejects like a real aborted fetch: when its signal fires. */
   function untilAborted(signal: AbortSignal | null | undefined): Promise<never> {
     return new Promise((_resolve, reject) => {
       signal?.addEventListener('abort', () => reject(signal.reason));
@@ -491,16 +489,16 @@ describe('computeFittingStats', () => {
       modules: [{ slot: 'rig', slotIndex: 0, typeId: 31105, state: 'online' }],
       drones: [
         { typeId: 2454, quantity: 3, state: 'active' },
-        { typeId: 2454, quantity: 2, state: 'online' }, // in the bay, not deployed — draws no bandwidth
+        { typeId: 2454, quantity: 2, state: 'online' },
       ],
       cargo: [],
     };
     calculateMock.mockReturnValue({
       ship: { attributes: new Map() },
       items: [
-        { attributes: new Map([[1153, { value: 100 }]]) }, // the rig
-        { attributes: new Map([[1272, { value: 5 }]]) }, // active drone stack
-        { attributes: new Map([[1272, { value: 5 }]]) }, // bay drone stack
+        { attributes: new Map([[1153, { value: 100 }]]) },
+        { attributes: new Map([[1272, { value: 5 }]]) },
+        { attributes: new Map([[1272, { value: 5 }]]) },
       ],
       character: { attributes: new Map() },
     });
@@ -509,7 +507,7 @@ describe('computeFittingStats', () => {
     const stats = await computeFittingStats(fittingWithRigAndDrones, profile);
 
     expect(stats.calibrationUsed).toBe(100);
-    expect(stats.droneBandwidthUsed).toBe(15); // 5 Mbit x 3 active, bay stack excluded
+    expect(stats.droneBandwidthUsed).toBe(15);
   });
 });
 
@@ -612,7 +610,6 @@ describe('computeFittingStats overheated values', () => {
     expect(stats.offense.overheated?.dps).toBe(32);
     expect(stats.ehp).toBe(1000);
     expect(stats.overheated?.ehp).toBe(1200);
-    // Not everything overheated: there is nothing unheated to compare against.
     expect(stats.unheated).toBeNull();
   });
 
@@ -666,13 +663,9 @@ describe('computeFittingStats overheated values', () => {
     expect(stats.allOverheated).toBe(true);
     expect(stats.ehp).toBe(1200);
     expect(stats.offense.dps).toBe(12);
-    // The heated figures are the figures now; there's no second number beside them.
     expect(stats.overheated).toBeNull();
     expect(stats.offense.overheated).toBeNull();
-    // The state control still shows what the pilot set.
     expect(stats.modules[0].state).toBe('active');
-    // Beside them, the same figures unheated — off the same two calculations,
-    // so each figure can say whether heat changed it.
     expect(calculateMock).toHaveBeenCalledTimes(2);
     expect(stats.unheated).toMatchObject({
       ehp: 1000,
@@ -769,15 +762,12 @@ describe('fit checks', () => {
     calculateMock.mockImplementation((fit) => {
       const typeId = fit.items[0].type_id;
       const violations = [
-        // The hull itself needing a skill says nothing about the candidate.
         { target: { type: 'ship' }, rule: { type: 'skill' } },
         ...(typeId === 1
           ? [{ target: { type: 'item', index: 0 }, rule: { type: 'wrong_slot' } }]
           : []),
         ...(typeId === 2 ? [{ target: { type: 'item', index: 0 }, rule: { type: 'skill' } }] : []),
-        // No launcher hardpoint: the engine reports it against the ship.
         ...(typeId === 4 ? [{ target: { type: 'ship' }, rule: { type: 'slots' } }] : []),
-        // More powergrid than the bare hull has: also reported against the ship.
         ...(typeId === 5
           ? [{ target: { type: 'ship' }, rule: { type: 'resource', resource: 'powergrid' } }]
           : []),
@@ -798,7 +788,6 @@ describe('fit checks', () => {
     expect(calculateMock.mock.calls[0][0].items[0].slot).toEqual({ type: 'low', index: 0 });
     expect(calculateMock.mock.calls[0][1]).toEqual({ validate: true });
 
-    // Memoized per hull + rack + profile: asking again recalculates nothing.
     calculateMock.mockClear();
     checkCandidates(587, 'low', [1, 2, 3, 4], profile);
     expect(calculateMock).not.toHaveBeenCalled();

@@ -7,14 +7,6 @@ import {
 } from './cloneTrainingTime';
 import type { AttributeName, Implants } from '../types';
 
-/**
- * Which clone is best for the active training queue, and is jumping worth it?
- * Counts attribute implants only (whatever `implants` carries) and compares
- * staying against jumping when the cooldown allows, never against an instant
- * jump the pilot cannot make. Pure: built on `cloneTrainingTimes`.
- */
-
-/** A saving under this reads as "stay put": not worth the jump and the cooldown it starts. */
 export const MIN_JUMP_GAIN_SECONDS = 60;
 
 export interface VerdictSegment {
@@ -24,9 +16,7 @@ export interface VerdictSegment {
 
 export interface CloneRow {
   cloneId: string | number;
-  /** Queue time wearing this clone the whole way; null for a paused queue. */
   totalSeconds: number | null;
-  /** Against the worn clone, jump-when-allowed under a cooldown. Negative = sooner. */
   deltaSeconds: number | null;
 }
 
@@ -35,27 +25,22 @@ export type CloneVerdict =
   | {
       kind: 'stay';
       stay: VerdictSegment[];
-      /** Set while the cooldown runs: every clone is locked for it after a jump. */
       cooldownReadyAt: Date | null;
-      /** The nearest rival and how much longer it would take; null when there is none. */
       closest: { cloneId: string | number; extraSeconds: number } | null;
     }
   | {
       kind: 'jump';
       cloneId: string | number;
       savedSeconds: number;
-      /** Attributes the queue trains on that the destination boosts more than the worn clone. */
       attributes: AttributeName[];
       stay: VerdictSegment[];
       best: VerdictSegment[];
-      /** Set while the cooldown runs: when the jump becomes possible. */
       cooldownReadyAt: Date | null;
     };
 
 export interface CloneVerdictResult {
   verdict: CloneVerdict;
   rows: CloneRow[];
-  /** The clone to badge; the worn one when staying. Null with no verdict. */
   bestCloneId: string | number | null;
 }
 
@@ -70,7 +55,6 @@ const ATTRIBUTES: AttributeName[] = [
 export function cloneVerdict(input: CloneTrainingInput): CloneVerdictResult {
   const { queue, clones, wornCloneId, baseAttributes, now, cooldownReadyAt } = input;
   const cloneState = input.cloneState ?? 'omega';
-  // Time and delta share one frame: jump-when-allowed under a cooldown, else wearing it throughout.
   const rows: CloneRow[] = cloneTrainingTimes(input).map((t) => {
     const delta = (t.stayThenSwitch ?? t).deltaSeconds;
     const wornTotal =

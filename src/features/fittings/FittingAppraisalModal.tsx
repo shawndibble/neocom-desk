@@ -24,11 +24,6 @@ interface Props {
   price: Appraisal;
 }
 
-/**
- * The Price section's per-item breakdown: what each item in the Fitting costs
- * off the hub's sell orders — the same rows and total the section's Sell
- * figure sums — with the list ready to paste into the game's Multibuy.
- */
 export function FittingAppraisalModal({ open, onClose, price }: Props) {
   const { t } = useTranslation();
   const { hubId } = useHubFor('fittings');
@@ -117,7 +112,6 @@ export function FittingAppraisalModal({ open, onClose, price }: Props) {
           </p>
         )}
         <div className="flex items-center justify-end gap-2">
-          {/* Always mounted, so a screen reader announces the notice when it appears. */}
           <span role="status" className="text-xs text-text-dim">
             {notice}
           </span>

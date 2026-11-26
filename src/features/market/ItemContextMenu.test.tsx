@@ -13,8 +13,8 @@ const pi = JSON.parse(
   readFileSync(resolve(process.cwd(), 'public/data/pi.json'), 'utf8')
 ) as PiData;
 
-const GRAVID = 47831; // Gravid Heavy Energy Neutralizer Mutaplasmid: on the market
-const ABYSSAL_NEUT = 47832; // Heavy Abyssal Energy Neutralizer: no market
+const GRAVID = 47831;
+const ABYSSAL_NEUT = 47832;
 
 vi.mock('@/sde/loadSde', () => ({
   loadPi: vi.fn(async () => pi),
@@ -29,15 +29,14 @@ vi.mock('@/sde/loadSde', () => ({
 
 const { ItemContextMenu, ItemMoreActions } = await import('./ItemContextMenu');
 
-const BROADCAST_NODE = 2867; // P4 planetary commodity
-const TRITANIUM = 34; // manufactured from nothing planetary
+const BROADCAST_NODE = 2867;
+const TRITANIUM = 34;
 
 function CurrentLocation() {
   const location = useLocation();
   return <p data-testid="location">{`${location.pathname}${location.search}`}</p>;
 }
 
-/** The Track entries (Quickbar, price alert, stock target) fold into a submenu: open it. */
 async function openTrack() {
   await userEvent.click(await screen.findByRole('menuitem', { name: 'Track' }));
 }
@@ -105,7 +104,6 @@ describe('ItemContextMenu — Abyssal types', () => {
 
     expect(await screen.findByRole('menuitem', { name: 'Show info' })).toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: 'Copy name' })).toBeInTheDocument();
-    // Shown while the lookup loads; wait for it to answer.
     await vi.waitFor(() => {
       for (const name of MARKET_ONLY)
         expect(screen.queryByRole('menuitem', { name })).not.toBeInTheDocument();
@@ -213,8 +211,6 @@ describe('ItemContextMenu — PI Plan', () => {
     renderMenu(TRITANIUM, 'Tritanium');
     fireEvent.contextMenu(screen.getByRole('button', { name: 'Tritanium' }));
 
-    // The Build Plan action is the last one to render, so its presence means
-    // the menu is fully painted and a missing PI Plan is a real absence.
     expect(
       await screen.findByRole('menuitem', { name: /Build Plan|No blueprint options/ })
     ).toBeInTheDocument();
@@ -249,8 +245,6 @@ describe('ItemContextMenu — price alert availability', () => {
     expect(item).toHaveAttribute('aria-disabled', 'true');
   });
 
-  // Issue #2162: a `title=` explanation is unreachable on a touch device,
-  // which has no hover — the reason must be reachable by a tap instead.
   it.each([['Add to Quickbar'], ['Set price alert']])(
     'reveals the disabled reason on a tap of "%s"',
     async (name) => {
@@ -297,9 +291,6 @@ describe('ItemContextMenu — price alert availability', () => {
   });
 });
 
-// Issue #1498: every surface wrapping a row in `ItemContextMenu` renders this
-// button beside it so the row has a keyboard path (WCAG 2.1.1) independent of
-// the context-menu trigger.
 describe('ItemMoreActions', () => {
   function renderMoreActions() {
     return render(

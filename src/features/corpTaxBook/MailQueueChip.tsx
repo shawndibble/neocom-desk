@@ -15,12 +15,6 @@ interface ChipProps extends MailQueueActions {
   onClearSent?: () => void;
 }
 
-/**
- * The send queue's button in the page header, beside the alerts bell (D16): the send icon and
- * one count badge, which says the most urgent thing: mails that failed (warning), else mails
- * still to send (accent), else the sent total (success, when done). The words and the percent
- * live in its label and in the queue it opens: a popover on a desktop, a sheet on a phone.
- */
 export function MailQueueChip(props: ChipProps) {
   const { t } = useTranslation();
   const phone = useIsPhone();

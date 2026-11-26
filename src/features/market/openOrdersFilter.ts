@@ -1,17 +1,3 @@
-/**
- * Filtering, sorting and the removable "active filters" chip row for the
- * Market Orders page. Reads `OpenOrderRow` fields only — every judgement
- * (which problem an order has, whether it beats me) was already made by
- * `openOrdersModel.ts`; this module never re-derives one.
- *
- * `problems`/`characterIds` are arrays because more than one can be active
- * at once (OR'd within a field, the way filter chips usually read). Each
- * SELECTED VALUE gets its own chip rather than one chip for the whole field:
- * a player who picked three characters expects to remove one of them and
- * keep the other two, and per-value chips give each one a stable, unique
- * `id` (`character:123`) for free. `clear` on a per-value chip removes only
- * that value from the array, never the whole constraint.
- */
 import type { TFunction } from 'i18next';
 import { summarizeFilterValues, type ActiveFilter } from '@/components/ui';
 import { formatIskCompact } from '@/lib/isk';
@@ -42,19 +28,12 @@ export const OPEN_ORDERS_SORTS: readonly OpenOrdersSort[] = [
 export interface OpenOrdersFilter {
   text: string;
   side: 'buy' | 'sell' | null;
-  /** Empty means every character. */
   characterIds: readonly number[];
-  /** Empty means every location. Matches against a row's `locationId`. */
   locationIds: readonly number[];
-  /** Empty means every problem. Matches against a row's `problems`, so filters overlap honestly. */
   problems: readonly OrderProblem[];
-  /** Null means any. */
   expiringWithinDays: number | null;
-  /** 'linked' | 'missing' | null. */
   costBasis: 'linked' | 'missing' | null;
-  /** Null means any. */
   minIskTiedUp: number | null;
-  /** The Needs you / Watch / All segment. Not a removable constraint: there is always one. */
   view: OpenOrdersView;
   sort: OpenOrdersSort;
 }
@@ -117,37 +96,15 @@ function matchesMinIskTiedUp(row: OpenOrderRow, min: number | null): boolean {
   return row.iskTiedUp >= min;
 }
 
-/**
- * Every problem a filter may name — that is, every `OrderProblem` except
- * `healthy`.
- *
- * Healthy orders are the Fine bucket, reached through the All segment
- * (`view`), not the funnel. A funnel chip for `healthy` would empty the
- * default Needs you segment under a chip that reads as though it should have
- * matched something, which is why it is excluded here rather than left to
- * each caller to remember.
- */
 export const FILTERABLE_PROBLEMS: readonly OrderProblem[] = ORDER_PROBLEMS.filter(
   (problem) => problem !== 'healthy'
 );
 
-/** One filter option per distinct `locationId` across `rows`, alphabetised by name. */
 export interface LocationFilterOption {
   locationId: number;
-  /** The full station/structure name, or a fallback naming an unresolved structure by id. */
   label: string;
 }
 
-/**
- * The location filter's option catalog: every location any of `rows` sits
- * in, deduplicated and named for the search box. Uses the full station name
- * rather than the table's truncated `stationShortName` — the same trade hub's
- * several stations ("Jita 4 - Moon 4 - ...", "Jita 4 - Moon 11 - ...") would
- * otherwise collide, and it is what the search box should match against.
- * A row whose `stationName` is null (an unresolved player structure, per
- * `openOrdersModel.ts`) still gets its own option, named by its id so several
- * unresolved structures do not all collapse into one indistinguishable entry.
- */
 export function locationFilterOptions(
   rows: readonly OpenOrderRow[],
   unknownLabel: (locationId: number) => string
@@ -180,7 +137,6 @@ export function filterOpenOrders(
 }
 
 function compareExpirySoonest(a: OpenOrderRow, b: OpenOrderRow): number {
-  // Null expiry (unparseable payload) sorts last — "unknown" is not "soonest".
   if (a.expiry === null && b.expiry === null) return a.orderId - b.orderId;
   if (a.expiry === null) return 1;
   if (b.expiry === null) return -1;
@@ -211,7 +167,6 @@ const COMPARATORS: Record<OpenOrdersSort, (a: OpenOrderRow, b: OpenOrderRow) => 
   character: compareCharacter,
 };
 
-/** Stable; never mutates `rows`. */
 export function sortOpenOrders(
   rows: readonly OpenOrderRow[],
   sort: OpenOrdersSort
@@ -219,13 +174,6 @@ export function sortOpenOrders(
   return [...rows].sort(COMPARATORS[sort]);
 }
 
-/**
- * How many constraints narrow the rows, search and Character pick included:
- * above zero, the page says how many orders of all of them match. One per
- * selected value of an array field, one per set scalar. `sort` and `view` are
- * not constraints (there is always exactly one of each); `filterOpenOrders`
- * never reads `view` either: the segment splits what the funnel matched.
- */
 export function activeFilterCount(filter: OpenOrdersFilter): number {
   const scalars = [
     filter.text.trim() !== '',
@@ -239,20 +187,9 @@ export function activeFilterCount(filter: OpenOrdersFilter): number {
 
 export interface OpenOrdersFilterNames {
   location: (locationId: number) => string;
-  /**
-   * Given only while the header's Character control cannot say the pick
-   * itself: a deep link naming one other alt reads "All characters" there
-   * (`characterFilterValue`), so the narrowing needs a pill of its own.
-   */
   character?: (characterId: number) => string;
 }
 
-/**
- * The funnel's filters set away from their default, for `FilterBar`'s pills:
- * one per field, however many values it holds, so a three-problem pick is one
- * pill to remove rather than three. The search text is not one (its box shows
- * it), nor are `sort` and `view`.
- */
 export function activeOpenOrdersFilters(
   filter: OpenOrdersFilter,
   t: TFunction,
@@ -314,12 +251,8 @@ export function activeOpenOrdersFilters(
   return active;
 }
 
-// --- URL state --------------------------------------------------------------
-
-/** Where the Orders page lives. Written down once here so every link agrees. */
 const ORDERS_PATH = '/market/orders';
 
-/** A closed set of members, comma-joined — same shape as `idListParam`, but of enum values rather than ids. */
 function enumListParam<V extends string>(values: readonly V[]): UrlParamCodec<readonly V[]> {
   return {
     parse: (raw) => {
@@ -333,10 +266,6 @@ function enumListParam<V extends string>(values: readonly V[]): UrlParamCodec<re
   };
 }
 
-/**
- * The whole filter, one `{ key, codec }` per field, scoped `orders.*` so it
- * can never collide with another panel's params on the same page (ADR 0015).
- */
 export const {
   schema: OPEN_ORDERS_FILTER_PARAMS,
   fieldToParam: OPEN_ORDERS_FIELD_TO_PARAM,
@@ -358,29 +287,13 @@ export const {
 });
 
 export interface OpenOrdersLinkTarget {
-  /** OR'd, the way the filter's own `problems` are. */
   problems?: readonly OrderProblem[];
   characterIds?: readonly number[];
-  /** Opens with the work-through queue already started. */
   workThrough?: boolean;
 }
 
-/** The one-shot param that opens Open Orders with the work-through queue started; spent on arrival. */
 export const WORK_THROUGH_PARAM = 'orders.workThrough';
 
-/**
- * A link to the Orders page already narrowed to what the linker counted.
- *
- * The Overview board's tiles are the caller: a tile reading "21 undercut" that
- * opens a page listing thirty is a tile that lied, because the board counts
- * one Character's orders and the page fans out across all of them. Carrying
- * the character makes the two figures agree, and the funnel's active count
- * ("Filters (1 active)") says the list arrived narrowed.
- *
- * Built from the same `OPEN_ORDERS_FILTER_PARAMS` codecs the page itself
- * reads live, so a link the board builds and a page that has since changed
- * its own params can never silently disagree about the shape of the URL.
- */
 export function openOrdersHref({
   problems,
   characterIds,
@@ -389,7 +302,6 @@ export function openOrdersHref({
   const params = new URLSearchParams();
   const problemsRaw = OPEN_ORDERS_FILTER_PARAMS['orders.problems'].serialize(problems ?? []);
   if (problemsRaw !== null) params.set('orders.problems', problemsRaw);
-  // Opens on the segment holding what the link names (Needs you is the default).
   const viewRaw = OPEN_ORDERS_FILTER_PARAMS['orders.view'].serialize(
     viewForProblems(problems ?? [])
   );

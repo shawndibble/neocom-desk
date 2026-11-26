@@ -1,8 +1,3 @@
-/**
- * Sample Corp Tax Book for the section pages' stories: a view built by the real engine
- * (`buildBookView`) from invented entries and handed to the real tabs and pages through
- * `BookProvider`, so the stories are the shipped components.
- */
 import { DEFAULT_NOTICE_RULES } from '@/engine/corpTaxBook/notices';
 import { buildBookView, type BookView } from '@/engine/corpTaxBook/bookView';
 import { draftNotice } from '@/engine/corpTaxBook/lateNotices';
@@ -112,7 +107,6 @@ const EXTRACTIONS = [
     naturalDecayTime: '2026-08-29T10:00:00Z',
     oreLines: [{ typeId: 3, quantity: 300_000 }],
   },
-  // Ready: the chunk has arrived, the laser has not fired.
   {
     structureId: KILN,
     moonId: 4,
@@ -121,7 +115,6 @@ const EXTRACTIONS = [
     naturalDecayTime: '2026-10-20T13:00:00Z',
     oreLines: [{ typeId: 3, quantity: 280_000 }],
   },
-  // Extracting, arriving within the week and beyond it.
   {
     structureId: DRILL,
     moonId: 5,
@@ -166,7 +159,6 @@ const base = {
 };
 
 function build(): BookView {
-  // A late notice to each Miner who owed on 1 Sep, read off the book as it stood then.
   const then = buildBookView({ ...base, now: '2026-09-01T10:00:00Z' });
   const notices = then.miners.flatMap((m) => draftNotice(then, m.id)?.notice ?? []);
   const tam = notices.find((n) => n.minerId === 'solo:4');
@@ -253,7 +245,6 @@ const NAMES = {
   ore: (id: number) => ORES[id]?.[0] ?? `Ore ${id}`,
 };
 
-/** What the real `BookProvider` takes, for the "today" stories. */
 export const BOOK_CONTEXT = {
   characterId: 1,
   corporationId: CORP_ID,
@@ -272,7 +263,6 @@ export const BOOK_CONTEXT = {
   reload: () => {},
 };
 
-/** The same corporation before any notice went out, behind: what the late notice run sends. */
 export const NOTICE_BOOK_CONTEXT = {
   ...BOOK_CONTEXT,
   view: buildBookView(base),

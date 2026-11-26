@@ -11,9 +11,7 @@ import { formatCountdown } from '@/lib/duration';
 import { formatCompactNumber } from '@/lib/compactNumber';
 import { useClosestCharacters } from './useClosestCharacters';
 
-/** Rows shown before "Show N more". */
 const VISIBLE_ROWS = 5;
-/** A roster this size or smaller loads on mount; a bigger one waits to be opened. */
 export const CLOSEST_AUTO_LOAD_MAX = 5;
 
 interface WhoIsClosestProps {
@@ -23,11 +21,6 @@ interface WhoIsClosestProps {
   skills: ReadonlyMap<number, EngineSkill>;
 }
 
-/**
- * Every roster Character ranked by time to finish the open plan. Display
- * only. Characters with the whole plan and Characters who cannot be timed
- * collapse into one line each, so neither reads as a row of zeros.
- */
 export function WhoIsClosest({ roster, ownerId, entries, skills }: WhoIsClosestProps) {
   const { t } = useTranslation();
   const onDemand = roster.length > CLOSEST_AUTO_LOAD_MAX;
@@ -138,7 +131,6 @@ function reasonText(t: (key: string) => string, reason: PlanTimingUnavailableRea
   return t(`plans.closest.reason.${reason}`);
 }
 
-/** One summary line that expands to the names behind it. */
 function NamesLine({
   label,
   items,

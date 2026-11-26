@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { formatLocalClock } from './localClock';
 
-// 06:44 UTC on a January day: 00:44 in Chicago (CST).
 const AT = Date.UTC(2026, 0, 15, 6, 44);
 
 describe('formatLocalClock', () => {

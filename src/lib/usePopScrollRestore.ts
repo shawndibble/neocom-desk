@@ -1,19 +1,8 @@
-/**
- * Puts the page's scroll back when Back (or Forward) returns to an entry.
- *
- * The browser restores scroll itself, but only at `popstate`: a page that
- * remounts behind a spinner (the PI Plan tab, back from a Map drawer) is short
- * at that moment, so the restore clamps to 0. This remembers each history
- * entry's scroll and, on a POP, waits for the page to be tall enough again.
- * It gives up after `POP_RESTORE_GIVE_UP_MS`, or as soon as the pilot scrolls,
- * types or taps, so nobody is yanked away from where they already went.
- */
 import { useEffect, useLayoutEffect, useRef } from 'react';
 import { useLocation, useNavigationType } from 'react-router-dom';
 
 export const POP_RESTORE_GIVE_UP_MS = 3000;
 
-/** Scroll per history entry (`location.key`); lives for the tab, like history itself. */
 const savedScroll = new Map<string, number>();
 
 const INPUT_EVENTS = ['wheel', 'touchstart', 'keydown', 'pointerdown'] as const;
@@ -22,8 +11,6 @@ export function usePopScrollRestore(): void {
   const location = useLocation();
   const navigationType = useNavigationType();
 
-  // Key and target set at commit: a clamp scroll fired after the next page commits is filed
-  // under the new key, and the target is read before that scroll can zero it.
   const keyRef = useRef(location.key);
   const targetRef = useRef<number | null>(null);
   useLayoutEffect(() => {

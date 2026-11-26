@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import type { CommunityRequest } from '@/engine/communities/requests';
 import { requestHeadline, standingRateLine } from './requestFormat';
 
-// A stub that echoes the key and its numbers, so the test pins what is asked for, not the wording.
 const t = (key: string, opts?: Record<string, unknown>) =>
   opts ? `${key}${JSON.stringify(opts)}` : key;
 

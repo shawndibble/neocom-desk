@@ -13,22 +13,16 @@ import {
 } from 'firebase/firestore';
 import { characterAuth, createRulesEnv } from './testEnv';
 
-// Vetting. Everything a pilot or an officer sees comes back from a `vettingCall` action, so no
-// client reads or writes any of it. A mistake here hands out a pilot's report, the raw rows a
-// read returned, or the hash of the key that proves a review is theirs.
 let env: RulesTestEnvironment;
 
 const CORP = 'corps/98000001';
 const REVIEW = `${CORP}/vettingReviews/r1`;
 
-/** Every vetting document, and the collection it sits in. */
 const DOCS: [path: string, parent: string][] = [
   [`${CORP}/vetting/settings`, `${CORP}/vetting`],
-  // Who the overview saw holding a reviewer role: the server's, like the settings beside it.
   [`${CORP}/vetting/reviewers`, `${CORP}/vetting`],
   [REVIEW, `${CORP}/vettingReviews`],
   [`${REVIEW}/inputs/50`, `${REVIEW}/inputs`],
-  // Every row a read returned, kept with the review (ADR 0035): officers get it through the action.
   [`${REVIEW}/rawRows/50_abc_wallet_0`, `${REVIEW}/rawRows`],
   [`${CORP}/vettingThrottle/50`, `${CORP}/vettingThrottle`],
 ];
@@ -47,7 +41,6 @@ beforeEach(async () => {
     await setDoc(doc(db, `${CORP}/vetting/reviewers`), {
       reviewers: { 'char:2': { characterId: 2, ownerHash: 'h2', lastSeenAt: 0 } },
     });
-    // The pilot, the requester and a reviewer are all named on the review: none may read it.
     await setDoc(doc(db, REVIEW), {
       state: 'open',
       pilot: { characterId: 50 },
@@ -58,7 +51,6 @@ beforeEach(async () => {
     await setDoc(doc(db, `${REVIEW}/inputs/50`), { characterId: 50, json: '{}' });
     await setDoc(doc(db, `${REVIEW}/rawRows/50_abc_wallet_0`), { characterId: 50, json: '[]' });
     await setDoc(doc(db, `${CORP}/vettingThrottle/50`), { windowStart: 0, count: 1 });
-    // An SRP officer record: officer access to SRP opens nothing here.
     await setDoc(doc(db, `${CORP}/srpOfficers/char:2`), {
       characterId: 2,
       ownerHash: 'h2',

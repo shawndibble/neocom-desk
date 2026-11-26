@@ -1,7 +1,3 @@
-/**
- * The SRP export (#4946). The rules let any SRP officer, an Accountant too, read all four
- * sources, so the Queue's button adds no reach.
- */
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Field, Fields, Panel } from '@/components/ui';
@@ -31,7 +27,6 @@ function useSrpExport(): () => Promise<WorkbookDownload> {
       readSrpActivity(characterId, corporationId, null),
       readSrpDoctrines(characterId, corporationId),
       corpTickerOrId(corporationId),
-      // Read at the press, so a click before the page's own name load lands still gets names.
       loadTypes(),
       loadSolarSystemsById(),
     ]);
@@ -44,7 +39,6 @@ function useSrpExport(): () => Promise<WorkbookDownload> {
       },
       t
     );
-    // A read that comes back at the cap may have more behind it, so the file is marked partial.
     return downloadWorkbook('corp-srp', sheets, {
       qualifier: ticker,
       truncated: claims.length >= SRP_READ_CAP || audit.length >= SRP_READ_CAP,
@@ -52,7 +46,6 @@ function useSrpExport(): () => Promise<WorkbookDownload> {
   }, [characterId, corporationId, t]);
 }
 
-/** The download alone: the Queue's header carries it beside the summary line. */
 export function SrpExportButton({ className }: { className?: string }) {
   const { t } = useTranslation();
   const build = useSrpExport();
@@ -61,7 +54,6 @@ export function SrpExportButton({ className }: { className?: string }) {
   );
 }
 
-/** The Export panel at the foot of SRP Settings, laid out like the editor's own fields. */
 export function SrpExportPanel() {
   const { t } = useTranslation();
   return (

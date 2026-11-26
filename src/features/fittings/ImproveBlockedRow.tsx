@@ -11,13 +11,11 @@ interface Props {
   option: RejectedOption;
   own: FittingStats;
   fitTotal: number | null;
-  /** Whether the implant alternative was searched for this fix. */
   searched: boolean;
   swapLabel: string;
   settings: ImproveSettings;
 }
 
-/** A fix that cannot be applied as it stands: greyed, with what it needs and why nothing covers it. */
 export function ImproveBlockedRow({ option, own, fitTotal, searched, swapLabel, settings }: Props) {
   const { t } = useTranslation();
   const short = RESOURCES.filter((resource) => overageOf(option.after, resource) > 0).map(

@@ -1,7 +1,6 @@
 import type { CsvColumn, CsvTranslate } from '@/lib/csv';
 import { npcAccessLevel, npcAgentAccessText, type NpcStandingRow } from './npcStandingsRows';
 
-/** Every column the picker offers, whatever it shows; standings are raw numbers and unknown is blank, never invented. */
 export function npcStandingsCsvColumns(t: CsvTranslate): CsvColumn<NpcStandingRow>[] {
   return [
     { header: t('contacts.name'), value: (row) => row.name },

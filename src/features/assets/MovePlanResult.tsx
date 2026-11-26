@@ -20,7 +20,6 @@ import { HaulerPicker } from './MovePlanHaulerPicker';
 import { MaxIskInput } from './MovePlanMaxIsk';
 import { PlaceName } from './PlaceName';
 
-/** "Don't remind me again" on the rig warning, ticked once for good. */
 const useSkipRigWarning = createLocalSetting<boolean>({
   key: 'movePlanSkipPackRigWarning',
   defaultValue: false,
@@ -29,17 +28,9 @@ const useSkipRigWarning = createLocalSetting<boolean>({
 export interface PlanState {
   plan: MovePlan;
   destinationSystem: number | null;
-  /** The destination station's name, when one was picked. */
   destinationStation: string | null;
-  /** System of each pickup location. */
   pickupSystems: ReadonlyMap<number, number | null>;
-  /**
-   * The haulers could not be sized, so "no hauler" says nothing about the
-   * pilot's skills: `unavailable` (data not downloaded, skills unread) or
-   * `loading` (not in yet).
-   */
   haulerSizing?: 'unavailable' | 'loading';
-  /** The price source could not be reached: a limit then counts every stack as unpriced. */
   pricesUnavailable?: boolean;
 }
 
@@ -47,39 +38,24 @@ interface PlanResultProps {
   state: PlanState;
   compareOpen: boolean;
   onToggleCompare: () => void;
-  /** The per-plan hauler pick; undefined is the suggestion. */
   haulerOverride: HaulerOverride | undefined;
   onPickHauler: (override: HaulerOverride | undefined) => void;
-  /** The saved max ISK per haul; null for no limit. */
   maxIsk: number | null;
   onChangeMaxIsk: (value: number | null) => void;
-  /** The plan's screen-reader heading, where focus lands once the plan shows. */
   headingRef: Ref<HTMLHeadingElement>;
   onBack: () => void;
-  /** Works out and shows the active haul; absent where no route can be planned. */
   onShowRoute?: () => void;
-  /** The route is being worked out. */
   routing?: boolean;
-  /** The route could not be worked out. */
   routeFailed?: boolean;
-  /** Haul this ship (itemID) packaged instead of flying it. */
   onPackShip: (itemId: number) => void;
-  /** Fly a packed ship (itemID) after all. */
   onUnpackShip: (itemId: number) => void;
-  /** Rigs fitted to a ship; packing it means unfitting them, which destroys them. */
   rigsOf: (itemId: number) => number;
-  /** Whether the ship type has a packaged volume to plan with. */
   canPack: (typeId: number) => boolean;
   name: (typeId: number) => string;
   placeLabel: (id: number) => string;
-  /** Palette slot of a pickup location. */
   hueOf: (locationId: number) => number;
 }
 
-/**
- * The plan: the suggested hauler and the load split by pickup and trip on top,
- * then the rail from each Character's pickups to the destination.
- */
 export function PlanResult({
   state,
   compareOpen,
@@ -111,7 +87,6 @@ export function PlanResult({
   const [dontRemind, setDontRemind] = useState(false);
   const [ownedFirst, setOwnedFirst] = useState(false);
   const focusAfterCommit = useFocusAfterCommit({ preventScroll: true });
-  /** Pickup the ship being packed sits in; its heading takes focus once the Pack button is gone. */
   const packFrom = useRef<string | null>(null);
   const pickupHeading = () =>
     document.querySelector<HTMLElement>(`[data-pickup-heading="${packFrom.current}"]`);
@@ -152,21 +127,17 @@ export function PlanResult({
     hull.typeId === CUSTOM_HAULER_TYPE_ID
       ? t('assets.movePlan.customHold', { volume: formatCubicMetres(hull.capacityM3) })
       : hull.name;
-  /** Ships flown out: each is a flight of its own, outside the hauler's trips. */
   const flownShips = plan.perCharacter.flatMap((c) =>
     c.pickups.flatMap((p) =>
       p.ships.map((ship) => ({ ship, pickupKey: `${c.characterId}:${p.locationId}` }))
     )
   );
   const flown = flownShips.map((f) => f.ship);
-  /** Every flown ship is a trip of its own on top of the hauls. */
   const withShips = (hauls: number, tooBig = 0) => hauls + totals.shipsToFly + tooBig;
-  /** Packed ships the active hauler cannot carry: flown, so each is a flight. */
   const tooBig = active?.tooBigCount ?? 0;
 
   return (
     <div className="flex flex-1 flex-col gap-3">
-      {/* Whose assets the plan covers is the header picker's to say. */}
       <h3 ref={headingRef} tabIndex={-1} className="sr-only focus:outline-none">
         {t('assets.movePlan.title')}
       </h3>

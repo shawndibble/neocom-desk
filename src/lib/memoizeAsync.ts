@@ -1,10 +1,3 @@
-/**
- * Memoizes an async loader for the session. A failed load is never memoized,
- * so a later call can retry. By default it rejects; pass `fallback` to resolve
- * that value instead. `reset()` drops the memo (tests swap data between
- * cases); a failure from a load `reset()` already replaced leaves the newer
- * memo alone.
- */
 export interface MemoizedAsync<T> {
   (): Promise<T>;
   reset(): void;

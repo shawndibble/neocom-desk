@@ -1,38 +1,3 @@
-/**
- * What one colony can extract and refine to P1, fitted against its own
- * CPU/Powergrid — the single capacity model the goal planner, the Baseline and
- * the factory host all read, so the three can never disagree about what fits.
- *
- * ## An extraction slot refines on the spot
- *
- * Every slot is ECUs on one P0 plus the Basic Industry Facilities that turn it
- * into its P1 on the same planet. Raw P0 never leaves the colony: at 0.005 m3
- * and a customs value of 5 ISK it is worth hauling only as P1, and every
- * Baseline and Goal Plan figure assumes the refined product. The basic count
- * is read off the schematic's own input and cycle (3000 per 1800 s, so one
- * basic eats 6000 P0/h) — no rate is written here.
- *
- * A second ECU on the *same* P0 yields `policy.extraEcuFactor` of the first:
- * two programs on one resource compete for the same hot spots. A second ECU on
- * a *different* P0 is credited in full — it is a second slot, not a second
- * program on the first slot's resource.
- *
- * ## The fit is on the combined pin set
- *
- * Two slots share one Command Center, so they are fitted together: ECUs, their
- * heads (`headsPerExtractor` each, `pinsLoad`'s total-heads convention), every
- * basic, and one Launchpad. The budget a `PlannerColony` carries is the whole
- * Command Center supply — the plan rebuilds the production pins — so the
- * Launchpad's own load is charged here, unlike `fitColony`, whose caller has
- * already subtracted an existing pad.
- *
- * Links follow `fitColony`'s per-pin rule: one `newLinkCost` for every planned
- * pin except the Launchpad. A colony's links form a tree rooted at the pad, so
- * N pins need N − 1 links, and that is exactly "every pin but the pad".
- *
- * Pure: `PiData`, the colony and the policy are parameters.
- */
-
 import type { PiData, PiPinKind } from '@/sde/types';
 import { EXTRACTOR_HEADS_MAX, pinsLoad } from './pinBudget';
 import type { ExtractionSlot, FitLimit, PlannerColony, PlannerPolicy } from './goalTypes';
@@ -40,10 +5,8 @@ import type { PinCounts, PinLoad } from './types';
 
 const SECONDS_PER_HOUR = 3_600;
 
-/** The same drift guard `chain.ts` uses, so 6000/6000 is one basic, not two. */
 const CEIL_EPSILON = 1e-9;
 
-/** One P0 and how many ECUs to put on it. */
 export interface ExtractionWant {
   p0TypeId: number;
   ecus: number;
@@ -52,39 +15,29 @@ export interface ExtractionWant {
 export type ColonyExtraction =
   | {
       status: 'fits';
-      /** Sorted by P0 typeId. */
       slots: ExtractionSlot[];
       pins: PinCounts;
-      /** The model's figure, which may exceed `budget` when `runningToday`. */
       used: PinLoad;
       budget: PinLoad;
-      /** Accepted because the colony runs this extraction today, not because the model fits it. */
       runningToday?: true;
     }
   | { status: 'does-not-fit'; limitedBy: FitLimit[]; used: PinLoad; budget: PinLoad }
-  /** P0s this colony's planet type does not yield (no rate on the colony). Sorted. */
   | { status: 'not-extractable'; p0TypeIds: number[] }
-  /** More ECUs or more distinct P0s than `PlannerPolicy` allows. */
   | { status: 'over-policy' };
 
 export type FittedExtraction = Extract<ColonyExtraction, { status: 'fits' }>;
 
 export interface PlannedPinFit {
   fits: boolean;
-  /** The production pins plus the one Launchpad. */
   pins: PinCounts;
-  /** Pins, heads and links together. */
   used: PinLoad;
   budget: PinLoad;
-  /** The axes `used` overruns. Empty when it fits. */
   limitedBy: FitLimit[];
 }
 
 interface BasicSchematic {
   p1TypeId: number;
-  /** P0 one basic consumes an hour. */
   p0PerFactoryHour: number;
-  /** P1 out per P0 in. */
   yieldRatio: number;
 }
 
@@ -109,11 +62,6 @@ function addCounts(a: PinCounts, b: PinCounts): PinCounts {
   return out;
 }
 
-/**
- * Fit a set of production pins on `colony`: adds the one Launchpad and a link
- * per non-pad pin, and checks the total against the whole Command Center
- * supply. The extraction slots and the factory host both go through here.
- */
 export function fitPlannedPins(
   colony: PlannerColony,
   production: PinCounts,
@@ -133,40 +81,12 @@ export function fitPlannedPins(
   return { fits: limitedBy.length === 0, pins, used, budget: colony.budget, limitedBy };
 }
 
-/** True when every slot in `want` is within what the colony runs today on that P0. */
 function runsToday(colony: PlannerColony, want: readonly ExtractionWant[]): boolean {
   const today = colony.current.ecusByP0;
   if (!today || want.length === 0) return false;
   return want.every((w) => (today.get(w.p0TypeId) ?? 0) >= w.ecus);
 }
 
-/**
- * Fit `want` — one or two P0s with their ECU counts — on `colony`, refining
- * each to its P1 on the spot.
- *
- * Checked in order: a P0 the colony has no rate for (`not-extractable`), then
- * the policy caps (`over-policy`), then CPU/Powergrid (`does-not-fit`). An
- * empty `want` with no `fixed` pins fits with no pins at all — an unused
- * colony builds nothing, not even a pad.
- *
- * ## What the colony runs today fits, whatever the model says
- *
- * The model is a little pessimistic against real colonies, for three
- * reasons it cannot see past: it refines every slot on the spot, so a
- * measured 12,000 P0/h ECU is charged two basics a colony shipping raw P0
- * does not run; it charges every planned pin a link at the colony's own
- * *longest* hop (`newLinkCost`), where real layouts cluster pins near the
- * pad; and its heads are the colony's mean. The e2e fixture's Jita I — CC4,
- * two 8-head ECUs — models at ~18,200 MW against 17,000 and yet runs. So a
- * want within `current.ecusByP0` (no more ECUs on any P0 than today, no P0
- * it does not run) is accepted as `runningToday` without the check: the
- * colony itself is the proof. Anything beyond today's layout, or any factory
- * pin on top of it, is new load and is fitted by the model as before.
- *
- * `fixed` is production the colony carries whatever it extracts — the factory
- * host's P2+ pins — fitted on the same Command Center as the slots, so a host
- * extracts only from what its factories leave.
- */
 export function colonyExtraction(
   colony: PlannerColony,
   want: readonly ExtractionWant[],
@@ -210,7 +130,6 @@ export function colonyExtraction(
     .map((w) => {
       const basic = basicSchematicFor(w.p0TypeId, pi);
       if (!basic) throw new Error(`no basic schematic refines P0 ${w.p0TypeId}`);
-      // `has` above guarantees the rate.
       const rate = colony.ratePerEcu.get(w.p0TypeId)!;
       const p0PerHour = rate.unitsPerHour * (1 + policy.extraEcuFactor * (w.ecus - 1));
       return {
@@ -254,13 +173,6 @@ export function colonyExtraction(
   return { status: 'fits', slots, pins: fit.pins, used: fit.used, budget: fit.budget };
 }
 
-/**
- * Every extraction this colony can run within the policy, fitted: each P0 at
- * 1..`maxEcusPerColony` ECUs, then — when the policy allows two types — each
- * pair of P0s split every way the ECU cap allows. Ordered singles first, by
- * P0 then ECUs, then pairs, so a caller breaking ties by position is
- * deterministic.
- */
 export function extractionOptions(
   colony: PlannerColony,
   pi: PiData,

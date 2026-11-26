@@ -1,17 +1,3 @@
-/**
- * The Moons nav dot (#6208): a Corp Tax Book editor sees it on the corp Moons
- * entry while "Needs you" has a card or Automatic sync has stopped, so a due
- * late notice, an Overdue Miner, an Unmatched donation or a dead schedule
- * reaches them outside the Moons page.
- *
- * The Moons page publishes what it found (`useMoonsAttentionPublisher`) into Dexie, per
- * Character and corporation, and the nav reads that. Only an editor's visit publishes, so the
- * dot never shows for a viewer. While the app is open, a shell poll (`useMoonsAttentionPoll`)
- * recounts for a Character whose editor visit is on record: the schedule's status doc, and the
- * book's Needs you as the Overview counts it (`moonsAttentionCount.ts`), so a declaration,
- * dispute or due late notice that arrives after the visit lights the dot, and one another
- * officer handled clears it. The scheduled sync's own push alert covers a closed app.
- */
 import { useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
@@ -24,16 +10,13 @@ import { isOnline } from '@/stores/network';
 import { useActiveCorporationId } from '../owner';
 
 export interface MoonsAttention {
-  /** Cards in the book's "Needs you" when the editor last looked. */
   needsYou: number;
-  /** Automatic sync has stopped (ADR 0025): the book says why on its health strip. */
   syncStopped: boolean;
 }
 
 const attentionKey = (characterId: number, corporationId: number) =>
   `moonsAttention:${characterId}:${corporationId}`;
 
-/** How often the open app recounts. */
 export const MOONS_ATTENTION_POLL_MS = 30 * MINUTE_MS;
 
 function readAttention(value: unknown): MoonsAttention | undefined {
@@ -44,7 +27,6 @@ function readAttention(value: unknown): MoonsAttention | undefined {
   };
 }
 
-/** Stores what an editor's visit found; `null` (a viewer, or no book) clears it. */
 export async function publishMoonsAttention(
   characterId: number,
   corporationId: number,
@@ -55,7 +37,6 @@ export async function publishMoonsAttention(
   else await db.settings.put({ key, value: attention });
 }
 
-/** Whether the corp Moons entry wears its dot for the active Character's corporation. */
 export function useMoonsNavAttention(): boolean {
   const characterId = useActiveCharacter((state) => state.activeCharacterId);
   const corporationId = useActiveCorporationId();
@@ -70,11 +51,6 @@ export function useMoonsNavAttention(): boolean {
   );
 }
 
-/**
- * Recounts the dot for an editor whose visit is on record: rereads `corps/{id}/meta/scheduledSync`
- * for the stop, and the book for its Needs you count. Never mints a token: only while the Firebase
- * session is already this Character's. A refused or failed read keeps what was stored for it.
- */
 export async function refreshMoonsAttention(
   characterId: number,
   corporationId: number
@@ -107,10 +83,8 @@ export async function refreshMoonsAttention(
         return undefined;
       }),
   ]);
-  // Re-read: a Moons visit may have published while these reads were in flight.
   const latest = readAttention((await db.settings.get(key))?.value);
   if (latest === undefined) return;
-  // No active book any more: nothing needs this editor.
   const next: MoonsAttention = {
     needsYou: needsYou === null ? 0 : (needsYou ?? latest.needsYou),
     syncStopped: syncStopped ?? latest.syncStopped,
@@ -119,7 +93,6 @@ export async function refreshMoonsAttention(
   await db.settings.put({ key, value: next });
 }
 
-/** Mounted once in the shell, like the Communities Request poll: the visible Tab Leader only. */
 export function useMoonsAttentionPoll() {
   const characterId = useActiveCharacter((state) => state.activeCharacterId);
   const corporationId = useActiveCorporationId();

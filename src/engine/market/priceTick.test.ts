@@ -50,8 +50,6 @@ describe('roundPriceDown', () => {
   });
 
   it('returns null for a positive sub-cent input with no legal price at or below it', () => {
-    // 0.005 rounds down to 0 cents, which is not a legal price — must not
-    // silently return 0, only ever a real legal price or null.
     expect(roundPriceDown(0.005)).toBeNull();
     expect(roundPriceDown(0.001)).toBeNull();
   });
@@ -76,15 +74,10 @@ describe('roundPriceUp', () => {
   });
 
   it('crosses a magnitude boundary upward when the exact value spills past the band max', () => {
-    // 999.95 has no legal price at or below it inside the 100-999.9 band that
-    // is still >= it, so the safe answer spills into the next band.
     expect(roundPriceUp(999.95)).toBe(1000);
   });
 
   it('floors a positive sub-cent input to the 0.01 minimum, never -0', () => {
-    // A tiny enough positive input used to `Math.ceil` straight through 0.01
-    // to `-0` — a value that is neither a legal price nor `null`. The
-    // smallest legal price at or above ANY positive input is 0.01.
     expect(roundPriceUp(1e-10)).toBe(0.01);
     expect(Object.is(roundPriceUp(1e-10), -0)).toBe(false);
     expect(roundPriceUp(0.005)).toBeCloseTo(0.01, 6);

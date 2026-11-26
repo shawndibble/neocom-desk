@@ -23,9 +23,6 @@ describe('extractableSp', () => {
 
 describe('isSpExtractionReady', () => {
   it('is false for a fresh character nowhere near the floor', () => {
-    // The bug this guards against: a naive `totalSp >= threshold` check on
-    // the default 500k threshold would flag every character within days of
-    // creation. The floor must be crossed first.
     expect(isSpExtractionReady(1_000_000, 500_000)).toBe(false);
   });
 

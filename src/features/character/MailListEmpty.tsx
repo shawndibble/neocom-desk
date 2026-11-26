@@ -1,14 +1,12 @@
 import { useTranslation } from 'react-i18next';
 import { Button, CachedEmptyState, EmptyState } from '@/components/ui';
 
-/** The first filter stage that emptied the Mail list, or `rows` when it has some. */
 export type MailListState =
   'rows' | 'no-folders' | 'empty-folder' | 'no-search-matches' | 'all-read-hidden';
 
 interface MailListEmptyProps {
   state: Exclude<MailListState, 'rows'>;
   folderCount: number;
-  /** Older pages are still unloaded, so an empty folder is not yet known to be empty. */
   hasMore: boolean;
   offline: boolean;
   onShowAllFolders: () => void;
@@ -16,7 +14,6 @@ interface MailListEmptyProps {
   onShowRead: () => void;
 }
 
-/** What the Mail list says when a filter stage left it empty. Each one's single action brings rows back. */
 export function MailListEmpty({
   state,
   folderCount,
@@ -28,10 +25,6 @@ export function MailListEmpty({
 }: MailListEmptyProps) {
   const { t } = useTranslation();
   if (state === 'no-folders') {
-    // Deselecting every folder is allowed rather than refused — a chip that
-    // visibly ignores a press is worse than an empty list that explains itself
-    // and hands back the way out. The chip row above sits outside this branch,
-    // so the control that undoes it never disappears along with the rows.
     return (
       <EmptyState
         title={t('mail.noFoldersTitle')}
@@ -46,8 +39,6 @@ export function MailListEmpty({
     );
   }
   if (state === 'empty-folder') {
-    // No action: no filter here brings mail back. With older pages unloaded,
-    // "none" isn't known yet: point at Load more below.
     return hasMore ? (
       <EmptyState
         title={t('mail.emptyFolderLoadedTitle', { count: folderCount })}

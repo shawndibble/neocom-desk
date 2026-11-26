@@ -2,7 +2,6 @@ import { describe, expect, it, vi } from 'vitest';
 import type { Firestore } from 'firebase-admin/firestore';
 import { refreshReadModels } from './corpTaxBookReadModelsStore.js';
 
-// A refresh that cannot write must never leave stale docs for a client to trust (#5259).
 function fakeDb(failReads: boolean) {
   const deleted: string[] = [];
   const empty = { docs: [], data: () => ({}) };

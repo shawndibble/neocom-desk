@@ -1,7 +1,3 @@
-/**
- * Improve's result list: one row per fitted module (or empty slot), showing
- * its best option for the chosen sort, with the other variations behind it.
- */
 import type { ImproveCandidate, ImproveOption } from './improve';
 import { nullsLast } from '@/engine/math';
 
@@ -11,13 +7,11 @@ export type ImproveSort = (typeof IMPROVE_SORTS)[number];
 export interface ModuleGroup {
   key: string;
   best: ImproveOption;
-  /** The module's other options, in the same order. */
   others: ImproveOption[];
 }
 
 const MILLION = 1_000_000;
 
-/** The module a candidate changes: its source and slots, not the paired downgrade. */
 export const moduleKey = (candidate: ImproveCandidate): string =>
   candidate.conversion
     ? `conversion|${candidate.conversion.side}`
@@ -26,7 +20,6 @@ export const moduleKey = (candidate: ImproveCandidate): string =>
         .sort()
         .join(',')}`;
 
-/** Gain per million ISK; a free or saving gain beats every priced one, an unpriced one has none. */
 function valueOf(option: ImproveOption): number | null {
   if (option.iskDelta === null) return null;
   if (option.iskDelta > 0) return option.score / (option.iskDelta / MILLION);
@@ -41,7 +34,6 @@ const COMPARE: Record<ImproveSort, (a: ImproveOption, b: ImproveOption) => numbe
   cheapest: (a, b) => nullsLast(a.iskDelta, b.iskDelta, 1) || byGain(a, b),
 };
 
-/** Replacing a module the pilot cannot fly comes before any gain. */
 const fixFirst = (a: ImproveOption, b: ImproveOption) =>
   Number(b.candidate.fixesUnflyable === true) - Number(a.candidate.fixesUnflyable === true);
 

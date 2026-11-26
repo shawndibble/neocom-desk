@@ -6,7 +6,6 @@ import {
   type PriorityTicket,
 } from './concurrency';
 
-/** Runs `fn` over 0..n-1, recording the highest number of overlapping calls. */
 async function runTracking(count: number, limit: number) {
   const order: number[] = [];
   let inFlight = 0;
@@ -50,7 +49,6 @@ describe('mapWithConcurrencyLimit', () => {
   });
 
   it('rejects if any call rejects, rather than swallowing it', async () => {
-    // Callers that want per-item isolation wrap fn themselves (roster.ts does).
     await expect(
       mapWithConcurrencyLimit([1, 2, 3], 2, async (n) => {
         if (n === 2) throw new Error('boom');
@@ -127,7 +125,6 @@ describe('createSemaphore', () => {
     await expect(queued).rejects.toThrow();
 
     held();
-    // The abandoned waiter must not still be holding the freed permit.
     expect(semaphore.inFlight).toBe(0);
     const next = await semaphore.acquire();
     next();
@@ -143,12 +140,10 @@ describe('createSemaphore', () => {
 describe('createSemaphore priority lanes', () => {
   const low = (): PriorityTicket => ({ priority: 'low' });
 
-  /** Lets every already-settled admission run its `then`. */
   const flush = async () => {
     for (let i = 0; i < 5; i += 1) await Promise.resolve();
   };
 
-  /** Queues acquires and records, by label, the order they are admitted in (permits kept). */
   function recorder() {
     const order: string[] = [];
     const track = (label: string, pending: Promise<() => void>) =>
@@ -158,7 +153,6 @@ describe('createSemaphore priority lanes', () => {
     return { order, track };
   }
 
-  /** Queues acquires that give their permit straight back, recording admission order. */
   function passer(semaphore: ReturnType<typeof createSemaphore>) {
     const order: string[] = [];
     const queue = (label: string, ticket?: PriorityTicket) =>
@@ -209,7 +203,6 @@ describe('createSemaphore priority lanes', () => {
     await flush();
     expect(order).toEqual([]);
     expect(semaphore.inFlight).toBe(2);
-    // The reserve is still there for foreground, at once.
     await semaphore.acquire();
     await semaphore.acquire();
     expect(semaphore.inFlight).toBe(4);
@@ -296,7 +289,6 @@ describe('createSemaphore priority lanes', () => {
     semaphore.promote(ticket);
     release();
 
-    // Background's count is back to zero, so its one permit is free again.
     const { order, track } = recorder();
     void track('bg', semaphore.acquire(undefined, low()));
     await flush();

@@ -1,6 +1,5 @@
 import type { RuleBreak } from './types';
 
-/** What a break is about, apart from how far over it is. */
 function identity(b: RuleBreak): string {
   switch (b.kind) {
     case 'max_group':
@@ -14,7 +13,6 @@ function identity(b: RuleBreak): string {
   }
 }
 
-/** How far over its limit a counted break is; 0 for one with no count. */
 function overBy(b: RuleBreak): number {
   switch (b.kind) {
     case 'max_group':
@@ -27,12 +25,6 @@ function overBy(b: RuleBreak): number {
   }
 }
 
-/**
- * The rule breaks `after` has that `before` did not: a break of a kind the
- * before-fit lacked, a further copy of an item-level one, or a counted one it
- * passes by more. A fit that already breaks a rule can still change, as long
- * as it adds no break.
- */
 export function newRuleBreaks(
   before: readonly RuleBreak[],
   after: readonly RuleBreak[]

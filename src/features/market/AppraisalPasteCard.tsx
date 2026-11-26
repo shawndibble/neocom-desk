@@ -1,4 +1,3 @@
-/** The Appraisal tab's paste card: the list box, Price %, hub, "Minus owned" and the Recent picker. */
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useId, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -30,13 +29,10 @@ import { formatVolume } from './format';
 import { MAX_PRICE_PERCENT, MIN_PRICE_PERCENT } from './pricePercent';
 import type { AppraisalController } from './useAppraisal';
 
-// Reserved Select value for the action item; real entries use their list index.
 const CLEAR_RECENT = 'clear';
 
 interface AppraisalPasteCardProps {
-  /** The hub the figures are quoted at, when a link overrides the Appraisal hub for this visit. */
   shownHubId?: TradeHub['id'];
-  /** After the hub field writes a pick: drops that override. */
   onHubPicked?: (id: TradeHub['id']) => void;
   controller: AppraisalController;
   characterId: number | null;
@@ -47,13 +43,10 @@ interface AppraisalPasteCardProps {
   ownedPref: AppraisalOwnedPref;
   setOwnedPref: (next: AppraisalOwnedPref) => Promise<void>;
   ownedStationId: number;
-  /** Non-hub places holding stock (stations, structures), beside the Trade Hubs. */
   otherPlaces: readonly { id: number; label: string }[];
   recent: readonly RecentAppraisal[];
   setRecent: (next: readonly RecentAppraisal[]) => Promise<void>;
-  /** Ages in the Recent list are read against when the panel opened. */
   openedAt: number;
-  /** Runs an appraise from the form, so a phone folds the card on the result. */
   appraiseFromForm: (run: () => void) => void;
   unmatchedNote: ReactNode;
 }
@@ -81,11 +74,8 @@ export function AppraisalPasteCard({
   const { text, setText, loading } = controller;
   const ownedReasonId = useId();
   const checkboxBlocked = lacksAssets || characterId === null;
-  // A missing Assets grant explains itself in the GrantNote below; a missing character has no other line.
   const needsCharacter = characterId === null && !lacksAssets;
   const isDesktop = useMediaQuery(MD_UP_QUERY);
-  // One picker, rendered in the header below `md` and above the textarea from `md` up:
-  // beside the title it squeezed "Paste" to "PA…" in the narrow desktop paste column (#5761).
   const recentPicker =
     recent.length > 0 ? (
       <Select
@@ -130,11 +120,6 @@ export function AppraisalPasteCard({
         controller.canAppraise ? (
           <StatChip
             label={t('market.appraisal.linesLabel')}
-            // The box's own line count, which is deliberately not the
-            // table's row count: repeated names merge into one priced row,
-            // so "15 lines" and "14 items" can both be true. Split by the
-            // parser's own rule rather than a second regex here, so the two
-            // can never disagree about what a line is.
             value={formatVolume(countPasteLines(text))}
           />
         ) : undefined
@@ -185,7 +170,6 @@ export function AppraisalPasteCard({
         </div>
 
         <div className="flex flex-col gap-1.5">
-          {/* One sentence: "Minus what I own at [Jita]". The picker stays put, disabled, while the box is unticked. */}
           <div className="flex flex-wrap items-center gap-x-2">
             <label className={`flex items-center gap-2 text-xs ${tappableRowClassName}`}>
               <Checkbox

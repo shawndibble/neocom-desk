@@ -27,7 +27,6 @@ const pi = JSON.parse(
   readFileSync(resolve(process.cwd(), 'public/data/pi.json'), 'utf8')
 ) as PiData;
 
-// Raws.
 const AQUEOUS = 2268;
 const IONIC = 2309;
 const NOBLE_GAS = 2310;
@@ -37,10 +36,9 @@ const FELSIC = 2307;
 const HEAVY_METALS = 2272;
 const NON_CS = 2306;
 const PLASMA = 2308;
-// Products.
-const CONDENSATES = 2344; // P3: Ionic, Aqueous, Reactive Gas, Noble Gas — all on Gas.
-const ROBOTICS = 9848; // P3: Non-CS Crystals, Heavy, Noble and Base Metals — none on Gas.
-const CAMERA_DRONES = 2345; // P3: Gas raws plus two a Lava planet yields.
+const CONDENSATES = 2344;
+const ROBOTICS = 9848;
+const CAMERA_DRONES = 2345;
 
 const GAS_RAWS = [AQUEOUS, IONIC, NOBLE_GAS, REACTIVE_GAS];
 const LAVA_RAWS = [BASE_METALS, FELSIC, HEAVY_METALS, NON_CS, PLASMA];
@@ -93,9 +91,7 @@ describe('biggerChainCandidates', () => {
   it('offers a P3 or P4 only when the pilot’s own planet types yield every raw and host the factories', () => {
     const candidates = biggerChainCandidates(TWO_GAS, pi);
     expect(candidates).toContain(CONDENSATES);
-    // Robotics needs metals a Gas planet never yields.
     expect(candidates).not.toContain(ROBOTICS);
-    // Every candidate is P3 or P4.
     expect(candidates.every((id) => piTier(id, pi) >= 3)).toBe(true);
   });
 
@@ -111,12 +107,10 @@ describe('estimateOnColonies', () => {
     const jumps = (from: number, to: number | 'hub') => (to === 'hub' ? 9 : from === to ? 0 : 2);
     const result = estimateOnColonies(CONDENSATES, colonies, basis(), jumps, pi);
     if (!result) throw new Error('expected an estimate');
-    // Both Gas colonies extract; the factories go wherever the solver hosts them best.
     expect(result.planetIds).toEqual(expect.arrayContaining([1, 2]));
     expect(result.planetIds).toContain(result.hostId);
     expect(result.iskPerDay).toBeGreaterThan(0);
     expect(result.m3PerWeek).toBeGreaterThan(0);
-    // Every leg between two of the chain's planets, with its distance.
     expect(result.legs.length).toBeGreaterThan(0);
     for (const leg of result.legs) {
       expect(leg.to).toBe(result.hostId);
@@ -161,8 +155,6 @@ describe('estimateOnNewPlanets', () => {
     expect(estimateOnNewPlanets(ROBOTICS, ['gas'], 6, basis(), pi)).toBeNull();
   });
 });
-
-// --- The verdict ---------------------------------------------------------------
 
 function onColonies(overrides: Partial<ColonyChainEstimate> = {}): ColonyChainEstimate {
   return {
@@ -213,11 +205,9 @@ describe('biggerChainsView', () => {
     expect(view.others).toEqual([]);
     expect(view.recommended).toHaveLength(1);
     const card = view.recommended[0];
-    // Compared with planets 1 and 2 only: the chain leaves planet 3 as it is.
     expect(card.versusPerDay).toBe(2_200_000);
     expect(card.gainPerDay).toBe(800_000);
     expect(card.verdict).toBe('beats');
-    // Per trip at the pilot's own haul cadence.
     expect(card.m3PerWeek).toBe(700);
     expect(card.m3PerHaul).toBe(300);
   });
@@ -264,7 +254,6 @@ describe('biggerChainsView', () => {
     });
     const card = view.recommended[0];
     expect(card.kind).toBe('new-planets');
-    // Two new planets, each against the one-planet pick a free slot would otherwise take.
     expect(card.versusPerDay).toBe(1_600_000);
     expect(card.gainPerDay).toBe(400_000);
   });
@@ -286,7 +275,7 @@ describe('biggerChainsView', () => {
   });
 
   it('orders recommendations by what they gain, most first', () => {
-    const other = 2345; // Camera Drones
+    const other = 2345;
     const view = biggerChainsView({
       estimates: new Map([
         [CONDENSATES, { colonies: onColonies({ iskPerDay: 2_500_000 }), newPlanets: null }],
@@ -316,15 +305,11 @@ describe('biggerChainsView', () => {
   });
 });
 
-// --- What if I add a planet? ------------------------------------------------------
-
 describe('whatIfChainCandidates', () => {
   it('offers the chains a planet type would make possible, never one the pilot can already make', () => {
     const added = whatIfChainCandidates(TWO_GAS, ['plasma'], pi);
-    // Every metal Robotics needs comes off a Plasma planet.
     expect(added).toContain(ROBOTICS);
     expect(whatIfChainCandidates(TWO_GAS, ['lava'], pi)).toContain(CAMERA_DRONES);
-    // Condensates are already a Bigger chain on Gas alone: nothing new.
     expect(added).not.toContain(CONDENSATES);
     expect(added.some((id) => biggerChainCandidates(TWO_GAS, pi).includes(id))).toBe(false);
   });
@@ -372,7 +357,6 @@ describe('several what-if planets at once', () => {
   });
 
   it('offers what the whole set makes possible: a chain needing two added types', () => {
-    // Condensates need nothing added; Robotics' metals come off Lava and Plasma but not Gas.
     const both = whatIfChainCandidates(TWO_GAS, ['lava', 'plasma'], pi);
     expect(both).toEqual(
       expect.arrayContaining([

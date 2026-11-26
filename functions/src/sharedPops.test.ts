@@ -222,7 +222,6 @@ describe('buildSharedPops', () => {
     expect(linked!.pops[0].surveyId).toBe('abc123');
     const plain = buildSharedPops(input());
     expect(plain!.pops[0]).not.toHaveProperty('surveyId');
-    // The Survey is the ore source: a book that hides its ore make-up hides the link too.
     const hidden = buildSharedPops(
       input({
         sharing: sharing({ defaults: { ...sharing().defaults, showOre: false } }),

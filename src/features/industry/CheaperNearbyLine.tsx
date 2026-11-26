@@ -13,7 +13,6 @@ interface CheaperNearbyLineProps {
   movePlan: (patch: PlanPatch) => void;
 }
 
-/** The Costs & revenue note offering a nearby system with a lower cost index, and the one-tap move there. */
 export function CheaperNearbyLine({ cheapest, saving, movePlan }: CheaperNearbyLineProps) {
   const { t } = useTranslation();
   return (
@@ -24,8 +23,6 @@ export function CheaperNearbyLine({ cheapest, saving, movePlan }: CheaperNearbyL
         index: formatCostIndex(cheapest.index),
         amount: formatIsk(saving),
       })}{' '}
-      {/* The same move the build-system field makes: the band follows the
-            system, and a picked structure is cleared since it was elsewhere. */}
       <button
         type="button"
         className={textActionClassName('inline-flex')}
@@ -35,8 +32,6 @@ export function CheaperNearbyLine({ cheapest, saving, movePlan }: CheaperNearbyL
             buildSystemName: cheapest.name,
             ...clearedBuildLocation,
             security: securityBand(cheapest.security),
-            // The station found there is what the plan builds in: no rigs,
-            // and the tax drops back to the NPC rate `jobFee` applies.
             ...(cheapest.npcStation
               ? {
                   facility: 'npcStation' as const,

@@ -73,7 +73,6 @@ describe('groupOf', () => {
 
   it('is pending until the kills arrive', () => {
     expect(groupOf(row({ activity: null }), 'highsec')).toBe('pending');
-    // A contact standing needs no kills to place a pilot.
     expect(
       groupOf(
         row({ activity: null, standing: { band: 'red', value: -10, via: 'character' } }),

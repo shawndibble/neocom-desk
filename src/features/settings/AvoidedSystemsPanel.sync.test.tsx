@@ -8,12 +8,6 @@ import { IDLE_SYNC_STATUS } from '@/sync/statusFixtures';
 import { AVOIDED_SYSTEMS_KEY, useAvoidedSystems } from '@/features/route/avoidedSystems';
 import { AvoidedSystemsPanel } from './AvoidedSystemsPanel';
 
-/*
- * An add or remove is pushed as it happens — stamped for merging and a sync
- * scheduled for every Character on the device — not left for the next sync
- * something else happens to trigger.
- */
-
 const SYSTEMS: SolarSystemEntry[] = [
   { id: 30002813, name: 'Tama', security: 0.3, regionId: 10000069 },
   { id: 30045328, name: 'Uedama', security: 0.5, regionId: 10000033 },
@@ -24,7 +18,6 @@ const scheduleSync = vi.fn<(characterId: number) => void>();
 
 vi.mock('@/app/syncStatus', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/app/syncStatus')>()),
-  // The real one is false under `MODE === 'test'`, which skips the push entirely.
   isSyncConfigured: () => true,
 }));
 

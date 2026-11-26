@@ -26,7 +26,6 @@ import {
 } from '../whatIfImplants';
 import type { usePlanAssumptions } from './usePlanAssumptions';
 
-/** The Assumptions section's controls: Alpha Clone, What-If Implants (preset or per-slot) and the Accelerator. */
 export function AssumptionControls({
   assumptions,
   alphaCappedCount,
@@ -76,8 +75,6 @@ export function AssumptionControls({
                   ? 'custom'
                   : whatIf.preset
             }
-            // Picking 'custom' freezes what is in force into five editable
-            // slots without changing a number (toCustomSelection).
             onValueChange={(value) => {
               const clone = jumpClones.find((c) => `clone:${c.id}` === value);
               setWhatIf(
@@ -117,13 +114,6 @@ export function AssumptionControls({
         />
       </div>
 
-      {/* EVE's hardwirings are per slot (+4 PER / +5 INT / nothing in
-              CHA), which a uniform preset cannot say. One row of five, shown
-              only under "Custom" (pick it, or edit a value): editing one
-              leaves the other four alone. Under a preset a one-line readout
-              says what the plan is being costed against. The three-letter codes are the same abbreviation the
-              entry list's attribute-pair badge uses; each input's accessible
-              name spells the attribute out. */}
       {whatIf.kind === 'custom' ? (
         <div
           role="group"
@@ -148,11 +138,6 @@ export function AssumptionControls({
                 onChange={(e) =>
                   setWhatIf(setWhatIfBonus(whatIf, implants, name, Number(e.target.value)))
                 }
-                // `field-no-spinner` (src/styles/index.css): Chrome draws
-                // the spin buttons on hover and focus into a 29.6px content
-                // box, taking about half of it and shoving the digit left —
-                // so the cell under the cursor would break the row's
-                // alignment with the other four.
                 className="field-no-spinner w-full text-center"
               />
             </label>

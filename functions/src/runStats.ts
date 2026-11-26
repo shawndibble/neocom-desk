@@ -1,14 +1,7 @@
-// In-memory counters for one scheduled run (issue #5144). They are logged once at
-// the end of the run and never written to Firestore, so measuring a job costs
-// nothing. Field names are the contract the owner queries in Cloud Logging:
-// every key is declared up front, so a field that stayed at zero is still in
-// the log line instead of missing from it. Counts only — no ids, no content.
-
 export interface RunStats {
   add(name: string, amount?: number): void;
   set(name: string, value: number): void;
   get(name: string): number;
-  /** A copy of every counter, in declaration order. */
   snapshot(): Record<string, number>;
 }
 
@@ -22,7 +15,6 @@ export function createRunStats(keys: readonly string[]): RunStats {
   };
 }
 
-/** `pollEveNotifications finished` — the Alerts poller's counters. */
 export const ALERTS_POLL_STATS_KEYS = [
   'grantsListed',
   'grantsRefreshed',
@@ -49,7 +41,6 @@ export const ALERTS_POLL_STATS_KEYS = [
   'durationMs',
 ] as const;
 
-/** `Server event poll finished` — the dispatch tick's server-event counters. */
 export const SERVER_POLL_STATS_KEYS = [
   'devicesListed',
   'devicesPolled',

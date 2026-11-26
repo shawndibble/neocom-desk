@@ -12,7 +12,6 @@ import {
   strainRangeRows,
 } from './mutaplasmidDisplay';
 
-// Shapes and ranges from public/data/mutaplasmids.json; values trimmed.
 const GRAVID_HEAVY_NEUT = 47831;
 const DECAYED_HEAVY_NEUT = 47829;
 const HEAVY_ABYSSAL_NEUT = 47832;
@@ -73,7 +72,6 @@ describe('displayRollRange', () => {
   });
 
   it('re-orders and flips the direction of a resonance shown as a resistance', () => {
-    // Resonance 0.54..0.66 (lower is better) is a 34%..46% resistance (higher is better).
     const shown = displayRollRange(
       { min: 0.54, max: 0.66, highIsGood: false },
       DOGMA_UNIT.inverseAbsolutePercent
@@ -111,7 +109,6 @@ describe('strainRangeRows', () => {
     expect(cap.highIsGood).toBe(false);
     expect(cap.ranges[0]).toEqual({ low: 85, high: 120, highIsGood: false });
     expect(cap.ranges[1]).toEqual({ low: 80, high: 130, highIsGood: false });
-    // Decayed doesn't roll optimal range; Gravid doesn't roll duration.
     expect(rows[1]!.ranges[0]).toBeNull();
     expect(rows[2]!.ranges[1]).toBeNull();
   });
@@ -160,7 +157,6 @@ describe('multiplierPercentRows', () => {
   });
 
   it('keeps a resonance roll as the raw multiplier and flags that it is shown backwards', () => {
-    // ×0.9 on a resonance is a higher resistance, by an amount that depends on the base.
     expect(multiplierPercentRows(lookup.mutaplasmid(GRAVID_DC)!, unitIdOf)).toEqual([
       {
         attributeId: 974,

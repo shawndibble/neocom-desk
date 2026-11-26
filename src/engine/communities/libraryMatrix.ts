@@ -1,8 +1,3 @@
-/**
- * The Community Library's rows (issue #3601, ADR 0018): every blueprint in
- * the catalog against the Members who share it. Pure: the page loads the
- * Members' libraries and the SDE, this only joins and filters them.
- */
 import type { SharedBlueprint } from './sharedLibrary';
 import type { BlueprintTypeInfo } from './shareTree';
 
@@ -13,7 +8,6 @@ export interface MemberLibrary {
 
 export interface LibraryHolder {
   uid: string;
-  /** How many of this blueprint the Member shares (originals and copies). */
   copies: number;
   hasOriginal: boolean;
 }
@@ -24,7 +18,6 @@ export interface LibraryRow extends BlueprintTypeInfo {
 
 export type LibraryFilter = 'missingCommunity' | 'ownedByMe' | 'missingFromMe';
 
-/** One row per catalog blueprint, holders in Member order. A shared type not in the catalog is dropped. */
 export function buildLibraryRows(
   catalog: readonly BlueprintTypeInfo[],
   libraries: readonly MemberLibrary[]

@@ -1,7 +1,3 @@
-/**
- * Doctrine Fit sources: an EFT paste or a saved Fitting becomes the corp's
- * snapshot. Client only (reuses the Fittings loaders); the match itself is srpDoctrine.ts.
- */
 import {
   loadEftFitting,
   type EftSlotLookup,
@@ -17,7 +13,6 @@ import {
 } from '@/engine/fittings/types';
 import { sortedIds, type BasesOf, type DoctrineFitSnapshot } from './srpDoctrine';
 
-/** A mutated module is stored as its base: the doctrine names what the pilot fits, not its rolls. */
 export function doctrineFitFromFitting(fitting: Fitting): DoctrineFitSnapshot {
   const modules: number[] = [];
   const rigs: number[] = [];
@@ -36,13 +31,11 @@ export type DoctrineEftResult =
   | {
       ok: true;
       fit: DoctrineFitSnapshot;
-      /** The whole fit (charges, drones, cargo), stored as its share code for members to open. */
       fitting: Fitting;
       unresolved: LoadWarning[];
     }
   | { ok: false; unresolved: LoadWarning[] };
 
-/** Parses EFT text via the Fittings loader. Unresolved lines are returned so the UI can warn. */
 export function doctrineFitFromEft(
   text: string,
   typeByName: EftTypeLookup,
@@ -65,11 +58,6 @@ export function doctrineFitFromEft(
 const isModuleRack = (rack: string | undefined): rack is FittingSlotKind =>
   (FITTING_SLOT_KINDS as readonly string[]).includes(rack ?? '');
 
-/**
- * A Doctrine Fit saved before it kept a share code, as an openable Fitting: its hull, modules,
- * rigs and subsystems, nothing more (the snapshot never held charges, drones or cargo). A type the
- * slot map does not place in a rack is dropped.
- */
 export function fittingFromDoctrineSnapshot(
   snapshot: DoctrineFitSnapshot,
   name: string,
@@ -96,7 +84,6 @@ export function fittingFromDoctrineSnapshot(
   return { name, shipTypeId: snapshot.hullTypeId, modules, drones: [], cargo: [] };
 }
 
-/** `BasesOf` from the loaded mutaplasmid lookup. */
 export function basesOfFromLookup(lookup: MutaplasmidLookup): BasesOf {
   return (typeId) => {
     if (!lookup.isAbyssalType(typeId)) return undefined;

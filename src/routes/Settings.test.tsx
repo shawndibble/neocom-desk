@@ -110,10 +110,6 @@ describe('Settings', () => {
     });
 
     expect(await screen.findByText('/characters/{character_id}/skills')).toBeInTheDocument();
-    // The character name comes from a Dexie useLiveQuery, resolved async — wait for it
-    // rather than asserting it's already there, or this races the query on a slow run.
-    // Scoped to the Activity Log table: the Notifications section's collapsible
-    // headers, and the shell's character menu, also render the character's name.
     const table = screen.getByRole('table', { name: /activity log/i });
     expect(await within(table).findByText('Pilot One')).toBeInTheDocument();
     expect(within(table).getByText('Succeeded')).toBeInTheDocument();
@@ -151,11 +147,6 @@ describe('Settings', () => {
       });
     });
 
-    // `findByRole`, not `getByRole`: the heading awaited above is the page
-    // title, which arrives before the Activity Log section below it. A
-    // synchronous query here has no retry, so on a loaded machine it throws
-    // against a table that is only a tick away — which is exactly how this
-    // failed in CI while passing locally.
     const table = await screen.findByRole('table', { name: /activity log/i });
     expect(
       await within(table).findByText(formatTimestamp(new Date(timestamp)))
@@ -180,8 +171,6 @@ describe('Settings', () => {
         outcome: 'success',
       });
     });
-    // Awaited for the same reason as the test above: the table follows the
-    // page heading rather than arriving with it.
     await within(await screen.findByRole('table', { name: /activity log/i })).findByText(
       'Pilot One'
     );
@@ -192,7 +181,6 @@ describe('Settings', () => {
 
     expect(screen.getByText(/no activity yet/i)).toBeInTheDocument();
     expect(await screen.findByText(/log cleared/i)).toBeInTheDocument();
-    // aria-disabled, not disabled: the pressed button keeps keyboard focus (issue #3365).
     expect(document.activeElement).toBe(clearButton);
     expect(clearButton).toHaveAttribute('aria-disabled', 'true');
   });
@@ -210,7 +198,6 @@ describe('Settings', () => {
     await screen.findByRole('heading', { level: 1, name: /settings/i });
 
     await user.click(screen.getByRole('button', { name: /clear cached eve data/i }));
-    // Asks first: nothing is cleared until the dialog is confirmed.
     const dialog = await screen.findByRole('dialog', { name: /clear cached eve data\?/i });
     expect(await db.esiCache.count()).toBe(1);
     expect(within(dialog).queryByText(/only copy you have/i)).not.toBeInTheDocument();
@@ -262,7 +249,6 @@ describe('Settings', () => {
 
     expect(screen.getByRole('heading', { name: /data age/i })).toBeInTheDocument();
     expect(screen.getByText(/no data loaded yet/i)).toBeInTheDocument();
-    // Nothing to fold, so no caret.
     expect(screen.queryByRole('button', { name: /show data age/i })).not.toBeInTheDocument();
   });
 
@@ -273,15 +259,12 @@ describe('Settings', () => {
 
     act(() => {
       const log = useActivityLog.getState();
-      // Older success, superseded by the newer one below — must not double-list.
       log.record({
         endpointId: 'getCharacterSkills',
         characterId: CHAR_ID,
         timestamp: 1_000,
         outcome: 'success',
       });
-      // A failed call after that never updated anything, so it's excluded
-      // even though it's the most recent event for this endpoint/character.
       log.record({
         endpointId: 'getCharacterSkills',
         characterId: CHAR_ID,
@@ -296,7 +279,6 @@ describe('Settings', () => {
       });
     });
 
-    // Folded by default: a one-line summary and the export menu, no table.
     expect(await screen.findByText(/1 source · last update/i)).toBeInTheDocument();
     expect(screen.queryByRole('table', { name: /data age/i })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /export data age/i })).toBeInTheDocument();
@@ -304,8 +286,6 @@ describe('Settings', () => {
 
     const table = await screen.findByRole('table', { name: /data age/i });
     const rows = within(table).getAllByRole('row');
-    // Header row plus exactly one data row — the superseded success and the
-    // failure both collapse into it, not two rows.
     expect(rows).toHaveLength(2);
     const hint = within(rows[1]).getAllByRole('cell').at(-1)!.querySelector('[tabindex="0"]')!;
     await userEvent.setup().hover(hint);
@@ -349,9 +329,6 @@ describe('Settings defaults', () => {
     renderSettingsPage();
     await screen.findByRole('heading', { level: 1, name: /settings/i });
 
-    // The point of the control: the key existed but was only reachable from
-    // inside one panel of one page. `findBy`, because the panel withholds
-    // every control until its stores have hydrated.
     expect(await screen.findByRole('combobox', { name: /^trade hub$/i })).toHaveTextContent(
       /jita/i
     );
@@ -367,8 +344,6 @@ describe('Settings defaults', () => {
     await user.clear(input);
     await user.type(input, '99');
 
-    // The engine range-checks ME and throws outside 0..10, so the control
-    // must never hand it a value it would reject.
     await waitFor(async () => {
       expect((await db.settings.get(ASSUMED_ME_SETTING_KEY))?.value).toBe(10);
     });
@@ -384,8 +359,6 @@ describe('Settings defaults', () => {
     await user.clear(input);
     await user.type(input, '99');
 
-    // TE researches twice as deep as ME — `engine/industry/time.ts` throws
-    // outside 0..20, so 20 is the ceiling here, not ME's 10.
     await waitFor(async () => {
       expect((await db.settings.get(ASSUMED_TE_SETTING_KEY))?.value).toBe(20);
     });
@@ -401,8 +374,6 @@ describe('Settings defaults', () => {
   });
 
   it('offers no facility defaults — a new plan starts where the last plan page set one', async () => {
-    // Both records are remembered from Build Plan pages now; a stored one is
-    // left exactly as it was, since the Settings page no longer reads it.
     const stored = { facility: 'azbel', rigLevel: 't2', facilityTaxPct: 5 };
     await db.settings.put({ key: FACILITY_DEFAULTS_SETTING_KEY, value: stored });
     window.history.pushState({}, '', '/settings/industry');
@@ -421,8 +392,6 @@ describe('Settings defaults', () => {
   });
 
   it('shows the stored values on a cold load, not the defaults', async () => {
-    // /settings is deep-linkable and mounts none of the pages that hydrate
-    // these stores, so it has to hydrate them itself.
     await db.settings.put({ key: ASSUMED_ME_SETTING_KEY, value: 7 });
     window.history.pushState({}, '', '/settings/industry');
     renderSettingsPage();
@@ -458,8 +427,6 @@ describe('Settings defaults', () => {
     renderSettingsPage();
     await screen.findByRole('heading', { level: 1, name: /settings/i });
 
-    // Hide rather than lock, the same rule the corp nav follows — a setting
-    // for a page you cannot open is noise. The URL still resolves, to a note.
     expect(await screen.findByText(/appear once the active character/i)).toBeInTheDocument();
     expect(screen.queryByRole('group', { name: /members go dark/i })).not.toBeInTheDocument();
     expect(
@@ -499,12 +466,6 @@ describe('Settings defaults', () => {
 
 describe('Reset saved view preferences', () => {
   it('clears every view-preference key and nothing else', async () => {
-    // Not the bare `/settings`: `stubGlobal('location', ...)` below takes a
-    // frozen snapshot of `window.location`, so the redirect `TabRoute` would
-    // otherwise issue for a bare tabbed-page path can never resolve — the
-    // snapshot's `pathname` never advances to the tab it redirected to.
-    // Starting already on the tab path sidesteps that, and must happen
-    // before the snapshot is taken.
     window.history.pushState({}, '', '/settings/dataAge');
 
     const reloadSpy = vi.fn();
@@ -513,7 +474,6 @@ describe('Reset saved view preferences', () => {
     for (const key of VIEW_PREFERENCE_KEYS) {
       await db.settings.put({ key, value: 'something' });
     }
-    // User-created content and the active character must survive.
     await db.settings.put({ key: 'overviewGroups', value: { groups: ['Mains'] } });
     await db.settings.put({ key: 'characters.starred', value: [CHAR_ID] });
 
@@ -531,7 +491,6 @@ describe('Reset saved view preferences', () => {
     expect(await db.settings.get('overviewGroups')).toBeDefined();
     expect(await db.settings.get('characters.starred')).toBeDefined();
     expect(await db.settings.get(ACTIVE_CHARACTER_KEY)).toBeDefined();
-    // The confirmation must stay readable: the reload waits for leaving Settings.
     expect(await screen.findByText('View preferences reset.')).toBeInTheDocument();
     expect(reloadSpy).not.toHaveBeenCalled();
     consumeStaleStores();
@@ -539,8 +498,6 @@ describe('Reset saved view preferences', () => {
 });
 
 describe('Settings — phone tab bar', () => {
-  // `NARROW_QUERY` is `md`'s max-width form, so the suite's never-matching
-  // `matchMedia` stub reads as a laptop; these tests need the phone.
   it('is absent from Display at md and up, where there is no bottom bar', async () => {
     window.history.pushState({}, '', '/settings/display');
     renderSettingsPage();
@@ -557,7 +514,6 @@ describe('Settings — phone tab bar', () => {
     await screen.findByRole('heading', { level: 1, name: /settings/i });
 
     const group = await screen.findByRole('group', { name: /phone tab bar links/i });
-    // Swap one out for one in: unpick Industry, pick Wallet.
     await user.click(within(group).getByRole('button', { name: /^industry$/i }));
     await user.click(within(group).getByRole('button', { name: /^wallet$/i }));
 
@@ -569,7 +525,6 @@ describe('Settings — phone tab bar', () => {
         '/wallet',
       ]);
     });
-    // The key has no `sync.` prefix, which is what keeps it on this device.
     expect(MOBILE_TABS_KEY.startsWith('sync.')).toBe(false);
   });
 
@@ -584,7 +539,6 @@ describe('Settings — phone tab bar', () => {
     await user.click(within(group).getByRole('button', { name: /^skills$/i }));
 
     expect(screen.getByText(/3 of 4 picked/i)).toBeInTheDocument();
-    // Nothing written yet: a three-item bar is not a bar.
     expect(await db.settings.get(MOBILE_TABS_KEY)).toBeUndefined();
   });
 
@@ -597,21 +551,16 @@ describe('Settings — phone tab bar', () => {
 
     const group = await screen.findByRole('group', { name: /phone tab bar links/i });
     const wallet = within(group).getByRole('button', { name: /^wallet$/i });
-    // `aria-disabled`, not the native attribute: the chip has to stay
-    // hoverable and focusable for its own explanation to be readable.
     expect(wallet).toHaveAttribute('aria-disabled', 'true');
     await user.click(wallet);
     expect(within(group).getByRole('button', { name: /^wallet$/i })).toHaveAttribute(
       'aria-pressed',
       'false'
     );
-    // The click above left the pointer on the chip; leave and re-enter so the
-    // tooltip sees a fresh pointer move rather than depending on timing.
     await user.unhover(wallet);
     await user.hover(wallet);
     expect(await screen.findByRole('tooltip')).toHaveTextContent(/the bar holds four/i);
 
-    // A chosen one still unpicks — that is the way out of a full bar.
     await user.click(within(group).getByRole('button', { name: /^skills$/i }));
     expect(within(group).getByRole('button', { name: /^wallet$/i })).not.toHaveAttribute(
       'aria-disabled'
@@ -664,7 +613,6 @@ describe('Settings — sections rail', () => {
       'Market',
       'Moon mining tax',
       'Characters',
-      // Corporation is absent: this character has no corp access.
       'Travel',
       'Permissions',
       'App & backup',
@@ -716,7 +664,6 @@ describe('Settings — phone list', () => {
     for (const group of ['Preferences', 'Defaults', 'Account & device', 'Data']) {
       expect(within(nav).getByText(group)).toBeInTheDocument();
     }
-    // Corporation is absent: this character has no corp access.
     expect(within(nav).queryByRole('link', { name: /corporation/i })).not.toBeInTheDocument();
     expect(within(nav).getAllByRole('link')).toHaveLength(14);
     expect(within(nav).getByRole('link', { name: /^display/i })).toHaveTextContent(
@@ -730,7 +677,6 @@ describe('Settings — phone list', () => {
     expect(within(nav).getByRole('link', { name: /^travel/i })).toHaveTextContent(
       /0 avoided systems/i
     );
-    // Log out lives in its own section, with no summary line.
     expect(within(nav).getByRole('link', { name: /^log out & delete$/i })).toBeInTheDocument();
   });
 
@@ -785,7 +731,6 @@ describe('Settings — This device', () => {
     window.history.pushState({}, '', '/settings/device');
     renderSettingsPage();
 
-    // Disabled until the live character count resolves.
     const logOut = await screen.findByRole('button', { name: /^log out$/i });
     await waitFor(() => expect(logOut).toBeEnabled());
     await user.click(logOut);
@@ -804,7 +749,6 @@ describe('Settings — review follow-ups', () => {
     window.history.pushState({}, '', '/settings/device');
     renderSettingsPage();
 
-    // Disabled until the live character count resolves.
     const logOut = await screen.findByRole('button', { name: /^log out$/i });
     await waitFor(() => expect(logOut).toBeEnabled());
     await user.click(logOut);
@@ -938,8 +882,6 @@ describe('Settings — update state', () => {
     const nav = settingsNav();
     expect(await within(nav).findByRole('img', { name: 'Update available' })).toBeInTheDocument();
     const panel = await screen.findByText('Update available', { selector: 'p' });
-    // The page's own button. In the app the shell rail's callout carries a
-    // second one; without the shell this is the only one.
     expect(await screen.findByRole('button', { name: 'Update now' })).toBeInTheDocument();
 
     act(() => useUpdateStatus.setState({ status: 'current' }));

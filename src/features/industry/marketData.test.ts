@@ -35,7 +35,7 @@ function fuzzworkHandler() {
           buy: { max: '4.8', volume: '80', orderCount: '3' },
         };
       } else {
-        body[t] = { sell: { orderCount: '0' }, buy: { orderCount: '0' } }; // no orders -> unpriceable
+        body[t] = { sell: { orderCount: '0' }, buy: { orderCount: '0' } };
       }
     }
     return HttpResponse.json(body);
@@ -48,7 +48,6 @@ function adjustedPricesHandler() {
   );
 }
 
-/** Two systems: the hub's, and Badivefi standing in for a build system elsewhere. */
 const BUILD_SYSTEM_ID = 30003888;
 
 function costIndexHandler() {
@@ -145,7 +144,6 @@ describe('loadMarketSnapshot', () => {
 
     const snapshot = await loadMarketSnapshot(DEFAULT_TRADE_HUB, [34], BUILD_SYSTEM_ID);
 
-    // The hub is still priced at the hub; only the job fee moves system.
     expect(snapshot.hubPrices).toEqual({ 34: 5.5 });
     expect(snapshot.systemCostIndex).toBe(0.0272);
   });
@@ -166,7 +164,6 @@ describe('loadMarketSnapshot', () => {
     expect(built.copyingCostIndex).toBe(0.011);
     expect(built.inventionCostIndex).toBe(0.033);
 
-    // The hub's system lists neither: 0, like a missing manufacturing index.
     const atHub = await loadMarketSnapshot(DEFAULT_TRADE_HUB, [34]);
     expect(atHub.copyingCostIndex).toBe(0);
     expect(atHub.inventionCostIndex).toBe(0);
@@ -192,9 +189,7 @@ describe('loadMarketSnapshot', () => {
     expect(snapshot.hubPrices).toEqual({ 34: 5.5 });
     expect(snapshot.adjustedPrices).toBeNull();
     expect(snapshot.systemCostIndex).toBeNull();
-    // Offline is not "no entry": the page must keep saying prices are unavailable.
     expect(snapshot.systemCostIndexMissing).toBe(false);
-    // Only ESI failed: the hub prices are fine, so they are not reported unreachable.
     expect(snapshot.hubPricesUnreachable).toBe(false);
   });
 
@@ -247,14 +242,11 @@ describe('loadMarketSnapshot', () => {
 
     expect(manufacturing.systemCostIndex).toBe(0.0464);
     expect(reaction.systemCostIndex).toBe(0.0055);
-    // One fetch serves both activities — ESI already returns every
-    // activity's index per system in the one response.
     expect(hits).toBe(1);
   });
 });
 
 describe('loadMarketSnapshots', () => {
-  /** Prices every requested type deterministically, so filtering is observable. */
   function pricedFuzzworkHandler(record: { station: string; types: string[] }[]) {
     return http.get(FUZZWORK_AGGREGATES_URL, ({ request }) => {
       const params = new URL(request.url).searchParams;
@@ -286,7 +278,6 @@ describe('loadMarketSnapshots', () => {
     expect(calls).toHaveLength(1);
     expect([...(calls[0]?.types ?? [])].sort()).toEqual(['34', '587', '588']);
 
-    // Each request still sees only its own type ids, not the union's.
     expect(snapshots[0]?.hubPrices).toEqual({ 34: 34, 587: 587 });
     expect(snapshots[1]?.hubPrices).toEqual({ 34: 34, 588: 588 });
     expect(snapshots[2]?.hubPrices).toEqual({ 34: 34 });
@@ -369,14 +360,10 @@ describe('loadMarketSnapshots', () => {
     expect(hubIndex?.systemCostIndex).toBe(0.0464);
     expect(buildSystem?.systemCostIndex).toBe(0.0272);
     expect(reaction?.systemCostIndex).toBe(0.0055);
-    // Two activities in one batch, still one fetch — the cost-index cache is
-    // warmed before the second activity reads it, not raced against it.
     expect(hits).toBe(1);
   });
 
   it('returns nothing and fetches nothing for an empty request list', async () => {
-    // No msw handlers registered: `onUnhandledRequest: 'error'` makes any
-    // fetch here a failure.
     expect(await Promise.all(loadMarketSnapshots([]))).toEqual([]);
   });
 });
@@ -406,7 +393,6 @@ describe('system cost indices: sharing and persistence', () => {
 
     expect(hits.count).toBe(1);
     expect(a.systemCostIndex).toBe(0.0464);
-    // ESI answered, but lists no reaction index for the hub system: 0, flagged missing.
     expect(b.systemCostIndex).toBe(0);
     expect(b.systemCostIndexMissing).toBe(true);
   });
@@ -420,7 +406,6 @@ describe('system cost indices: sharing and persistence', () => {
     await (await import('./marketData')).loadMarketSnapshot(DEFAULT_TRADE_HUB, [34]);
     expect(hits.count).toBe(1);
 
-    // The write behind the fetch is not awaited by its caller; let it land.
     await vi.waitFor(async () => {
       const keys = (await db.esiCache.toArray()).map((row) => row.key);
       expect(keys.some((key) => key.startsWith('industryCostIndices'))).toBe(true);

@@ -1,9 +1,3 @@
-/**
- * The persisted "Add my other corps" run. EVE's login leaves the page between
- * corporations and the player may close the tab, so the run lives in a
- * device-local Dexie setting. Outcomes stay after the run ends: Needs sign-in,
- * Needs a role and Has its own book leave no server record.
- */
 import { useCallback } from 'react';
 import { isId } from '@/engine/guards';
 import { createLocalSetting } from '@/lib/useLocalSetting';
@@ -40,7 +34,6 @@ function isOutcome(raw: unknown): raw is AddCorpsOutcome {
 
 const ALERTS_KINDS = new Set(['on', 'failed', 'cancelled', 'skipped']);
 
-/** The alerts chain's fields (issue #6103); anything malformed is dropped, not the run. */
 function parseAlerts(
   r: Record<string, unknown>,
   queue: AddCorpsRun['queue']
@@ -69,7 +62,6 @@ function parseAlerts(
   return out;
 }
 
-/** Anything stored, or null when it is not a usable run. */
 export function parseAddCorpsRun(raw: unknown): AddCorpsRun | null {
   if (typeof raw !== 'object' || raw === null) return null;
   const r = raw as Record<string, unknown>;
@@ -115,18 +107,13 @@ export const useAddCorpsRunStore = createLocalSetting<AddCorpsRun | null>({
 });
 
 export interface UseAddCorpsRun {
-  /** `null` when there is no run (never started, or cleared). A finished run is kept until `clear`. */
   run: AddCorpsRun | null;
   start: (args: Parameters<typeof startRun>[0]) => Promise<void>;
   recordOutcome: (outcome: AddCorpsOutcome) => Promise<void>;
-  /** How the chained alerts approval for the corporation just connected went. */
   recordAlertsOutcome: (outcome: AlertsStepOutcome) => Promise<void>;
   skip: () => Promise<void>;
-  /** End the run; its outcomes stay for the result screen. */
   stop: () => Promise<void>;
-  /** Put one corporation back on the sign-in list (its outcome is forgotten). */
   retry: (corporationId: number) => Promise<void>;
-  /** Forget the run and its outcomes. */
   clear: () => Promise<void>;
 }
 

@@ -9,7 +9,6 @@ describe('boosterSideEffects', () => {
       { effectId: 2745, penaltyPct: -20 },
       { effectId: 2749, penaltyPct: -20 },
     ]);
-    // A Strong one bites harder.
     expect(boosterSideEffects(10156)[0]).toEqual({ effectId: 2737, penaltyPct: -30 });
   });
 
@@ -26,7 +25,6 @@ describe('boosterSideEffects', () => {
 
 describe('withBoosters', () => {
   it('swaps the boosters, keeping only the side effects of boosters still there', () => {
-    // 9950 Standard Blue Pill (shield capacity 2737); 9947 Standard Crash.
     const next = withBoosters(
       { implants: [1], boosters: [9950, 9947], boosterSideEffects: [2737, 2735] },
       [9947]

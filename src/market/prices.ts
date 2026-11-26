@@ -1,16 +1,3 @@
-/**
- * Build Plan price lookups: Fuzzwork primary, per-type null fallback when
- * Fuzzwork is unreachable (ADR 0002).
- *
- * Two cache tiers, one TTL. Memory answers repeat asks within a session; the
- * generic `esiCache` table (under `GLOBAL_CACHE_CHARACTER_ID`) carries the
- * same entries across a reload, so reopening the app inside the TTL does not
- * refetch every price on screen. A persisted entry is served only while its
- * own TTL holds — never as a stale fallback, except adjusted prices read with
- * `allowStale` — so the TTLs mean exactly what they did when this cache was
- * memory-only. Concurrent asks for the same prices share one in-flight
- * request rather than each missing and fetching.
- */
 import { HOUR_MS, MINUTE_MS } from '@/lib/age';
 import {
   emitCacheRevalidated,
@@ -29,7 +16,6 @@ export type { HubAggregate, AdjustedPrice };
 export const HUB_PRICE_TTL_MS = 15 * MINUTE_MS;
 export const ADJUSTED_PRICE_TTL_MS = HOUR_MS;
 
-/** Injectable so tests can move time without waiting on it. Defaults to wall-clock. */
 export type Clock = () => number;
 
 const NULL_AGGREGATE: HubAggregate = Object.freeze({
@@ -39,10 +25,6 @@ const NULL_AGGREGATE: HubAggregate = Object.freeze({
   buyVolume: 0,
 });
 
-/**
- * An aggregate, whether it is a priced snapshot (R2) rather than a live book,
- * and whether it came from a snapshot at all (a snapshot's "no price" is not live either).
- */
 interface PricedAggregate {
   value: HubAggregate;
   stale: boolean;
@@ -56,34 +38,15 @@ interface CacheEntry<V> {
 
 const hubPriceCache = new Map<string, CacheEntry<HubAggregate>>();
 const regionSellCache = new Map<string, CacheEntry<number | null>>();
-/** Region fetches in flight, keyed like the cache, so concurrent askers share one request. */
 const regionSellInFlight = new Map<string, Promise<number | null>>();
 let adjustedPriceCache: CacheEntry<Map<number, AdjustedPrice>> | null = null;
 
-/**
- * Per (station, type) fetches in flight. Resolves to the aggregate, or `null`
- * when the fetch failed (the caller serves a null aggregate, nothing cached).
- */
 const hubPricesInFlight = new Map<string, Promise<PricedAggregate | null>>();
 let adjustedPricesInFlight: Promise<Map<number, AdjustedPrice>> | null = null;
-/** Lapsed copy handed to `allowStale` callers while the refresh runs. */
 let adjustedStaleServed: Map<number, AdjustedPrice> | null = null;
 
-/**
- * Keys `invalidateHubPrices` dropped: their persisted rows are skipped until a
- * fetch replaces them, so a manual refresh cannot be answered from disk.
- */
 const persistedBypass = new Set<string>();
 
-/**
- * Bumped by `clearMarketPriceCache` and folded into every persisted key, so
- * the (synchronous, test-only) clear also retires rows already on disk.
- * Always 0 in production, which keeps the keys stable across reloads.
- *
- * Also what stops a fetch or disk read still in flight at a clear from
- * landing afterwards: each captures the generation it started under and
- * caches nothing if it has moved on.
- */
 let persistedGeneration = 0;
 
 function hubCacheKey(stationId: number, typeId: number): string {
@@ -97,20 +60,11 @@ function persistedKey(key: string): string {
 
 const ADJUSTED_KEY = 'adjusted';
 
-/**
- * Writes behind a fetch without holding its caller: the memory tier already
- * has the value, and a failed write only costs the next reload a refetch.
- */
 function persist(rows: ReadonlyArray<readonly [key: string, value: unknown]>, at: number): void {
   const keyed = rows.map(([key, value]) => [persistedKey(key), value] as const);
   void writeCachedMany(GLOBAL_CACHE_CHARACTER_ID, keyed, at).catch(() => {});
 }
 
-/**
- * The persisted tier, where an unreadable one (IndexedDB unavailable, a
- * damaged store) is a miss rather than an error: these lookups never failed
- * on a cache before it existed, and must not start to now.
- */
 async function readPersisted<V>(
   keys: readonly string[]
 ): Promise<Map<string, { value: V; fetchedAt: number }>> {
@@ -121,11 +75,6 @@ async function readPersisted<V>(
   }
 }
 
-/**
- * Test-only: production callers rely on TTL expiry instead of clearing. Runs
- * before every test (`registerTestReset`); a test calls it itself only to
- * clear mid-test.
- */
 export function clearMarketPriceCache(): void {
   hubPriceCache.clear();
   regionSellCache.clear();
@@ -140,37 +89,15 @@ export function clearMarketPriceCache(): void {
 }
 registerTestReset(clearMarketPriceCache);
 
-/**
- * Drops the cached prices for specific types at one station, so the next
- * `getHubPrices` re-fetches them inside the TTL.
- *
- * For the manual refresh button, which GLOSSARY.md's "Data Age" makes the one
- * thing besides app open that may bypass a TTL. Scoped to a station and a
- * type list rather than clearing the map, for the same reason Market's
- * refresh re-fetches only what is on screen: a Build Plan holding prices for
- * the same materials should not be made to re-fetch them because someone
- * pressed refresh on a different page.
- */
 export function invalidateHubPrices(stationId: number, typeIds: readonly number[]): void {
   for (const typeId of typeIds) {
     const key = hubCacheKey(stationId, typeId);
     hubPriceCache.delete(key);
     persistedBypass.add(key);
-    // A request sent before the click is not an answer to it.
     hubPricesInFlight.delete(key);
   }
 }
 
-/**
- * Sell/buy aggregates for typeIds at one station, from cache where fresh.
- * Falls back to null prices per type (not a thrown error) when Fuzzwork is
- * unreachable. Station-keyed rather than hub-keyed (issue #1423) so a caller
- * that only ever has a bare `location_id` — the Foreground Poller's
- * `marketOrderUndercutDomain`, checking a Character's own order's station,
- * not one of the five Trade Hubs — can share this same 15-minute cache
- * without constructing a `TradeHub` object for it. `getHubPrices` below is
- * now a thin wrapper over this for the hub-shaped callers.
- */
 export async function getStationPrices(
   stationId: number,
   typeIds: number[],
@@ -181,35 +108,15 @@ export async function getStationPrices(
 }
 
 export interface PriceOptions {
-  /**
-   * Accept yesterday's close when no live source answers (default true). A
-   * caller that compares a price with a live order, such as an alert or an
-   * undercut check, passes false: a stale type then reads as unreachable.
-   */
   allowStale?: boolean;
 }
 
-/** A price lookup plus whether the price source could not be reached for it. */
 export interface PricesWithStatus {
   prices: Map<number, HubAggregate>;
-  /**
-   * True when at least one requested type got a null aggregate because the
-   * Fuzzwork fetch failed, not because the market has no orders. Lets a
-   * caller show "prices unavailable" rather than "no orders" / "0 ISK".
-   */
   unreachable: boolean;
-  /**
-   * True when a price is yesterday's close from the daily open prices, served
-   * because no live source answered. Never cached, so the next ask retries.
-   */
   stale: boolean;
 }
 
-/**
- * `getStationPrices` with the failure made visible: a failed fetch is still
- * served as a null aggregate (nothing cached), but flagged `unreachable` so
- * the caller can tell it from a genuinely empty market.
- */
 export async function getStationPricesWithStatus(
   stationId: number,
   typeIds: number[],
@@ -241,7 +148,6 @@ export async function getStationPricesWithStatus(
   const notInMemory = typeIds.filter((typeId) => !readMemory(typeId));
   if (notInMemory.length === 0) return { prices: result, unreachable, stale };
 
-  // A reload inside the TTL: the rows the last session wrote.
   const generation = persistedGeneration;
   const onDisk = notInMemory
     .map((typeId) => hubCacheKey(stationId, typeId))
@@ -254,8 +160,6 @@ export async function getStationPricesWithStatus(
     }
   }
 
-  // Memory again — the disk read above, or a fetch that landed while it ran —
-  // then join what is already in flight and fetch only the rest.
   const pending: Array<Promise<void>> = [];
   const toFetch: number[] = [];
   for (const typeId of notInMemory) {
@@ -289,13 +193,6 @@ export async function getStationPricesWithStatus(
   return { prices: result, unreachable, stale };
 }
 
-/**
- * One price lookup (Fuzzwork, then the fallback chain), cached in both tiers
- * on success. Never rejects: `null` means no source answered, and then nothing
- * is cached, so the next refresh (open or manual button) retries instead of
- * pinning "no price" for the rest of the TTL. A type served from yesterday's
- * close is flagged `stale` and left out of both caches for the same reason.
- */
 async function fetchHubPrices(
   stationId: number,
   typeIds: number[],
@@ -304,9 +201,6 @@ async function fetchHubPrices(
   const generation = persistedGeneration;
   let fetched: Awaited<ReturnType<typeof fetchAggregatesWithFallback>>;
   try {
-    // Chunked internally; a failure partway through discards earlier
-    // batches too. Acceptable: the retry re-fetches everything, nothing gets
-    // cached as a false "no price".
     fetched = await fetchAggregatesWithFallback(stationId, typeIds);
   } catch {
     return null;
@@ -319,7 +213,6 @@ async function fetchHubPrices(
       snapshot: fetched.fromSnapshot,
     });
   }
-  // A snapshot answer is never cached, priced or not: the next ask retries live.
   if (generation !== persistedGeneration || fetched.fromSnapshot) return priced;
   const rows: Array<readonly [string, HubAggregate]> = [];
   for (const [typeId, { value }] of priced) {
@@ -332,10 +225,6 @@ async function fetchHubPrices(
   return priced;
 }
 
-/**
- * Sell/buy aggregates for typeIds at hub, from cache where fresh. Falls back
- * to null prices per type (not a thrown error) when Fuzzwork is unreachable.
- */
 export async function getHubPrices(
   hub: TradeHub,
   typeIds: number[],
@@ -345,7 +234,6 @@ export async function getHubPrices(
   return getStationPrices(hub.stationId, typeIds, now, options);
 }
 
-/** `getHubPrices` with the unreachable flag; see `getStationPricesWithStatus`. */
 export async function getHubPricesWithStatus(
   hub: TradeHub,
   typeIds: number[],
@@ -355,13 +243,6 @@ export async function getHubPricesWithStatus(
   return getStationPricesWithStatus(hub.stationId, typeIds, now, options);
 }
 
-/**
- * The lowest sell order for each of `typeIds` anywhere in one region, or
- * `null` — memory-cached on the hub TTL. For Blueprint Acquisition: an
- * NPC-seeded blueprint original is sold at its seeding corp's stations,
- * rarely at the hub station itself, so a hub-only price would miss it. A
- * failed fetch reads as no price for every type, never a thrown error.
- */
 export async function getRegionSellPrices(
   regionId: number,
   typeIds: readonly number[],
@@ -402,7 +283,6 @@ export async function getRegionSellPrices(
   return result;
 }
 
-/** Global adjusted/average prices (job-cost EIV), cached for an hour. */
 export async function getAdjustedPrices(
   now: Clock = Date.now,
   options: { allowStale?: boolean } = {}
@@ -424,11 +304,6 @@ export async function getAdjustedPrices(
   }
 }
 
-/**
- * Stored as `[typeId, adjusted, average]` tuples rather than the `Map`: the
- * payload covers every market type (tens of thousands), and flat number
- * triples are the cheapest shape to clone in and out of IndexedDB.
- */
 type AdjustedPriceRow = Array<[typeId: number, adjusted: number | null, average: number | null]>;
 
 function rowsToMap(rows: AdjustedPriceRow): Map<number, AdjustedPrice> {
@@ -463,8 +338,6 @@ async function loadAdjustedPrices(
     return value;
   };
   if (allowStale && generation === persistedGeneration && row) {
-    // Hourly averages behind badges: show the lapsed copy now, swap in place
-    // when the refresh signals mounted views.
     const stale = rowsToMap(row.value);
     adjustedStaleServed = stale;
     const refresh = fetchLive();
@@ -483,10 +356,6 @@ async function loadAdjustedPrices(
   return fetchLive();
 }
 
-/**
- * Average traded price per type for value badges. Best-effort: a lapsed copy
- * shows at once, and an outage degrades the badges to 0 rather than the page.
- */
 export async function getAveragePriceByType(): Promise<Map<number, number>> {
   const byType = new Map<number, number>();
   try {

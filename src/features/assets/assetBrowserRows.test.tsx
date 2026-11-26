@@ -104,7 +104,6 @@ describe('ItemRow name', () => {
     expect(link).not.toHaveAttribute('title');
   });
 
-  // §6c: the name stays a real link in select mode; only the checkbox selects.
   it('still navigates in select mode, where only the checkbox selects', async () => {
     const onToggleSelection = vi.fn();
     renderItemRow({ typeId: 11, onToggleSelection, selectMode: true });
@@ -122,7 +121,6 @@ describe('ItemRow name', () => {
     expect(screen.getByTestId('loc')).toHaveTextContent('/');
     expect(screen.getByTestId('loc')).not.toHaveTextContent('info=');
 
-    // The next ordinary tap still follows it.
     fireEvent.pointerDown(link, { pointerType: 'touch' });
     fireEvent.click(link, { detail: 1 });
     expect(screen.getByTestId('loc')).toHaveTextContent('?info=type-11');
@@ -159,7 +157,6 @@ describe('ItemRow name', () => {
     expect(cell).toHaveClass('md:flex-[0_1_24rem]');
     expect(cell).not.toBeNull();
     expect(cell).toHaveClass('min-w-0');
-    // The cap is md-only: no unprefixed width/flex class on the cell.
     expect(cell).not.toHaveClass('flex-1');
   });
 
@@ -178,7 +175,6 @@ describe('blueprint badge', () => {
       'true'
     );
     expect(screen.getByText('assets.blueprintBadge.original.name')).toHaveClass('sr-only');
-    // The badge sits beside the link, so the link's name stays the item's.
     expect(screen.getByRole('link', { name: 'Rifter Blueprint' })).toBeInTheDocument();
   });
 

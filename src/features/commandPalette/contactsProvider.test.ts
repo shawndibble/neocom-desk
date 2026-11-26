@@ -32,7 +32,6 @@ function list(characterId: number, name: string, contacts: CharacterContact[]) {
   return { characterId, name, contacts, truncated: false, read: true };
 }
 
-/** The Contacts page's own merge, then the palette's reduction of it. */
 function merged(
   lists: Parameters<typeof mergeContactsAcrossCharacters>[0],
   names: ReadonlyMap<number, string>
@@ -146,7 +145,6 @@ describe('loadPaletteContacts', () => {
     await writeCached(1, 'contacts', [contact(10, 'character', 10)], Date.now());
     await writeCached(2, 'contacts', [contact(20, 'corporation', -10)], Date.now());
     await writeCached(GLOBAL_CACHE_CHARACTER_ID, 'name:10', 'Scam Artist', Date.now());
-    // Lapsed on purpose: a stale name must still not trigger a refresh here.
     await writeCached(GLOBAL_CACHE_CHARACTER_ID, 'name:20', 'Honest Corp', 0);
   });
 

@@ -1,11 +1,3 @@
-/**
- * A contract's progress as a row of steps (Issued, Accepted, Completed — or
- * Waiting and then the expiry), in place of separate date rows. Presentational
- * over `engine/contracts/contractTimeline`.
- *
- * A step that has not happened reads "Waiting" in text, and the bar above it
- * is only a second cue: colour never carries the state alone (WCAG 1.4.1).
- */
 import { useTranslation } from 'react-i18next';
 import { formatTimestamp } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';
@@ -25,11 +17,6 @@ const LABEL_KEY: Record<TimelineStepKey, string> = {
   reversed: 'contractDetail.timelineReversed',
 };
 
-/**
- * The bar above a step. A failure reads red, a withdrawal or a lapse stays
- * quiet, and anything else that happened is the accent; the label says which in
- * words, so the colour is never the only signal.
- */
 function barClassName(step: TimelineStep): string {
   if (step.key === 'rejected' || step.key === 'failed' || step.key === 'reversed') {
     return 'bg-danger';
@@ -43,8 +30,6 @@ function barClassName(step: TimelineStep): string {
 export function ContractTimeline({ steps }: { steps: readonly TimelineStep[] }) {
   const { t } = useTranslation();
   const timeZone = useTimeZone();
-  // `null`: a step that happened but ESI gives no date for (a cancellation) has
-  // no second line, rather than a made-up one.
   const when = (step: TimelineStep): string | null => {
     if (step.sameMinuteAsPrevious) return t('contractDetail.timelineSameMinute');
     if (step.atMs === null) return step.done ? null : t('contractDetail.timelineWaiting');

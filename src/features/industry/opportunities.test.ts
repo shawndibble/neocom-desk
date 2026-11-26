@@ -180,9 +180,6 @@ describe('planForOpportunityCandidate — plan ownership (issue #1061)', () => {
 });
 
 describe('computeOpportunityRow — auto make-or-buy depth (issue #652)', () => {
-  // Root blueprint (1) needs 100 Tritanium (34) per run; a second blueprint
-  // (900) shows Tritanium itself can be built from 10 units of a much
-  // cheaper raw input (999) — building 34 is a huge saving over buying it.
   const rootEntry = catalogEntry(1);
   const subEntry: BlueprintCatalogEntry = {
     blueprintTypeID: 900,
@@ -317,9 +314,6 @@ describe('computeOpportunityRow — priced like a Build Plan (issue #2055)', () 
   });
 
   it('owned-blueprint rows include no acquisition cost regardless of Include Blueprint Cost (AC3)', () => {
-    // computeOpportunityRow never reads an Include Blueprint Cost setting —
-    // it always resolves the top-level product as owned/free, so there is no
-    // toggle capable of adding a cost line here in the first place.
     const opportunityRow = row()!;
     expect(
       opportunityRow.result.materials.some((m) => m.typeID === candidate.blueprint.type_id)
@@ -345,7 +339,6 @@ describe('a plan opened from a row prices the row', () => {
     adjustedPrices: { 34: 1 },
     systemCostIndex: 0.05,
   };
-  // The pilot already holds most of the Tritanium the build needs.
   const stock = new Map([[34, { quantity: 90 }]]) as unknown as DetectedOwnedStockMap;
   const recipeFor = recipeForLookup({ catalog: cat, pi: null, ownedBlueprints: [ownedCopy] });
   const row = computeOpportunityRow(
@@ -459,7 +452,6 @@ describe('rows count owned materials as the plan page’s hero does', () => {
   it('follows the Profit Basis setting: owned materials free reads the plan’s free-basis figure', () => {
     const row = priceRow(stock, 'free');
     const result = planResultFor(row);
-    // The stock is used, so the sell-value basis would have moved the figure.
     expect(planOwnedStockSale(result.materials, snapshot, 'instant', {}).net).toBeGreaterThan(0);
     const free = profitOnBasis('free', {
       result,
@@ -477,7 +469,6 @@ describe('rows count owned materials as the plan page’s hero does', () => {
 
   it('charges the stock it uses at what it would sell for, so ISK/hour matches the plan hero', () => {
     const row = priceRow(stock);
-    // What BuildPlanDetail does by default: sell-value basis over an instant sale.
     const plan = planForOpportunityCandidate(
       candidate,
       DEFAULT_ACTIVITY_FACILITY_DEFAULTS,
@@ -509,11 +500,9 @@ describe('rows count owned materials as the plan page’s hero does', () => {
       brokerRelationsLevel: 0,
     });
     expect(row.result.profit).toBe(hero.profit);
-    // What was charged, so a loss tooltip can add up.
     expect(row.forgoneSale).toBe(sale.net);
     expect(row.result.iskPerHour).toBe(hero.iskPerHour);
     expect(row.result.marginPct).toBe(hero.marginPct);
-    // The claim itself is untouched: the plan still lists the stock as held.
     expect(row.result.profit!).toBeLessThan(result!.profit!);
   });
 
@@ -556,7 +545,6 @@ describe('rows price with the plan page’s settings', () => {
   };
   const snapshot: MarketSnapshot = {
     hubPrices: { 2: 100_000, 34: 500 },
-    // Buy orders sit well under sell orders.
     hubBuyPrices: { 2: 90_000, 34: 300 },
     hubSellVolumes: { 2: 10 },
     adjustedPrices: { 34: 1 },
@@ -564,7 +552,6 @@ describe('rows price with the plan page’s settings', () => {
   };
   const cat = catalog([entry]);
   const recipeFor = recipeForLookup({ catalog: cat, pi: null, ownedBlueprints: [ownedCopy] });
-  // The pilot's latest plan: priced on buy orders, built at a Raitaru.
   const latest = {
     ...planForOpportunityCandidate(
       candidate,
@@ -594,7 +581,6 @@ describe('rows price with the plan page’s settings', () => {
   it('buys materials at the side of the market the latest plan’s basis names', () => {
     const sell = rowWith(null);
     const buy = rowWith(latest);
-    // 90 Tritanium (the owned copy is ME 10) at 300, plus an untrained 3% placement fee, against 500.
     expect(sell.result.materialCost - buy.result.materialCost).toBeCloseTo(90 * (500 - 300 * 1.03));
   });
 
@@ -723,7 +709,6 @@ describe('reaction rows (issue #5990)', () => {
     expect(row.result.profit).toBeNull();
     expect(row.result.marginPct).toBeNull();
     expect(row.result.iskPerHour).toBeNull();
-    // The job's own cost and time still read: only the sell-side figures blank.
     expect(row.result.totalCost).toBeGreaterThan(0);
   });
 
@@ -851,8 +836,6 @@ describe('opportunitiesInputsKey', () => {
   });
 
   it('is the same when only the reaction location changes and no row is a reaction', () => {
-    // A batch of manufacturing blueprints reads only the manufacturing record;
-    // a Reaction Location set on some plan page must not ask it for a Refresh.
     expect(opportunitiesInputsKey(INPUTS)).toBe(
       opportunitiesInputsKey({
         ...INPUTS,
@@ -1077,8 +1060,6 @@ describe('rankOpportunityRows', () => {
 
 describe('opportunitySnapshotRequest — where the job fee is charged', () => {
   it('prices at the remembered build system, the one a seeded plan will name', () => {
-    // A row priced at the hub's cost index would seed a plan that quotes a
-    // different job fee the moment it is opened.
     const request = opportunitySnapshotRequest([], DEFAULT_TRADE_HUB, catalog([]), null, {
       ...DEFAULT_ACTIVITY_FACILITY_DEFAULTS,
       manufacturing: {
@@ -1126,8 +1107,6 @@ describe('opportunitySnapshotRequest — where the job fee is charged', () => {
   });
 
   it('prices at the hub when the remembered facility cannot manufacture', () => {
-    // `newBuildPlan` refuses such a record whole, so the seeded plan builds
-    // at its hub — and so must the row.
     const request = opportunitySnapshotRequest([], DEFAULT_TRADE_HUB, catalog([]), null, {
       ...DEFAULT_ACTIVITY_FACILITY_DEFAULTS,
       manufacturing: {

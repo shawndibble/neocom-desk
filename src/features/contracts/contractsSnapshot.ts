@@ -13,56 +13,36 @@ import type { CharacterAffiliation, Contract } from '@/esi/endpoints';
 
 export interface ContractsSnapshot {
   contractsResult: CachedResult<Contract[]> | null;
-  /** 401/403 (or a failed token refresh) means "log in again", not "offline". */
   contractsNeedsReauth: boolean;
-  /** Fewer pages came back than ESI advertised — the list below is partial. */
   contractsTruncated: boolean;
   issuerNames: Map<number, string>;
-  /** Entity kind of each receiver, so a corp that took a public contract links as a corp. */
   receiverCategories: Map<number, NameCategory>;
-  /**
-   * This character's own contact list, indexed once per snapshot. Empty
-   * (never missing) when the contacts scope isn't granted — a stranger's tag
-   * is simply absent, not an error the page needs to surface.
-   */
   standingIndex: ContactStandingIndex;
-  /** Each issuer's corp/alliance/faction, so an issuer with no personal contact entry can still match one the pilot holds on their corp. */
   issuerAffiliations: Map<number, CharacterAffiliation>;
 }
 
-/** One Character's contracts and the lookups that depend on who is viewing them. */
 export interface ContractGroup {
   ownerId: number;
   contracts: readonly Contract[];
-  /** Read this owner's contact list for standings. A Character without the scope must pass false. */
   withStandings: boolean;
 }
 
 export interface ContractLookups {
   issuerNames: Map<number, string>;
   receiverCategories: Map<number, NameCategory>;
-  /** Each owner's own contact list, indexed. Empty (never missing) when not read. */
   standingIndexByOwner: Map<number, ContactStandingIndex>;
   issuerAffiliations: Map<number, CharacterAffiliation>;
 }
 
-/**
- * Names, receiver kinds, standings and affiliations for contracts grouped by the
- * Character each was read for: a receiver is "the other party" relative to its
- * own owner, and a standing is that owner's own contact entry.
- */
 export async function resolveContractLookups(
   groups: readonly ContractGroup[],
   signal: RouteSnapshotSignal
 ): Promise<ContractLookups> {
-  // Already superseded: skip the name/standing lookups, their results would be discarded.
   const live = signal.cancelled ? groups.map((g) => ({ ...g, contracts: [] })) : groups;
   const issuers = live.flatMap((g) => g.contracts.map(contractIssuer));
-  // Receivers share the name map; their kind comes from the resolved category.
   const receiverIds = live.flatMap((g) =>
     g.contracts.flatMap((c) => contractReceiver(c, g.ownerId)?.id ?? [])
   );
-  // Contacts and the names don't depend on the categories, so they run alongside.
   const contactsPromise = Promise.all(
     live.map(async (g) =>
       signal.cancelled || !g.withStandings ? null : await loadContacts(g.ownerId)
@@ -73,7 +53,6 @@ export async function resolveContractLookups(
   const receivers = live.flatMap((g) =>
     g.contracts.flatMap((c) => contractReceiver(c, g.ownerId, receiverCategories) ?? [])
   );
-  // Only characters have affiliations/standings.
   const [issuerNames, contactsStatuses, issuerAffiliations] = await Promise.all([
     namesPromise,
     contactsPromise,

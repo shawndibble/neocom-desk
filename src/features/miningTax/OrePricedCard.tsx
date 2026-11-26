@@ -6,20 +6,11 @@ import { OreIcon, OreLink } from './OreIcon';
 export interface OrePricedLine {
   typeId: number;
   name: string;
-  /** The amount column; a node so a split's "reported / claimed" or "book · you" can stand in. */
   quantity: ReactNode;
-  /** The unit price, shown as `quantity × unit`; absent when the day has no pricing to show. */
   unit?: string;
-  /** Where the price came from, only when it is worth saying (not the day's own saved snapshot). */
   source?: string;
 }
 
-/**
- * One card for a mined day's ore: each ore once, with its amount, unit price and
- * the price's source beside it, and what the prices were built from (hub, ore form,
- * rate) underneath. The ore list and the pricing used to be two cards naming every
- * ore twice. Shared by the manual record and the Corp Tax Book record.
- */
 export function OrePricedCard({
   title,
   lines,

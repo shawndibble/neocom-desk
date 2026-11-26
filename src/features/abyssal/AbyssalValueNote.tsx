@@ -1,10 +1,3 @@
-/**
- * The line under an Assets level saying how its abyssal modules are valued:
- * how many carry MutaMarket's estimate, how many are unpriced or not yet
- * looked up (both left out of the total), and the "Price from MutaMarket"
- * credit, given once for the view rather than on every row (scope decision
- * `*-abyssal-estimates-in-asset-totals.md`).
- */
 import { Fragment } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ExternalLink } from '@/components/ui/ExternalLink';

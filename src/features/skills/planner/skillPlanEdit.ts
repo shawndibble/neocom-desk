@@ -1,21 +1,3 @@
-/**
- * Every Skill Plan edit, each a pure `(plan, ...args) => patch`: the Plan
- * Editor (issue #2044) only dispatches — the same shape as the Fitting
- * editor's `engine/fittings/fittingEdit.ts` — and the writes from outside it
- * (`useTargetPlan`'s Add/Undo, `SkillPlanAdd`'s Add) come through here
- * too. Never mutates its input.
- *
- * A Skill Plan holds three index-aligned lists: `entries`, `markers` (Remap
- * Marker positions into `entries`) and `markerAttributes` (each marker's
- * manual override, by marker ordinal — see `normalizeMarkerAttributes`).
- * Keeping those three consistent is this module's job for every edit: each
- * operation returns a patch in which whatever it touches still lines up, so
- * no caller has to remember which marker helper pairs with which.
- *
- * A patch carries only the fields the edit changes — every caller persists
- * and syncs `{ ...plan, ...patch }`, so an extra field here would be an
- * extra synced write.
- */
 import type { SkillPlanRecord } from '@/db';
 import { normalizePlan } from '@/engine/skills/plan';
 import { optimizeAtMarkers } from '@/engine/optimizer';
@@ -48,27 +30,18 @@ import {
 } from './reorder';
 import { splitEntriesByLevel } from './splitEntries';
 
-/** The three index-aligned lists every operation here keeps consistent. */
 export type SkillPlanEditable = Pick<SkillPlanRecord, 'entries' | 'markers' | 'markerAttributes'>;
 
-/** What an operation writes: only the fields it changed. */
 export type SkillPlanPatch = Partial<SkillPlanEditable>;
 
-/**
- * Each marker's manual override, aligned to the markers as they read now —
- * `plan.markerAttributes` itself can be stale relative to `plan.markers`, so
- * this is the only way to read it by marker ordinal.
- */
 export function alignedMarkerAttributes(plan: SkillPlanEditable): (Attributes | null)[] {
   return normalizeMarkerAttributes(plan.markers, plan.markerAttributes, plan.entries.length);
 }
 
-/** Add one entry row at the end, unless the plan already covers that level. */
 export function addEntry(plan: SkillPlanEditable, entry: PlanEntry): SkillPlanPatch {
   return { entries: upsertEntry(plan.entries, entry) };
 }
 
-/** Set a skill's priority band on every row of that skill. */
 export function setPriority(
   plan: SkillPlanEditable,
   skillTypeID: number,
@@ -77,7 +50,6 @@ export function setPriority(
   return { entries: setEntryPriority(plan.entries, skillTypeID, priority) };
 }
 
-/** Clipboard import, and queue import's Append: merge `imported` onto the entries. */
 export function appendImport(
   plan: SkillPlanEditable,
   imported: readonly PlanEntry[]
@@ -85,7 +57,6 @@ export function appendImport(
   return { entries: appendImportedEntries(plan.entries, imported) };
 }
 
-/** Accept on "Suggest reorder" / "Shortest first": entries follow the suggested step order. */
 export function applyReorder(
   plan: SkillPlanEditable,
   suggestedSteps: readonly PlanStep[]
@@ -93,7 +64,6 @@ export function applyReorder(
   return { entries: applyReorderSuggestion(plan.entries, suggestedSteps) };
 }
 
-/** "Add remap marker": a new marker after the last entry (the user drags it up), with no override. */
 export function addRemapMarker(plan: SkillPlanEditable): SkillPlanPatch {
   const entryCount = plan.entries.length;
   const markers = [...(plan.markers ?? []), entryCount];
@@ -107,7 +77,6 @@ export function addRemapMarker(plan: SkillPlanEditable): SkillPlanPatch {
   };
 }
 
-/** Remove the marker at ordinal `markerIndex` (normalized order), and its override with it. */
 export function removeRemapMarker(plan: SkillPlanEditable, markerIndex: number): SkillPlanPatch {
   const markers = normalizeMarkers(plan.markers, plan.entries.length);
   const markerAttributes = alignedMarkerAttributes(plan);
@@ -116,7 +85,6 @@ export function removeRemapMarker(plan: SkillPlanEditable, markerIndex: number):
   return { markers, markerAttributes };
 }
 
-/** The Remap Marker modal's Save / Clear: set (or clear, via `null`) one marker's override. */
 export function setRemapMarkerAttributes(
   plan: SkillPlanEditable,
   markerIndex: number,
@@ -127,11 +95,6 @@ export function setRemapMarkerAttributes(
   return { markerAttributes };
 }
 
-/**
- * A drop's new entries and markers, with each marker's override carried to
- * wherever that marker went — `markerOrder` names, per new marker, which old
- * ordinal it was (see `RowsToState`).
- */
 function dropPatch(plan: SkillPlanEditable, state: PlanDropState): SkillPlanPatch {
   const before = alignedMarkerAttributes(plan);
   return {
@@ -141,23 +104,16 @@ function dropPatch(plan: SkillPlanEditable, state: PlanDropState): SkillPlanPatc
   };
 }
 
-/** Why a drop was refused — `planDrop`'s refusal, for the editor to put into words. */
 export type MoveRowRefusal = Extract<PlanDropResult, { ok: false }>;
 
 export type MoveRowResult =
   | {
       ok: true;
       patch: SkillPlanPatch;
-      /** Set when the drag started on a prereq row, so the caller can say what it did. */
       promoted: { skillTypeID: number; level: number } | null;
     }
   | MoveRowRefusal;
 
-/**
- * One drag (or keyboard move) on the merged entry/marker/prereq row list:
- * a plain reorder, a prereq row promoted into a real entry, or a refusal of
- * an order the normalizer would silently undo. See `planDrop`.
- */
 export function moveRow(
   plan: SkillPlanEditable,
   move: {
@@ -173,7 +129,6 @@ export function moveRow(
   return { ok: true, patch: dropPatch(plan, result), promoted: result.promoted };
 }
 
-/** The "+" on a prereq row: promote it in place. Null if `rowId` is not a prereq row of `rows`. */
 export function promotePrereqRow(
   plan: SkillPlanEditable,
   rows: readonly MergedRow[],
@@ -183,13 +138,6 @@ export function promotePrereqRow(
   return result ? dropPatch(plan, result) : null;
 }
 
-/**
- * Queue import's Replace: the imported entries in, every Remap Marker and
- * override out. `undo` is the patch that puts the plan back exactly as it
- * was — absent marker lists snapshot as empty ones, since a synced write
- * can't carry an explicit `undefined` (Firestore rejects it) and an absent
- * list already reads as empty everywhere.
- */
 export function replaceWithImport(
   plan: SkillPlanEditable,
   imported: readonly PlanEntry[]
@@ -204,7 +152,6 @@ export function replaceWithImport(
   };
 }
 
-/** Whatever the optimizer needs to re-price a segment, once its markers land. */
 export interface RemapPricingContext {
   currentAttributes: Attributes;
   implants?: Implants;
@@ -222,31 +169,6 @@ function attributesEqual(a: Attributes, b: Attributes): boolean {
   );
 }
 
-/**
- * `segmentsToMarkers` snaps a boundary that falls mid-entry (a prereq chain
- * spanning two attribute pairs) forward to the entry after it — correct,
- * since a remap can't happen mid-skill, but it can shift a step or two out of
- * the segment `placeRemaps` costed onto its neighbor. Re-pricing each
- * resulting segment at its ACTUAL (snapped) boundary can then land it on the
- * exact same attribute spread as the segment before it: a remap that changed
- * nothing. Dropping that marker is only safe for markers the OPTIMIZER just
- * proposed (Optimize Remaps / Optimize for me) — never for the user's own
- * Remap Markers (Optimize at my markers), which this must not silently
- * delete. Filters out catalog-missing entries first, the same way
- * `segmentsToMarkers`/`markerStepIndices` do, since `normalizePlan` throws on
- * an unknown skill typeID.
- *
- * Groups `markers` by the step index each one resolves to, rather than
- * zipping `markers[i]` against `resolved.segments[i]` positionally: two
- * distinct marker positions collapse onto the same step (and so the same
- * segment) whenever the entries strictly between them contribute no step —
- * an already-trained skill sitting between two near-adjacent markers, the
- * exact "markers jammed right next to each other" shape this fix targets.
- * `optimizeAtMarkers` dedupes its own cut points in that case
- * (`[...new Set(...)]`), so `resolved.segments` can be shorter than
- * `markers`; a positional zip would then compare the wrong marker against
- * the wrong segment for every index past the collapse.
- */
 function dropRedundantMarkers(
   entries: readonly PlanEntry[],
   markers: readonly number[],
@@ -283,13 +205,6 @@ function dropRedundantMarkers(
   return kept;
 }
 
-/**
- * Accept on "Use my remap markers" (Optimize at my markers): the markers
- * become one per remapped segment, replacing the old ones wholesale. Their
- * overrides go too — they were for a segmentation this just discarded. These
- * are the user's own marker positions (just re-costed), so nothing here is
- * ever dropped as redundant — see `applyOptimizerRemapSegments` for that.
- */
 export function applyRemapSegments(
   plan: SkillPlanEditable,
   segments: readonly RemapSegment[],
@@ -302,13 +217,6 @@ export function applyRemapSegments(
   };
 }
 
-/**
- * Accept on "Optimize Remaps": same as `applyRemapSegments`, but `segments`
- * is the optimizer's OWN proposal (placeRemaps' search), not the user's
- * existing markers — so a marker whose entry-snapped boundary re-prices to
- * the same spread as the one before it is redundant and gets dropped
- * (`dropRedundantMarkers`). `pricing` is what that re-pricing needs.
- */
 export function applyOptimizerRemapSegments(
   plan: SkillPlanEditable,
   segments: readonly RemapSegment[],
@@ -323,13 +231,6 @@ export function applyOptimizerRemapSegments(
   };
 }
 
-/**
- * Accept on "Optimize for me": the reordered entries and the markers for
- * them in one write. `segments` index the *new* order, so the markers are
- * placed against it, not against the plan's current entries. Goes through
- * `applyOptimizerRemapSegments`, not `applyRemapSegments`: these are the
- * optimizer's own segments too.
- */
 export function applyOptimizeForMe(
   plan: SkillPlanEditable,
   order: readonly PlanStep[],
@@ -345,12 +246,6 @@ export function applyOptimizeForMe(
   };
 }
 
-/**
- * One row per skill level: split any entry spanning several levels, moving
- * the markers to stay in front of the same entries (their ordinals don't
- * change, so the overrides stay aligned untouched). Null when nothing needs
- * splitting, so the caller can skip a pointless write.
- */
 export function splitByLevel(
   plan: SkillPlanEditable,
   skills: ReadonlyMap<number, EngineSkill>,
@@ -361,13 +256,6 @@ export function splitByLevel(
   return { entries: split.entries, ...(split.markers ? { markers: split.markers } : {}) };
 }
 
-/**
- * Remove one entry row. Remap Markers stay anchored to the entries they sat
- * in front of — those after the removed entry shift one position left, and
- * their attributes shift with them. Removing an entry can land two markers
- * on the same position; they collapse into one and the earlier one's
- * attributes survive, the same "first wins" `normalizeMarkerAttributes` uses.
- */
 export function removeEntry(
   plan: SkillPlanEditable,
   skillTypeID: number,
@@ -397,14 +285,6 @@ export function removeEntry(
   };
 }
 
-/**
- * Drop every row the character has already trained (its level at or below the
- * trained one), for a pasted plan full of skills they own. Remap Markers keep
- * their place in front of the same surviving entry and the attributes ride
- * along; markers that land together collapse, first wins, as in `removeEntry`.
- * Null when nothing is trained, so the caller skips a pointless write; `undo`
- * is the plan as it stood.
- */
 export function removeTrainedEntries(
   plan: SkillPlanEditable,
   trainedSkills: ReadonlyMap<number, TrainedSkill>
@@ -420,7 +300,6 @@ export function removeTrainedEntries(
     markerAttributes: plan.markerAttributes ?? [],
   };
   if (!plan.markers) return { patch: { entries }, removed, undo };
-  // A marker sits in front of entries[m]: it now sits in front of however many survivors precede it.
   const survivorsBefore = (position: number) =>
     plan.entries.slice(0, position).filter((e) => !isTrained(e)).length;
   const shifted = plan.markers.map(survivorsBefore);

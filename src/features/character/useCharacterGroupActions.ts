@@ -10,11 +10,6 @@ import {
   type CharacterGroup,
 } from '@/features/character/groups';
 
-/**
- * Card view's group management: the new-group input state and every group
- * mutation, each followed by a focus hand-off because the control that ran it
- * usually unmounts or turns disabled once the groups change.
- */
 export function useCharacterGroupActions(
   groupsValue: OverviewGroupsValue,
   setGroupsValue: (next: OverviewGroupsValue) => Promise<void>
@@ -33,13 +28,11 @@ export function useCharacterGroupActions(
         Date.now()
       )
     );
-    // The card remounts under its new group, so the Select that ran this is gone.
     focusAfterCommit(() =>
       document.querySelector<HTMLElement>(`[data-group-select="${characterId}"]`)
     );
   }
 
-  /** `returnFocus` is false on blur: the user already went elsewhere. */
   async function handleCreateGroup(returnFocus: boolean) {
     const name = newGroupName.trim();
     setAddingGroup(false);
@@ -92,7 +85,6 @@ export function useCharacterGroupActions(
         Date.now()
       )
     );
-    // At the top or bottom the pressed button turns disabled; the sibling takes focus.
     const enabledMove = (side: 'up' | 'down') => () => {
       const el = document.querySelector<HTMLButtonElement>(
         `[data-move-group="${groupId}:${side}"]`

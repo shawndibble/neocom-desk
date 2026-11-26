@@ -1,12 +1,6 @@
 import type { ShipTreeGroup } from '@/sde/types';
 import raw from './classData.json';
 
-/**
- * The real class data the layout tests run on, trimmed from the prototype's
- * ship tree bake + public/data/skills.json (2026-09-26): per faction, how
- * many hulls each class has and that class's prereqs; per skill, its name
- * and Alpha cap. Prereqs are stored as `[skillTypeID, level, display]`.
- */
 interface RawFaction {
   name: string;
   hullCounts: Record<string, number>;
@@ -26,7 +20,6 @@ export function hullCounts(factionID: number): Map<number, number> {
   return new Map(Object.entries(f?.hullCounts ?? {}).map(([id, n]) => [Number(id), n]));
 }
 
-/** Every class this fixture knows, with prereqs for every faction that has hulls in it. */
 export const GROUPS: ReadonlyMap<number, ShipTreeGroup> = (() => {
   const groups = new Map<number, ShipTreeGroup>();
   for (const [id, name] of Object.entries(data.classNames)) {

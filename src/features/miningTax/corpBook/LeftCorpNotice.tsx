@@ -5,11 +5,6 @@ import type { LeftCorpBook } from './leftCorpBooks';
 
 const textAction = plainTextActionClassName('min-h-9 md:min-h-6');
 
-/**
- * A corporation the member has left whose book is still read (a leaver keeps read access to their
- * own lines): says so once, offers to pay what it still lists, and lets the member stop showing it.
- * Nothing is settled or deleted by hiding it.
- */
 export function LeftCorpNotice({
   book,
   onPay,
@@ -48,7 +43,6 @@ export function LeftCorpNotice({
   );
 }
 
-/** The notices for each left book in view, then one dim line bringing back any the member hid. */
 export function LeftCorpNotices({
   books,
   hidden,

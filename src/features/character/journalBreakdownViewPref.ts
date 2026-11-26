@@ -1,8 +1,3 @@
-/**
- * Which list "Where the ISK went" shows (issue #5602): the ref-type rows or the
- * Journal Party rows. Remembered on this device, like the other view preferences
- * `VIEW_PREFERENCE_KEYS` clears.
- */
 import { createLocalSetting } from '@/lib/useLocalSetting';
 
 export type JournalBreakdownView = 'type' | 'party';

@@ -48,7 +48,6 @@ const CURRENT: Attributes = {
 };
 const PRICING: RemapPricingContext = { currentAttributes: CURRENT };
 
-/** Three entries (1, 2, 3), plus whatever markers the test gives it. */
 const plan = (extra: Partial<SkillPlanEditable> = {}): SkillPlanEditable => ({
   entries: [entry(1), entry(2), entry(3)],
   ...extra,
@@ -68,13 +67,6 @@ const skill = (
   prereqs,
 });
 
-/**
- * 1, 3 and 4 are free-standing; 2 needs 1 at III. 3 and 4 sit on different
- * attribute pairs from 1 and from each other, so a genuine two-remap split
- * across them has a real benefit — `applyRemapSegments`'s redundant-marker
- * drop (see skillPlanEdit.ts) would otherwise collapse them, since same-pair
- * segments always re-price to the same spread.
- */
 const SKILLS = new Map<number, EngineSkill>(
   [
     skill(1, [], 'perception', 'willpower'),
@@ -86,7 +78,6 @@ const SKILLS = new Map<number, EngineSkill>(
 
 const NO_TRAINED = new Map<number, TrainedSkill>();
 
-/** The merged row list the Plan Editor hands EntryList, with stand-in times. */
 function mergedRows(entries: readonly PlanEntry[], markers?: readonly number[]): MergedRow[] {
   const { steps, entryBoundaries } = normalizePlanWithBoundaries(entries, SKILLS, NO_TRAINED);
   const scheduled: ScheduledStep[] = steps.map((step, i) => ({
@@ -113,8 +104,6 @@ describe('removeEntry', () => {
   });
 
   it('shifts a Remap Marker after the removed entry left, together with its attributes', () => {
-    // Markers before entries[1] and after the last entry; removing entry 0
-    // moves both one position left and each keeps its own override.
     expect(removeEntry(plan({ markers: [1, 3], markerAttributes: [A, B] }), 1, 1)).toEqual({
       entries: [entry(2), entry(3)],
       markers: [0, 2],
@@ -132,7 +121,6 @@ describe('removeEntry', () => {
 
   it("keeps the first marker's attributes when the removal collapses two markers into one", () => {
     const five = { entries: [1, 2, 3, 4, 5].map((id) => entry(id)) };
-    // Markers [3, 4] both land on 3 once entries[3] goes.
     expect(removeEntry({ ...five, markers: [3, 4], markerAttributes: [A, B] }, 4, 1)).toEqual({
       entries: [entry(1), entry(2), entry(3), entry(5)],
       markers: [3],
@@ -198,7 +186,6 @@ describe('addRemapMarker', () => {
 
 describe('removeRemapMarker', () => {
   it('removes the marker and its attributes together, by ordinal in normalized order', () => {
-    // [3, 1] normalizes to [1, 3], so ordinal 0 is the marker at 1 (attributes B).
     const marked = plan({ markers: [3, 1], markerAttributes: [A, B] });
     expect(removeRemapMarker(marked, 0)).toEqual({ markers: [3], markerAttributes: [A] });
     expect(removeRemapMarker(marked, 1)).toEqual({ markers: [1], markerAttributes: [B] });
@@ -245,8 +232,6 @@ describe('moveRow', () => {
   });
 
   it("carries each marker's attributes along when a drag reorders two markers", () => {
-    // Rows: [entry 1-III, marker 0, entry 3, marker 1]. Dragging marker 1 to
-    // the top puts it ahead of marker 0, so their overrides trade places.
     const p: SkillPlanEditable = {
       entries: [entry(1, 3), entry(3)],
       markers: [1, 2],
@@ -321,8 +306,6 @@ describe('replaceWithImport', () => {
   });
 
   it('snapshots absent marker lists as empty ones, never as undefined', () => {
-    // A synced write can't carry an explicit `undefined` (Firestore rejects
-    // it), and an absent list already reads as empty everywhere.
     expect(replaceWithImport(plan(), [entry(4)]).undo).toEqual({
       entries: [entry(1), entry(2), entry(3)],
       markers: [],
@@ -333,7 +316,6 @@ describe('replaceWithImport', () => {
 
 describe('applyRemapSegments / applyOptimizerRemapSegments / applyOptimizeForMe', () => {
   it("replaces the markers with one per remapped segment, dropping the old markers' overrides", () => {
-    // Steps [1, 3, 4], one per entry: each segment start is an entry boundary.
     const p: SkillPlanEditable = {
       entries: [entry(1), entry(3), entry(4)],
       markers: [3],
@@ -346,10 +328,6 @@ describe('applyRemapSegments / applyOptimizerRemapSegments / applyOptimizeForMe'
   });
 
   it('never drops a marker: these are the plan’s own, not the optimizer’s', () => {
-    // Same setup as the redundant-marker test below, but through the plain
-    // (non-search) path "Optimize at my markers" uses: even though entries 11
-    // and 12 share a pair and the split changes nothing, a manually-placed
-    // marker is never this function's call to delete.
     const sameAttrsSkills = new Map<number, EngineSkill>(
       [
         skill(10, [], 'perception', 'willpower'),
@@ -370,11 +348,6 @@ describe('applyRemapSegments / applyOptimizerRemapSegments / applyOptimizeForMe'
   });
 
   it('drops an optimizer-proposed marker whose re-priced spread matches the segment before it', () => {
-    // Entries 11 and 12 train the same attribute pair at the same rank, so
-    // splitting between them never changes anything: the two proposed remap
-    // segments (bogus, distinct `attributes` from `seg()`) are only what the
-    // search *proposed* — re-pricing each at its real, entry-snapped boundary
-    // always lands on the same spread, so the second marker is redundant.
     const sameAttrsSkills = new Map<number, EngineSkill>(
       [
         skill(10, [], 'perception', 'willpower'),
@@ -407,7 +380,6 @@ describe('applyRemapSegments / applyOptimizerRemapSegments / applyOptimizeForMe'
       { skillTypeID: 3, level: 1 },
       { skillTypeID: 1, level: 1 },
     ];
-    // Segment 2 starts at step 2 of the *new* order — entry 1, now last.
     expect(
       applyOptimizeForMe(p, order, [seg(0, false), seg(2)], SKILLS, NO_TRAINED, PRICING)
     ).toEqual({
@@ -458,7 +430,6 @@ describe('removeTrainedEntries', () => {
   });
 
   it('keeps each Remap Marker in front of the same surviving entry, with its attributes', () => {
-    // Markers before entry 2 and entry 3; entry 1 is trained and goes.
     const edit = removeTrainedEntries(
       plan({ markers: [1, 2], markerAttributes: [A, B] }),
       trained({ 1: 1 })
@@ -471,7 +442,6 @@ describe('removeTrainedEntries', () => {
   });
 
   it('collapses markers that end up in the same place, the first one keeping its attributes', () => {
-    // Markers before entries 2 and 3; entry 2 is trained, so both land before entry 3.
     const edit = removeTrainedEntries(
       plan({ markers: [1, 2], markerAttributes: [A, B] }),
       trained({ 2: 1 })

@@ -1,17 +1,3 @@
-/**
- * The Goal Planner's reads: the active Character's colonies and everything a
- * `PlannerColony` is built from. A slim loader over the same lower-level
- * reads the Advisor's own loader uses, not a move of it — see
- * `goalPlannerModel.ts`'s header for why.
- *
- * Prices are a second call (`loadGoalPlannerPrices`) because they depend on
- * the pilot's hub: switching hub must not refetch every colony.
- *
- * Every optional read degrades rather than failing the tab, the Advisor's
- * rule: an unresolved planet radius leaves that colony's link cost to be
- * borrowed, an unresolved security reads as highsec (the rate that cannot
- * understate customs), unknown skills are `null`.
- */
 import { loadPi, loadPiPlanetRadius } from '@/sde/loadSde';
 import { db } from '@/db';
 import type { TradeHub } from '@/market/hubs';
@@ -32,16 +18,12 @@ import { plannableTypeIds } from './products';
 import type { PlannerSnapshot } from './goalPlannerModel';
 
 export interface GoalPlannerSnapshot extends PlannerSnapshot {
-  /** The planets read came back 403: a missing scope, not an empty list. */
   needsReauth: boolean;
-  /** ESI did not answer the planets read and nothing is cached: unknown, not "no colonies". */
   fetchFailed: boolean;
-  /** When the colony list was read; null when nothing is cached. */
   fetchedAt: Date | null;
   planetNames: ReadonlyMap<number, string>;
   systemNames: ReadonlyMap<number, string>;
   customsOverrides: CustomsOverrides;
-  /** Accounting; null when the character's skills never loaded. */
   accountingLevel: number | null;
 }
 
@@ -101,13 +83,11 @@ export async function loadGoalPlannerSnapshot(characterId: number): Promise<Goal
     fetchedAt: planets.cached ? new Date(planets.cached.fetchedAt) : null,
     planetNames,
     systemNames,
-    // Whatever a sync last wrote, validated: not necessarily this version's.
     customsOverrides: parseCustomsOverrides(overridesRow?.value),
     accountingLevel,
   };
 }
 
-/** Both sides of the hub book for every planetary commodity — about eighty types, one read. */
 export function loadGoalPlannerPrices(
   hub: TradeHub,
   pi: PlannerSnapshot['pi']

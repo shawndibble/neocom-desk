@@ -23,8 +23,6 @@ beforeEach(async () => {
   await db.esiCache.clear();
   await db.esiCacheMeta.clear();
   resetRevalidationState();
-  // `freshnessInvalidatedAt` is module state; pin it to 0 so an earlier
-  // real-clock `invalidateFreshness()` cannot outrank the mocked clock.
   vi.spyOn(Date, 'now').mockReturnValue(0);
   invalidateFreshness();
   await clearCachePurgePending(CHAR_ID);
@@ -86,7 +84,6 @@ describe('cache-miss signal', () => {
     const gate = new Promise<string>((resolve) => (release = resolve));
     const first = loadWithCache(CHAR_ID, KEY, () => gate);
     const second = loadWithCache(CHAR_ID, KEY, () => gate);
-    // Both reads must be past their Dexie lookups before the call settles.
     await vi.waitFor(() => expect(misses).toHaveLength(1));
     release('live');
     await Promise.all([first, second]);

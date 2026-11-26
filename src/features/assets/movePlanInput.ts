@@ -7,7 +7,6 @@ export interface MovePlanSource {
   assets: readonly CharacterAsset[];
 }
 
-/** One checkbox row of the picker: loose stock of a type at one pickup location, or an assembled ship. */
 export interface PickerStack {
   key: string;
   characterId: number;
@@ -22,7 +21,6 @@ function stackKey(a: CharacterAsset, characterId: number, ship: boolean): string
   return `${characterId}:${a.location_id}:${a.type_id}:${ship ? 'ship' : 'loose'}`;
 }
 
-/** What can be moved: hangar stock and assembled ships; items inside containers or ships are left out. */
 function movable(a: CharacterAsset, shipTypeIds: ReadonlySet<number>): 'ship' | 'loose' | null {
   if (a.location_type === 'item' || a.location_type === 'solar_system') return null;
   if (a.is_singleton) return shipTypeIds.has(a.type_id) ? 'ship' : null;
@@ -56,7 +54,6 @@ export function pickerStacks(
   return [...stacks.values()];
 }
 
-/** The engine's input: only the assets the user ticked, per Character. */
 export function selectedPlanCharacters(
   sources: readonly MovePlanSource[],
   shipTypeIds: ReadonlySet<number>,
@@ -83,7 +80,6 @@ export function selectedPlanCharacters(
   return out;
 }
 
-/** Rigs fitted to each assembled ship, by the ship's itemID; ships with none are absent. */
 export function fittedRigCounts(sources: readonly MovePlanSource[]): Map<number, number> {
   const counts = new Map<number, number>();
   for (const { assets } of sources)

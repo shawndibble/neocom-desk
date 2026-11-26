@@ -131,11 +131,9 @@ describe('HubField percent', () => {
     expect(box).toHaveValue(100);
     await user.clear(box);
     await user.type(box, '9');
-    // Not written mid-typing: the page would re-price at each partial value.
     expect(usePagePricePercents.getState().value).toEqual({});
     await user.type(box, '0{Enter}');
     await waitFor(() => expect(usePagePricePercents.getState().value).toEqual({ fittings: 90 }));
-    // The percent belongs to the page: the Global hub is untouched.
     expect(useMarketHub.getState().value).toBe('jita');
     expect(screen.getByRole('button', { name: 'Jita · 90%, Priced at' })).toBeInTheDocument();
   });

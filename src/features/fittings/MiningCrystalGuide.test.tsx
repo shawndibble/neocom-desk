@@ -97,7 +97,6 @@ describe('MiningCrystalGuide', () => {
     const coherent = screen.getByRole('button', { name: /^Coherent Asteroid: Omber/ });
     expect(simple).toHaveAttribute('aria-expanded', 'true');
     expect(simple).toHaveAccessibleName(/, loaded$/);
-    // aria-controls names one real id: the family's body.
     expect(document.getElementById(simple.getAttribute('aria-controls')!)).toHaveTextContent(
       'For Veldspar, Scordite, Pyroxeres, Plagioclase.'
     );

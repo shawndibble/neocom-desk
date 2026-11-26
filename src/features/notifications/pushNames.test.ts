@@ -64,8 +64,6 @@ describe('resolvePushNames', () => {
 });
 
 describe('service worker bundle weight', () => {
-  // The worker has its own small i18next instance (`pushHandler.ts`); a module
-  // in its graph reaching for `@/i18n` or React would put every locale back in.
   const SW_MODULES = [
     'pushHandler.ts',
     'pushNames.ts',

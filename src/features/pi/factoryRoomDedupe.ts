@@ -1,12 +1,5 @@
 import type { NetworkOpportunity } from '@/engine/pi/network';
 
-/**
- * One host's factory-room wins, minus the ones that would spend a surplus an
- * earlier (better-paying) win already claimed. Two wins on the same routed or
- * local input are one surplus counted twice: the headline would add them. A
- * product also appears once. Bought inputs are nobody's surplus, so they
- * never clash. Order of the survivors follows the input.
- */
 export function dropSharedSurplus(
   opportunities: readonly NetworkOpportunity[]
 ): NetworkOpportunity[] {
@@ -27,12 +20,6 @@ export function dropSharedSurplus(
   return opportunities.filter((opportunity) => keep.has(opportunity));
 }
 
-/**
- * A quick win must be doable within one system: drop wins that draw on a
- * colony's surplus in another system (that is a haul, not a quick win). A
- * source whose system is unknown is dropped too. Run before
- * `dropSharedSurplus` so a dropped win claims no surplus.
- */
 export function dropOtherSystemSurplus(
   opportunities: readonly NetworkOpportunity[],
   systemOf: ReadonlyMap<number, number>

@@ -30,7 +30,6 @@ const row = (
     blueprintSource: productTypeID === 200 ? 'owned' : 'contract',
     priceCapped: productTypeID === 300,
     iskPerHour: 1_000_000,
-    // Gamma is the expensive build, for the build-cost cap.
     buildCost: productTypeID === 300 ? 500_000_000 : 5_000_000,
     orderDepth: 'deep',
     marginPct: 18.4,
@@ -52,12 +51,8 @@ const hookState = vi.hoisted(() => ({
   skills: new Map() as ReadonlyMap<number, Record<number, number>>,
 }));
 vi.mock('@/lib/useIsPhone', () => ({ useIsPhone: () => hookState.isPhone }));
-// Below `md` (`useIsNarrow`) is where `FilterBar` turns into its sheet and
-// the panel moves the funnel into its title bar; the test's phone is both.
 vi.mock('@/lib/useIsNarrow', () => ({ useIsNarrow: () => hookState.isPhone }));
-// Below `lg` the ranking is cards rather than the table.
 vi.mock('@/lib/useIsDesktop', () => ({ useIsDesktop: () => !hookState.isPhone }));
-// Beta sells 1 a day, Gamma 50 — once the filter asks.
 vi.mock('./useDailySales', () => ({
   useDailySales: (_ids: readonly number[], _regionId: number, enabled: boolean) => ({
     sales: enabled
@@ -69,7 +64,6 @@ vi.mock('./useDailySales', () => ({
     pending: 0,
   }),
 }));
-// Beta's price sits 25% over its 90-day median; Gamma's history is too thin to say.
 vi.mock('./usePriceVsMedian', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./usePriceVsMedian')>()),
   usePriceVsMedian: () => ({
@@ -93,8 +87,6 @@ vi.mock('./useMarketWideOpportunities', () => ({
     run: hookState.run,
   }),
 }));
-// Pages of 5, not 200: a few hundred real rows time out in jsdom. The 200
-// itself is pinned in `marketWidePage.test.ts`.
 vi.mock('./marketWidePage', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./marketWidePage')>()),
   MARKET_WIDE_PAGE_SIZE: 5,
@@ -107,7 +99,6 @@ vi.mock('@/features/market/useTradeHubStandings', () => ({
   tradeHubStanding: () => undefined,
 }));
 
-// Only Widget Beta has a catalog entry; Widget Gamma has none.
 const catalog = {
   entries: [],
   byBlueprintTypeID: new Map(),
@@ -250,7 +241,6 @@ describe('MarketWideOpportunitiesPanel skill gate chips', () => {
       renderPanel(fakeItemActions(), ['/'], undefined, { catalog: gatedCatalog });
       expect(screen.queryByText('2 skills short')).not.toBeInTheDocument();
       expect(screen.getByText('3 skills short')).toBeInTheDocument();
-      // Quiet is still a control: the popover is one click away.
       expect(screen.getAllByRole('button', { name: /2 skills short/ })).toHaveLength(3);
     } finally {
       hookState.skills = new Map();
@@ -367,8 +357,6 @@ describe('MarketWideOpportunitiesPanel filters: skill gate, mid-scan, phone', ()
       const header = scan.closest('header')!;
       expect(header).toContainElement(filters);
       expect(screen.getAllByRole('button', { name: /Filters/ })).toHaveLength(1);
-      // `IconButton size="sm"` and `Button size="sm"` share one control tier:
-      // 36px on a phone, 28px with a pointer.
       expect(filters).toHaveClass('size-9', 'md:size-7');
       expect(scan).toHaveClass('h-9', 'md:h-7');
     } finally {
@@ -442,7 +430,6 @@ describe('MarketWideOpportunitiesPanel paging', () => {
   });
 
   it('cuts the page from the whole ranking under the URL sort, not the ISK/hour top page', () => {
-    // Widget 9 is outside the ISK/hour top 5 but the cheapest build.
     hookState.rows = many(12).map((r, i) => (i === 9 ? { ...r, buildCost: 1 } : r));
     renderPanel(undefined, ['/?marketWide.sort=buildCost:asc']);
     expect(screen.getByText('Widget 9')).toBeInTheDocument();
@@ -534,7 +521,6 @@ describe('MarketWideOpportunitiesPanel ISK/day', () => {
     hookState.rows = null;
   });
 
-  // Beta sells 1/day, Gamma 50/day, Delta is unread; every job builds 24/day.
   const threeRows = () => [
     row(200, 'Widget Beta'),
     row(300, 'Widget Gamma'),
@@ -669,7 +655,6 @@ describe('MarketWideOpportunitiesPanel offline', () => {
     await user.click(scan);
     expect(hookState.run).not.toHaveBeenCalled();
     await user.hover(scan);
-    // No open delay (`delayDuration={0}`), but a loaded CI runner can take over the default 1 s.
     expect(await screen.findByRole('tooltip', {}, { timeout: 3000 })).toHaveTextContent(
       'Needs a connection'
     );

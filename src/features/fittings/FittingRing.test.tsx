@@ -14,7 +14,6 @@ import { FittingItemActionsProvider, type FittingItemActions } from './fittingIt
 import { fakeItemActions } from './__fixtures__/itemActions';
 import { resolveFittingView } from './fittingViewPreference';
 
-/** A drop carrying this app's marker, with `payload` as the drag in progress. */
 function dropWith(payload: FittingDragPayload) {
   useFittingDrag.setState({ payload });
   return { dataTransfer: { types: [FITTING_DRAG_TYPE], dropEffect: 'none' } };
@@ -55,7 +54,6 @@ describe('FittingRing', () => {
   it('seats a T3’s subsystems on the band, which drops the outlines of positions it lacks', () => {
     const { container, rerender } = render(<FittingRing fitting={fitting} stats={statsWith(10)} />);
     const subsystem = screen.getByLabelText(/^Subsystems 1, /);
-    // On the band: turned with the ring like every other tile, not in a row beneath it.
     expect(subsystem.closest('[style*="rotate"]')).not.toBeNull();
     expect(screen.queryByText('Subsystems')).toBeNull();
     const outlines = () => container.querySelectorAll('span[aria-hidden="true"][style*="rotate"]');
@@ -127,10 +125,8 @@ describe('FittingRing', () => {
     expect(onSlotSelect).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: /^High slots\s*1 \/ 3$/ }));
     expect(onRackOpen).toHaveBeenCalledWith('high');
-    // A T3's subsystems get a sheet of their own.
     fireEvent.click(screen.getByRole('button', { name: /^Subsystems\s*0 \/ 5$/ }));
     expect(onRackOpen).toHaveBeenCalledWith('subsystem');
-    // The overview carries the two budgets that gate a fit, above the rack buttons.
     expect(screen.getByRole('meter', { name: 'CPU' })).toBeTruthy();
     expect(screen.getByRole('meter', { name: 'Powergrid' })).toBeTruthy();
     expect(screen.queryByRole('meter', { name: 'Calibration' })).toBeNull();
@@ -179,7 +175,6 @@ describe('FittingRing', () => {
   });
 
   it('caps the ring by the room its column leaves after the readouts', () => {
-    // Column top 0; the ring 100px down (tabs and panel header); the readouts end 200px under it.
     const rects = new Map<string, Partial<DOMRect>>([
       ['column', { top: 0, bottom: 900 }],
       ['ring', { top: 100, bottom: 500 }],
@@ -204,7 +199,6 @@ describe('FittingRing', () => {
     );
     spy.mockRestore();
     const style = container.querySelector<HTMLElement>('.aspect-square')!.getAttribute('style');
-    // Never past the first-load bound, nor the pinned column less 100 above + 200 below.
     expect(style).toContain('calc(100dvh - 24rem)');
     expect(style).toContain('var(--ring-room, 100dvh) - 300px');
   });
@@ -235,7 +229,6 @@ describe('FittingRing', () => {
     const powergrid = container.querySelector('[data-gauge="powergrid"]')!;
     expect(cpu).not.toBeNull();
     expect(powergrid).not.toBeNull();
-    // Told apart by form, not only by side: powergrid's band is dashed.
     expect(powergrid.querySelector('path[stroke-dasharray]')).not.toBeNull();
     expect(cpu.querySelector('path[stroke-dasharray]')).toBeNull();
 
@@ -307,7 +300,6 @@ describe('FittingRing', () => {
         ?.getAttribute('data-charge-pip');
     expect(pipOf('high-0')).toBe('loaded');
     expect(pipOf('high-1')).toBe('empty');
-    // A module that takes no charge, and an empty slot, get no pip at all.
     expect(pipOf('low-0')).toBeUndefined();
     expect(pipOf('high-2')).toBeUndefined();
   });
@@ -340,7 +332,6 @@ describe('FittingRing', () => {
     );
     expect(screen.getByLabelText('High slots 2, empty')).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByLabelText('High slots 3, empty')).toHaveAttribute('aria-pressed', 'false');
-    // A fitted tile opens its module rather than toggling, so it is no pressed button.
     expect(screen.getByLabelText(/^High slots 1: .*, active$/)).not.toHaveAttribute('aria-pressed');
   });
 
@@ -364,7 +355,6 @@ describe('FittingRing', () => {
         typeName={(typeId) => (typeId === 209 ? 'Scourge Heavy Missile' : '')}
       />
     );
-    // The badge's own "1.5K" is part of the name, so it can be spoken to select it.
     expect(screen.getByLabelText('Scourge Heavy Missile ×1,535 (1.5K)')).toHaveTextContent('1.5K');
   });
 
@@ -380,7 +370,6 @@ describe('FittingRing', () => {
     expect(turrets.querySelectorAll('circle')).toHaveLength(3);
     expect(turrets.querySelectorAll('circle.fill-accent')).toHaveLength(2);
     expect(container.querySelectorAll('[data-hardpoints="launcher"] circle')).toHaveLength(2);
-    // The same numbers as text, for a screen reader or a keyboard — the rim is a picture.
     expect(screen.getByText('Turret hardpoints: 2 of 3 used')).toBeTruthy();
     expect(screen.getByText('Launcher hardpoints: 0 of 2 used')).toBeTruthy();
 
@@ -425,13 +414,11 @@ describe('FittingRing', () => {
         typeName={(typeId) => `Type ${typeId}`}
       />
     );
-    // The rim's icon heading each kind's pips says it; the tiles carry no icon of their own.
     expect(
       container.querySelector('[data-ring-slot] img[src*="/images/fitting/hardpoint-"]')
     ).toBeNull();
     expect(screen.getByLabelText(/^High slots 1: .*, active, turret hardpoint$/)).toBeTruthy();
     expect(screen.getByLabelText(/^High slots 2: .*, active, launcher hardpoint$/)).toBeTruthy();
-    // A utility high (a neut, a cloak) takes no hardpoint.
     expect(screen.getByLabelText(/^High slots 3: .*, active$/)).toBeTruthy();
 
     fireEvent.pointerMove(container.querySelector('[data-ring-slot="high-1"]')!, {
@@ -452,7 +439,6 @@ describe('FittingRing', () => {
     expect(
       container.querySelectorAll('[data-hardpoints="turret"] circle.fill-danger')
     ).toHaveLength(1);
-    // Not by colour alone.
     expect(
       screen.getByText('Turret hardpoints: 2 of 1 used — 1 more than the hull has')
     ).toBeTruthy();
@@ -491,24 +477,19 @@ describe('FittingRing with the editor’s item actions', () => {
     const actions = fakeItemActions({ names });
     const onSlotSelect = vi.fn();
     renderRing(actions, { onSlotSelect });
-    // A mouse click carries detail 1: the active autocannon goes to overload.
     fireEvent.click(screen.getByLabelText(/^High slots 1: .*, active/), { detail: 1 });
     expect(actions.setState).toHaveBeenCalledWith('high', 0, 'overload');
-    // The passive module tops out at online, so its click wraps to offline.
     fireEvent.click(screen.getByLabelText(/^Low slots 1: .*, online/), { detail: 1 });
     expect(actions.setState).toHaveBeenCalledWith('low', 0, 'offline');
     expect(onSlotSelect).not.toHaveBeenCalled();
-    // Enter/Space arrive as a click with no detail: they keep selecting.
     fireEvent.click(screen.getByLabelText(/^High slots 1: .*, active/));
     expect(onSlotSelect).toHaveBeenCalledWith('high', 0);
-    // The keyboard cycles with S.
     fireEvent.keyDown(screen.getByLabelText(/^Low slots 1: .*, online/), { key: 's' });
     expect(actions.setState).toHaveBeenCalledTimes(3);
   });
 
   it('never recolours a state-bearing tile’s border on hover', () => {
     renderRing(fakeItemActions({ names }), { onSlotSelect: vi.fn() });
-    // The border colour is the module's state; hover would read as a state change.
     expect(screen.getByLabelText(/^High slots 1: .*, active/).className).not.toMatch(
       /hover:border/
     );
@@ -516,9 +497,7 @@ describe('FittingRing with the editor’s item actions', () => {
     expect(screen.getByLabelText(/^High slots 1: .*, active/).className).toMatch(
       /\bborder-success\b/
     );
-    // An empty slot has no state to confuse, so it keeps its hover.
     expect(screen.getByLabelText(/^Mid slots 1, empty/).className).toMatch(/hover:border-accent/);
-    // The keyboard focus ring stays.
     expect(screen.getByLabelText(/^High slots 1: .*, active/).className).toMatch(/focus-visible/);
   });
 
@@ -696,12 +675,10 @@ describe('FittingRing with the editor’s item actions', () => {
       'opacity-35'
     );
 
-    // A dim tile doesn't take it, so it falls through to the ring, which places it.
     fireEvent.drop(screen.getByLabelText(/^Low slots 1: .*, online$/), dropWith(payload));
     expect(actions.drop).toHaveBeenCalledWith(payload, { kind: 'ring' }, undefined);
     vi.mocked(actions.drop).mockClear();
 
-    // jsdom has no DragEvent, so the drop can't carry altKey on its own.
     const target = screen.getByLabelText(/^High slots 1: .*, active$/);
     const altDrop = createEvent.drop(target, dropWith(payload));
     Object.defineProperty(altDrop, 'altKey', { value: true });
@@ -717,12 +694,10 @@ describe('FittingRing with the editor’s item actions', () => {
     const actions = fakeItemActions({ names });
     renderRing(actions, { onDropType: vi.fn() });
     const medium: FittingDragPayload = { kind: 'type', typeId: 99, rack: 'medium' };
-    // Over a low tile, which doesn't take a mid-slot module.
     fireEvent.drop(screen.getByLabelText(/^Low slots 1: .*, online$/), dropWith(medium));
     expect(actions.drop).toHaveBeenCalledWith(medium, { kind: 'ring' }, undefined);
     vi.mocked(actions.drop).mockClear();
 
-    // The one low slot is taken: nowhere to go.
     const low: FittingDragPayload = { kind: 'type', typeId: 98, rack: 'low' };
     fireEvent.drop(screen.getByLabelText('High slots 2, empty'), dropWith(low));
     expect(actions.drop).not.toHaveBeenCalled();
@@ -759,7 +734,6 @@ describe('FittingRing with the editor’s item actions', () => {
     const payload = useFittingDrag.getState().payload;
     expect(payload).toEqual({ kind: 'type', typeId: 12, rack: 'high', fromCargo: true });
 
-    // Onto a high slot: through the page's drop, which takes it off the stack.
     fireEvent.drop(screen.getByLabelText('High slots 2, empty'), dropWith(payload!));
     expect(onDropType).not.toHaveBeenCalled();
     expect(actions.drop).toHaveBeenCalledWith(

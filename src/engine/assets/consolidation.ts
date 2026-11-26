@@ -1,19 +1,9 @@
-/**
- * Consolidation Plan: what each Character would have to move to bring their
- * loose hangar stock to one destination, with the packaged volume to haul.
- *
- * Pure — the caller loads the assets, the per-unit volumes and the saved Cargo
- * Space. The result is a Cargo-Space-based estimate, never a safety verdict.
- */
-
-/** The slice of an ESI asset row this plan reads. */
 export interface ConsolidationAsset {
   itemId: number;
   typeId: number;
   quantity: number;
   locationId: number;
   locationType: 'station' | 'solar_system' | 'item' | 'other';
-  /** Assembled items (ships, rigged gear) are not cargo. */
   isSingleton: boolean;
 }
 
@@ -26,34 +16,27 @@ export interface ConsolidationCharacter {
 export interface ConsolidationLine {
   typeId: number;
   quantity: number;
-  /** `null` when the type's volume is unknown. */
   m3: number | null;
 }
 
 export interface ConsolidationCharacterPlan {
   characterId: number;
   name: string;
-  /** Largest volume first; unknown-volume lines last. */
   lines: ConsolidationLine[];
   totalM3: number;
-  /** Types whose volume is unknown — `totalM3` is then a floor. */
   unknownTypeCount: number;
 }
 
 export interface ConsolidationPlan {
-  /** Only Characters with something to move. */
   perCharacter: ConsolidationCharacterPlan[];
   totalM3: number;
-  /** `ceil(totalM3 / holdsCapacityM3)`; null without a Cargo Space or without volume. */
   trips: number | null;
 }
 
-/** Hangar stock only: not assembled, not in a container/ship, not in space. */
 export function isHangarStock(a: ConsolidationAsset): boolean {
   return !a.isSingleton && a.locationType !== 'item' && a.locationType !== 'solar_system';
 }
 
-/** One line of the plan: `m3` is `null` when the type's volume is unknown. */
 export function consolidationLine(
   typeId: number,
   quantity: number,
@@ -63,7 +46,6 @@ export function consolidationLine(
   return { typeId, quantity, m3: unit === undefined ? null : unit * quantity };
 }
 
-/** `ceil(totalM3 / capacityM3)`; null without a usable capacity or without volume. */
 export function tripsFor(totalM3: number, capacityM3: number | null): number | null {
   return capacityM3 !== null && capacityM3 > 0 && totalM3 > 0
     ? Math.ceil(totalM3 / capacityM3)
@@ -73,7 +55,6 @@ export function tripsFor(totalM3: number, capacityM3: number | null): number | n
 export function planConsolidation(input: {
   destinationLocationId: number;
   characters: readonly ConsolidationCharacter[];
-  /** Per-unit packaged volume (unpackaged where none) by typeID. */
   unitM3: ReadonlyMap<number, number>;
   holdsCapacityM3: number | null;
 }): ConsolidationPlan {

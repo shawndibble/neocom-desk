@@ -1,20 +1,7 @@
-/**
- * The books the Corp Tax Book specs open, each built once here and shared: a spec names the
- * scenario and reads its facts (who owes what, from which day), never builds data inline.
- * Every figure follows from `bookSeed.ts`'s flat pricing: one ordinary mined day owes `DAY_TAX`.
- */
 import { snapshotThroughFor } from '../../../functions/src/corpTaxBookCheckpoint';
 import { BookSeed, DAY_TAX, day, verifyToken } from './bookSeed';
 import { MINER, OFFICER, solo } from './identities';
 
-/**
- * A book with months of history.
- *
- * - Ada mined ten days over four months. 7 days' tax came in at once a month ago, so she owes the
- *   three newest. Her August notice is settled; her November one is open.
- * - Bram mined three days in September, got a notice, and paid it exactly: paid through his last.
- * - Cora mined two days last week and has had no notice.
- */
 export function historyBook() {
   const ada = { days: [100, 99, 98, 70, 69, 40, 39, 10, 9, 8], paid: 7 * DAY_TAX };
   const notices = {
@@ -52,27 +39,18 @@ export function historyBook() {
     seed,
     notices,
     tokens,
-    /** Ada owes her three newest days. */
     adaOwes: { amount: 3 * DAY_TAX, days: 3, oldestBack: 10 },
-    /** Bram is paid through his last mined day. */
     bramPaidThroughBack: 58,
     coraOwes: { amount: 2 * DAY_TAX, days: 2, oldestBack: 5 },
   };
 }
 
-/**
- * One Miner (Ada) and one donation, to watch where money lands on the Running account. She mined
- * two ordinary days (6 and 5 days ago, `DAY_TAX` each), unless the case adds a second refinery.
- * The donation came in 2 days ago with her payment code, so the server placed it on her.
- */
 export type PaymentCase = 'exact' | 'shortWithinTolerance' | 'shortBeyondTolerance' | 'over';
 
-/** What the book's 0.5% per-day tolerance forgives on one `DAY_TAX` day. */
 export const DAY_TOLERANCE = DAY_TAX * 0.005;
 
 const PAID: Record<PaymentCase, number> = {
   exact: DAY_TAX,
-  // 4,000 short of two days: within the second day's 5,000 tolerance.
   shortWithinTolerance: 2 * DAY_TAX - 4_000,
   shortBeyondTolerance: 1.5 * DAY_TAX,
   over: 2.5 * DAY_TAX,
@@ -87,10 +65,6 @@ export function paymentBook(kind: PaymentCase) {
   return { seed, minerId, paid, oldestBack: 6, newestBack: 5 };
 }
 
-/**
- * Ada mined at two refineries on the same date (6 days ago), and one ordinary day after. One
- * donation pays exactly that date's two lines: the date settles as one, the next stays owed.
- */
 export function twoRefineriesBook() {
   const minerId = solo(MINER.ada.id);
   const seed = new BookSeed({ startBack: 30 })
@@ -109,20 +83,6 @@ export function twoRefineriesBook() {
   return { seed, minerId, sharedBack: 6, owedBack: 5 };
 }
 
-/**
- * The book an officer works through: one Miner per action, so each test reads one account.
- *
- * - Ada mined four days; her late notice listed the oldest three, and she declared she paid
- *   2,000,000 of it by contract (Needs you: confirm or keep the bill).
- * - Bram's 2,000,000 donation was placed on him, but it was Cora's (move it to Cora). Cora
- *   mined two days and has paid nothing.
- * - Eli is no Miner; his 3,000,000 could be Ada's or Bram's, so it waits in Needs you.
- * - Lev mined two days as a member, got a notice, and left the corp owing (write it off).
- * - Dax disputes 5,000 units of his middle day: the day is held, and his 2,000,000 pays the days
- *   either side of it (waive the disputed tax, or keep the bill).
- * - Fen mined three days; yesterday's 1,000,000 donation is already on his account (a hand
- *   record of the same transfer is refused).
- */
 export function officerBook() {
   const id = (key: keyof typeof MINER) => solo(MINER[key].id);
   const seed = new BookSeed({ startBack: 40 })
@@ -204,16 +164,6 @@ export function officerBook() {
   };
 }
 
-/**
- * Late notices from plan to verify link.
- *
- * - Cora mined eleven days, the oldest twenty days ago, and has had no notice: she is behind by
- *   the default rules (oldest unpaid 14+ days, 10,000,000+ owed), so the run plans one for her.
- * - Ada has a notice in `lateNotices` (its verify link in `lateNoticeLinks`).
- * - Bram has a notice for two days.
- * - Gale is a guest whose notice listed his first two days; two more days were never listed, so
- *   closing his account leaves a final notice to send.
- */
 export function lateNoticeBook() {
   const tokens = {
     ada: verifyToken('ada-current'),
@@ -257,12 +207,6 @@ export function lateNoticeBook() {
   };
 }
 
-/**
- * A Miner whose history passes the lock date (decision 20261120-235011, "a lock date"). Ada mined
- * three days about three months ago and two this month, and paid two days' tax then: she still
- * owes the third old day, before the lock date, and both new ones. The lock date is between 59
- * and 91 days back, so her old days and payment are always before it and her new days after it.
- */
 export function closedMonthBook(how: { checkpointed?: boolean } = {}) {
   const minerId = solo(MINER.ada.id);
   const seed = new BookSeed({ startBack: 130 }).mine(MINER.ada.id, [100, 99, 98, 20, 10]).donation({
@@ -272,7 +216,6 @@ export function closedMonthBook(how: { checkpointed?: boolean } = {}) {
     back: 95,
     minerId,
   });
-  /** The snapshot an officer's tab records for her (`RunningAccountCheckpoint`): the old day owed. */
   const checkpoint = {
     minerId,
     through: snapshotThroughFor(day(0, seed.now)),

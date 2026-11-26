@@ -1,12 +1,3 @@
-/**
- * The route Route Safety last drew, kept on this device so the Overview's
- * Route safety widget has something to read without planning a trip itself.
- *
- * Route Safety keeps its start and Stops only in the link, so "the saved
- * route" is this snapshot: the start, the Stops in the order typed, and the
- * systems the drawn trip crosses, in flight order. Device-local on purpose:
- * it is what this device last looked at, not a preference.
- */
 import { createLocalSetting } from '@/lib/useLocalSetting';
 
 export const SAVED_ROUTE_KEY = 'travel.savedRoute';
@@ -14,14 +5,12 @@ export const SAVED_ROUTE_KEY = 'travel.savedRoute';
 export interface SavedRoute {
   fromId: number;
   stops: number[];
-  /** Each system the trip crosses once, in flight order. */
   systems: number[];
 }
 
 const isId = (value: unknown): value is number =>
   typeof value === 'number' && Number.isInteger(value) && value > 0;
 
-/** A stored route, or `null` when it is not a usable one (never a half-route). */
 export function parseSavedRoute(raw: unknown): SavedRoute | null {
   if (typeof raw !== 'object' || raw === null) return null;
   const { fromId, stops, systems } = raw as Record<string, unknown>;
@@ -38,7 +27,6 @@ export const useSavedRoute = createLocalSetting<SavedRoute | null>({
   parse: parseSavedRoute,
 });
 
-/** Whether two routes are the same one, so a redraw of an unchanged route writes nothing. */
 export function sameSavedRoute(a: SavedRoute | null, b: SavedRoute | null): boolean {
   if (a === null || b === null) return a === b;
   const same = (x: readonly number[], y: readonly number[]) =>

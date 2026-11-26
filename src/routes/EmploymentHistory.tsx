@@ -36,11 +36,8 @@ import { employmentHistoryCsvColumns } from '@/features/character/employmentHist
 interface Snapshot {
   historyResult: CachedResult<CorporationHistoryEntry[]> | null;
   corpNames: Map<number, string>;
-  /** Captured in the loader, not at render: `Date.now()` is impure and React forbids it in render/useMemo. */
   loadedAt: number;
 }
-
-/** Stable identity, so the fallback doesn't invalidate the column memo every render. */
 
 async function loadEmploymentHistorySnapshot(
   characterId: number,
@@ -48,7 +45,6 @@ async function loadEmploymentHistorySnapshot(
 ): Promise<Snapshot> {
   const historyResult = await loadEmploymentHistory(characterId);
   const loadedAt = Date.now();
-  // Already superseded: skip the name lookup, its result would be discarded.
   const corporationIds = signal.cancelled
     ? []
     : (historyResult?.data ?? []).map((entry) => entry.corporation_id);
@@ -56,7 +52,6 @@ async function loadEmploymentHistorySnapshot(
   return { historyResult, corpNames, loadedAt };
 }
 
-/** Employment History: a character's corporation history. Public endpoint, no scope, no re-auth. */
 export function EmploymentHistory() {
   const { t } = useTranslation();
   const { data, error, loading, hydrated, activeCharacterId, refresh } = useRouteSnapshot(
@@ -72,8 +67,6 @@ export function EmploymentHistory() {
   const historyResult = data?.historyResult ?? null;
   const corpNames = data?.corpNames ?? NO_NAMES;
 
-  // Falls back to 0 when nothing has loaded yet: `historyResult` is null then too,
-  // so `deriveEmploymentHistoryRows` receives no entries and the value is unused.
   const loadedAt = data?.loadedAt ?? 0;
   const rows = useMemo(
     () => deriveEmploymentHistoryRows(historyResult?.data ?? [], loadedAt),
@@ -97,11 +90,6 @@ export function EmploymentHistory() {
 
   return (
     <div className="mx-auto max-w-page space-y-4">
-      {/*
-        The header carries this tab's Refresh and export (level with the bell, at
-        the bell's size), as the Overview's does; its data age sits on the tab row. They stay here in
-        the empty and failed states too: those are the ones a Refresh is for. No SP: this tab has no use for it.
-      */}
       <CharacterHeader
         characterId={activeCharacterId}
         actions={

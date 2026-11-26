@@ -23,14 +23,6 @@ function fire(overrides: Partial<EveNotificationFire> = {}): EveNotificationFire
 
 const CHARACTER = { name: 'Test Pilot' };
 
-/**
- * The generic body is the one that says only "a notification arrived" — so its
- * own opening phrase is what distinguishes a real body from the fallback, and
- * is the shape AC1 asks for. Matched on the phrase rather than on the `type`,
- * because the generic body no longer spells the type out: it names it in words
- * now (`eveTypeLabel.ts`), so a raw identifier reaching a body is a
- * regression, not a fallback — which is why both helpers assert its absence.
- */
 const GENERIC_BODY_PHRASE = 'received a new EVE notification';
 
 function expectTheGenericBody(body: string, type: string): void {
@@ -56,15 +48,10 @@ describe('eveNotificationText', () => {
   });
 
   it('renders generically for a type this catalog has never heard of, without throwing (AC2)', () => {
-    // In production `foregroundPoller.ts` drops anything off the allow-list
-    // before it reaches here, so this type can't actually occur — but the
-    // function stays defensive rather than assuming its caller.
     expect(() =>
       eveNotificationText(fire({ type: 'SomeBrandNewMsgType6041' }), CHARACTER)
     ).not.toThrow();
     const { body } = eveNotificationText(fire({ type: 'SomeBrandNewMsgType6041' }), CHARACTER);
-    // Spaced out by `humanizeEveType`, never the raw identifier: a type with no
-    // catalog entry still reaches the tray as a phrase a reader can parse.
     expectTheGenericBody(body, 'SomeBrandNewMsgType6041');
     expect(body).toContain('Some Brand New Msg Type 6041');
   });
@@ -74,11 +61,6 @@ describe('eveNotificationText', () => {
   });
 });
 
-/**
- * Issue #300 AC2, checked across the whole rendered set rather than per type:
- * whatever CCP reshapes a payload into, the notification still arrives, still
- * names the character, and never carries a raw i18n key or an `undefined`.
- */
 describe('eveNotificationText — a payload it cannot read never costs the notification', () => {
   const HOSTILE_PAYLOADS: ReadonlyArray<[string, string]> = [
     ['an empty payload', ''],
@@ -104,7 +86,6 @@ describe('eveNotificationText — a payload it cannot read never costs the notif
   }
 
   it('falls back to the generic body when a required field is missing', () => {
-    // BillOutOfMoneyMsg needs a due date; `amount` alone is a truncated payload.
     const { body } = eveNotificationText(
       fire({ type: 'BillOutOfMoneyMsg', text: 'amount: 1\n' }),
       CHARACTER
@@ -122,7 +103,6 @@ describe('eveNotificationText — a payload it cannot read never costs the notif
       }),
       CHARACTER
     );
-    // Still specific about the structure — only the timer is dropped.
     expect(body).toContain('structure #1000000000001');
     expect(body).not.toContain('Invalid Date');
   });
@@ -228,7 +208,6 @@ describe('eveNotificationText — structures', () => {
     const { title, body } = eveNotificationText(
       fire({
         type: 'StructureLostShields',
-        // 1727805401093 ticks is ~2 days after the fire instant.
         text: `${STRUCTURE_PAYLOAD}timeLeft: 1727805401093\ntimestamp: 132148470780000000\nvulnerableTime: 9000000000\n`,
         timestamp: '2026-09-03T00:00:00Z',
       }),
@@ -238,8 +217,6 @@ describe('eveNotificationText — structures', () => {
     expect(title).toBe('Structure reinforced');
     expect(body).toContain("Athanor 'Chunk Line 3'");
     expect(body).toContain('shields');
-    // Timezone-independent: two days on from 2026-09-03 lands in 2026-09-05
-    // in every zone the runner might be in.
     expect(body).toMatch(/2026-09-0[456]/);
   });
 
@@ -335,8 +312,6 @@ describe('eveNotificationText — moon mining', () => {
     expect(body).toContain('fractured');
   });
 
-  // Issue #4058: the drill's start, firing and cancellation, so the Corp Tax
-  // Book's Extraction timeline is exact (epic #4055, D14).
   it('MoonminingExtractionStarted names the refinery and when the chunk arrives', () => {
     const { title, body } = eveNotificationText(
       fire({
@@ -424,8 +399,6 @@ describe('eveNotificationText — bills', () => {
   });
 
   it('CorpOfficeExpirationMsg says what happened even when CCP sends no fields at all', () => {
-    // No public schema and no public sample exists for this type, so the plain
-    // sentence is the floor rather than a degraded state.
     const { title, body } = eveNotificationText(
       fire({ type: 'CorpOfficeExpirationMsg', text: '' }),
       CHARACTER

@@ -7,16 +7,6 @@ import type { StatChangeKey } from '@/engine/fittings/variationDelta';
 import { PreviewedFigure } from './statPreview';
 import { STAT_DETAIL, STAT_EYEBROW, statRowClassName } from './statKit';
 
-/**
- * One figure as `format` shows it. Under "Overheat all" it reads in the
- * warning tone — the game's own mark for heat — only when heat changed it as
- * shown, with the unheated figure in a tooltip (`HintText`); a figure heat
- * leaves as it is (a hold, the mass, a fitting budget) stays in the normal
- * tone. `note` joins the unheated figure in the tooltip, or stands alone as
- * it when heat changed nothing. `toneClassName` tints the figure by its own
- * reading (the capacitor's stability) and then wins over the heat tone; the
- * unheated figure still shows in the tooltip.
- */
 export function HeatFigure<S extends { unheated: S | null }>({
   keys,
   ...props
@@ -25,7 +15,6 @@ export function HeatFigure<S extends { unheated: S | null }>({
   format: (stats: S) => string;
   note?: string;
   toneClassName?: string;
-  /** The stats this figure shows: a previewed change to one reads `<current> → <after>` instead. */
   keys?: readonly StatChangeKey[];
 }) {
   return (
@@ -76,7 +65,6 @@ const NOTE_TONE = {
   danger: 'text-danger',
 } as const;
 
-/** A footnote, a hint or an empty state (a short list, too): dim 11px, or a status tone. */
 export function StatNote({
   tone = 'dim',
   children,
@@ -87,7 +75,6 @@ export function StatNote({
   return <div className={`text-[0.6875rem] ${NOTE_TONE[tone]}`}>{children}</div>;
 }
 
-/** A labelled run of rows or facts inside a section ("Local tank", "Compression"). */
 export function StatGroup({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="space-y-1.5">
@@ -98,23 +85,16 @@ export function StatGroup({ label, children }: { label: string; children: ReactN
 }
 
 export interface StatRowProps {
-  /** What the row is: "4× Heavy Assault Missile Launcher II". Takes the full width, wrapping if it must. */
   name: ReactNode;
-  /** Dim beneath the name: its charge, range, cycle (`joinDetail`). */
   detail?: ReactNode;
-  /** The whole detail line is a warning ("Projects nothing"). */
   detailTone?: 'warning';
-  /** The row's figure — or its controls — at the right of the detail line. */
   figure?: ReactNode;
-  /** A control at the end of the name line (the row's ⋮). */
   action?: ReactNode;
-  /** One line: the figure beside the name, for a row with nothing to detail (a total). */
   inline?: boolean;
 }
 
 const FIGURE = 'max-w-[60%] shrink-0 text-right tabular-nums';
 
-/** A row's two lines: the name across the top, then the detail with the figure at its right. */
 export function StatRowContent({
   name,
   detail,
@@ -159,31 +139,22 @@ export function StatRow(props: StatRowProps) {
   );
 }
 
-/** A list of things the fit carries — weapons, remote modules, miners, bursts — one row each. */
 export function StatRows({ children }: { children: ReactNode }) {
   return <ul className="flex flex-col text-xs">{children}</ul>;
 }
 
-/**
- * The pickers at the top of a section, as a two-column grid of `StatField`s:
- * labels in one column, controls lined up in the other. The stats column's
- * name for the shared `Fields` grid, in its `compact` look.
- */
 export function StatFields({ children }: { children: ReactNode }) {
   return <Fields variant="compact">{children}</Fields>;
 }
 
-/** One labelled control in a `StatFields` grid; see `Field`. */
 export const StatField = Field;
 
 export interface Fact {
-  /** Tells two facts with the same label apart (two of one repairer); the label otherwise. */
   id?: string;
   label: string;
   value: ReactNode;
 }
 
-/** Label-over-value pairs, two to a row — the compact body most stats sections use. */
 export function Facts({ items }: { items: Fact[] }) {
   return (
     <dl className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs tabular-nums">

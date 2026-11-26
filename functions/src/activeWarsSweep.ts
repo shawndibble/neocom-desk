@@ -1,9 +1,3 @@
-/**
- * The active-wars sweep: reads ESI's war list and the wars it holds open. The
- * planning is `activeWars.ts`; this is the fetching, with `read`, `write` and
- * `fetchImpl` injected so it runs against fakes. Free of Firestore and firebase-admin, so the GitHub Actions
- * runner (publicDataActiveWars.ts) can use it.
- */
 import { info as logInfo, warn as logWarn } from 'firebase-functions/logger';
 import {
   ACTIVE_WARS_HORIZON_IDS,
@@ -16,16 +10,11 @@ import {
 } from './activeWars.js';
 import { ESI_BASE, esiHeaders } from './esiClient.js';
 
-/** Detail reads in one run. Each costs 2 of the 3,600 tokens ESI gives this route per 15 minutes. */
 export const ACTIVE_WARS_RUN_BUDGET = 1500;
-/** Stop reading when ESI says this few tokens are left, so the window is never emptied. */
 const MIN_TOKENS_LEFT = 300;
 const CONCURRENCY = 8;
-/** Share of held wars that must read again for `updatedAt` to move. */
 const OPEN_CONFIRMED_SHARE = 0.95;
-/** Open wars past this and one doc, or one run's reads, start to strain. */
 const OPEN_WARS_WARN_AT = 1000;
-/** `/wars` pages are 2,000 ids, so the horizon is about six. */
 const MAX_LIST_PAGES = 10;
 
 export interface ActiveWarsDoc extends SweepState {
@@ -38,7 +27,6 @@ export interface ActiveWarsDeps {
   read: () => Promise<ActiveWarsDoc | undefined>;
   write: (
     doc: Required<Pick<ActiveWarsDoc, 'updatedAt'>> & { wars: StoredWar[] } & SweepState,
-    /** `complete`: the sweep has read back to the horizon, so `wars` is the whole open list. */
     progress: { complete: boolean }
   ) => Promise<void>;
   now: () => number;
@@ -55,7 +43,6 @@ export interface ActiveWarsOutcome {
 
 const headers = esiHeaders();
 
-/** Every war id back to the horizon, newest first; null when ESI would not say. */
 async function listWarIds(fetchImpl: typeof fetch): Promise<number[] | null> {
   const ids: number[] = [];
   let maxWarId: number | undefined;
@@ -130,14 +117,11 @@ export async function runActiveWarsSweep(deps: ActiveWarsDeps): Promise<ActiveWa
           done.add(id);
           removed.push(id);
         } else if (res.ok) {
-          // A body that is not a war will not be one next run either: done, not stored.
           const war = parseEsiWar(await res.json().catch(() => null));
           if (war !== null) fetched.push(war);
           done.add(id);
         }
-      } catch {
-        // A failed read is left undone: the next run tries it again.
-      }
+      } catch {}
     }
   }
   await Promise.all(Array.from({ length: CONCURRENCY }, worker));
@@ -145,10 +129,6 @@ export async function runActiveWarsSweep(deps: ActiveWarsDeps): Promise<ActiveWa
   const at = now();
   const wars = mergeOpenWars(held, fetched, removed, at);
   const next = advanceSweep(listed, state, plan, done);
-  // The list is "confirmed now" when nearly every war it holds was read again,
-  // so one war ESI will not serve cannot freeze the list for everyone; an
-  // outage or a spent rate window reads few and does not confirm. A new id that
-  // would not read is retried next run and does not age the rest.
   const openRead = plan.openIds.filter((id) => done.has(id)).length;
   const openConfirmed = openRead >= plan.openIds.length * OPEN_CONFIRMED_SHARE;
   const updatedAt = openConfirmed ? at : (doc?.updatedAt ?? 0);

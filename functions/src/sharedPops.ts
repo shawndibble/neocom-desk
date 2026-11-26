@@ -1,9 +1,3 @@
-// Shared Pops (issue #6223; scope: docs/context/decisions/20261115-122511-corp-tax-book-shares-
-// moon-pop-schedules.md; storage: docs/adr/0034-shared-pops-are-a-server-only-read-model-read-
-// through-a-callable.md). The pure half: which of a book's Extractions are published, at what Pop
-// Time and until when, who may read each one, and the Community officer rule. Firestore and ESI
-// stay in sharedPopsStore.ts.
-
 import { DEFAULT_EXPIRY_HOURS, MAX_EXPIRY_HOURS } from './corpTaxBookEngine.js';
 import {
   audienceKey,
@@ -14,24 +8,14 @@ import {
 } from './popSharing.js';
 import { DAY_MS, HOUR_MS, MINUTE_MS } from './timeConstants.js';
 
-/** `sharedPops/{corporationId}`: one server-only doc per sharing book. */
 export const SHARED_POPS = 'sharedPops';
-/**
- * `sharedPopSources/{corporationId}`: server-only inputs kept for publishing: the book's
- * last-editor-use stamps (`editors`) and its own refineries' names (`refineries`).
- */
 export const SHARED_POP_SOURCES = 'sharedPopSources';
-/** `communities/{id}/popSharingBlocks/{corporationId}`: a Community admin's block. */
 export const POP_SHARING_BLOCKS = 'popSharingBlocks';
 
-/** A pop stays listed this long past its belt expiry, so a moon nobody marked finished still nags. */
 export const POP_RETAIN_MS = 3 * DAY_MS;
-/** Share of the chunk the ledger must show mined before the pop reads "likely mined out". */
 export const LIKELY_MINED_OUT_PCT = 90;
-/** How long the mined figure must hold still before the pop reads "likely mined out". */
 export const MINED_QUIET_MS = 30 * MINUTE_MS;
 
-/** An officer counts for a Community share this long after their last editing use of the book. */
 export const OFFICER_WINDOW_MS = 30 * DAY_MS;
 
 export interface OreLine {
@@ -39,7 +23,6 @@ export interface OreLine {
   quantity: number;
 }
 
-/** What the builder needs of one stored Extraction. */
 export interface PopExtraction {
   id: string;
   structureId: number;
@@ -49,113 +32,59 @@ export interface PopExtraction {
   naturalDecayTime: string;
   laserFiredAt?: string;
   cancelledAt?: string;
-  /** Set on a moon owner's Extraction: that owner's corporation. */
   sourceCorporationId?: number;
-  /** The chunk's make-up in units, when known (the stored `oreLines`). */
   oreLines?: readonly OreLine[];
-  /** The Survey an officer linked as the chunk's ore source (a Share Link id). */
   surveyId?: string;
-  /** An officer's Fully Mined flag on the Extraction. */
   fullyMined?: { byName: string; at: string };
-  /** Ore units the book's ledger rows stamped with this Extraction show mined. */
   minedQty?: number;
 }
 
-/** One published pop. Never carries ISK. */
 export interface SharedPop {
-  /** `{corporationId}_{extractionId}`: the deep-link id. */
   id: string;
   extractionId: string;
   moonId: number;
   structureId: number;
-  /** The refinery's name as the book knows it; null when it knows none. */
   refineryName: string | null;
   solarSystemId: number | null;
   popTime: PopTime;
-  /** ISO instant the pop shows: the chunk's arrival or its natural decay, or the actual fracture. */
   popAt: string;
-  /**
-   * Both instants whatever the officer chose, so each viewer picks theirs. After an early
-   * fracture both are the actual time. Absent from a doc published before they existed: read
-   * `popAt`.
-   */
   readyAt?: string;
   autoFractureAt?: string;
-  /** Whether the chunk was already fractured (popAt is then the actual time). */
   fractured: boolean;
   startedAt: string;
-  /** ISO instant the belt is Expired: the pop is dropped then. */
   expiresAt: string;
-  /** ISO instant the pop is dropped: `POP_RETAIN_MS` past `expiresAt`. Absent: `expiresAt`. */
   retainUntil?: string;
-  /** The officer's Fully Mined flag, when set. */
   fullyMined?: { byName: string; at: string };
-  /** Share of the chunk's ore the ledger shows mined, whole percent; absent without both. */
   minedPct?: number;
-  /** The ledger's mined ore units and when that figure last changed (epoch ms): the quiet test. */
   minedQty?: number;
   minedChangedAt?: number;
-  /** At least 90% mined and quiet for 30 minutes. A guess, never set once flagged. */
   likelyMinedOut?: boolean;
-  /** Null when the settings hide the ore make-up, or the book does not know it. */
   ore: OreLine[] | null;
-  /**
-   * Whether the settings share the ore make-up, so a null `ore` reads as "unknown" rather than
-   * "not shared" (issue #6239). Absent from a doc published before it existed.
-   */
   oreShared?: boolean;
   notes: string;
-  /**
-   * The Survey linked to this pop (a Share Link id); absent when none, and whenever the settings
-   * hide the ore make-up. The id is the Survey's only privacy, so it goes only where the ore does.
-   */
   surveyId?: string;
-  /** The start link's rate. */
   ratePct: number;
-  /** `audienceKey`s of who may read it. */
   audiences: string[];
-  /**
-   * The moon owner's corporation, on a moon owner's pop: a read drops it at once when that owner
-   * opts out or the book stops handling it. Absent on the book's own pops, and on a doc published
-   * before it existed. Never sent to a viewer.
-   */
   ownerCorporationId?: number;
 }
 
-/**
- * One Shared Pop as a viewer receives it (`listSharedPopsCallable`): no audience list, plus who
- * shares it and the data's age. The client's read seam is `src/sync/sharedPops.ts`.
- */
 export type SharedPopView = Omit<
   SharedPop,
   'audiences' | 'ownerCorporationId' | 'minedPct' | 'minedQty' | 'minedChangedAt'
 > & {
-  /** The book's corporation: the start link's payee, and the filter by sharing corporation. */
   corporationId: number;
   syncedAt: number | null;
-  /**
-   * Which of the caller's own Characters are in one of the pop's audiences, so the Shared Moon
-   * Pop notification goes to those Characters only (issue #6225). Absent from a server deployed
-   * before it existed: every Character then counts.
-   */
   viewerCharacterIds?: number[];
 };
 
-/** The `sharedPops/{corporationId}` doc. */
 export interface SharedPopsDoc {
-  /** The book's corporation: the Corp audience and the start link's payee. */
   corporationId: number;
-  /** The book's corporation's alliance: the Alliance audience. Null outside an alliance. */
   allianceId: number | null;
-  /** Whether any pop names the Corp / Alliance audience. */
   corpShared: boolean;
   allianceShared: boolean;
-  /** Every Community any pop names, for the array-contains query. */
   communityIds: string[];
-  /** Community names as the officers saw them, for the admin's list. */
   communityNames: Record<string, string>;
   pops: SharedPop[];
-  /** Epoch ms of the book's last sync, so a viewer sees the data's age. */
   syncedAt: number | null;
 }
 
@@ -164,33 +93,22 @@ export interface BuildSharedPopsInput {
   allianceId: number | null;
   sharing: PopSharingDoc;
   extractions: readonly PopExtraction[];
-  /** Moon owners whose moons the book handles (active), each with whether it opted out. */
   owners: ReadonlyMap<number, { optedOut: boolean }>;
-  /** Per-structure expiry hours (the book's `expiryHours`). */
   expiryHours: Readonly<Record<string, number>>;
-  /** The book's own rate for a moon, in percent. */
   bookRatePct: (x: PopExtraction) => number;
   refinery: (structureId: number) => { name: string | null; solarSystemId: number | null };
   syncedAt: number | null;
-  /** The pops last published, which carry when each mined figure last moved. */
   heldPops?: readonly SharedPop[];
-  /** Epoch ms. */
   now: number;
 }
 
-/** When the chunk fractured, or will: the laser shot, else its natural decay. */
 const fracturedAt = (x: PopExtraction): string => x.laserFiredAt ?? x.naturalDecayTime;
 
-/**
- * The instant a Shared Pop shows. Ready is the chunk's arrival, Auto-fracture its natural decay;
- * once the laser fired, both move to the actual fracture.
- */
 export function popInstant(x: PopExtraction, popTime: PopTime): string {
   if (x.laserFiredAt) return x.laserFiredAt;
   return popTime === 'ready' ? x.chunkArrivalTime : x.naturalDecayTime;
 }
 
-/** When the belt is Expired: the fracture plus the refinery's expiry (48 h, at most 96 h). */
 export function popExpiresAt(
   x: PopExtraction,
   expiryHours: Readonly<Record<string, number>>
@@ -202,7 +120,6 @@ export function popExpiresAt(
   return new Date(Date.parse(fracturedAt(x)) + hours * HOUR_MS).toISOString();
 }
 
-/** A pop exists from the Extraction's start until it is Expired; a cancelled one never. */
 export function popIsLive(
   x: PopExtraction,
   expiryHours: Readonly<Record<string, number>>,
@@ -215,7 +132,6 @@ export function popIsLive(
   return start <= now && now < end;
 }
 
-/** A pop is kept from the Extraction's start until `POP_RETAIN_MS` past its expiry. */
 export function popIsRetained(
   x: PopExtraction,
   expiryHours: Readonly<Record<string, number>>,
@@ -228,7 +144,6 @@ export function popIsRetained(
   return start <= now && now < end + POP_RETAIN_MS;
 }
 
-/** What the ledger says of one chunk: share mined, when it last moved, and the likely-done guess. */
 function miningState(
   x: PopExtraction,
   held: SharedPop | undefined,
@@ -249,17 +164,12 @@ function miningState(
   };
 }
 
-/**
- * The book's Shared Pops at `now`, or null when it publishes none (sharing off, every moon
- * blocked, nothing live): the store deletes the doc then, so a pop goes the moment it stops.
- */
 export function buildSharedPops(input: BuildSharedPopsInput): SharedPopsDoc | null {
   if (!input.sharing.enabled) return null;
   const pops: SharedPop[] = [];
   const communityNames: Record<string, string> = {};
   for (const x of input.extractions) {
     const owner = x.sourceCorporationId;
-    // A moon owner the book no longer handles shares nothing.
     if (owner !== undefined && owner !== input.corporationId && !input.owners.has(owner)) continue;
     const optedOut =
       owner !== undefined && owner !== input.corporationId && input.owners.get(owner)!.optedOut;
@@ -323,21 +233,12 @@ export function buildSharedPops(input: BuildSharedPopsInput): SharedPopsDoc | nu
   };
 }
 
-/** What a read checks a published doc against: the book and its settings as they are now. */
 export interface BookSharingNow {
-  /** Whether the book is active. */
   active: boolean;
   sharing: PopSharingDoc;
-  /** Moon owners the book handles now, each with whether it opted out (as `owners` above). */
   owners: ReadonlyMap<number, { optedOut: boolean }>;
 }
 
-/**
- * A published doc as the book's settings allow now, or null when they allow nothing. Publishing
- * is best effort and can race an edit, so a read never trusts the doc alone: sharing turned off,
- * an opt-out, a moon owner no longer handled, a blocked moon or a removed audience takes the pop
- * away at once even when the republish that follows failed or was overtaken.
- */
 export function currentSharedPops(doc: SharedPopsDoc, book: BookSharingNow): SharedPopsDoc | null {
   if (!book.active || !book.sharing.enabled) return null;
   const pops = doc.pops.flatMap((pop) => {
@@ -358,15 +259,12 @@ export function currentSharedPops(doc: SharedPopsDoc, book: BookSharingNow): Sha
 export const sharedPopId = (corporationId: number, extractionId: string): string =>
   `${corporationId}_${extractionId}`;
 
-/** What one viewer is, across all their Characters, for one sharing book. */
 export interface ViewerAccess {
   corporationIds: ReadonlySet<number>;
   allianceIds: ReadonlySet<number>;
-  /** Communities the viewer is a Member of that share this book's pops (officer rule, no block). */
   communityIds: ReadonlySet<string>;
 }
 
-/** Whether a viewer is in one of a pop's audiences. Corp and Alliance are the book's own. */
 export function inAudience(doc: SharedPopsDoc, pop: SharedPop, viewer: ViewerAccess): boolean {
   return pop.audiences.some((key) => {
     if (key === 'corp') return viewer.corporationIds.has(doc.corporationId);
@@ -376,7 +274,6 @@ export function inAudience(doc: SharedPopsDoc, pop: SharedPop, viewer: ViewerAcc
   });
 }
 
-/** The caller's Characters that are in one of a pop's audiences, each judged on its own access. */
 export function audienceCharacters(
   doc: SharedPopsDoc,
   pop: SharedPop,
@@ -385,34 +282,25 @@ export function audienceCharacters(
   return characters.filter((c) => inAudience(doc, pop, c.access)).map((c) => c.characterId);
 }
 
-/** The pops of one book a viewer may read, still live at `now`. */
 export function visiblePops(doc: SharedPopsDoc, viewer: ViewerAccess, now: number): SharedPop[] {
   return doc.pops.filter(
     (p) => Date.parse(p.retainUntil ?? p.expiresAt) > now && inAudience(doc, p, viewer)
   );
 }
 
-/** One officer's last editing use of a book, and their last failed role check. */
 export interface EditorStamp {
   characterId: number;
   ownerHash: string;
-  /** Epoch ms of the last use of the book with an editing role. */
   usedAt: number;
-  /** Epoch ms of the last failed role check, if any. */
   failedAt?: number;
 }
 
-/**
- * The book's officers who count for a Community share: an editing use in the last 30 days and
- * no failed role check since. The caller still checks each is in the book's corporation now.
- */
 export function qualifyingEditors(stamps: readonly EditorStamp[], now: number): EditorStamp[] {
   return stamps.filter(
     (s) => s.usedAt > now - OFFICER_WINDOW_MS && (s.failedAt === undefined || s.failedAt < s.usedAt)
   );
 }
 
-/** A stored `sharedPopSources` doc's `editors` as stamps, dropping what it cannot read. */
 export function editorStampsFrom(raw: unknown): EditorStamp[] {
   const editors = (raw as { editors?: unknown } | undefined)?.editors;
   if (typeof editors !== 'object' || editors === null) return [];
@@ -436,7 +324,6 @@ export function editorStampsFrom(raw: unknown): EditorStamp[] {
   return out;
 }
 
-/** The rates the book stores (`StoredRate` in corpTaxBook.ts), as far as a start link reads them. */
 export interface RateEntry {
   scope: string;
   pct: number;
@@ -446,10 +333,6 @@ export interface RateEntry {
   feederId?: number;
 }
 
-/**
- * The book's rate for a moon's start link today: the moon's own rate, else its refinery's,
- * else (a moon owner's moon) that owner's, else the corporation rate. Each the latest in force.
- */
 export function bookRatePctFor(
   rates: readonly RateEntry[],
   pull: { moonId: number; structureId: number; sourceCorporationId?: number },
@@ -476,11 +359,6 @@ export function bookRatePctFor(
   );
 }
 
-/**
- * The pops whose time moved since the doc last published, with the new time: chiefly a chunk
- * the laser fractured early, whose Pop Time drops back to the actual fracture. A Scheduled Push
- * already projected for the old time is then stale (its Occurrence Key names that time).
- */
 export function movedPops(
   held: readonly SharedPop[] | undefined,
   next: readonly SharedPop[]
@@ -492,16 +370,8 @@ export function movedPops(
   });
 }
 
-/** The book's alliance is re-read at most this often, and a quiet sync republishes a doc this old. */
 export const ALLIANCE_RECHECK_MS = 6 * HOUR_MS;
 
-/**
- * Whether a sync republishes the book's Shared Pops. A sync that changed something always does.
- * A quiet one (#6254) republishes only a doc an alliance recheck old, or one whose alliance is no
- * longer the corporation's (`allianceNow`, read by the sync), so an alliance the book joins sees
- * its pops at once. `allianceNow` undefined (unread) keeps the age rule; `held` null (no doc) has
- * nothing to bring up to date.
- */
 export function sharedPopsRepublishDue(input: {
   changed: boolean;
   held: { publishedAtMs: number | undefined; allianceId: number | null } | null;
@@ -515,12 +385,6 @@ export function sharedPopsRepublishDue(input: {
   return held.publishedAtMs === undefined || now - held.publishedAtMs >= ALLIANCE_RECHECK_MS;
 }
 
-/**
- * The book's alliance now, read off the affiliation of any Character in its corporation (a
- * viewer or an officer the read already looks up), so a book that left its alliance stops
- * showing there at once rather than at the next republish. With no such Character, the alliance
- * last published (re-read every 6 h at most).
- */
 export function bookAllianceNow(
   corporationId: number,
   stored: number | null,
@@ -530,7 +394,6 @@ export function bookAllianceNow(
   return stored;
 }
 
-/** The Communities the settings name (default and every Moon override), or none while off. */
 export function namedCommunityIds(sharing: PopSharingDoc): string[] {
   if (!sharing.enabled) return [];
   const ids = new Set<string>();

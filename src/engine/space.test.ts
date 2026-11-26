@@ -21,9 +21,6 @@ describe('isWormholeSystemName', () => {
 describe('classifySpace', () => {
   it('classifies a J-named system as wormhole regardless of its security status', () => {
     expect(classifySpace('J105443', -0.99)).toBe('wormhole');
-    // Some wormhole systems carry a nominally "highsec" security status —
-    // the name pattern must win, since `securityBand` folds it into nullsec
-    // for its own two callers, not this one.
     expect(classifySpace('J105443', 0.8)).toBe('wormhole');
   });
 

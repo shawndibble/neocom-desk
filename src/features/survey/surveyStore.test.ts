@@ -41,7 +41,6 @@ const { addDoc, updateDoc, getDocs, loadShare, saveShare, FakeTimestamp } = vi.h
 vi.mock('firebase/firestore/lite', () => ({
   addDoc,
   updateDoc,
-  // Real docs always carry an id, which the merge keys on; most fixtures here leave it off.
   getDocs: async (ref: unknown) => {
     const snapshot = (await getDocs(ref)) as { docs: { id?: string }[] };
     return { docs: snapshot.docs.map((d, i) => ({ id: `doc${i}`, ...d })) };
@@ -644,7 +643,6 @@ describe('polling a survey', () => {
     id,
     data: () => ({ scanId, ignored, createdAt: FakeTimestamp.fromMillis(at) }),
   });
-  /** Serves each subcollection's docs, honouring the `>=` cursor and `limit` the store sends. */
   function serve(store: Record<string, Row[]>) {
     getDocs.mockImplementation(async (ref: Ref) => {
       const name = ref.path.split('/').pop()!;
@@ -798,7 +796,7 @@ describe('polling a survey', () => {
     const [a, b] = [loadSurvey('abc123XYZ'), loadSurvey('abc123XYZ')];
     expect(await b).toEqual(await a);
     expect(loadShare).toHaveBeenCalledTimes(1);
-    expect(getDocs).toHaveBeenCalledTimes(4); // scans, ignores, tax, info
+    expect(getDocs).toHaveBeenCalledTimes(4);
   });
 
   it('reads again for a fresh load, not joining one under way', async () => {
@@ -861,7 +859,6 @@ describe('polling a survey', () => {
     vi.setSystemTime(LIVE);
     loadShare.mockResolvedValue({ ok: false, reason: 'not-found' });
     expect(await loadSurvey('abc123XYZ')).toEqual({ ok: false, reason: 'not-found' });
-    // The cache went with it: the next load asks the share doc again.
     vi.setSystemTime(NOW);
     expect(await loadSurvey('abc123XYZ')).toEqual({ ok: false, reason: 'not-found' });
     expect(loadShare).toHaveBeenCalledTimes(3);
@@ -889,7 +886,6 @@ describe('polling a survey', () => {
     store.surveyScans.push(scanDoc('s2', 2000));
     const result = await loadSurvey('abc123XYZ');
     expect(result.ok && result.scans.map((s) => s.id)).toEqual(['s1', 's2']);
-    // Remembered: the next poll goes straight to the full read.
     getDocs.mockClear();
     await loadSurvey('abc123XYZ');
     expect(calls().every((ref) => ref.constraints === undefined)).toBe(true);

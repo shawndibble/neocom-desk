@@ -5,21 +5,14 @@ import type { MaterialPriceBasis } from '@/engine/industry/types';
 import type { ResolvedMaterial } from '@/engine/industry/materialResolution';
 import { loadMarketOpenPrices } from '@/features/market/marketOpenPrices';
 
-/** The product sells on the sell side of its hub, as the plan's revenue does. */
 const PRODUCT_SIDE = 'sell';
 
-/**
- * The plan's own inputs and product, read from the daily Open Prices series
- * (one cached read per type) and folded into the 7-day cost move. Null while
- * loading, when the hub has no series, or when the move is under the threshold.
- */
 export function useInputCostMove(
   regionId: number,
   productTypeID: number | null,
   materials: readonly ResolvedMaterial[],
   basis: MaterialPriceBasis
 ): InputCostMove | null {
-  // Built materials are costed by their own sub-job, not a market price.
   const inputs = useMemo(
     () =>
       materials

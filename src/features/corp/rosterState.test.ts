@@ -22,11 +22,6 @@ describe('readPreviousRoster', () => {
     expect(await readPreviousRoster(CHAR_ID, CORP_ID)).toEqual([1, 2, 3]);
   });
 
-  /**
-   * A Character who changed corporation. The stored roster is not a stale
-   * baseline for the new corporation, it is a different corporation's — reading
-   * it would report every one of its members as having left.
-   */
   it('has no baseline after a corporation change', async () => {
     await recordRoster(CHAR_ID, CORP_ID, [1, 2, 3], NOW);
     expect(await readPreviousRoster(CHAR_ID, 98000002)).toBeUndefined();
@@ -51,7 +46,6 @@ describe('readPreviousRoster', () => {
     expect(await readPreviousRoster(CHAR_ID, CORP_ID)).toEqual([1, 2]);
   });
 
-  /** A row written by an older shape must not be read as a real baseline. */
   it('ignores a stored value it does not recognise', async () => {
     await db.settings.put({ key: 'corp.rosterBaseline', value: { [CHAR_ID]: 'nonsense' } });
     expect(await readPreviousRoster(CHAR_ID, CORP_ID)).toBeUndefined();

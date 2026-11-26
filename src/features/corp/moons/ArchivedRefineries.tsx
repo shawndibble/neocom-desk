@@ -74,11 +74,6 @@ function ArchivedRow({
   );
 }
 
-/**
- * The Archived section under Refineries (#6298): collapsed while it has rows, each with when, who
- * and why, and Restore for an officer. An officer always sees it, so Restore has a home; a viewer
- * only when it is not empty. Archived refineries keep every row: this only hides them.
- */
 export function ArchivedRefineries({
   rows,
   name,
@@ -93,13 +88,10 @@ export function ArchivedRefineries({
   moonName: (row: RefineryRow) => string | undefined;
   pathOf: (structureId: number) => string;
   byName: (characterId: number) => string;
-  /** Absent for a viewer who may not edit. */
   onRestore?: (structureId: number) => Promise<void>;
-  /** Hides Restore on a row whose moon owner left or was removed. Every row, when absent. */
   canRestore?: (structureId: number) => boolean;
 }) {
   const { t } = useTranslation();
-  // Until toggled, follows the rows: the moon owner records can load after the page mounts.
   const [toggled, setToggled] = useState<boolean>();
   const open = toggled ?? rows.length === 0;
   if (rows.length === 0 && !onRestore) return null;

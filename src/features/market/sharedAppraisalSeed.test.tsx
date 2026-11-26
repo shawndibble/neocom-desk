@@ -51,7 +51,6 @@ describe('useSharedAppraisalSeed', () => {
     await waitFor(() => expect(onSeed).toHaveBeenCalledWith('Tritanium\t1000\nPyerite\t20'));
     expect(onSeed).toHaveBeenCalledTimes(1);
     expect(loadShare).toHaveBeenCalledWith('abc123XYZ');
-    // Hub and percent stay: they're what the pasted pile is priced at.
     expect(screen.getByTestId('search')).toHaveTextContent('?hub=amarr&percent=85');
   });
 
@@ -66,7 +65,6 @@ describe('useSharedAppraisalSeed', () => {
 
     await waitFor(() => expect(loadShare).toHaveBeenCalled());
     expect(onSeed).not.toHaveBeenCalled();
-    // Retrying a dead link cannot help, so it is not left in the address.
     await waitFor(() => expect(screen.getByTestId('search')).toHaveTextContent(/^$/));
     expect(screen.getByTestId('failed')).toHaveTextContent('false');
   });

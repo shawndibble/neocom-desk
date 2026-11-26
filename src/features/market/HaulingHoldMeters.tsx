@@ -1,8 +1,3 @@
-/**
- * The trip rail's meters for a Cargo Space of several holds: one named bar
- * per hold, so a hauler sees which is full. A hold no candidate fits stays
- * empty rather than reading as spare room.
- */
 import { useTranslation } from 'react-i18next';
 import type { HoldUse } from '@/engine/market/haulingPlan';
 import { ProgressBar } from '@/components/ui/ProgressBar';

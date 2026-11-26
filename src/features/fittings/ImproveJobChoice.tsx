@@ -1,9 +1,3 @@
-/**
- * The Job setting, first in Improve's Search settings: PvE / PvP / Explore with
- * a one-line hint per job and, under Explore, where it flies. Dangerous is the
- * default: a wrong Safe can cost a ship, a wrong Dangerous only leaves some
- * strength unused. Controlled; the owner stores the choice.
- */
 import { useTranslation } from 'react-i18next';
 import { Checkbox, Radio, SegmentedControl } from '@/components/ui';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
@@ -18,10 +12,8 @@ import {
 interface Props {
   job: ImproveJob;
   onJobChange: (job: ImproveJob) => void;
-  /** Only read under Explore. */
   space?: ExploreSpace;
   onSpaceChange: (space: ExploreSpace) => void;
-  /** Only read under PvE: the pilot needs no propulsion module. Without a handler the control is left out. */
   noPropulsion?: boolean;
   onNoPropulsionChange?: (on: boolean) => void;
 }

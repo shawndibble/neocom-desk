@@ -1,6 +1,3 @@
-/**
- * Units and plain-text naming the Goal Planner's result sections share.
- */
 import type { Translate } from '@/lib/translate';
 import type { TFunction } from 'i18next';
 import type { PiData } from '@/sde/types';
@@ -13,7 +10,6 @@ import { commodityName } from '../goalPlannerFormat';
 export const HOURS_PER_DAY = 24;
 export const formatPercent = createNumberFormat({ maximumFractionDigits: 0 });
 
-/** Names and links the sections share. */
 export interface PlanNames {
   planet: (planetId: number) => string;
   systemOf: (planetId: number) => number | undefined;
@@ -30,7 +26,6 @@ export function signedCompact(perDay: number): string {
   return `${rounded > 0 ? '+' : ''}${formatIskCompact(rounded)}`;
 }
 
-/** Planet types as alternatives: "Gas or Ice". */
 export function planetTypesText(types: readonly PlanetType[], t: Translate): string {
   return types.map((type) => t(`pi.planetType.${type}`)).join(t('piPlan.or'));
 }
@@ -41,7 +36,6 @@ export function limitsText(limits: readonly FitLimit[], t: TFunction): string {
     .join(', ');
 }
 
-/** Either end of a haul, by name: the hub's system or the colony. */
 export function endName(end: FlowEnd, names: PlanNames): string {
   return end === 'hub' ? names.hub.systemName : names.planet(end);
 }

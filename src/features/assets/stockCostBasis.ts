@@ -1,8 +1,3 @@
-/**
- * Stock Cost Basis for the Assets page (issue #6381): the unit cost of the
- * units the active Character holds, from their wallet buys and sells plus
- * their logged Production Runs. Derived on read — nothing is stored.
- */
 import { db } from '@/db';
 import { stockCostBasis } from '@/engine/market/stockCostBasis';
 import type { ProductionLot, WalletTrade } from '@/engine/market/walletCostBasis';
@@ -15,7 +10,6 @@ export interface HeldStockCost {
   unitCost: number;
 }
 
-/** Units held per type, across every location the Character's own assets sit in. */
 export function heldQuantityByType(
   assets: ReadonlyArray<Pick<CharacterAsset, 'type_id' | 'quantity'>>
 ): Map<number, number> {
@@ -24,11 +18,6 @@ export function heldQuantityByType(
   return held;
 }
 
-/**
- * Cost per held unit for every type the history covers; a type it does not
- * cover is simply absent. A Character without the wallet permission, or whose
- * wallet cannot be read, gets an empty map — never an error.
- */
 export async function loadStockCostBases(
   characterId: number,
   assets: ReadonlyArray<Pick<CharacterAsset, 'type_id' | 'quantity'>>,
@@ -48,7 +37,6 @@ export async function loadStockCostBases(
     loadWalletArchiveInfo(characterId, nowMs, 'transactions'),
     db.productionRuns.where('characterId').equals(characterId).toArray(),
   ]);
-  // Only gaps between covered windows: the stretch since the last fetch is the next fetch's job.
   const gaps = info.gaps.filter(([, to]) => to < nowMs);
 
   const tradesByType = new Map<number, WalletTrade[]>();

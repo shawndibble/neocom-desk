@@ -14,8 +14,6 @@ import {
 } from './priceHistoryRangePref';
 import { historyPoint } from '@/engine/market/__fixtures__/priceHistory';
 
-// Every fixed-date fixture below is well within 30 days of this, so the
-// panel's default range never has to change per test just to keep a point visible.
 const FIXED_NOW = new Date('2026-08-05T00:00:00Z');
 
 vi.mock('./priceHistory', () => ({
@@ -70,8 +68,6 @@ afterEach(() => {
 
 beforeEach(async () => {
   await db.settings.clear();
-  // Module-scope store: without a reset, the range one test picks is the
-  // window the next one opens on.
   usePriceHistoryRange.setState({ value: DEFAULT_PRICE_HISTORY_RANGE, hydrated: false });
   usePriceHistorySeries.setState({ value: DEFAULT_PRICE_HISTORY_SERIES, hydrated: false });
   mockedOpen.mockResolvedValue(null);
@@ -158,8 +154,6 @@ describe('PriceHistoryPanel', () => {
       <PriceHistoryPanel regionId={10000002} typeId={34} itemName="Tritanium" now={FIXED_NOW} />
     );
     expect(await screen.findByTestId('chart')).toBeInTheDocument();
-    // Shorthand on screen (#947), so each figure is matched by its accessible
-    // name and still checked against the label it sits beside.
     expect(
       screen.getByText('30.00 ISK', { selector: '.sr-only' }).parentElement?.parentElement
     ).toHaveTextContent('High');
@@ -203,20 +197,13 @@ describe('PriceHistoryPanel', () => {
       <PriceHistoryPanel regionId={10000002} typeId={34} itemName="Tritanium" now={FIXED_NOW} />
     );
     expect(await screen.findByTestId('chart')).toBeInTheDocument();
-    // Matched from the figure outward, like the ISK stats above, so each
-    // number is pinned to the label it actually sits beside. The market's
-    // first trade is 3 days before `now`, so 81 orders is 27 a day.
     expect(screen.getByText('2,000').parentElement).toHaveTextContent('Volume');
     expect(screen.getByText('27').parentElement).toHaveTextContent('Orders / day');
   });
 
   it('keeps a thin market off a flat zero in the orders-per-day stat', async () => {
     mockedLoad.mockResolvedValue({
-      points: [
-        // One order on the first of ten days since the market began: 0.1 a day.
-        // ESI omits the nine quiet days, so they must count as zero.
-        historyPoint({ date: '2026-07-26', average: 10, orderCount: 1 }),
-      ],
+      points: [historyPoint({ date: '2026-07-26', average: 10, orderCount: 1 })],
       fetchedAt: 1_000_000,
     });
     render(
@@ -235,11 +222,6 @@ describe('PriceHistoryPanel', () => {
       <PriceHistoryPanel regionId={10000002} typeId={34} itemName="Tritanium" now={FIXED_NOW} />
     );
     expect(await screen.findByTestId('chart')).toBeInTheDocument();
-    // One assertion over the whole group rather than a negative beside each
-    // label: the substring checks elsewhere in this file would all still pass
-    // if `Label:` came back, and five separate `not.toHaveTextContent` lines
-    // would say the same thing five times. Nothing in this group — labels,
-    // figures, "Orders / day" — contains a colon.
     const stats = screen.getByText('High').parentElement?.parentElement;
     expect(stats?.textContent).not.toContain(':');
   });
@@ -248,8 +230,8 @@ describe('PriceHistoryPanel', () => {
     const user = userEvent.setup();
     mockedLoad.mockResolvedValue({
       points: [
-        historyPoint({ date: '2026-07-20', average: 5, volume: 50 }), // within 30d (default) but outside 7d
-        historyPoint({ date: '2026-08-04', average: 6, volume: 50 }), // within 7d
+        historyPoint({ date: '2026-07-20', average: 5, volume: 50 }),
+        historyPoint({ date: '2026-08-04', average: 6, volume: 50 }),
       ],
       fetchedAt: 1_000_000,
     });
@@ -264,17 +246,12 @@ describe('PriceHistoryPanel', () => {
     expect(screen.getByTestId('chart')).toHaveTextContent('Tritanium: 1 points');
   });
 
-  /**
-   * The panel is remounted per item, so before this a trader comparing a run
-   * of prices across several items re-picked their window on every one. The
-   * range slices points already fetched, so remembering it costs nothing.
-   */
   it('opens the next item on the range last chosen, not back at 30 days', async () => {
     const user = userEvent.setup();
     mockedLoad.mockResolvedValue({
       points: [
-        historyPoint({ date: '2026-07-20', average: 5, volume: 50 }), // within 30d, outside 7d
-        historyPoint({ date: '2026-08-04', average: 6, volume: 50 }), // within 7d
+        historyPoint({ date: '2026-07-20', average: 5, volume: 50 }),
+        historyPoint({ date: '2026-08-04', average: 6, volume: 50 }),
       ],
       fetchedAt: 1_000_000,
     });
@@ -314,11 +291,6 @@ describe('PriceHistoryPanel', () => {
   });
 
   it('computes the moving average over the full unfiltered series, not the filtered range', async () => {
-    // 10 real days of history: the default 30d range keeps all of them, and
-    // a correct 7-day window (computed pre-filter) yields 4 MA points
-    // (days 7-10). Computing after filtering would still yield 4 here since
-    // 30d keeps everything — the 7d-range assertion below is what actually
-    // distinguishes pre- vs post-filter computation.
     const points = Array.from({ length: 10 }, (_, i) =>
       historyPoint({
         date: `2026-07-${String(20 + i).padStart(2, '0')}`,
@@ -336,9 +308,6 @@ describe('PriceHistoryPanel', () => {
 
   it('uses a shorter window on the 7d range so it never collapses to a single point', async () => {
     const user = userEvent.setup();
-    // 7 real days ending today: a 7-day window here would produce exactly 1
-    // MA point (a restatement of the summary), which is the defect the
-    // ticket calls out. The 7d range must use a shorter window instead.
     const points = [
       historyPoint({ date: '2026-07-30', average: 10, volume: 5 }),
       historyPoint({ date: '2026-07-31', average: 11, volume: 5 }),
@@ -506,7 +475,6 @@ describe('PriceHistoryPanel', () => {
         expect(screen.getByTestId('chart')).toHaveTextContent('{open 10000002:2:both}')
       );
       expect(screen.getByRole('combobox', { name: 'Lines' })).toHaveTextContent('Buy / Sell');
-      // A region with a series is never reported as missing one.
       expect(screen.getByTestId('chart')).toHaveTextContent(/missing=$/);
       expect(mockedOpen).toHaveBeenCalledTimes(1);
     });

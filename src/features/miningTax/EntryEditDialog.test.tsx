@@ -104,7 +104,6 @@ describe('EntryEditDialog', () => {
     const d4 = member('d4', '2026-10-04');
     const { onSaved } = renderDialog([d4, d3]);
 
-    // One box per ore line per day, each starting at its share of the billed value.
     const zeolitesOct4 = screen.getByRole('textbox', { name: 'Zeolites value on 2026-10-04' });
     expect(zeolitesOct4).toHaveValue('1,000');
     fireEvent.change(zeolitesOct4, { target: { value: '3000' } });
@@ -115,9 +114,7 @@ describe('EntryEditDialog', () => {
     expect(records.map((a: MiningTaxAssignmentRecord) => a.id)).toEqual(['d3', 'd4']);
     expect(input.payeeId).toBe('st');
     expect(input.taxPct).toBe(5);
-    // Untouched: keeps exactly what it was billed.
     expect(input.members.d3).toEqual({ estimatedValue: 2_000, taxOwed: 100 });
-    // Edited: re-totalled from its lines, which it now remembers.
     expect(input.members.d4).toEqual({
       estimatedValue: 4_000,
       taxOwed: 200,
@@ -179,7 +176,6 @@ describe('EntryEditDialog', () => {
     fireEvent.change(box, { target: { value: '4000' } });
     expect(screen.getByRole('textbox', { name: 'Tax owed on 2026-10-03' })).toHaveValue('200');
     fireEvent.change(box, { target: { value: '' } });
-    // Blank while editing, so a new figure can be typed; blur restores the default as text.
     expect(box).toHaveValue('');
     fireEvent.blur(box);
     expect(screen.getByRole('textbox', { name: 'Estimated value on 2026-10-03' })).toHaveValue(

@@ -6,7 +6,6 @@ import { triageGoals } from './triage';
 import { BASE_METALS, POLICY, REACTIVE_METALS, colony, goal, pi } from './test-helpers';
 import type { Goal, PlannerColony, PlannerPolicy } from '../goalTypes';
 
-/** Steps 1–6 for P1 goals only (no host), then the demand lines and achievement. */
 function run(goals: Goal[], colonies: PlannerColony[], policy: PlannerPolicy = POLICY) {
   const triage = triageGoals(goals, colonies, policy, pi);
   const dead = new Set<Goal>(triage.blocked);
@@ -46,7 +45,6 @@ function run(goals: Goal[], colonies: PlannerColony[], policy: PlannerPolicy = P
 
 describe('demandLines', () => {
   it('marks a budget-gapped P1 and its P0 short, with the share actually made', () => {
-    // Two ECUs make 72 of the 120 Reactive Metals/h asked.
     const { lines, achieved } = run([goal(REACTIVE_METALS, 120)], [colony(1, 'barren')]);
     expect(lines).toMatchObject([
       { typeId: REACTIVE_METALS, tier: 1, source: 'short', madeFraction: expect.closeTo(0.6, 6) },

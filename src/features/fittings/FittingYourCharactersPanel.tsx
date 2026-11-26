@@ -1,8 +1,3 @@
-/**
- * "Your Characters": who can fly the open Fitting, what each is missing and
- * how long it takes to train. Built for 20+ Characters: a filter, a search
- * box and one sortable table, closest to flying first; a row opens in place.
- */
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { DataTable, SearchInput, SegmentedControl, type DataTableColumn } from '@/components/ui';
@@ -17,7 +12,6 @@ type Filter = 'all' | 'fly' | 'cant';
 
 const isCant = (row: CharacterGapRow) => row.state === 'ready' && row.gap.missingCount > 0;
 
-/** Only answered rows rank; undefined sinks to the end whichever way the column sorts. */
 const gapRank = (pick: (gap: FittingGap) => number) => (row: CharacterGapRow) =>
   row.state === 'ready' ? pick(row.gap) : undefined;
 
@@ -91,7 +85,6 @@ export function FittingYourCharactersPanel({ rows }: { rows: readonly CharacterG
 
   const detail = (row: CharacterGapRow) => {
     if (row.state !== 'ready' || row.gap.skills.length === 0) {
-      // DataTable has no per-row opt-out, so a row with nothing to list says why.
       const reason =
         row.state === 'unloaded'
           ? t('fittings.yourCharacters.notLoadedReason')

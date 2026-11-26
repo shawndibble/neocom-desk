@@ -36,7 +36,6 @@ const feed = (orders: CorporationOrder[], over: Partial<CorpOrdersFeed> = {}): F
     orders,
     typeNames: new Map([[34, 'Tritanium']]),
     stationNames: new Map([[STATION, 'Jita IV - Moon 4']]),
-    // Best rival sells at 90: a sell order at 100 is undercut.
     stationPrices: new Map([[`${STATION}:34`, { sellMin: 90, buyMax: 50 } as never]]),
     issuerNames: new Map([[7, 'Efa Astrahus']]),
     ...over,
@@ -85,7 +84,6 @@ describe('corpOrders', () => {
     expect(columns).toEqual(['item', 'side', 'price', 'vsBest', 'expires', 'issuedBy', 'station']);
     const byKey = new Map(view.table?.rows.map((r) => [r.key, r.cells[5]]));
     expect(byKey.get('1')).toBe('Efa Astrahus');
-    // An issuer ESI could not name shows as unknown, never as a wrong name.
     expect(byKey.get('2')).not.toBe('Efa Astrahus');
     expect(view.table?.rows.every((r) => r.cells.length === columns?.length)).toBe(true);
   });

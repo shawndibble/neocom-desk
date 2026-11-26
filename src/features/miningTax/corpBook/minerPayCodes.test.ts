@@ -16,7 +16,6 @@ const names = new Map([
 ]);
 
 describe('minerPayCodes', () => {
-  // Audit bug 8: with no open notice there was no code at all.
   it("gives each of the member's Miners its own code, whether or not a notice is open", () => {
     expect(minerPayCodes(book(['solo:1', 'g1']), (id) => names.get(id))).toEqual([
       { code: minerPaymentCode('solo:1'), character: 'Main', characterIds: [1] },

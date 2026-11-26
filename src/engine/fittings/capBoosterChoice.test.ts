@@ -176,7 +176,6 @@ describe('capQuickPicks', () => {
     const picks = capQuickPicks([small, mid, midNavy, big]);
     expect(picks?.smallestStable).toBe(mid);
     expect(picks?.mostGjPerSecond).toBe(big);
-    // 200 GJ at 50 is the cheapest GJ (0.25), but it runs dry; of the stable, 800 at 240 (0.3).
     expect(picks?.bestValue).toBe(big);
   });
 

@@ -139,14 +139,12 @@ describe('HaulingItemDetail — listing', () => {
     renderDetail(listRow());
     const label = screen.getByText('Pay at most');
     const block = label.parentElement!;
-    // Full digits with grouping: no "M"/"B" shorthand.
     expect(within(block).getByText(/^\d{1,3}(,\d{3})+$/)).toBeInTheDocument();
     expect(block.textContent).not.toMatch(/\d+(\.\d+)?\s?[MBK]\b/);
     expect(within(block).getByText('each in Amarr, to keep a 5% margin')).toBeInTheDocument();
   });
 
   it('places your listing among the sell orders by price, with the plan’s units', () => {
-    // An Expected Sell Price above the cheapest order lands after it.
     renderDetail(listRow({ price: 23_200_000 }), line(4));
     const rows = within(screen.getByRole('table')).getAllByRole('row').slice(1);
     const prices = rows.map((r) => within(r).getAllByRole('cell')[0]!.textContent);
@@ -177,7 +175,6 @@ describe('HaulingItemDetail — listing', () => {
   it('shows Days to Sell and how fast it sells', () => {
     renderDetail(listRow());
     expect(screen.getByText('about 9 days')).toBeInTheDocument();
-    // Each segment carries its trailing dot, so a wrap never starts a line with one.
     expect(screen.getByText('0.6 sold a day ·')).toBeInTheDocument();
     expect(screen.getByText('5 listed near your price')).toBeInTheDocument();
   });
@@ -217,7 +214,6 @@ describe('HaulingItemDetail — listing', () => {
     const route = screen.getByRole('link', { name: 'Route safety' }).getAttribute('href')!;
     expect(route).toContain(`from=${AMARR.systemId}`);
     expect(route).toContain(String(JITA.systemId));
-    // A real link (new tab, copy link), not a button.
     expect(screen.getByRole('link', { name: 'Show info' })).toHaveAttribute(
       'href',
       expect.stringContaining('info=type-2048')
@@ -228,9 +224,7 @@ describe('HaulingItemDetail — listing', () => {
     const user = userEvent.setup();
     const actions = renderDetail(listRow());
     await user.click(screen.getByRole('button', { name: 'More actions for Damage Control II' }));
-    // Opening the ⋮ loads the blueprint catalog, so Build Plan can show.
     expect(actions.requestBlueprints).toHaveBeenCalled();
-    // Quickbar, price alert and stock target fold into the Track submenu.
     await user.click(await screen.findByRole('menuitem', { name: 'Track' }));
     for (const name of [
       'Add to Quickbar',

@@ -3,24 +3,6 @@ import { join, relative } from 'node:path';
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 
-/**
- * Controls sharing a row share one `size` (DESIGN.md §3). A static check of the
- * rule, so a mismatch fails in a unit test instead of in a browser that had to
- * load every route (`e2e/inlineControlHeights.spec.ts` now measures a sample).
- *
- * Deliberately narrow, to stay free of false positives: it reads only a plain
- * flex row (a lowercase element whose `className` literals carry `flex` or
- * `inline-flex` and no `flex-col`), and only the `src/components/ui` controls
- * below that are its direct children (through fragments, `cond && <X/>` and
- * ternaries; not through `.map` or a wrapper component). A child whose `size`
- * is an expression, or that spreads props, is unknown and never flagged. What
- * it cannot see (a `Link` styled with `buttonClassName`, a hand-built control,
- * a row laid out by a component) is the e2e sample's job. A deliberate mismatch
- * opts out the same way it does there: `data-inline-height="exempt"` on the row
- * or the control, with a comment saying why.
- */
-
-/** Each boxed control with a `ControlSize` (`sm` | `md`) and its default. */
 const DEFAULT_SIZE: Readonly<Record<string, string>> = {
   Button: 'md',
   TextInput: 'md',
@@ -33,7 +15,6 @@ const DEFAULT_SIZE: Readonly<Record<string, string>> = {
   SegmentedControl: 'md',
   FilterChip: 'sm',
 };
-/** No `size` prop: always this size. */
 const FIXED_SIZE: Readonly<Record<string, string>> = { SearchInput: 'md' };
 
 const ROOTS = ['src/routes', 'src/features', 'src/components', 'src/app'];
@@ -52,7 +33,6 @@ function openingOf(node: JsxLike): ts.JsxOpeningLikeElement {
   return ts.isJsxElement(node) ? node.openingElement : node;
 }
 
-/** The element that carries the size: a Radix `Select` root's is its `SelectTrigger`. */
 function controlOf(node: JsxLike): ts.JsxOpeningLikeElement {
   const opening = openingOf(node);
   if (opening.tagName.getText() !== 'Select') return opening;
@@ -69,7 +49,6 @@ function controlOf(node: JsxLike): ts.JsxOpeningLikeElement {
   return trigger;
 }
 
-/** The JSX elements an expression renders in place: `a && <X/>`, `a ? <X/> : <Y/>`. */
 function elementsOfExpression(expr: ts.Expression): JsxLike[] {
   if (ts.isParenthesizedExpression(expr)) return elementsOfExpression(expr.expression);
   if (ts.isJsxElement(expr) || ts.isJsxSelfClosingElement(expr)) return [expr];
@@ -93,7 +72,6 @@ function elementsOfChild(child: ts.JsxChild): JsxLike[] {
   return [];
 }
 
-/** Every string literal in a `className` (a plain string, a template, a `cx(...)` call). */
 function classNameText(opening: ts.JsxOpeningLikeElement): string | null {
   const attr = opening.attributes.properties.find(
     (p): p is ts.JsxAttribute => ts.isJsxAttribute(p) && p.name.getText() === 'className'
@@ -131,7 +109,6 @@ function isExempt(opening: ts.JsxOpeningLikeElement): boolean {
   );
 }
 
-/** The control's size: its literal `size`, its default, or null when it can't be read. */
 function sizeOf(opening: ts.JsxOpeningLikeElement): string | null {
   const tag = opening.tagName.getText();
   if (isExempt(opening)) return null;
@@ -150,7 +127,6 @@ function sizeOf(opening: ts.JsxOpeningLikeElement): string | null {
   return null;
 }
 
-/** `file:line  Tag=size Tag=size` for each flex row whose controls mix sizes. */
 export function mixedSizeRows(file: string, text: string): string[] {
   const source = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
   const rows: string[] = [];

@@ -14,11 +14,6 @@ function involvesOther(c: Contract, otherId: number): boolean {
   return c.issuer_id === otherId || c.assignee_id === otherId || c.acceptor_id === otherId;
 }
 
-/**
- * Personal contracts with the other player, for each of the viewer's Characters, read as the
- * Contracts History tab does (live window plus the device archive). Items are not fetched per
- * contract: an exchange reads as its title. Courier ends are named only for matching couriers.
- */
 export const contractSource: PersonalSource = async ({ otherId, characterIds, t }) => {
   const perCharacter = await Promise.all(
     characterIds.map(async (characterId): Promise<Interaction[]> => {

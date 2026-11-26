@@ -87,12 +87,10 @@ const REFERENCE: NpcStandingsReference = {
   ]),
 };
 
-/** Shows the query string, so a test can read what the filters wrote to the URL. */
 function SearchProbe() {
   return <output data-testid="search">{useLocation().search}</output>;
 }
 
-/** The page's header, as `Contacts` lays it out around the hook's parts. */
 function StandingsHarness({ characterId }: { characterId: number }) {
   const { meta, actions, content } = useContactsStandings(characterId, true);
   return (
@@ -240,13 +238,11 @@ describe('ContactsStandings table', () => {
         within(table).getByRole('columnheader', { name: new RegExp(`^${header}`) })
       ).toBeVisible();
     }
-    // Base is ESI's number, which only broker fees read: off until asked for.
     expect(within(table).queryByRole('columnheader', { name: /^Base/ })).toBeNull();
     const agent = within(table).getByText('Hanna Kurosawa').closest('tr') as HTMLElement;
     expect(within(agent).getByText('Agent')).toBeInTheDocument();
     expect(within(agent).getByText(/Ishukone Corporation/)).toBeInTheDocument();
     expect(within(agent).getByText(/L3 Security/)).toBeInTheDocument();
-    // the faction's 3.5 is the best standing in the chain: level 3 is open
     expect(within(agent).getByText('Open')).toBeInTheDocument();
 
     const corp = within(table).getByText('Caldari Navy Corp').closest('tr') as HTMLElement;
@@ -271,7 +267,6 @@ describe('ContactsStandings table', () => {
     expect(within(table).queryByRole('columnheader', { name: /^Standing/ })).toBeNull();
     expect(within(table).getByRole('columnheader', { name: /^Base/ })).toBeVisible();
     expect(within(corp).getByText('5.00')).toBeInTheDocument();
-    // Access: a base-standing answer would understate what the skills lift.
     expect(within(corp).getAllByText('—')).toHaveLength(1);
   });
 
@@ -359,7 +354,6 @@ describe('ContactsStandings table', () => {
     });
 
     it('keeps agents of at least the chosen level from the URL', async () => {
-      // the corporation's 5.0 opens level 4; the faction's 3.5 and the agent's chain (best 3.5) only level 3
       renderTab('/?standings.access=4');
       await screen.findByText('Caldari Navy Corp');
       expect(screen.queryByText('Hanna Kurosawa')).toBeNull();
@@ -399,7 +393,6 @@ describe('ContactsStandings table', () => {
 
     await user.click(screen.getByRole('button', { name: 'Columns' }));
     await user.click(await screen.findByRole('menuitemcheckbox', { name: 'Belongs to' }));
-    // An open menu hides the page from the accessibility tree.
     await user.keyboard('{Escape}');
 
     await waitFor(() =>

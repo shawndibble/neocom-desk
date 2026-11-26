@@ -1,22 +1,11 @@
-/**
- * The hulls a new Fitting can start from, browsed by class — the Start
- * screen's "new from a hull" picker. Built from the market-group tree the
- * Fitting catalogue already loads: everything under the "Ships" branch, one
- * class per child of it (Frigates, Cruisers, …), each hull named with the
- * groups it sits in below that (e.g. "Standard Cruisers · Gallente"). The
- * tree groups advanced hulls by role rather than race, so race isn't a
- * reliable facet and isn't offered.
- */
 import type { MarketGroupNode, MarketTypeEntry } from '@/sde/marketTypes';
 
 export interface HullEntry {
   typeId: number;
   name: string;
-  /** The market groups between the class and the hull, joined with " · ". */
   group: string;
 }
 
-/** A hull to start a Fitting on: all a new Fitting reads of a picked hull. */
 export type StartHull = Pick<HullEntry, 'typeId' | 'name'>;
 
 export interface HullClass {
@@ -25,7 +14,6 @@ export interface HullClass {
   hulls: HullEntry[];
 }
 
-/** Smallest to largest, then the industrial and special lines; unknown classes sort after, by name. */
 const CLASS_ORDER = [
   'Corvettes',
   'Shuttles',
@@ -53,7 +41,6 @@ export function buildHullCatalogue(
   if (!ships) return [];
   const byId = new Map(groups.map((group) => [group.id, group]));
 
-  /** The Ships class a group falls under, and the group names from that class down to it. */
   function placeOf(groupId: number): { classId: number; path: string[] } | null {
     const path: string[] = [];
     let node = byId.get(groupId);
@@ -82,10 +69,6 @@ export function buildHullCatalogue(
     .sort((a, b) => classRank(a.name) - classRank(b.name) || a.name.localeCompare(b.name));
 }
 
-/**
- * The hulls whose name or group holds every word of `query`, case-blind;
- * classes left empty drop out. A blank query returns the catalogue itself.
- */
 export function searchHulls(catalogue: HullClass[], query: string): HullClass[] {
   const words = query.toLowerCase().split(/\s+/).filter(Boolean);
   if (words.length === 0) return catalogue;

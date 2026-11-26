@@ -24,7 +24,7 @@ describe('isSettledRow', () => {
   });
 
   it('never treats today or yesterday as settled, whatever the watermark', () => {
-    const w = dayEnd('2026-10-11') + 1; // a read made early on the 12th
+    const w = dayEnd('2026-10-11') + 1;
     expect(isSettledRow({ structureId: 5000, date: '2026-10-11' }, { '5000': w })).toBe(false);
     expect(isSettledRow({ structureId: 5000, date: '2026-10-12' }, { '5000': w })).toBe(false);
   });

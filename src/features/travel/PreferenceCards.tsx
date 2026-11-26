@@ -1,16 +1,3 @@
-/**
- * Route Safety's three preference cards: Safer, Shorter and Less secure, each
- * the same trip planned under that Route Preference, facts side by side.
- *
- * The cards are the Route Preference picker, a second face for the control in
- * Route rules (one variable, decision `20261006-143832`): choosing one saves
- * the pilot's default, exactly as that segmented control does.
- *
- * Conditions, never verdicts (decision `20260912-172628`): a card shows jumps,
- * the lowest security, last hour's kills and Gank Chokepoints, and never which
- * to take. Until a route exists the cards show dashes, so the page already has
- * its shape.
- */
 import { useRef, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SecurityStatus } from '@/components/SecurityStatus';
@@ -25,7 +12,6 @@ import { formatNumber } from '@/lib/numberLocale';
 import { SegmentedControl } from '@/components/ui';
 import { useIsPhone } from '@/lib/useIsPhone';
 
-/** The game's own order on a phone: Shorter is the usual choice, so it leads. */
 const PHONE_ORDER: readonly RoutePreferenceKind[] = ['shortest', 'prefer-highsec', 'avoid-highsec'];
 
 function Strip({ securities }: { securities: PreferenceCard['securities'] }) {
@@ -108,7 +94,6 @@ export function PreferenceCards({
   const { t } = useTranslation();
   const isPhone = useIsPhone();
   const buttons = useRef<(HTMLButtonElement | null)[]>([]);
-  // One tab stop: the chosen card, or the first when none shows as chosen.
   const stop = Math.max(
     0,
     cards.findIndex((card) => card.active)
@@ -131,7 +116,6 @@ export function PreferenceCards({
     onSelect(cards[next]!.preference);
   }
   if (isPhone) {
-    // One segmented control, then the facts of the chosen route: a half-clipped carousel hid two of three cards.
     const chosen = cards.find((card) => card.active) ?? cards[0];
     return (
       <div className="flex flex-col gap-2">

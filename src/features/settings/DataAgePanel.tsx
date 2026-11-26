@@ -15,16 +15,6 @@ import { characterCell, dataAgeCsvColumns } from '@/features/settings/activityLo
 import { CharacterNameCell } from '@/features/settings/CharacterNameCell';
 import { SettingsHint } from '@/features/settings/settingsFields';
 
-/**
- * The most recent *successful* fetch per endpoint/character pair — the
- * `DataAgeBadge` on every view, collected into one list for the surface that
- * replaces it on mobile (docs/context/decisions). A failed call never
- * updated anything, so it's excluded rather than shown as a "last updated".
- *
- * `entries` is most-recent-first (`stores/activityLog.ts`), so keeping only
- * the first entry seen per key already yields the latest one, in order —
- * no separate sort needed.
- */
 function latestFetchPerSource(entries: ActivityLogEntry[]): ActivityLogEntry[] {
   const seen = new Map<string, ActivityLogEntry>();
   for (const entry of entries) {
@@ -35,22 +25,14 @@ function latestFetchPerSource(entries: ActivityLogEntry[]): ActivityLogEntry[] {
   return [...seen.values()];
 }
 
-/** `DataAgeBadge`'s cadence: ages are shown to the minute. */
 const RELATIVE_AGE_TICK_MS = 30_000;
 
-/**
- * "N min ago", kept current by the shared ticker. Its own component rather
- * than a `Date.now()` in the column's `render`: `DataTable`'s rows are
- * memoized, so a render-time read would freeze at whatever it said when the
- * row last changed.
- */
 function RelativeAge({ timestamp }: { timestamp: number }) {
   const { t } = useTranslation();
   const now = useTicker(RELATIVE_AGE_TICK_MS);
   return formatAge(now - timestamp, t);
 }
 
-/** The folded Data Age panel's one-line read: how many sources, and how fresh the newest is. */
 function DataAgeSummary({ rows }: { rows: ActivityLogEntry[] }) {
   const { t } = useTranslation();
   const now = useTicker(RELATIVE_AGE_TICK_MS);
@@ -130,9 +112,6 @@ export function DataAgePanel() {
             rowKey={(entry) => entry.id}
             label={t('dataAge.title')}
             density="compact"
-            // §4a: a log read row by row, not compared across columns, so a
-            // phone gets a two-line card (endpoint, then character) with the
-            // age at the right, not a table wider than the screen.
             stackLayout="dense"
           />
         )}

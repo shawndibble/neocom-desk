@@ -1,8 +1,3 @@
-/**
- * The Corp Tax Book send queue's public API (issue #4064). The late notice run calls
- * `enqueueLateNotices` when the officer presses Send; everything after that (pacing, 520 waits,
- * survival across tabs, the audit log) is the queue's own business.
- */
 import {
   isAlreadyQueued,
   reminderAllowed,
@@ -29,37 +24,27 @@ import {
 import { db } from '@/db';
 import { addToQueue, listQueue, nextOrder, saveItem, saveItems } from './mailQueueStore';
 
-/** What the queue needs to mail one Miner their late notice. */
 export interface LateNoticeToMail extends Omit<
   LateNoticeMailInput,
   'kind' | 'corporationName' | 'verifyUrl'
 > {
   noticeId: string;
-  /** The character who gets the mail. */
   recipientId: number;
-  /**
-   * The mail as the officer edited it in the run's preview: sent as written, except that the
-   * preview's verify link (`previewVerifyUrl`) becomes this notice's real one.
-   */
   edited?: { subject: string; body: string };
 }
 
 export interface EnqueueInput {
   corporationId: number;
   corporationName: string;
-  /** The officer's character the mail goes from. */
   senderCharacterId: number;
   notices: readonly LateNoticeToMail[];
-  /** Where the app is served, for the verify link. Defaults to this origin. */
   origin?: string;
 }
 
 export interface EnqueueResult {
   batchId: string;
   queued: number;
-  /** Already in the queue (or already sent): not queued again. */
   skipped: number;
-  /** Late notices with no verify link in the book: not queued. */
   missingLink: string[];
 }
 
@@ -117,7 +102,6 @@ async function buildItems(
   return { items, missingLink };
 }
 
-/** Queues one late notice mail per Miner. A notice already queued or sent is skipped. */
 export async function enqueueLateNotices(input: EnqueueInput): Promise<EnqueueResult> {
   const batchId = crypto.randomUUID();
   const { items, missingLink } = await buildItems(input, 'notice', batchId);
@@ -128,11 +112,6 @@ export async function enqueueLateNotices(input: EnqueueInput): Promise<EnqueueRe
 export type ReminderResult =
   ({ ok: true } & EnqueueResult) | { ok: false; reason: 'stopped' | 'queued' | 'missingLink' };
 
-/**
- * Queues one manual reminder of a late notice (D19: reminders are manual). A Miner who chose
- * "Stop reminders" (D27) gets one per notice: the book counts it before the mail is queued and
- * refuses the next.
- */
 export async function enqueueReminder(
   input: Omit<EnqueueInput, 'notices'> & {
     notice: LateNoticeToMail;
@@ -157,12 +136,10 @@ export async function enqueueReminder(
     batchId
   );
   if (items.length === 0) return { ok: false, reason: 'missingLink' };
-  // Counted in the book first: the server is the one that enforces D27.
   const { editBook } = await import('@/features/corp/taxBook/bookClient');
   await editBook(
     input.senderCharacterId,
     input.corporationId,
-    // The server's reminder count still names the notice by its legacy field.
     { action: 'recordReminder', statementId: input.notice.noticeId },
     { freshToken: true }
   );
@@ -173,20 +150,13 @@ export async function enqueueReminder(
 export interface RemovalMailsInput {
   corporationId: number;
   feederCorporationId: number;
-  /** The officer's character the mail goes from. */
   senderCharacterId: number;
   kind: 'removal' | 'removalCancelled';
-  /** `startsClock`: a copy to the moon owner's CEO or payee (a removal notice only). */
   recipients: readonly { id: number; name: string; startsClock?: boolean }[];
   mail: { subject: string; body: string };
-  /** The removal a notice belongs to (`startedAt`); the queue re-checks it before sending (#4621). */
   removalStartedAt?: number;
 }
 
-/**
- * Queues the removal notice (or its cancellation) once per recipient. The queue sends them
- * paced like any other mail; the first copy to the moon owner side starts the removal's 24 hours.
- */
 export async function enqueueRemovalMails(input: RemovalMailsInput): Promise<number> {
   const batchId = crypto.randomUUID();
   const start = await nextOrder();
@@ -215,7 +185,6 @@ export async function enqueueRemovalMails(input: RemovalMailsInput): Promise<num
   return added.length;
 }
 
-/** A cancelled removal: its notices still waiting (or failed, awaiting Retry) never go out. */
 export async function dropRemovalMails(
   corporationId: number,
   feederCorporationId: number
@@ -224,7 +193,6 @@ export async function dropRemovalMails(
   if (ids.length > 0) await db.corpMailQueue.bulkDelete(ids);
 }
 
-/** The removal's clock started: every copy still to send states that recorded time. */
 export async function stampRemovalMails(
   corporationId: number,
   feederCorporationId: number,
@@ -239,18 +207,15 @@ export async function stampRemovalMails(
   if (stamped.length > 0) await saveItems(stamped);
 }
 
-/** Puts a failed mail back at the end of the line. */
 export async function retryMail(item: MailQueueItem): Promise<void> {
   await saveItem(retryItem(item, await nextOrder()));
 }
 
-/** One short notice per recipient, queued paced behind whatever is waiting. */
 async function queueNotices(
   base: Pick<MailQueueItem, 'corporationId' | 'senderCharacterId' | 'kind'> &
     Partial<Pick<MailQueueItem, 'feederCorporationId'>>,
   notices: readonly {
     recipient: { id: number; name: string };
-    /** Identifies the change, so one change is mailed once per recipient. */
     statementId: string;
     mail: { subject: string; body: string };
   }[]
@@ -276,10 +241,6 @@ async function queueNotices(
   return { queued: added.length };
 }
 
-/**
- * Queues the short "your rate changed" mail, one per recipient. A mail already queued
- * for the same change and recipient is not queued twice.
- */
 export function enqueueRateChangeMail(input: {
   corporationId: number;
   accountingCorporationName: string;
@@ -288,7 +249,6 @@ export function enqueueRateChangeMail(input: {
   change: OwnerRateChange;
   recipients: readonly { id: number; name: string }[];
 }): Promise<{ queued: number }> {
-  // The change is the edit that made it: 8% → 6% → 8% on one day is three mails, not two.
   const { change } = input;
   const event = change.recordedAt ?? `${change.date}:${change.newPct}`;
   return queueNotices(
@@ -309,17 +269,12 @@ export function enqueueRateChangeMail(input: {
   );
 }
 
-/**
- * Queues the short "settled another way" / "paid in ISK again" mail (#6209), one per recipient.
- * One switch (`at`) is mailed once per recipient.
- */
 export function enqueueModeChangeMail(input: {
   corporationId: number;
   accountingCorporationName: string;
   senderCharacterId: number;
   feederCorporationId: number;
   mode: 'normal' | 'settled-otherwise';
-  /** When the switch was made (ms). */
   at: number;
   recipients: readonly { id: number; name: string }[];
 }): Promise<{ queued: number }> {
@@ -343,19 +298,13 @@ export function enqueueModeChangeMail(input: {
   );
 }
 
-/**
- * Queues the "we can't read the moon owner's ledger" mail (#6210), one per recipient, to both
- * sides. One stale spell (`staleSince`) is mailed once per recipient.
- */
 export function enqueueGrantStaleMail(input: {
   corporationId: number;
   accountingCorporationName: string;
   moonOwnerName: string;
   senderCharacterId: number;
   feederCorporationId: number;
-  /** When the ledger was first refused (ms). */
   staleSince: number;
-  /** The UTC day EVE drops the first unread day (`oreLostOn`). */
   lostOn: string;
   recipients: readonly { id: number; name: string }[];
 }): Promise<{ queued: number }> {
@@ -380,15 +329,10 @@ export function enqueueGrantStaleMail(input: {
   );
 }
 
-/**
- * Queues the short "payments now go to" mail (#4653), one per recipient. One change (`at`) is
- * mailed once per recipient.
- */
 export function enqueuePayeeChangeMail(input: {
   corporationId: number;
   senderCharacterId: number;
   feederCorporationId: number;
-  /** When the change was made (ms): one mail per change and recipient. */
   at: number;
   changedByName: string;
   moonOwnerName: string;
@@ -416,11 +360,6 @@ export function enqueuePayeeChangeMail(input: {
   );
 }
 
-/**
- * Queues the mail that tells a pilot how their vetting review was decided. Written by the caller
- * (it needs the reviewer's i18n). The queue lives on this device, so one review is mailed once
- * per device: a second reviewer, or the same one on another device, can queue it again.
- */
 export function enqueueVettingDecisionMail(input: {
   corporationId: number;
   senderCharacterId: number;
@@ -444,11 +383,6 @@ export function enqueueVettingDecisionMail(input: {
   );
 }
 
-/**
- * Queues the mail that tells a member an officer asked for a vetting review. `sentSlot` is when
- * the asking officer last recorded one (0 before any), so each resend is a new mail while a double
- * press before it is recorded queues once.
- */
 export function enqueueVettingRequestMail(input: {
   corporationId: number;
   senderCharacterId: number;
@@ -473,19 +407,12 @@ export function enqueueVettingRequestMail(input: {
   );
 }
 
-/**
- * Queues the mail that tells each pilot how their SRP claims were decided. The mails are
- * written by the caller (they need the officer's i18n); the queue only paces and persists them.
- * A decision is its kind plus the claims it covers, so a double submit mails once per pilot.
- */
 export function enqueueSrpResultMails(input: {
-  /** The officer's corporation: scopes the queue row. 0 while it is not yet known. */
   corporationId: number;
   senderCharacterId: number;
   kind: 'approved' | 'rejected';
   mails: readonly {
     recipient: { id: number; name: string };
-    /** The claims this mail covers (killmail ids). */
     killmailIds: readonly number[];
     subject: string;
     body: string;

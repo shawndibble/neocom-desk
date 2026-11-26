@@ -99,7 +99,6 @@ const NAMES: Record<number, string> = {
 };
 const typeName = (typeId: number) => NAMES[typeId] ?? `#${typeId}`;
 
-/** Two blasters that overheat, five drones, an armor rep, and a shield hardener under heat. */
 function heatedStats(): FittingStats {
   const base = stats();
   return {
@@ -198,7 +197,6 @@ function sectionBody(title: string): HTMLElement {
   return screen.getByRole('heading', { name: title }).closest('section')!;
 }
 
-/** Opens the Pilot or Situation panel from its trigger, and returns it. */
 async function openPanel(name: 'Pilot' | 'Situation'): Promise<HTMLElement> {
   await userEvent.click(screen.getByRole('button', { name: new RegExp(`^${name}`) }));
   return screen.findByRole('dialog', { name });
@@ -246,7 +244,6 @@ describe('FittingStatsSections offense weapon menu', () => {
     modules: [
       { slot: 'high', slotIndex: 0, typeId: 3186, state: 'active', chargeTypeId: 230 },
       { slot: 'high', slotIndex: 1, typeId: 3186, state: 'active', chargeTypeId: 230 },
-      // Same blaster, other charge: another row, not this one.
       { slot: 'high', slotIndex: 2, typeId: 3186, state: 'active', chargeTypeId: 231 },
     ],
     drones: [],
@@ -292,7 +289,6 @@ describe('FittingStatsSections offense weapon menu', () => {
       { button: 0, pointerType: 'mouse' }
     );
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Change charge' }));
-    // The charge it already holds isn't offered again.
     expect(screen.queryByRole('menuitem', { name: 'Antimatter Charge M' })).toBeNull();
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Null M' }));
     expect(actions.charges.load).toHaveBeenCalledWith(229, { fromCargo: true, only: group });
@@ -337,7 +333,6 @@ describe('FittingStatsSections offense', () => {
     expect(offense.getByText('5× Warrior II')).toBeInTheDocument();
     expect(offense.getByText('53.7 DPS')).toBeInTheDocument();
     expect(offense.getByText('120.0 DPS')).toBeInTheDocument();
-    // The total, once in the section header and once as the Total row.
     expect(offense.getAllByText('173.7 DPS')).toHaveLength(2);
     expect(offense.getByText('784 volley')).toBeInTheDocument();
   });
@@ -378,11 +373,9 @@ describe('FittingStatsSections offense', () => {
     });
     const offense = within(sectionBody('Offense'));
 
-    // As the HUD tooltip reads it: the falloff line is optimal + falloff.
     expect(offense.getByText('Optimal range within 2.4 km')).toBeInTheDocument();
     expect(offense.getByText('Falloff range within 8.7 km')).toBeInTheDocument();
     expect(offense.getByText('Range within 62.5 km')).toBeInTheDocument();
-    // A drone flying to its target carries no range.
     expect(offense.getAllByText(/range within [\d.]+ km$/i)).toHaveLength(3);
   });
 
@@ -603,8 +596,6 @@ function armed(weapons: AppliedWeapon[] = [blaster]) {
 }
 
 describe('FittingStatsSections — Applied DPS', () => {
-  // The graphs are lazy; load recharts once up front so the first findBy
-  // doesn't spend its whole timeout on the import.
   beforeAll(async () => {
     await import('./AppliedDpsChart');
   }, 60000);
@@ -868,11 +859,9 @@ describe('FittingStatsSections — remembered layout', () => {
     expect(toggle()).toHaveAttribute('aria-expanded', 'false');
     unmount();
 
-    // A fresh load reads the choice back from storage, not from memory.
     useStatsSectionsPreference.setState({ value: {}, hydrated: false });
     renderSections(stats());
     await waitFor(() => expect(toggle()).toHaveAttribute('aria-expanded', 'false'));
-    // Sections the pilot never touched keep their defaults.
     expect(screen.getByRole('button', { name: 'Offense' })).toHaveAttribute(
       'aria-expanded',
       'true'
@@ -882,11 +871,6 @@ describe('FittingStatsSections — remembered layout', () => {
 });
 
 describe('FittingStatsSections — Overheat all', () => {
-  /**
-   * `heatedStats()` as "Overheat all" hands it over: the heated figures are
-   * the figures, the unheated ones ride along. The blasters' DPS rises with
-   * heat but — as a launcher's does — their volley doesn't.
-   */
   function allOverheatedStats(): FittingStats {
     const base = heatedStats();
     const unheated: FittingStats = {
@@ -924,7 +908,6 @@ describe('FittingStatsSections — Overheat all', () => {
     await openPanel('Situation');
     await user.click(screen.getByRole('checkbox', { name: 'Overheat all' }));
     expect(useOverheatAll.getState().overheatAll).toBe(true);
-    // Every figure moved: the Situation trigger says so with the panel shut.
     await user.keyboard('{Escape}');
     expect(screen.queryByRole('dialog')).toBeNull();
     expect(screen.getByRole('button', { name: /^Situation/ })).toHaveTextContent(
@@ -936,20 +919,16 @@ describe('FittingStatsSections — Overheat all', () => {
     const user = userEvent.setup();
     renderSections(allOverheatedStats());
 
-    // The Defense headline: heated, and what it reads unheated.
     const ehp = screen.getByText('17,400 EHP');
     expect(inWarningTone(ehp)).toBe(true);
     await user.hover(ehp);
     expect(await screen.findByRole('tooltip')).toHaveTextContent('Unheated: 4,619 EHP');
     await user.unhover(ehp);
-    // Colour and hover alone reach neither touch nor screen readers: the value is also in the text.
     expect(ehp).toHaveTextContent('(Unheated: 4,619 EHP)');
     expect(inWarningTone(screen.getByText('81.8 HP/s'))).toBe(true);
 
-    // Offense: the blasters' DPS moved, their volley and the drones didn't.
     const offense = within(sectionBody('Offense'));
     expect(inWarningTone(offense.getByText('61.7 DPS'))).toBe(true);
-    // Heat's own hover keeps the row's sustained figure beside the unheated one.
     await user.hover(offense.getByText('61.7 DPS'));
     expect(await screen.findByRole('tooltip')).toHaveTextContent(
       'Unheated: 53.7 DPS · Sustained with reload: 50.1 DPS'
@@ -957,28 +936,23 @@ describe('FittingStatsSections — Overheat all', () => {
     await user.unhover(offense.getByText('61.7 DPS'));
     expect(inWarningTone(offense.getByText('304 volley'))).toBe(false);
     expect(inWarningTone(offense.getByText('120.0 DPS'))).toBe(false);
-    // The total, in the body and as the section's headline.
     expect(offense.getAllByText('181.7 DPS').every(inWarningTone)).toBe(true);
 
-    // Resists: only the shield's EM cell moved.
     const shield = within(screen.getByRole('row', { name: /^Shield/ }));
     expect(inWarningTone(shield.getByText('60%'))).toBe(true);
     expect(shield.getAllByText('50%').some(inWarningTone)).toBe(false);
     const armor = within(screen.getByRole('row', { name: /^Armor/ }));
     expect(armor.getAllByText('50%').some(inWarningTone)).toBe(false);
 
-    // Applied DPS moves with the weapons' raw DPS.
     const rawDps = screen.getByText('Raw DPS').nextElementSibling!.firstElementChild as HTMLElement;
     expect(inWarningTone(rawDps)).toBe(true);
 
-    // What heat never touches stays in the normal tone.
     expect(screen.getAllByText('350 m/s').some(inWarningTone)).toBe(false);
     expect(screen.getAllByText('20.0 km').some(inWarningTone)).toBe(false);
     for (const section of ['Capacitor', 'Targeting', 'Navigation', 'Drones']) {
       expect(sectionBody(section).querySelector('.text-warning')).toBeNull();
     }
 
-    // No second, "overheated" number beside the heated one.
     expect(screen.queryByText(/overheated$/)).toBeNull();
   });
 
@@ -1024,10 +998,8 @@ describe('FittingStatsSections — Overheat all', () => {
     });
 
     const support = within(sectionBody('Support out'));
-    // The neutralizer drains harder, at the same range.
     expect(inWarningTone(support.getByText('17.6 GJ/s neutralized'))).toBe(true);
     expect(inWarningTone(support.getByText('Range within 10.0 km'))).toBe(false);
-    // The scrambler reaches further, with the same two points.
     expect(inWarningTone(support.getByText('Range within 10.8 km'))).toBe(true);
     await user.hover(support.getByText('Range within 10.8 km'));
     expect(await screen.findByRole('tooltip')).toHaveTextContent('Unheated: Range within 9.0 km');
@@ -1197,7 +1169,6 @@ describe('FittingStatsSections — Support out', () => {
     expect(support.getByText('−34% optimal range, −34% falloff')).toBeInTheDocument();
     expect(support.getByText('−12% explosion velocity, +12% explosion radius')).toBeInTheDocument();
     expect(support.getByText('1.30 gravimetric, 4.00 ladar')).toBeInTheDocument();
-    // An effect under half a percent reads 0%, not −0%.
     expect(support.getByText('0% optimal range, −34% falloff')).toBeInTheDocument();
     expect(support.getByText('2.60 jam strength')).toBeInTheDocument();
   });
@@ -1239,7 +1210,6 @@ describe('FittingStatsSections — Mining', () => {
     expect(mining.getByText('1122 m³ / 32.5 s')).toBeInTheDocument();
     expect(mining.getAllByText('34.5 m³/s').length).toBeGreaterThan(0);
     expect(mining.getByText('124.2K m³/h')).toBeInTheDocument();
-    // Residue is lost on top of the yield, never read as a cut from it.
     expect(mining.getByText('Residue (ore destroyed)')).toBeInTheDocument();
     expect(mining.getByText('12.7 m³/s, 36.8% of yield on top')).toBeInTheDocument();
     expect(mining.queryByText(/−36.8%/)).toBeNull();
@@ -1274,7 +1244,6 @@ describe('FittingStatsSections — Fighters', () => {
 });
 
 describe('FittingStatsSections price', () => {
-  // Named as `loadFittingPrice` names them: by bare typeId, for the section to resolve.
   const PRICE_NAMES: Record<number, string> = { 1: 'Priced Thing', 2: 'Rare Thing' };
   const priceTypeName = (typeId: number) => PRICE_NAMES[typeId] ?? `#${typeId}`;
   const row = (typeId: number, quantity: number, sell: number | null) => ({
@@ -1312,7 +1281,6 @@ describe('FittingStatsSections price', () => {
   });
 
   it('prices on sell orders alone: no Buy fact, and a missing buy order is not "unpriced"', async () => {
-    // Sells at the hub, no buy order there (the order book's usual state for a rare module).
     const sellOnly = { ...row(1, 2, 1500), buyEach: null, buyTotal: null };
     const price = {
       rows: [sellOnly],
@@ -1362,7 +1330,6 @@ describe('FittingStatsSections price', () => {
       </MemoryRouter>
     );
     await user.click(screen.getByRole('button', { name: /^Price/ }));
-    // The compact figure is an IskAmount: shorthand on screen, the exact value in its tooltip.
     const sellFigure = within(sectionBody('Price')).getAllByText('3K')[0]!;
     await user.hover(sellFigure);
     expect(await screen.findByRole('tooltip')).toHaveTextContent('3,000');
@@ -1485,7 +1452,6 @@ describe('FittingStatsSections — column and side panels', () => {
       />
     );
     const pilot = within(await screen.findByRole('dialog', { name: 'Pilot' }));
-    // Always open: nothing to unfold before the list shows.
     expect(pilot.getByRole('heading', { name: 'What to train' })).toBeInTheDocument();
     expect(pilot.getByText('Train list')).toBeInTheDocument();
     expect(onShown).toHaveBeenCalled();
@@ -1517,7 +1483,6 @@ describe('FittingStatsSections — column and side panels', () => {
     expect(screen.queryByRole('combobox', { name: 'Skills' })).toBeNull();
     expect(screen.queryByRole('checkbox', { name: 'Overheat all' })).toBeNull();
     const pilotTrigger = screen.getByRole('button', { name: /^Pilot/ });
-    // Just the label and any skill gap: the name reads in the panel.
     expect(pilotTrigger).toHaveTextContent(/^Pilot3 missing$/);
     expect(pilotTrigger).toHaveAttribute('aria-haspopup', 'dialog');
 
@@ -1527,7 +1492,6 @@ describe('FittingStatsSections — column and side panels', () => {
     expect(pilot.getByText('Missing chip')).toBeInTheDocument();
     expect(pilot.getByRole('combobox', { name: 'Skills' })).toBeInTheDocument();
     expect(pilot.getByRole('heading', { name: 'What to train' })).toBeInTheDocument();
-    // The chip sits just above What to train, below the Skills controls.
     expect(
       pilot
         .getByRole('combobox', { name: 'Skills' })
@@ -1538,7 +1502,6 @@ describe('FittingStatsSections — column and side panels', () => {
         .getByText('Missing chip')
         .compareDocumentPosition(pilot.getByRole('heading', { name: 'What to train' }))
     ).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
-    // No collapsible sections in the Pilot panel.
     expect(pilot.queryByRole('button', { name: 'What to train' })).toBeNull();
     await user.click(pilot.getByRole('button', { name: 'Close' }));
     expect(screen.queryByRole('dialog')).toBeNull();
@@ -1547,7 +1510,6 @@ describe('FittingStatsSections — column and side panels', () => {
     expect(situation.getByText('Mode picker')).toBeInTheDocument();
     expect(situation.getByRole('button', { name: 'Projected effects' })).toBeInTheDocument();
     expect(situation.getByRole('checkbox', { name: 'Overheat all' })).toBeInTheDocument();
-    // The page behind stays live: a column section still toggles with the panel open.
     await user.click(screen.getByRole('button', { name: 'Defense' }));
     expect(screen.getByRole('button', { name: 'Defense' })).toHaveAttribute(
       'aria-expanded',
@@ -1561,8 +1523,6 @@ describe('FittingStatsSections — column and side panels', () => {
     renderSections(stats());
     const panel = await openPanel('Pilot');
     await user.click(screen.getByRole('button', { name: /^Situation/ }));
-    // The same panel, not a remount: a remount sends focus back to the Pilot
-    // trigger and leaves its history entry behind for Back to step through.
     expect(await screen.findByRole('dialog', { name: 'Situation' })).toBe(panel);
     expect(screen.getAllByRole('dialog')).toHaveLength(1);
     expect(screen.getByRole('checkbox', { name: 'Overheat all' })).toBeInTheDocument();
@@ -1616,7 +1576,6 @@ describe('FittingStatsSections — column and side panels', () => {
         />
       </MemoryRouter>
     );
-    // Mounted (its effects have run) with the panel shut: nothing may have started.
     expect(compare).not.toHaveBeenCalled();
     await openPanel('Situation');
     expect(screen.getByRole('button', { name: 'Abyssal' })).toHaveAttribute(
@@ -1702,7 +1661,6 @@ describe('FittingStatsSections previewed change', () => {
         preview={delta}
       />
     );
-    // A stat shows in its section's headline and its body; signature radius sits in the collapsed Targeting section, so only its header dot shows it.
     const named = new Set(
       [...document.querySelectorAll('[data-verdict]')].map((el) =>
         el.parentElement?.previousElementSibling?.textContent?.replace(/ [\d.,]+ to .*$/, '')

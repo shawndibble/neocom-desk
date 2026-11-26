@@ -1,12 +1,3 @@
-/**
- * The Jump Range filter's controls, shared by Market Browser, Item Offers and
- * BPC Sourcing: the range select, the Current System it measures from, and a
- * note for when it cannot measure at all.
- *
- * The range select is a plain controlled field so it can sit inside a
- * `FilterBar`'s draft. The Current System picker writes its setting straight
- * away — it is where the pilot is, not part of any one page's filter.
- */
 import { useTranslation } from 'react-i18next';
 import {
   LiveNote,
@@ -26,12 +17,7 @@ interface JumpRangeSelectProps {
   value: JumpRange;
   onChange: (next: JumpRange) => void;
   className?: string;
-  /**
-   * What "no range" reads as. Market Browser names the scope its book falls
-   * back to (the header's hub or region); elsewhere it is "Any distance".
-   */
   anyLabel?: string;
-  /** Draw the accent border: the range is set away from its default. */
   active?: boolean;
 }
 
@@ -63,10 +49,6 @@ interface CurrentSystemPickerProps {
   current: CurrentSystemState;
 }
 
-/**
- * "From: Jita" — a `SolarSystemPicker` whose pick is the Current System
- * setting, with a way back to the game location.
- */
 export function CurrentSystemPicker({ current }: CurrentSystemPickerProps) {
   const { t } = useTranslation();
   const currentName = useSystemName(current.systemId);
@@ -80,8 +62,6 @@ export function CurrentSystemPicker({ current }: CurrentSystemPickerProps) {
     <SolarSystemPicker
       value={current.systemId}
       onChange={(systemId) => current.pick(systemId)}
-      // A pick made before ESI answers would record no game location, and
-      // the answer arriving a moment later would then clear it.
       disabled={!current.loaded}
       ariaLabel={t('jumpRange.changeSystem', { current: label })}
       triggerLabel={
@@ -108,7 +88,6 @@ export function CurrentSystemPicker({ current }: CurrentSystemPickerProps) {
   );
 }
 
-/** Why a set range is not filtering, or nothing when it is (or is off). */
 export function JumpRangeNote({ status }: { status: JumpRangeStatus }) {
   const { t } = useTranslation();
   if (status !== 'no-origin' && status !== 'unknown') return null;

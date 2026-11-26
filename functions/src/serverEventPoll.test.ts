@@ -106,7 +106,6 @@ describe('pollServerEvents', () => {
     ]);
     await pollServerEvents(deps);
     expect(sent).toEqual([]);
-    // Skipped, not queued: the reading still advances.
     expect(saved.get('A')?.['7'].priceAlerts?.[0].price).toBe(11);
   });
 
@@ -133,7 +132,7 @@ describe('pollServerEvents', () => {
 
 describe('pollServerEvents: stale devices and run counts (issue #5144)', () => {
   const DAY = 24 * 3_600_000;
-  const SLOT = 4_000 * 15 * 60_000; // the hourly slot of the back-off
+  const SLOT = 4_000 * 15 * 60_000;
   const stale = (days: number, at: number) => device({ updatedAtMs: at - days * DAY });
   const at = (now: number) => (d: ServerPollDeps) => ({ ...d, now: () => now });
 

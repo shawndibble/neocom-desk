@@ -1,9 +1,3 @@
-/**
- * What a colony's factories eat that nothing on the colony supplies: the
- * "brought in" line of the Colonies card. Judged from pin configuration alone
- * (an extractor's product, a factory's schematic), never from measured rates,
- * so an extractor with an unknown rate still counts as local supply. Pure.
- */
 import type { PlanetPin } from '@/esi/endpoints';
 import type { PiData } from '@/sde/types';
 import { pinRole, factorySchematicId } from '@/engine/pi/colonyPins';
@@ -14,9 +8,7 @@ export interface ImportedInput {
   typeId: number;
   name: string;
   unitsPerDay: number;
-  /** Null when the input's volume is not in the data. */
   m3PerDay: number | null;
-  /** Built factory pins running a schematic that eats this input. */
   factories: number;
 }
 

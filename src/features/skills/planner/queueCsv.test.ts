@@ -38,7 +38,6 @@ const context: QueueCsvContext = {
   ]),
 };
 
-/** The editor's merged rows for `entries`, as `usePlanRows` builds them. */
 function mergedFor(
   entries: readonly PlanEntry[],
   scheduled: readonly ScheduledStep[],
@@ -84,10 +83,10 @@ describe('queueCsvRows', () => {
   it('lists entries in plan position, with a status row where an entry has no step', () => {
     const entries: PlanEntry[] = [
       { skillTypeID: 1, targetLevel: 4 },
-      { skillTypeID: 5, targetLevel: 3 }, // trained
+      { skillTypeID: 5, targetLevel: 3 },
       { skillTypeID: 2, targetLevel: 1 },
-      { skillTypeID: 6, targetLevel: 2 }, // ahead in the live queue
-      { skillTypeID: 99, targetLevel: 1 }, // unknown
+      { skillTypeID: 6, targetLevel: 2 },
+      { skillTypeID: 99, targetLevel: 1 },
     ];
     const result = queueCsvRows({
       ...base,

@@ -1,24 +1,3 @@
-/**
- * What a multi-planet chain earns: the most of one product a set of colonies
- * makes in full, and the Goal Plan's ISK at that rate.
- *
- * `planBest` answers "make N a day": it sizes the host's factories for the
- * whole goal, so a goal beyond what the colonies supply is not made partly but
- * fails on the host's budget. The capacity question — "what do these planets
- * make, and is it worth it" — is therefore a search over the goal rate: double
- * from a small rate while the plan reaches it in full, then bisect the last
- * step. The solver is greedy, so reaching a rate is not strictly monotone; the
- * search is capped and keeps the best rate it saw reached, never a guess.
- *
- * The figure is the plan's absolute `netPerHour` a day (sales after sales tax,
- * less customs and anything bought), never a Lift over a Baseline: for
- * hypothetical colonies what they "would earn anyway" means nothing. A caller
- * on real colonies reads the plan's `perColony` for the ones the chain uses.
- * Nothing is bought unless `allowBuy`: the policy's `buyTiers` is cleared, since
- * a chain that buys its inputs is a trade spread, not a planet chain.
- *
- * Pure: colonies, policy, prices and `PiData` are parameters.
- */
 import type { PiData } from '@/sde/types';
 import type { GoalPlan, JumpsFn, PlannerColony, PlannerPolicy, PriceBooks } from './goalTypes';
 import { planBest, type BestPlan } from './planBest';
@@ -28,49 +7,28 @@ export interface ChainEstimateInput {
   colonies: readonly PlannerColony[];
   policy: PlannerPolicy;
   books: PriceBooks;
-  /**
-   * Jumps between real colonies, when the caller knows them: the planner then
-   * prefers the nearer host and every leg carries its distance. Hypothetical
-   * planets have none.
-   */
   jumps?: JumpsFn;
-  /**
-   * Keep the policy's `buyTiers`, so the plan may buy inputs at the hub. Off by
-   * default: a chain that buys its inputs is a trade spread, so the All
-   * products and Map figures never buy. The whole-account plan turns it on
-   * when the pilot has said which tiers they will buy.
-   */
   allowBuy?: boolean;
-  /** Units a day per type the hub absorbs; sales past it are unsold. See `planEconomics`. */
   salesCapPerDay?: ReadonlyMap<number, number>;
 }
 
 export type ChainEstimate =
   | {
       status: 'estimated';
-      /** The most units a day the colonies make in full. */
       unitsPerDay: number;
-      /** The plan's net ISK a day at that rate. */
       iskPerDay: number;
-      /** m³ a week moved over every leg, once. */
       m3PerWeek: number;
       best: BestPlan;
     }
-  /** The plan reaches a rate, but a sale or purchase on it has no price: unknown, never zero. */
   | { status: 'needs-price'; missing: number[] }
-  /** The colonies make none of it in full at any rate tried. */
   | { status: 'no-plan' };
 
-/** The first rate tried, in units a day: below any chain worth naming. */
 const START_UNITS_PER_DAY = 0.25;
-/** Doublings before giving up on finding a ceiling (0.25 × 2^20 ≈ 260k a day). */
 const MAX_DOUBLINGS = 20;
-/** Bisection steps between the last reached rate and the first missed one. */
 const BISECT_STEPS = 6;
 
 const FULL = 1 - 1e-9;
 
-/** Every goal reached in full with no gap named. */
 export function reachesInFull(plan: GoalPlan): boolean {
   return (
     plan.shortfalls.length === 0 &&

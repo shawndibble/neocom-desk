@@ -28,11 +28,6 @@ describe('usePriceHistoryRange', () => {
     expect(usePriceHistoryRange.getState().value).toBe('7d');
   });
 
-  /**
-   * A range dropped between releases is still a string, so the `typeof`
-   * default would wave it through — and one the filter has no day count for
-   * draws an empty chart instead of failing loudly.
-   */
   it('falls back to 30 days for a range the filter no longer knows', async () => {
     await db.settings.put({ key: PRICE_HISTORY_RANGE_KEY, value: '5y' });
     await usePriceHistoryRange.getState().hydrate();

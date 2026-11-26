@@ -26,11 +26,6 @@ interface CashFlowPanelProps {
   characters: readonly FanOutCharacter[];
 }
 
-/**
- * Balance's Cash flow: ISK earned and spent over 7, 30 or 90 days with the
- * Journal's own daily bars. A day on the bars opens the Journal on that day.
- * The Journal tab keeps the by-source breakdown.
- */
 export function CashFlowPanel({ characters }: CashFlowPanelProps) {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -52,7 +47,6 @@ export function CashFlowPanel({ characters }: CashFlowPanelProps) {
     return () => {
       cancelled = true;
     };
-    // `key` stands for `characters`: a new array of the same Characters must not reload.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
 

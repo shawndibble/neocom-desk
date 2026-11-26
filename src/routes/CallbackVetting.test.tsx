@@ -50,7 +50,6 @@ beforeEach(async () => {
   await db.tokens.clear();
 });
 
-/** A Vetting round trip, in the layout `startVettingLogin` writes. */
 function stashVettingLogin(state: string, reviewId?: string): void {
   sessionStorage.setItem(
     `neocom.sso.pkce.${state}`,
@@ -63,7 +62,6 @@ function stashVettingLogin(state: string, reviewId?: string): void {
   );
 }
 
-/** Stands in for the page the login was pressed on: takes the login the callback left for it. */
 function Landing({ name }: { name: string }) {
   const location = useLocation();
   const login = useConsumedVettingLogin();
@@ -99,16 +97,13 @@ describe('Callback, Vetting round trip', () => {
       await screen.findByText(new RegExp(`apply at /apply/98000001: ok CCP Alpha ${CHAR_ID}`))
     ).toBeInTheDocument();
     expect(screen.getByRole('status')).toHaveTextContent(ACCESS);
-    // Not in the history entry, which a reload, Back or a copied tab would hand out again.
     expect(screen.getByRole('status')).toHaveTextContent('state null');
     expect(JSON.stringify(window.history.state)).not.toContain(ACCESS);
     expect(JSON.stringify({ ...sessionStorage })).not.toContain(ACCESS);
     expect(JSON.stringify({ ...localStorage })).not.toContain(ACCESS);
-    // StrictMode ran the effect twice; the one-time code was exchanged once.
     expect(tokenRequests).toBe(1);
     expect(await db.characters.count()).toBe(0);
     expect(await db.tokens.count()).toBe(0);
-    // The refresh token SSO answered with is nowhere: not in state, not in storage.
     expect(document.body.textContent).not.toContain('vetting-refresh-1');
     expect(JSON.stringify({ ...sessionStorage })).not.toContain('vetting-refresh-1');
     expect(JSON.stringify({ ...localStorage })).not.toContain('vetting-refresh-1');
@@ -132,7 +127,6 @@ describe('Callback, Vetting round trip', () => {
     stashVettingLogin('state-v');
     const first = renderCallback('?code=good-code&state=state-v');
     await screen.findByText(/apply at \/apply\/98000001: ok/);
-    // The page drops the login in an effect after it commits, which can trail the text.
     await waitFor(() => expect(heldVettingLogin()).toBeNull());
     first.unmount();
     render(

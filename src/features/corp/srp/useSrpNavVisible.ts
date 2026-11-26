@@ -4,11 +4,6 @@ import { useActiveCorporationId } from '../owner';
 import { isNpcCorporationId } from '@/esi/entityIds';
 import { probeSrp, readSrpProbe, subscribeSrpProbe } from './srpNavProbe';
 
-/**
- * Whether the SRP nav entry shows for a pilot with no Corp Access: their corporation has SRP on
- *. Hidden, never locked, and hidden while unknown. One gate for the rail, the More
- * sheet and the command palette, like `useCorpNavVisible`.
- */
 export function useSrpNavVisible(): boolean {
   const characterId = useActiveCharacter((s) => (s.hydrated ? s.activeCharacterId : null));
   const corporationId = useActiveCorporationId();

@@ -11,8 +11,6 @@ import {
 } from '../../serverEventCopy';
 import type { DomainCopy, NoNames } from './shared';
 
-// The wording is shared with the service worker, which renders the same fires
-// when the backend pushes them to a closed app (issue #5121).
 const t = (key: string, vars?: Record<string, unknown>) => i18n.t(key, vars);
 
 export const communityJoinRequestCopy: DomainCopy<CommunityJoinRequestFire, NoNames> = {

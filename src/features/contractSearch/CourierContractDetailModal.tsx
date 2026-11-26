@@ -1,24 +1,3 @@
-/**
- * Full detail for one public courier contract, opened from a row in the
- * Contracts page's Courier tab.
- *
- * Unlike `PublicContractDetailModal` (item_exchange/auction contracts), a
- * courier haul has no item list — ESI's public items route only ever answers
- * for the two contract types that actually carry one — and no single
- * location, only an origin and a destination. So this is its own, simpler
- * modal rather than a shared one: every field it shows is already resolved on
- * `CourierRouteRow` (`resolveCourierRoutes`, local SDE snapshots only), so
- * unlike its sibling it needs no fetch of its own and never shows a loading
- * state.
- *
- * Laid out in three registers rather than one strip of equal chips (issue
- * #975). A hauler decides on two figures — what it pays, and what it pays per
- * jump, which is what the board itself ranks on — so those lead at display
- * size. The route comes next, because the names are long and a truncated
- * region hides the one fact the row could not already show. Everything else
- * is a constraint to check rather than a figure to weigh, and sits in one
- * quiet grid below.
- */
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import { Link } from 'react-router-dom';
@@ -68,75 +47,29 @@ import { RISK_COPY, WARNING_RISKS } from '@/features/contractSearch/courierRiskL
 import { useHydratedStore } from '@/lib/useHydratedStore';
 import { Well } from '@/components/ui/Well';
 
-/**
- * This haul's distance, in the states the board itself has.
- *
- * `pending` is the jump snapshot still being read, which must not render as
- * "no route" — that is a confident wrong answer where the honest one is "we
- * cannot say yet". A known `null` count is the two cases the table also folds
- * together: an endpoint nothing local places, and a system no stargate
- * reaches. Neither yields a distance, and the modal says so the same way.
- */
 export type CourierJumps = { kind: 'pending' } | { kind: 'known'; count: number | null };
 
-/**
- * What the board found running this haul's lane backwards (issue #941).
- *
- * `unresolved` is a haul with an end nothing local places, which has no region
- * to swap and therefore no lane to look up. It is a separate state rather than
- * a count of zero on purpose: zero reads as "nobody is hauling back", and the
- * truth here is "we cannot tell".
- *
- * `unplaceable` is the return hauls leaving the right region whose own drop-off
- * cannot be placed, so the lane cannot be measured for them either. They are
- * missing from `count` by construction; saying how many keeps a small count
- * from reading as a complete one.
- */
 export type ReverseLane =
   { kind: 'unresolved' } | { kind: 'counted'; count: number; unplaceable: number };
 
 export interface CourierContractDetailModalProps {
   row: CourierRouteRow;
   regionNames: ReadonlyMap<number, string>;
-  /** Resolved by the board, which already holds the graph read for every row. */
   jumps: CourierJumps;
-  /** How far above the corpus median it pays, or `null` where that cannot be stated. */
   goingRateMultiple: number | null;
-  /** Which route the board is measuring, so the exposure below counts the same one. */
   preference: RoutePreferenceKind;
-  /** The return leg, resolved by the board — it holds the corpus and the filter. */
   reverseLane: ReverseLane;
-  /** Where focus lands on close when the row that opened this is gone (the reverse-lane search filters it out). */
   returnFocusFallback?: () => HTMLElement | null;
-  /** The active character, whose access list decides whether a player structure's name is readable. */
   characterId: number | null;
-  /**
-   * A player structure end this modal placed once ESI named it — its system
-   * comes back with its name. The board swaps it in, so the haul is measured
-   * (jumps, route, going rate) like any station haul.
-   */
   onStructurePlaced?: (endpoint: CourierEndpoint) => void;
-  /** Swap the two region filters and go look, closing this. */
   onSearchReverseLane: () => void;
   onClose: () => void;
 }
 
-/**
- * The systems this haul is flown through at 0.5 or below, and which of them are
- * the ones haulers are most often killed in — resolved when the detail opens.
- * One route on demand, never one per row: a path per row is the fan-out the
- * local snapshots exist to avoid, and this is where a hauler is deciding.
- *
- * `null` while it is still being worked out, which is a different thing from
- * having no answer.
- */
 function useRouteExposure(
   row: CourierRouteRow,
   preference: RoutePreferenceKind
 ): RouteExposure | null {
-  // Tagged with the rules it was measured under, so a change to Travel
-  // Settings while this is open reads as "measuring" rather than showing the
-  // old path under the board's new jump count.
   const [measured, setMeasured] = useState<{ key: string; exposure: RouteExposure } | null>(null);
   const originSystemId = row.origin.systemId;
   const destinationSystemId = row.destination.systemId;
@@ -158,15 +91,6 @@ function useRouteExposure(
   return measured?.key === routeKey ? measured.exposure : null;
 }
 
-/**
- * A player structure's name, asked for once when its haul is opened. ESI names
- * a structure only to a character on its access list, so a refusal is a normal
- * answer: it reads "Unknown/Undockable", not an error. With no active
- * character nothing was asked, so the id stays — that is not a refusal.
- *
- * The same answer says which system the structure is in, which is the one fact
- * the board lacked to measure the haul: it goes to `onPlaced`.
- */
 type StructureLookup = 'pending' | 'unreadable' | { name: string };
 
 function useStructureLookup(
@@ -177,8 +101,6 @@ function useStructureLookup(
   const wanted =
     endpoint.resolution === 'structure' && endpoint.name === null && characterId !== null;
   const [answer, setAnswer] = useState<{ id: number; result: string | null } | null>(null);
-  // Read through a ref so a fresh callback, or a new object for the same
-  // unplaced end, does not ask ESI again — the request depends on the id alone.
   const latest = useRef({ endpoint, onPlaced });
   useEffect(() => {
     latest.current = { endpoint, onPlaced };
@@ -191,15 +113,11 @@ function useStructureLookup(
       .then(async (structure) => {
         if (cancelled) return;
         setAnswer({ id: endpoint.locationId, result: structure?.name ?? null });
-        // ESI's schema requires it, but a malformed cached row must not place
-        // an end in system `undefined`.
         if (typeof structure?.solar_system_id !== 'number') return;
         const placed = await placeStructureEndpoint(latest.current.endpoint, {
           name: structure.name,
           systemId: structure.solar_system_id,
         }).catch(() => null);
-        // Not gated on `cancelled`: where a structure sits is true whether or
-        // not this detail is still open, and the board outlives it.
         if (placed) latest.current.onPlaced?.(placed);
       });
     return () => {
@@ -211,7 +129,6 @@ function useStructureLookup(
   return answer.result === null ? 'unreadable' : { name: answer.result };
 }
 
-/** The station name, linked to its Place Info once it resolved; the `#id` fallback stays plain. */
 function EndpointPlaceName({
   endpoint,
   characterId,
@@ -235,16 +152,6 @@ function EndpointPlaceName({
   return <>{endpointName(endpoint)}</>;
 }
 
-/**
- * Where this end sits, as one dim line: system and its security status, then
- * region — "Jita 0.9 · The Forge".
- *
- * The number rather than the space band word, the same as the board's route
- * cell: "Highsec" tells a 0.5 gank system and a 1.0 core system apart not at
- * all, and the number carries the band anyway. An end with no security (a
- * system nothing local places) prints none rather than an "unknown" — the
- * structure label and the bare id above already say why it is unplaced.
- */
 function EndpointPlace({
   endpoint,
   regionNames,
@@ -255,8 +162,6 @@ function EndpointPlace({
   structureLabel: string;
 }) {
   const parts: ReactNode[] = [];
-  // A structure names itself before anything else: its bare id is the line
-  // above, and "#1039…" alone does not say *why* there is no name.
   if (endpoint.resolution === 'structure') parts.push(structureLabel);
   if (endpoint.systemName !== null || endpoint.security !== null) {
     parts.push(
@@ -287,10 +192,6 @@ function EndpointPlace({
   );
 }
 
-/**
- * One row of the benchmark readout: a short value under a label, with the
- * reasoning in the label's tooltip so it never has to be read to scan the row.
- */
 function BenchmarkRow({
   label,
   tip,
@@ -323,7 +224,6 @@ function BenchmarkRow({
   );
 }
 
-/** Label over value, the shape every figure below the hero takes. */
 function Figure({ label, value, note }: { label: string; value: ReactNode; note?: string }) {
   return (
     <div className="flex min-w-0 flex-col gap-px">
@@ -356,12 +256,7 @@ export function CourierContractDetailModal({
   useHydratedStore(useCourierCollateralRatio);
   const jumpCount = jumps.kind === 'known' ? jumps.count : null;
   const jumpRate = jumps.kind === 'known' ? iskPerJump(row.reward, jumpCount) : null;
-  // Spelled out here, where the decision is actually made — the row only has
-  // room for a marker. Every one names a condition and what it would cost;
-  // none claims to know whether this player in particular has access.
   const endpointRisks = courierRisks(row);
-  // Contract-scoped rather than endpoint-scoped, so they are added here rather
-  // than derived from the two ends (issues #946, #1720).
   const risks: CourierRiskKind[] = [
     ...endpointRisks,
     ...(paysFarAboveGoingRate(goingRateMultiple) ? (['over-rate'] as const) : []),
@@ -372,28 +267,15 @@ export function CourierContractDetailModal({
   const exposure = useRouteExposure(row, preference);
   const planRouteHref = courierPlanRouteHref(row.origin, row.destination, preference);
   const lawless = useLawlessSystems();
-  // A same-system haul has a one-system path, which is no trip to review.
   const path = exposure?.kind === 'known' && exposure.path.length > 1 ? exposure.path : null;
   const [showPath, setShowPath] = useState(false);
-  // Where the return hauls set out from, which is this haul's drop-off region.
-  // Narrowed at the render site rather than defaulted to a blank here: a lane
-  // is only counted when both ends have a region, so there is no honest empty
-  // case to write — only an unnamed one, which shows its id.
   const returnRegionId = row.destination.regionId;
   const measuring = jumps.kind === 'pending';
   const floor = measuring ? null : communityFloorReward(collateral, jumpCount);
-  // Said as a share only when short of the floor — the case where two bare
-  // figures side by side read as unrelated to the multiple above (#1720).
   const shareOfFloor = floorShare(row.reward, floor);
   const belowFloor = shareOfFloor !== null && shareOfFloor < 1;
-  // Pinned to when the detail opened rather than read each render: a figure
-  // that ticks while the reader looks at it is a moving target, and "as of
-  // when you opened this" is the honest reading of a countdown anyway.
   const [openedAt] = useState(() => Date.now());
   const expiresIn = hoursToExpiry(row.dateExpired, openedAt);
-  // A nullsec end is a note, not an alarm. Heading a section of nothing but
-  // notes with a warning-coloured "Before you accept" would contradict the
-  // sentence underneath it, which says outright that it is not a warning.
   const warns = risks.some((kind) => WARNING_RISKS.includes(kind));
 
   const regionName = (regionId: number) => regionNames.get(regionId) ?? `#${regionId}`;
@@ -406,18 +288,9 @@ export function CourierContractDetailModal({
     />
   );
 
-  /**
-   * The exact rate and what it is quoted over, under the compact figure —
-   * the same pairing the reward gets. Compact notation rounds to one fraction
-   * digit, so two hauls paying 1,240,000 and 1,190,000 per jump both read
-   * "1.2M"; this is where the figure a hauler actually compares on lives.
-   */
   const jumpSpan = () => {
     if (jumps.kind === 'pending') return t('common.loading');
     if (jumpCount === null || jumpRate === null) return t('contractSearch.jumpsUnavailableHint');
-    // A same-system haul is a real job with no trip, and `iskPerJump` pays it
-    // its whole reward as the rate. "over 0 jumps" would read as a division
-    // nobody made.
     if (jumpCount === 0) {
       return t('contractSearch.sameSystemSpan', { isk: formatIsk(jumpRate) });
     }
@@ -436,12 +309,6 @@ export function CourierContractDetailModal({
       })}
     >
       <div className="flex flex-col gap-3">
-        {/*
-         * Reward and ISK/jump at display size, side by side. ISK/jump is the
-         * board's own default sort and was absent from this modal entirely —
-         * a hauler could rank on it in the table and then lose it on the one
-         * screen where the decision is made.
-         */}
         <div className="grid grid-cols-2 items-end gap-3">
           <div className="flex flex-col gap-0.5">
             <span className={eyebrowClassName}>{t('contractSearch.rewardColumn')}</span>
@@ -455,9 +322,6 @@ export function CourierContractDetailModal({
           <div className="flex flex-col gap-0.5 text-right">
             <span className={eyebrowClassName}>{t('contractSearch.perJumpLabel')}</span>
             <span
-              // Accent marks the figure the board ranks on, so it is spent
-              // only where there is a rate to rank: a free haul's honest zero
-              // and an unmeasurable route both read as quiet.
               className={`text-3xl leading-tight font-semibold tabular-nums ${
                 jumpRate ? 'text-accent' : 'text-text-dim'
               }`}
@@ -471,9 +335,6 @@ export function CourierContractDetailModal({
         <Well size="lg" as="section" className="flex flex-col gap-2">
           <div className="flex flex-col gap-0.5">
             <span className={eyebrowClassName}>{t('contractSearch.pickUpLabel')}</span>
-            {/* Wraps rather than truncates: the station name and its region
-                are the whole reason this row exists, and the old `truncate`
-                clipped the region off both ends. */}
             <span className="text-sm">
               <EndpointPlaceName
                 endpoint={row.origin}
@@ -486,12 +347,6 @@ export function CourierContractDetailModal({
 
           <div className="flex items-center gap-2 text-[0.6875rem] text-text-dim">
             <span aria-hidden className="h-4 w-px bg-line" />
-            {/*
-              A link only once there is a path to show and a trip to show it
-              for — the same rule as the reverse lane below: a control that
-              opens nothing is a dead link. The count stays the board's, which
-              measures the same route under the same rules as the path.
-            */}
             {path !== null && jumpCount !== null ? (
               <button
                 type="button"
@@ -514,8 +369,6 @@ export function CourierContractDetailModal({
           </div>
 
           {path !== null && showPath && (
-            // In place between the two ends, so it reads as the trip itself.
-            // Ordered: the order is the route.
             <ol
               aria-label={t('contractSearch.routePathLabel')}
               className="flex flex-col gap-0.5 border-l border-line pl-3 text-xs"
@@ -525,8 +378,6 @@ export function CourierContractDetailModal({
                   <span>{system.name ?? `#${system.systemId}`}</span>
                   {system.security !== null && <SecurityStatus security={system.security} />}
                   {system.chokepoint && (
-                    // The same tag and hint Route Safety gives it, so the term
-                    // is explained wherever a route is listed.
                     <Tooltip content={t('travel.chokepointHint')} openOnTap>
                       <span tabIndex={0} className="text-[0.6875rem] text-warning">
                         {t('travel.chokepoint')}
@@ -559,23 +410,10 @@ export function CourierContractDetailModal({
             )}
           </div>
 
-          {/*
-            The way home, as one line rather than a nested table. At this corpus
-            size — every public courier contract in New Eden, under 620 rows —
-            the reverse set for a given region pair is typically none or one, so
-            a table would exist to render "none" most of the time, and would owe
-            a row cap, an empty state and a second unresolved-endpoint note for
-            the privilege. A count that is also the link needs none of that.
-
-            Region to region, which is coarse: "somewhere in Domain" is not
-            necessarily near where this load is dropped. It is a prompt to go
-            look, not a matched return trip.
-          */}
           <div className="flex flex-col gap-1 border-t border-line pt-2 text-xs">
             {reverseLane.kind === 'unresolved' ? (
               <span className="text-text-dim">{t('contractSearch.reverseLaneUnresolved')}</span>
             ) : reverseLane.count > 0 ? (
-              // `-my-1.5` cancels `min-h-9`'s added height so the section doesn't grow — the 36px only exists as invisible hit area bleeding into the border-t/pt-2 gap above and the section's own p-3 below; `md:` reverts both so desktop is unchanged.
               <button
                 type="button"
                 onClick={onSearchReverseLane}
@@ -584,10 +422,6 @@ export function CourierContractDetailModal({
                 {t('contractSearch.reverseLaneCount', { count: reverseLane.count })}
               </button>
             ) : (
-              // Plain text, never a button: a control that leads to an empty
-              // board is a dead link whether or not it is disabled. Said in one
-              // sentence when there are unplaceable hauls behind it, because
-              // "none" followed by "N *more*" is more than none.
               <span className="text-text-dim">
                 {reverseLane.unplaceable > 0 && returnRegionId !== null
                   ? t('contractSearch.reverseLaneNoneUnplaceable', {
@@ -635,16 +469,6 @@ export function CourierContractDetailModal({
           </Well>
         )}
 
-        {/*
-          What the rate multiple is measured against, and the conditions the
-          documented ganking shape travels with. Every line is arithmetic over
-          the snapshot: none of it says the contract is a scam, because nothing
-          here can know that — the app cannot value a courier contract's cargo,
-          which carries no item lines, or read anyone's intent.
-
-          Each row is a label and one short value; the reasoning behind it sits
-          in the label's tooltip (DESIGN.md §6c), so the section reads at a glance.
-        */}
         <Well size="lg" as="section" className="flex flex-col gap-2">
           <h3 className={eyebrowClassName}>{t('contractSearch.goingRateBenchmarkLabel')}</h3>
           <ValueList variant="plain">
@@ -669,9 +493,6 @@ export function CourierContractDetailModal({
             {floor !== null && (
               <BenchmarkRow
                 label={t('contractSearch.benchmark.floorLabel')}
-                // A high multiple beside a short floor reads as a contradiction
-                // unless the two bases are named: one is cargo size, the other
-                // collateral.
                 tip={`${t('contractSearch.benchmark.floorTip')}${
                   belowFloor && goingRateMultiple !== null
                     ? ` ${t('contractSearch.communityFloorVsGoingRate')}`
@@ -679,8 +500,6 @@ export function CourierContractDetailModal({
                 }`}
               >
                 {formatIskAuto(floor)}
-                {/* Said as a share only when short of the floor — the case where
-                    two bare figures read as unrelated to the multiple above (#1720). */}
                 {belowFloor && (
                   <span className="text-warning">
                     {' · '}
@@ -697,10 +516,6 @@ export function CourierContractDetailModal({
                 tip={t('contractSearch.freighterVolumeNote', {
                   volume: formatMagnitude(FREIGHTER_VOLUME_M3),
                 })}
-                // Warning-toned only where it is actually the ganking shape:
-                // the bait is an oversized load *on a lowsec route*. A 400,000
-                // m³ Jita-to-Perimeter haul is a freighter job, which is worth
-                // stating and is not a warning.
                 tone={
                   exposure?.kind === 'known' && exposure.exposedSystems > 0 ? 'warning' : 'default'
                 }
@@ -717,11 +532,6 @@ export function CourierContractDetailModal({
                 {exposure.chokepoints.join(', ')}
               </BenchmarkRow>
             )}
-            {/*
-              Said either way: silence for a clean route reads the same as
-              silence for a route we could not work out, and the rule on this
-              surface is to state what is not in the figure.
-            */}
             <BenchmarkRow
               label={t('contractSearch.benchmark.routeLabel')}
               tip={
@@ -748,17 +558,9 @@ export function CourierContractDetailModal({
           </ValueList>
         </Well>
 
-        {/*
-         * Constraints rather than figures to weigh: whether the hold fits,
-         * whether the deadline is long enough, and the two ids. One quiet
-         * grid, so nothing here competes with the two figures above.
-         */}
         <div className="grid grid-cols-2 gap-x-3 gap-y-2.5 text-sm sm:grid-cols-3">
           <Figure
             label={t('contractSearch.collateralColumn')}
-            // A haul asking no collateral says so the same way the table cell
-            // does. "0 ISK" is arithmetically true and reads as a figure the
-            // issuer typed, which is the opposite of "none was asked for".
             value={collateral === 0 ? '—' : <IskAmount value={collateral} />}
             note={
               collateral === 0
@@ -803,7 +605,6 @@ export function CourierContractDetailModal({
               </span>
             }
           />
-          {/* Its own cell, so the button keeps its natural width; nothing renders when unavailable. */}
           <OpenInEveButton
             kind="contract"
             id={row.contractId}

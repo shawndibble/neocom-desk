@@ -1,55 +1,27 @@
-/**
- * The Community share picker's rules (issue #3599, ADR 0018), kept pure so the
- * component only draws. A Character's owned blueprints are bucketed into the
- * market-group tree; a selection is the set of blueprint *type ids* the
- * Character chose to share. Nothing is selected by default.
- *
- * A type id, not an item id: copies are consumed and re-seeded all the time,
- * and the later push (#3600) expands a chosen type to whatever instances are
- * owned then. Blueprints the market doesn't list (most T2 originals) go in a
- * trailing Other bucket so every owned blueprint can still be picked.
- *
- * Every row is a blueprint, so the tree's roots are the children of the
- * "Blueprints & Reactions" market group (`BLUEPRINT_ROOT_GROUP_ID`), not that
- * group itself. A blueprint the market doesn't list there (most T2 originals,
- * or the odd one filed under Trade Goods) is placed by what it makes: the
- * product's market group is looked up in `blueprintGroupOfProductGroup` (where
- * the listed blueprints making that kind of product already sit); failing
- * that its path is followed down the blueprint tree by name, and whatever part
- * of the path has no blueprint twin is added as extra groups.
- */
-
 import { byName } from '../compare';
 
-/** The market-group tree row, as `sde/marketTypes.ts` publishes it. */
 export interface ShareMarketGroup {
   id: number;
   name: string;
   parentId: number | null;
 }
 
-/** One owned blueprint type. `marketGroupId` is null when the market doesn't list it. */
 export interface BlueprintTypeInfo {
   typeId: number;
   name: string;
   marketGroupId: number | null;
-  /** The market group of what the blueprint makes; places it when its own group can't. */
   productMarketGroupId?: number | null;
 }
 
 export const OTHER_GROUP_ID = -1;
-/** The market group every blueprint and reaction formula hangs under. */
 export const BLUEPRINT_ROOT_GROUP_ID = 2;
-/** Groups added for a product's path get ids no market group has: below Other's. */
 const productGroupId = (marketGroupId: number) => -(marketGroupId + 1000);
 
 export interface ShareGroup {
   id: number;
   name: string;
-  /** Owned blueprint types listed directly in this group, by name. */
   types: BlueprintTypeInfo[];
   children: ShareGroup[];
-  /** Owned blueprint types in this group and everything below it. */
   total: number;
 }
 
@@ -64,7 +36,6 @@ function finish(group: Omit<ShareGroup, 'total'>): ShareGroup {
   };
 }
 
-/** A market group and its ancestors, root first. */
 function groupPath(byId: ReadonlyMap<number, ShareMarketGroup>, id: number): ShareMarketGroup[] {
   const path: ShareMarketGroup[] = [];
   for (let at = byId.get(id); at; at = at.parentId === null ? undefined : byId.get(at.parentId)) {
@@ -73,15 +44,9 @@ function groupPath(byId: ReadonlyMap<number, ShareMarketGroup>, id: number): Sha
   return path;
 }
 
-/** Strictly below the Blueprints & Reactions group: the group itself is not a place. */
 const isBlueprintGroup = (byId: ReadonlyMap<number, ShareMarketGroup>, id: number) =>
   id !== BLUEPRINT_ROOT_GROUP_ID && groupPath(byId, id)[0]?.id === BLUEPRINT_ROOT_GROUP_ID;
 
-/**
- * For each market group of products, the blueprint market group most of its
- * listed blueprints sit in: the blueprint tree and the product tree are named
- * differently in places (Turrets & Bays against Turrets & Launchers).
- */
 export function blueprintGroupOfProductGroup(
   blueprints: readonly BlueprintTypeInfo[],
   groups: readonly ShareMarketGroup[]
@@ -107,10 +72,6 @@ export function blueprintGroupOfProductGroup(
   return result;
 }
 
-/**
- * Owned blueprint types nested under their market-group path. Groups holding
- * none are pruned; unlisted types go in a last root named `otherName`.
- */
 export function buildShareTree(
   owned: readonly BlueprintTypeInfo[],
   groups: readonly ShareMarketGroup[],
@@ -119,8 +80,6 @@ export function buildShareTree(
 ): ShareGroup[] {
   const hasBlueprintRoot = groups.some((group) => group.id === BLUEPRINT_ROOT_GROUP_ID);
   const rawById = new Map(groups.map((group) => [group.id, group]));
-  // The root itself disappears: its children become roots, and no other
-  // market tree is shown (a blueprint filed in one is placed by its product).
   const allGroups: ShareMarketGroup[] = hasBlueprintRoot
     ? groups
         .filter((group) => isBlueprintGroup(rawById, group.id))
@@ -129,7 +88,6 @@ export function buildShareTree(
         )
     : [...groups];
 
-  // Where a product's path leaves the blueprint tree, groups are added.
   const addedIds = new Set<number>();
   function placeByProduct(productGroup: number | null | undefined): number | null {
     if (productGroup == null || !rawById.has(productGroup)) return null;
@@ -204,7 +162,6 @@ export function buildShareTree(
   return roots;
 }
 
-/** Every blueprint type id in a group and below, as the tree currently shows it. */
 export function descendantTypeIds(group: ShareGroup): number[] {
   return [...group.types.map((type) => type.typeId), ...group.children.flatMap(descendantTypeIds)];
 }
@@ -216,7 +173,6 @@ export function groupState(group: ShareGroup, selected: ReadonlySet<number>): Gr
   return chosen === ids.length ? 'all' : 'some';
 }
 
-/** A full category clears; a partial or empty one fills up. */
 export function toggleGroup(group: ShareGroup, selected: ReadonlySet<number>): Set<number> {
   const next = new Set(selected);
   const ids = descendantTypeIds(group);
@@ -235,7 +191,6 @@ export function selectAll(owned: readonly BlueprintTypeInfo[]): Set<number> {
   return new Set(owned.map((type) => type.typeId));
 }
 
-/** Only blueprints still owned count: a saved choice can outlive a consumed copy. */
 export function countSelected(
   selected: ReadonlySet<number>,
   owned: readonly BlueprintTypeInfo[]
@@ -243,7 +198,6 @@ export function countSelected(
   return new Set(owned.filter((type) => selected.has(type.typeId)).map((type) => type.typeId)).size;
 }
 
-/** Blueprints whose name contains `query` (any case), with the groups above them. */
 export function filterShareTree(roots: readonly ShareGroup[], query: string): ShareGroup[] {
   const needle = query.trim().toLowerCase();
   if (!needle) return [...roots];

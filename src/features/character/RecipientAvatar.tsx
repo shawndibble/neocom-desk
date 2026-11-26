@@ -26,12 +26,6 @@ interface RecipientAvatarProps {
   recipient: Pick<ComposeRecipient, 'recipient_id' | 'recipient_type'>;
 }
 
-/**
- * A mail recipient's portrait or logo, for the composer's chips and options.
- * Decorative: the name and type label beside it already say who it is. A
- * mailing list has no image, and a failed one falls back to the type's glyph
- * in the same box, so nothing shifts.
- */
 export function RecipientAvatar({ recipient }: RecipientAvatarProps) {
   const { recipient_id: id, recipient_type: type } = recipient;
   const [failedKey, setFailedKey] = useState<string | null>(null);

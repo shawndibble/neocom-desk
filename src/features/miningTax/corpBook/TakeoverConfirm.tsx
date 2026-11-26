@@ -5,7 +5,6 @@ import type { OreLine } from '@/engine/miningTax/types';
 import { formatCount } from '@/lib/formatCount';
 import { typeLabel } from './typeLabel';
 
-/** One of the miner's Payees, and its ore before and after the corporation's ore comes off. */
 export interface OverlapPreview {
   payeeName: string;
   before: readonly OreLine[];
@@ -17,17 +16,10 @@ interface Props {
   typeNames: ReadonlyMap<number, string>;
   busy?: boolean;
   onTakeOver: () => void;
-  /** The first button's text; defaults to "Let the corporation bill it". */
   label?: string;
-  /** Buttons beside "Let the corporation bill it", hidden while it asks to confirm. */
   others?: ReactNode;
 }
 
-/**
- * "Let the corporation bill it", in two steps (issue #4517): the first press shows what
- * changes on the miner's list, the second takes only that ore off. Shared by the overlap
- * notice and a Conflict day's notice, so the take-over reads and behaves the same in both.
- */
 export function TakeoverConfirm({ previews, typeNames, busy, onTakeOver, label, others }: Props) {
   const { t } = useTranslation();
   const [confirming, setConfirming] = useState(false);

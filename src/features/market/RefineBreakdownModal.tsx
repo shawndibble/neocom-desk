@@ -1,20 +1,3 @@
-/**
- * The Refine breakdown: the arithmetic behind an Appraisal's Refine figure,
- * for the whole pile or one item of it, so a pilot can both decide between
- * refining and selling as is, and check every number against another tool.
- *
- * It compares the two on every price basis at once (the buy orders, halfway,
- * the sell orders) and says once what to do on the selected one. The selected
- * basis is the pilot's remembered pick: choosing a row here sets it for every
- * appraisal, so the page's single Refine figures follow.
- *
- * One component for two homes. On the live Appraisal tab the Refining Setup is
- * editable in place and the numbers follow it. On a **Shared Appraisal** the
- * sharer's own numbers are shown as shared, and a signed-in visitor can swap in
- * their own (`shared`), which recomputes the same breakdown from their skills.
- *
- * All the figures come from `buildRefineComparison`; this only lays them out.
- */
 import { useState, type ReactNode } from 'react';
 import { facilityBaseYieldFor } from '@/engine/industry/refiningSetup';
 import { InlinePercent } from '@/features/refining/InlinePercent';
@@ -41,13 +24,9 @@ import { createNumberFormat } from '@/lib/numberLocale';
 import { formatVolume } from './format';
 import { efficiencyText, pct, skillsText } from './refineFormat';
 
-/** Whose numbers a Shared Appraisal's breakdown is showing, and what swapping needs. */
 export interface SharedRefineView {
-  /** Epoch seconds the sharer priced the appraisal. */
   generatedAt: number;
-  /** `mine` is the visitor's own skills and Refining Setup; `shared` is the sharer's. */
   source: 'shared' | 'mine';
-  /** Why "Use my numbers" can't be pressed yet; null when it can. */
   unavailable: 'signedOut' | 'loading' | 'failed' | null;
   onToggleSource: () => void;
 }
@@ -58,30 +37,22 @@ interface RefineBreakdownModalProps {
   appraisal: Pick<Appraisal, 'rows' | 'items'>;
   pricePercent: number;
   hubName: string;
-  /** The facility yield and tax the figures were worked out at, as fractions. */
   setup: { yieldRate: number; taxRate: number };
   mineralNames: ReadonlyMap<number, string>;
-  /** The item to open on, or null for the whole pile. */
   initialTypeId: number | null;
-  /** The selected price basis: the remembered pick, which the page's Refine figures are on. */
   basis: RefineBasis;
   onBasisChange: (basis: RefineBasis) => void;
-  /** Live tab only: makes the facility yield and tax editable in place; each change is saved as it is made. */
   editSetup?: { onYield: (fraction: number) => void; onTax: (fraction: number) => void };
-  /** Shared page only. */
   shared?: SharedRefineView;
 }
 
-/** The unrounded yield, so the line shows what "rounding down" rounds. */
 const oneDecimal = createNumberFormat({ minimumFractionDigits: 1, maximumFractionDigits: 1 });
 
 interface BasisRow {
   key: RefineBasis;
-  /** Null where the basis cannot be priced (the link never carried the sell side). */
   breakdown: RefineBreakdown | null;
 }
 
-/** A line under the minerals table, shown in the same columns so its figures sit under the table's own. */
 type MineralRow =
   | { kind: 'mineral'; key: string; line: RefineMineralLine }
   | {
@@ -112,18 +83,13 @@ export function RefineBreakdownModal({
   const input = { appraisal, pricePercent, taxRate: setup.taxRate };
   const all = buildRefineComparison(input);
   const scoped = typeId === null ? all : buildRefineComparison({ ...input, onlyTypeId: typeId });
-  // A chosen item that stops refining (the appraisal changed, or the visitor's numbers have no
-  // recipe for it) falls back to the whole pile rather than leaving an empty scope with no way out.
   const single = typeId === null ? null : (scoped.buy.items[0] ?? null);
   const comparison = single === null ? all : scoped;
-  // The sell side may be missing (a link from before it was carried): then only the buy basis can be shown.
-  // Judged over the whole pile, as the page does, so the modal's selected row and the page agree.
   const activeBasis: RefineBasis = basisAvailable(appraisal, basis) ? basis : 'buy';
   const breakdown = comparison[activeBasis] ?? comparison.buy;
 
   const nameOf = (id: number): string => mineralNames.get(id) || `#${id}`;
   const basisName = (key: RefineBasis): string => t(`market.appraisal.breakdown.basis.${key}`);
-  /** The basis as it reads inside a sentence. */
   const basisInline = (key: RefineBasis): string =>
     t(`market.appraisal.breakdown.basisInline.${key}`);
 
@@ -149,7 +115,6 @@ export function RefineBreakdownModal({
               )}
             />
             {basisName(row.key)}
-            {/* The radio dot already marks it on a phone; screen readers keep the word. */}
             {row.key === activeBasis && (
               <span className="text-[0.6875rem] font-semibold tracking-widest text-accent uppercase max-sm:sr-only">
                 {t('market.appraisal.breakdown.selected')}
@@ -203,14 +168,12 @@ export function RefineBreakdownModal({
     },
   ];
 
-  // What to do on the selected basis.
   const action = t(
     breakdown.refineWins
       ? 'market.appraisal.breakdown.actionRefine'
       : 'market.appraisal.breakdown.actionSell'
   );
 
-  // An item selling for many times its buy price props up the Sell and Split rows.
   const lopsided = lopsidedItems(appraisal.items, typeId ?? undefined);
   const lopsidedNames = lopsided.map((item) => item.name).join(', ');
 
@@ -331,7 +294,6 @@ export function RefineBreakdownModal({
       id: 'item',
       stickyStart: true,
       header: t('market.appraisal.columnItem'),
-      // The row is the control (a click or Enter opens that item); the accent marks it.
       render: (line) => <span className="text-accent">{line.name}</span>,
     },
     {
@@ -380,8 +342,6 @@ export function RefineBreakdownModal({
     },
   ];
 
-  // One skills multiplier across the items lets a typed reprocessing yield be divided back down to the
-  // facility's base yield; with several (ores trained to different levels) there is no single answer.
   const skillsMultiplier =
     breakdown.efficiencyMin !== null &&
     breakdown.efficiencyMax !== null &&
@@ -625,7 +585,6 @@ export function RefineBreakdownModal({
                 rows={mineralRows}
                 rowKey={(row) => row.key}
                 rowClassName={(row) =>
-                  // A heavier rule over the bold Minerals row says the lines above it add up to it.
                   row.kind === 'subtotal'
                     ? 'border-t-2 border-line-bright font-semibold'
                     : row.kind === 'leftover' || row.kind === 'tax'
@@ -701,7 +660,6 @@ export function RefineBreakdownModal({
 
 const SECTION_HEADING = 'text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase';
 
-/** One of the four setup readouts: a label, its explanation, and the figure (or the field that edits it). */
 function SetupBox({
   label,
   tooltip,
@@ -720,7 +678,6 @@ function SetupBox({
         {label}
         <InfoTooltip label={t('common.aboutLabel', { label })} content={tooltip} />
       </span>
-      {/* min-h-9 matches an editable value's phone touch target, so a read-only box (Skills) lines up with its neighbours. */}
       <span
         className={cx(
           'flex min-h-9 items-center text-sm font-medium tabular-nums md:min-h-0',
@@ -733,7 +690,6 @@ function SetupBox({
   );
 }
 
-/** One item's batch arithmetic, line by line, so each mineral quantity can be recomputed by hand. */
 function ItemMath({ line, nameOf }: { line: RefineItemLine; nameOf: (typeId: number) => string }) {
   const { t } = useTranslation();
   return (

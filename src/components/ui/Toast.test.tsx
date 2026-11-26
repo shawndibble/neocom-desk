@@ -41,7 +41,6 @@ describe('Toast', () => {
     try {
       const props = { undo: { label: 'Undo', onUndo: () => {} }, onClose: () => {} };
       const { rerender } = render(<Toast message="Tritanium moved to To buy" {...props} />);
-      // The mount itself plays from CSS; nothing to restart yet.
       expect(rise.play).not.toHaveBeenCalled();
 
       rerender(<Toast message="Pyerite moved to To buy" {...props} />);
@@ -49,11 +48,9 @@ describe('Toast', () => {
       expect(rise.play).toHaveBeenCalledTimes(1);
       expect(other.play).not.toHaveBeenCalled();
 
-      // A re-render with the same message is not a new toast.
       rerender(<Toast message="Pyerite moved to To buy" {...props} />);
       expect(rise.play).toHaveBeenCalledTimes(1);
 
-      // Same text, but the caller says it is a new event (a second job dismissed).
       const first = {};
       rerender(<Toast message="Job dismissed" instance={first} {...props} />);
       expect(rise.play).toHaveBeenCalledTimes(2);
@@ -102,8 +99,6 @@ describe('Toast', () => {
       const box = toastBox();
       expect(box).toHaveClass('border-success');
       expect(box).not.toHaveClass('border-line-bright');
-      // The glyph is decorative: the live region carries the word instead, so
-      // colour is never the only signal (DESIGN.md §7).
       const glyph = box.querySelector('svg');
       expect(glyph).toHaveAttribute('aria-hidden', 'true');
       act(() => {

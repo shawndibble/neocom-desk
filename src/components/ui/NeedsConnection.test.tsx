@@ -42,9 +42,6 @@ describe('NeedsConnection', () => {
     expect(button).not.toBeDisabled();
     await userEvent.click(button);
     expect(onClick).not.toHaveBeenCalled();
-    // Reach it by keyboard: focus opens the reason with no hover timing involved
-    // (a click leaves pointer focus, which the tooltip deliberately ignores; the
-    // hover path is covered by the tooltip-merge test below).
     act(() => button.blur());
     await userEvent.tab();
     expect(button).toHaveFocus();

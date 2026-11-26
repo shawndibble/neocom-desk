@@ -9,22 +9,12 @@ import {
 import { corporationLogoUrl } from '@/lib/eveImages';
 import { cx } from '@/lib/cx';
 
-/** The portrait box sizes, without the portrait's border: a logo sits in the same footprint. */
 const BOX: Record<CharacterAvatarSize, string> = {
   sm: 'size-7',
   md: 'size-8',
   lg: 'size-16',
 };
 
-/**
- * A Character's own corporation logo, in the box that Character's portrait
- * would use: the "Corporation" glyph of `CharacterFilterControl`, so that
- * choice reads as *my* corporation the way "This character" reads as my
- * portrait. The corporation id comes from the Character's Dexie row
- * (`corporationId`, written by the public-info read), so there is no ESI call
- * here. The `Corporation` (Buildings) glyph holds the box while the logo
- * loads, after it fails, and whenever no corporation id is known.
- */
 export function CorporationLogoGlyph({
   characterId,
   corporationId: givenCorporationId,
@@ -33,10 +23,8 @@ export function CorporationLogoGlyph({
   className,
 }: {
   characterId: number | null;
-  /** A corporation named outright (the Corp Board's scope control); `characterId` is then not read. */
   corporationId?: number;
   size: CharacterAvatarSize;
-  /** Replaces the portrait box `size` gives, for a caller that steps the box per breakpoint. */
   boxClassName?: string;
   className?: string;
 }) {

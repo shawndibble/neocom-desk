@@ -1,10 +1,3 @@
-/**
- * The implant finder's pure half: what an implant family is, which goals a
- * pilot can ask an implant to improve, how much a candidate moves a goal,
- * where to buy it, and which combinations fix an over-budget fit for the
- * least ISK. The engine runs and price fetches live in
- * `features/fittings/useImplantFinder.ts`.
- */
 import {
   appliedDpsVsRange,
   graphMaxRange,
@@ -15,7 +8,6 @@ import type { TargetProfile } from './targetProfile';
 import { withBoosters } from './boosterSideEffects';
 import type { FittingImplantSet, FittingStats } from './types';
 
-/** A hardwiring's family and grade, read from its name: `EE-605` is grade 5 of `EE-60x`. */
 export interface ImplantGradeName {
   family: string;
   code: string;
@@ -31,7 +23,6 @@ export function parseImplantGrade(name: string): ImplantGradeName | null {
   return { family: family!, code: `${prefix}${grade}`, grade: Number(grade) };
 }
 
-/** A combat booster's strengths, weakest first: "Strong Crash Booster" is grade 4 of "Crash Booster". */
 const BOOSTER_GRADES = ['Synth', 'Standard', 'Improved', 'Strong'] as const;
 const BOOSTER_GRADED = new RegExp(`^(${BOOSTER_GRADES.join('|')}) (.+)$`);
 
@@ -46,14 +37,12 @@ export function parseBoosterGrade(name: string): ImplantGradeName | null {
   };
 }
 
-/** What goes in a slot: an implant (slots 1–10) or a combat booster (its own slots). */
 export type ImplantKind = 'implant' | 'booster';
 
 export interface ImplantEntry {
   typeId: number;
   name: string;
   slot: number;
-  /** Absent: an implant. */
   kind?: ImplantKind;
 }
 
@@ -68,10 +57,6 @@ interface MarketTypeLike {
   marketGroupId: number;
 }
 
-/**
- * Every type in the market tree under a slot group (`slotGroup` captures the
- * slot number), with that slot — the baked SDE carries no slot attribute.
- */
 function entriesUnderSlotGroups(
   types: readonly MarketTypeLike[],
   groups: readonly MarketGroupLike[],
@@ -99,7 +84,6 @@ function entriesUnderSlotGroups(
   return entries;
 }
 
-/** Every implant, slotted by its "Implant Slot NN" market group. */
 export function implantEntriesFromMarket(
   types: readonly MarketTypeLike[],
   groups: readonly MarketGroupLike[]
@@ -107,7 +91,6 @@ export function implantEntriesFromMarket(
   return entriesUnderSlotGroups(types, groups, /^Implant Slot (\d+)$/);
 }
 
-/** Every booster, slotted by its "Booster Slot NN" market group. */
 export function boosterEntriesFromMarket(
   types: readonly MarketTypeLike[],
   groups: readonly MarketGroupLike[]
@@ -120,18 +103,15 @@ export function boosterEntriesFromMarket(
 
 export interface ImplantGrade {
   typeId: number;
-  /** `EE-605`, or a booster's strength (`Strong`); null for one sold in one version only. */
   code: string | null;
   grade: number | null;
 }
 
-/** Every grade of one implant or booster — the same bonus at each strength, each its own item. */
 export interface ImplantFamily {
   key: string;
   name: string;
   kind: ImplantKind;
   slot: number;
-  /** Lowest grade first. */
   grades: ImplantGrade[];
 }
 
@@ -166,14 +146,8 @@ export function groupImplantFamilies(entries: readonly ImplantEntry[]): ImplantF
   return [...families.values()];
 }
 
-/** Where an item goes: which kind of slot, and which one. */
 export type SlotOf = (typeId: number) => { kind: ImplantKind; slot: number } | undefined;
 
-/**
- * `set` with `typeId` added to its own kind of slot, replacing whatever of that
- * kind is already there — implant slot 3 and booster slot 3 are different slots.
- * A replaced booster takes its switched-on side effects with it.
- */
 export function placeInSet(
   set: FittingImplantSet,
   slotOf: SlotOf,
@@ -190,7 +164,6 @@ export function placeInSet(
   return { ...set, implants: [...set.implants.filter((id) => !sameSlot(id)), typeId] };
 }
 
-/** `set` with each of `typeIds` placed in turn. */
 export function placeAllInSet(
   set: FittingImplantSet,
   slotOf: SlotOf,
@@ -226,18 +199,15 @@ export interface Budget {
   total: number;
 }
 
-/** How a goal's figure is shown: decimals, and a divisor into the page's unit (ms → s, m → km). */
 export interface GoalDisplay {
   decimals: number;
   divisor?: number;
 }
 
-/** What some goals are measured against: the Fitting page's selected Target Profile. */
 export interface GoalContext {
   target?: TargetProfile;
 }
 
-/** Where a goal sits in the goal list. */
 export type GoalGroup = 'fitting' | 'weapons' | 'mining' | 'tank' | 'navigation';
 
 export type ImplantGoal = { id: ImplantGoalId; group: GoalGroup; display: GoalDisplay } & (
@@ -245,12 +215,10 @@ export type ImplantGoal = { id: ImplantGoalId; group: GoalGroup; display: GoalDi
   | { kind: 'more' | 'less'; read: (stats: FittingStats, context: GoalContext) => number }
 );
 
-/** Peak sustained applied DPS (reload included) against `target` at any range — so an implant or booster that only improves application or reach still counts. */
 const peakCache = new WeakMap<FittingStats, Map<TargetProfile, number>>();
 
 export function peakAppliedDps(stats: FittingStats, target: TargetProfile | undefined): number {
   if (!target || stats.applied.weapons.length === 0) return 0;
-  // Screening reads the same baseline for every family it tries: work it out once.
   let byTarget = peakCache.get(stats);
   if (!byTarget) peakCache.set(stats, (byTarget = new Map()));
   let peak = byTarget.get(target);
@@ -263,12 +231,10 @@ export function peakAppliedDps(stats: FittingStats, target: TargetProfile | unde
   return peak;
 }
 
-/** Raw DPS of one kind of weapon the Fitting fires. */
 function weaponDps(stats: FittingStats, kind: AppliedWeapon['kind']): number {
   return stats.applied.weapons.reduce((sum, w) => (w.kind === kind ? sum + w.dps : sum), 0);
 }
 
-/** Metres: the longest turret optimal + falloff or missile flight among the firing weapons. */
 function longestWeaponReach(stats: FittingStats): number {
   let reach = 0;
   for (const weapon of stats.applied.weapons) {
@@ -301,7 +267,6 @@ export const IMPLANT_GOALS: readonly ImplantGoal[] = [
     display: { decimals: 0 },
     read: (s) => s.capacitorCapacity,
   },
-  // The engine's recharge time is in milliseconds; the page shows seconds.
   {
     id: 'capacitorRecharge',
     group: 'fitting',
@@ -394,7 +359,6 @@ export const IMPLANT_GOALS: readonly ImplantGoal[] = [
     display: { decimals: 0 },
     read: (s) => s.targeting.signatureRadius,
   },
-  // m³ an hour from the running miners and mining drones (`mining.ts`); 0 on a fit that mines nothing.
   {
     id: 'miningYield',
     group: 'mining',
@@ -402,7 +366,6 @@ export const IMPLANT_GOALS: readonly ImplantGoal[] = [
     display: { decimals: 0 },
     read: (s) => s.mining.perHour,
   },
-  // AU/s. Hold sizes and jump range are not goals: no implant or booster moves them.
   {
     id: 'warpSpeed',
     group: 'navigation',
@@ -410,7 +373,6 @@ export const IMPLANT_GOALS: readonly ImplantGoal[] = [
     display: { decimals: 2 },
     read: (s) => s.navigation.warpSpeed,
   },
-  // Defence against ECM jams.
   {
     id: 'sensorStrength',
     group: 'tank',
@@ -420,7 +382,6 @@ export const IMPLANT_GOALS: readonly ImplantGoal[] = [
   },
 ];
 
-/** A goal's figure in the unit the page shows it in. */
 export function displayValue(
   goal: ImplantGoal,
   stats: FittingStats,
@@ -436,21 +397,14 @@ export function goalById(id: ImplantGoalId): ImplantGoal {
   return goal;
 }
 
-/** What is left of a budget: negative when the fit is over. */
 export function headroom(budget: Budget): number {
   return budget.total - budget.used;
 }
 
-/** CPU or powergrid still needed for the fit to fit; 0 when it already does. */
 export function shortfall(budget: Budget): number {
   return Math.max(0, budget.used - budget.total);
 }
 
-/**
- * How far `after` moves the goal from `before`, as a share: freed headroom
- * over the total for a budget, the relative rise (or fall, for "less is
- * better") otherwise. Comparable across candidates for one goal only.
- */
 export function goalGain(
   goal: ImplantGoal,
   before: FittingStats,
@@ -468,7 +422,6 @@ export function goalGain(
   return goal.kind === 'more' ? (a - b) / Math.abs(b) : (b - a) / Math.abs(b);
 }
 
-/** Headroom an implant frees on a budget goal, in its own unit (tf, MW). */
 export function headroomGain(goal: ImplantGoal, before: FittingStats, after: FittingStats): number {
   if (goal.kind !== 'budget') return 0;
   return headroom(goal.read(after)) - headroom(goal.read(before));
@@ -476,7 +429,6 @@ export function headroomGain(goal: ImplantGoal, before: FittingStats, after: Fit
 
 export interface HubPrice {
   hubId: string;
-  /** Lowest sell order; null when nobody is selling. */
   sellMin: number | null;
   sellVolume: number;
 }
@@ -485,11 +437,9 @@ export interface ImplantSource {
   hubId: string;
   price: number;
   volume: number;
-  /** False when the pilot's hub has no sellers and this is the cheapest other one. */
   atSelectedHub: boolean;
 }
 
-/** Where to buy: the pilot's own hub when it has sellers, else the cheapest hub that does. */
 export function pickSource(
   prices: readonly HubPrice[],
   selectedHubId: string
@@ -510,29 +460,17 @@ export function pickSource(
 
 export interface FixCandidate {
   typeId: number;
-  /** Which slot it takes — one item per key in a fix. */
   slot: number | string;
-  /** Headroom this implant frees on its own, in the budget's unit. */
   headroomGain: number;
-  /** NaN when it can't be bought anywhere. */
   price: number;
 }
 
 export interface FixOption {
-  /** Lowest slot first. */
   typeIds: number[];
   cost: number;
-  /** Summed per-implant gains — an estimate; the caller re-runs the fit to confirm. */
   headroomGain: number;
 }
 
-/**
- * Combinations of implants (one per slot) whose estimated headroom covers
- * `needed`, cheapest first. A grade that another in its slot beats on both
- * price and headroom is never used. The estimates sum each implant's own
- * gain, which stacking can sink, so the caller re-runs each option whole and
- * then thins the confirmed list with `keepMoreHeadroom`.
- */
 export function cheapestFixes(
   candidates: readonly FixCandidate[],
   needed: number,
@@ -577,10 +515,6 @@ export function cheapestFixes(
   return found.slice(0, limit);
 }
 
-/**
- * Cheapest first, keeping a dearer option only when it leaves more
- * headroom than every cheaper one — so each extra line buys something.
- */
 export function keepMoreHeadroom<T extends { cost: number; headroom: number }>(
   options: readonly T[]
 ): T[] {

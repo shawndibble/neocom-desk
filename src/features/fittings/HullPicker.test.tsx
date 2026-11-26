@@ -9,7 +9,6 @@ const { usePopularFitsMock, useHullFlyMarksMock, useRecentHullIdsMock } = vi.hoi
   useHullFlyMarksMock: vi.fn<() => HullFlyMarks | null>(() => null),
   useRecentHullIdsMock: vi.fn<() => number[]>(() => []),
 }));
-// The EVE Workbench rows read the losses too, for their "Seen on zKillboard" badge.
 vi.mock('./popularFits', () => ({
   usePopularFits: usePopularFitsMock,
   loadPopularFits: () => Promise.resolve({ ok: true, fits: [] }),
@@ -151,7 +150,6 @@ describe('HullPicker', () => {
   describe('can-fly marks', () => {
     beforeEach(() => useActiveCharacter.setState({ activeCharacterId: 7 }));
     afterEach(() => {
-      // Unmount first: clearing the Character re-renders a mounted picker outside act.
       cleanup();
       useHullFlyMarksMock.mockReset().mockReturnValue(null);
       useActiveCharacter.setState({ activeCharacterId: null });

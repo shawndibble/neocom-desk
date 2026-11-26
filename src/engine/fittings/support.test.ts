@@ -150,20 +150,17 @@ describe('extractSupport', () => {
 
   it('keeps a scripted module whose script zeroes one of its effects', () => {
     const support = extract([
-      // Optimal Range Disruption Script: no tracking left, range and falloff doubled.
       module(2109, {
         [A.maxRangeBonus]: -34.38,
         [A.falloffBonus]: -34.38,
         [A.trackingSpeedBonus]: 0,
         [A.optimal]: 48000,
       }),
-      // Scan Resolution Dampening Script: no lock range left.
       module(1969, {
         [A.maxTargetRangeBonus]: 0,
         [A.scanResolutionBonus]: -30.6,
         [A.optimal]: 30000,
       }),
-      // Missile Range Disruption Script: no explosion velocity or radius left.
       module(37546, {
         [A.missileVelocityBonus]: -18,
         [A.explosionDelayBonus]: -18,

@@ -13,10 +13,6 @@ import {
   type SortDirection,
 } from '@/features/character/groups';
 
-/**
- * Card view — one section per group plus Ungrouped. Group sectioning is
- * card-view-only (decision 20260927-071415); the table is one flat list.
- */
 export function CharactersCardView({
   groups,
   ungroupedIds,
@@ -65,17 +61,9 @@ export function CharactersCardView({
   const { t } = useTranslation();
 
   function renderCardList(characterIds: readonly number[]) {
-    // A group (or the ungrouped section) that the filter emptied just shows
-    // nothing here — repeating a "no matches" line under every such section
-    // would be noise once any other section still has results. The one case
-    // worth telling the user about, the whole roster coming up empty, is
-    // handled once, above every section, by the caller.
     const filteredIds = characterIds.filter((characterId) => matchesFilters(characterId));
     if (filteredIds.length === 0) return null;
 
-    // Starred first, then the chosen sort key — a layer on top of the sort,
-    // not a replacement for it, so a star raises one card and leaves the order
-    // of everything around it exactly as the user asked for.
     const sortedIds = partitionStarredFirst(
       sortCharacterIds(filteredIds, sortStatsById, sortKey, sortDirection),
       starred

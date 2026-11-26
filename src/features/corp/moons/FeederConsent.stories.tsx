@@ -2,7 +2,6 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import type { FeederInvitePreview } from '../taxBook/feederClient';
 import { FeederConsent } from './FeederConsent';
 
-/** @summary What an accounting corporation will see, what it cannot do, how to stop it, and the one optional rate. */
 const meta = {
   title: 'corp/FeederConsent',
   component: FeederConsent,
@@ -24,10 +23,8 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** @summary The link names the accounting corporation and the rate it offers. */
 export const WithOffer: Story = {};
 
-/** @summary The link offers no rate. */
 export const NoOffer: Story = {
   args: {
     loadPreview: async () => ({
@@ -38,7 +35,6 @@ export const NoOffer: Story = {
   },
 };
 
-/** @summary The link is no longer valid: Continue is off. */
 export const InvalidLink: Story = {
   args: {
     loadPreview: () =>
@@ -46,7 +42,6 @@ export const InvalidLink: Story = {
   },
 };
 
-/** @summary The EVE login could not start. */
 export const LoginFailed: Story = {
   args: { error: 'Could not connect. Try again, or ask for a new invite link.' },
 };

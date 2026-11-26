@@ -14,11 +14,6 @@ import { renderInRouter } from '@/test/render';
 
 const entry = (skillTypeID: number, targetLevel = 1): PlanEntry => ({ skillTypeID, targetLevel });
 
-/**
- * One own step per stepIndex, levels running 1..n so the row's target level
- * matches its last step. `levels` overrides that for the already-trained case,
- * where an entry's first queued level is above I.
- */
 function entryRow(skillTypeID: number, stepIndices: number[], levels?: number[]): MergedRow {
   const stepLevels = levels ?? stepIndices.map((_, i) => i + 1);
   const planEntry = entry(skillTypeID, stepLevels[stepLevels.length - 1] ?? 1);
@@ -62,7 +57,6 @@ const defaultProps = {
   onRemoveMilestone: noop,
 };
 
-/** jsdom's default `window.matchMedia` never matches, so EntryList renders its narrow (below-`md`) layout by default; mock it to exercise the desktop layout. */
 function mockDesktop(matches: boolean): () => void {
   return stubViewport(() => matches);
 }
@@ -139,7 +133,6 @@ describe('EntryList prereq rows', () => {
   it('renders a dimmed prereq row ahead of the entry it was inserted for', () => {
     renderInRouter(<EntryList rows={prereqRows} bandsAt={new Map()} {...defaultProps} />);
     expect(screen.getByText(/prereq/i)).toBeInTheDocument();
-    // Still no priority control — a prereq's priority is inherited (#27), not set.
     expect(screen.queryByLabelText(/normal priority, skill 9/i)).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /reorder skill 1/i })).toBeInTheDocument();
   });
@@ -227,7 +220,6 @@ describe('EntryList column visibility', () => {
     expect(screen.queryByLabelText(/ priority, /i)).not.toBeInTheDocument();
     expect(screen.queryByText('1m')).not.toBeInTheDocument();
     expect(screen.queryByText('10m')).not.toBeInTheDocument();
-    // Always-present parts remain regardless of the column toggle.
     expect(screen.getByRole('button', { name: /reorder skill 1/i })).toBeInTheDocument();
     expect(screen.getByText(/^Skill 1\b/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /more actions for skill 1/i })).toBeInTheDocument();
@@ -301,17 +293,11 @@ describe('EntryList narrow vs desktop layout (#114)', () => {
           columns={{ ...DEFAULT_COLUMN_VISIBILITY, priority: true }}
         />
       );
-      // Line 1 is the name and its ⋮ only: the finish date used to
-      // ride up here and squeeze the name.
       const nameLine = screen.getByText(/^Skill 1\b/).closest('div');
       expect(nameLine).not.toBeNull();
       expect(within(nameLine as HTMLElement).queryByText('10m')).toBeNull();
-      // Line 2: attribute badge, priority pill, and both times, each labelled
-      // in place rather than hidden behind a tooltip the user has to find.
       expect(screen.getByText('PER/WIL')).toBeInTheDocument();
       expect(screen.getByLabelText(/normal priority, skill 1/i)).toBeInTheDocument();
-      // Both labels ride the values themselves below `md`, since the desktop
-      // column headers they'd otherwise sit under are not rendered here.
       expect(screen.getByText('Takes')).toBeInTheDocument();
       expect(screen.getByText('1m')).toBeInTheDocument();
       expect(screen.getByText('Done by')).toBeInTheDocument();
@@ -364,13 +350,6 @@ describe('EntryList narrow vs desktop layout (#114)', () => {
     }
   });
 
-  /**
-   * #1106: the pill was a bare `px-1` button around 11px text — roughly a
-   * 17px tap target on the one layout where a thumb is doing the tapping.
-   * The chip keeps that size; the trigger around it grows. Asserted on the
-   * class here because jsdom has no layout; the rendered box is asserted in
-   * `e2e/skillPlanEditorNarrow.spec.ts`.
-   */
   it('pads the priority pill out to the sm touch tier below the desktop breakpoint', () => {
     const restore = mockDesktop(false);
     try {
@@ -384,8 +363,6 @@ describe('EntryList narrow vs desktop layout (#114)', () => {
       );
       const pill = screen.getByLabelText(/normal priority, skill 1/i);
       expect(pill).toHaveClass('h-9');
-      // The chip itself is untouched: same border and padding as the
-      // attribute badge it sits beside.
       expect(pill.querySelector('span')).toHaveClass('px-1');
     } finally {
       restore();
@@ -423,9 +400,6 @@ describe('EntryList narrow vs desktop layout (#114)', () => {
     }
   });
 
-  // The desktop header above these columns is visual only, so each cell
-  // carries its own `sr-only` label — the mobile meta line already showed
-  // this inline (`MetaValue`'s "Takes 1m" pairing).
   it("labels each entry row's Takes/Done by cell for screen readers, on desktop only", () => {
     const restore = mockDesktop(true);
     try {
@@ -453,7 +427,6 @@ describe('EntryList narrow vs desktop layout (#114)', () => {
       const { unmount } = renderInRouter(
         <EntryList rows={rows} bandsAt={new Map()} {...defaultProps} />
       );
-      // One label per row: the prereq row's own cell, and the entry row's.
       expect(screen.getAllByText('Takes:')).toHaveLength(2);
       expect(screen.getAllByText('Done by:')).toHaveLength(2);
       unmount();
@@ -478,8 +451,6 @@ describe('EntryList finish date (#20)', () => {
   it('renders the running total as the date that step finishes on', () => {
     const restore = mockDesktop(true);
     try {
-      // 600 cumulative seconds past a start date one full day earlier than the
-      // step ahead of it, so the two rows land on different calendar dates.
       const rows = [entryRow(1, [0]), entryRow(2, [864])];
       renderInRouter(
         <EntryList rows={rows} bandsAt={new Map()} {...defaultProps} startDate={startDate} />
@@ -507,9 +478,6 @@ describe('EntryList finish date (#20)', () => {
 });
 
 describe('EntryList reorder affordance', () => {
-  // Drag (or the handle's Space + arrow keys) is the only reorder path. A
-  // Move up/Move down button or menu on the row was tried twice (#223, #1493)
-  // and crowds the row on a phone — see docs/context/decisions.
   const rows: MergedRow[] = [
     entryRow(1, [0]),
     { kind: 'marker', id: markerRowId(0), markerIndex: 0 },
@@ -536,9 +504,6 @@ describe('EntryList reorder affordance', () => {
 });
 
 describe('EntryList drag announcements (#1493)', () => {
-  // Dynamic per-drag naming/position is buildRowAnnouncer's job, unit-tested
-  // in rowAnnouncer.test.ts — jsdom can't drive an actual drag. This only
-  // checks the wiring reaches dnd-kit's `screenReaderInstructions`.
   it('renders the translated keyboard instructions dnd-kit exposes up front', () => {
     const rows: MergedRow[] = [
       entryRow(1, [0]),
@@ -578,9 +543,6 @@ describe('EntryList marker row attributes', () => {
       />
     );
     expect(screen.getByText('PER 27 / WIL 21 / INT 17 / MEM 17 / CHA 17')).toBeInTheDocument();
-    // The numbers already say what the row is; repeating the generic label
-    // next to them would just be clutter — it stays only for a marker with
-    // nothing known yet (the sibling test above).
     expect(screen.queryByText('Remap marker')).not.toBeInTheDocument();
   });
 
@@ -670,11 +632,6 @@ describe('EntryList band headers (#115)', () => {
 });
 
 describe('EntryList one row per level', () => {
-  // #254 shipped a caret here: a "Caldari Carrier V" entry queued several
-  // levels behind one aggregated time, so the row disclosed them. A plan now
-  // holds one entry per level (reorder.ts), so each level is its own row —
-  // which is what lets the user drag another skill between two of them — and
-  // there is nothing left for a row to disclose.
   for (const desktop of [false, true]) {
     const width = desktop ? 'desktop' : 'narrow';
 
@@ -684,15 +641,8 @@ describe('EntryList one row per level', () => {
         renderInRouter(
           <EntryList rows={[entryRow(1, [0], [4])]} bandsAt={new Map()} {...defaultProps} />
         );
-        // Level numeral now lives in its own shrink-0 span, sibling to the
-        // truncating name span (#1716) — not one direct text-node run
-        // anymore, so match name and numeral separately within the row.
         const row = screen.getByText(/^Skill 1\b/).closest('li');
         expect(within(row as HTMLElement).getByText('IV', { exact: true })).toBeInTheDocument();
-        // The retired per-level disclosure (#254) is gone outright, not just
-        // hidden — unlike the row's own legitimate menus (priority, Plan
-        // Milestone), there is no "levels trained" list left for anything to
-        // disclose.
         expect(screen.queryByRole('list', { name: /levels trained/i })).toBeNull();
       } finally {
         restore();
@@ -880,13 +830,10 @@ describe('EntryList Plan Milestones (GLOSSARY.md)', () => {
 });
 
 describe("pinnedInProgress (#1701 follow-up): the row that IS the in-game queue's currently-training level shows its real remaining time", () => {
-  // Isolates the "Takes" cell this feature changes: "Done by" also reads a
-  // plain duration here only because these tests pass no `startDate` —
-  // PlanEditor always does, and that half of #1701 was already correct.
   const takesOnly = { ...DEFAULT_COLUMN_VISIBILITY, cumulativeTime: false };
 
   it('shows the level\'s real remaining time instead of a bare "0m" for the row it pins, on the narrow layout', () => {
-    const rows = [entryRow(1, [])]; // zero own steps, entry targets skill 1 level 1
+    const rows = [entryRow(1, [])];
     renderInRouter(
       <EntryList
         rows={rows}

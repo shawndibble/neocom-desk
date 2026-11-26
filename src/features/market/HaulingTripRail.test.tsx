@@ -178,7 +178,6 @@ describe('HaulingTripSummary', () => {
     expect(screen.getByRole('progressbar', { name: 'Hold used' })).toBeInTheDocument();
     expect(screen.getByText('20,038 of 64,500 m³ used')).toBeInTheDocument();
     expect(screen.getByText('+137,608,611')).toBeInTheDocument();
-    // 137,608,611 / 45
     expect(screen.getByText('Profit per jump (45)')).toBeInTheDocument();
     expect(screen.getByText('+3,057,969')).toBeInTheDocument();
     expect(
@@ -292,7 +291,6 @@ function renderFill(props: Partial<HaulingFillListProps> = {}) {
   return { ...handlers, update: (more: Partial<HaulingFillListProps>) => rerender(list(more)) };
 }
 
-/** The visible line, not its screen-reader copy in the live region. */
 const line = (text: string | RegExp) => screen.getByText(text, { selector: 'p' });
 
 describe('HaulingFillList', () => {
@@ -351,7 +349,6 @@ describe('HaulingFillList', () => {
     expect(screen.getByRole('checkbox', { name: 'Nitrogen Fuel Block' })).toBeChecked();
     await user.click(screen.getByRole('button', { name: 'Add 1 · +9,000 m³' }));
     expect(onAdd).toHaveBeenCalledOnce();
-    // No stop reason: the run did not stop, it failed.
     expect(screen.queryByText('Filled: 120 m³ left.')).toBeNull();
   });
 
@@ -386,7 +383,6 @@ describe('HaulingFillList', () => {
   ] as const)('ready: says why it stopped (%s)', async (reason, text) => {
     renderFill({ reason });
     expect(line(text)).toBeInTheDocument();
-    // Announced too, from a region mounted before the text.
     await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(text));
   });
 
@@ -428,7 +424,6 @@ describe('HaulingFillList', () => {
     expect(within(list).getAllByRole('listitem')).toHaveLength(2);
     expect(screen.getByRole('checkbox', { name: 'Nitrogen Fuel Block' })).toBeChecked();
     expect(screen.getByRole('checkbox', { name: 'Coolant' })).not.toBeChecked();
-    // m³ leads the line, where truncating the category can't hide it.
     expect(screen.getByText('9,000 m³')).toBeInTheDocument();
     expect(screen.getByText('· Fuel Blocks')).toHaveClass('truncate');
     expect(screen.getByText('<1 m³')).not.toHaveClass('truncate');

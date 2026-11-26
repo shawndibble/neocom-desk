@@ -79,96 +79,34 @@ import { ERRAND_GLYPH, ERRAND_LABEL_KEY, ERRAND_TONE, linkClassName } from './ma
 import { formatCount } from '@/lib/formatCount';
 
 interface MaterialsTableProps {
-  /** Engine cost lines — already resolved against the plan's sourcing overrides and hub prices. */
   materials: readonly MaterialTableRow[];
   nameFor: (typeID: number) => string;
-  /** Per-unit m3 volume for a typeID, baked SDE data; null when unresolvable (issue #874). */
   volumeFor: (typeID: number) => number | null;
-  /** The plan's raw overrides. Needed to tell an override apart from a hub price of the same value. */
   sourcing: MaterialSourcingMap | undefined;
-  /** False when the market snapshot couldn't be fetched — hub prices fall back to placeholder text. */
   pricesReady: boolean;
-  /** A material's Depth Price walk; absent for a row priced at the lowest sell. */
   depthFor?: (typeID: number) => DepthPrice | undefined;
   onSourcingChange: (typeID: number, patch: MaterialSourcing) => void;
-  /**
-   * Writes several rows' owned quantities as one change — "Use all", "Use
-   * none" and every Undo. Omitted, each goes through `onSourcingChange`.
-   */
   onOwnedStockChange?: (changes: readonly OwnedStockChange[]) => void;
-  /** "Use all" / "Use none" for controls the caller renders outside the table. */
   ref?: Ref<MaterialsTableHandle>;
-  /** ESI-detected owned stock (issue #181); omitted where no detection ran. Never written by itself. */
   detection?: OwnedStockDetection;
-  /**
-   * What other members of this plan's Build Group claimed of each material's
-   * scoped stock (issue #3992); `null` where none did. Omitted for a
-   * standalone plan and on the group page, whose offers stay as they were.
-   */
   groupClaimsFor?: (typeID: number) => GroupStockClaims | null;
-  /** Make-or-buy verdicts by material typeID. A material with no entry has no advice to show; omitted entirely where the caller can't price recipes. */
   makeOrBuy?: ReadonlyMap<number, MakeOrBuy>;
-  /**
-   * Whether a material can be produced here rather than bought — a blueprint
-   * makes it. Deliberately independent of `makeOrBuy`, which needs live prices:
-   * the run count and input quantities do not, so an unpriced row can still be
-   * expanded. Omitted where the caller cannot look recipes up at all.
-   */
   canBuildHere?: (typeID: number) => boolean;
-  /** Turns one material's sub-build on or off. Omitted alongside `canBuildHere`. */
   onToggleBuildHere?: (typeID: number) => void;
-  /**
-   * Switches several bought materials to built at once — the To buy
-   * heading's link when two or more rows would be cheaper to build.
-   */
   onBuildAll?: (typeIDs: readonly number[]) => void;
-  /** Opens "Buy ore instead" from the To buy heading; passed only while a mineral is still bought. */
   onBuyOre?: () => void;
-  /**
-   * What the owned units this job consumes would net if sold, after fees;
-   * shown on the folded owned section's heading. Omitted when unknown.
-   */
   ownedSellNet?: number | null;
-  /** What one material's owned units would net if sold; shown in a fully owned row's Total cell. */
   sellValueFor?: (typeID: number) => number | undefined;
-  /**
-   * Opens the "Build it" modal for a material being built here — the runs and
-   * ingredient list the Building row's Recipe link opens. Omitted
-   * where the caller has no modal to open, which simply drops the link.
-   */
   onShowRecipe?: (typeID: number) => void;
-  /**
-   * Opens the picker/override modal (issue #839) for a Blueprint Acquisition
-   * row — present alongside `material.acquisitionTier` exactly where that
-   * caption renders. Omitted where the caller has no modal to open, which
-   * simply drops the trigger.
-   */
   onOpenAcquisitionPicker?: (typeID: number) => void;
-  /**
-   * Skill-gate verdicts by material typeID, for a sub-build row — a job the
-   * plan chose, not the pilot. Only `gated: true` renders anything; omitted
-   * entirely drops the marker. `characterNameFor` names the closest character.
-   */
   skillGates?: ReadonlyMap<number, SkillGateVerdict>;
   characterNameFor?: (characterId: number) => string;
-  /** `useTableExport(...).tableProps` — exports the table (a row menu never carries export). */
   exportProps?: UseTableExport<MaterialTableRow>['tableProps'];
-  /** The page's item menu (`buildItemMenuProps`): Show info, View in Market and the rest, ahead of the export items. Omitted, rows have no item menu. */
   itemMenuFor?: ItemMenuFor;
-  /** The same menu as a visible button, for the phone card (which has no right-click). */
   itemActionsFor?: (typeId: number, bordered?: boolean, extraItems?: ReactNode) => ReactElement;
-  /**
-   * Opens the "Used by" dialog: the jobs that consume a bought material. Given
-   * only when the plan builds something, so a bought row's menu offers it
-   * only where more than the plan's own job could be the consumer.
-   */
   onShowUsedBy?: (typeID: number) => void;
 }
 
-/**
- * "Use all" / "Use none" over every row on the table, answered by the table's
- * own toast so a row edit and a bulk one share one Undo (issue #2548).
- */
 export interface MaterialsTableHandle {
   fillAll: () => void;
   clearAll: () => void;
@@ -176,45 +114,11 @@ export interface MaterialsTableHandle {
 
 const parsePrice = unmaskNumber;
 
-/** `xl` (78.125rem, src/styles/index.css) up to `2xl`: where BuildPlanDetail puts Costs & revenue beside Materials. */
 const BESIDE_COSTS_QUERY = '(min-width: 78.125rem) and (max-width: 95.999rem)';
 
-/** The phone list's own sort — the header sort buttons are a table's, and a phone gets no table. */
 type PhoneSort = 'plan' | 'total' | 'toBuy' | 'name';
 const PHONE_SORTS: readonly PhoneSort[] = ['plan', 'total', 'toBuy', 'name'];
 
-/**
- * Materials, as a shopping list: one section per errand — To buy, Building,
- * Blueprint, Already have (`materialErrands.ts`) — each headed by its colour,
- * glyph, count and what it still costs.
- *
- * At `sm` and up every section is its own table over one shared column set, so
- * Need − Have = To buy reads left to right and the columns line up from one
- * section to the next. Below `sm` the same sections become a list whose rows
- * spell that subtraction out on one line, with the Have field in it; the
- * labelled card the shared DataTable stacks into put six equal-weight labels
- * on every material.
- *
- * A row changes section when the player's edit changes its errand — owning
- * all of it, or switching it to be built. Two rules keep that from being
- * disorienting:
- *
- * - A section holds its rows in place while focus is inside it, so a Have
- *   commit (which lands on blur, as the player tabs on) never unmounts the
- *   field focus is moving to. Rows move once focus leaves the section.
- * - Every move the player caused is confirmed by a toast with Undo — one
- *   toast and one Undo shared with "Use all" / "Use none" (`fillAll` /
- *   `clearAll` on the `ref`).
- *
- * Both rules, and which toast an edit earns, are the edit session's
- * (`materialsEditSession.ts`); this component renders what it decides and
- * makes the writes.
- *
- * Price is one field, not a market column beside an override column: the hub
- * price is its value and typing over it is the override, with a revert
- * control beside a changed field. `SourcingInput`'s commit rule keeps that
- * safe — a field blurred as it was found writes nothing.
- */
 export function MaterialsTable({
   materials,
   nameFor,
@@ -251,13 +155,8 @@ export function MaterialsTable({
   const [session, dispatch] = useReducer(reduceEditSession, INITIAL_EDIT_SESSION);
   const [haveOpen, setHaveOpen] = useState(false);
   const [phoneSort, setPhoneSort] = useState<PhoneSort>('plan');
-  // The phone card whose price field is open; every other card shows its
-  // price as text.
   const [editingPrice, setEditingPrice] = useState<number | null>(null);
-  // Same for the ledger's Have number.
   const [editingHave, setEditingHave] = useState<number | null>(null);
-  // The digit typed on a value that opened its field (`EditableValue`), so
-  // tabbing down a column and typing keeps the first keystroke.
   const [editSeed, setEditSeed] = useState<string | undefined>(undefined);
   function editHave(typeID: number | null, seed?: string) {
     setEditSeed(seed);
@@ -267,10 +166,7 @@ export function MaterialsTable({
     setEditSeed(seed);
     setEditingPrice(typeID);
   }
-  // The value whose field Enter or Escape just closed: it takes focus back as
-  // it remounts (§6c, `useInPlaceEdit`'s contract), keyed "have-34" / "price-34".
   const [refocus, setRefocus] = useState<string | null>(null);
-  // Stable across the keystrokes of a Have/Price edit: `DataTable` memoizes its rows on it.
   const usedByItem = useCallback(
     (material: MaterialTableRow) =>
       onShowUsedBy && !isBuilt(material) && material.acquisitionTier === undefined ? (
@@ -303,28 +199,20 @@ export function MaterialsTable({
   const groups = useMemo(() => editSessionGroups(held, materials), [held, materials]);
   const shown = useMemo(() => shownSections(groups), [groups]);
   const ownedFor = useCallback((typeID: number) => sourcing?.[typeID]?.ownedQuantity, [sourcing]);
-  // The stock a row's offer and "Use all" may draw on: the scoped stock, less
-  // what group members ahead of this plan already claimed.
   const offerQuantityFor = (typeID: number) =>
     offerableStock(typeID, groupClaimsFor, detection?.scopedQuantityFor);
 
-  // Owned-quantity writes the session makes (bulk, and every Undo) go out as
-  // one batch where the caller takes one.
   function writeOwned(changes: readonly OwnedStockChange[]) {
     if (onOwnedStockChange) onOwnedStockChange(changes);
     else for (const { typeID, to } of changes) onSourcingChange(typeID, { ownedQuantity: to });
   }
 
-  // The session confirms the moves an edit caused once they are actually
-  // shown, so it watches every render that could have moved a row.
   useEffect(() => {
     dispatch({ type: 'rendered', shown, ownedFor });
   }, [shown, ownedFor]);
 
   const toast = session.toast;
 
-  // Runs after every render: the toggled row only reaches its new section
-  // once the plan write lands, which can be several renders later.
   useEffect(() => {
     const target = session.focusAfterToggle;
     if (!target) return;
@@ -335,8 +223,6 @@ export function MaterialsTable({
       dispatch({ type: 'focusSettled' });
       el.focus();
     } else if (shown.get(target.typeID) !== target.from) {
-      // It moved somewhere its control isn't mounted — the folded Already
-      // have section. Give up rather than steal focus whenever that opens.
       dispatch({ type: 'focusSettled' });
     }
   });
@@ -351,8 +237,6 @@ export function MaterialsTable({
     clearAll: () => applyBulk('none', clearEveryOwned(materials, ownedFor)),
   }));
 
-  // Built per render, so Undo writes through the latest props: a write made
-  // while the toast was up isn't dropped by a stale callback.
   function undo() {
     const patch = session.toast?.undo;
     if (patch) {
@@ -404,7 +288,6 @@ export function MaterialsTable({
     [onToggleBuildHere]
   );
 
-  /** The make-or-buy advice for a row, and whether a Build/Buy instead switch is offered on it. */
   function buildChoice(material: MaterialTableRow) {
     return {
       advice: makeOrBuy?.get(material.typeID),
@@ -412,25 +295,18 @@ export function MaterialsTable({
     };
   }
 
-  /** What building saves over buying, when the advice says building is cheaper. */
   function buildSavingsOf(material: MaterialTableRow): number | null {
     return buildSavings(material, buildChoice(material).advice);
   }
 
-  /** The name, any advice/skill marker, and — unless the caller places it itself — the row's text action. */
   function renderName(material: MaterialTableRow, withAction: boolean, badge = false) {
     const name = nameFor(material.typeID);
     const { advice, toggleable } = buildChoice(material);
-    // Only a built row names what blocks it. A bought row carries no gate
-    // text: its lock sits on the Build instead button (see `SwapButton`).
     const skillGate = isBuilt(material) ? skillGates?.get(material.typeID) : undefined;
     return (
       <span className="flex min-w-0 flex-col items-start gap-0.5">
         <span className="inline-flex min-w-0 items-center gap-1.5">
           <ItemInfoLink typeId={material.typeID}>{name}</ItemInfoLink>
-          {/* Advice with nothing to act on here — a material something
-              else produces. Inline after the name, not in a reserved slot
-              before it, so every name starts at the same edge. */}
           {!toggleable && !material.acquisitionTier && advice && (
             <MakeOrBuyMarker advice={advice} remaining={material.remainingQuantity} badge={badge} />
           )}
@@ -447,7 +323,6 @@ export function MaterialsTable({
     );
   }
 
-  /** Recipe · Buy instead, Build instead, or Change tier — whichever this row's errand offers. */
   function renderAction(material: MaterialTableRow, withSavings = true) {
     const name = nameFor(material.typeID);
     if (material.acquisitionTier) {
@@ -468,7 +343,6 @@ export function MaterialsTable({
       if (!onShowRecipe && !toggleable && savings === null) return null;
       return (
         <span className="inline-flex flex-wrap items-center gap-x-2">
-          {/* What this build is worth, in the same green its heading uses. */}
           {savings !== null && (
             <span className="text-[0.6875rem] text-success tabular-nums">
               {t('industry.errands.savesVsBuying', { amount: formatIskCompact(savings) })}
@@ -510,22 +384,8 @@ export function MaterialsTable({
     ) : null;
   }
 
-  /** The Have field, with the detected-stock offer under it. A blueprint row only ever says Owned. */
-  /**
-   * The detected-stock offer ("Use assets") for a row, or nothing. Its own
-   * piece so the phone row can put it on the line under the subtraction
-   * instead of inside it, where it split Need − Have = To buy over two lines.
-   *
-   * Inside a Build Group it also carries the over-claim warning (issue
-   * #3992), shown whether or not the row still has an offer: a member whose
-   * Have already fills its need has none, and is exactly the one to warn.
-   * Not on a lower-bound count, which may simply be short.
-   */
   function renderOwnedHint(material: MaterialTableRow) {
     if (!detection || material.acquisitionTier) return null;
-    // Whether the row offers anything, and what, is the owned-stock offer's
-    // call (`ownedStockOffer.ts`) — the same rule "Use all" applies. It
-    // respects the plan's owned-stock scope (issue #454).
     const claims = groupClaimsFor?.(material.typeID) ?? null;
     const offer = ownedStockOffer(
       material,
@@ -563,9 +423,6 @@ export function MaterialsTable({
     seed?: string,
     onSettle?: () => void
   ) {
-    // Blueprint Acquisition (issue #838): ownership comes entirely from the
-    // Character's real BPO/BPC, never from a typed quantity — an editable
-    // field here would silently do nothing.
     if (material.acquisitionTier) {
       return material.remainingQuantity === 0 ? (
         <span className="text-[0.6875rem] text-text-dim">
@@ -596,11 +453,6 @@ export function MaterialsTable({
     );
   }
 
-  /**
-   * The table's Have cell: the count edited in place (§6c faint pencil), the
-   * field only while it is being edited, and the row's owned-stock offer
-   * under it. A Blueprint Acquisition row keeps `renderHave`'s own readout.
-   */
   function renderHaveCell(material: MaterialTableRow) {
     if (material.acquisitionTier) return renderHave(material);
     if (editingHave === material.typeID) {
@@ -627,18 +479,10 @@ export function MaterialsTable({
     );
   }
 
-  /**
-   * The price field and what kind of price it holds. A built row has no
-   * purchase price at all. `inline` is the phone row's form: "@ [field]" on
-   * one line with its tag beside it rather than stacked under it, and no tier
-   * caption, which the phone row prints beside Change tier instead.
-   */
   function renderPrice(material: MaterialTableRow, inline = false, autoFocus = false) {
     const name = nameFor(material.typeID);
     const priceTag = materialPriceTag(material, sourcing, pricesReady);
     if (isBuilt(material)) {
-      // "Something under this has no price" is a warning about the plan's
-      // totals, not a price — hiding it would quietly understate the cost.
       return priceTag === 'unpriced' ? (
         <span className="text-[0.6875rem] text-warning">{t('industry.unpriced')}</span>
       ) : (
@@ -649,8 +493,6 @@ export function MaterialsTable({
     const overridden = state.priceSource === 'override';
     const depth = inline ? undefined : shownDepth(material, sourcing, depthFor);
     const unpriced = priceTag === 'unpriced';
-    // No tag on a plain hub price — that is what every row is unless
-    // something says otherwise.
     const tag =
       priceTag === 'override'
         ? { text: t('industry.priceSourceOverride'), tone: 'text-accent' }
@@ -659,7 +501,6 @@ export function MaterialsTable({
           : priceTag === 'unpriced'
             ? { text: t('industry.unpriced'), tone: 'text-warning' }
             : null;
-    // Only once prices have landed: before then every row reads as unpriced.
     const onFindBlueprint =
       unpriced && pricesReady && material.acquisitionTier && onOpenAcquisitionPicker
         ? () => onOpenAcquisitionPicker(material.typeID)
@@ -678,9 +519,6 @@ export function MaterialsTable({
           </span>
         )}
         {!inline && editingPrice !== material.typeID && state.unitPrice !== null ? (
-          // Stays a value to edit even once the row is fully owned: Tab out of
-          // its Have lands here, and a value that vanished under focus would
-          // drop the player at the top of the page. Dim then — nothing is bought.
           <EditableValue
             focusOnMount={refocus === `price-${material.typeID}`}
             onFocused={clearRefocus}
@@ -761,7 +599,6 @@ export function MaterialsTable({
     );
   }
 
-  /** The line total — or, for a built row, its runs: its inputs carry the cost in their own rows. */
   function renderTotal(material: MaterialTableRow) {
     if (material.subBuilds.length > 0) {
       const recipe = buildRecipe(material);
@@ -771,7 +608,6 @@ export function MaterialsTable({
     const sellValue =
       material.remainingQuantity === 0 ? sellValueFor?.(material.typeID) : undefined;
     if (sellValue !== undefined) {
-      // A fully owned row costs nothing; what it would fetch is the number worth reading.
       return (
         <span className="whitespace-nowrap text-text-dim">
           {t('industry.errands.rowSellsFor', { amount: formatIskCompact(sellValue) })}
@@ -784,16 +620,12 @@ export function MaterialsTable({
         {state.lineCost === null ? (
           t('common.unknown')
         ) : (
-          // Long press, not tap: the row's own tap belongs to its context menu.
           <IskAmount value={state.lineCost} decimals={0} />
         )}
       </span>
     );
   }
 
-  // Rebuilt every render, deliberately: the cell renderers close over the
-  // hold and toggle machinery above, and a stale closure there would commit
-  // an edit through an outdated sourcing map.
   const anyDepth = materials.some((m) => shownDepth(m, sourcing, depthFor) !== undefined);
   const columns = buildMaterialsColumns({
     t,
@@ -808,9 +640,6 @@ export function MaterialsTable({
     renderTotal,
   });
 
-  // Dropped only where Materials shares its row with Costs & revenue (`xl`
-  // up to `2xl`): that panel already totals the plan's volume, and the
-  // table has to fit beside it without a sideways scroll (#2165).
   const tableColumns = besideCosts ? columns.filter((column) => column.id !== 'volume') : columns;
 
   function holdSection(errand: MaterialErrand) {
@@ -831,9 +660,6 @@ export function MaterialsTable({
         : null;
     const saved =
       errand === 'building' ? rows.reduce((sum, row) => sum + (buildSavingsOf(row) ?? 0), 0) : 0;
-    // Bought rows that would be cheaper built: one link for all of them, so the
-    // suggestion is a line of the heading rather than a banner competing with
-    // the verdict. One row keeps only its own Build instead.
     const cheaperBuilt =
       errand === 'toBuy' && onBuildAll
         ? rows.filter(
@@ -851,8 +677,6 @@ export function MaterialsTable({
       <div
         className={cx(
           'flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-b border-line px-2 py-1.5',
-          // On a phone the heading is a rule over its cards, not a filled bar
-          // — one more box around boxes there.
           !isPhone && 'bg-panel-2'
         )}
       >
@@ -864,7 +688,6 @@ export function MaterialsTable({
           )}
         >
           {errand === 'have' ? (
-            // Folded by default: nothing on these rows needs doing.
             <button
               type="button"
               aria-expanded={haveOpen}
@@ -929,7 +752,6 @@ export function MaterialsTable({
     );
   }
 
-  /** Within one section only — a sort never pulls a row out of its errand. */
   function sortForPhone(rows: readonly MaterialTableRow[]): readonly MaterialTableRow[] {
     if (phoneSort === 'plan') return rows;
     const keyed = rows.map((row) => ({
@@ -946,7 +768,6 @@ export function MaterialsTable({
               : materialRowState(row, sourcing, pricesReady).lineCost,
     }));
     keyed.sort((a, b) => {
-      // Rows with nothing to sort by sink, as the table's own sort does.
       if (a.key === null || b.key === null) return a.key === b.key ? 0 : a.key === null ? 1 : -1;
       if (typeof a.key === 'string' && typeof b.key === 'string') return a.key.localeCompare(b.key);
       return (b.key as number) - (a.key as number);
@@ -973,8 +794,6 @@ export function MaterialsTable({
 
   return (
     <div ref={containerRef} className="flex flex-col gap-3">
-      {/* Once for the whole list, on its own line: inside the first heading a
-          36px field made that heading the heaviest thing in the section. */}
       {isPhone && visible.length > 0 && (
         <label className="flex items-center justify-end gap-2 text-xs text-text-dim">
           {t('industry.errands.sortLabel')}
@@ -1045,9 +864,6 @@ export function MaterialsTable({
                     rowMoreActions={itemMenuFor !== undefined}
                     columns={tableColumns}
                     rows={rows}
-                    // Fixed layout over the same column widths in every
-                    // section, so Need, Have and To buy line up from one
-                    // section's table to the next; the name takes the rest.
                     className="table-fixed"
                     rowKey={(material) => material.typeID}
                     label={t('industry.errands.tableLabel', { section: sectionLabel(errand) })}

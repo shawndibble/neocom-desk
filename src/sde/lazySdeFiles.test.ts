@@ -5,7 +5,6 @@ import { LAZY_SDE_FILES, lazySdeGlobIgnores } from './lazySdeFiles';
 
 const dataDir = join(process.cwd(), 'public', 'data');
 const viteConfig = readFileSync(join(process.cwd(), 'vite.config.ts'), 'utf-8');
-/** The service worker's `maximumFileSizeToCacheInBytes` (vite.config.ts). */
 const PRECACHE_MAX_BYTES = 5 * 1024 * 1024;
 
 describe('LAZY_SDE_FILES', () => {
@@ -20,7 +19,6 @@ describe('LAZY_SDE_FILES', () => {
   it('is what vite.config.ts ignores for the precache, and nothing under data/ beyond it', () => {
     expect(viteConfig).toMatch(/from '\.\/src\/sde\/lazySdeFiles\.ts'/);
     expect(viteConfig).toContain('...lazySdeGlobIgnores()');
-    // No second, hand-kept list of data files to drift from this one.
     expect(viteConfig).not.toMatch(/'\*\*\/data\/[^']*'/);
     expect(lazySdeGlobIgnores()).toEqual(LAZY_SDE_FILES.map((f) => `**/data/${f}`));
   });
@@ -33,7 +31,6 @@ describe('LAZY_SDE_FILES', () => {
     expect(precached).toContain('blueprints.json');
     expect(precached).toContain('shipTree.json');
     expect(precached).toContain('market/systemPositions.json');
-    // The Fittings / Show Info catalogue: ~360 KB gzip together, precached so it needs no warm.
     for (const f of ['market/types.json', 'market/stations.json', 'market/variations.json'])
       expect(precached).toContain(f);
     for (const file of precached) {

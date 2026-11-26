@@ -17,7 +17,6 @@ interface TypeNameProps extends FactsProps {
   typeName: (typeId: number) => string;
 }
 
-/** Drones section body: DPS, bandwidth, bay, active count and control range. */
 export function DroneFacts({ stats }: FactsProps) {
   const { t } = useTranslation();
   const figure = makeFigure(stats);
@@ -66,7 +65,6 @@ export function DroneFacts({ stats }: FactsProps) {
   );
 }
 
-/** Fighters section body: DPS, launch tubes and bay. */
 export function FighterFacts({ stats }: FactsProps) {
   const { t } = useTranslation();
   const figure = makeFigure(stats);
@@ -100,7 +98,6 @@ export function FighterFacts({ stats }: FactsProps) {
   );
 }
 
-/** Navigation section body: speed, align time, agility, mass and warp. */
 export function NavigationFacts({ stats }: FactsProps) {
   const { t } = useTranslation();
   const figure = makeFigure(stats);
@@ -160,7 +157,6 @@ export function NavigationFacts({ stats }: FactsProps) {
   );
 }
 
-/** Targeting section body: range, locked targets, scan resolution and signature. */
 export function TargetingFacts({ stats }: FactsProps) {
   const { t } = useTranslation();
   const figure = makeFigure(stats);
@@ -216,7 +212,6 @@ export function TargetingFacts({ stats }: FactsProps) {
   );
 }
 
-/** Fitting section body: CPU, powergrid and calibration against the hull, then holds and sensors. */
 export function FittingBudgetFacts({ stats, typeName }: TypeNameProps) {
   const { t } = useTranslation();
   const figure = makeFigure(stats);
@@ -274,7 +269,6 @@ export function FittingBudgetFacts({ stats, typeName }: TypeNameProps) {
       />
       {stats.unknownItemTypeIds.length > 0 && (
         <StatNote tone="warning">
-          {/* Which items, one per line — on hover, focus or a tap. */}
           <HintText content={unknownItemsList(stats.unknownItemTypeIds, typeName, t)}>
             {t('fittings.stats.unknownItems', { count: stats.unknownItemTypeIds.length })}
           </HintText>

@@ -40,13 +40,6 @@ const k = (key: string) => `corpTaxBook.moons.refinery.${key}`;
 const kl = (key: string) => `corpTaxBook.moons.refineryLabels.${key}`;
 const kp = (key: string) => `corpTaxBook.moons.refineryPage.${key}`;
 
-/**
- * A refinery's page (#6348): its moon, owner, ore, every Extraction and every Miner, one page for
- * the book's own refineries and moon owners'. It reads the refinery's moon docs, never the ledger,
- * so mining outside an Extraction's window is not counted. Archive lives in the header of a moon
- * owner's refinery only, and is offered (accent, with a hint) when the structure is gone or idle;
- * an officer may archive by hand any time. Archive hides; it never deletes.
- */
 export function RefineryPage({ structureId }: { structureId: number }) {
   const zone = useTimeZone();
   const { t } = useTranslation();
@@ -61,11 +54,9 @@ export function RefineryPage({ structureId }: { structureId: number }) {
     [view.extractions, structureId]
   );
   const key = String(structureId);
-  // The Refineries list owns which refineries exist, who owns them and whether one is archived.
   const list = useRefineryList();
   const listed = list.active.find((r) => r.structureId === structureId);
   const listedArchived = list.archived.find((r) => r.row.structureId === structureId);
-  // A refinery with no Extraction yet still belongs to the moon owner whose record names it.
   const ownerId =
     listed?.ownerId ??
     listedArchived?.ownerId ??
@@ -113,8 +104,6 @@ export function RefineryPage({ structureId }: { structureId: number }) {
   const moonId = rows[0]?.moonId;
   const place = splitPlace(name, moonId === undefined ? undefined : names.moon(moonId));
   const title = place.moon === undefined ? name : place.station;
-  // A refinery the list does not hold (a moon owner's record names it, nothing else does) has no
-  // mining to age, so its state is read from the record alone.
   const row =
     listed?.row ??
     listedArchived?.row ??

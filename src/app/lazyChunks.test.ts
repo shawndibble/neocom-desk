@@ -275,7 +275,6 @@ describe('listMatchesBuild', () => {
 });
 
 describe('preloadGraphSignature', () => {
-  /** A rendered chunk as `renderChunk`'s `meta.chunks` gives it, keyed by its preliminary file name. */
   const rendered = (
     name: string,
     moduleIds: string[],
@@ -339,10 +338,6 @@ describe('preloadGraphSignature', () => {
 });
 
 describe('shellChunkGroups', () => {
-  // Static: main → app; Layout → nav → [app, card]; Overview → widget →
-  // [card, chart, badge]; SharedLink → card; ShareView → chart;
-  // InfoModal → badge; Market → widget.
-  // import(): main → [Layout, Overview, Market, InfoModal]; SharedLink → ShareView.
   const graph: Record<string, string[]> = {
     main: ['app'],
     app: [],
@@ -393,7 +388,6 @@ describe('shellChunkGroups', () => {
 
   it('keeps what the entry reaches by import() apart, short of the signed-in routes, so an info modal on /login never loads the shell', () => {
     const { shell, publicShared, entryLazy } = groups(['SharedLink'], dynamicGraph);
-    // badge: InfoModal's. Not widget: only Market (a signed-in route) and Overview reach it.
     expect([...entryLazy]).toEqual(['badge']);
     expect([...publicShared].sort()).toEqual(['card', 'chart', 'format']);
     expect([...shell].sort()).toEqual(['nav', 'widget']);
@@ -476,10 +470,6 @@ describe('PUBLIC_ROUTE_SUFFIXES', () => {
   it('names every lazy route App.tsx renders outside the signed-in shell, so none loads the shell chunk', () => {
     const app = source('src/app/App.tsx');
     const chunks = source('src/app/routeChunks.ts');
-    // Every literal-path <Route> is outside the shell (the shell's are
-    // `path={…}`). Each must parse, and its element must be either in the
-    // entry (a static import or a function here) or a routeChunks loader:
-    // a shape this cannot read fails rather than dropping out of the check.
     const literal = app.match(/<Route\s+path="/g)?.length ?? 0;
     const parsed = [...app.matchAll(/<Route\s+path="[^"]+"\s+element=\{<(\w+)\s*\/>\}\s*\/>/g)];
     expect(literal).toBeGreaterThan(0);

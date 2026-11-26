@@ -1,8 +1,3 @@
-// Every route renders the same figures from its own book parts as from the whole book (#5247).
-// A route that joins a slice its `bookPartsFor` leaves out shows wrong figures silently, as the
-// Overview did when it read `core` only: owed and Needs you ignored payments. The book is read
-// through the real `readBook` over a stand-in Firestore, so a field filed under the wrong part
-// (bookRead/slices.ts) shows here too.
 import { cleanup, render } from '@testing-library/react';
 import type { ReactElement } from 'react';
 import { MemoryRouter } from 'react-router-dom';
@@ -27,7 +22,6 @@ import { LateNoticesTab } from './LateNoticesTab';
 type BookPartSet = ReadonlySet<BookPart>;
 type BookDetailKind = NonNullable<Parameters<typeof bookPartsFor>[1]>;
 
-/** The stand-in Firestore: documents by path. */
 const store = vi.hoisted(() => new Map<string, Record<string, unknown>>());
 vi.mock('firebase/firestore/lite', () => ({
   doc: (_db: unknown, ...segments: string[]) => ({ path: segments.join('/') }),
@@ -114,7 +108,6 @@ const ENTRIES = [
   mined(3, '2026-09-21', 1800),
   mined(4, '2026-09-22', 1600),
   mined(1, '2026-10-05', 900, { structureId: 1002, moonId: undefined }),
-  // A moon owner's miners, billable once its ledger read lands.
   mined(5, '2026-10-05', 5000, {
     recordedCorporationId: MOON_OWNER,
     sourceCorporationId: MOON_OWNER,
@@ -157,10 +150,7 @@ const base: BookViewInput = {
   pricesOn: () => ({ prices: new Map([[ORE, 1000]]), sources: new Map() }),
 };
 
-/** The ledger slice of a rich book: a payment, dismissal, declaration, adjustment, write-off, rebill. */
 function richBook() {
-  // A late notice to each Miner who owed on 1 Sep and 2 Oct; Pilot 4's September day is
-  // dismissed: one chunk with days a notice listed and a dismissed one.
   const at = (now: string) => buildBookView({ ...base, now });
   const aug = at('2026-09-01T10:00:00Z');
   const issued = aug.miners.flatMap((m) => draftNotice(aug, m.id)?.notice ?? []);
@@ -247,7 +237,6 @@ function richBook() {
 
 const RICH = richBook();
 
-/** The rich book as Firestore holds it: no version stamps, so every read is fresh. */
 function seed() {
   const book = `corps/${CORP}`;
   store.clear();
@@ -261,7 +250,6 @@ function seed() {
     rates: base.rates,
   });
   store.set(`${book}/meta/paid`, { ids: [] });
-  // Stored as a record: the clock in ms, and the payouts (none) under it.
   store.set(`${book}/feeders/${MOON_OWNER}`, {
     ...FEEDER,
     payouts: undefined,
@@ -281,7 +269,6 @@ function seed() {
     for (const row of rows) store.set(`${book}/${name}/${row.id}`, row);
 }
 
-/** What `readBook` returns for a read of `parts` (undefined: the whole book). */
 async function bookData(parts: BookPartSet | undefined): Promise<BookData> {
   seed();
   return (await readBook(7, CORP, { parts: parts ?? bookPartsFor() }))!;
@@ -310,7 +297,6 @@ const verdict: OfficerVerdict = {
   expiresAt: 0,
 };
 
-/** What a route puts on screen, from a book read as `parts`. */
 async function screenText(ui: ReactElement, parts: BookPartSet | undefined): Promise<string> {
   const data = await bookData(parts);
   const { container } = render(
@@ -416,7 +402,6 @@ describe('book parts parity', () => {
     expect(g1(view).owed).toBeLessThan(billed);
     expect(g1(view).owed).toBe(g1(whole).owed);
     expect(view.totals.owed).toBe(whole.totals.owed);
-    // What the Miners tab reads is the same row.
     const minersTab = viewOf(await bookData(bookPartsFor('miners', null)));
     expect(g1(minersTab).owed).toBe(g1(view).owed);
     expect(minersTab.totals.owed).toBe(view.totals.owed);

@@ -28,7 +28,6 @@ describe('not paying, on this device', () => {
     expect(result.current.hidden).toEqual(new Set());
   });
 
-  // Two hides in one tick used to read the same stored set and the second overwrote the first.
   it('loses no hide when two land together', async () => {
     const { result } = renderHook(() => useNotPaying());
     await act(async () => {
@@ -38,7 +37,6 @@ describe('not paying, on this device', () => {
     expect((await db.settings.get('miningTaxNotPaying'))?.value).toEqual(['a', 'b']);
   });
 
-  // A donation that becomes uncredited after the member hid the others is a new problem.
   it('keys uncredited donations by when they were sent, in any order', () => {
     expect(uncreditedKey(1, ['b', 'a'])).toBe(uncreditedKey(1, ['a', 'b']));
     expect(uncreditedKey(1, ['a'])).not.toBe(uncreditedKey(1, ['a', 'b']));

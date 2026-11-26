@@ -1,17 +1,3 @@
-/**
- * Wallet's LP Store tab: one corporation's LP store (Wallet's Loyalty Points table links here by
- * `corporation_id`): every offer ranked by ISK/LP — profit divided by the LP
- * each offer costs, since LP (not ISK) is the resource a character can't
- * just make more of. A ranked list on the left, a full profit breakdown for
- * the selected offer on the right; on a phone the breakdown opens as a
- * bottom sheet instead of a second column. See
- * src/features/loyalty/useLoyaltyStoreOffers.ts for how the numbers are
- * assembled.
- *
- * The landing search opens any NPC corporation's store, LP or not. An open
- * store is a large modal over that search at its own URL; closing it returns
- * to the search (`/wallet/lp-store` with no corporation is the landing state).
- */
 import { usePricesUnavailableLabel } from '@/features/market/usePricesUnavailableLabel';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 import {
@@ -78,33 +64,18 @@ import { formatNumber } from '@/lib/numberLocale';
 import { useCharacterLacksEndpoints } from '@/app/useGrantedScopes';
 import type { EsiEndpointId } from '@/esi/registry';
 
-/** Module-level so the table's windowing and row memo see one stable function. */
 const offerRowKey = (row: LoyaltyOfferRow) => row.offer.offer_id;
 const LOYALTY_ENDPOINTS: readonly EsiEndpointId[] = ['getCharacterLoyaltyPoints'];
 
-/**
- * The filter row's three fields, in the URL (ADR 0015, issue #1302): all
- * three as one `useUrlParams` group, so a click and a keystroke in the same
- * update write together. `affordableOnly` is `null` when left alone: its
- * default hangs on the pilot's LP with this corporation (see
- * `defaultAffordableOnly`), which a codec can't see.
- */
 const FILTER_PARAMS = {
   search: textParam(),
   affordableOnly: optionalBoolParam(),
   blueprintsOnly: boolParam(false),
-  /** The selected offer: a link (BPC Sourcing's LP rows) arrives with one already picked. */
   offer: optionalIdParam(),
 };
 
 const OFFERS_SORT = { columnId: 'iskPerLp', direction: 'desc' } as const;
 
-/**
- * The route: `/wallet/lp-store` (landing) or `/wallet/lp-store/:corporationId`
- * (the landing with the store modal open on top). The modal's content is keyed
- * on the corporation so switching stores remounts it — no previous store's
- * offers, selection or loaded state carried over under the new store's URL.
- */
 export function LoyaltyStore() {
   const { corporationId: corporationIdParam } = useParams<{ corporationId?: string }>();
   const corporationId = Number(corporationIdParam);
@@ -124,7 +95,6 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
   const navigate = useNavigate();
   const isDesktop = useIsDesktop();
   const isPhone = useIsPhone();
-  // Read once, on arrival: the landing view this store was opened from.
   const location = useLocation();
   const [arrivedState] = useState(() => location.state as Partial<LpSearchCrumbState> | null);
 
@@ -165,19 +135,12 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
 
   const [filterParams, setFilterParams] = useUrlParams(FILTER_PARAMS);
   const { search, blueprintsOnly } = filterParams;
-  // At 0 LP every offer is unaffordable, so the filter would open on an empty
-  // list (#6004). Unknown LP (`null`) keeps the old default. A URL value wins.
   const defaultAffordableOnly = playerLp !== 0;
   const affordableOnly = filterParams.affordableOnly ?? defaultAffordableOnly;
-  /** The URL value for an Affordable choice: none when it matches the default. */
   const affordableParam = (next: boolean) => (next === defaultAffordableOnly ? null : next);
-  // Rows filter on a deferred copy so a keystroke paints the box first
-  // (`useUrlFilter`'s rule); the search box keeps the immediate one.
   const rowsSearch = useDeferredValue(search);
   const selectedOfferId = filterParams.offer;
-  // The offer the link arrived on: the table scrolls to it once, not on every later pick.
   const [arrivedOfferId] = useState(selectedOfferId);
-  // A phone arriving on a linked offer opens its breakdown straight away.
   const [sheetOpen, setSheetOpen] = useState(() => selectedOfferId !== null && !isDesktop);
 
   const activeCharacterId = useActiveCharacter((s) => s.activeCharacterId);
@@ -187,8 +150,6 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
   const filteredRows = useMemo(() => {
     const q = rowsSearch.trim().toLowerCase();
     return rows.filter((row) => {
-      // The offer a link arrived on stays listed whatever the filters say, so its
-      // detail never vanishes behind "affordable only".
       if (row.offer.offer_id === arrivedOfferId && row.offer.offer_id === selectedOfferId)
         return true;
       if (affordableOnly && row.profit.affordableLp === false) return false;
@@ -198,7 +159,6 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
     });
   }, [rows, rowsSearch, affordableOnly, blueprintsOnly, selectedOfferId, arrivedOfferId]);
 
-  // Spend my LP: nothing loads until the button is pressed (#6199).
   const spendPlan = useSpendPlan({
     corporationId,
     rows: filteredRows,
@@ -217,16 +177,8 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
     [rows]
   );
 
-  // No fallback to "the top row" here: `DataTable` sorts its own displayed
-  // copy independently of `filteredRows`' order, so a fallback tied to this
-  // array's order can point at a row that no longer reads as "first" once
-  // the table itself is sorted differently. The prompt below stands until an
-  // explicit click picks a row.
   const selectedRow = filteredRows.find((row) => row.offer.offer_id === selectedOfferId);
 
-  // Not `DataTable`'s `highlightRowKey`: that re-marks the row `aria-current="location"`
-  // and steals focus, where a selected row already announces itself. The list isn't
-  // windowed, so the row is in the DOM once the offers have loaded.
   const arrivedRowPresent = rows.some((row) => row.offer.offer_id === arrivedOfferId);
   useEffect(() => {
     if (arrivedOfferId === null || !arrivedRowPresent) return;
@@ -240,12 +192,6 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
     if (!isDesktop) setSheetOpen(true);
   }
 
-  /**
-   * Opens the product's Build Plan with this redemption as its Blueprint
-   * Acquisition — the pilot is in the LP Store looking at it, so that is
-   * where the blueprint comes from. A redemption that can't be priced (a
-   * turn-in with no hub price) opens the plan unseeded, to price itself.
-   */
   async function planInIndustry(row: LoyaltyOfferRow) {
     if (row.productTypeId === null) return;
     const params = new URLSearchParams({ product: String(row.productTypeId) });
@@ -256,15 +202,10 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
     navigate(`${industryTabHref('plans')}?${params.toString()}`);
   }
 
-  // Stable, so the offers table's memoized rows skip re-rendering on every page render.
   const rowContextMenu = useCallback(
     (row: LoyaltyOfferRow, tr: ReactElement) => {
       const { typeId, itemName } = resolveLoyaltyRowItem(row);
       if (typeId === null) return tr;
-      // `catalog` is always resolved by the time a row exists to right-click —
-      // `useLoyaltyStoreOffers` gates `ready` on `catalog !== null` — so this
-      // never needs the lazy-load `onOpenChange` wiring the Market/Assets menus
-      // use; `?? null` collapsing "not loaded" into "no blueprint" is safe here.
       const blueprintTypeID = catalog?.byProductTypeID.get(typeId)?.blueprintTypeID ?? null;
       return (
         <ItemContextMenu typeId={typeId} itemName={itemName} blueprintTypeID={blueprintTypeID}>
@@ -274,14 +215,7 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
     },
     [catalog]
   );
-  // `DataTable` draws the selected row itself from `selectedRowKey`; it keys on the
-  // selected id rather than `selectedRow`, so a selected offer filtered out of
-  // `filteredRows` simply has no row to mark.
 
-  // The full catalog, not just `columns`' currently-visible ids: a sort
-  // picked while a column was shown should still resolve once the picker
-  // hides it, ready to take effect again the moment it's shown back
-  // (`resolveSort` only rejects a `columnId` the catalog has never heard of).
   const offersSortProps = useUrlSort('sort', OFFERS_SORT, [
     'item',
     ...LOYALTY_STORE_OFFERS_COLUMN_IDS,
@@ -294,7 +228,6 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
     playerLp,
     sortColumnId: offersSortProps.sort?.columnId,
   });
-  // Every column, whatever the picker hides.
   const offersCsvColumns = useMemo(
     () => loyaltyOfferCsvColumns(t, { concordRate: concord?.rate ?? null }),
     [t, concord]
@@ -306,8 +239,6 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
     qualifier: corpName ?? undefined,
   });
 
-  // Close shows the landing under the store: it replaces the URL, never goes Back,
-  // which would land on whatever page pushed the store.
   function closeStore() {
     const search = arrivedState?.from === 'lp-search' ? arrivedState.search : undefined;
     navigate(`/wallet/lp-store${search?.startsWith('?') ? search : ''}`, { replace: true });
@@ -315,8 +246,6 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
 
   const list = (
     <Panel
-      // The modal's own title names the store and the tab bar names the page, so on a
-      // phone the heading only costs a line above the "Jita · Sell order" readout.
       title={isPhone ? undefined : t('loyaltyStore.title')}
       wrapMeta
       meta={
@@ -440,7 +369,6 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
             density="compact"
             stackLayout="dense"
             className="dt-actions-pinned-only"
-            // Not windowed: the virtualizer follows the window scroll, and the modal body scrolls instead.
             sort={offersSortProps.sort}
             onSortChange={offersSortProps.onSortChange}
             mobileSort
@@ -483,7 +411,6 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
       <Modal
         open
         onClose={closeStore}
-        // A URL already backs this modal: Back pops its entry, not a second one.
         closeOnBack={false}
         placement="page"
         title={corpName ?? t('loyaltyStore.title')}
@@ -503,20 +430,14 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
       >
         <div className="flex flex-col gap-3">
           <NearestStationLine corporationId={corporationId} />
-          {/* On a phone the search row stays put while the offers scroll beneath it. */}
           <div className="max-sm:sticky max-sm:-top-3 max-sm:z-10 max-sm:-mx-3 max-sm:bg-panel max-sm:px-3 max-sm:py-1.5">
             <LoyaltyOfferFilterBar
               value={{ hubId, priceBasis, lpBasis, affordableOnly, blueprintsOnly }}
               onChange={(next) => {
-                // Persisted preferences (hub, price basis) are written here and only
-                // here, so a Cancel in the mobile sheet never has a store write to
-                // roll back — the draft was local until this point.
                 if (next.hubId !== hubId) void pickHubFor('lpStore', next.hubId);
                 if (next.priceBasis !== priceBasis) void setPriceBasis(next.priceBasis);
                 if (next.lpBasis !== lpBasis) void setLpBasis(next.lpBasis);
                 setFilterParams({
-                  // Only a changed choice is written, so another filter's change
-                  // never pins the LP-based default into the URL.
                   ...(next.affordableOnly !== affordableOnly && {
                     affordableOnly: affordableParam(next.affordableOnly),
                   }),
@@ -545,9 +466,6 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
           {isDesktop ? (
             <div className="flex items-start gap-3">
               {list}
-              {/* The mobile branch below opens the same content in a `Modal`,
-              which announces itself on open — this split-panel layout just
-              repaints in place, so it needs its own announcement (#1490). */}
               <p aria-live="polite" className="sr-only">
                 {selectedRow &&
                   t('loyaltyStore.selectedAnnouncement', { name: selectedRow.itemName })}

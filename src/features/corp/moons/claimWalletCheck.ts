@@ -1,9 +1,3 @@
-/**
- * The officer's own-wallet check of an "I already paid" whose transfer went to one of the
- * officer's Characters, not to the corporation (resolving in the app). The corporation's wallet
- * cannot show it, and the officer's wallet token never leaves the device, so the match is made
- * here, on the journal this device already holds. Pure: the read is `useOwnWalletCheck`.
- */
 import type { WalletJournalEntry } from '@/esi/endpoints';
 import type { TFunction } from 'i18next';
 import type { PillTone } from '@/components/ui/Pill';
@@ -15,10 +9,8 @@ import { type ClockZone, atDate, shortDateTime } from './moonsFormat';
 
 type Transfer = NonNullable<Declaration['transfers']>[number];
 
-/** An automatically credited claim stays on the queue's line this long. */
 export const AUTO_CREDIT_DAYS = 7;
 
-/** The tracked Character a transfer was paid to, when it was paid to one of `ownIds`. */
 export function paidToOwn(transfer: Transfer, ownIds: ReadonlySet<number>): number | undefined {
   return transfer.recipient === 'character' &&
     transfer.recipientId !== undefined &&
@@ -27,12 +19,6 @@ export function paidToOwn(transfer: Transfer, ownIds: ReadonlySet<number>): numb
     : undefined;
 }
 
-/**
- * Whether an entry of the officer's own journal is this transfer: an incoming donation the
- * member's stated transfer matches (the shared `matchesStatedTransfer`: under 1 ISK apart, within
- * two days). `senderIds` are the member's Characters; with none known, or an entry naming no
- * sender, the amount and time alone decide.
- */
 export function entryMatchesTransfer(
   entry: WalletJournalEntry,
   transfer: Pick<Transfer, 'amount' | 'at'>,
@@ -42,7 +28,6 @@ export function entryMatchesTransfer(
   if (entry.amount === undefined || entry.amount <= 0) return false;
   const sender = entry.first_party_id;
   if (senderIds.length > 0 && sender !== undefined && !senderIds.includes(sender)) return false;
-  // The sender is settled above, so the shared rule compares only the amount and the time.
   const characterId = sender ?? 0;
   return matchesStatedTransfer(
     { characterId, amount: transfer.amount, at: transfer.at },
@@ -50,7 +35,6 @@ export function entryMatchesTransfer(
   );
 }
 
-/** The first journal entry that is this transfer (the closest in time when several are). */
 export function findOwnEntry(
   journal: readonly WalletJournalEntry[],
   transfer: Pick<Transfer, 'amount' | 'at'>,
@@ -62,7 +46,6 @@ export function findOwnEntry(
     .sort((a, b) => Math.abs(Date.parse(a.date) - at) - Math.abs(Date.parse(b.date) - at))[0];
 }
 
-/** The oldest entry's date: how far back a "not in your wallet" actually looked. */
 export function oldestEntryDate(journal: readonly WalletJournalEntry[]): string | undefined {
   return journal.reduce<string | undefined>(
     (oldest, e) => (oldest === undefined || e.date < oldest ? e.date : oldest),
@@ -70,11 +53,9 @@ export function oldestEntryDate(journal: readonly WalletJournalEntry[]): string 
   );
 }
 
-/** What a read of one Character's own journal came to. */
 export type OwnJournal =
   { state: 'ok'; entries: readonly WalletJournalEntry[] } | { state: 'noScope' | 'failed' };
 
-/** Declarations the book confirmed itself (`by` 0) in the last week, newest first. */
 export function autoCredited<T extends Pick<Declaration, 'resolution'>>(
   declarations: readonly T[],
   now: number
@@ -89,18 +70,14 @@ export function autoCredited<T extends Pick<Declaration, 'resolution'>>(
     .sort((a, b) => b.resolution!.at.localeCompare(a.resolution!.at));
 }
 
-/** What one claimed transfer's check came to, as the card shows it. */
 export interface TransferStatus {
   tone: PillTone;
   label: string;
-  /** What the check found about it; the transfer's own amount, time and ref go beside it. */
   note?: string;
   division?: number;
-  /** Paid to one of this officer's Characters: the own-wallet check decides, and it is found. */
   own?: { found: boolean };
 }
 
-/** What a transfer paid to one of the officer's Characters came to in that Character's journal. */
 export function ownStatus(
   t: TFunction,
   tr: ClaimedTransfer,
@@ -139,7 +116,6 @@ export function ownStatus(
   };
 }
 
-/** What one claimed transfer's check, or its own-wallet check, found. */
 export function transferStatus(
   t: TFunction,
   tr: ClaimedTransfer,

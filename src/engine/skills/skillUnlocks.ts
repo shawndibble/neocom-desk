@@ -1,10 +1,5 @@
 import type { EngineSkill, SkillUnlock } from '../types';
 
-/**
- * Reverse index of EngineSkill.prereqs: for a prerequisite skill, every skill
- * it unlocks and the level of the prerequisite each requires. Built once from
- * the full catalog — callers must not recompute this per render.
- */
 export function buildUnlockIndex(
   skills: ReadonlyMap<number, EngineSkill>
 ): Map<number, SkillUnlock[]> {

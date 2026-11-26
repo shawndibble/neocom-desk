@@ -223,7 +223,6 @@ describe('useRememberedPageTab', () => {
     expect(probe()).toBe('/page/two?q=abc#x|REPLACE|false');
     expect(screen.getByTestId('tab')).toHaveTextContent('two');
 
-    // No phantom default-tab entry behind it for Back to bounce off.
     await user.click(screen.getByRole('button', { name: 'back' }));
     expect(screen.getByText('elsewhere')).toBeInTheDocument();
   });
@@ -245,7 +244,6 @@ describe('useRememberedPageTab', () => {
     rerender({ value: 'one', hydrated: true });
     rerender({ value: 'two', hydrated: true });
 
-    // Decided at hydration: a later change to the stored value is an edit, not a landing.
     expect(probe()).toBe('/page/one|REPLACE|true');
   });
 

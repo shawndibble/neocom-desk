@@ -1,12 +1,3 @@
-/**
- * The impure edge of the open-prices sync: fetch one EVE Ref market-order
- * snapshot (`.csv.bz2`, ~20MB compressed, every order in every region),
- * decompress it as a stream and fold the rows into an `OpenPriceFold`.
- *
- * Nothing is buffered: rows are parsed as arrays (not one object per row) and
- * folded one at a time, so only the fold's per-type map stays resident. Shared
- * by the daily function.
- */
 import { Readable, pipeline } from 'node:stream';
 import { parse } from 'csv-parse';
 import unbzip2Stream from 'unbzip2-stream';
@@ -14,14 +5,8 @@ import type { HaulingBookFold } from './haulingBooks.js';
 import type { OpenPriceFold, StationPriceFold } from './marketOpenPrices.js';
 
 const REQUIRED_COLUMNS = ['is_buy_order', 'price', 'type_id', 'region_id'] as const;
-/** Read only when a station fold rides along (the daily job and the backfill). */
 const LOCATION_COLUMN = 'location_id';
 
-/**
- * EVE Ref writes `true` / `false`; any casing of those is accepted. Anything
- * else throws, so an unexpected format fails the run instead of silently
- * turning every order into a sell.
- */
 export function parseIsBuy(value: string | undefined): boolean {
   const v = value?.toLowerCase();
   if (v === 'true') return true;
@@ -33,31 +18,16 @@ function snapshotCsvParser() {
   return parse({ skip_empty_lines: true, relax_column_count: true });
 }
 
-/**
- * Folds a decompressed snapshot CSV into `fold`, and into `stations` too when
- * given (the same single pass); returns the data rows read. Throws when a
- * required column is missing.
- */
 export function foldOrdersCsv(
   csv: Readable,
   fold: OpenPriceFold,
   stations?: StationPriceFold
 ): Promise<number> {
-  // pipeline, not pipe: an error in the source (a dropped download, a corrupt
-  // bzip2 block) destroys the parser with that error, so the loop rejects
-  // instead of hanging or ending as if the file were complete.
   const rows = snapshotCsvParser();
   pipeline(csv, rows, () => {});
   return foldRows(rows, fold, stations);
 }
 
-/**
- * Decompresses a `.csv.bz2` snapshot stream and folds it into `fold`. One
- * pipeline through all three streams, not one pipeline into the decompressor
- * and a second out of it: unbzip2-stream is a legacy `Stream`, and two
- * pipelines plus their `pipe` calls put 11 `close` listeners on it (Node's
- * MaxListenersExceededWarning on every run); one pipeline puts 9.
- */
 export function foldBz2Snapshot(
   compressed: Readable,
   fold: OpenPriceFold,
@@ -68,7 +38,6 @@ export function foldBz2Snapshot(
   return foldRows(rows, fold, stations);
 }
 
-/** `rows` sits at the end of a pipeline, so destroying it tears the whole pipeline down. */
 async function foldRows(
   rows: ReturnType<typeof snapshotCsvParser>,
   fold: OpenPriceFold,
@@ -118,7 +87,6 @@ export async function fetchJson(url: string, userAgent: string): Promise<unknown
   return response.json().catch(() => null);
 }
 
-/** Downloads one snapshot and folds it (and `stations`, in the same pass). Returns the data rows read. */
 export async function foldSnapshotUrl(
   url: string,
   fold: OpenPriceFold,
@@ -138,7 +106,6 @@ export async function foldSnapshotUrl(
 
 const BOOK_COLUMNS = ['is_buy_order', 'price', 'type_id', 'location_id', 'volume_remain'] as const;
 
-/** Folds a decompressed snapshot CSV into `books` by column name; returns the data rows read. */
 export async function foldOrderBooksCsv(csv: Readable, books: HaulingBookFold): Promise<number> {
   const rows = snapshotCsvParser();
   pipeline(csv, rows, () => {});
@@ -173,7 +140,6 @@ async function foldBookRows(
   return count;
 }
 
-/** Downloads one snapshot into `books`. Returns the data rows read and when EVE Ref published it (ms; null if not stated). */
 export async function foldOrderBooksUrl(
   url: string,
   books: HaulingBookFold,
@@ -195,7 +161,6 @@ export async function foldOrderBooksUrl(
   const rows = snapshotCsvParser();
   pipeline(compressed, unbzip2Stream(), rows, () => {});
   const count = await foldBookRows(rows, books);
-  // unbzip2-stream ends quietly on a cut stream: a short body must fail the run, not publish a partial book.
   if (expectedBytes > 0 && receivedBytes !== expectedBytes) {
     throw new Error(
       `EVE Ref market-orders download was cut short (${receivedBytes} of ${expectedBytes} bytes)`

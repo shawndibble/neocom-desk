@@ -1,8 +1,3 @@
-/**
- * Doctrine Fits as the client sees them (ADR 0026). A Director's reads go to Firestore
- * under the rules (`verifySrpOfficer` first); every change and the pilot's pre-filing check are
- * callables. Only a short-lived access token is sent; the refresh token never leaves Dexie.
- */
 import type { CallableAction } from '../../../functions/src/callableManifest';
 import { collection, getDocs, limit, query } from 'firebase/firestore/lite';
 import { getValidAccessToken } from '@/auth/session';
@@ -19,7 +14,6 @@ import type {
   SaveDoctrineInput,
 } from './srpTypes';
 
-/** Most Doctrine Fits one read takes. */
 export const DOCTRINE_READ_CAP = 500;
 
 async function directorCall<Out>(
@@ -42,7 +36,6 @@ async function directorCall<Out>(
 }
 
 const real = {
-  // Officer rules; the Director's settings read them.
   list: async (characterId: number, corporationId: number): Promise<DoctrineFit[]> => {
     await ensureSignedIn(characterId);
     const snap = await getDocs(
@@ -61,7 +54,6 @@ const real = {
     directorCall(characterId, corporationId, 'saveSrpDoctrineCallable', { ...input }),
   remove: (characterId: number, corporationId: number, id: string): Promise<void> =>
     directorCall(characterId, corporationId, 'deleteSrpDoctrineCallable', { id }),
-  // A callable, not a Firestore read: the rules keep `srpDoctrines` officers-only.
   memberList: async (characterId: number, corporationId: number): Promise<MemberDoctrineFit[]> => {
     const accessToken = await getValidAccessToken(characterId);
     const { fits } = await callSignedIn<Record<string, unknown>, { fits: MemberDoctrineFit[] }>(
@@ -89,19 +81,12 @@ const backend = (): SrpDoctrineBackend => {
 
 const op = delegate(backend);
 
-/** The corp's Doctrine Fits, newest first. */
 export const readSrpDoctrines = op('list');
 
-/** A Director saves a Doctrine Fit: no `id` adds one, an `id` replaces that fit. */
 export const saveSrpDoctrine = op('save');
 
-/** A Director deletes a Doctrine Fit; filed claims keep the name they were checked against. */
 export const deleteSrpDoctrine = op('remove');
 
-/**
- * Any member: the check a filing of this killmail would store, with nothing written. A hull the
- * corp does not check answers `not-checked`.
- */
 export async function previewSrpDoctrineCheck(
   characterId: number,
   corporationId: number,
@@ -115,8 +100,4 @@ export async function previewSrpDoctrineCheck(
   });
 }
 
-/**
- * Any verified member: the corp's Doctrine Fits for the Fittings library. SRP off lists
- * none.
- */
 export const listCorpDoctrineFits = op('memberList');

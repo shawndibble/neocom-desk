@@ -4,8 +4,6 @@ import { EsiError } from '@/esi/client';
 import { useAuthFailure } from '@/stores/authFailure';
 import { getAccessTokenReportingFailures, isTotalAuthFailure } from './tokenProvider';
 
-// Vitest cannot spy on a live ES module binding; replace the one function the
-// provider wraps.
 const { getValidAccessToken } = vi.hoisted(() => ({ getValidAccessToken: vi.fn() }));
 vi.mock('@/auth/session', () => ({ getValidAccessToken }));
 
@@ -39,8 +37,6 @@ describe('isTotalAuthFailure', () => {
   });
 
   it('rejects an ESI 403, which can mean a structure ACL rather than a bad grant', () => {
-    // Unreachable through the token provider by construction; asserted so the
-    // narrowing survives anyone widening it later.
     expect(isTotalAuthFailure(new EsiError(403, 'Forbidden'))).toBe(false);
   });
 });

@@ -1,49 +1,22 @@
-/**
- * Ansiblex jump gates (issue #2478): the alliance-built bridges a pilot's
- * characters can use, as more connections for Route Safety's search.
- *
- * Public ESI lists no Ansiblex, so the gates come from a character's
- * structure search, or from a list the pilot pastes. Either way a gate is
- * known by its name, which reads "SYS1 » SYS2 - …" in game; this module reads
- * those names and turns the gates into connections. Pure: the search, the
- * structure lookups and the stored list live in `features/travel`.
- *
- * Unlike a Thera / Turnur hole, a bridge makes no system free: each bridge is
- * one jump, and the system it lands in is charged like any other. So bridges
- * go into the search's `extraConnections` and never its `freeSystems`.
- */
 import { securityBand } from '../securityStatus';
 import { isWormholeSystem } from './routeSafety';
 
-/** The Ansiblex Jump Bridge's type id. */
 export const ANSIBLEX_TYPE_ID = 35841;
 
-/**
- * What the structure search asks for. ESI will not search fewer than three
- * characters, and a lone "»" is one; with a space either side it still
- * matches every "SYS1 » SYS2" name, as the search is a substring match.
- */
 export const ANSIBLEX_SEARCH = ' » ';
 
-/** One Ansiblex: the system it stands in, the one it jumps to, and its name. */
 export interface AnsiblexGate {
   fromId: number;
   toId: number;
   name: string;
 }
 
-/** The two systems an Ansiblex name joins, and the gate's own name after them. */
 export interface AnsiblexName {
   from: string;
   to: string;
   label: string | null;
 }
 
-/**
- * Reads "SYS1 » SYS2" or the full in-game "SYS1 » SYS2 - name". The far
- * system ends at the first " - " (spaced), never a bare dash: nullsec names
- * like 1DQ1-A carry their own.
- */
 export function parseAnsiblexName(text: string): AnsiblexName | null {
   const parts = text.split('»');
   if (parts.length !== 2) return null;
@@ -56,25 +29,19 @@ export function parseAnsiblexName(text: string): AnsiblexName | null {
   return { from, to, label };
 }
 
-/** A system named in a gate list: its id and security, or `undefined` when no system has that name. */
 export type SystemLookup = (name: string) => { id: number; security: number } | undefined;
 
-/** Ansiblex are sovereignty structures: only known-space nullsec holds one. */
 function canHoldAnsiblex(system: { id: number; security: number }): boolean {
   return !isWormholeSystem(system.id) && securityBand(system.security) === 'nullsec';
 }
 
-/** A pasted line that is not a gate, and why. */
 export interface GateListError {
-  /** From 1. */
   line: number;
   text: string;
   reason: 'format' | 'unknown' | 'same-system' | 'not-nullsec';
-  /** The names the reason is about: the unknown ones, or the ones outside nullsec. */
   names: string[];
 }
 
-/** One pair of systems, the same whichever way round: what a bridge's two ends are keyed by. */
 export function bridgePairKey(a: number, b: number): string {
   return a < b ? `${a}:${b}` : `${b}:${a}`;
 }
@@ -95,10 +62,6 @@ function readGate(name: AnsiblexName, fullName: string, lookup: SystemLookup): R
   return { kind: 'gate', gate: { fromId: from.id, toId: to.id, name: fullName } };
 }
 
-/**
- * A pasted list, one gate per line. Blank lines are skipped; a second line
- * for a pair already read (either way round) adds nothing.
- */
 export function parseGateList(
   text: string,
   lookup: SystemLookup
@@ -127,20 +90,12 @@ export function parseGateList(
   return { gates, errors };
 }
 
-/** What a structure search found, as `/universe/structures/{id}` describes it. */
 export interface FoundStructure {
   name: string;
   solar_system_id: number;
-  /** ESI may leave it out; a name read as a gate then stands on its own. */
   type_id?: number;
 }
 
-/**
- * A structure the search found, as a gate: `skip` for any other structure
- * (the search matches every name with a "»" in it, and a name placing the
- * gate anywhere but the system ESI says is not trusted), `unknown` for a gate
- * naming a system this app has no name for.
- */
 export function foundGate(
   structure: FoundStructure,
   lookup: SystemLookup
@@ -150,7 +105,6 @@ export function foundGate(
   }
   const name = parseAnsiblexName(structure.name);
   if (name === null) return { kind: 'skip' };
-  // The name must place the gate where ESI says it stands, or it is not read as one.
   const near = lookup(name.from);
   if (near && near.id !== structure.solar_system_id) return { kind: 'skip' };
   const read = readGate(name, structure.name, lookup);
@@ -158,7 +112,6 @@ export function foundGate(
   return read.reason === 'unknown' ? { kind: 'unknown', names: read.names } : { kind: 'skip' };
 }
 
-/** Each pair of systems the gates join, once, for the search to cross either way. */
 export function bridgeConnections(gates: readonly AnsiblexGate[]): [number, number][] {
   const seen = new Set<string>();
   const pairs: [number, number][] = [];
@@ -171,12 +124,6 @@ export function bridgeConnections(gates: readonly AnsiblexGate[]): [number, numb
   return pairs;
 }
 
-/**
- * The gate a step between two systems crosses, or `null` for a step no known
- * gate joins: the one standing in the system the step leaves, when both ends
- * have one. Whether a stargate joins them first is the trip's call
- * (`routeSafetyTrip.ts`).
- */
 export function bridgeBetween(
   gates: readonly AnsiblexGate[],
   from: number,

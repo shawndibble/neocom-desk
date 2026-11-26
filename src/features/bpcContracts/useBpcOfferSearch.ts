@@ -11,7 +11,6 @@ import {
   type BpcSourceData,
 } from './searchBpcOffers';
 
-/** Below this the page answers itself: a handful of early rows is faster than a round trip. */
 export const WORKER_MIN_ROWS = 5_000;
 
 const NO_OFFERS: BpcOfferSearch = {
@@ -24,17 +23,7 @@ const NO_OFFERS: BpcOfferSearch = {
 };
 
 export interface BpcOfferSearchAnswer extends BpcOfferSearch {
-  /**
-   * The worker has not answered this exact question yet and there is nothing
-   * fit to show: the first load, or a filter edit. The fields are empty;
-   * callers show a spinner, so a new filter never sits under the last one's
-   * table and summary.
-   */
   awaiting: boolean;
-  /**
-   * Only the snapshot changed (a background reload) and the worker is still
-   * ranking it. The fields are the previous answer, kept on screen.
-   */
   refreshing: boolean;
 }
 
@@ -45,13 +34,6 @@ interface Settled {
   search: BpcOfferSearch;
 }
 
-/**
- * `prepareBpcOffers` + `rankBpcOffers` over the snapshot — in the worker for a
- * big one, on the page for a small one or where there is no Worker. On the page
- * the two stages are memoised separately, so a keystroke reruns only stage 2.
- * `prepareInput` must keep its identity while its content does; the worker
- * keeps stage 1's result for as long as it does.
- */
 export function useBpcOfferSearch(
   data: BpcSourceData,
   prepareInput: BpcPrepareInput,
@@ -100,7 +82,6 @@ export function useBpcOfferSearch(
   );
   const [settled, setSettled] = useState<Settled | null>(null);
   const [failure, setFailure] = useState<unknown>(null);
-  // Thrown in render, as the page path would: the error boundary catches it.
   if (failure !== null) throw failure;
 
   useEffect(() => {
@@ -114,7 +95,6 @@ export function useBpcOfferSearch(
       },
       (error: unknown) => {
         if (!live || (error instanceof Error && error.message === SUPERSEDED)) return;
-        // The worker failed: answer on the page, once.
         try {
           const search = rankBpcOffers(prepareBpcOffers(data, prepareInput), data, query);
           setSettled({ data, prepareInput, query, search });
@@ -132,11 +112,9 @@ export function useBpcOfferSearch(
     viaWorker &&
     (settled?.data !== data || settled.prepareInput !== prepareInput || settled.query !== query);
   const search = onPage ?? settled?.search ?? NO_OFFERS;
-  // A background reload keeps the last answer up; a filter edit or the first load blanks.
   const keepsLastAnswer =
     pending && settled !== null && settled.prepareInput === prepareInput && settled.query === query;
   if (pending && !keepsLastAnswer) {
-    // Suggestions stay up between keystrokes; everything about the rows waits for the answer.
     return { ...NO_OFFERS, suggestions: search.suggestions, awaiting: true, refreshing: false };
   }
   return { ...search, awaiting: false, refreshing: keepsLastAnswer };

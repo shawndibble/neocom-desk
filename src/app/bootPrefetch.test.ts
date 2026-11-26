@@ -15,7 +15,6 @@ vi.mock('./prefetch', () => ({ prefetchCharacterData: vi.fn(async () => {}) }));
 vi.mock('@/sde/warmLazySde', () => ({ warmLazySde: vi.fn(async () => {}) }));
 vi.mock('@/esi/cachePrune', () => ({ runDailyEsiCachePrune: vi.fn(async () => null) }));
 
-/** Let the dynamic `import('./prefetch')` settle. */
 const flush = () => vi.dynamicImportSettled();
 
 beforeEach(() => {

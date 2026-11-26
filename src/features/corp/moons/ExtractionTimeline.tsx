@@ -19,15 +19,10 @@ import { DAY_MS } from '@/lib/age';
 
 const AFTER_DAYS = 27;
 
-/** The label column and what lines up with it: widens with the viewport so a long moon name keeps its room. */
 const LABEL_W = 'sm:w-48 lg:w-64 xl:w-80';
 const LABEL_LEFT = 'sm:left-48 lg:left-64 xl:left-80';
 const LABEL_MARGIN = 'sm:ml-48 lg:ml-64 xl:ml-80';
 
-/**
- * The state chips (a phone gets the checkbox list) that decide which Extractions the timeline and
- * the table below it show. A count is every Extraction in that state, so it is what the chip adds.
- */
 export function ExtractionStateFilter({
   rows,
   states,
@@ -40,7 +35,6 @@ export function ExtractionStateFilter({
   const { t } = useTranslation();
   const phone = useIsPhone();
   const countOf = (state: ExtractionState) => rows.filter((r) => r.state === state).length;
-  // Cancelled is rare: a chip only when the book has one.
   const listed = FILTER_STATES.filter((s) => s !== 'cancelled' || countOf(s) > 0);
   return phone ? (
     <CheckboxSelect
@@ -72,7 +66,6 @@ export function ExtractionStateFilter({
   );
 }
 
-/** The dates an officer plans around, on the Time format's clock, with the time left where one is still ahead. */
 function PlanTip({ row, now }: { row: ExtractionRow; now: number }) {
   const { t } = useTranslation();
   const zone = useTimeZone();
@@ -106,11 +99,6 @@ function PlanTip({ row, now }: { row: ExtractionRow; now: number }) {
   );
 }
 
-/**
- * Every chunk on one time axis (#4056 step 1): Extracting, then one bar from
- * Ready to Expired (a tick marks an early laser fracture). A row opens the
- * moon's page; the line is now. Shared scale across rows so they compare.
- */
 export function ExtractionTimeline({
   rows,
   states,
@@ -173,7 +161,6 @@ function TimelineBody({ shown, now }: { shown: readonly ExtractionRow[]; now: nu
         ))}
       </div>
       <div className="relative space-y-3">
-        {/* One "now" line over the whole bars column: a line per row froze Chrome's painting. */}
         <div
           data-testid="timeline-now"
           aria-hidden="true"
@@ -194,7 +181,6 @@ function TimelineBody({ shown, now }: { shown: readonly ExtractionRow[]; now: nu
             >
               <span
                 className={cx(
-                  // Above the now line, which runs the whole column: on a phone it would cross the label.
                   'relative flex min-w-0 items-baseline gap-1 text-xs max-sm:bg-panel max-sm:group-hover:bg-panel-2 sm:shrink-0',
                   LABEL_W
                 )}
@@ -216,7 +202,6 @@ function TimelineBody({ shown, now }: { shown: readonly ExtractionRow[]; now: nu
                     className="absolute inset-y-1 rounded-xs bg-line-bright"
                     style={{ left: pct(start), width: width(start, ready) }}
                   />
-                  {/* One bar, Ready to Expired: the whole time the chunk can be mined or is about to be. */}
                   <span
                     className={cx(
                       'absolute inset-y-0 min-w-1.5 rounded-xs',

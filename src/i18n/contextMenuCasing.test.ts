@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import en from './locales/en.json';
 
-/** Proper feature names / acronyms that stay capitalised mid-label. */
 const ALLOWED_PHRASES = [
   'Compare Variations',
   'Build Plan',
@@ -35,8 +34,6 @@ describe('context-menu label casing', () => {
   collectContextMenuStrings(en, false, 'en', entries);
 
   it('finds the context-menu strings', () => {
-    // A sanity floor: the collector must still find the surviving menus (many were deleted
-    // by the §6c restraint rules, so this is a floor, not a count).
     expect(entries.length).toBeGreaterThan(10);
   });
 
@@ -45,7 +42,6 @@ describe('context-menu label casing', () => {
     for (const phrase of ALLOWED_PHRASES) {
       rest = rest.replace(new RegExp(String.raw`\b${phrase}\b`, 'g'), 'x');
     }
-    // The first word may be capitalised; every later word must not be.
     for (const word of rest.split(/\s+/).slice(1)) {
       expect(word, `"${word}" in "${label}"`).not.toMatch(/^[A-Z]/);
     }

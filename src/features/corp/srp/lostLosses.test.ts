@@ -26,8 +26,8 @@ describe('collectLosses', () => {
   it('keeps only the pilot own losses in the current corporation, newest first', async () => {
     const out = await run({
       1: km(1, {}, '2026-10-01T00:00:00Z'),
-      2: km(2, { character_id: 5 }), // a kill: someone else died
-      3: km(3, { corporation_id: 99 }), // lost in another corp: the server would refuse it
+      2: km(2, { character_id: 5 }),
+      3: km(3, { corporation_id: 99 }),
       4: km(4, {}, '2026-10-10T00:00:00Z'),
     });
     expect(out.map((l) => l.killmailId)).toEqual([4, 1]);

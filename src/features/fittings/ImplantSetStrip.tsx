@@ -1,4 +1,3 @@
-/** "Your set" strip of the implant finder: every implant and booster slot, and the helpers that read a slot. */
 import { useState, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Caret, IconButton, Tooltip } from '@/components/ui';
@@ -12,14 +11,8 @@ import { occupantOf, slotName } from './implantSlots';
 import { slotKey } from './useImplantFinder';
 
 const IMPLANT_SLOTS = Array.from({ length: 10 }, (_, i) => i + 1);
-/** Booster slots the strip shows at least; more when the set already fills a higher one. */
 const MIN_BOOSTER_SLOTS = 3;
 
-/**
- * "Your set": slots 1–10 and the booster slots, marking the ones that can help
- * the chosen goal. Each slot is a button: picking one narrows the goals and
- * results to what goes in it.
- */
 export function SetStrip({
   set,
   slotOf,
@@ -58,7 +51,6 @@ export function SetStrip({
     const picked = selected === key;
     const name = id === undefined ? undefined : names.get(id);
     const label = slotName(t, kind, slot);
-    // The short name truncates; the full one is a tooltip (hold on touch).
     const withLabel = (button: ReactElement<{ className?: string }>) =>
       name === undefined ? button : <Tooltip content={name.full}>{button}</Tooltip>;
     return (
@@ -154,7 +146,6 @@ export function SetStrip({
               : t('fittings.implantFinder.slotHint')}
           </span>
         </div>
-        {/* Desktop: 7 implants, then the other 3, a gap, and the boosters. */}
         <ul className="grid grid-cols-5 gap-1 md:grid-cols-7 md:gap-y-2">
           {cells.slice(0, 10).map(cell)}
           <li aria-hidden className="hidden md:block" />

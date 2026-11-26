@@ -158,7 +158,6 @@ describe('decideSignOff', () => {
   it('stays open after a no until everyone needed has signed, then rejects', () => {
     const open = review({ deleteAt: T0 + 9, expiresAt: T0 + 9 });
     const once = decided(open, actor(2), 'no');
-    // Indistinguishable from a yes: still open, nothing decided, the submit's expiry kept.
     expect(once).toMatchObject({
       state: 'open',
       decidedAt: null,
@@ -219,7 +218,6 @@ describe('isSubject', () => {
   it('is not the requester or anyone else', () => {
     expect(isSubject(about, actor(1))).toBe(false);
     expect(isSubject(about, actor(2))).toBe(false);
-    // A read stored without its account matches by character only.
     expect(isSubject(review(), actor(60, 'h50'))).toBe(false);
   });
 });
@@ -288,11 +286,9 @@ describe('reviewView', () => {
       note: 'Too new',
       reasonShown: true,
     });
-    // Hidden with the decision and the note while the second review is blind.
     expect(reviewView('r1', stamped.review, actor(3)).signOffs[0]).not.toHaveProperty(
       'reasonShown'
     );
-    // A sign-off stored before the stamp existed was never shown to the pilot.
     const legacy = review({
       state: 'rejected',
       signOffs: [{ ...actor(2), at: T0, decision: 'no', note: 'Old note' }],
@@ -373,7 +369,6 @@ describe('what an officer sees of invites and answers', () => {
     expect(view.invite).toBe('Reddit');
     expect(view.answers).toEqual(answers);
     expect(JSON.stringify(view)).not.toContain('abcDEF123_-x');
-    // A review stored before answers and invites existed.
     expect(reviewSummary('r1', review(), actor(2))).not.toHaveProperty('invite');
     expect(reviewView('r1', review(), actor(2)).answers).toEqual([]);
   });
@@ -432,10 +427,8 @@ describe('pilotStatus', () => {
       answers: [],
       unmet: ['ageDays', 'characters'],
     });
-    // Met a year on, with a second character.
     const two = { ...draft, characters: [young, { ...young, characterId: 51 }] };
     expect(pilotStatus('r1', two, asking, T0 + 365 * DAY_MS).unmet).toEqual([]);
-    // A character read before its birthday was kept on the review meets no age or SP minimum.
     const bare = { ...young, birthday: undefined, skillPoints: undefined };
     expect(pilotStatus('r1', { ...draft, characters: [bare] }, asking, T0).unmet).toEqual([
       'ageDays',
@@ -482,13 +475,11 @@ describe('pilotStatus', () => {
     let rejected = signed(open, 2, 'no', ' Too new ', true);
     rejected = signed(rejected, 3, 'yes', 'Seems fine', true);
     rejected = signed(rejected, 4, 'no', '  ', true);
-    // Written while the corp kept reasons to itself: never the pilot's to read.
     rejected = signed(rejected, 5, 'no', 'Private doubt', false);
     expect(rejected.state).toBe('rejected');
 
     const hidden = settingsOf();
     const shown = settingsOf({ rejection: { wording: 'notNow', showReason: true } });
-    // The stamp decides, whatever the corp's setting is when the pilot looks.
     expect(pilotStatus('r1', rejected, hidden, T0).rejection).toEqual({
       wording: 'rejected',
       reasons: ['Too new'],
@@ -501,7 +492,6 @@ describe('pilotStatus', () => {
       'rejection'
     );
 
-    // A note stored before the stamp existed stays hidden even once the corp shows reasons.
     const legacy = review({
       state: 'rejected',
       signOffs: [{ ...actor(2), at: T0, decision: 'no', note: 'Old note' }],
@@ -534,7 +524,6 @@ describe('the open log', () => {
 
 describe('settings', () => {
   it('defaults to off, and repairs what is stored', () => {
-    // A document written before the newer settings existed reads as their defaults.
     expect(readVettingSettings(undefined)).toEqual({ ...VETTING_DEFAULT_SETTINGS, invites: [] });
     expect(readVettingSettings({ on: true, signOffs: { application: 1, promotion: 2 } })).toEqual({
       ...VETTING_DEFAULT_SETTINGS,
@@ -585,8 +574,6 @@ describe('settings', () => {
         addWatchNames: [],
         welcome: 'Hello',
         contact: 'Ask Bob',
-        // Reordered; q1 reworded; one new without an id, one with an id nobody issued, and
-        // q2 sent twice (the second is a new question).
         questions: [
           { id: 'q2', label: 'Timezone?', required: true },
           { label: 'New one', required: false },
@@ -623,7 +610,6 @@ describe('settings', () => {
         mailDecision: false,
       },
     });
-    // A patch that names none of them changes none of them.
     const same = applyVettingSettingsPatch(
       settings,
       { removeWatch: [], addWatchNames: [] },
@@ -759,7 +745,6 @@ describe('known reviewers', () => {
         'char:3': { characterId: 3, ownerHash: 'h3', lastSeenAt: T0 - VETTING_REVIEWER_DAYS * day },
         'char:50': { characterId: 50, ownerHash: 'h50', lastSeenAt: T0 },
         'char:9': { characterId: 'x', lastSeenAt: T0 },
-        // The same Character signed in under two uids is told once.
         'other:2': { characterId: 2, ownerHash: 'h2', lastSeenAt: T0 - 9 },
       },
     };
@@ -772,10 +757,8 @@ describe('known reviewers', () => {
     const about = review({ characters: [read] });
     const doc = {
       reviewers: {
-        // The pilot's reviewer alt, on the account the report was read from.
         'char:60': { characterId: 60, ownerHash: 'h50', lastSeenAt: T0 },
         'char:2': { characterId: 2, ownerHash: 'h2', lastSeenAt: T0 },
-        // Stored before the account was kept: matched by character only.
         'char:61': { characterId: 61, lastSeenAt: T0 - 1 },
         'char:50': { characterId: 50, lastSeenAt: T0 },
       },
@@ -965,7 +948,6 @@ describe('the timed cache', () => {
     const cache = new Map<number, { at: number; value: number }>();
     for (let i = 0; i < 5; i++) rememberTimed(cache, i, i, T0 + i, 3);
     expect([...cache.keys()]).toEqual([2, 3, 4]);
-    // Remembering a key again moves it to the newest place and adds no entry.
     rememberTimed(cache, 2, 9, T0 + 9, 3);
     expect([...cache.keys()]).toEqual([3, 4, 2]);
     expect(recallTimed(cache, 2, T0 + 9, HOUR_MS)?.value).toBe(9);
@@ -1010,7 +992,6 @@ describe('the request mail', () => {
       ok: false,
       reason: 'not-asker',
     });
-    // An empty stored owner hash never matches another character with an empty hash.
     expect(recordRequestMail(asked({ requestedBy: actor(2, '') }), actor(3, ''), T0)).toEqual({
       ok: false,
       reason: 'not-asker',

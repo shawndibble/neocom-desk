@@ -7,11 +7,6 @@ import type { VettingSource } from '@/engine/vetting';
 import { cx } from '@/lib/cx';
 import { formatList } from '@/lib/listFormat';
 
-/**
- * `read`: the server read it. `reading`: that read is running. `partMissing`: read, but a
- * source was not shared. `ready`: signed in on this device, not read yet. `needsSignIn`: on this
- * device, but its sign-in does not cover what the report reads.
- */
 export type VettingRowState = 'read' | 'reading' | 'partMissing' | 'ready' | 'needsSignIn';
 
 export interface VettingCharacterRow {
@@ -19,7 +14,6 @@ export interface VettingCharacterRow {
   name: string;
   corporationName?: string;
   state: VettingRowState;
-  /** What was not shared, for `partMissing` and `needsSignIn`. */
   missing?: readonly VettingSource[];
 }
 
@@ -33,16 +27,12 @@ const TONE: Record<VettingRowState, PillTone> = {
 
 interface VettingCharacterListProps {
   rows: readonly VettingCharacterRow[];
-  /** Checkboxes, for a member choosing which device characters to share. */
   tick?: { checked: ReadonlySet<number>; onToggle: (characterId: number) => void };
   onRemove?: (row: VettingCharacterRow) => void;
-  /** Runs the EVE sign-in again for a row that is missing something. */
   onSignIn?: (row: VettingCharacterRow) => void;
-  /** A change is running: the row actions do nothing meanwhile. */
   busy?: boolean;
 }
 
-/** The pilot's characters in a report: portrait, name, corporation, read state, and how to fix it. */
 export function VettingCharacterList({
   rows,
   tick,
@@ -104,7 +94,6 @@ export function VettingCharacterList({
                     : t('vetting.characters.partMissingHint', { missing })}
                 </span>
                 {onSignIn && (
-                  // Goes to EVE's login page, so a Button (DESIGN.md §6c); Remove acts in place.
                   <Button
                     size="sm"
                     aria-label={t('vetting.characters.signInAgainNamed', { name: row.name })}

@@ -3,16 +3,10 @@ import { Checkbox } from '@/components/ui';
 import type { FittingStats } from '@/engine/fittings/types';
 import { useOverheatAll } from './statsConditions';
 
-/**
- * The Situation panel's last row: the "Overheat all" switch — every figure
- * on the page (and in Compare) switches to its overheated value, in amber.
- * (Copy stats lives in the header's ⋮ menu.)
- */
 export function StatsToolbar({ stats }: { stats: FittingStats }) {
   const { t } = useTranslation();
   const overheatAll = useOverheatAll((state) => state.overheatAll);
   const setOverheatAll = useOverheatAll((state) => state.setOverheatAll);
-  // Nothing to overheat: the switch has nothing to do (unless it's on, so it can be turned off).
   const canOverheat = overheatAll || stats.allOverheated || stats.overheated !== null;
 
   return (

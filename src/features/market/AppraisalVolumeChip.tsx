@@ -3,12 +3,6 @@ import { StatChip } from '@/components/ui';
 import type { AppraisalTotals } from '@/engine/market/appraisal';
 import { formatCubicMetres } from '@/lib/volume';
 
-/**
- * The Appraisal's Total volume tile (issue #2337): packaged m³ over every row
- * with a known volume. When any row's volume is unknown the figure reads
- * "≈", turns warning-toned and its tooltip says how many rows it leaves out —
- * a partial total is labelled, never passed off as the whole pile.
- */
 export function AppraisalVolumeChip({
   totals,
   emphasis = false,

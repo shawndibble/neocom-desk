@@ -14,7 +14,6 @@ import type { CloneState } from '@/engine/types';
 import { buildInjectorFacts } from './injectorFacts';
 import { createNumberFormat, formatNumber } from '@/lib/numberLocale';
 
-// Part-trained levels bank fractional SP; the old default printed up to 3 decimals.
 const formatSp = createNumberFormat({ maximumFractionDigits: 3 });
 
 const LARGE_SKILL_INJECTOR_NAME = 'Large Skill Injector';
@@ -26,11 +25,6 @@ interface InjectorFactsPanelProps {
   cloneState: CloneState;
 }
 
-/**
- * "Skill injectors" tools-pane section (issue #1408): every figure derived,
- * no typed-in estimate — the pilot decides whether covering the plan with
- * Large Skill Injectors is worth it, this just shows the facts.
- */
 export function InjectorFactsPanel({
   scheduled,
   totalSp,
@@ -44,12 +38,7 @@ export function InjectorFactsPanel({
   const percent = usePricePercentFor('skills');
 
   const [aggregate, setAggregate] = useState<HubAggregate | null>(null);
-  // Distinct from `aggregate === null`, which also means "no sell orders" —
-  // without this, the fetch's own in-flight window renders that same
-  // (wrong) claim before the hub has actually answered.
   const [priceLoaded, setPriceLoaded] = useState(false);
-  // The price source could not be reached: a null aggregate then means
-  // "unknown", not "no sell orders".
   const [unreachable, setUnreachable] = useState(false);
   useEffect(() => {
     if (!hubHydrated) return;

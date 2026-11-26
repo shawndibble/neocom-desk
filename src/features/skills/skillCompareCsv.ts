@@ -1,12 +1,6 @@
 import type { CsvColumn, CsvTranslate } from '@/lib/csv';
 import type { ComparisonRow } from '@/engine/skills/compareSkills';
 
-/**
- * Export columns for the skill comparison: skill, group, then one level column
- * per compared character, headed by the character's name. Group is always
- * included — the on-screen view shows it as a band, and a spreadsheet can hide
- * a column itself.
- */
 export function skillCompareCsvColumns(
   t: CsvTranslate,
   characterIds: readonly number[],

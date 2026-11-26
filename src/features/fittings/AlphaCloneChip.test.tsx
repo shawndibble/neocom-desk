@@ -32,7 +32,6 @@ describe('AlphaCloneChip', () => {
     const tooltip = await screen.findByRole('tooltip');
     expect(tooltip).toHaveTextContent('Heavy Assault Cruisers I (Alphas can’t train it)');
     expect(tooltip).toHaveTextContent('Gallente Cruiser V (Alpha max IV)');
-    // The skill levels sit in one ruled list under the verdict.
     const list = within(tooltip).getByRole('list');
     expect(list).toHaveClass('border-y');
     expect(within(list).getAllByRole('listitem')).toHaveLength(2);
@@ -70,8 +69,6 @@ describe('AlphaCloneChip', () => {
   });
 
   it("holds the badge's place, silently, while the requirements load", () => {
-    // Issue #2255: an empty slot the badge's size, so the header's action
-    // group doesn't jump rows when the verdict lands.
     const { container } = render(<AlphaCloneChip blockers={null} skillName={skillName} />);
     expect(screen.queryByRole('button')).toBeNull();
     const slot = container.firstElementChild!;

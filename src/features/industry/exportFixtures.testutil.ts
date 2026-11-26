@@ -1,4 +1,3 @@
-/** Typed fixtures for the industry export tests: full records with every field set, overridable per test. */
 import type { BuildResult } from '@/engine/industry/types';
 import { TRADE_HUBS } from '@/market/hubs';
 import type { MarketWideDayRow } from './marketWideOpportunities';

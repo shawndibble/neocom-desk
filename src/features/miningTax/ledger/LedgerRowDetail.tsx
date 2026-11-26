@@ -23,7 +23,6 @@ function Days({ title, days }: { title: string; days: readonly DayAmount[] }) {
   );
 }
 
-/** Several lines on one date as one day, oldest first. */
 function byDate(lines: readonly { date: string; tax: number }[]): DayAmount[] {
   const sums = new Map<string, number>();
   for (const l of lines) sums.set(l.date, (sums.get(l.date) ?? 0) + l.tax);
@@ -32,7 +31,6 @@ function byDate(lines: readonly { date: string; tax: number }[]): DayAmount[] {
     .map(([date, amount]) => ({ date, amount }));
 }
 
-/** What one ledger row was, opened under it (the row's expand-in-place, DESIGN.md §6c). */
 export function LedgerRowDetail({
   row,
   typeNames,
@@ -40,10 +38,8 @@ export function LedgerRowDetail({
   onLinkWalletPayment,
 }: {
   row: PayeeLedgerRow;
-  /** Given on a personal Payee's ledger: opens the wallet payments to link to this Payee. */
   onLinkWalletPayment?: (() => void) | undefined;
   typeNames?: ReadonlyMap<number, string> | undefined;
-  /** Given on a personal Payee's ledger: unlinks this payment (a legacy link too). */
   onUnlinkPayment?: ((paymentId: string) => void) | undefined;
 }) {
   const { t } = useTranslation();

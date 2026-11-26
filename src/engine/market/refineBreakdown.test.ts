@@ -11,7 +11,6 @@ import {
 const PYERITE = 35;
 const MEXALLON = 36;
 
-/** A 100-portion ore returning 16,000 Pyerite and 800 Mexallon per portion. */
 function ore(
   overrides: Partial<AppraisalItem> & { efficiency?: number; quantity?: number }
 ): AppraisalItem {
@@ -55,7 +54,6 @@ describe('buildRefineBreakdown', () => {
       taxRate: 0,
     });
     const pyerite = breakdown.minerals.find((m) => m.typeId === PYERITE);
-    // 10 batches and 2 batches, each floored on its own.
     expect(pyerite?.quantity).toBe(Math.floor(16_000 * 10 * 0.5) + Math.floor(16_000 * 2 * 0.5));
     expect(breakdown.minerals.map((m) => m.typeId)).toEqual([PYERITE, MEXALLON]);
   });
@@ -74,7 +72,6 @@ describe('buildRefineBreakdown', () => {
     expect(breakdown.unitsLeftOver).toBe(38);
     expect(breakdown.leftoverValue).toBeCloseTo(38 * 900, 6);
     expect(breakdown.total).toBeCloseTo(breakdown.mineralValue + 38 * 900, 6);
-    // `net` is what the table's Refine column and the chip sum to: minerals only, no leftover.
     expect(breakdown.net).toBeCloseTo(appraisal.totals.refine, 6);
   });
 
@@ -88,8 +85,6 @@ describe('buildRefineBreakdown', () => {
   });
 
   it('says refine wins only when it beats selling as is to buy orders', () => {
-    // 1,000 units at 1,000 ISK is 1,000,000 ISK as is.
-    // 50% efficiency refines into 80,000 x 10 + 4,000 x 50 = 1,000,000 ISK: a tie is not a win.
     const tie = buildRefineBreakdown({
       appraisal: buildAppraisal([ore({ quantity: 1000 })], 100),
       pricePercent: 100,
@@ -114,8 +109,6 @@ describe('buildRefineBreakdown', () => {
       pricePercent: 100,
       taxRate: 0,
     });
-    // As is is 100M; refining yields (16,000 x 10 + 800 x 50) = 200,000 per batch at 100%:
-    // 1,000 batches x 200,000 x e = 100M at e = 0.5.
     expect(breakdown.breakEvenEfficiency).toBeCloseTo(0.5, 2);
   });
 
@@ -222,7 +215,6 @@ describe('refineEfficiencyRange', () => {
 });
 
 describe('refine on each price basis', () => {
-  /** Minerals sell for 8 and 70 where they buy for 10 and 50; the ore buys for 1,000 and sells for 1,500. */
   function withSell(item: AppraisalItem): AppraisalItem {
     const refine = item.refine;
     const detail = refine?.detail;
@@ -246,7 +238,6 @@ describe('refine on each price basis', () => {
 
   it('prices the minerals and the as-is pile on the chosen side', () => {
     const item = withSell(ore({ quantity: 1000, efficiency: 0.9 }));
-    // 10 portions at 0.9: 144,000 Pyerite and 7,200 Mexallon.
     const buy = build(item, 'buy');
     expect(buy.asIs).toBe(1_000_000);
     expect(buy.mineralValue).toBe(144_000 * 10 + 7_200 * 50);
@@ -267,7 +258,6 @@ describe('refine on each price basis', () => {
 
   it('judges the verdict on the basis it prices', () => {
     const item = withSell(ore({ quantity: 1000, efficiency: 0.9 }));
-    // Buy: 1,800,000 refined against 1,000,000 as is. Sell: 1,656,000 against 1,500,000.
     expect(build(item, 'buy').refineWins).toBe(true);
     expect(build(item, 'sell').refineWins).toBe(true);
     const poor = withSell(ore({ quantity: 1000, efficiency: 0.5 }));
@@ -296,9 +286,6 @@ describe('refine on each price basis', () => {
 });
 
 describe('Janice parity', () => {
-  // The six ores of the Jita appraisal the breakdown was checked against, at 100%, with the buy and sell
-  // prices Janice quoted in the same minute and the 0.6831 reprocessing yield. Its Buy, Split and Sell
-  // totals, as is and refined with leftover, are the figures below to the cent.
   const BIT = [
     { typeId: 35, quantity: 6000 },
     { typeId: 36, quantity: 400 },
@@ -334,7 +321,6 @@ describe('Janice parity', () => {
     quantity,
     buy,
     sell,
-    // Built as the app builds it, so the table's figures and the breakdown's come from the same inputs.
     refine: refineFromDetail(
       quantity,
       {
@@ -388,7 +374,6 @@ describe('Janice parity', () => {
     const appraisal = buildAppraisal(items, 100);
     for (const basis of ['buy', 'split', 'sell'] as const) {
       const breakdown = comparison[basis];
-      // The chip is the minerals alone; the table's Refine + ore column and the comparison's total add the leftover.
       expect(pileFigures(appraisal.rows, basis).refineMinerals).toBeCloseTo(
         breakdown?.net ?? NaN,
         2

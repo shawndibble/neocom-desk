@@ -92,10 +92,6 @@ describe('loadEftFitting', () => {
 
     expect(result.hullTypeId).toBe(587);
     if (result.hullTypeId === null) return;
-    // Ammo has no rack at all, so it's always cargo. The autocannon does have
-    // one (high), but EVE's own export never writes a count on a fitted
-    // module line — only cargo-hold contents get one, even a lone spare — so
-    // the written "x1" is what says this one is a spare, not fitted.
     expect(result.cargo).toEqual([
       { typeId: 12608, quantity: 200 },
       { typeId: 484, quantity: 1 },
@@ -167,7 +163,6 @@ describe('loadEftFitting', () => {
 });
 
 describe('loadEftFitting — Pyfa mutated items', () => {
-  // Pyfa layout: see the eftFit.ts header.
   const MUTA_TYPES: Record<string, number> = {
     ...TYPES,
     'heavy gremlin compact energy neutralizer': 16475,
@@ -218,7 +213,6 @@ describe('loadEftFitting — Pyfa mutated items', () => {
         '',
         '[1] Heavy Gremlin Compact Energy Neutralizer',
         '  Gravid Heavy Energy Neutralizer Mutaplasmid',
-        // maxRange isn't rolled by this mutaplasmid here: dropped.
         '  capacitorNeed 419.25, energyNeutralizerAmount 591.36, maxRange 15680',
         '[2] Hobgoblin I',
         '  Exigent Light Drone Firepower Mutaplasmid',
@@ -240,7 +234,6 @@ describe('loadEftFitting — Pyfa mutated items', () => {
         },
       },
     ]);
-    // Each mutated drone is its own item: a stack of two is two drones.
     const drone = {
       typeId: 60478,
       quantity: 1,

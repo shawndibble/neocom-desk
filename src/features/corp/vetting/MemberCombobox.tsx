@@ -9,7 +9,6 @@ import { formatAge } from '@/lib/age';
 import { cx } from '@/lib/cx';
 import { matchParts, narrowMembers, pickable, type RosterMember } from './reviewRoster';
 
-/** Title and last seen, or who asked a waiting review and when. */
 function useMemberLine() {
   const { t } = useTranslation();
   return (member: RosterMember): string => {
@@ -36,15 +35,9 @@ interface MemberComboboxProps {
   query: string;
   onQuery: (query: string) => void;
   onPick: (member: RosterMember) => void;
-  /** Focus the field when it appears (the dialog's first control). */
   inputRef?: React.Ref<HTMLInputElement>;
 }
 
-/**
- * A list-autocomplete combobox (WAI-ARIA): typing narrows every member, Arrow keys move, Enter
- * picks, Escape clears. The list sits in the flow under the field, so a dialog edge or a phone
- * keyboard never clips it. A member who cannot be picked stays listed with the reason on the row.
- */
 export function MemberCombobox({ members, query, onQuery, onPick, inputRef }: MemberComboboxProps) {
   const { t } = useTranslation();
   const listId = useId();
@@ -54,7 +47,6 @@ export function MemberCombobox({ members, query, onQuery, onPick, inputRef }: Me
   const none = rows.length === 0;
   const current = Math.min(active, Math.max(0, rows.length - 1));
   useEffect(() => {
-    // jsdom has no scrollIntoView.
     document.getElementById(`${listId}-${current}`)?.scrollIntoView?.({ block: 'nearest' });
   }, [listId, current]);
   const keys = (event: KeyboardEvent) => {
@@ -168,7 +160,6 @@ export function MemberCombobox({ members, query, onQuery, onPick, inputRef }: Me
   );
 }
 
-/** The picked member: portrait, name, title and last seen, with Change. */
 export function PickedMember({ member, onChange }: { member: RosterMember; onChange: () => void }) {
   const { t } = useTranslation();
   const memberLine = useMemberLine();

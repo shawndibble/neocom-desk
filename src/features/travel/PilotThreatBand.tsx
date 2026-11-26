@@ -1,11 +1,3 @@
-/**
- * The verdict band under a pilot's name: the Threat level in large type, the
- * sentence it was read from (recent kills and how long ago the last one was),
- * and neutral chips for the facts behind it: the kind of space they hunt in, how
- * often they fly in gangs and how many of their kills are pods. The "?" gives
- * the rule. The level word is the one red on a pilot's profile. The small
- * `ThreatBadge` belongs to the Local list rows, not here.
- */
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useTranslation } from 'react-i18next';
 import { InfoTooltip } from '@/components/ui';
@@ -28,17 +20,10 @@ import {
   THREAT_TEXT_CLASS,
 } from './threatTone';
 
-/** A gang share from here up is worth a chip. */
 const GANG_CHIP_MIN = 70;
-/** A gang share up to here reads as mostly solo. */
 const SOLO_CHIP_MAX = 30;
-/** A pod share from here up is worth a chip. */
 const POD_CHIP_MIN = 0.25;
 
-/**
- * Every chip is neutral: the level word is the one loud colour on the band, and each chip
- * says in words what it is (a hot space or a gang share is not a second alarm).
- */
 function Chip({ children }: { children: string }) {
   return (
     <li
@@ -59,10 +44,8 @@ export function PilotThreatBand({
   context,
 }: {
   verdict: ThreatVerdict;
-  /** zKillboard's all-time gang ratio, 0-100; null when unknown. */
   gangRatio: number | null;
   nowMs: number;
-  /** Where you are and who is in Local, when they moved the level: said in plain words. */
   context?: { read: ThreatRead; hereSpace: KillSpace | null; orgMatesHere: number | null };
 }) {
   const { t } = useTranslation();
@@ -86,7 +69,6 @@ export function PilotThreatBand({
     sentence = t('travel.pilot.threat.summary', { count: verdict.recentKills, days, age });
   }
   const space = (kind: KillSpace) => t(`common.spaceOption.${kind}`);
-  // Why the level moved, in plain words, with what it would read without that.
   const contextLines =
     context === undefined
       ? []
@@ -119,7 +101,6 @@ export function PilotThreatBand({
       text: t('travel.pilot.threat.chip.also', { space: space(also) }),
     });
   }
-  // The gang ratio is all-time, so it says nothing about a pilot with no recent kills.
   const gangKnown = gangRatio !== null && verdict.level !== 'inactive';
   if (gangKnown && gangRatio >= GANG_CHIP_MIN) {
     chips.push({

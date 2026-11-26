@@ -1,11 +1,3 @@
-/**
- * The EVE notifications event, with its per-type breakdown (issue #274)
- * listed straight under it, not behind it: every type from the closed
- * allow-list grouped by Notification Family (issue #352), plus types the
- * server has seen beyond it (issue #3755) under "Other". Each type is its own
- * aggregate row, so it can be set for every Character at once and opened to fix
- * individual ones. The event's own row still opens, to its per-Character chips.
- */
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useTranslation } from 'react-i18next';
 import { SelectionCheckbox } from '@/features/character/SelectionCheckbox';
@@ -48,11 +40,8 @@ export function EveNotificationRow({
   typeFilter = null,
 }: {
   context: EventRowContext;
-  /** Seen ESI types outside the allow-list, per Character. */
   extraTypesByCharacter: ReadonlyMap<number, readonly string[]>;
-  /** Leave the type list out: a search stacks every match, and this list is the longest on the page. */
   showTypes?: boolean;
-  /** A search's matched types: only these get a row. The family tick-boxes still act on the whole family. */
   typeFilter?: ReadonlySet<string> | null;
 }) {
   const { t } = useTranslation();
@@ -94,7 +83,6 @@ export function EveNotificationRow({
         onToggleOne={(id, channel) => toggleEventChannelPref(id, currentValue(), eventId, channel)}
         channelOff={context.channelOff}
         visibleCharacterIds={context.visibleCharacterIds}
-        // Never opened by a search: its chips are not what a search is after.
         forceExpanded={false}
         isDesktop={context.isDesktop}
         notes={missing !== null ? <PermissionNote {...missing} /> : undefined}
@@ -156,7 +144,6 @@ export function EveNotificationRow({
                             tone="type"
                             label={typeLabel}
                             labelAccessory={
-                              // Only the missing-grant mark, and only where Device is ticked: a hundred rows of marks would drown the page.
                               grantMissing === true &&
                               applicableIds.some((id) =>
                                 isEveTypeEnabledFor(
@@ -186,7 +173,6 @@ export function EveNotificationRow({
                             channelOff={context.channelOff}
                             visibleCharacterIds={context.visibleCharacterIds}
                             forceExpanded={false}
-                            // Always inline, even on a phone: a sheet over the Topic page loses the Back button.
                             isDesktop
                           />
                         );

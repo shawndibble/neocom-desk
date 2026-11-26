@@ -9,7 +9,6 @@ import {
 } from '@/components/ui';
 import { CopyToClipboard } from '@/components/ui/icons';
 
-/** What the button last copied and how it went, for the label it flashes. */
 export type CopyOutcome = { what: 'chat' | 'link'; result: 'copied' | 'failed' } | null;
 
 interface SurveyCopyButtonProps {
@@ -19,12 +18,6 @@ interface SurveyCopyButtonProps {
   outcome: CopyOutcome;
 }
 
-/**
- * "Copy chat message" as one split button, like Save in Fittings: the button
- * is the everyday copy, and its caret lists the same link on its own, for a
- * pilot who wants the URL without the message around it, and the dialog that
- * configures the message.
- */
 export function SurveyCopyButton({
   onCopyChat,
   onCopyLink,

@@ -1,7 +1,3 @@
-/**
- * Industry builder: jobs, slots and the Gantt chart. Same contract as `models.ts`:
- * pure, derived at render time.
- */
 import type { DeadlineSeverity } from '@/engine/character/severity';
 import {
   activityI18nKey,
@@ -35,8 +31,6 @@ export function elapsedShare(startMs: number, endMs: number, now: number): numbe
   return Math.min(1, Math.max(0, (now - startMs) / span));
 }
 
-// --- Industry ---------------------------------------------------------------------
-
 interface JobFacts {
   key: string;
   label: string;
@@ -44,19 +38,16 @@ interface JobFacts {
   startMs: number;
   endMs: number;
   tone: DeadlineSeverity;
-  /** Time left, or "Ready". */
   when: string;
   progress: number | null;
   activity: string;
   location: string | undefined;
 }
 
-/** "Jita IV - Moon 4 - Caldari Navy Assembly Plant" reads as where it is by its first part. */
 function shortLocation(name: string | undefined): string | undefined {
   return name?.split(' - ')[0];
 }
 
-/** Finished jobs first (oldest waiting first), then running ones by soonest end. */
 function jobFacts(
   data: IndustryBoardData,
   jobs: IndustryBoardData['jobs'],
@@ -98,7 +89,6 @@ const percent = (share: number | null): TableCell =>
 
 type SlotPools = Record<JobSlotCategory, { open: number; max: number }>;
 
-/** Free / max per pool for one Character right now; an over-capacity pool reads 0 free, never negative. */
 function slotPools(row: IndustryCharacterSlots, now: number): SlotPools {
   const summary = aggregateJobSlotSummary([row], now);
   const pools = {} as SlotPools;
@@ -116,7 +106,6 @@ interface SlotRow {
   max: number;
 }
 
-/** Character · Manufacturing · Science · Reactions, each "free/max". */
 function slotsTable(t: Translate, rows: readonly SlotRow[]): TableModel {
   const W = 'overview.widgets.industry';
   return {
@@ -137,7 +126,6 @@ function slotsTable(t: Translate, rows: readonly SlotRow[]): TableModel {
   };
 }
 
-/** Free slots per Character as bars, the most free the longest. */
 function slotsChart(t: Translate, rows: readonly SlotRow[]): ChartModel | undefined {
   return (
     hbarsFromRows(
@@ -158,8 +146,6 @@ export const industry: Builder = (feeds, { t, now, activeCharacterId, scopeAll }
   const data = feed?.data ?? null;
   const to = '/industry';
   if (!data) return blank(to, statusOf(feed));
-  // `loadIndustryBoard` reads every Character's jobs and skills; a widget on
-  // one Character narrows to the header Character's.
   const everyone = scopeAll || activeCharacterId === null;
   const jobs = everyone ? (data.allJobs ?? data.jobs) : data.jobs;
   const slotRows: SlotRow[] = (data.slots ?? [])
@@ -182,7 +168,6 @@ export const industry: Builder = (feeds, { t, now, activeCharacterId, scopeAll }
           }),
         ]
       : undefined;
-  // On All characters the Table and Chart answer "who has a slot free", not "which job ends next".
   const slotView = everyone && slotRows.length > 0;
   const summary = summarizeJobs(jobs, now);
   const running = sortJobsBySoonest(jobs.filter((job) => !isJobDone(job, now)));
@@ -218,7 +203,6 @@ export const industry: Builder = (feeds, { t, now, activeCharacterId, scopeAll }
 
   const nextJobMs = running.length > 0 ? Date.parse(running[0].end_date) : Number.NaN;
   const ready = summary.done > 0;
-  // The headline is a count; the next clock is the fact it lacks.
   const next = running[0];
   const secondary: NumberSecondary | undefined = next
     ? {
@@ -260,12 +244,10 @@ export const industry: Builder = (feeds, { t, now, activeCharacterId, scopeAll }
       ? []
       : [{ at: nextJobMs, note: t('overview.board.nextJob'), severity: 'watch', to }],
     summary: industrySummary(t, { ...data, jobs }, now),
-    // Jobs on a time axis; Small falls back to one progress bar per job (the fallback is that model).
     chart: slotView ? slotsChart(t, slotRows) : industryChart(t, facts, now),
   };
 };
 
-/** Jobs laid on a shared time axis, with the progress-bar list as the Small fallback; undefined with no jobs. */
 function industryChart(
   t: Translate,
   facts: readonly JobFacts[],

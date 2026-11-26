@@ -1,17 +1,8 @@
-/**
- * The Implants & Boosters editor's open state, kept in the URL (`?implants=1`;
- * the Pilot panel that hosts its control opens itself for it). A link out of the editor —
- * the market, an LP Store — is a normal navigation, so Back lands on the same
- * Fitting with the editor open again instead of a page that forgot it. Opening
- * pushes one history entry, so Back closes it; closing never goes Back, it clears
- * the param, so the Fitting under the editor stays as it is.
- */
 import { useCallback, useMemo } from 'react';
 import { boolParam, nullableTextParam } from '@/lib/urlState';
 import { useUrlParams } from '@/lib/useUrlState';
 
 export const IMPLANT_GOAL_PARAM = 'implantGoal';
-/** The editor's other view state; all of it goes when the editor closes. */
 const VIEW_PARAMS = ['implantSlot', 'implantQuery', 'implantSort', 'implantTab'] as const;
 
 export function useImplantsModalUrl(param: 'implants') {

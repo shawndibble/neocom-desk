@@ -55,7 +55,6 @@ describe('resolveAsOf', () => {
     expect(MAX_AS_OF_DAYS_BACK).toBe(30);
   });
 
-  // NOW is 2026-10-18: 30 days back is 2026-09-18; the record joined 2026-10-01.
   it('is today when no day is given', () => {
     expect(resolveAsOf(record(), undefined, NOW)).toBe('2026-10-18');
   });
@@ -108,7 +107,6 @@ describe('appendAgreedRate', () => {
       noBackdate: true,
     });
     expect(effectiveOwnerRatePct(history, '2026-10-18')).toBe(6);
-    // A new entry counts from its day only: nothing reaches back (#6347).
     expect(effectiveOwnerRatePct(history, '2026-10-17')).toBeUndefined();
   });
   it('dates the entry by the as-of day', () => {

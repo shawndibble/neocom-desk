@@ -1,11 +1,3 @@
-/**
- * Improve's drawer body (scope decision `20261024-171917`): the Improve Goal
- * chips (a goal the fit cannot score is a disabled chip with its reason),
- * the goal's Guardrails as one plain line, then the search — progress with
- * Cancel, "Show best so far" after 10 s — and its results in two sections,
- * No downside and Trade-offs, never ranked against each other. Ticked rows
- * are applied together as one unsaved edit.
- */
 import { useMemo, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { UnloadedWeapons } from '@/engine/fittings/improve';
@@ -42,29 +34,16 @@ interface Props {
   search: ImproveSearch;
   catalogue: FittingCatalogue | null;
   onApply: (options: ImproveOption[]) => void;
-  /** The implant alternative under a Make Flyable fix that overran CPU or powergrid; absent: none. */
   renderFlyableImplants?: (fix: RejectedOption, label: string) => ReactNode;
   settings: ImproveSettings;
-  /** Opens Make it fit on that budget, from "Fix this first". */
   onFixFirst: (resource: Resource) => void;
-  /** Weapons holding no charge, which damage goals can't score; null or absent: none. */
   unloaded?: UnloadedWeapons | null;
-  /** Loads Mine more's best crystal into the miners that hold none of the ore's; absent when it cannot. */
   onLoadBestCrystal?: () => void;
-  /** Loads the best charge into each empty weapon group; absent when none can be loaded. */
   onLoadBestCharge?: () => void;
-  /** Train and Implants, which cost the fit nothing and sit above the swaps; none for an over-budget fit. */
   freeSections?: ReactNode;
-  /** The open Fitting, to check the ticked rows together; absent: no combined check. */
   fitting?: Fitting | null;
-  /** The page's Target Profile, for the summary's DPS. */
   target?: TargetProfile;
-  /**
-   * Tells the stats column what the ticked rows, plus the row under the
-   * pointer or keyboard focus, would change; null when nothing is previewed.
-   */
   onPreview?: (delta: FittingStatsDelta | null, iskDelta?: number | null) => void;
-  /** The drawer's footer, where the selection and Apply bar goes; absent: it sticks to the list's bottom. */
   footerTarget?: HTMLElement | null;
 }
 
@@ -101,7 +80,6 @@ export function ImprovePanel({
     iskBudget: settings.value.iskBudget,
     chosen,
   });
-  // Ticked rows that no list shows are covers added from the footer: they get a tick of their own there.
   const listedKeys = useMemo(
     () =>
       state.status === 'done'
@@ -128,7 +106,6 @@ export function ImprovePanel({
     onPreview,
   });
 
-  // A fit that doesn't fit has nothing to improve yet: hand over to Make it fit (`20261019-144736`).
   if (state.status === 'overBudget')
     return <ImproveFixFirst resources={state.resources} onFixFirst={onFixFirst} />;
 

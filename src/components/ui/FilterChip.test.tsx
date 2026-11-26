@@ -64,8 +64,6 @@ describe('FilterChip', () => {
       />
     );
     const chip = screen.getByRole('button', { name: /Wallet/ });
-    // Not the native attribute: that one takes no hover and no focus, so the
-    // explanation would be unreachable by either route.
     expect(chip).not.toBeDisabled();
     expect(chip).toHaveAttribute('aria-disabled', 'true');
 
@@ -107,8 +105,6 @@ describe('FilterChip', () => {
     );
     const chip = screen.getByRole('button', { name: 'Hide risky routes' });
     await userEvent.hover(chip);
-    // Described, not renamed: the visible label has to survive in the
-    // accessible name (WCAG 2.5.3), so the bubble arrives as a description.
     expect(await screen.findByRole('tooltip')).toHaveTextContent(
       'Hides hauls that could strand the cargo.'
     );

@@ -21,7 +21,6 @@ import { refreshRequestBadge, resetRequestBadge } from '@/features/communities/r
 import { NavItem } from './NavItem';
 import { useNavBadges } from './navBadges';
 
-/** A nav entry built the way the rail and tab bar build theirs. */
 function Entry({ to, label }: { to: '/communities' | '/market'; label: string }) {
   const badge = useNavBadges();
   return <NavItem to={to} label={label} locked={false} {...badge(to)} />;

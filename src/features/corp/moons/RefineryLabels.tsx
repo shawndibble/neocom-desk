@@ -9,29 +9,21 @@ import * as Icon from '@/components/ui/icons';
 import { useInPlaceEdit } from '@/lib/useInPlaceEdit';
 import { callableErrorText } from './feederErrorText';
 
-/** The server's `MAX_REFINERY_LABEL`: it refuses anything longer. */
 export const REFINERY_LABEL_MAX = 100;
 
 const k = (key: string) => `corpTaxBook.moons.refineryLabels.${key}`;
 
 export interface RefineryLabelEdit {
-  /** The officer label set now, from either side; empty when there is none. */
   current: (structureId: number) => string;
-  /** Saves it; null clears it. Rejects with the callable's refusal. */
   onSave: (structureId: number, label: string | null) => Promise<void>;
 }
 
-/** What a moon owner's page adds to a refinery's row (#6298): where its name goes, and a hint. */
 export interface RefineryRowInfo {
-  /** The refinery's own page. */
   to: string;
-  /** One dim line: its moon, Extractions, last mined. */
   meta: string;
-  /** The pill's words when the page offers to archive it; absent when it does not. */
   offer?: string;
 }
 
-/** One refinery: its resolved label, edited in place behind the faint pencil (§6c). */
 function RefineryRow({
   structureId,
   name,
@@ -102,7 +94,6 @@ function RefineryRow({
   );
 }
 
-/** A moon owner's refineries, one row each, by the label chain; `edit` adds the pencil. */
 export function RefineryLabels({
   structureIds,
   name,
@@ -110,10 +101,8 @@ export function RefineryLabels({
   info,
 }: {
   structureIds: readonly number[];
-  /** The resolved label: the officer label, else the structure, system or owner fallback. */
   name: (structureId: number) => string;
   edit?: RefineryLabelEdit;
-  /** Per refinery: a name link, a meta line and an offer pill; absent for a plain list. */
   info?: (structureId: number) => RefineryRowInfo;
 }) {
   const { t } = useTranslation();

@@ -1,8 +1,3 @@
-/**
- * A section's swap rows: one row per fitted module with its best option, the
- * module's other options folded behind "N more options". Each row is a tick
- * box; hovering or focusing one previews it.
- */
 import { Fragment, useId } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Caret, Checkbox, TypeIcon } from '@/components/ui';
@@ -28,15 +23,12 @@ import type { ImproveSelection } from './useImproveSelection';
 
 interface Props {
   options: ImproveOption[];
-  /** The fit as it is, which each row's figures are measured against. */
   own: FittingStats;
-  /** Keeps the ids of two lists' rows apart. */
   section: string;
   sort: ImproveSort;
   labels: ImproveLabels;
   selection: ImproveSelection;
   lead: LeadContext;
-  /** A quiet line for a row whose target group most community fits carry (#5581); null: none. */
   hintOf?: (candidate: ImproveOption['candidate']) => string | null;
 }
 
@@ -58,7 +50,6 @@ export function ImproveOptionList({
     <ul className="space-y-1">
       {groupByModule(options, sort).map((group, index) => {
         const all = [group.best, ...group.others];
-        // A ticked alternative takes the row's place; the rest stay behind it.
         const shown = all.find((option) => ticked.has(optionKey(option))) ?? group.best;
         const rest = all.filter((option) => option !== shown);
         const groupKey = `${section}:${group.key}`;
@@ -138,7 +129,6 @@ function ImproveOptionRow({
   const id = `improve-${section}-${key}`;
   const statsKey = `stats:${id}`;
   const lead = leadLine(t, leadContext, option, own);
-  // The stats the row already prints, so Gives up names only the losses it does not.
   const shown = [
     ...(lead?.keys ?? []),
     ...shownChangeKeys(option, own, expanded.has(statsKey), lead?.keys),
@@ -150,9 +140,7 @@ function ImproveOptionRow({
   return (
     <li
       className="border-line rounded-xs border p-2 text-sm"
-      // A mouse hover or a keyboard focus previews it; touch has no hover, so only its tick does (§6c).
       onPointerEnter={(event) => event.pointerType === 'mouse' && setHover(option)}
-      // Leaving with the pointer keeps a keyboard-focused row previewed; moving focus between the row's own parts keeps it too.
       onPointerLeave={(event) =>
         !event.currentTarget.contains(
           document.activeElement?.matches(':focus-visible') ? document.activeElement : null

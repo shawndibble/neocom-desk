@@ -1,38 +1,3 @@
-/**
- * The Event Entry catalog (issue #1285): one entry per Notification Event,
- * and the one place that event's behaviour is declared —
- *
- * - `source` — which poll domain's snapshot it reads (`pollDomains/` owns
- *   the fetching; several events can share one fetch),
- * - `diff` — the pure engine diff that fires it (`engine/notificationDiffs.ts`),
- * - `copy` — its live wording and click subject (`domainCopy.ts`),
- * - `projection` — its Scheduled Push renderer, or `null` when it is only
- *   observable by polling (ADR 0010),
- * - `thresholds` — the per-Character threshold fields it owns
- *   (`eventThresholdFields.ts`), or `null`,
- * - `rowHintKey` — a delivery caveat Settings shows under its row, or `null`.
- *
- * A server-only event (`ServerOnlyEventEntry`: backend-pushed, never polled) has
- * `source: null` and no `diff`, so no poll domain owns it.
- *
- * Every field is required, and the catalog is keyed by `NotificationEventId`
- * (itself derived from `events.ts`'s catalog), so a new event that lacks any
- * part of this is a type error here rather than a silent gap. `projection` is
- * further tied to `engine/projection.ts`'s `PROJECTABLE_EVENT_IDS` per key:
- * a projectable event must declare one and any other must say `null`.
- *
- * What reads it: `pollDomains/` derives each domain's event list, diffs,
- * renderer and push copy from the entries naming it as their `source`;
- * `NotificationsPanel.tsx` and `notificationRows.ts` derive an event's
- * threshold controls, row hint and Scheduled Push badge from it. The
- * helpers it composes stay where they were — this module declares, it does
- * not implement.
- *
- * Deliberately not reachable from the service worker: `sw.ts` reaches
- * `events.ts`, `preferences.ts` and `eventSelection.ts`, none of which import
- * this, so the SW bundle carries no diff or copy code. Keep it that way — no
- * React, DOM, Dexie or fetch here either.
- */
 import {
   diffStockBelowTarget,
   type StockAlertSnapshot,
@@ -201,7 +166,6 @@ import type { EveNotificationNames } from './eveNotificationText';
 import type { NotificationEventId } from './events';
 import { THRESHOLD_FIELDS, type ThresholdField } from './eventThresholdFields';
 
-/** Every fire any registered diff can produce. */
 export type AnyNotificationFire =
   | NotificationFire
   | SpExtractionFire
@@ -241,19 +205,8 @@ export type AnyNotificationFire =
   | CorpTaxBookSyncStoppedFire
   | SharedMoonPopFire;
 
-/* -------------------------------------------------------------------------- */
-/* Snapshot sources                                                            */
-/* -------------------------------------------------------------------------- */
-
-/**
- * A typed handle on one poll domain's snapshot: the domain in
- * `pollDomains/` that fetches it and every entry that diffs it name the
- * same handle, so an entry's `diff` and `copy` are checked against the
- * snapshot and name-lookup shapes that domain actually produces.
- */
 export interface SnapshotSource<TSnapshot, TNames> {
   readonly id: string;
-  /** Type-only carrier for `TSnapshot`/`TNames`; never set at runtime. */
   readonly types?: (snapshot: TSnapshot, names: TNames) => void;
 }
 
@@ -293,35 +246,17 @@ export const SNAPSHOT_SOURCES = {
   sharedMoonPops: source<SharedMoonPopSnapshot, SharedMoonPopNames>('sharedMoonPops'),
 } as const;
 
-/* -------------------------------------------------------------------------- */
-/* Entry shape                                                                 */
-/* -------------------------------------------------------------------------- */
-
-/**
- * How a projectable event reads as a Scheduled Push. The fire and names are
- * the ones its domain's `project*` builds (`engine/projection.ts`), which for
- * `eveNotification` is a narrower derived fire, not its poll fire.
- */
 export interface EventProjection<TPushFire, TPushNames> {
   readonly push: PushCopy<TPushFire, TPushNames>;
-  /**
-   * False when only some occurrences are projected (`eveNotification`: only
-   * a structure's reinforcement exit), so Settings' Scheduled Push badge —
-   * a promise about every occurrence — stays off its row.
-   */
   readonly everyOccurrence: boolean;
 }
 
-/** The per-Character threshold fields an event owns, rendered inline under its Settings row. */
 export interface EventThresholds {
   readonly fields: readonly [ThresholdField, ...ThresholdField[]];
-  /** A caveat shown under the controls, or null. */
   readonly hintKey: string | null;
-  /** i18n key of the disclosure heading when the generic "Warn-ahead times" doesn't fit. */
   readonly headingKey?: string;
 }
 
-/** An event only the backend raises (ADR 0027): no snapshot to diff, so no poll domain. */
 export interface ServerOnlyEventEntry<TFire> {
   readonly source: null;
   readonly copy: DomainCopy<TFire, NoNames>;
@@ -330,7 +265,6 @@ export interface ServerOnlyEventEntry<TFire> {
   readonly rowHintKey: string | null;
 }
 
-/** One Event Entry, as written. `defineEvent` checks it against its source's types. */
 export interface NotificationEventEntry<
   TSnapshot,
   TFire,
@@ -343,15 +277,9 @@ export interface NotificationEventEntry<
   readonly copy: DomainCopy<TFire, TNames>;
   readonly projection: TProjection;
   readonly thresholds: TThresholds;
-  /** i18n key of a caveat Settings shows under this event's row whatever the Character's grants, or null. */
   readonly rowHintKey: string | null;
 }
 
-/**
- * Identity at runtime; at compile time it infers one entry's snapshot, fire
- * and names types from its `source`, so `diff` and `copy` must agree with
- * each other and with what the domain produces.
- */
 function defineEvent<
   TSnapshot,
   TFire,
@@ -370,16 +298,7 @@ function defineServerOnlyEvent<TFire>(
   return { source: null, projection: null, thresholds: null, ...entry };
 }
 
-/**
- * An entry as the poll loop and Settings see it, its types erased. Method
- * syntax on purpose: method parameters compare bivariantly, which is what
- * lets every typed entry satisfy this one shape without a cast. The domain
- * only ever hands an entry its own source's snapshot and fires
- * (`pollDomains/`), which is what makes that sound in practice. A server-only
- * entry has no domain: it has no `diff` and `source` is null.
- */
 export interface ErasedEventEntry {
-  /** Null for a server-only event: no poll domain fetches or diffs it. */
   readonly source: { readonly id: string } | null;
   diff?(characterId: number, prev: unknown, next: unknown): AnyNotificationFire[];
   readonly copy: {
@@ -399,10 +318,6 @@ interface ErasedProjection {
 type ErasedEntryFor<K extends NotificationEventId> = ErasedEventEntry & {
   readonly projection: K extends ProjectableEventId ? ErasedProjection : null;
 };
-
-/* -------------------------------------------------------------------------- */
-/* The catalog                                                                 */
-/* -------------------------------------------------------------------------- */
 
 export const NOTIFICATION_EVENT_ENTRIES = {
   skillLevelComplete: defineEvent({
@@ -429,8 +344,6 @@ export const NOTIFICATION_EVENT_ENTRIES = {
     thresholds: { fields: [THRESHOLD_FIELDS.skillQueueEndingLeadHours], hintKey: null },
     rowHintKey: null,
   }),
-  // Over the same skill-queue read as the three above. A slowdown that already happened, so it
-  // is only ever seen while the app is open: nothing to project for a Scheduled Push.
   omegaLapsed: defineEvent({
     source: SNAPSHOT_SOURCES.skillQueue,
     diff: SKILL_QUEUE_NOTIFICATION_DIFFS.omegaLapsed,
@@ -439,8 +352,6 @@ export const NOTIFICATION_EVENT_ENTRIES = {
     thresholds: null,
     rowHintKey: null,
   }),
-  // Opt-in behind sync.spExtractionMonitoringEnabled, with its threshold a
-  // single account-wide setting (`Settings.tsx`), not a per-Character field.
   spExtractionReady: defineEvent({
     source: SNAPSHOT_SOURCES.spExtraction,
     diff: diffSpExtractionReady,
@@ -457,11 +368,6 @@ export const NOTIFICATION_EVENT_ENTRIES = {
     thresholds: null,
     rowHintKey: null,
   }),
-  // The ready time uses the effective Infomorph Synchronizing level; when
-  // skills can't be loaded it falls back to level 0 (a 24h cooldown), so the
-  // alert can arrive late but never early. The Occurrence Key is the jump
-  // itself, not the ready time, so two devices that read different levels
-  // still agree on one occurrence.
   cloneJumpReady: defineEvent({
     source: SNAPSHOT_SOURCES.cloneJump,
     diff: diffCloneJumpReady,
@@ -492,12 +398,8 @@ export const NOTIFICATION_EVENT_ENTRIES = {
     copy: colonyCopy,
     projection: { push: colonyCopy.push, everyOccurrence: true },
     thresholds: { fields: [THRESHOLD_FIELDS.extractorExpiringLeadHours], hintKey: null },
-    // Delivery disclosure (issues #310/#358): bounded by the 72-hour
-    // Projection Horizon, not the Character's grants, so it shows even
-    // before authorization.
     rowHintKey: 'settings.notifications.extractorExpiringHint',
   }),
-  // Local data (the typed-in accelerator), so no scope; per Character like the rest.
   acceleratorExpiring: defineEvent({
     source: SNAPSHOT_SOURCES.accelerator,
     diff: diffAcceleratorExpiring,
@@ -506,8 +408,6 @@ export const NOTIFICATION_EVENT_ENTRIES = {
     thresholds: { fields: [THRESHOLD_FIELDS.acceleratorExpiringLeadHours], hintKey: null },
     rowHintKey: null,
   }),
-  // Local data again, and a fact that already happened, so there is nothing to project for a
-  // Scheduled Push: it can only be seen while the app is open to read the accelerator.
   acceleratorEnded: defineEvent({
     source: SNAPSHOT_SOURCES.acceleratorPresence,
     diff: diffAcceleratorEnded,
@@ -516,7 +416,6 @@ export const NOTIFICATION_EVENT_ENTRIES = {
     thresholds: null,
     rowHintKey: null,
   }),
-  // Per Character (issue #4782): ESI has no corporation den route.
   mercenaryDenReinforced: defineEvent({
     source: SNAPSHOT_SOURCES.mercenaryDens,
     diff: diffMercenaryDenReinforced,
@@ -525,7 +424,6 @@ export const NOTIFICATION_EVENT_ENTRIES = {
     thresholds: { fields: [THRESHOLD_FIELDS.mercenaryDenReinforcedLeadHours], hintKey: null },
     rowHintKey: 'settings.notifications.mercenaryDenReinforcedHint',
   }),
-  // Diff-based, so foreground-only: the server holds no den-scope token (ADR 0010).
   mercenaryDenAnarchy: defineEvent({
     source: SNAPSHOT_SOURCES.mercenaryDens,
     diff: diffMercenaryDenAnarchy,
@@ -534,8 +432,6 @@ export const NOTIFICATION_EVENT_ENTRIES = {
     thresholds: { fields: [THRESHOLD_FIELDS.mercenaryDenAnarchyPercent], hintKey: null },
     rowHintKey: 'settings.notifications.mercenaryDenAnarchyForegroundOnlyHint',
   }),
-  // Shared Pops another corporation's book shares (issue #6225): projected, so a closed app is
-  // told at the Pop Time or the Character's lead time before it.
   sharedMoonPop: defineEvent({
     source: SNAPSHOT_SOURCES.sharedMoonPops,
     diff: diffSharedMoonPop,
@@ -552,9 +448,6 @@ export const NOTIFICATION_EVENT_ENTRIES = {
     thresholds: null,
     rowHintKey: null,
   }),
-  // Foreground-only, station-only (issue #1423, owner decisions #1/#2) — no
-  // Scheduled Push (needs a re-check the projector never does) and no
-  // system/region scope yet.
   marketOrderUndercut: defineEvent({
     source: SNAPSHOT_SOURCES.marketOrderUndercut,
     diff: diffMarketOrderUndercut,
@@ -646,8 +539,6 @@ export const NOTIFICATION_EVENT_ENTRIES = {
     source: SNAPSHOT_SOURCES.eveNotification,
     diff: diffEveNotification,
     copy: eveNotificationCopy,
-    // Only a structure's reinforcement exit (issue #359) has a future
-    // instant to project; every other EVE notification is "as it happens".
     projection: { push: eveNotificationCopy.push, everyOccurrence: false },
     thresholds: null,
     rowHintKey: null,
@@ -659,13 +550,10 @@ export const NOTIFICATION_EVENT_ENTRIES = {
     projection: { push: structureFuelCopy.push, everyOccurrence: true },
     thresholds: {
       fields: [THRESHOLD_FIELDS.structureFuelLowDays],
-      // Issue #299: "say so in the UI, so nobody reads it as a second copy
-      // of the EVE alert."
       hintKey: 'settings.notifications.structureFuelLowNotDuplicateHint',
     },
     rowHintKey: null,
   }),
-  // Corp scope (issue #4784): a raid window is a known timestamp, so it projects.
   skyhookRaidable: defineEvent({
     source: SNAPSHOT_SOURCES.skyhooks,
     diff: diffSkyhookRaidable,
@@ -706,7 +594,6 @@ export const NOTIFICATION_EVENT_ENTRIES = {
     diff: diffCorpWalletThreshold,
     copy: corpWalletCopy,
     projection: null,
-    // Two independent thresholds, either of which fires (issue #299).
     thresholds: {
       fields: [
         THRESHOLD_FIELDS.corpWalletBalanceFloorIsk,
@@ -758,7 +645,6 @@ export const NOTIFICATION_EVENT_ENTRIES = {
     source: SNAPSHOT_SOURCES.kills,
     diff: diffShipLost,
     copy: shipLostCopy,
-    // zKillboard is not polled server-side, so there is nothing to project.
     projection: null,
     thresholds: {
       fields: [THRESHOLD_FIELDS.shipLostMinimumIsk],
@@ -770,7 +656,6 @@ export const NOTIFICATION_EVENT_ENTRIES = {
     source: SNAPSHOT_SOURCES.signIn,
     diff: diffCharacterNeedsLogin,
     copy: characterNeedsLoginCopy,
-    // The mark is device-local; the backend never sees a failed refresh.
     projection: null,
     thresholds: null,
     rowHintKey: null,
@@ -799,7 +684,6 @@ export const NOTIFICATION_EVENT_ENTRIES = {
     thresholds: null,
     rowHintKey: null,
   }),
-  // Raised by the backend alone (ADR 0027): no poll domain, so no diff.
   vettingShared: defineServerOnlyEvent<VettingSharedFire>({
     copy: vettingSharedCopy,
     rowHintKey: 'settings.notifications.vettingSharedHint',
@@ -813,7 +697,6 @@ export const NOTIFICATION_EVENT_ENTRIES = {
 const ERASED: { readonly [K in NotificationEventId]: ErasedEventEntry } =
   NOTIFICATION_EVENT_ENTRIES;
 
-/** One event's entry, types erased — for callers that hold only an id. */
 export function eventEntry(eventId: NotificationEventId): ErasedEventEntry {
   return ERASED[eventId];
 }

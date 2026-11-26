@@ -14,7 +14,6 @@ import { TIME_CELL, attributePairLabel, priorityLabelKey } from './rowChrome';
 
 type AttributePairBadgeProps = AttributePair;
 
-/** A skill's primary/secondary attribute pair, toggleable via the "Columns" control (#114). */
 export function AttributePairBadge({ primary, secondary }: AttributePairBadgeProps) {
   const { t } = useTranslation();
   const label = attributePairLabel(primary, secondary);
@@ -32,17 +31,12 @@ export function AttributePairBadge({ primary, secondary }: AttributePairBadgePro
 }
 
 interface TimeCellProps {
-  /** Already-formatted duration or date — this cell only places it. */
   value: string;
-  /** PrereqRow's dimmed/italic `<li>` already colors its text; EntryRow's doesn't, so its cell dims itself. */
   dim?: boolean;
-  /** Desktop columns are fixed-width so they line up under their headers; the narrow meta line packs its values inline instead. */
   fixedWidth?: boolean;
-  /** "Takes" or "Done by" — the desktop column header is visual only, so `sr-only` (`CorpBoardRow`'s pattern) gives the cell its own accessible name without changing what's on screen. */
   label?: string;
 }
 
-/** One training-time value: a duration ("Takes") or a finish date ("Done by"). */
 export function TimeCell({ value, dim = false, fixedWidth = true, label }: TimeCellProps) {
   return (
     <span
@@ -56,12 +50,6 @@ export function TimeCell({ value, dim = false, fixedWidth = true, label }: TimeC
   );
 }
 
-/**
- * A labelled value on the narrow layout's meta line. Below `md` the desktop
- * column headers are gone, so each number carries its own label rather than
- * hiding behind a tooltip the user has to discover (#114 shipped cumulative
- * time that way, and it read as an unexplained second duration).
- */
 export function MetaValue({ label, value }: { label: string; value: string }) {
   return (
     <span className="whitespace-nowrap tabular-nums">
@@ -70,12 +58,6 @@ export function MetaValue({ label, value }: { label: string; value: string }) {
   );
 }
 
-/**
- * Priority pill tones — hierarchy by text weight/style, not color alone;
- * status colors carry meaning here (docs/DESIGN.md §6). `low` is italic
- * rather than `text-faint`, which is below AA (issue #1491) and would also
- * have made `low` and `normal` identical, since both use `border-line`.
- */
 const PRIORITY_TONE: Record<PlanPriority, string> = {
   high: 'border-line-bright text-text',
   normal: 'border-line text-text-dim',
@@ -84,29 +66,12 @@ const PRIORITY_TONE: Record<PlanPriority, string> = {
 
 interface PriorityPillProps {
   skillTypeID: number;
-  /** The row's full label (name and level), so two levels of one skill get distinct names. */
   name: string;
   priority: PlanPriority;
   onSetPriority: (skillTypeID: number, priority: PlanPriority) => void;
-  /**
-   * Pad the trigger out to the `sm` touch tier without resizing the chip
-   * (#1106). Set only from the mobile meta line; the desktop row leaves it
-   * off so the pill keeps sitting flush with the `sm` controls beside it.
-   */
   touchTarget?: boolean;
 }
 
-/**
- * An entry's priority (#27) as a menu behind a pill the size of the attribute
- * badge beside it. Was a `NativeSelect`, whose native chrome made it the widest
- * thing in the row by a distance and pushed every column after it out of line.
- *
- * The chip lives in a span inside the trigger rather than on the trigger
- * itself, so `touchTarget` can grow the *button* to the `sm` touch tier on a
- * phone (#1106) while the chip stays the width and height of the attribute
- * badge next to it. Hover and focus are driven off the button through `group`
- * so both still draw on the chip, not on the padded box around it.
- */
 export function PriorityPill({
   skillTypeID,
   name,

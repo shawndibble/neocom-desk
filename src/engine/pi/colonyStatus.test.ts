@@ -13,13 +13,6 @@ import type { ExtractorYieldProgram, ColonyStatus } from './types';
 
 const NOW = Date.parse('2026-09-01T00:00:00Z');
 
-/**
- * CCP's worked example, the same baseline `extraction.test.ts` uses:
- * qty_per_cycle 6,965 on a 30-minute cycle over 14 days. Its trailing day of
- * output runs at 100% of its first day through day 1, 38% across day 3 and
- * 30% across day 4, so it straddles `EFFICIENT_WINDOW_FRACTION` between those
- * two days without either side being a near-miss.
- */
 const decayingProgram: ExtractorYieldProgram = {
   pinId: 9,
   installTimeMs: NOW,
@@ -44,7 +37,6 @@ describe('extractorState', () => {
   });
 
   it('takes the pilot’s own warning window when one is given', () => {
-    // 36h out: inside a 48h window, outside the default 24h one.
     expect(extractorState(NOW + 36 * HOUR_MS, NOW, 48 * HOUR_MS)).toBe('expiring-soon');
     expect(extractorState(NOW + 36 * HOUR_MS, NOW)).toBe('active');
   });
@@ -151,9 +143,6 @@ describe('sortColoniesByAttention', () => {
       },
       { id: 'thirtySix', status: { idle: false, soonestExpiryMs: NOW + 36 * HOUR_MS } },
     ];
-    // At 24h the 36-hour colony is merely healthy, so the decayed one outranks
-    // it. At 48h it becomes expiring-soon and jumps the queue — the window
-    // changes what the pilot sees first, which is why it earns a control.
     expect(sortColoniesByAttention(colonies, (c) => c.status, NOW).map((c) => c.id)).toEqual([
       'decayed',
       'thirtySix',
@@ -182,8 +171,6 @@ describe('colonyStatus decay', () => {
   });
 
   it('is not decayed four hours in, the regression this threshold exists for', () => {
-    // On the old per-cycle read this fired here, with 6% of a fourteen-day
-    // program banked — a badge on every colony, always.
     expect(colonyStatus([decayingProgram], NOW + 4 * HOUR_MS).decayed).toBe(false);
   });
 
@@ -193,7 +180,6 @@ describe('colonyStatus decay', () => {
   });
 
   it("is decayed by day four, once the trailing day falls under the program's window", () => {
-    // Day 3 runs at 0.379 of the first day's rate, day 4 at 0.300.
     expect(colonyStatus([decayingProgram], NOW + 3 * DAY_MS).decayed).toBe(false);
     expect(colonyStatus([decayingProgram], NOW + 4 * DAY_MS).decayed).toBe(true);
   });
@@ -205,8 +191,6 @@ describe('colonyStatus decay', () => {
       installTimeMs: NOW + 2 * DAY_MS,
       expiryTimeMs: NOW + 2 * DAY_MS + 14 * DAY_MS,
     };
-    // Two days into its own program, `freshlyReset` is at 0.547 — inside the
-    // window, so the colony stays off the flag even though the other is past.
     expect(colonyStatus([decayingProgram, freshlyReset], NOW + 4 * DAY_MS).decayed).toBe(false);
   });
 

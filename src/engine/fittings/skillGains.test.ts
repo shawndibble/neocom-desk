@@ -146,7 +146,6 @@ describe('gainMetrics', () => {
     expect(metrics.dps).toBeCloseTo(0.1);
     expect(metrics.align).toBeCloseTo(0.1);
     expect(metrics.ehp).toBe(0);
-    // Align counts half towards overall: damage and tank come first.
     expect(metrics.overall).toBeCloseTo(0.15);
   });
 
@@ -156,11 +155,9 @@ describe('gainMetrics', () => {
       capacitor: { stable: false, depletesInSeconds: 180 },
       offense: { ...baseStats.offense, dps: 105 },
     });
-    // Rapid Firing: +5% DPS outweighs running dry 10% sooner.
     const metrics = gainMetrics(unstable, sooner);
     expect(metrics.capacitor).toBeCloseTo(-0.1);
     expect(metrics.overall).toBeCloseTo(0.05 - 0.025);
-    // Each metric itself stays unweighted, so ranking by one stat is unchanged.
     expect(metrics.dps).toBeCloseTo(0.05);
   });
 
@@ -262,7 +259,6 @@ describe('gainMetrics — weapon reach', () => {
         droneControlRange: 60000,
         weapons: [
           turret(optimal, falloff, tracking),
-          // A drone's reach is not the guns': never compared.
           {
             kind: 'drone',
             dps: 100,
@@ -315,9 +311,7 @@ describe('gainMetrics — weapon reach', () => {
         },
       });
     const [before, after] = [mixed(100000, 50000), mixed(110000, 40000)];
-    // A skill level never cuts reach, so What to Train keeps the gain…
     expect(roleChanges(before, after)).toContainEqual({ key: 'optimal', before: 100, after: 110 });
-    // …but a module swap must not hide the missile range it costs.
     expect(roleSwapChanges(before, after)).toContainEqual({
       key: 'optimal',
       before: 50,
@@ -509,8 +503,7 @@ describe('evaluateSkillGains', () => {
           ? withStats({ offense: { ...baseStats.offense, dps: 105 } })
           : skillTypeId === 3
             ? withStats({ ehp: 22000 })
-            : // A CPU-only change is displayed but not ranked on.
-              withStats({ cpuTotal: 440 }),
+            : withStats({ cpuTotal: 440 }),
     }));
     const gains = await evaluateSkillGains(candidates, compare);
     expect(compare).toHaveBeenCalledWith(1, 4);
@@ -639,7 +632,6 @@ describe('rankSkillGains', () => {
     ];
     expect(rankSkillGains(gains, 'overall').map((g) => g.skillTypeId)).toEqual([3, 1, 2]);
     expect(rankSkillGains(gains, 'dps').map((g) => g.skillTypeId)).toEqual([2, 1, 3]);
-    // Not in place.
     expect(gains.map((g) => g.skillTypeId)).toEqual([3, 1, 2]);
   });
 

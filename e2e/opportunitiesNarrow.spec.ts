@@ -1,25 +1,10 @@
-/**
- * Build Opportunities on a phone (mobile UX pass, issues stemming from
- * #1096's checkbox fix): `DataTable`'s stacked layout hid the sortable
- * column headers entirely (`.dt-stack thead`, `src/styles/index.css`), so a
- * phone pilot had no way to change sort — and its 8-line stacked card had no
- * single number a glance could land on. `MobileOpportunityList` replaces the
- * table below `lg` with a card list: a leading selection checkbox, a "hero"
- * metric that tracks whichever field is the active sort, and a real "Sort by"
- * menu. The panel's title is a view picker there ("Ranked builds" / "Owned
- * blueprints"), and "All owned" gets its own card list too.
- * Desktop (`isDesktop`, `lg` and up) keeps the exact `DataTable` it always
- * had — this list never mounts there.
- */
 import type { Page } from '@playwright/test';
 import { test, expect, PHONE, DESKTOP } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 import { CHARACTER_ID } from './support/fixtureData';
 
-/** Rifter Blueprint (BPC) — same fixture pair other Industry specs use. */
 const BLUEPRINT_TYPE_ID = 691;
 
-/** A second account character, never logged into — only its Dexie rows are seeded, to give one row in the list a genuinely non-comparable owner (issue #1174). */
 const SECOND_CHARACTER_ID = 90000002;
 const SECOND_CHARACTER_NAME = 'Alt Pilot';
 
@@ -44,14 +29,6 @@ async function seedOwnedBlueprint(page: Page): Promise<void> {
   );
 }
 
-/**
- * A second character record plus its own owned-blueprint cache row, written
- * straight into Dexie rather than driven through a second login — `data.ts`'s
- * `loadCharacterBlueprints` reads cache-first (`esi/cache.ts`), so a fresh
- * row here is served without ever needing a live token for this character.
- * `characters.toArray().length > 1` is also what makes the Industry
- * header's Character picker (`IndustryCharacterPicker`) render at all.
- */
 async function seedSecondCharacterBlueprint(page: Page): Promise<void> {
   await page.evaluate(
     async ({ characterId, characterName, blueprintTypeID }) => {
@@ -112,7 +89,6 @@ test.describe('Opportunities — ranked phone list', () => {
 
     await expect(page.getByRole('table', { name: 'Build Opportunities' })).toHaveCount(0);
     await expect(page.getByText('Rifter', { exact: true })).toBeVisible();
-    // The view picker stands in for the title, on the same line as the actions.
     const picker = page.getByRole('combobox', { name: 'View' });
     await expect(picker).toHaveText(/Ranked builds/);
   });
@@ -189,9 +165,6 @@ test.describe('Opportunities — ranked phone list', () => {
 
     const trigger = page.getByRole('button', { name: /Sort by ISK\/hour/ });
     await expect(trigger).toBeVisible();
-    // Polled, not read once: the list re-renders as the ranking lands, and a
-    // trigger remounted between the visibility check and the measurement
-    // reads as a null box — a CI-only flake, not a short target.
     await expect
       .poll(async () => (await trigger.boundingBox())?.height ?? 0)
       .toBeGreaterThanOrEqual(36);
@@ -213,7 +186,6 @@ test.describe('Opportunities — ranked phone list', () => {
       })
       .toBe(true);
 
-    // Polled for the same remount race as the Sort by trigger above.
     await expect
       .poll(async () => {
         const box = await wrapper.boundingBox();
@@ -232,7 +204,6 @@ test.describe('Opportunities — ranked phone list', () => {
     await page.getByRole('menuitem', { name: 'Margin', exact: true }).click();
 
     await expect(page.getByRole('button', { name: /Sort by Margin/ })).toBeVisible();
-    // The hero number's own unit label now reads "Margin", not "ISK/hour".
     await expect(page.getByText('ISK/hour', { exact: true })).toHaveCount(0);
   });
 
@@ -264,17 +235,6 @@ test.describe('Opportunities — ranked phone list', () => {
       .toEqual([16, 16]);
   });
 
-  /**
-   * `hasTouch` scoped to this block, not the file — same reasoning
-   * `charactersToolbarNarrow.spec.ts`'s own touch-and-hold block gives.
-   *
-   * Previously (issue #1174) this row's checkbox was disabled with a
-   * tooltip explaining that only the active character's own blueprints
-   * could be added to Compare — because the seeded plan used to be stamped
-   * with the alt's own id, which no surface reading Build Plans could ever
-   * find. Issue #1061 fixed the stamping (seeded plans now belong to the
-   * active character), so the row is selectable like any other.
-   */
   test.describe("another character's row is selectable on touch (issue #1061)", () => {
     test.use({ hasTouch: true });
 
@@ -283,17 +243,8 @@ test.describe('Opportunities — ranked phone list', () => {
       await page.setViewportSize(PHONE);
       await page.goto('./industry/opportunities');
 
-      // Wait for Opportunities' own data (and with it its Character filter
-      // trigger) to have mounted before touching "This character" — Active
-      // Jobs renders an independent filter control of its own higher up the
-      // page, and `.last()` below only reliably means "Opportunities' own"
-      // once this panel has actually finished its first render.
       await expect(page.getByRole('button', { name: /Sort by/ })).toBeVisible();
 
-      // The Character filter defaults to "This character" — switch to "All
-      // characters" so the alt's row joins the list. Below `md` the trigger
-      // is icon-only, so it's found by its `aria-label`, not its (absent)
-      // visible text.
       await page.getByRole('button', { name: 'This character' }).last().click();
       await page.getByRole('menuitemradio', { name: 'All characters' }).click();
 
@@ -312,15 +263,10 @@ test.describe('Opportunities — ranked phone list', () => {
     });
   });
 
-  /**
-   * Issue #1781: the card's own face stays uncrowded. Tapping the card (its
-   * name included) is Start plan; the ⋯ menu keeps price history only.
-   */
   test('tapping the product name opens the plan, not the Market page', async ({ page }) => {
     await page.setViewportSize(PHONE);
     await page.goto('./industry/opportunities');
 
-    // Wait for the card to be fully rendered (its controls mounted) before tapping.
     await expect(page.getByRole('checkbox', { name: /Select Rifter/ })).toBeVisible();
     await expect(page.getByRole('button', { name: /More actions for Rifter/ })).toBeVisible();
     await page.getByText('Rifter', { exact: true }).click();

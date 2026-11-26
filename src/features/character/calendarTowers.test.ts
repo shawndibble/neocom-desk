@@ -10,7 +10,6 @@ const loadStarbaseDetails = vi.hoisted(() => vi.fn());
 vi.mock('@/features/corp/corpReadAccess', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/features/corp/corpReadAccess')>()),
   loadAccountCorpAccess: async () => accounts,
-  // The tower read gates itself the same way the account list does.
   resolveCorpReadAccess: async (characterId: number) =>
     (accounts as { characterId: number; access: unknown }[]).find(
       (account) => account.characterId === characterId

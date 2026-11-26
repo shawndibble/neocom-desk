@@ -33,48 +33,22 @@ import { LedgerActionError } from './LedgerActionError';
 import { formatCount } from '@/lib/formatCount';
 import { clamp, sum } from '@/engine/math';
 
-// Whole units only: every non-digit is a grouping mark from the mask, so
-// `5,4930` is 54,930 — the locale parser would read it as 5.493.
 const typedUnits = (value: string) => Number(value.replace(/\D/g, ''));
 
 interface SplitDialogProps {
   open: boolean;
   onClose: () => void;
-  /** The Assignment being split — Outstanding or Paid, never part of a joined group. */
   assignment: MiningTaxAssignmentRecord;
-  /** Its Mining Ledger Entry row: the sibling Assignments decide whether the collector choice is on offer. */
   row: MoonMiningTaxRow;
   systemName: string;
   payees: readonly PayeeRecord[];
-  /** Every Assignment the pilot has made — the rates previously billed per Payee become quick picks. */
   assignments?: readonly MiningTaxAssignmentRecord[];
   typeNames: ReadonlyMap<number, string>;
-  /**
-   * Prices at a given Payee's trade hub, on a given date. A split is the one
-   * flow that needs two of them at once: the units staying put are worth
-   * what the original Payee's hub bids, the moved units what the *second*
-   * Payee's hub bids, and the second Payee is picked here. Both sides use
-   * `assignment.date` — the entry's mined date, not "now" — since a split
-   * only changes who is billed, never when the ore was mined.
-   */
   pricesFor: (hubId: string | undefined, date: string) => ReadonlyMap<number, number>;
   busy: boolean;
   onSplit: () => void;
 }
 
-/**
- * Splits one assigned EVE day between two Payees by quantity (issue #523):
- * one UTC day can hold two local-time sessions at two different corps' moons
- * in the same system, and ESI reports them as one entry. Per ore type the
- * pilot types what the original keeps or what moves to a second Payee —
- * whichever figure they know (issue #6180) — and a radio picks which side
- * collects any ore ESI reports for this day later
- * (`engine/miningTax/ownership.ts`). Keeping more than ESI reports so far
- * claims the client's figure ahead of the ledger; the new side then collects
- * only what ESI reports past it. Each side is re-priced at *its own*
- * Payee's trade hub, at the entry's mined date — the two Payees need not
- * share a hub — see `splitAssignment`.
- */
 export function SplitDialog({
   open,
   onClose,
@@ -93,12 +67,6 @@ export function SplitDialog({
   const [taxPct, setTaxPct] = useState('');
   const [label, setLabel] = useState('');
   const original = assignment.oreLines;
-  // One figure per ore type — what the original's Payee keeps (issue #6180).
-  // The pilot types whichever side they know: the Moves box writes
-  // `held − moved` here. Above `held` is ore the client shows but ESI has
-  // not reported yet, up to `maxUnreportedClaim`. A needs-review Assignment
-  // starts with its growth moved, since that is what the pilot is nearly
-  // always here to hand on; anything else starts keeping everything.
   const [keeps, setKeeps] = useState<ReadonlyMap<number, number>>(() => {
     const growth =
       assignment.status === 'needs-review' && assignment.reviewDiff
@@ -111,24 +79,14 @@ export function SplitDialog({
       ])
     );
   });
-  // A third Assignment on this entry may already be the Growth Collector
-  // (a second split). The choice is still offered on every split (#6205): ESI
-  // lags up to an hour, so the pilot knows better than any default which
-  // moon later ore is from. Left alone, that third Assignment keeps the role.
   const currentCollector = row.assignments.find(
     (a) => a.id !== assignment.id && a.collectsGrowth === true
   );
-  // Sessions run in order, so ore ESI reports after the split is usually from
-  // the moon the pilot moved on to — the new side. Growth on a split day is
-  // always reviewed (reconcile.ts), so a wrong guess never grows silently.
-  // 'current' leaves the third Assignment collecting (no `collector` sent).
   const [collector, setCollector] = useState<SplitCollector | 'current'>(
     currentCollector ? 'current' : 'new'
   );
   const { pending: saving, error: saveError, run } = useLedgerAction();
 
-  // Keeping more than ESI reports only works when the new side takes what
-  // comes after, and a paid day's bill never grows (ADR 0024).
   const canClaimUnreported = assignment.status !== 'paid';
 
   const moves: OreLine[] = [];
@@ -136,23 +94,17 @@ export function SplitDialog({
   for (const line of original) {
     const keep = keeps.get(line.typeId) ?? line.quantity;
     if (keep < line.quantity) moves.push({ typeId: line.typeId, quantity: line.quantity - keep });
-    // Clamped again here: an open dialog's entry can shrink under a typed keep.
     if (keep > line.quantity)
       unreported.push({
         typeId: line.typeId,
         quantity: Math.min(keep - line.quantity, maxUnreportedClaim(line.quantity)),
       });
   }
-  // `setKeep` keeps every figure in range, so this never throws — and it is
-  // the same plan `splitAssignment` commits.
   const { kept: keptLines, moved: movedLines } = planSplit(original, moves, unreported);
   const claimsUnreported = unreported.length > 0;
   const effectiveCollector = claimsUnreported ? 'new' : collector;
   const pctValue = Number(taxPct);
   const safePct = Number.isFinite(pctValue) ? pctValue : 0;
-  // One book per side, resolved live: the preview below has to move when the
-  // pilot picks a second Payee that bills somewhere else, not only when they
-  // move units.
   const prices = {
     kept: pricesFor(payees.find((p) => p.id === assignment.payeeId)?.hubId, assignment.date),
     moved: pricesFor(payees.find((p) => p.id === payeeId)?.hubId, assignment.date),
@@ -162,8 +114,6 @@ export function SplitDialog({
   const movedUnits = sum(movedLines.map((line) => line.quantity));
   const unreportedUnits = sum(unreported.map((line) => line.quantity));
 
-  // The same Payee at the same rate would be fused back into one Assignment
-  // on the next load (`coalesce.ts`), so it is no split at all.
   const refuses = payeeId === assignment.payeeId && pctValue === assignment.taxPct;
   const chosenPayee = payees.find((p) => p.id === payeeId);
   const rateChips = chosenPayee
@@ -216,7 +166,6 @@ export function SplitDialog({
     <Modal
       open={open}
       onClose={onClose}
-      // Typed input or a half-finished choice: a stray backdrop click must not throw it away.
       dismissOnOutsidePress={false}
       title={t('miningTax.splitTitle', { date: row.entry.date, system: systemName })}
     >

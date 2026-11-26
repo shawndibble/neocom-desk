@@ -1,9 +1,3 @@
-/**
- * The two ship lists on a pilot's profile, side by side (stacked on a phone):
- * the hulls they fly on kills (zKillboard's all-time top ships) and the hulls
- * they kill most (from their latest kills). Either column drops out when its
- * data is not in: the stats are still loading or failed, or no kill list came.
- */
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { TypeIcon } from '@/components/ui';
@@ -12,7 +6,6 @@ import { loadTypeNames } from '@/features/character/typeNames';
 import { ItemInfoLink } from '@/features/entities';
 import type { PilotTopShip } from '@/lib/zkillboard';
 
-/** Hulls listed in each column. */
 const HULLS_SHOWN = 5;
 
 interface Hull {
@@ -24,9 +17,7 @@ export function PilotShips({
   kills,
   flown,
 }: {
-  /** Their dated kills; null while loading or when zKillboard failed. */
   kills: readonly KillRecord[] | null;
-  /** zKillboard's all-time top ships; null when the stats are not in. */
   flown: readonly PilotTopShip[] | null;
 }) {
   const { t } = useTranslation();

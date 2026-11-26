@@ -1,15 +1,9 @@
-/**
- * Reads one system's cost index history from R2 (public, no Firebase session):
- * cache-through like the other R2 snapshots, `null` for "unavailable" so the
- * trend popover simply stays hidden. No ESI request.
- */
 import { useEffect, useState } from 'react';
 import { loadWithCache, GLOBAL_CACHE_CHARACTER_ID } from '@/esi/cache';
 import { R2_SNAPSHOT_ORIGIN, fetchJson } from '@/features/contractSearch/r2OfferSnapshot';
 import { parseCostIndexHistory, type CostIndexHistory } from './costIndexHistory';
 import { HOUR_MS } from '@/lib/age';
 
-/** The job republishes daily. */
 const STALE_AFTER_MS = 12 * HOUR_MS;
 
 export async function loadCostIndexHistory(systemId: number): Promise<CostIndexHistory | null> {
@@ -31,7 +25,6 @@ export async function loadCostIndexHistory(systemId: number): Promise<CostIndexH
   return cached?.data ?? null;
 }
 
-/** The history once read; `null` while loading, absent or failed. */
 export function useCostIndexHistory(systemId: number | undefined) {
   const [state, setState] = useState<{ systemId: number; history: CostIndexHistory | null } | null>(
     null

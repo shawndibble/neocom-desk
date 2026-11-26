@@ -24,9 +24,6 @@ const TYPES: TypeMap = {
   '300': { name: 'Widget Gamma', groupID: 1, volume: 1 },
 };
 
-// Blueprint 100 -> product 200 ("Widget Alpha" builds "Widget Beta"), for the
-// "Log production" job-row action's create-a-plan path (issue #1787), which
-// resolves an unmatched job's blueprint through `loadBlueprintCatalog`.
 const BLUEPRINTS: BlueprintMap = {
   '100': {
     name: 'Widget Alpha Blueprint',
@@ -41,7 +38,6 @@ const BLUEPRINTS: BlueprintMap = {
 vi.mock('@/sde/loadSde', () => ({
   loadTypes: vi.fn(async () => TYPES),
   loadBlueprints: vi.fn(async () => BLUEPRINTS),
-  // The row context menu (issue #409) asks usePiPlannable, which reads this.
   loadPi: vi.fn(async () => ({ schematics: {}, raw: [] })),
 }));
 
@@ -50,7 +46,6 @@ const NOW = new Date('2026-08-29T12:00:00Z');
 
 const server = mswServer();
 
-/** Any character's `/skills` — the job-slot header (#679) reads this for every render, so a default with no trained slot skills keeps the rest of this file's tests unconcerned with it. */
 function skillsUrl(characterId: number | string = ':characterId') {
   return `${ESI_BASE_URL}/characters/${characterId}/skills`;
 }
@@ -61,9 +56,6 @@ beforeEach(async () => {
   await db.industryJobHistory.clear();
   await db.productionRuns.clear();
   await db.settings.delete('characterFilterPicks');
-  // Module-scope singleton: a value left over from a previous test would
-  // make the cross-character block's assertions pass or fail for the wrong
-  // reason (`Settings.test.tsx`'s precedent).
   useDefaultCharacterFilter.setState({ value: 'current', hydrated: false });
   useCharacterFilterPicks.setState({ value: {}, hydrated: false });
   server.use(http.get(skillsUrl(), () => HttpResponse.json({ skills: [], total_sp: 0 })));
@@ -71,8 +63,6 @@ beforeEach(async () => {
 afterEach(() => {
   configureEsi({ getToken: null });
   vi.useRealTimers();
-  // The fan-out failure test spies on `db.tokens`; left in place it would
-  // reject every later test's scope check too.
   vi.restoreAllMocks();
 });
 
@@ -80,12 +70,6 @@ function jobsUrl() {
   return `${ESI_BASE_URL}/characters/${CHAR_ID}/industry/jobs`;
 }
 
-/**
- * The job list is folded by default (verdict-first header); the table, chips,
- * and offline/refresh-failed banner only render once opened. Accepts a
- * caller's own `userEvent.setup()` instance (several tests run under fake
- * timers) or falls back to the direct API for tests that have none.
- */
 async function expandJobs(user: { click: (el: Element) => Promise<void> } = userEvent) {
   await user.click(await screen.findByRole('button', { name: 'Show job list' }));
 }
@@ -95,14 +79,12 @@ describe('ActiveJobsPanel: rendering', () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     vi.setSystemTime(NOW);
 
-    // Deliberately out of end-date order in the response, to prove the
-    // component sorts rather than trusting API order.
     server.use(
       http.get(jobsUrl(), () =>
         HttpResponse.json([
           {
             job_id: 1,
-            activity_id: 8, // invention
+            activity_id: 8,
             blueprint_type_id: 300,
             facility_id: 60003760,
             station_id: 60003760,
@@ -113,7 +95,7 @@ describe('ActiveJobsPanel: rendering', () => {
           },
           {
             job_id: 2,
-            activity_id: 4, // material efficiency research
+            activity_id: 4,
             blueprint_type_id: 200,
             facility_id: 60003760,
             station_id: 60003760,
@@ -124,7 +106,7 @@ describe('ActiveJobsPanel: rendering', () => {
           },
           {
             job_id: 3,
-            activity_id: 1, // manufacturing
+            activity_id: 1,
             blueprint_type_id: 100,
             facility_id: 60003760,
             station_id: 60003760,
@@ -151,55 +133,37 @@ describe('ActiveJobsPanel: rendering', () => {
     expect(screen.getByText('Widget Gamma')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Widget Beta' })).toBeInTheDocument();
 
-    // Scoped to tbody: activity names also appear on the filter chips and
-    // the column headers.
     const jobList = within(container.querySelector('tbody')!);
     expect(jobList.getByText('Manufacturing')).toBeInTheDocument();
     expect(jobList.getByText('Material efficiency research')).toBeInTheDocument();
     expect(jobList.getByText('Invention')).toBeInTheDocument();
 
-    // Sort: job 3 (past, "done") first, then job 2 (30m left), then job 1 (1h30m left).
-    // Scoped to tbody — the header's own "finishes in" text names job 2 (Widget
-    // Beta) too, ahead of the table in DOM order, which would break the count.
     const text = container.querySelector('tbody')!.textContent ?? '';
     expect(text.indexOf('Widget Alpha')).toBeLessThan(text.indexOf('Widget Beta'));
     expect(text.indexOf('Widget Beta')).toBeLessThan(text.indexOf('Widget Gamma'));
 
-    // Countdown, minutes granularity. Job 3 (past end_date, "done") prints
-    // "Done" twice: the blueprint cell's success-tone badge, and the Ends-in
-    // cell text itself — both in success tone.
     const doneTexts = screen.getAllByText('Done');
     expect(doneTexts).toHaveLength(2);
     doneTexts.forEach((el) => expect(el).toHaveClass('text-success'));
     expect(screen.getByText('30m')).toBeInTheDocument();
     expect(screen.getByText('1h 30m')).toBeInTheDocument();
 
-    // <1h remaining ("completing soon") gets the warning-tone badge; the others don't.
-    // (#409 also added an Activity/Status filter menu above the list, hence scoping.)
     expect(jobList.getByText('Completing soon')).toBeInTheDocument();
 
-    // Job 3 (Widget Alpha, done) carries the success tint; job 2 (Widget
-    // Beta, completing soon) carries the warning tint; job 1 (Widget Gamma,
-    // 90m out) carries neither.
     expect(screen.getByText('Widget Alpha').closest('tr')).toHaveClass('bg-success/10');
     expect(screen.getByText('Widget Beta').closest('tr')).toHaveClass('bg-warning/10');
     const gammaRow = screen.getByText('Widget Gamma').closest('tr');
     expect(gammaRow).not.toHaveClass('bg-warning/10');
     expect(gammaRow).not.toHaveClass('bg-success/10');
 
-    // Progress bars: past job at 100%, 30m-of-60m window at 50%, 30m-of-120m window at 25%.
     const bars = screen.getAllByRole('progressbar');
     expect(bars.map((b) => b.getAttribute('aria-valuenow'))).toEqual(['100', '50', '25']);
 
-    // Track sits in the Panel's bg-panel/85 content area, so its fill backdrop
-    // must be one layering step up (bg-panel-2), not the panel's own bg-panel (#828).
     bars.forEach((bar) => {
       expect(bar).toHaveClass('bg-panel-2');
       expect(bar).not.toHaveClass('bg-panel');
     });
 
-    // Absolute end date exposed via dateTime (ISO, TZ-stable) in Ends (EVE).
-    // Scoped to the job list: the panel header's DataAgeBadge also renders a <time>.
     const timeEls = container.querySelectorAll('tbody time');
     expect(Array.from(timeEls).map((el) => el.getAttribute('dateTime'))).toEqual([
       new Date(NOW.getTime() - 10 * 60_000).toISOString(),
@@ -212,7 +176,6 @@ describe('ActiveJobsPanel: rendering', () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     vi.setSystemTime(NOW);
 
-    // Same fixture as the sorting test: 2 running (30m, 90m left), 1 done.
     server.use(
       http.get(jobsUrl(), () =>
         HttpResponse.json([
@@ -264,12 +227,10 @@ describe('ActiveJobsPanel: rendering', () => {
     const caret = await screen.findByRole('button', { name: 'Show job list' });
     expect(caret).toHaveAttribute('aria-expanded', 'false');
 
-    // Soonest unfinished job is job 2 (30m left); job 3 is done, excluded from "next".
     expect(screen.getByText('2 running · 1 done')).toBeInTheDocument();
     expect(screen.getByText('Widget Beta finishes in 30m')).toBeInTheDocument();
     expect(screen.queryByRole('table')).toBeNull();
 
-    // The table menu/Refresh live in the accordion body, not the title bar.
     expect(screen.queryByRole('button', { name: 'Refresh' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Export Jobs' })).toBeNull();
     await userEvent.setup({ advanceTimers: vi.advanceTimersByTime }).click(caret);
@@ -286,12 +247,9 @@ describe('ActiveJobsPanel: rendering', () => {
         </FakeItemActions>
       </MemoryRouter>
     );
-    // The whole point: an idle panel is its own header line, not a card that
-    // stands taller than the same panel with jobs running in it.
     expect(await screen.findByText('None')).toBeInTheDocument();
     expect(screen.queryByText('Job data not loaded yet')).toBeNull();
     expect(screen.queryByRole('table')).toBeNull();
-    // Still a working title line: the age badge and the refresh button stay.
     expect(screen.getByRole('button', { name: 'Refresh' })).toBeInTheDocument();
   });
 
@@ -309,7 +267,6 @@ describe('ActiveJobsPanel: rendering', () => {
 });
 
 describe('ActiveJobsPanel: 403 (missing scope) surfaces a distinct re-login state', () => {
-  // Named, and with no stored grant, so the banner names the missing Permission.
   beforeEach(async () => {
     await db.characters.put({
       characterId: CHAR_ID,
@@ -461,7 +418,6 @@ describe('ActiveJobsPanel: offline cache fallback', () => {
 
     await expandJobs(user);
 
-    // Initial load falls back to cache too, but this is the generic banner, not "Refresh failed".
     expect(await screen.findByText('Showing cached data')).toBeInTheDocument();
     expect(screen.queryByText(/refresh failed/i)).toBeNull();
 
@@ -534,8 +490,6 @@ describe('ActiveJobsPanel: filters (#409)', () => {
     await expandJobs(user);
     expect(screen.getByText('Widget Gamma')).toBeInTheDocument();
 
-    // Scoped: the "Activity" name also belongs to the table's sortable
-    // Activity column header.
     const filterGroup = screen.getByRole('group', { name: 'Filter jobs' });
     await user.click(within(filterGroup).getByRole('button', { name: 'Activity' }));
     await user.click(screen.getByRole('menuitemcheckbox', { name: 'Manufacturing' }));
@@ -637,8 +591,6 @@ describe('ActiveJobsPanel: filters (#409)', () => {
   });
 
   describe('a filter that hides every job stays clearable (#1477)', () => {
-    // Pinned clock: every job here ends hours out, so none reads as done or
-    // completing soon and the Status menu stays out of the way.
     beforeEach(() => {
       vi.useFakeTimers({ shouldAdvanceTime: true });
       vi.setSystemTime(NOW);
@@ -745,8 +697,6 @@ describe('ActiveJobsPanel: filters (#409)', () => {
         '/industry/plans?jobs.activity=11&jobs.status=done&jobs.chars=current&highlight=1&tab=keep'
       );
 
-      // No expand click: `?highlight=` naming a listed job opens the panel
-      // itself (issue #2302), or the pulse would land inside a folded list.
       expect(await screen.findByText('No jobs match these filters')).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Hide job list' })).toBeInTheDocument();
       await user.click(screen.getByRole('button', { name: 'Reset filters' }));
@@ -758,7 +708,6 @@ describe('ActiveJobsPanel: filters (#409)', () => {
       expect(params.has('jobs.activity')).toBe(false);
       expect(params.has('jobs.status')).toBe(false);
       expect(params.get('tab')).toBe('keep');
-      // The character picker's own param group and the job highlight both survive.
       expect(params.get('jobs.chars')).toBe('current');
       expect(screen.getByText('Widget Alpha').closest('tr')).toHaveClass('row-pulse');
     });
@@ -818,7 +767,6 @@ describe('ActiveJobsPanel: Log production from job (#1787)', () => {
     };
   }
 
-  /** Captures the router's current location so a test can assert where "Log production" navigated. */
   function LocationProbe({
     onLocation,
   }: {
@@ -848,9 +796,6 @@ describe('ActiveJobsPanel: Log production from job (#1787)', () => {
   const realSetActiveCharacter = useActiveCharacter.getState().setActiveCharacter;
 
   afterEach(() => {
-    // The cross-character test switches these globals (and gates the store's
-    // setter); reset so later describe blocks in this file see the usual
-    // single-character defaults.
     useActiveCharacter.setState({
       activeCharacterId: null,
       hydrated: false,
@@ -994,8 +939,6 @@ describe('ActiveJobsPanel: Log production from job (#1787)', () => {
     const targetPlan = plan({ id: 'plan-b-owned', characterId: CHAR_B });
     await db.buildPlans.add(targetPlan);
 
-    // Hold the character switch open so the test can prove navigation waits
-    // for it, rather than inferring order from timing.
     let releaseSwitch!: () => void;
     const switchGate = new Promise<void>((resolve) => {
       releaseSwitch = resolve;
@@ -1015,14 +958,9 @@ describe('ActiveJobsPanel: Log production from job (#1787)', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Log production' }));
 
     await waitFor(() => expect(gatedSetActiveCharacter).toHaveBeenCalledWith(CHAR_B));
-    // waitFor drains a macrotask before it returns, so any router transition
-    // has landed: with the switch still pending, nothing may have navigated yet.
     expect(location?.pathname).toBe('/');
 
     releaseSwitch();
-    // Wait on the location itself, not the store: MemoryRouter applies a
-    // navigate() inside React.startTransition, so useLocation() lags the
-    // store's activeCharacterId flip by at least one scheduler task.
     await waitFor(() => expect(location?.pathname).toBe('/industry/plans/plan-b-owned'));
     expect(useActiveCharacter.getState().activeCharacterId).toBe(CHAR_B);
   });
@@ -1075,17 +1013,13 @@ describe('ActiveJobsPanel: table columns', () => {
 
     await expandJobs(user);
 
-    // Every table column, header and value.
     for (const header of ['Blueprint', 'Activity', 'Runs', 'Progress', 'Ends in', 'Ends (EVE)']) {
       expect(screen.getByRole('columnheader', { name: header })).toBeInTheDocument();
     }
     const rows = within(container.querySelector('tbody')!).getAllByRole('row');
     expect(within(rows[0]).getByText('250')).toBeInTheDocument();
-    // Absolute end time as a machine-readable <time>, one per row.
     expect(container.querySelectorAll('tbody time')).toHaveLength(2);
 
-    // Default sort is soonest-ending; Runs is numeric so a first click is high to low
-    // (the same Alpha first), and a second click, ascending, flips the pair.
     expect(within(rows[0]).getByText('Widget Alpha')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Runs' }));
     await user.click(screen.getByRole('button', { name: 'Runs' }));
@@ -1201,8 +1135,6 @@ describe('ActiveJobsPanel: cross-character view (issue #607)', () => {
       </MemoryRouter>
     );
 
-    // Awaiting the fold toggle first proves the panel is fully loaded, so the
-    // filter's absence is the gate rather than a not-rendered-yet race.
     expect(await screen.findByRole('button', { name: 'Show job list' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'This character' })).toBeNull();
   });
@@ -1279,7 +1211,6 @@ describe('ActiveJobsPanel: cross-character view (issue #607)', () => {
       ownerHash: 'oh3',
       addedAt: 3,
     });
-    // CHAR_C deliberately gets no token at all — never granted the scope.
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
 
     render(
@@ -1295,15 +1226,11 @@ describe('ActiveJobsPanel: cross-character view (issue #607)', () => {
     await user.click(await screen.findByRole('menuitemradio', { name: 'All characters · 3' }));
     await expandJobs(user);
 
-    // All three selected: Pilot Three's skipped notice shows.
     const skipped = (await screen.findByText(/Pilot Three —/)).closest('p')!;
     expect(
       within(skipped).getByRole('link', { name: 'Grant missing Permissions' })
     ).toHaveAttribute('href', '/settings/permissions?grant=industry');
 
-    // Narrow the filter back to "This character" — the notice list must
-    // follow the same filter the job rows do (issue #607 CodeRabbit review),
-    // not just keep listing every skipped Character regardless.
     await user.click(screen.getByRole('button', { name: 'All characters · 3' }));
     await user.click(screen.getByRole('menuitemradio', { name: 'This character' }));
 
@@ -1339,7 +1266,6 @@ describe('ActiveJobsPanel: cross-character view (issue #607)', () => {
     await user.click(await screen.findByRole('button', { name: 'This character' }));
     await user.click(await screen.findByRole('menuitemradio', { name: 'All characters · 2' }));
 
-    // Pilot Two's grant holds the jobs scope, so EVE refused it: a re-login.
     expect(await screen.findByText('Pilot Two: log in again')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Log in' }));
     expect(beginEveLogin).toHaveBeenCalledWith({ characterId: CHAR_B, groups: ['industry'] });
@@ -1349,9 +1275,6 @@ describe('ActiveJobsPanel: cross-character view (issue #607)', () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     vi.setSystemTime(NOW);
     await seedSecondCharacter();
-    // The per-character ESI reads are already caught inside
-    // `loadAllCharactersIndustryJobs`; only its own Dexie reads can reject it,
-    // so that is what this breaks.
     vi.spyOn(db.tokens, 'bulkGet').mockRejectedValue(new Error('IndexedDB unavailable'));
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
 
@@ -1367,8 +1290,6 @@ describe('ActiveJobsPanel: cross-character view (issue #607)', () => {
     await user.click(await screen.findByRole('button', { name: 'This character' }));
     await user.click(await screen.findByRole('menuitemradio', { name: 'All characters · 2' }));
 
-    // "No data cached", not "None" — a failed read must not read as an answer
-    // of zero running jobs.
     expect(await screen.findByText('Job data not loaded yet')).toBeInTheDocument();
     expect(screen.queryByRole('status', { name: 'Loading' })).not.toBeInTheDocument();
     expect(screen.queryByText('None')).not.toBeInTheDocument();
@@ -1378,7 +1299,6 @@ describe('ActiveJobsPanel: cross-character view (issue #607)', () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     vi.setSystemTime(NOW);
     await seedSecondCharacter();
-    // Pilot One: Mass Production III -> 1 + 3 = 4 max, 1 running (seeded job) -> 3 open.
     server.use(
       http.get(skillsUrl(CHAR_ID), () =>
         HttpResponse.json({
@@ -1393,7 +1313,6 @@ describe('ActiveJobsPanel: cross-character view (issue #607)', () => {
           total_sp: 1,
         })
       ),
-      // Pilot Two: Mass Production I -> 1 + 1 = 2 max, 1 running (seeded job) -> 1 open.
       http.get(skillsUrl(CHAR_B), () =>
         HttpResponse.json({
           skills: [
@@ -1419,7 +1338,6 @@ describe('ActiveJobsPanel: cross-character view (issue #607)', () => {
       </MemoryRouter>
     );
 
-    // Solo: only Pilot One counts (3 open manufacturing).
     await screen.findByRole('button', { name: 'This character' });
     await waitFor(() => {
       expect(container.querySelector('.cursor-help')!.textContent).toBe('Free slots3/1/1');
@@ -1428,8 +1346,6 @@ describe('ActiveJobsPanel: cross-character view (issue #607)', () => {
     await user.click(screen.getByRole('button', { name: 'This character' }));
     await user.click(await screen.findByRole('menuitemradio', { name: 'All characters · 2' }));
 
-    // Both: 4+2=6 max, 2 running -> 4 open. Science/reaction stay at the
-    // untrained 1/1 for both characters (base slot only), summed to 2/2.
     await waitFor(() => {
       expect(container.querySelector('.cursor-help')!.textContent).toBe('Free slots4/2/2');
     });
@@ -1468,9 +1384,6 @@ describe('ActiveJobsPanel: open job-slot header (issue #679)', () => {
   it('shows per-category open counts with per-category tone, and the used/max breakdown on the tooltip', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     vi.setSystemTime(NOW);
-    // Manufacturing: Mass Production III -> 1+3=4 max, 3 running -> 1 open (25% open, plain).
-    // Science: no skill -> 1 max, 0 running -> 1 open (fully idle, danger).
-    // Reaction: Mass Reactions I -> 1+1=2 max, 1 running -> 1 open (50% open, warning).
     server.use(
       http.get(skillsUrl(CHAR_ID), () => HttpResponse.json(skillsResponse({ 3387: 3, 45748: 1 }))),
       http.get(jobsUrl(), () => HttpResponse.json([job(1, 1), job(1, 2), job(1, 3), job(11, 4)]))
@@ -1486,7 +1399,6 @@ describe('ActiveJobsPanel: open job-slot header (issue #679)', () => {
 
     await screen.findByRole('button', { name: 'Show job list' });
     const summaryEls = await screen.findAllByText('1');
-    // Exactly manufacturing/science/reaction, in that order — proven by tone.
     expect(summaryEls).toHaveLength(3);
     expect(summaryEls[0]).toHaveClass('text-text');
     expect(summaryEls[1]).toHaveClass('text-danger');
@@ -1495,8 +1407,6 @@ describe('ActiveJobsPanel: open job-slot header (issue #679)', () => {
     const summaryTrigger = container.querySelector('.cursor-help')!;
     expect(summaryTrigger.textContent).toBe('Free slots1/1/1');
     fireEvent.focus(summaryTrigger);
-    // Numerator is jobs *used* (max - open), not open — 3 running of 4
-    // manufacturing, 0 of 1 science, 1 of 2 reaction.
     expect(screen.getByRole('tooltip')).toHaveTextContent('Mfg 3/4 · Sci 0/1 · Rxn 1/2');
   });
 
@@ -1574,7 +1484,6 @@ describe('ActiveJobsPanel: corp jobs by installer (issue #2302)', () => {
       ownerHash: 'oh1',
       addedAt: 1,
     });
-    // The pilot from the report: no personal jobs at all.
     server.use(http.get(jobsUrl(), () => HttpResponse.json([])));
   });
 
@@ -1586,7 +1495,6 @@ describe('ActiveJobsPanel: corp jobs by installer (issue #2302)', () => {
     await expandJobs();
     const row = screen.getByText('Widget Gamma').closest('tr')!;
     expect(within(row).getByText('Corp')).toBeInTheDocument();
-    // The corpmate's job is theirs, not this pilot's.
     expect(screen.getAllByRole('row')).toHaveLength(2);
   });
 
@@ -1696,7 +1604,6 @@ describe('ActiveJobsPanel: Job History (#2866)', () => {
 
     const zero = await screen.findByText('0 of 5 succeeded');
     expect(zero).not.toHaveClass('text-danger');
-    // Job 8 (no count from ESI) and job 9 (manufacturing) show plain runs.
     expect(screen.getAllByText(/of \d+ succeeded/)).toHaveLength(1);
   });
 

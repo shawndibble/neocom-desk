@@ -1,7 +1,3 @@
-/**
- * The detail lines under an Improve row's swap: the other stats it changes,
- * what it gives up, and what it costs.
- */
 import type { ReactNode } from 'react';
 import type { TFunction } from 'i18next';
 import { IskAmount, StatChangeList } from '@/components/ui';
@@ -16,10 +12,8 @@ import {
   type StatChange as StatChangeValue,
 } from '@/engine/fittings/variationDelta';
 
-/** How many stat changes a row spells out before counting the rest. */
 const CHANGES_SHOWN = 4;
 
-/** The swap's other changes, what the row prints first; the CPU, powergrid and calibration it takes after. */
 function otherChanges(
   option: ImproveOption | RejectedOption,
   own: FittingStats,
@@ -30,7 +24,6 @@ function otherChanges(
     .sort((a, b) => Number(isResource(a.key)) - Number(isResource(b.key)));
 }
 
-/** The stats `changeLine` prints as rows (not those behind "N other stats"), so Gives up need not repeat them. */
 export function shownChangeKeys(
   option: ImproveOption | RejectedOption,
   own: FittingStats,
@@ -42,7 +35,6 @@ export function shownChangeKeys(
     .map((change) => change.key);
 }
 
-/** The swap's other changes; `onOpen` makes the "N other stats" tail a button that spells them out. */
 export function changeLine(
   t: TFunction,
   option: ImproveOption | RejectedOption,
@@ -50,17 +42,14 @@ export function changeLine(
   all = false,
   onOpen?: () => void,
   omit: readonly string[] = [],
-  /** The goal's own stat changes, listed first in the same columns. */
   leading: readonly StatChangeValue[] = []
 ): ReactNode {
   const changes = otherChanges(option, own, omit);
-  // Role figures it raises (reach, remote repair, bursts…); one it cuts is under Gives up.
   const roleGains = roleSwapChanges(own, option.after).filter(
     (change) => !omit.includes(change.key) && changeVerdict(change) === 'better'
   );
   if (changes.length === 0 && leading.length === 0 && roleGains.length === 0)
     return t('fittings.variations.noChanges');
-  // One stat per row, so a long list reads down instead of running on as a sentence.
   const shown = changes.slice(0, all ? undefined : CHANGES_SHOWN);
   const rest = changes.length - shown.length;
   const label = rest > 0 ? t('fittings.makeItFit.otherStats', { count: rest }) : null;
@@ -87,12 +76,10 @@ export function changeLine(
   );
 }
 
-/** What the swap gives up that the rows above do not already show (`shown`): nothing left, nothing to say. */
 export function unshownLosses(option: ImproveOption, shown: readonly string[]) {
   return option.lost.filter((lost) => lost.kind !== 'stat' || !shown.includes(lost.change.key));
 }
 
-/** Each stat the swap makes worse that the rows above do not show, with its before → after, so the loss has a size: one per row. */
 export function lostLine(
   t: TFunction,
   option: ImproveOption,
@@ -117,7 +104,6 @@ export function lostLine(
   );
 }
 
-/** What the swap costs or saves. */
 export function iskLine(t: TFunction, option: ImproveOption): ReactNode {
   if (option.iskDelta === null)
     return <span className="text-text-dim">{t('fittings.improve.noPrice')}</span>;

@@ -1,13 +1,3 @@
-/**
- * "Where they kill" on a pilot's profile (Pilot Lookup and Show Info's
- * Character tab): kills in the last 30 days by kind of space and how long ago
- * the latest was, under six months of kills by space. The chart is always open
- * (it is the point of the section), and its card carries the counts. The
- * hulls they fly and kill (`PilotShips`) and their latest kills are the
- * sections below it. Kills only: a loss says little about how dangerous a
- * pilot is. The profile's Threat verdict (`PilotThreatBand`) is read from the
- * same kills.
- */
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -31,7 +21,6 @@ import { PilotStandingTag } from './PilotStandingTag';
 import { SPACE_BAR, SPACE_RULE, SPACE_TEXT } from './pilotListStyles';
 import { usePilotKillHistory, type PilotKillHistoryState } from './usePilotKillHistory';
 
-/** `2026-05` -> "May", read in UTC like the buckets. */
 function monthName(key: string, locale: string): string {
   const [year, month] = key.split('-').map(Number);
   return new Date(Date.UTC(year, month - 1, 1)).toLocaleString(locale, {
@@ -40,11 +29,6 @@ function monthName(key: string, locale: string): string {
   });
 }
 
-/**
- * The self-fetching form, for a caller with no other use for the kills.
- * `PilotProfileView` fetches once itself (the verdict reads the same kills)
- * and draws `PilotKillActivityView` directly.
- */
 export function PilotKillActivity({ characterId }: { characterId: number }) {
   const { history, retry } = usePilotKillHistory(characterId);
   return <PilotKillActivityView history={history} onRetry={retry} />;
@@ -57,7 +41,6 @@ export function PilotKillActivityView({
 }: {
   history: PilotKillHistoryState;
   onRetry: () => void;
-  /** zKillboard's other reads failed: an empty list here is unknown, not "no kills". */
   unknown?: boolean;
 }) {
   const { t, i18n } = useTranslation();
@@ -250,12 +233,6 @@ export function PilotKillActivityView({
   );
 }
 
-/**
- * Where this pilot sits on the active Character's contact list (their own
- * contact, else their corporation's, else their alliance's), or that they are
- * in the Character's own corporation or alliance. Silent without a Character
- * or the contacts scope: no line is better than a wrong one.
- */
 export function PilotStandingLine({
   characterId,
   corporationId,

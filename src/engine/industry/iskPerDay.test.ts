@@ -5,7 +5,6 @@ const DAY = 86_400;
 
 describe('iskPerDay', () => {
   it('is build-capped when the market can absorb more than one slot builds', () => {
-    // 1 unit/hour = 24/day; market sells 1000/day x 10% = 100/day.
     expect(
       iskPerDay({
         unitMargin: 1000,
@@ -18,7 +17,6 @@ describe('iskPerDay', () => {
   });
 
   it('is volume-capped when the market absorbs fewer than one slot builds', () => {
-    // 24 built/day, but 30/day x 10% = 3 sellable.
     expect(
       iskPerDay({
         unitMargin: 1000,
@@ -40,7 +38,6 @@ describe('iskPerDay', () => {
   });
 
   it('multiplies by units a job yields', () => {
-    // 100 units per 1-day job, plenty of volume.
     expect(
       iskPerDay({
         unitMargin: 10,

@@ -1,9 +1,3 @@
-/**
- * What an officer does to a Miner's account (decision 20261120-235011): record a payment by
- * hand, move one to another Miner, place an ambiguous donation, write a leaver's debt off, answer
- * a dispute and a declaration. Each goes through the real callable, and the test reads the
- * account the book then shows.
- */
 import type { Page } from '@playwright/test';
 import { expect, minerUrl, openMiner, signInAsOfficer, test } from './support/taxBook/bookTest';
 import { officerBook } from './support/taxBook/bookScenarios';
@@ -20,7 +14,6 @@ test.beforeEach(async ({ book: emulator }) => {
 const owed = (page: Page, amount: number) =>
   expect(page.getByRole('main')).toContainText(`Owed${isk(amount)}`);
 
-/** A Needs you card on the Overview, by the words of its title. */
 const card = (page: Page, title: string | RegExp) =>
   page
     .getByRole('region', { name: /Needs you/ })
@@ -28,10 +21,6 @@ const card = (page: Page, title: string | RegExp) =>
     .getByRole('listitem')
     .filter({ hasText: title });
 
-/**
- * Opens a Miner's page through the app (the Moons nav's Miners, then their row): the book this
- * tab already holds is read again, without a reload of the whole app.
- */
 async function openMinerInApp(page: Page, name: string) {
   await page.getByRole('list', { name: 'Moons' }).getByRole('link', { name: 'Miners' }).click();
   await page
@@ -41,7 +30,6 @@ async function openMinerInApp(page: Page, name: string) {
   await expect(page.getByRole('heading', { level: 1, name })).toBeVisible();
 }
 
-/** The officer's words, in the book's Activity log (the page header's Activity panel). */
 async function expectInActivity(page: Page, words: string) {
   await page.getByRole('button', { name: 'Activity', exact: true }).click();
   await expect(page.getByRole('dialog', { name: 'Activity' })).toContainText(words);
@@ -67,7 +55,6 @@ test('recording a transfer the book already holds is refused', async ({ page }) 
   await openMiner(page, book.id('fen'), MINER.fen.name);
   await page.getByRole('button', { name: 'Record payment' }).click();
   const dialog = page.getByRole('dialog', { name: `Record a payment for ${MINER.fen.name}` });
-  // The same sender and amount as yesterday's donation, dated today: the same transfer.
   await dialog.getByRole('textbox', { name: 'Amount' }).fill(String(book.fen.donation));
   await dialog.getByRole('button', { name: `Record ${isk(book.fen.donation)}` }).click();
   await expect(dialog).toContainText('That transfer is already in the book');
@@ -83,11 +70,6 @@ async function openMovePayment(page: Page) {
   return page.getByRole('dialog', { name: 'Move a payment' });
 }
 
-// The Miner page reads only that Miner, so the picker reads the book's Miners itself
-// (`useBookMiners`): the groupings and the accounts an officer's visit to the whole book
-// recorded. That visit comes first, as it would in use. Moving
-// the payment drops Bram's recorded paid-through on the server (decision 20261121-093000), so his
-// days are owed again.
 test('an officer moves a payment to another Miner', async ({ page }) => {
   await signInAsOfficer(page, './corp/moons/miners');
   await expect(page.getByRole('row', { name: new RegExp(MINER.cora.name) })).toBeVisible();
@@ -97,7 +79,6 @@ test('an officer moves a payment to another Miner', async ({ page }) => {
       return account !== null;
     })
     .toBe(true);
-  // Straight to Bram's page, as a link would: the book is read for him alone.
   await page.goto(minerUrl(book.id('bram')));
   await expect(page.getByRole('table', { name: 'Ledger', exact: true })).toBeVisible();
   await page.getByRole('button', { name: /^More actions for .* Payment$/ }).click();
@@ -112,9 +93,6 @@ test('an officer moves a payment to another Miner', async ({ page }) => {
   await owed(page, book.cora.owed - book.bram.paid);
 });
 
-// The server re-checks roles live for `reassignPayment` (its token goes with it,
-// LIVE_CHECK_ACTION_NAMES) and drops the Miner's recorded paid-through, so the days the payment
-// paid are owed again.
 test('an officer takes a payment off a Miner, and it waits in Needs you', async ({ page }) => {
   const dialog = await openMovePayment(page);
   await dialog.getByRole('button', { name: 'No Miner' }).click();
@@ -174,7 +152,6 @@ test('a disputed day is held: payments skip it and pay the next days', async ({ 
   ).toContainText(`${isk(DAY_TAX)} is held until`);
 
   await openMinerInApp(page, MINER.dax.name);
-  // His 2,000,000 paid the days either side; the held day is the one left.
   const ledger = page.getByRole('table', { name: 'Ledger', exact: true });
   await ledger.getByRole('row', { name: /Payment from/ }).click();
   await expect(ledger).toContainText(
@@ -189,7 +166,6 @@ test('a disputed day is held: payments skip it and pay the next days', async ({ 
   await expect(owedDays).toContainText(shortDay(book.dax.heldBack));
 });
 
-// The held day says it is held, with its dispute, in Owed days and under the ledger, as Needs you does.
 test("the Miner page says a disputed day is held, not that it isn't billable yet", async ({
   page,
 }) => {
@@ -264,8 +240,6 @@ test('keeping the bill on a declaration records the reason the Miner reads', asy
   await expectInActivity(page, 'No contract from Ada reached the CEO');
 });
 
-// An officer's answer names only the declaration or the dispute: the Miner's Activity counts
-// those too (`isMinerAuditEntry`).
 test("the officer's answer to a declaration is on the Miner's own activity", async ({ page }) => {
   await openNeedsYou(page);
   await card(page, `${MINER.ada.name} says they paid`)

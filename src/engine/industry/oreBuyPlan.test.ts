@@ -66,7 +66,6 @@ describe('planOreBuy', () => {
       ores: [multi],
       ordering: 'cost',
     });
-    // 10 batches: 750 trit, 450 pyer.
     expect(route.purchases).toEqual([expect.objectContaining({ typeId: 3, batches: 10 })]);
     expect(route.leftovers).toEqual({ [TRIT]: 150 });
   });
@@ -86,8 +85,6 @@ describe('planOreBuy', () => {
   });
 
   it('repair pass drops a batch the later picks made redundant', () => {
-    // Multi is bought first for Pyerite; Veldspar then covers all trit, so
-    // Multi's extra batches that only served trit are trimmed.
     const route = planOreBuy({
       needs: { [TRIT]: 1000, [PYER]: 90 },
       ores: [heavyCheap, multi],
@@ -96,7 +93,6 @@ describe('planOreBuy', () => {
     expect(route.uncovered).toEqual([]);
     const total = route.refined[TRIT]!;
     expect(total).toBeGreaterThanOrEqual(1000);
-    // Removing any one batch of any purchase breaks coverage.
     for (const p of route.purchases) {
       const ore = [heavyCheap, multi].find((o) => o.typeId === p.typeId)!;
       const lost = refinedOf(ore, p.units).reduce<Record<number, number>>(
@@ -165,7 +161,6 @@ describe('compareOreRoute', () => {
       mineralsTotal: 10_000,
       mineralBuyPrices: { [TRIT]: 4 },
     });
-    // ore 10 batches * 600 = 6000; leftover 150 * 4 = 600.
     expect(c.oreCost).toBe(6000);
     expect(c.leftoverValue).toBe(600);
     expect(c.oreNet).toBe(5400);

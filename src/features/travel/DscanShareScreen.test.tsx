@@ -23,11 +23,9 @@ import { PilotListView } from './PilotListView';
 const SCAN =
   '626\tA\tVexor\t1 km\n626\tB\tVexor\t2 km\n23773\tC\tRagnarok\t3 AU\n1\tD\tDrone\t1 km';
 
-// The answer, Worth and Since-last-scan are read, market and device state, not the scan itself.
 const ROLE_SECTIONS =
   'section[aria-label]:not([data-testid="dscan-answer"]):not([aria-label^="Worth on the scan"]):not([aria-label^="Since your last scan"])';
 
-/** The roles sit in the collapsed Full scan. */
 async function openFullScan() {
   await userEvent.click(await screen.findByRole('button', { name: /^Full scan/ }));
 }

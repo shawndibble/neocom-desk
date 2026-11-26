@@ -33,14 +33,6 @@ import { ProfitCell, RunsCell, VerdictTag } from './BuildPlanCells';
 import { DROP_INTO_CLASS, DROP_OUT_CLASS } from './buildPlanDnd';
 import { planHref } from './planLinkClick';
 
-/**
- * The inline rename both a plan row and a group header use: commit on Enter or
- * blur, abandon on Escape, and never store a blank name.
- *
- * Rendered only while renaming, so it re-reads `value` on each open and needs
- * no reset path of its own — which is what the two hand-rolled copies of this
- * were spending their `else setDraftName(...)` branch on.
- */
 export function RenameField({
   value,
   label,
@@ -52,7 +44,6 @@ export function RenameField({
   onRename: (name: string) => void;
   onDone: () => void;
 }) {
-  // Mounted only while renaming: the parent's `onDone` unmounts it.
   const { inputProps } = useInPlaceEdit({
     open: true,
     initial: () => value,
@@ -74,12 +65,9 @@ type PlanRowProps = {
   onToggleCompareSelected: (id: string) => void;
   groups: readonly BuildGroup[];
   onMovePlan: (planId: string, groupId: string | null) => void;
-  /** What a drop on this row would do right now, or null when it would do nothing — see `dropTarget` in the list. */
   dropKind: 'into' | 'out' | null;
-  /** Set on a row sitting under its group's header, to step it in from the ungrouped ones. */
   indented?: boolean;
   stats: PlanIndexStats | undefined;
-  /** Where the job runs, shown under the name only when another plan shares that name. */
   locationHint?: string;
   onSelect: (id: string) => void;
   onDuplicate: (id: string) => void;
@@ -106,17 +94,10 @@ export const PlanRow = memo(function PlanRow({
 }: PlanRowProps) {
   const { t } = useTranslation();
   const [renaming, setRenaming] = useState(false);
-  // The whole row opens the plan; a hold that became the row menu must not.
   const guard = useLiftAfterHoldGuard();
-  // One id for both roles, the way `useSortable` registers its own: a row is
-  // the thing being dragged *and* a target meaning "into whatever group this
-  // row is in", which is how an expanded group's body accepts a drop rather
-  // than only its header.
   const dropId = planDropId(plan.id);
   const { setNodeRef: setDropRef } = useDroppable({ id: dropId });
   const { setNodeRef: setDragRef, listeners, isDragging } = useDraggable({ id: dropId });
-  // A drag released over its own row still ends in a click on that row; it
-  // is the drop's, not an open. Stays set until the click has come and gone.
   const dragged = useRef(false);
   useEffect(() => {
     if (isDragging) {
@@ -129,8 +110,6 @@ export const PlanRow = memo(function PlanRow({
     return () => clearTimeout(timer);
   }, [isDragging]);
 
-  // After the menu has closed: its focus hand-back would blur the new field
-  // and cancel the rename straight away.
   const startRename = () => setTimeout(() => setRenaming(true), 0);
   const items = (
     <>
@@ -189,32 +168,7 @@ export const PlanRow = memo(function PlanRow({
         }`}
       >
         <RowTappableContext.Provider value>
-          {/* No groups yet means every drop is a no-op, and a grab cursor on a row
-          nothing will accept is a lie — so the handle appears with the first
-          group. The list still renders inside a DndContext either way, which
-          keeps the hooks above unconditional.
-
-          Deliberately not focusable and hidden from assistive tech. Keyboard
-          dragging here would step the row a flat 25px per arrow press —
-          `sortableKeyboardCoordinates` needs a sort order this list does not
-          have — and announce raw droppable ids. The row's `ContextMenu` (name
-          button, opens on right-click/long-press or the keyboard's Shift+F10 /
-          Menu key) has a "Move to group" submenu that reaches every
-          destination this handle does, which is the pointer alternative that
-          matters (WCAG 2.5.7).
-
-          No tooltip or `title`: either would put it back in the accessibility
-          tree this pointer-only grip is deliberately out of (the cursor is its cue).
-
-          `distance: 4` on the sensor and `touch-none` here are both load-
-          bearing, for the reasons EntryList.tsx's copy spells out (#408). */}
           {groups.length > 0 && (
-            // `size-9 md:size-7`: the same touch-tier box `IconButton size="sm"`
-            // gives `GroupHeader`'s Caret toggle. Without it this box stayed a
-            // fixed 28px while the Caret's grew to 36px below `md` (DESIGN.md
-            // §3), so the member row's deliberate nesting indent under its group
-            // (`pl-6` vs the header's `px-2` — 16px by design) shrank to 8px on a
-            // phone instead of matching desktop's own 16px.
             <button
               type="button"
               tabIndex={-1}
@@ -243,9 +197,6 @@ export const PlanRow = memo(function PlanRow({
               onDone={() => setRenaming(false)}
             />
           ) : (
-            // Name click opens the plan, double-click renames; the rest (move to
-            // group, rename, duplicate, delete) is the trailing ⋮, also the row's
-            // right-click menu.
             <span className="flex min-w-0 flex-1 flex-col">
               <button
                 type="button"
@@ -262,8 +213,6 @@ export const PlanRow = memo(function PlanRow({
               )}
             </span>
           )}
-          {/* Kept, not withheld, while the verdict is "Fix location": the figures
-          read in the dim tone with a warning glyph, never faded. */}
           <span className="w-24 shrink-0 text-right">
             <span className="sr-only">{t('industry.profitColumn')}: </span>
             {stats?.verdict === 'fixLocation' && (
@@ -300,9 +249,6 @@ export const PlanRow = memo(function PlanRow({
             <span className="sr-only">{t('industry.runsColumn')}: </span>
             <RunsCell runs={stats?.runs ?? 0} />
           </span>
-          {/* Unmounted while renaming: closing the menu hands focus back to the ⋮,
-          which would blur the rename field and cancel it. The spacer keeps
-          the stat columns where they are. */}
           {renaming ? (
             <span className="w-9 shrink-0 md:w-7" aria-hidden="true" />
           ) : (

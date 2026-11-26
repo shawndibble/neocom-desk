@@ -1,22 +1,3 @@
-/**
- * The Overview's one table: what the Table view draws, and what the Chart view
- * draws beside its chart at Large and Full.
- *
- * Single-line rows, a header in the micro style (only when a column has a
- * label), tabular numerals, numeric columns right-aligned, a severity icon
- * before the first cell of a toned row, the first column truncated, and the
- * whole row a link when it has a `to` (the trailing caret is the §6c cue), or
- * a button that opens `RowDetailModal` when it has a `detail`, or the item's Show
- * info when it has an `info`, or `TurnInDetail` when it is a campaign turn-in (`turnIn`) (the first
- * cell's accent name is the cue every way, §6c "Widget rows"). No row buttons and no other
- * chrome: the widget's title link and the row's own link or modal are the only
- * ways out. Columns are chosen by `visibleColumns` from the width budget the
- * caller passes, never from the viewport, then by `fitColumns` for a
- * `fitWidth` table. The one other way a column goes is `hideNarrow`: CSS hides
- * it while this table's own box is under 28rem (a container query, so a
- * phone's full-width widget drops it and a half-width one on a desktop does
- * too).
- */
 import { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -57,21 +38,13 @@ import {
   type RowsPerPage,
 } from './tableSortPage';
 
-/** A turn-in row's opener, with the popover's reads: loaded only when a table has one. */
 const TurnInRowTrigger = lazy(() => import('./TurnInRowTrigger'));
 
 export interface TableBodyProps {
   table: TableModel;
-  /** The width budget, which decides how many columns fit (not necessarily the widget's own size). */
   columnsFor: WidgetSize;
-  /** The most rows to draw; the rest become a "+N more" line. Ignored by a paged table. */
   rowLimit: number;
-  /**
-   * Pages a table that opted in (`table.pageable`) instead of cutting it at `rowLimit`. Left out
-   * by a caller that has no room or no stored size (the chart's side table), which keeps the cut.
-   */
   paging?: { rowsPerPage: RowsPerPage; onRowsPerPage: (rows: RowsPerPage) => void };
-  /** The table's accessible name: the widget's title. */
   ariaLabel?: string;
   className?: string;
 }
@@ -80,7 +53,6 @@ function cellText(cell: TableCell): string {
   return typeof cell === 'string' ? cell : cell.text;
 }
 
-/** A cell that already starts with a sign says which way it went without its colour. */
 const SIGNS = [String.fromCharCode(43), String.fromCharCode(45), String.fromCharCode(0x2212)];
 
 const TONE_WORD: Record<CellTone, (t: TFunction) => string> = {
@@ -91,7 +63,6 @@ const TONE_WORD: Record<CellTone, (t: TFunction) => string> = {
 
 const CELL_TONE = { good: 'text-success', caution: 'text-warning', bad: 'text-danger' } as const;
 
-/** At Small the bar is half as long: the first column keeps the width, the bar is only decoration. */
 function CellValue({ cell, compact }: { cell: TableCell; compact: boolean }) {
   if (typeof cell === 'string') return <>{cell}</>;
   if ('iskAmount' in cell) {
@@ -136,25 +107,16 @@ function cellTone(cell: TableCell): CellTone | undefined {
 }
 
 const cellPad = 'pl-3 last:pr-3';
-/** The header's share of the first column's icon slot (`size-4` plus `gap-1.5`) past `cellPad`, so a label sits over its rows' text. */
 const ICON_SLOT_INDENT = 'pl-[2.125rem] last:pr-3';
 
-/** A row whose tone draws a severity icon: only what needs a decision, a "watch" row just tints its figure. */
 function isFlagged(row: Pick<TableRowModel, 'tone'>): boolean {
   return row.tone === 'warning' || row.tone === 'critical';
 }
 
-/** Px of the `w-5` caret column a linked row adds. */
 const CARET_WIDTH = 20;
 
-/** A `hideNarrow` column is hidden until the table is 28rem across (see `TableColumn.hideNarrow`). */
 const HIDE_NARROW = 'hidden @md:table-cell';
 
-/**
- * The first column beside a `capped` column: its full text up to 60% of the table's own box
- * (container query units), the capped column taking the rest (see `TableColumn.capped`). While
- * a `hideNarrow` capped column is hidden, the first column takes the whole leftover instead.
- */
 const FIRST_BESIDE_CAPPED = 'max-w-[60cqw]';
 const FIRST_BESIDE_NARROW_CAPPED = 'w-full max-w-0 @md:w-auto @md:max-w-[60cqw]';
 
@@ -172,19 +134,13 @@ function Row({
 }: {
   row: TableRowModel;
   columns: readonly TableColumn[];
-  /** Which of `row.cells` each visible column reads. */
   indexes: readonly number[];
   caret: boolean;
   compact: boolean;
-  /** No header row: the first cell names the row for a screen reader. */
   rowHeader: boolean;
-  /** The visible column that truncates in the first one's place, when a table has one. */
   growKey: string | undefined;
-  /** The first column's cap while `growKey` is set: 10rem, or a share of the box beside a `capped` column. */
   firstCellClass: string;
-  /** Whether the first cell keeps a leading icon column (some row of the table draws an icon). */
   iconSlot: boolean;
-  /** Opens the row's detail modal or Show info; set only for a row with a `detail` or `info`. */
   onOpen?: () => void;
 }) {
   const { t } = useTranslation();
@@ -192,7 +148,6 @@ function Row({
   const flagged = isFlagged(row);
   const linked = row.to !== undefined;
   const turnIn = row.turnIn;
-  // The row is a target (row styling): it opens a modal, Show info or TurnInDetail.
   const opens = onOpen !== undefined || turnIn !== undefined;
   return (
     <tr
@@ -206,7 +161,6 @@ function Row({
         const cell = row.cells[indexes[i]];
         if (cell === undefined) return <td key={column.key} className={cellPad} />;
         const first = i === 0;
-        // Hidden trailing columns are still `:last-child`, so the last cell that shows pads itself.
         const trailingHidden =
           columns.slice(i + 1).length > 0 && columns.slice(i + 1).every((c) => c.hideNarrow);
         const text = cellText(cell);
@@ -296,7 +250,6 @@ function Row({
   );
 }
 
-/** The header cell's text: a plain label, or a button that sorts by the column. */
 function SortableLabel({
   column,
   direction,
@@ -336,7 +289,6 @@ function SortableLabel({
   );
 }
 
-/** Rows-per-page choice, a range, and paired carets (§6c's "Paired carets in IconButtons" cue). */
 function Pager({
   page,
   total,
@@ -398,39 +350,28 @@ export function TableBody({
   className,
 }: TableBodyProps) {
   const { t } = useTranslation();
-  // Only a `fitWidth` table measures; until the first measure it keeps the size-budget columns.
   const [box, setBox] = useState<HTMLDivElement | null>(null);
   const [boxWidth, setBoxWidth] = useState<number | null>(null);
   const fit = table.fitWidth === true;
-  // Observed from a layout effect, so the first measure arrives before the first paint.
   useLayoutEffect(() => {
     if (!fit || !box || typeof ResizeObserver === 'undefined') return;
     const observer = new ResizeObserver((entries) => {
       const width = entries[entries.length - 1]?.contentRect.width;
-      // Whole pixels, so a drag-resize does not re-render on every fraction.
       if (width !== undefined) setBoxWidth(Math.round(width));
     });
     observer.observe(box);
     return () => observer.disconnect();
   }, [fit, box]);
   const budgeted = visibleColumns(table.columns, columnsFor);
-  // The trailing caret column (`w-5`) takes its share of the box before any data column.
   const caretWidth = table.rows.some((row) => row.to !== undefined) ? CARET_WIDTH : 0;
   const columns = fit && boxWidth !== null ? fitColumns(budgeted, boxWidth - caretWidth) : budgeted;
   const indexes = columns.map((column) => table.columns.indexOf(column));
   const [sort, setSort] = useState<{ columnId: string; direction: 'asc' | 'desc' } | null>(null);
-  // The opened row's facts as they were on the click, so a refresh never swaps them mid-read.
   const [opened, setOpened] = useState<TableRowModel | null>(null);
-  // "+N more" opens the rest in place.
   const [expanded, setExpanded] = useState(false);
-  // Set by the expand click so the effect below moves focus once, not on every later render.
   const revealFocus = useRef(false);
   const bodyRef = useRef<HTMLTableSectionElement>(null);
-  // The page is remembered with the page size it was chosen under, so a size change
-  // starts over on page 1 without an effect to reset it.
   const [pageState, setPageState] = useState({ page: 1, perPage: paging?.rowsPerPage });
-  // A sort on a column this width has dropped is ignored, so the rows never sit in an order
-  // no visible header explains; choosing it again (wider) picks it back up.
   const activeSort = sort && columns.some((column) => column.key === sort.columnId) ? sort : null;
   const sorted = useMemo(() => {
     const index = activeSort
@@ -441,8 +382,6 @@ export function TableBody({
       : table.rows;
   }, [table, activeSort]);
 
-  // The button that revealed the rows unmounts into "Show fewer"; focus would otherwise sit on
-  // nothing, so it lands on the first revealed row.
   useEffect(() => {
     if (!expanded || !revealFocus.current) return;
     revealFocus.current = false;
@@ -453,8 +392,6 @@ export function TableBody({
     target.focus();
   }, [expanded, rowLimit]);
 
-  // A pageable table is never cut at the size's row limit; it shows everything, a page at a time
-  // once there are more rows than the smallest page.
   const pageable = table.pageable === true && paging !== undefined;
   const paged = pageable && sorted.length > ROWS_PER_PAGE_OPTIONS[0];
   const requested = pageState.perPage === paging?.rowsPerPage ? pageState.page : 1;
@@ -475,7 +412,6 @@ export function TableBody({
     );
   }
   const hasHeader = columns.some((column) => column.label !== '');
-  // A `capped` column grows like a `grow` one, but leaves the first column a larger share.
   const growColumn = columns.find((column, i) => i > 0 && (column.grow || column.capped));
   const growKey = growColumn?.key;
   const firstCellClass = !growColumn?.capped
@@ -484,7 +420,6 @@ export function TableBody({
       ? FIRST_BESIDE_NARROW_CAPPED
       : FIRST_BESIDE_CAPPED;
   const caret = shown.some((row) => row.to !== undefined);
-  // The icon column exists only while a row of the table draws an icon (all rows, so "+N more" and paging never shift it), so a table without one starts its text flush with its header.
   const iconSlot = table.rows.some(isFlagged);
   return (
     <div ref={setBox} className={cx('@container', className)}>
@@ -508,7 +443,6 @@ export function TableBody({
                         : undefined
                     }
                     className={cx(
-                      // Replaces `cellPad`, never adds to it: two `pl-*` classes would race on stylesheet order.
                       i === 0 && iconSlot ? ICON_SLOT_INDENT : cellPad,
                       column.hideNarrow && HIDE_NARROW,
                       'py-1 text-[0.6875rem] font-semibold tracking-widest whitespace-nowrap text-text-dim uppercase',

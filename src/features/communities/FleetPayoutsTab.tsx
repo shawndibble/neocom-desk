@@ -25,10 +25,8 @@ import { formatShortAge } from './requestFormat';
 import { useMyFleetShare } from './useMyFleetShare';
 import type { CommunityMember } from './communityStore';
 
-/** One array for "not loaded yet", so the roster effect does not re-run each render. */
 const NO_MEMBERS: never[] = [];
 
-/** What a listed Member sees in the status cell: their own Share only. */
 function MyShareCell({
   characterId,
   communityId,
@@ -56,11 +54,6 @@ function MyShareCell({
   );
 }
 
-/**
- * The Payouts tab body (issue #4779): the Fleet Payouts the viewer opened as
- * boss (all progress) or is listed on (their own Share only), newest first.
- * A row opens its side panel; New payout opens the compose dialog.
- */
 export function FleetPayoutsTab({
   characterId,
   communityId,
@@ -75,7 +68,6 @@ export function FleetPayoutsTab({
   communityId: string;
   myUid: string;
   members: CommunityMember[] | null;
-  /** Null until the first read lands. */
   payouts: FleetPayout[] | null;
   failed: boolean;
   now: number;
@@ -84,7 +76,6 @@ export function FleetPayoutsTab({
   const { t } = useTranslation();
   const [openId, setOpenId] = useState<string | null>(null);
   const [composing, setComposing] = useState(false);
-  // A removed payout stays hidden until its Undo toast ends and the write lands.
   const pendingRemovals = useDeferredCommits();
   const { hiddenIds } = pendingRemovals;
 

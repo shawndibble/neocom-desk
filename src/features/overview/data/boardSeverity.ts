@@ -1,15 +1,3 @@
-/**
- * How urgent each card is — one answer per domain, read twice.
- *
- * A widget wears it as a word and a glyph, and the header's Next deadline reads
- * the same ladder. Two independent judgements would drift the first time either
- * changed. It never reorders anything: where a widget sits is the pilot's
- * Overview Layout (`widgets/layout.ts`).
- *
- * `null` means "not loaded yet", and is deliberately not `clear`: a card whose
- * read has not landed printing "Clear" beside a note saying "Checking…" is
- * the same silence the old card board was rebuilt to remove.
- */
 import { worstSeverity, type DeadlineSeverity } from '@/engine/character/severity';
 import { isCompletingSoon, isJobDone } from '@/features/industry/jobs';
 import type { IndustryJob } from '@/esi/endpoints';
@@ -26,21 +14,8 @@ import type {
   SpExtractionBoardData,
 } from './boardData';
 
-/**
- * A lapsed grant is `warning`, never `clear`.
- *
- * The card cannot answer its own question, and a board that sorts an
- * unanswerable card to the bottom hides the one thing the reader could
- * actually fix — logging in again.
- */
 const UNREADABLE: DeadlineSeverity = 'warning';
 
-/**
- * Null while the snapshot is still in flight, like every other domain here.
- * An empty row list is what both "no orders" and "not fetched yet" look like,
- * and the second one answering `clear` would claim an all-clear the card has
- * not checked yet.
- */
 export function ordersSeverity(
   rows: readonly OpenOrderRow[] | null,
   needsReauth: boolean
@@ -54,7 +29,6 @@ export function ordersSeverity(
   return counts.expiringOrStale > 0 ? 'watch' : 'clear';
 }
 
-/** Unpaid tax is a routine debt, not an emergency, until it has sat this long. */
 export const MINING_TAX_WARNING_DAYS = 30;
 
 export function miningTaxSeverity(data: MiningTaxBoardData | null): DeadlineSeverity | null {
@@ -73,7 +47,6 @@ export function planetarySeverity(data: PlanetaryBoardData | null): DeadlineSeve
   return worstSeverity(data.batches.map((batch) => batch.severity));
 }
 
-/** A running job is never worse than `watch` — it is doing what it was told. Only a finished one waits on you. */
 export function jobSeverity(job: IndustryJob, nowMs: number): DeadlineSeverity {
   return isCompletingSoon(job, nowMs) ? 'watch' : 'clear';
 }
@@ -91,7 +64,6 @@ export function industrySeverity(
   return worstSeverity(severities);
 }
 
-/** A courier past its deliver-by forfeits the collateral, so it is the one `critical`; anything else due inside a day is `warning`. */
 export function contractsSeverity(data: ContractsBoardData | null): DeadlineSeverity | null {
   if (data === null) return null;
   if (data.needsReauth) return UNREADABLE;
@@ -99,36 +71,24 @@ export function contractsSeverity(data: ContractsBoardData | null): DeadlineSeve
   return data.summary.dueSoon > 0 ? 'warning' : 'clear';
 }
 
-/** How soon a Calendar widget's clock has to be before it is flagged. */
 const COMING_UP_WATCH_MS = DAY_MS;
 
-/**
- * One clock's tone on the Calendar widget: `watch` within a day (or past), `clear` beyond. A plan,
- * not a problem, so never past `watch`; Next deadline rates the same clock on the full ladder.
- */
 export function comingUpEventSeverity(atMs: number, nowMs: number): DeadlineSeverity {
   return atMs - nowMs <= COMING_UP_WATCH_MS ? 'watch' : 'clear';
 }
 
-/**
- * Spare SP is an opportunity, not a fault, so ready is `watch` at most — and
- * only when the pilot switched monitoring on. The card still shows the number
- * with monitoring off; it just never claims anything is waiting.
- */
 export function spExtractionSeverity(data: SpExtractionBoardData): DeadlineSeverity | null {
   if (data.totalSp === null) return null;
   if (!data.monitoring) return 'clear';
   return isSpExtractionReady(data.totalSp, data.thresholdSp) ? 'watch' : 'clear';
 }
 
-/** Unread mail is worth a look, never an emergency. */
 export function mailSeverity(data: MailBoardData | null): DeadlineSeverity | null {
   if (data === null) return null;
   if (data.needsReauth) return UNREADABLE;
   return data.unread > 0 ? 'watch' : 'clear';
 }
 
-/** A crossed target is what the pilot asked to be told about, so it is `warning`. */
 export function priceAlertsSeverity(data: PriceAlertsBoardData | null): DeadlineSeverity | null {
   if (data === null) return null;
   return data.alerts.some((alert) => alert.crossed) ? 'warning' : 'clear';

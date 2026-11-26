@@ -1,9 +1,3 @@
-/**
- * Pure character-grouping and sort helpers for the Overview character wall.
- * No Dexie, no fetch — storage lives in overviewGroups.ts, this module only
- * shuffles arrays. `RosterEntry` is a type-only import (roster.ts does the
- * actual Dexie/ESI reads); this module stays dependency-free.
- */
 import type { RosterEntry } from './roster';
 
 export interface CharacterGroup {
@@ -15,19 +9,6 @@ export interface CharacterGroup {
 export type CharacterSortKey = 'name' | 'skillPoints' | 'wallet' | 'group' | 'alerts';
 export type SortDirection = 'asc' | 'desc';
 
-/**
- * Flat, not nested `{value, fetchedAt}` pairs: `sortCharacterIds` indexes
- * `stats[key]` directly, and a flat shape keeps that untouched. `*FetchedAt`
- * is undefined exactly when its value is — never show a badge for a value
- * that isn't there (#483).
- *
- * `groupName`/`alertCount` are never set by `rosterSortStats` — group
- * membership lives in `overviewGroups.ts` and alert counts in
- * `alertCountsByCharacter.ts`, both outside this module's Dexie-free, no-fetch
- * scope. The caller (`Characters.tsx`) merges them in before sorting by
- * `'group'`/`'alerts'`. Left unset, both keys sink every id to the end, same
- * as any other missing value.
- */
 export interface CharacterSortStats {
   name: string;
   skillPoints?: number;
@@ -38,13 +19,6 @@ export interface CharacterSortStats {
   alertCount?: number;
 }
 
-/**
- * Roster snapshot -> the map both the sort control and the character card
- * read from — one pass over `loadRosterSnapshot()`'s result, no second fetch.
- * SP's age is the underlying `/skills` read's `fetchedAt`: `correctedTotalSp`
- * is that same row's total_sp adjusted by queue data in hand, not a fetch of
- * its own.
- */
 export function rosterSortStats(entries: readonly RosterEntry[]): Map<number, CharacterSortStats> {
   return new Map(
     entries.map((entry) => [
@@ -60,7 +34,6 @@ export function rosterSortStats(entries: readonly RosterEntry[]): Map<number, Ch
   );
 }
 
-/** Drops character ids no longer on this device. A group is kept even if emptied. */
 export function pruneGroups(
   groups: readonly CharacterGroup[],
   existingCharacterIds: ReadonlySet<number>
@@ -71,7 +44,6 @@ export function pruneGroups(
   }));
 }
 
-/** True if pruning would change anything — lets a caller skip a no-op write. */
 export function groupsNeedPruning(
   groups: readonly CharacterGroup[],
   existingCharacterIds: ReadonlySet<number>
@@ -79,7 +51,6 @@ export function groupsNeedPruning(
   return groups.some((group) => group.characterIds.some((id) => !existingCharacterIds.has(id)));
 }
 
-/** Ids claimed by no group, in their original order. */
 export function ungroupedCharacterIds(
   groups: readonly CharacterGroup[],
   allCharacterIds: readonly number[]
@@ -103,12 +74,10 @@ export function renameGroup(
   return groups.map((group) => (group.id === groupId ? { ...group, name } : group));
 }
 
-/** Removes the group; its characters become ungrouped rather than deleted. */
 export function removeGroup(groups: readonly CharacterGroup[], groupId: string): CharacterGroup[] {
   return groups.filter((group) => group.id !== groupId);
 }
 
-/** Moves a character into `groupId`, clearing it from any other group first. `null` ungroups it. */
 export function moveCharacterToGroup(
   groups: readonly CharacterGroup[],
   characterId: number,
@@ -144,10 +113,6 @@ export function reorderGroups(
   return next;
 }
 
-/**
- * Stable sort by the chosen key; a character with no value for that key sinks
- * to the end regardless of direction — mirrors DataTable's `sortValue` convention.
- */
 export function sortCharacterIds(
   ids: readonly number[],
   statsById: ReadonlyMap<number, CharacterSortStats>,

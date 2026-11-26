@@ -10,23 +10,13 @@ import { CONTRACT_STATUS_KEY, CONTRACT_TYPE_KEY } from './contractLabels';
 
 export interface ContractsCsvOptions {
   nameFor: (issuerId: number) => string;
-  /** The party a row is read relative to (for the receiver); undefined when unknown. */
   selfId?: number | ((contract: Contract) => number | undefined);
-  /** Who the contract belongs to. Omit where the view has no character owner (the corporation's), so no always-empty column. */
   characterNameFor?: (contract: Contract) => string | null;
-  /** The standing tag the table puts beside a character issuer or receiver. */
   standingFor?: (contract: Contract, id: number) => EffectiveStanding | null;
-  /** A resolved station or structure name; null while unresolved (the ID columns stay). */
   locationName?: (locationId: number) => string | null;
-  /** The buyback Quote request a contract answers (the table's Community cue), as words. */
   buybackFor?: (contract: Contract) => string | null;
 }
 
-/**
- * CSV columns for the History table, every column whichever the picker shows, plus the
- * facts it keeps in cells and cues. Dates are raw ISO; a courier's delivery deadline is its
- * own clock, distinct from the accept-by Expires; location names fill in as they resolve.
- */
 export function contractsCsvColumns(
   t: CsvTranslate,
   { nameFor, selfId, characterNameFor, standingFor, locationName, buybackFor }: ContractsCsvOptions
@@ -35,7 +25,6 @@ export function contractsCsvColumns(
     const self = typeof selfId === 'function' ? selfId(contract) : selfId;
     return self === undefined ? null : contractReceiver(contract, self);
   };
-  /** The standing tag's words for a party; only a character carries one. */
   const standingOf = (contract: Contract, party: { id: number; kind: string } | null) =>
     party?.kind === 'character' && standingFor
       ? standingLabel(t, standingFor(contract, party.id))

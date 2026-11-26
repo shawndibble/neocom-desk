@@ -24,7 +24,6 @@ const GUNNERY: EngineSkill = {
   secondary: 'willpower',
   prereqs: [],
 };
-// Needs Gunnery III, which the pilot hasn't got: a missing prerequisite.
 const SURGICAL: EngineSkill = {
   ...GUNNERY,
   typeID: 3315,
@@ -76,7 +75,6 @@ function gain(skillTypeId: number, fromLevel: number, overall: number): SkillGai
   };
 }
 
-// Every skill row by default; a test empties it to see the empty state.
 const skillGainsState = vi.hoisted(() => ({ empty: false, overBudget: false }));
 vi.mock('./useSkillGains', () => ({
   useSkillGains: () => ({
@@ -84,7 +82,6 @@ vi.mock('./useSkillGains', () => ({
       ? []
       : [
           gain(3315, 0, 0.2),
-          // Over budget, Drones' next level eats into the overage (as Drones Rigging's does on an Orca).
           skillGainsState.overBudget
             ? { ...gain(3436, 2, 0), budgetFreed: 0.3 }
             : gain(3436, 2, 0.1),
@@ -94,7 +91,6 @@ vi.mock('./useSkillGains', () => ({
     failed: false,
   }),
 }));
-// A level the ranking did not score: worked out on demand, told apart here by the level asked for.
 vi.mock('./useSkillLevelGain', () => ({
   useSkillLevelGain: (_evaluator: unknown, gain: SkillGain, level: number) => ({
     failed: false,
@@ -108,7 +104,6 @@ vi.mock('./useSkillLevelGain', () => ({
           },
   }),
 }));
-// The training that makes the fit fit: none by default.
 const skillFixesState = vi.hoisted(() => ({ fixes: null as unknown[] | null }));
 vi.mock('./useSkillFixes', () => ({
   useSkillFixes: (_evaluator: unknown, enabled: boolean) => ({
@@ -116,7 +111,6 @@ vi.mock('./useSkillFixes', () => ({
     failed: false,
   }),
 }));
-// Tech II upgrades: none by default; a test sets a row to see the section.
 const upgradeState = vi.hoisted(() => ({ rows: [] as unknown[] | null }));
 vi.mock('./useModuleUpgrades', () => ({
   useModuleUpgrades: () => ({ rows: upgradeState.rows, loading: upgradeState.rows === null }),
@@ -139,7 +133,6 @@ function railgunUpgrade() {
     roleChanges: [],
     metrics: base.metrics,
     required: [{ skillTypeID: 3315, targetLevel: 1 }],
-    // Gunnery II and III first: the prerequisites the pilot lacks.
     scheduled: [
       { skillTypeID: 3300, level: 2, seconds: 600, sp: 0, cumulativeSeconds: 600 },
       { skillTypeID: 3300, level: 3, seconds: 3000, sp: 0, cumulativeSeconds: 3600 },
@@ -183,7 +176,6 @@ function renderPanel() {
 }
 
 function rowFor(name: string) {
-  // A plan can share a skill's name, so only the skill link (`?info=skill-…`) counts.
   const cell = screen
     .getAllByRole('link', { name })
     .find((link) => link.getAttribute('href')?.includes('info=skill-'));
@@ -213,7 +205,6 @@ describe('FittingWhatToTrainPanel — Add to plan', () => {
     });
     const plans = await db.skillPlans.where('characterId').equals(CHARACTER_ID).toArray();
     expect(plans[0].name).toBe('Rifter');
-    // The plan's schedule trains the missing Gunnery II and III before it.
     expect(normalizePlan(plans[0].entries, SKILLS, trained)).toEqual([
       { skillTypeID: 3300, level: 2 },
       { skillTypeID: 3300, level: 3 },
@@ -256,7 +247,6 @@ describe('FittingWhatToTrainPanel — level picker', () => {
     await screen.findByText('Drones');
     const row = rowFor('Drones');
 
-    // Drones is trained to II: I and II are not offered.
     await user.click(await within(row).findByRole('button', { name: /level to train/i }));
     const options = (await screen.findAllByRole('menuitemradio')).map((option) =>
       option.textContent?.replace('✓', '')
@@ -264,7 +254,6 @@ describe('FittingWhatToTrainPanel — level picker', () => {
     expect(options).toEqual(['III', 'IV', 'V']);
     await user.click(screen.getByRole('menuitemradio', { name: 'V' }));
 
-    // The changes follow the level picked.
     expect(within(row).getByText('Mining yield 100 → 105 m³/h')).toBeInTheDocument();
     await user.click(within(row).getByRole('button', { name: /add to plan/i }));
     await waitFor(async () => {
@@ -291,7 +280,6 @@ describe('FittingWhatToTrainPanel — level picker', () => {
       `/skills/plans/${plan.id}`
     );
     expect(row).toHaveTextContent('III–IV in plan Drone boat');
-    // III and IV are in the plan, so the picker already sits on V.
     expect(within(row).getByRole('button', { name: /add to plan/i })).toHaveTextContent('Add V');
     await user.click(within(row).getByRole('button', { name: /level to train/i }));
     expect(await screen.findByRole('menuitemradio', { name: 'III · in plan' })).toHaveAttribute(
@@ -327,7 +315,6 @@ describe('FittingWhatToTrainPanel — level picker', () => {
     });
     expect(within(row).queryByRole('button', { name: /add to plan/i })).toBeNull();
     expect(within(row).queryByRole('combobox')).toBeNull();
-    // The other row is still offered.
     expect(
       within(rowFor('Surgical Strike')).getByRole('button', { name: /add to plan/i })
     ).toBeInTheDocument();
@@ -345,7 +332,6 @@ describe('FittingWhatToTrainPanel — level picker', () => {
       expect(found).toHaveTextContent('II–III in plan Gunnery');
       return found;
     });
-    // The skill's own link and the plan's.
     expect(within(row).getAllByRole('link', { name: 'Gunnery' })).toHaveLength(2);
   });
 });
@@ -376,7 +362,6 @@ describe('FittingWhatToTrainPanel — Skill Plan button and prerequisites', () =
     renderPanel();
     await screen.findByText('Surgical Strike');
 
-    // Only Surgical Strike misses a prerequisite (Gunnery III).
     expect(screen.getAllByRole('button', { name: /incl\. prerequisites/i })).toHaveLength(1);
     await user.click(
       await within(rowFor('Surgical Strike')).findByRole('button', {
@@ -385,10 +370,8 @@ describe('FittingWhatToTrainPanel — Skill Plan button and prerequisites', () =
     );
     const card = await screen.findByText(/^Skills needed for Surgical Strike I$/);
     const list = card.closest('div') as HTMLElement;
-    // Each row names the level it needs: the pips only show what's trained.
     expect(within(list).getByText('Gunnery III')).toBeInTheDocument();
     expect(within(list).getByText('Surgical Strike I')).toBeInTheDocument();
-    // …and the bar draws it as the levels still needed.
     expect(within(list).getByRole('img', { name: /needs 3/ })).toBeInTheDocument();
   });
 });
@@ -486,12 +469,10 @@ describe('FittingWhatToTrainPanel — over budget', () => {
     const user = userEvent.setup();
     renderPanel();
     expect(await screen.findByText('Makes it fit')).toBeInTheDocument();
-    // Awaited: the heading renders at once, but the fix block's button waits for the target plan to load.
     await user.click(await screen.findByRole('button', { name: 'Add to plan: Gunnery III' }));
     await waitFor(async () => {
       expect(await planEntries()).toEqual([{ skillTypeID: 3300, targetLevel: 3 }]);
     });
-    // The rest sit under their own heading, without the skill Makes it fit already lists.
     expect(screen.getByText('Improves fit')).toBeInTheDocument();
     const ranked = within(screen.getByRole('list', { name: 'What to train' }));
     const items = ranked.getAllByRole('listitem');
@@ -576,7 +557,6 @@ describe('FittingWhatToTrainPanel — over budget', () => {
         />
       </MemoryRouter>
     );
-    // Gunnery III trains first and carries its own levels; Surgical Strike I is then just its own.
     expect(
       await screen.findByRole('button', { name: 'Add to plan: Surgical Strike I' })
     ).toBeVisible();

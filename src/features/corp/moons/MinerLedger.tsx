@@ -14,11 +14,6 @@ import { dateWithYear, isk, shortDate } from './moonsFormat';
 import { BookSection } from './sectionParts';
 import { useBook } from './useBook';
 
-/**
- * A Miner's account as the one Payee ledger (decision 20261120-235011, "A Payee ledger"): the
- * same rows a pilot reads of their own account, owed positive, newest first so the top row is
- * where the account stands now, each with what an officer can change on it.
- */
 export function MinerLedger({
   minerId,
   detail,
@@ -29,9 +24,7 @@ export function MinerLedger({
   minerId: string;
   detail: MinerDetail;
   phone: boolean;
-  /** What a row's menu opens; without it the rows have no menu. */
   actions?: LedgerActions;
-  /** The first UTC day the page's range takes in; earlier rows hide (the balance keeps them). */
   from?: string;
 }) {
   const { t } = useTranslation();
@@ -66,7 +59,6 @@ export function MinerLedger({
     for (const d of detail.days) for (const l of d.oreLines) out.set(l.typeId, names.ore(l.typeId));
     return out;
   }, [detail.days, names]);
-  // Each opens its dialog once the menu has closed, so focus lands in the dialog.
   const opened: LedgerActions | undefined = actions && {
     editCorrection: (id) => run(() => actions.editCorrection(id)),
     reverseCorrection: (id) => run(() => actions.reverseCorrection(id)),
@@ -78,7 +70,6 @@ export function MinerLedger({
     changeRate: (key) => run(() => actions.changeRate(key)),
     dismissDays: (keys) => run(() => actions.dismissDays(keys)),
   };
-  /** A mined row's day, with its status: what can still be changed on it. */
   const dayOf = (r: PayeeLedgerRow) =>
     r.kind === 'charge' && r.charge.kind === 'mined'
       ? detail.days.filter((d) => d.key === r.charge.id)

@@ -20,7 +20,6 @@ interface NoticeRow {
   owed: number;
 }
 
-/** The late notices sent so far, one row per Miner (#6294): the run above sends the next ones. */
 export function LateNoticesTab() {
   const zone = useTimeZone();
   const { t } = useTranslation();
@@ -28,7 +27,6 @@ export function LateNoticesTab() {
   const navigate = useNavigate();
   const [tableRef, cards] = useCards();
 
-  // Each Miner's settlement holds its late notices already, oldest first.
   const rows = useMemo(
     () =>
       view.miners

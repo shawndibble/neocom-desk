@@ -1,56 +1,22 @@
-/**
- * What a stored Appraisal **Share Link** holds: the priced items exactly as the
- * sharer saw them, so the link shows the quote *at the time of the appraisal*
- * rather than whatever the market says when it is opened. Rebuilding the rows
- * and totals is `buildAppraisal`'s job, the same engine the live tab runs, so
- * only its inputs are stored — never derived figures that could drift from it.
- * The one resolved figure is each refinable item's `efficiency`: the sharer's
- * skills are not stored, so their outcome has to be, and the recipe and mineral
- * prices ride along so the refine figure is rebuilt by the same
- * `refineFromDetail` the live tab uses. The minerals' sell prices ride along too,
- * as an optional extra (`sellPrice`): a link from before they did has none, and
- * is priced on the buy side only.
- *
- * Pure: the Firestore read/write around it lives in `features/share`.
- */
 import { isFiniteNumber } from '../guards';
 import { refineFromDetail, type AppraisalItem } from './appraisal';
 
 export const APPRAISAL_SNAPSHOT_VERSION = 1;
 
-/**
- * Far past any real hauling paste, and far under Firestore's 1 MiB doc limit
- * (~100 bytes an item). `firestore.rules` enforces the same cap.
- */
 export const MAX_SNAPSHOT_ITEMS = 1000;
 
-/**
- * Far past any item's reprocessing recipe (an ore returns three to nine
- * materials). With the items cap this keeps a share under Firestore's 1 MiB:
- * 1000 items x 16 x ~30 bytes is under 0.5 MB on top of the ~100 bytes an item.
- */
 const MAX_REFINE_MATERIALS = 16;
-/** Every mineral the whole paste refines into; the game has well under this many. */
 const MAX_REFINE_MINERALS = 200;
 
-/**
- * One item's refine inputs: the recipe and the yield already applied to it.
- * The sharer's skills are not here and are never needed: the yield is the
- * sharer's own skills, facility and implant folded into one number.
- */
 export interface AppraisalSnapshotRefineItem {
   portionSize: number;
   materials: { typeId: number; quantity: number }[];
   efficiency: number;
 }
 
-/** The refine setup behind the items' refine inputs, and the minerals' prices as quoted. */
 export interface AppraisalSnapshotRefine {
-  /** The facility's own yield, a fraction, before skills. */
   yieldRate: number;
-  /** The facility's fee, a fraction of the refined value. */
   taxRate: number;
-  /** Every mineral the items refine into, priced at 100% of the hub's buy side, with its sell side beside it. */
   minerals: { typeId: number; name: string; price: number | null; sellPrice?: number | null }[];
 }
 
@@ -58,24 +24,18 @@ export interface AppraisalSnapshotItem {
   typeId: number;
   name: string;
   quantity: number;
-  /** Per unit, at 100% — the `AppraisalItem` convention. */
   buy: number | null;
   sell: number | null;
-  /** Null, never absent: Firestore refuses `undefined`. */
   unitVolume: number | null;
-  /** Absent (not null) where the item has no reprocessing data; added later, so an older link has none. */
   refine?: AppraisalSnapshotRefineItem;
 }
 
 export interface AppraisalSnapshot {
   v: typeof APPRAISAL_SNAPSHOT_VERSION;
-  /** A `TradeHub` id; resolved (and possibly unknown to an older build) by the caller. */
   hub: string;
   pricePercent: number;
-  /** Epoch seconds the appraisal was priced at. */
   generatedAt: number;
   items: AppraisalSnapshotItem[];
-  /** Absent on a link made before refine travelled with it, or where nothing refines. */
   refine?: AppraisalSnapshotRefine;
 }
 
@@ -87,9 +47,7 @@ export function buildAppraisalSnapshot(input: {
   pricePercent: number;
   generatedAt: number;
   items: readonly AppraisalItem[];
-  /** The Refining Setup the items' refine figures were worked out at. */
   refining?: { yieldRate: number; taxRate: number };
-  /** Mineral type id -> name, for the minerals the refine breakdown lists. */
   mineralNames?: ReadonlyMap<number, string>;
 }): BuildAppraisalSnapshotResult {
   if (input.items.length === 0) return { ok: false, reason: 'empty' };
@@ -146,7 +104,6 @@ export function buildAppraisalSnapshot(input: {
         typeId,
         name: input.mineralNames?.get(typeId) ?? '',
         price,
-        // Absent, not null, where the sell side was never read: null means nobody sells it.
         ...(mineralSellPrices.has(typeId)
           ? { sellPrice: mineralSellPrices.get(typeId) ?? null }
           : {}),
@@ -196,7 +153,6 @@ function parseRefine(raw: unknown): AppraisalSnapshotRefine | null {
       typeId: typeId as number,
       name,
       price,
-      // A sell price that is not a price reads as not sent, so the link keeps its buy side.
       ...(sellPrice !== undefined && isPrice(sellPrice) ? { sellPrice } : {}),
     });
   }
@@ -223,11 +179,6 @@ function parseItem(raw: unknown): AppraisalSnapshotItem | null {
   return parsed;
 }
 
-/**
- * Validates a snapshot read back from Firestore. Anyone signed in can write a
- * share, so the stored shape is checked here as well as in the rules — a
- * malformed doc reads as an invalid link, never as a crash.
- */
 export function parseAppraisalSnapshot(raw: unknown): AppraisalSnapshot | null {
   if (typeof raw !== 'object' || raw === null) return null;
   const data = raw as Record<string, unknown>;
@@ -248,26 +199,16 @@ export function parseAppraisalSnapshot(raw: unknown): AppraisalSnapshot | null {
     generatedAt: data.generatedAt,
     items,
   };
-  // The refine figures are an extra: a malformed set reads as none, never as a bad link,
-  // since the prices above are still right. Both halves or neither: an item's recipe
-  // is no use without the setup and the mineral prices.
   const refine = data.refine === undefined ? null : parseRefine(data.refine);
   if (refine) snapshot.refine = refine;
   else for (const item of snapshot.items) delete item.refine;
   return snapshot;
 }
 
-/**
- * The snapshot's items as the engine's `AppraisalItem`s, each with the refine
- * figure the sharer saw rebuilt from the stored recipe, yield and prices. An
- * item without a stored recipe, or a snapshot without its refine setup, has
- * none.
- */
 export function appraisalItemsFromSnapshot(snapshot: AppraisalSnapshot): AppraisalItem[] {
   const refine = snapshot.refine;
   const priceOf = new Map<number, number>();
   const sellPriceOf = new Map<number, number>();
-  // The sell side travelled only if the link says so for some mineral; otherwise it was never read.
   const hasSellSide = (refine?.minerals ?? []).some((mineral) => mineral.sellPrice !== undefined);
   for (const mineral of refine?.minerals ?? []) {
     if (mineral.price !== null) priceOf.set(mineral.typeId, mineral.price);
@@ -301,21 +242,10 @@ export function appraisalItemsFromSnapshot(snapshot: AppraisalSnapshot): Apprais
   });
 }
 
-/**
- * The snapshot as Appraisal paste text — one `name<TAB>quantity` line per item,
- * the shape EVE's own inventory copy uses — for "Open in Neocom Desk" to fill
- * the live tab with. No thousands separators: the parser reads digits.
- */
 export function appraisalSnapshotPasteText(snapshot: AppraisalSnapshot): string {
   return snapshot.items.map((item) => `${item.name}\t${item.quantity}`).join('\n');
 }
 
-/**
- * The snapshot's content, minus when it was priced: equal for the same
- * appraisal shared twice, so the second press reuses the first link
- * (`features/share/shareStore.ts`). Any change of hub, percent, item,
- * quantity or price gives a new key, and so a new link.
- */
 export function appraisalSnapshotReuseKey(snapshot: AppraisalSnapshot): string {
   return JSON.stringify([
     snapshot.hub,

@@ -34,7 +34,6 @@ function scan(minutes: number, ...rocks: [string, number][]): SurveyScan {
   return { at: T0 + minutes * MINUTE_MS, rocks: rocks.map(([ore, volume]) => ({ ore, volume })) };
 }
 
-/** The message split into its heading and the rows of the box. */
 function parts(message: string): { heading: string; box: string[] } {
   const [heading, ...box] = message.split('\n');
   return { heading, box };
@@ -47,11 +46,6 @@ const message = (
 ): { heading: string; box: string[] } =>
   parts(surveyChatMessage(summarizeSurvey(scans, unitPrices)!, url, labels));
 
-/**
- * The rails sit over the bar without ever being shorter than it, and less than
- * two characters longer (the bar rounds down, the rails up); and the two rails
- * end within a character of each other.
- */
 function expectRailsOverBar(box: string[]): void {
   const [top, bar, bottom] = [box[0], box[1], box[box.length - 1]].map(textWidth);
   for (const rail of [top, bottom]) {
@@ -63,7 +57,6 @@ function expectRailsOverBar(box: string[]): void {
 
 describe('surveyChatMessage', () => {
   it('counts the time left from the given clock, not from the last scan', () => {
-    // Last scan at +10 m, finish estimated at +20 m (1000 m3 left at 1.667 m3/s).
     const summary = summarizeSurvey([scan(0, ['Veldspar', 2000]), scan(10, ['Veldspar', 1000])])!;
     const text = (now?: number) => surveyChatMessage(summary, URL, labels, now);
     expect(text()).toContain('(~10m)');
@@ -71,7 +64,6 @@ describe('surveyChatMessage', () => {
   });
 
   it('opens with a heading line, then an ETA rail, the bar, the ore line and a link rail', () => {
-    // 930 m3 mined in 900 s, 70 left at 1.0333 m3/s: about 68 s to go
     const { heading, box } = message([
       scan(0, ['Glistening Sylvite', 800], ['Glistening Bitumens', 200]),
       scan(15, ['Glistening Sylvite', 40], ['Glistening Sylvite', 20], ['Glistening Bitumens', 10]),
@@ -86,12 +78,10 @@ describe('surveyChatMessage', () => {
 
   it('never makes a rail shorter than the content, and at most a character longer', () => {
     const cases = [
-      // the ore line sets the width
       [
         scan(0, ['Brimful Zeolites', 90_000], ['Brimful Bitumens', 80_000], ['Sylvite', 70_000]),
         scan(10, ['Brimful Zeolites', 80_000], ['Brimful Bitumens', 80_000], ['Sylvite', 60_000]),
       ],
-      // the link sets the width
       [scan(0, ['A', 1000]), scan(5, ['A', 750])],
     ];
     for (const scans of cases) {
@@ -115,7 +105,6 @@ describe('surveyChatMessage', () => {
       [box[3], 'https:'],
     ] as const) {
       const before = textWidth(row.slice(0, row.indexOf(label)));
-      // everything between the label's closing bracket and the taper
       const after = textWidth(row.slice(row.lastIndexOf(']'), -3));
       expect(Math.abs(before - after)).toBeLessThanOrEqual(2 * CHARACTER_PX);
     }
@@ -130,7 +119,6 @@ describe('surveyChatMessage', () => {
   });
 
   it('shows hours and minutes when long', () => {
-    // 1 m3/s with 9400 s left is 2h 36m 40s
     const { box } = message([scan(0, ['A', 10_000]), scan(10, ['A', 9_400])]);
     expect(box[0]).toContain('(~2h 37m)');
   });
@@ -148,7 +136,6 @@ describe('surveyChatMessage', () => {
     const filled = box[1].match(/█/g)?.length ?? 0;
     const empty = box[1].match(/░/g)?.length ?? 0;
     expect(filled / (filled + empty)).toBeCloseTo(0.25, 1);
-    // The bar is a visual aid only; the percent is the "Left:" line's to give.
     expect(box[1]).not.toMatch(/[\d%]/);
   });
 
@@ -163,7 +150,6 @@ describe('surveyChatMessage', () => {
   });
 
   it('calls out the two ores with the dearest unit price, with how many rocks each has', () => {
-    // Per unit: Scordite 500, Kernite 200, Pyroxeres 80, Veldspar 50 (total ISK would put Pyroxeres second).
     const rocks = (ore: string, count: number) =>
       Array.from({ length: count }, () => ({ ore, volume: 100 }));
     const { box } = message(
@@ -231,7 +217,6 @@ describe('chat message width', () => {
   });
 
   it('names only one ore when a long first name leaves no room for a second', () => {
-    // Plain Zeolites and Bitumens are on the field too, so "Brimful" stays in the names.
     const ores = (k: number): [string, number][] => [
       ['Brimful Zeolites', 90_000 * k],
       ['Brimful Bitumens', 80_000 * k],
@@ -355,11 +340,9 @@ describe('chat message options', () => {
     const off = withOptions({}, 'Efa IV').box.join('\n');
     for (const word of ['Efa', 'Pace', 'Duration', 'ISK', 'm³']) expect(off).not.toContain(word);
     const { box } = withOptions({ location: true, pace: true, elapsed: true }, 'Efa IV');
-    // The place takes the top rail and the ETA moves into the body.
     expect(box[0]).toMatch(/^┌─*\[ Efa IV \]─*╌┄┈$/);
     expect(box[2]).toMatch(/^│ Left: /);
     expect(box[3]).toMatch(/^│ ETA: /);
-    // Short facts share a row.
     expect(box[4]).toMatch(/^│ Pace: \d+ m³\/s · Duration: 10m$/);
   });
 

@@ -13,8 +13,6 @@ describe('colonyBudget', () => {
   });
 
   it('has nothing to hedge, because the level is measured', () => {
-    // A built colony's `upgrade_level` comes straight from ESI, so unlike the
-    // skill-derived ceiling there is no unknown case to flag.
     expect(colonyBudget(0, pi)).toEqual({ level: 0, budget: { cpu: 1_675, powergrid: 6_000 } });
   });
 
@@ -24,9 +22,6 @@ describe('colonyBudget', () => {
   });
 
   it('never reads the budget off the skill, which would overstate an un-upgraded colony', () => {
-    // The regression this guards: a pilot at Command Center Upgrades V with a
-    // colony still at upgrade level 1 has 9,000 MW there, not 19,000. Sizing
-    // that colony off the skill would promise more than twice the headroom.
     const atColonyLevel = colonyBudget(1, pi);
     const atSkillCeiling = maxColonyBudget(5, pi);
     expect(atColonyLevel.budget.powergrid).toBe(9_000);

@@ -34,7 +34,6 @@ import { ContactNameCell, DenseOmit } from '@/features/character/ContactCells';
 import { portraitColumn } from '@/features/character/contactsPortraitColumn';
 import { entityName } from '@/features/character/contactsSnapshot';
 
-/** An Across row as the identity the shared helpers read. */
 function acrossIdentity(row: AcrossCharactersRow): ContactIdentity {
   return { contact_id: row.contactId, contact_type: row.contactType };
 }
@@ -47,28 +46,14 @@ interface AcrossCharactersPanelProps {
   lists: readonly CharacterContactList[];
   names: ReadonlyMap<number, string>;
   filter: ContactsFilter;
-  /** Lifted to `Contacts` (issue #1282): its chip now lives in the shared `FilterBar`. */
   disagreementsOnly: boolean;
-  /** Reports the count up on every change, so the lifted chip can badge it — the `ContractSearchPanel`/`onStatusChange` pattern. */
   onDisagreementCountChange: (count: number) => void;
   isColumnVisible: (id: ContactsAcrossColumnId) => boolean;
-  /** Reports the currently filtered rows up, so the page header's export (issue #2164) can read this tab's own rows without owning its fetch/merge state. The export itself reads them in the table's on-screen sort. */
   onVisibleRowsChange: (rows: readonly AcrossCharactersRow[]) => void;
-  /** Reports whether any list behind the current merge is truncated, so the CSV export's filename can carry the same "-partial" suffix the Character tab's own truncated export does. */
   onTruncatedChange: (truncated: boolean) => void;
-  /** The page header's export button for this tab, so the table's row menus export the same rows. */
   tableExport: UseTableExport<AcrossCharactersRow>;
 }
 
-/**
- * The same contacts, every Character at once: who holds each one, who does
- * not, and where they set it differently.
- *
- * Reads what each Character last cached rather than fetching them all on
- * arrival — a pilot with a dozen alts would otherwise pay a dozen paginated
- * fetches for opening a tab. The button fetches them on demand, and the hint
- * below the table says which of the two is on screen.
- */
 export function AcrossCharactersPanel({
   lists,
   names,
@@ -92,9 +77,6 @@ export function AcrossCharactersPanel({
     () => onDisagreementCountChange(disagreementCount),
     [disagreementCount, onDisagreementCountChange]
   );
-  // Any one character's own fetch stopping short makes the whole merge
-  // incomplete — the export's "-partial" suffix (issue #2164) has to cover
-  // that the same way the Character tab's own truncation does.
   const truncated = useMemo(() => effectiveLists.some((list) => list.truncated), [effectiveLists]);
   useEffect(() => onTruncatedChange(truncated), [truncated, onTruncatedChange]);
 
@@ -120,10 +102,6 @@ export function AcrossCharactersPanel({
     }
   }
 
-  // The identity column (never hidden) plus the optional columns the picker
-  // controls, in table order — `CONTACTS_ACROSS_COLUMN_IDS`' own order.
-  // Memoized so the `sortValue`s `DataTable` keys its sort on keep their
-  // identity across renders (a keystroke in the filter re-renders this).
   const acrossListCount = effectiveLists.length;
   const optionalColumns = useMemo<
     Record<ContactsAcrossColumnId, DataTableColumn<AcrossCharactersRow>>
@@ -133,7 +111,6 @@ export function AcrossCharactersPanel({
         id: 'type',
         header: t('contacts.type'),
         className: 'text-text-dim',
-        // As the character table: a player's or agent's type stays off the phone card.
         render: (row) => {
           const label = t(contactTypeLabelKey(acrossIdentity(row)));
           return row.contactType === 'character' ? <DenseOmit>{label}</DenseOmit> : label;
@@ -145,9 +122,6 @@ export function AcrossCharactersPanel({
         header: t('contacts.acrossCharacters'),
         headerTooltip: t('contacts.acrossCharactersHeaderTooltip'),
         align: 'center',
-        // The names go in the tooltip rather than the cell: with a dozen alts
-        // the cell would be the widest thing on the page, and the count is what
-        // a reader scans for. The count takes focus so a keyboard can open it.
         render: (row) => (
           <Tooltip
             content={[
@@ -181,10 +155,7 @@ export function AcrossCharactersPanel({
         id: 'standings',
         header: t('contacts.acrossStandings'),
         align: 'center',
-        // The phone card's headline, as Standing is on the character table.
         cardCorner: true,
-        // Every distinct standing, not an average: two alts at +10 and -10 have
-        // no meaningful midpoint, and seeing both is the whole point of the row.
         render: (row) => (
           <span className="inline-flex items-center gap-1.5">
             {row.standings.map((standing) => (
@@ -192,7 +163,6 @@ export function AcrossCharactersPanel({
             ))}
           </span>
         ),
-        // Worst first on a descending click, which is the direction trouble is in.
         sortValue: (row) => row.standings[0],
       },
     }),
@@ -215,14 +185,9 @@ export function AcrossCharactersPanel({
     nameColumn,
     ...CONTACTS_ACROSS_COLUMN_IDS.filter(isColumnVisible).map((id) => optionalColumns[id]),
   ];
-  // The full catalog, not just `columns`' currently-visible ids: a sort
-  // picked while a column was shown should still resolve once the picker
-  // hides it, ready to take effect again the moment it's shown back
-  // (`resolveSort` only rejects a `columnId` the catalog has never heard of).
   const sortProps = useUrlSort('across.sort', ACROSS_SORT, ['name', ...CONTACTS_ACROSS_COLUMN_IDS]);
 
   if (rows.length === 0) {
-    // Every character's contacts were read and none holds any: really empty.
     const allRead = effectiveLists.length > 0 && effectiveLists.every((list) => list.read);
     return (
       <EmptyState
@@ -267,7 +232,6 @@ export function AcrossCharactersPanel({
             const kind = contactPublicInfoKind(acrossIdentity(row));
             if (kind) open(kind, row.contactId);
           }}
-          // A faction has no Show Info (no public faction endpoint): not a tab stop either.
           rowClickable={(row) => contactPublicInfoKind(acrossIdentity(row)) !== null}
         />
       )}

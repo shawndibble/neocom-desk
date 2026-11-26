@@ -1,8 +1,3 @@
-/**
- * One source's kept rows: a search, the source's one kind filter, a date range where the rows
- * have dates, a "Flagged rows only" chip and one windowed table with every row, never a cap.
- * Empty (the source was read and held nothing) and "no rows match" are two states.
- */
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -65,14 +60,11 @@ const DEFAULT_SORT: Record<VettingRawSource, DataTableSort> = {
 
 interface TableProps {
   source: VettingRawSource;
-  /** Null: all characters. */
   characterId: number | null;
   characters: readonly { characterId: number; name: string }[];
-  /** The corporation-history rows run to the day the read ran. */
   readAt: number;
   flags: readonly VettingFlag[];
   data: RawRows;
-  /** How many rows the review kept in this source, all characters. */
   total: number;
   skills: SkillNames;
   reportPath: string;
@@ -95,7 +87,6 @@ export function VettingRawTable({
 }: TableProps) {
   const { t } = useTranslation();
   const timeZone = useTimeZone();
-  /** A date as the report words it; the raw string when it is not a date, never a throw. */
   const stamp = (iso: string) => {
     const ms = validTime(iso);
     return ms === null ? iso : formatTimestamp(new Date(ms), timeZone);
@@ -110,7 +101,6 @@ export function VettingRawTable({
     [characters]
   );
 
-  /** A journal or contract type in words; a type the report has no wording for reads as its own id. */
   const whatLabel = (what: string) => {
     const key = evidenceWhatKey(what);
     if (key !== 'vetting.what.other') return t(key);
@@ -138,7 +128,6 @@ export function VettingRawTable({
         skills,
         whatLabel,
       }),
-    // `whatLabel` only reads `t`, which is stable per language.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [source, data.rows, data.parties, flags, skills, t]
   );
@@ -404,7 +393,6 @@ export function VettingRawTable({
       });
     }
     return columns;
-    // `kindLabel` and the labels only read `t` and the source.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     source,
@@ -477,7 +465,6 @@ export function VettingRawTable({
     />
   );
 
-  // The read kept `total` rows and fewer arrived: never claim all of them, or an empty source.
   const short = !data.loading && !data.failed && data.rows.length < total;
   const waiting = data.loading && scope.length === 0;
   const empty = !data.loading && !data.failed && !short && scope.length === 0;

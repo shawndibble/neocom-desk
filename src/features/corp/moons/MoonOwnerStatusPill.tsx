@@ -17,7 +17,6 @@ const STATUS_TONE: Record<MoonOwnerStatus, PillTone> = {
 
 const k = (key: string) => `corpTaxBook.moons.moonOwners.${key}`;
 
-/** A moon owner's status as a word on a tint (readable without the colour). */
 export function MoonOwnerStatusPill({ status }: { status: MoonOwnerStatus }) {
   const { t } = useTranslation();
   return <Pill tone={STATUS_TONE[status]}>{t(k(`status.${status}`))}</Pill>;

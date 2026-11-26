@@ -1,12 +1,7 @@
-/**
- * Whether any character on the account can install a blueprint's job. Pure,
- * account-wide comparison — which surfaces feed it is each call site's call.
- */
 import type { BlueprintSkillRequirement, SkillLevels } from './types';
 
 export type { BlueprintSkillRequirement };
 
-/** One requirement a character falls short on. */
 export interface SkillShortfall {
   typeID: number;
   haveLevel: number;
@@ -16,7 +11,6 @@ export interface SkillShortfall {
 export type SkillGateVerdict =
   { gated: false } | { gated: true; shortfall: readonly SkillShortfall[]; bestCharacterId: number };
 
-/** Every requirement a character's skill map falls short of, in requirement order. */
 function unmetRequirements(
   requirements: readonly BlueprintSkillRequirement[],
   skills: SkillLevels
@@ -34,12 +28,6 @@ function totalGap(shortfall: readonly SkillShortfall[]): number {
   return shortfall.reduce((sum, s) => sum + (s.needLevel - s.haveLevel), 0);
 }
 
-/**
- * Account-wide skill-gate verdict: not gated with no requirements, no
- * characters loaded (absent reads as unknown, never blocked), or any loaded
- * character meeting everything. Otherwise shortfall for the closest
- * character: fewest unmet, then smallest total gap, then lowest id.
- */
 export function evaluateSkillGate(
   requirements: readonly BlueprintSkillRequirement[],
   accountSkills: ReadonlyMap<number, SkillLevels>
@@ -61,18 +49,10 @@ export function evaluateSkillGate(
     }
   }
 
-  // Unreachable when accountSkills.size > 0 — the loop above always sets
-  // `best` on its first iteration — but TypeScript can't see that.
   if (best === null) return { gated: false };
   return { gated: true, shortfall: best.shortfall, bestCharacterId: best.characterId };
 }
 
-/**
- * One verdict for several builds that run together: every distinct missing
- * skill once (at the highest level any of them needs), for the first gated
- * verdict's closest character. Callers pass only the builds the plan actually
- * runs — a bought material's gate has no bearing on the plan.
- */
 export function mergeSkillGates(
   verdicts: readonly (SkillGateVerdict | undefined)[]
 ): SkillGateVerdict {

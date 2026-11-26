@@ -47,7 +47,6 @@ describe('materialErrand', () => {
   it('files a Blueprint Acquisition row under Blueprint ahead of every other rule', () => {
     const tier = { me: 10, te: 20 };
     expect(materialErrand(row({ typeID: 999, acquisitionTier: tier }))).toBe('blueprint');
-    // Owned outright: still the blueprint, not just another thing you have.
     expect(
       materialErrand(row({ typeID: 999, acquisitionTier: tier, quantity: 1, ownedQuantity: 1 }))
     ).toBe('blueprint');

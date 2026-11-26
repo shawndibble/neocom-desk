@@ -12,12 +12,6 @@ import { budgetValue } from './ringFormat';
 import { useOverBudgetFlash } from '../useOverBudgetFlash';
 import { fmt1 } from '../stats/fixedFormat';
 
-/**
- * How each rim gauge is drawn. CPU and powergrid are told apart by form as
- * well as side (DESIGN.md: a new series tries form before a new colour): CPU
- * a solid band, powergrid a dashed one. The two lesser budgets are thinner
- * and dim. `dash` is in ring units.
- */
 const GAUGE_STYLE: Readonly<
   Record<RingGauge, { width: number; tone: 'accent' | 'dim'; dash?: string }>
 > = {
@@ -29,7 +23,6 @@ const GAUGE_STYLE: Readonly<
 
 const TONE_STROKE = { accent: 'stroke-accent', dim: 'stroke-text-dim' } as const;
 
-/** Wide enough to be easy to hover without reaching the tiles inside it. */
 const GAUGE_HIT_WIDTH = 22;
 
 function share(used: number | null, total: number | null): number {
@@ -40,12 +33,10 @@ export interface Budget {
   label: string;
   used: number | null;
   total: number | null;
-  /** `{{used}} / {{total}}` with the resource's unit. */
   valueKey: string;
   flash: ReturnType<typeof useOverBudgetFlash>;
 }
 
-/** A gauge's hover text: the numbers, the share used, and any overage. */
 function gaugeTooltip(t: ReturnType<typeof useTranslation>['t'], budget: Budget): string {
   const value = budgetValue(t, budget);
   if (value === null) return t('fittings.ring.gaugeLoading', { label: budget.label });
@@ -97,12 +88,9 @@ export function RimGauge({
       )}
     </>
   );
-  // The phone overview has no readouts and a band there is a sliver to tap,
-  // so it is just drawn; its numbers are on the List bars and the Stats tab.
   if (compact) return <g data-gauge={gauge}>{bands}</g>;
   return (
     <Tooltip content={gaugeTooltip(t, budget)}>
-      {/* The svg itself lets the pointer through to the tiles; only this band catches it. */}
       <g data-gauge={gauge} className="pointer-events-auto">
         <path
           d={arcPath(from, to, RING_GAUGE_RADIUS, c, c)}
@@ -115,7 +103,6 @@ export function RimGauge({
   );
 }
 
-/** A readout's key: a short stroke drawn the way its rim gauge is. */
 export function GaugeSwatch({ gauge }: { gauge: RingGauge }) {
   const style = GAUGE_STYLE[gauge];
   return (
