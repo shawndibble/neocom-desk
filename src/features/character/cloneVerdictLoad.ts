@@ -1,13 +1,3 @@
-/**
- * The Overview's Best clone widget reads: which jump clone finishes the queue
- * soonest, and by how much. The same loads the Clones page's verdict card
- * makes (clones, corrected skills, worn implants, attribute sheet), composed
- * once here, with the precedence and the comparison shared through
- * `cloneVerdictGate` so the widget and the page cannot disagree.
- *
- * Heavy (dogma lookups for implants, the SDE skill catalogue), so the
- * Overview reaches it only through `import()`.
- */
 import { cloneJumpCooldown, INFOMORPH_SYNCHRONIZING_SKILL_ID } from '@/engine/clone/cloneJump';
 import { loadCharacterClones } from '@/features/character/clones';
 import { loadStationName } from '@/features/character/stations';
@@ -21,38 +11,26 @@ import { cloneVerdictGate, runCloneVerdict, type CloneVerdictNote } from './clon
 import { cloneOwnName, readCloneNicknames } from './cloneNicknames';
 
 export interface CloneWidgetRow {
-  /** `WORN_CLONE_ID` for the clone being worn. */
   id: string | number;
-  /** The pilot's own name for it, else its resolved location; null when neither is known (the widget says "Clone #id"). */
   label: string | null;
-  /** Where the clone sits (station or structure name), when it resolved; null for the worn clone and for an unknown place. */
   location?: string | null;
-  /** Implants plugged into it; for the worn clone, the implants worn right now. Null when not read. */
   implantCount?: number | null;
-  /** Queue time wearing it, jumping when allowed; null for a paused queue. */
   totalSeconds: number | null;
-  /** Against the worn clone; negative is sooner. */
   deltaSeconds: number | null;
 }
 
 export interface ClonesWidgetData {
-  /** The clones grant lapsed. */
   needsReauth: boolean;
-  /** Why there is no verdict; null when there is one. */
   note: CloneVerdictNote | null;
-  /** Jump clones the Character holds (the worn one is not counted). */
   cloneCount: number;
   verdict: 'stay' | 'jump' | null;
   bestId: string | number | null;
-  /** Seconds a jump saves; only for a `jump` verdict. */
   savedSeconds: number | null;
-  /** When the clone jump cooldown ends, if it is running. */
   cooldownReadyAt: number | null;
   rows: CloneWidgetRow[];
   fetchedAt: Date | null;
 }
 
-/** Where a jump clone sits, by name; null when the lookup fails (offline, no ACL). */
 async function placeOf(characterId: number, clone: JumpClone): Promise<string | null> {
   try {
     return clone.location_type === 'station'

@@ -7,27 +7,20 @@ import * as pasteDestinationModule from '@/engine/import/pasteDestination';
 import { GlobalPasteRouter } from './GlobalPasteRouter';
 import { routePaste } from './pasteRouting';
 
-// Spied, so a "stays put" test can wait until the paste was really classified
-// rather than asserting an absence before the lazy imports have settled.
 vi.mock('@/engine/import/pasteDestination', async (importOriginal) => {
   const actual = await importOriginal<typeof pasteDestinationModule>();
   return { ...actual, pasteDestination: vi.fn(actual.pasteDestination) };
 });
 
-// Spied, so a test can wait until a paste's routing has settled (whatever it
-// was going to do, it has done) before asserting nothing followed.
 vi.mock('./pasteRouting', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./pasteRouting')>();
   return { ...actual, routePaste: vi.fn(actual.routePaste) };
 });
 
-// The market catalogue is fetched on first use and not precached: `available`
-// false is a fresh install with no connection.
 const market = vi.hoisted(() => ({ available: true, neverLoads: false }));
 
 vi.mock('@/features/market/appraisalData', () => ({
   loadAppraisalCatalogue: () => {
-    // A load that never settles: a tab left idle with a stalled download.
     if (market.neverLoads) return new Promise(() => {});
     if (!market.available) return Promise.reject(new TypeError('Failed to fetch'));
     return Promise.resolve(
@@ -80,7 +73,6 @@ function paste(target: Element, text: string) {
   fireEvent.paste(target, { clipboardData: { getData: () => text } });
 }
 
-/** Once the paste has been routed — or found nowhere to go. */
 async function routed() {
   await waitFor(() => expect(routePaste).toHaveResolved());
 }

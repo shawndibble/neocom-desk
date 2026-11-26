@@ -1,15 +1,8 @@
-/**
- * The Overview widget grid, end to end: the first-run Role chooser, Customize
- * (remove, Undo, Cancel, Add), a widget's menu, the alerts bell panel and the
- * Danger banner, and the phone's Customize list. Geometry lives in
- * overviewNarrow.spec.ts.
- */
 import type { Page } from '@playwright/test';
 import { test, expect, PHONE } from './support/testBase';
 import { overviewLayoutSetting, signInAndGoto } from './support/authSeed';
 import { CHARACTER_ID, SCOPES } from './support/fixtureData';
 
-// The first load on a cold dev server is slow; later assertions use the default budget.
 const FIRST_LOAD = { timeout: 20_000 };
 
 const THREE = [
@@ -50,7 +43,6 @@ test('Customize removes a widget, Undo brings it back, Cancel restores, Done kee
 
   await page.locator('main').getByRole('button', { name: 'Customize' }).click();
   await expect(page.getByRole('region', { name: 'Customize the Overview' })).toBeVisible();
-  // The edit bar owns Done: the header's Customize is gone, not duplicated.
   await expect(page.getByRole('button', { name: 'Done' })).toHaveCount(1);
 
   await page.getByRole('button', { name: 'Remove Training' }).click();
@@ -96,27 +88,20 @@ test('the Gallery list scrolls only up and down; in the drawer the category row 
   await page.getByRole('button', { name: /^Add widget$/ }).click();
   const gallery = page.getByRole('dialog', { name: 'Add a widget' });
   await expect(gallery).toBeVisible();
-  // A desktop opens in Browse all, whose rail is a column; the drawer keeps the sideways row.
   const sidewaysIn = () =>
     gallery.evaluate((root) =>
       [root, ...root.querySelectorAll('*')]
-        // Only a scroller can scroll sideways. An `overflow: visible` box that
-        // spills shows up at the scroller it spills into; counting it too made
-        // this flaky: a Recharts preview's inner box spills while its
-        // ResponsiveContainer is still 0px wide, before its first resize.
         .filter((el) => {
           const { overflowX } = getComputedStyle(el);
           return (
             el.scrollWidth > el.clientWidth + 1 && (overflowX === 'auto' || overflowX === 'scroll')
           );
         })
-        // sr-only helpers clip themselves
         .filter((el) => !el.classList.contains('sr-only'))
         .map((el) => el.getAttribute('role') ?? el.className.toString())
     );
   expect(await sidewaysIn()).toEqual([]);
   await gallery.getByRole('button', { name: 'Quick add' }).click();
-  // Exactly one thing may scroll sideways: the category chips (role=group).
   expect(await sidewaysIn()).toEqual(['group']);
 });
 
@@ -148,7 +133,6 @@ test('the bell opens the alerts panel and Escape closes it', async ({ page }) =>
   await expect(bell).toBeFocused();
 });
 
-/** The Notification Feed row a poll would write, put straight into the app's IndexedDB. */
 async function writeDangerAlert(page: Page): Promise<void> {
   await page.evaluate(
     async ({ characterId }) => {
@@ -184,7 +168,6 @@ test('a danger alert draws the banner and a red bell; Acknowledge clears both', 
   await signInAndGoto(page, './overview', SCOPES, THREE);
   await expect(card(page, 'Wallet')).toBeVisible(FIRST_LOAD);
   await writeDangerAlert(page);
-  // A reload, not a live query: the write comes from outside the app's own Dexie connection.
   await page.reload();
 
   const banner = page.locator('main').getByText('Structure under attack').first();
@@ -201,7 +184,6 @@ test('phone Customize is a reorder and remove list with 36px targets', async ({ 
   await signInAndGoto(page, './overview', SCOPES, THREE);
   await expect(card(page, 'Training')).toBeVisible(FIRST_LOAD);
 
-  // Below `md` Customize is an item of the header's ⋮ menu.
   await page.locator('main').getByRole('button', { name: 'More actions' }).click();
   await page.getByRole('menuitem', { name: 'Customize' }).click();
   await expect(page.getByText(/set on a larger screen/i)).toBeVisible();

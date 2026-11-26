@@ -1,12 +1,3 @@
-/**
- * A tiny external store holding the Overview's raw reads ("feeds"), so each
- * widget subscribes to the whole set without the grid re-rendering from a
- * source's own state. Sources write; widgets read through `useSyncExternalStore`.
- *
- * `get` returns the same object until something actually changes: that
- * identity is what `useSyncExternalStore` compares, and what keeps `buildView`
- * memoised.
- */
 import type { FeedId, FeedMap, FeedState, Feeds } from './types';
 
 export interface FeedStore {

@@ -52,7 +52,6 @@ describe('fetchLatestRelease', () => {
 
   it('is null when the read does not settle in time', async () => {
     vi.useFakeTimers();
-    // Like a real fetch, rejects when its signal aborts.
     vi.stubGlobal(
       'fetch',
       vi.fn(

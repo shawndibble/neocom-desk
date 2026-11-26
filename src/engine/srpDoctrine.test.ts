@@ -7,7 +7,6 @@ import {
   type FittedSet,
 } from '@/engine/srpDoctrine';
 
-// Types: 1 hull, 10-13 mods, 20 rig, 21 rig, 30 charge, 40 abyssal of bases 10/11, 50 subsystem
 const rackByType: Record<number, string> = {
   10: 'high',
   11: 'high',
@@ -155,10 +154,8 @@ describe('matchDoctrine', () => {
     );
   });
   it('mutated modules are paired optimally, not greedily', () => {
-    // 40 can be 10 or 11; plain 11 only fits 11. Doctrine wants 10 and 11.
     const d = doctrine('d', [10, 11], []);
     expect(matchDoctrine(fitted([40, 11], []), [d], basesOf).status).toBe('matched');
-    // two mutated, doctrine has one base slot only
     expect(
       matchDoctrine(fitted([40, 40], []), [doctrine('e', [10], [])], basesOf).diff
     ).toMatchObject({

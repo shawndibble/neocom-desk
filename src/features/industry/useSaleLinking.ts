@@ -10,13 +10,6 @@ export type SaleLinkingPickerKind = 'sale' | 'watch';
 
 interface PickerState {
   runId: string;
-  /**
-   * Carried on the picker itself, not a single hook-wide value: a Build
-   * Plan's own `ProductionRunsPanel` has one product for every run, but
-   * `ProductionLogPanel` shows every run across every plan in one table, so
-   * the candidate filter needs each run's own product at the moment its
-   * picker opens.
-   */
   productTypeID: number;
   kind: SaleLinkingPickerKind;
 }
@@ -41,14 +34,6 @@ interface ManualSaleState {
   errors: ManualSaleErrors;
 }
 
-/**
- * The "Sold" split button's actions: its three linking mechanisms (issue
- * #525) — Link Past Sale, Watch Open Order, Manual/Private Sale — plus the
- * manual refresh a watched order needs to pick up its latest
- * `volume_remain`, and Delete Production Run, which drops the run itself.
- * Shared between `ProductionRunsPanel` (one Build Plan's own runs) and
- * `ProductionLogPanel` (every run, every plan) so the two never drift.
- */
 export function useSaleLinking(
   characterId: number,
   saleLinks: readonly ProductionSaleLinkRecord[],
@@ -60,12 +45,6 @@ export function useSaleLinking(
   const [openOrders, setOpenOrders] = useState<MarketOrder[] | null>(null);
   const [manualSale, setManualSale] = useState<ManualSaleState | null>(null);
   const [refreshingRunId, setRefreshingRunId] = useState<string | null>(null);
-  /**
-   * The run whose delete confirmation is open. A menu item sits one
-   * mis-click from the trigger, and the deletion is tombstoned and cascades
-   * to the run's sale links and order watches, so it asks first — the same
-   * friction the edit modal's danger button gets from being two steps in.
-   */
   const [deletingRunId, setDeletingRunId] = useState<string | null>(null);
 
   const linkedTransactionIds = new Set(
@@ -105,8 +84,6 @@ export function useSaleLinking(
     setManualSale((state) => {
       if (!state) return state;
       const form = updater(state.form);
-      // Only the field that actually changed loses its error — editing quantity
-      // must not silently clear a still-blank unitPrice's invalid state.
       const errors = {
         quantity: form.quantity === state.form.quantity ? state.errors.quantity : false,
         unitPrice: form.unitPrice === state.form.unitPrice ? state.errors.unitPrice : false,
@@ -154,11 +131,7 @@ export function useSaleLinking(
         updatedAt: now,
       });
       scheduleSync(characterId, { collections: ['productionSaleLinks'] });
-    } catch {
-      // Already linked (Dexie's primary-key constraint on the deterministic
-      // id) — the picker list should already exclude it, but a concurrent
-      // link from another device can win the race between load and click.
-    }
+    } catch {}
     closePicker();
   }
 
@@ -178,9 +151,7 @@ export function useSaleLinking(
         updatedAt: now,
       });
       scheduleSync(characterId, { collections: ['productionOrderWatches'] });
-    } catch {
-      // Already watched — see linkPastSale's catch.
-    }
+    } catch {}
     closePicker();
   }
 
@@ -194,7 +165,6 @@ export function useSaleLinking(
 
   async function deleteRun() {
     if (deletingRunId === null) return;
-    // `markProductionRunDeleted` tombstones and schedules its own sync.
     await markProductionRunDeleted(characterId, deletingRunId);
     setDeletingRunId(null);
   }

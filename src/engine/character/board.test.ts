@@ -55,22 +55,10 @@ describe('buildCharacterBoard', () => {
     expect(board.map((item) => item.kind)).toEqual(['industryJob', 'orderExpiry', 'calendarEvent']);
   });
 
-  /**
-   * The distinction the whole page rests on: a source the Character cannot
-   * read contributes nothing, and a source that read fine with nothing due
-   * contributes nothing *too* — but they are different answers, and only
-   * `readableKinds` may be asked which happened. Copied from the corp board's
-   * own rule: "cannot read" and "nothing due" must never look alike.
-   */
   it('treats an absent source and an empty one alike when building the list', () => {
     expect(build({ calendarEvents: [], industryJobs: undefined })).toEqual([]);
   });
 
-  /**
-   * Unclamped, exactly as the corp board keeps it: two overdue items differ by
-   * how far past due they are, and clamping at zero here would collapse them
-   * into one tie that no later sort could undo. The clamp belongs at display.
-   */
   it('keeps remaining time signed so overdue items still order against each other', () => {
     const board = build({
       contractExpiries: [
@@ -84,11 +72,6 @@ describe('buildCharacterBoard', () => {
     expect(board[1].remainingMs).toBe(-1 * HOUR_MS);
   });
 
-  /**
-   * Ties are broken explicitly rather than left to sort stability, so the
-   * board is a function of its inputs and not of the order this happened to
-   * concatenate its sources in.
-   */
   it('breaks an exact tie by kind, then by id', () => {
     const sameInstant = at(4 * HOUR_MS);
     const board = build({
@@ -103,13 +86,6 @@ describe('buildCharacterBoard', () => {
     expect(board.map((item) => item.sourceId)).toEqual(['z', 'a', 'aa', 'b']);
   });
 
-  /**
-   * A calendar event past its deadline is running, not late. An industry job
-   * past its deadline is finished and waiting for pickup — ESI has no signal
-   * for a job genuinely overdue, so it reads the same "ready to deliver" copy
-   * the detail line already uses, never "Overdue". Every other kind has no
-   * such distinction: past its deadline simply means late.
-   */
   it('picks the past-deadline word per kind', () => {
     expect(pastDeadlineLabelKey('calendarEvent')).toBe('calendar.started');
     expect(pastDeadlineLabelKey('industryJob')).toBe('calendar.detail.industryJob.ready');
@@ -128,11 +104,6 @@ describe('buildCharacterBoard', () => {
     expect(board[1]).toMatchObject({ sourceId: 'j', response: null, important: false });
   });
 
-  /**
-   * Ids collide across sources — an industry job and a contract can both be
-   * numbered 42 — so the board's own id must be namespaced or a React key
-   * repeats and the tie-break compares unrelated things.
-   */
   it('namespaces ids by kind so two sources cannot collide', () => {
     const board = build({
       industryJobs: [clock({ id: '42', deadlineMs: at(1 * HOUR_MS) })],

@@ -1,55 +1,20 @@
-/**
- * Applied DPS against a Target Profile (issue #1546) — our own math on top
- * of the engine's per-weapon raw DPS and attributes (ADR 0016: anything
- * beyond what the engine computes is our addition, and labelled as such).
- * Pure. Assumes a stationary shooter and a target moving fully transversal
- * at the profile's speed, the same simplification Pyfa's graphs default to.
- *
- * - Turrets: EVE's chance-to-hit, `0.5 ^ (trackingTerm² + rangeTerm²)`, then
- *   the average hit-quality multiplier including 1% wrecking shots — so a
- *   certain hit averages ~1.015× the listed volley, as in game and in Pyfa.
- * - Missiles: all-or-nothing on flight range, then
- *   `min(1, S/E, (S/E · Ve/Vt)^drf)`.
- * - Drones: nothing past drone control range; a mobile drone at least as
- *   fast as its target is assumed to keep up and always hit (Pyfa's "auto"
- *   mode), one slower than it — or a sentry — tracks like a turret on the ship.
- * - Area weapons (smartbombs, Vorton projectors, breacher pods): full damage
- *   inside their range, nothing past it. A smartbomb's blast and a Vorton's
- *   chain lightning need no tracking; a breacher's damage-over-time needs only
- *   to land.
- * - Fighters: at full, wherever the target is. A squadron flies to its
- *   target, so neither the shooter's range nor drone control range limits
- *   it, and no application model for its attack is verified against the
- *   engine here, so none is guessed at, and the UI says so.
- * - Then the target's resists: each damage type the weapon deals is taken
- *   down by the target's resist to it.
- */
 import { targetResists, type TargetProfile, type TargetResists } from './targetProfile';
 import type { PerDamageType } from './types';
 
-/** A weapon's damage split by type, as shares summing to 1. */
 export type DamageSplit = PerDamageType;
 
-/** A weapon whose damage types aren't known counts as an even split. */
 const EVEN_SPLIT: DamageSplit = { em: 0.25, thermal: 0.25, kinetic: 0.25, explosive: 0.25 };
 
 interface TrackingWeapon {
-  /** Raw DPS, no reload. */
   dps: number;
-  /** Metres. */
   optimal: number;
-  /** Metres. */
   falloff: number;
-  /** Radians per second. */
   tracking: number;
-  /** Metres. */
   optimalSigRadius: number;
 }
 
 interface DamageTyped {
-  /** The share (0–1] of a long fight it spends firing, not reloading; absent: it never reloads. */
   reloadDuty?: number;
-  /** How its damage splits by type — what the target's resists bite on. Absent: an even split. */
   damage?: DamageSplit;
 }
 
@@ -59,7 +24,6 @@ export type AppliedWeapon = DamageTyped &
     | {
         kind: 'missile';
         dps: number;
-        /** Metres — flight speed × flight time. */
         range: number;
         explosionRadius: number;
         explosionVelocity: number;
@@ -67,37 +31,29 @@ export type AppliedWeapon = DamageTyped &
       }
     | ({
         kind: 'drone';
-        /** m/s; 0 for a sentry. */
         speed: number;
       } & TrackingWeapon)
     | {
         kind: 'area';
         dps: number;
-        /** Metres: a smartbomb's blast, a Vorton's optimal, a breacher's flight. */
         range: number;
       }
     | {
         kind: 'fighter';
-        /** A launched squadron's raw DPS: per fighter, times the fighters in it. */
         dps: number;
       }
   );
 
-/** Everything applied DPS needs from one calculated Fitting. */
 export interface AppliedDpsInputs {
-  /** Only weapons actually firing: active/overloaded modules, launched drones (their stack's DPS), launched fighter squadrons. */
   weapons: AppliedWeapon[];
-  /** Metres. */
   droneControlRange: number;
 }
 
 export interface AppliedDpsPoint {
-  /** Metres for a range graph, m/s for a speed graph. */
   x: number;
   dps: number;
 }
 
-/** Pyfa's own threshold for a "mobile" drone: a sentry's speed reads ~0 (a Garde's 1.25e-5 m/s). */
 export function isMobileDrone(speed: number): boolean {
   return speed > 1;
 }
@@ -122,7 +78,6 @@ export function turretHitChance(
   return 0.5 ** (trackingTerm ** 2 + rangeTerm ** 2);
 }
 
-/** Average damage per shot relative to the listed volley, for a given chance to hit. */
 export function turretDamageMultiplier(hitChance: number): number {
   const wreckingChance = Math.min(hitChance, 0.01);
   const normalChance = hitChance - wreckingChance;
@@ -165,7 +120,6 @@ function weaponAppliedDps(
   }
 }
 
-/** The share of a weapon's damage that gets through the target's resists. */
 function throughResists(split: DamageSplit, resists: TargetResists): number {
   return (
     split.em * (1 - resists.em) +
@@ -175,7 +129,6 @@ function throughResists(split: DamageSplit, resists: TargetResists): number {
   );
 }
 
-/** Applied DPS against `target` at `distance` metres, after its resists. */
 export function appliedDps(
   inputs: AppliedDpsInputs,
   target: TargetProfile,
@@ -191,7 +144,6 @@ export function appliedDps(
   );
 }
 
-/** The same weapons with each one's DPS scaled by its reload share: what it sustains over a long fight. */
 export function sustainedInputs(inputs: AppliedDpsInputs): AppliedDpsInputs {
   return {
     ...inputs,
@@ -201,7 +153,6 @@ export function sustainedInputs(inputs: AppliedDpsInputs): AppliedDpsInputs {
   };
 }
 
-/** The firing weapons' listed DPS — untouched by any Target Profile. */
 export function rawDps(inputs: AppliedDpsInputs): number {
   return inputs.weapons.reduce((sum, weapon) => sum + weapon.dps, 0);
 }
@@ -219,7 +170,6 @@ export function appliedDpsVsRange(
   return sample(maxRange, steps).map((x) => ({ x, dps: appliedDps(inputs, target, x) }));
 }
 
-/** Applied DPS as the target's speed runs from 0 to `maxSpeed`, at a fixed `distance`. */
 export function appliedDpsVsSpeed(
   inputs: AppliedDpsInputs,
   target: TargetProfile,
@@ -243,20 +193,12 @@ function weaponReach(weapon: AppliedWeapon, droneControlRange: number): number {
     case 'drone':
       return droneControlRange;
     case 'fighter':
-      // Reaches wherever its target is: it stretches no axis.
       return 0;
   }
 }
 
 const RANGE_ROUNDING = 5000;
 
-/**
- * A range axis every fit in `fits` reaches across: 10% past the longest
- * weapon's reach (a turret's optimal + 3 falloffs, where it's down to ~0.2%),
- * rounded up to a whole 5 km. Fighters have no reach of their own, so a fit
- * firing only fighters runs to its drone control range, the usual axis for
- * launched craft. 0 when nothing fires.
- */
 export function graphMaxRange(fits: readonly AppliedDpsInputs[]): number {
   const reach = Math.max(
     0,
@@ -272,12 +214,6 @@ export function graphMaxRange(fits: readonly AppliedDpsInputs[]): number {
   return Math.ceil((axis * 1.1) / RANGE_ROUNDING) * RANGE_ROUNDING;
 }
 
-/**
- * The range a sampled range graph peaks at, 0 for an empty graph. On a tie —
- * a missile's or a keeping-up drone's flat line — the far end, so a speed
- * graph worked out there isn't pinned at 0 m, where no turret ever hits a
- * moving target.
- */
 export function bestRange(points: readonly AppliedDpsPoint[]): number {
   let best: AppliedDpsPoint | null = null;
   for (const point of points) if (best === null || point.dps >= best.dps) best = point;
@@ -286,7 +222,6 @@ export function bestRange(points: readonly AppliedDpsPoint[]): number {
 
 const SPEED_ROUNDING = 500;
 
-/** A speed axis that shows the profile's own speed with room either side: twice it, at least 1000 m/s. */
 export function graphMaxSpeed(target: TargetProfile): number {
   return Math.max(1000, Math.ceil((target.velocity * 2) / SPEED_ROUNDING) * SPEED_ROUNDING);
 }

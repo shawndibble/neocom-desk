@@ -1,10 +1,3 @@
-/**
- * Each Character's corporation's open manufacture projects, read once when
- * Opportunities opens (issue #4786): no polling, and `corpProjectsData`'s cache
- * answers a revisit. Only a Character that holds the Corporation projects
- * Permission and has a corporation is read, so the answer doubles as the hide
- * rule: no entries, no Corp projects view.
- */
 import { useEffect, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useCharacterIdsWithScopes } from '@/app/characterIdsWithScopes';
@@ -20,9 +13,7 @@ export interface CharacterCorpProjects {
 }
 
 export interface CorpProjectsState {
-  /** Characters with at least one open manufacture project, in `characterIds` order. */
   entries: CharacterCorpProjects[];
-  /** True until the first read settles (or the permission lookup does). */
   loading: boolean;
 }
 
@@ -57,7 +48,6 @@ export function useCorpProjects(characterIds: readonly number[]): CorpProjectsSt
   useEffect(() => {
     if (eligibleKey === undefined) return;
     let cancelled = false;
-    // The key is the eligible list by value, so the effect parses it back rather than depend on a rebuilt array.
     const pairs =
       eligibleKey === '' ? [] : eligibleKey.split(',').map((pair) => pair.split(':').map(Number));
     void Promise.all(
@@ -69,7 +59,6 @@ export function useCorpProjects(characterIds: readonly number[]): CorpProjectsSt
             ? [{ characterId: characterId!, corporationId: corporationId!, projects }]
             : [];
         } catch {
-          // A Character whose read fails drops out, as one with no projects does: the view hides, never hangs.
           return [];
         }
       })

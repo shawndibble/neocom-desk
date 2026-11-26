@@ -3,9 +3,6 @@ import { db } from '@/db';
 import type { SyncStatus } from '@/sync/status';
 import { createSyncedSetting } from './useSyncedSetting';
 
-// A real allow-listed key, because the factory rejects anything else — the
-// allow-list is the whole point of the `sync.` namespace. Which preference it
-// happens to belong to is irrelevant here.
 const KEY = 'sync.marketHub';
 const LEGACY_KEY = 'marketHub';
 
@@ -15,15 +12,9 @@ let statusListeners: ((status: SyncStatus) => void)[] = [];
 
 vi.mock('@/app/syncStatus', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/app/syncStatus')>()),
-  // `MODE === 'test'` makes the real one false, which would switch off every
-  // sync-side path this file exists to test.
   isSyncConfigured: () => true,
 }));
 
-// A factory mock with no `importOriginal`, deliberately: several suites mock
-// the barrel exactly like this, and the factory under test must stay
-// initializable under one — which is why its allow-list check imports the leaf
-// module instead.
 import { IDLE_SYNC_STATUS } from '@/sync/statusFixtures';
 vi.mock('@/sync', () => ({
   getSyncStatus: () => IDLE_SYNC_STATUS,
@@ -42,17 +33,10 @@ vi.mock('@/sync/status', async (importOriginal) => ({
   },
 }));
 
-/** A sync run that finished successfully, as `status.ts` reports one. */
 function announceSyncedAt(lastSyncedAt: number): void {
   for (const listener of statusListeners) listener({ state: 'idle', lastSyncedAt, error: null });
 }
 
-/**
- * Settles every Dexie read already in flight. IndexedDB serves requests on a
- * store in order, so a read issued now cannot resolve before one issued
- * earlier — which is what makes the "a press outran the pull" assertion below
- * deterministic rather than a race against a timer.
- */
 const settleReads = () => db.settings.get('sync.__probe');
 
 beforeEach(async () => {
@@ -122,8 +106,6 @@ describe('createSyncedSetting', () => {
     });
     await useSetting.getState().hydrate();
 
-    // setSyncedSetting stamps `updatedAt: Date.now()`, which would make a
-    // never-synced local value beat every other device's real edit.
     expect(setSyncedSetting).not.toHaveBeenCalled();
   });
 
@@ -201,7 +183,6 @@ describe('createSyncedSetting', () => {
     await useSetting.getState().hydrate();
     expect(useSetting.getState().value).toBe('jita');
 
-    // What planSync's settings pull does: a bare put, behind the store's back.
     await db.settings.put({ key: KEY, value: 'amarr' });
     announceSyncedAt(1000);
 
@@ -218,8 +199,6 @@ describe('createSyncedSetting', () => {
     await useSetting.getState().hydrate();
     expect(useSetting.getState().value).toBe('amarr');
 
-    // A hub id this build has never heard of — an older bundle's, or a row
-    // edited by hand. It must land as the default, not as itself.
     await db.settings.put({ key: KEY, value: 'hub-from-a-newer-build' });
     announceSyncedAt(1000);
 
@@ -231,8 +210,6 @@ describe('createSyncedSetting', () => {
     const useSetting = createSyncedSetting({ key: KEY, defaultValue: 'jita' });
     await useSetting.getState().hydrate();
 
-    // The re-read is issued here; the press lands before it resolves, and is
-    // the newer of the two.
     announceSyncedAt(1000);
     await useSetting.getState().setValue('dodixie');
     await settleReads();

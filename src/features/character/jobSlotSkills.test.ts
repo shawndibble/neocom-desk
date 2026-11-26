@@ -25,13 +25,13 @@ describe('jobSlotSkillsFromCharacterSkills', () => {
 
   it('reads each of the six by its real EVE type id', () => {
     const skills = [
-      skill(3387, 5), // Mass Production
-      skill(24625, 4), // Advanced Mass Production
-      skill(3406, 3), // Laboratory Operation
-      skill(24624, 2), // Advanced Laboratory Operation
-      skill(45748, 4), // Mass Reactions
-      skill(45749, 0), // Advanced Mass Reactions (untrained, present at 0)
-      skill(3300, 5), // an unrelated skill — must not leak into any field
+      skill(3387, 5),
+      skill(24625, 4),
+      skill(3406, 3),
+      skill(24624, 2),
+      skill(45748, 4),
+      skill(45749, 0),
+      skill(3300, 5),
     ];
     expect(jobSlotSkillsFromCharacterSkills(skills)).toEqual({
       massProduction: 5,

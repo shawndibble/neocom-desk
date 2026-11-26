@@ -12,7 +12,6 @@ import {
 
 describe('reloadDuty', () => {
   it('is the share of the time a magazine keeps the module running, reloads counted', () => {
-    // Three 12 s cycles, then a 10 s reload: 36 of every 46 s.
     expect(reloadDuty({ cycles: 3, cycleSeconds: 12, reloadSeconds: 10 })).toBeCloseTo(36 / 46, 9);
   });
 
@@ -24,11 +23,8 @@ describe('reloadDuty', () => {
 
 describe('capacitorBudget', () => {
   const users: CapacitorUser[] = [
-    // A shield booster: 60 GJ every 3 s.
     { capPerSecond: 20 },
-    // A cap booster: no activation cost, 400 GJ every 12 s.
     { capPerSecond: -400 / 12, injectionPerCharge: 400 },
-    // A nosferatu: the engine reports what it takes as a negative draw.
     { capPerSecond: -7.2 },
     { capPerSecond: 9.375 },
   ];
@@ -40,12 +36,10 @@ describe('capacitorBudget', () => {
     expect(budget.drain).toBeCloseTo(29.375, 6);
     expect(budget.boosterInjection).toBeCloseTo(33.333, 3);
     expect(budget.nosferatuGain).toBeCloseTo(7.2, 6);
-    // Recharge + booster − drain: a nosferatu needs a cap-rich target, so it is shown, not counted.
     expect(budget.delta).toBeCloseTo(35.84 + 33.333 - 29.375, 3);
   });
 
   it('averages an ancillary repairer’s draw over its reload', () => {
-    // Medium AAR: eight 9 s cycles of paste, then a 60 s reload — 72 of every 132 s.
     const ancillary = { cycles: 8, cycleSeconds: 9, reloadSeconds: 60 };
     const budget = capacitorBudget([{ capPerSecond: 40 }, { capPerSecond: 30, ancillary }], 50);
     expect(budget.drain).toBeCloseTo(40 + (30 * 72) / 132, 6);
@@ -65,8 +59,6 @@ describe('capacitorBudget', () => {
   });
 
   it('averages a cap booster over its reload, as an ancillary repairer is', () => {
-    // Medium Capacitor Booster II, Navy Cap Booster 400: three 400 GJ charges
-    // 12 s apart, then 10 s reloading — 1200 GJ every 46 s, not 400 every 12.
     const magazine = { cycles: 3, cycleSeconds: 12, reloadSeconds: 10 };
     const budget = capacitorBudget(
       [{ capPerSecond: 20 }, { capPerSecond: -400 / 12, injectionPerCharge: 400, magazine }],
@@ -82,7 +74,6 @@ describe('capacitorBudget', () => {
       [{ capPerSecond: 60 }, { capPerSecond: -400 / 12, injectionPerCharge: 400, magazine }],
       40
     );
-    // Still 20 GJ/s short without it: one 400 GJ charge per 20 s on average.
     expect(budget.secondsPerBoosterCharge).toBeCloseTo(20, 6);
   });
 
@@ -91,7 +82,6 @@ describe('capacitorBudget', () => {
       [{ capPerSecond: 60 }, { capPerSecond: -400 / 12, injectionPerCharge: 400 }],
       40
     );
-    // 20 GJ/s short without the booster; a 400 GJ charge covers 20 s of it.
     expect(budget.secondsPerBoosterCharge).toBeCloseTo(20, 6);
   });
 
@@ -182,14 +172,12 @@ describe('sustainedRepair', () => {
   });
 
   it('scales only the capacitor-using repairers by the share of their draw the capacitor can feed', () => {
-    // 20 GJ/s go to other modules; 30 GJ/s of recharge is left for 30 GJ/s of reps... minus 10.
     const loaded: Repairer = { layer: 'shield', rate: 25, capPerSecond: 0 };
     const result = sustainedRepair([booster, armorRep, loaded], {
       peakRecharge: 30,
       peakLoad: 50,
     });
 
-    // Non-rep load 20; 10 GJ/s left for 30 GJ/s of rep draw → a third.
     expect(result.capFraction).toBeCloseTo(1 / 3, 6);
     expect(result.sustained.shield).toBeCloseTo(40 / 3 + 25, 6);
     expect(result.sustained.armor).toBeCloseTo(10, 6);
@@ -202,7 +190,6 @@ describe('sustainedRepair', () => {
   });
 
   it('spreads a loaded ancillary repairer over its reload', () => {
-    // Eight 12 s cycles of paste, then a 60 s reload: 96 of every 156 s.
     const aar: Repairer = {
       layer: 'armor',
       rate: 78,
@@ -214,7 +201,6 @@ describe('sustainedRepair', () => {
   });
 
   it('spreads a capacitor-using ancillary repairer’s draw over its reload too', () => {
-    // 8 × 9 s of paste, 60 s reload: duty 72/132. Its 30 GJ/s averages to 16.36; 10 GJ/s of recharge is left.
     const ancillary = { cycles: 8, cycleSeconds: 9, reloadSeconds: 60 };
     const aar: Repairer = { layer: 'armor', rate: 78, capPerSecond: 30, ancillary };
     const duty = 72 / 132;
@@ -235,12 +221,10 @@ describe('sustainedRepair', () => {
 });
 
 describe('capacitorStatusAtDrain', () => {
-  // 1000 GJ, 200 s recharge: peak recharge 2.5 × 1000 / 200 = 12.5 GJ/s at 25%.
   const capacity = 1000;
   const recharge = 200;
 
   it('settles where the recharge curve meets a drain it can carry', () => {
-    // 10(√s − s)·C/τ = D → √s = (1 + √(1 − 4D·τ/10C)) / 2.
     const status = capacitorStatusAtDrain(capacity, recharge, 10);
     const root = (1 + Math.sqrt(1 - (4 * 10 * recharge) / (10 * capacity))) / 2;
     expect(status).toEqual({
@@ -250,7 +234,6 @@ describe('capacitorStatusAtDrain', () => {
   });
 
   it('matches a worked example: a 10 GJ/s drain settles at 52.36%', () => {
-    // Load 10 / 12.5 = 0.2; √s = (1 + √0.2) / 2 = 0.72361; s = 0.5236.
     const status = capacitorStatusAtDrain(1000, 200, 10);
     expect(status.stable).toBe(true);
     expect(status).toEqual({ stable: true, stablePercentage: expect.closeTo(52.36, 2) });
@@ -269,7 +252,6 @@ describe('capacitorStatusAtDrain', () => {
 
   it('runs dry past peak, in the time the recharge curve buys from full', () => {
     const status = capacitorStatusAtDrain(capacity, recharge, 20);
-    // Numerical check of ∫₀¹ C ds / (D − 10C/τ·(√s − s)).
     let seconds = 0;
     const steps = 200000;
     for (let i = 0; i < steps; i++) {

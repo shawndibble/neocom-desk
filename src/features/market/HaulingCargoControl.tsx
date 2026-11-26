@@ -1,12 +1,3 @@
-/**
- * "Cargo space" on the Hauling Opportunities page: one control that opens a
- * small popover with three ways to say how much the hauler can carry — a ship
- * (its base holds), a saved Fitting (the exact holds, skills and expanders
- * included) or a typed number of m³ in one hold of a chosen kind.
- *
- * The popover body mounts only when opened, so the catalogue and saved
- * Fittings it reads cost nothing to a visit that never picks a ship.
- */
 import { useId, useMemo, useState, type ReactNode } from 'react';
 import { InlineError } from '@/components/ui/InlineError';
 import { useTranslation } from 'react-i18next';
@@ -43,7 +34,6 @@ import { formatCount } from '@/lib/formatCount';
 
 type CargoTab = 'ship' | 'fitting' | 'custom';
 
-/** The hull class a hauler most likely means; the rest is reachable by search. */
 const DEFAULT_HULL_CLASS = 'Haulers and Industrial Ships';
 const SHOWN_HULLS = 30;
 
@@ -57,10 +47,6 @@ function formatM3(m3: number): string {
   return `${formatCount(m3)} m³`;
 }
 
-/**
- * The picker popover around any trigger. The page-level button and the
- * Appraisal hold line's ship name are two triggers for the one picker.
- */
 export function HaulingCargoPopover({
   characterId,
   cargo,
@@ -117,11 +103,6 @@ export function HaulingCargoControl({
       cargo={cargo}
       onCargoChange={onCargoChange}
       triggerLabel={t('market.hauling.cargo.label')}
-      // Gives way first when the summary bar is short of room (a phone, or a
-      // tablet with the rail open): in a bar under 30rem the m³ goes, since
-      // the bar's hold meter prints it beside the button, and past that the
-      // name truncates on one line rather than wrapping inside a
-      // fixed-height button.
       triggerClassName={buttonClassName({
         variant: cargo === null ? 'primary' : 'ghost',
         size: 'sm',
@@ -205,7 +186,6 @@ export function CargoPickerBody({ characterId, onPick, onClear, hasCargo }: Carg
         <CustomTab
           onChoose={(hold) =>
             onPick({
-              // A typed hold of a kind says which, so the control shows it after picking.
               label:
                 hold.kind === 'general'
                   ? t('market.hauling.cargo.custom')
@@ -323,7 +303,6 @@ function FittingTab({
   );
 }
 
-/** A typed Cargo Space: one hold of m³, "Any item" unless a Specialised Hold kind is picked. */
 function CustomTab({ onChoose }: { onChoose: (hold: CargoHold) => void }) {
   const { t } = useTranslation();
   const [text, setText] = useState('');

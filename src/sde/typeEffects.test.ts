@@ -3,7 +3,6 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { COVERT_CLOAK_EFFECT } from '@/engine/fittings/explore';
 
-// Drift guard: the committed file is what `scripts/lib/typeEffects.mjs` bakes.
 const read = <T>(name: string) =>
   JSON.parse(readFileSync(join(process.cwd(), 'public', 'data', name), 'utf-8')) as T;
 const idOf = (name: string) =>

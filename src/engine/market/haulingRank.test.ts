@@ -9,9 +9,7 @@ import {
 
 describe('priceScore', () => {
   it('ranks a bulk steady seller over a high-ratio item with thin stock', () => {
-    // 3x the price, but two units on the market at the cheaper end.
     const thin = priceScore({ buy: 1_000_000, sell: 3_000_000, originListed: 2, destListed: 500 });
-    // 1.2x the price, thousands listed at both ends.
     const bulk = priceScore({
       buy: 10_000,
       sell: 12_000,

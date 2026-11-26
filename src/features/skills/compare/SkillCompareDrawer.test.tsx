@@ -81,7 +81,6 @@ const server = setupServer(
 
 beforeAll(() => {
   server.listen({ onUnhandledRequest: 'error' });
-  // `App` wires this at boot; an isolated render has to do it itself.
   configureEsi({ getToken: async () => 'access-token' });
 });
 afterAll(() => {
@@ -112,7 +111,6 @@ function LocationProbe() {
   return <output data-testid="search">{useLocation().search}</output>;
 }
 
-/** The drawer on its own, in a router: the URL carries the selection, as it does on Skills › Trained. */
 function renderDrawer(search = '', onClose: () => void = () => {}, activeCharacterId = CHAR_A) {
   return render(
     <MemoryRouter initialEntries={[`/skills/trained${search}`]}>
@@ -126,7 +124,6 @@ function currentSearch(): URLSearchParams {
   return new URLSearchParams(screen.getByTestId('search').textContent ?? '');
 }
 
-/** A character chip in the picker, found by name. */
 async function chip(name: RegExp): Promise<HTMLElement> {
   const list = await screen.findByRole('list', { name: 'Characters to compare' });
   return await within(list).findByRole('button', { name });
@@ -159,14 +156,12 @@ describe('SkillCompareDrawer', () => {
     await waitFor(() => expect(columnNames(table)).toEqual(['Pilot OneBaseline', 'Pilot Two']));
 
     const gunnery = within(skillRow(table, 'Gunnery')).getAllByRole('cell');
-    // Pilot One (the baseline) is a bare level; Pilot Two is its level and the lead over it.
     expect(gunnery[0]).toHaveTextContent('3');
     expect(gunnery[0]).not.toHaveTextContent('+');
     expect(gunnery[1]).toHaveTextContent('5');
     expect(gunnery[1]).toHaveTextContent('+2');
     expect(within(gunnery[1]!).getByRole('img', { name: 'Level 5 of 5' })).toBeInTheDocument();
 
-    // Pilot One has no Spaceship Command at all: level 0, and Pilot Two is ahead by its whole level.
     expect(within(skillRow(table, 'Spaceship Command')).getAllByRole('cell')[1]).toHaveTextContent(
       '+2'
     );
@@ -253,7 +248,6 @@ describe('SkillCompareDrawer', () => {
       http.get(`https://esi.evetech.net/characters/${CHAR_B}/skills`, () =>
         HttpResponse.json({
           skills: [
-            // Matches Pilot One's Gunnery level exactly.
             { skill_id: GUNNERY, trained_skill_level: 3, skillpoints_in_skill: 24_000 },
             { skill_id: SPACESHIP_COMMAND, trained_skill_level: 2, skillpoints_in_skill: 8000 },
           ],
@@ -318,7 +312,6 @@ describe('SkillCompareDrawer', () => {
     expect(stored.items).toHaveLength(1);
     expect(stored.items[0]?.characterIds.sort()).toEqual([CHAR_A, CHAR_B]);
 
-    // Deselect both, then reload the saved comparison from the list.
     await user.keyboard('{Escape}');
     await user.click(await chip(/Pilot One/));
     await user.click(await chip(/Pilot Two/));
@@ -344,7 +337,6 @@ describe('SkillCompareDrawer', () => {
     await user.clear(input);
     await user.type(input, 'Miners{Enter}');
     expect(await screen.findByText('Miners')).toBeInTheDocument();
-    // Enter unmounted the focused input: focus returns to the row's Rename button.
     await waitFor(() =>
       expect(screen.getByRole('button', { name: 'Rename Miners' })).toHaveFocus()
     );
@@ -355,7 +347,6 @@ describe('SkillCompareDrawer', () => {
     await user.click(within(dialog).getByRole('button', { name: 'Delete' }));
     await waitFor(() => expect(screen.queryByText('Miners')).not.toBeInTheDocument());
     expect(screen.getByText('No saved comparisons yet.')).toBeInTheDocument();
-    // The only row is gone: focus lands on the menu heading, not <body>.
     await waitFor(() =>
       expect(screen.getByRole('heading', { name: 'Saved comparisons' })).toHaveFocus()
     );
@@ -402,11 +393,6 @@ describe('SkillCompareDrawer', () => {
   });
 
   it('resolves a saved comparison clicked before the character roster has loaded', async () => {
-    // The saved list renders straight from the comparisons store, so it is
-    // clickable on the very first frame — before `db.characters`' useLiveQuery
-    // has resolved. Resolving against an empty roster dropped every id and left
-    // a permanent "some characters removed" notice with a selection of none
-    // (#594).
     const readRoster = db.characters.toArray.bind(db.characters);
     vi.spyOn(db.characters, 'toArray').mockImplementation(() =>
       readRoster().then(async (rows) => {

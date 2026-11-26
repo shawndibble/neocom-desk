@@ -1,12 +1,3 @@
-/**
- * Test-only Build Plan pricing inputs. Imported by test files only; nothing in
- * the app references this module.
- *
- * Hydrated, at every setting's default, with no corp blueprints, standings or
- * BPC Sourcing rows: what a fresh pilot's inputs read once loaded. A single
- * module-level object, so its identity stays put across renders and a
- * pricing memo keyed on it doesn't re-run.
- */
 import { DEFAULT_ASSUMED_ME } from './assumedMe';
 import type { BuildPlanPricingInputs } from './buildPlanPricingInputs';
 

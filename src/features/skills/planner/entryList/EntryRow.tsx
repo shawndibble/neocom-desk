@@ -28,57 +28,23 @@ interface EntryRowProps {
   row: Extract<MergedRow, { kind: 'entry' }>;
   name: string;
   attributes: AttributePair | undefined;
-  /** Step indices a live Booster speeds up — the row's own mark and its per-level marks both read this. */
   boostedSteps: ReadonlySet<number> | undefined;
-  /** Step indices above the Alpha skill cap; empty unless the Character is Alpha. */
   alphaCappedSteps: ReadonlySet<number> | undefined;
-  /** When training begins, for this row's finish date. Undefined when there's no wall-clock basis to offer. */
   startDate: Date | undefined;
   columns: ColumnVisibility;
   isDesktop: boolean;
-  /**
-   * Phone only: this row trains the next level of the skill the row above it
-   * trains. It drops the repeated skill name and the per-skill attribute pair
-   * and priority, so the run reads as one skill with its levels inline. It
-   * keeps its own grip, time and ⋮ — reordering and removal stay per level.
-   */
   continuation?: boolean;
   onRemove: (skillTypeID: number, targetLevel: number) => void;
-  /** Runs as a skill name is clicked, before the link navigates — carries this plan's entries to the modal. */
   onStageSkillDetail: (skillTypeID: number) => void;
-  /**
-   * Undefined when the row is freely removable. Set to a plain-language
-   * reason (naming what still needs it) when some other entry — a later
-   * level of this skill, or a dependent skill's own entry — would pull this
-   * exact level straight back in as a dimmed prereq row the instant it's
-   * removed (`findRemovalBlockers`). The remove button disables rather than
-   * accepting a click that silently undoes itself.
-   */
   removalBlockedReason: (skillTypeID: number, targetLevel: number) => string | undefined;
   onSetPriority: (skillTypeID: number, priority: PlanPriority) => void;
-  /**
-   * Set when this row IS the in-game queue's currently-training level (#1701
-   * follow-up) — it contributes zero of its own scheduled steps (already
-   * credited as trained by `startDate`), so its "Takes" cell reads that
-   * level's real remaining time instead of a bare, misleading "0m".
-   */
   pinnedInProgress: PinnedInProgressEntry | null | undefined;
-  /** This row's Plan Milestone (GLOSSARY.md), if one is anchored to its skill/level. */
   milestoneStatus: MilestoneStatus | undefined;
   onAddMilestone: (skillTypeID: number, targetLevel: number) => void;
   onRenameMilestone: (milestoneId: string) => void;
   onRemoveMilestone: (milestoneId: string) => void;
 }
 
-/**
- * Memoized (#408): PlanEditor re-renders on state that has nothing to do
- * with any given row (dropError, an unrelated marker's editor, the export
- * menu, another row's own expansion) — `React.memo` skips this row entirely
- * when none of its own props changed. Only holds if the callback props below
- * are themselves stable (`useCallback`'d at the PlanEditor/EntryList call
- * sites) — an inline arrow recreated every render would defeat this the same
- * way an unstable dependency defeats `useMemo`.
- */
 export const EntryRow = memo(function EntryRow({
   row,
   name,
@@ -102,20 +68,11 @@ export const EntryRow = memo(function EntryRow({
   const { t } = useTranslation();
   const timeZone = useTimeZone();
   const { setNodeRef, style, handleProps, isDragging } = useRowSortable(row.id);
-  // The dialogs these items open wait for the menu to hand focus back to ⋮.
   const menu = useOpenAfterMenu();
   const { entry, stepIndices } = row;
-  // A row credited as already-trained by the plan's start (`row.seconds: 0`)
-  // because it IS the in-game queue's currently-training level (#1701
-  // follow-up) reads that level's real remaining time instead of a bare,
-  // misleading "0m" — straight off the ESI queue's own `finish_date`, not
-  // the plan's (zeroed) schedule.
   const takesSeconds = pinnedInProgress?.id === row.id ? pinnedInProgress.seconds : row.seconds;
   const boosted = stepIndices.some((i) => boostedSteps?.has(i) ?? false);
   const alphaCapped = stepIndices.some((i) => alphaCappedSteps?.has(i) ?? false);
-  // Names the level, not just the skill: a plan holds one row per level, so
-  // two rows of the same skill would otherwise offer two buttons with the
-  // identical accessible name "Remove Gunnery".
   const rowLabel = formatLevelLabel(name, entry.targetLevel);
 
   const dragHandle = (
@@ -129,10 +86,6 @@ export const EntryRow = memo(function EntryRow({
     </button>
   );
 
-  // One row trains one level (reorder.ts), so the row says which level it is
-  // and there is nothing left to disclose — the caret and the per-level
-  // breakdown it opened (#254) both retired with the level ranges that made
-  // them necessary.
   const nameSpan = continuation ? (
     <span className={NAME_CELL}>
       <span className="sr-only">{name} </span>
@@ -156,9 +109,6 @@ export const EntryRow = memo(function EntryRow({
         {boosted && <BoosterMark />}
         {alphaCapped && <AlphaCapMark />}
       </span>
-      {/* Desktop keeps the mark on line one (#114's fixed columns leave it
-          room); below `md` it moves to the meta line instead, so a long
-          milestone name can't squeeze the skill name off this row. */}
       {isDesktop && milestoneStatus && <MilestoneMark status={milestoneStatus} />}
     </span>
   );
@@ -180,10 +130,6 @@ export const EntryRow = memo(function EntryRow({
     ) : null;
 
   const blockedReason = removalBlockedReason(entry.skillTypeID, entry.targetLevel);
-  // One ⋮ ends the row (right-click and touch-and-hold open the same menu):
-  // the milestone's actions, then Remove as the danger item. A blocked removal
-  // is an `aria-disabled` item with a tap-reachable reason (`DisabledMenuItem`)
-  // rather than a click that silently undoes itself.
   const rowMenuItems = (
     <>
       {milestoneStatus ? (
@@ -222,13 +168,6 @@ export const EntryRow = memo(function EntryRow({
     </>
   );
 
-  /**
-   * Below `md` every optional value drops to one dim meta line under the name
-   * (#114), including the finish date — which used to ride line one and eat
-   * the width the skill name and its Booster mark needed. Line one is now the
-   * row's identity and its one action, nothing else, and the row still folds
-   * back to a single line when the user turns every optional column off.
-   */
   const metaLine =
     attributeBadge ||
     priorityControl ||

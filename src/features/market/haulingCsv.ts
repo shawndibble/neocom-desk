@@ -6,29 +6,16 @@ import { hubAtAnyEnd, type HaulingAnyEnd } from './haulingHubs';
 import type { HaulingViewRow } from './haulingView';
 
 export interface HaulingCsvOptions {
-  /** The flag's on-screen label (the panel owns that wording). */
   flagText: (flag: HaulingFlag) => string;
-  /** Units the trip plan brings of this row; null when it's off the trip. */
   bringFor: (row: HaulingViewRow) => number | null;
-  /** The trip plan's profit on the row's Bring quantity; null when it has no plan line or brings nothing. */
   profitFor: (row: HaulingViewRow) => number | null;
-  /** The row's hold space at the Bring quantity, m³; null when it has no plan line. */
   holdM3For: (row: HaulingViewRow) => number | null;
-  /** The category a row was added from by the fill, or null for a row the scan itself found. */
   addedFromFor: (row: HaulingViewRow) => string | null;
-  /** Whether the row is ticked onto the trip. */
   selectedFor: (row: HaulingViewRow) => boolean;
-  /** Selling into buy orders drops Days to Sell and demand, as the table does. Defaults to `list`. */
   mode?: HaulMode;
-  /** The end set to Any hub: adds a Hub column naming the hub each row uses there. */
   anyEnd?: HaulingAnyEnd;
 }
 
-/**
- * CSV columns for the Hauling table, in its on-screen order, plus the facts it keeps in
- * sub-lines (added-from category) and its tick box. Figures are raw numbers — not the
- * table's "99+" or signed-percent display — and Bring is what the trip plan loads.
- */
 export function haulingCsvColumns(
   t: CsvTranslate,
   {

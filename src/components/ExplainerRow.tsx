@@ -3,11 +3,6 @@ import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
 
-/**
- * One ruled line of a "New to …?" explainer drawer (PI, Industry): a 32px
- * picture, a bold title over a dim sentence, and an optional chip at the end
- * (PI's tier chip).
- */
 export function ExplainerRow({
   art,
   title,
@@ -31,12 +26,10 @@ export function ExplainerRow({
   );
 }
 
-/** A drawer section's eyebrow heading ("The buildings", "Two kinds of blueprint"). */
 export function ExplainerSection({ title }: { title: string }) {
   return <h3 className={cx(eyebrowClassName, 'pt-3 pb-1')}>{title}</h3>;
 }
 
-/** The down arrow between two `ExplainerRow` steps of a chain, naming what moves things on. */
 export function ExplainerArrow({ label }: { label: string }) {
   return (
     <p className={cx(eyebrowClassName, 'py-1 pl-1')}>

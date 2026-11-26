@@ -1,28 +1,3 @@
-/**
- * Short-lived view state in the query string (ADR 0015): the React side of
- * `./urlState.ts`'s codecs.
- *
- * - **Replace, not push.** A filter keystroke or a sort click is not a place
- *   Back should return to; tab switches (`usePageTab`) are the pushes. A
- *   write that *is* a place to return to — a Fitting edit (issue #1533) —
- *   opts in with `{ push: true }`.
- * - **Debounced text.** A codec with `debounceMs` holds its value locally and
- *   writes once typing pauses; any other key changing in the same update
- *   flushes the pending text with it, in one navigation.
- * - **Grouped writes.** One `useUrlParams` call owns a set of keys and writes
- *   them together. Two separate hooks writing in the same tick would each
- *   start from the URL as last rendered and the second would drop the first,
- *   so keys that change together (a filter bar's text, types and standings)
- *   belong in one group.
- * - **Read-only defaults.** The URL wins over a default; absent means the
- *   default. Nothing read from the URL is written back to a stored setting
- *   (scope decision "persisted view preferences stay out of the URL").
- *   `useRememberedUrlParams` below stores a reader's own *edit* of a field
- *   with a stored default, and its opt-in `adoptLinked` is the one recorded
- *   exception.
- *
- * Pass a schema that is stable across renders — module scope, or a `useMemo`.
- */
 import {
   startTransition,
   type ContextType,
@@ -44,7 +19,6 @@ import {
 } from 'react-router-dom';
 import { resolveSort, sortParam, type UrlParamCodec, type UrlSort } from './urlState';
 
-/** Any codec, whatever its value type — `serialize`'s parameter is the only contravariant spot. */
 export type UrlParamSchema = Record<
   string,
   {
@@ -54,10 +28,8 @@ export type UrlParamSchema = Record<
   }
 >;
 
-/** `push` adds a history entry instead of replacing the current one; `clearHash` drops the `#fragment`. */
 export interface UrlWriteOptions {
   push?: boolean;
-  /** History state for the written entry; default keeps the current entry's. */
   state?: unknown;
   clearHash?: boolean;
 }
@@ -85,17 +57,12 @@ export function useUrlParams<S extends UrlParamSchema>(
 
   const [pending, setPending] = useState<Record<string, unknown>>({});
 
-  // The timer below fires after later renders, so it reads the location as it
-  // is *then*, not as it was when the keystroke scheduled it (`flush` drops it
-  // if the path has changed since).
   const latest = useRef({ location, navigate, history, urlValues, pending });
   useLayoutEffect(() => {
     latest.current = { location, navigate, history, urlValues, pending };
   });
 
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Leaving the page drops a pending write rather than landing it on
-  // whichever page the reader went to.
   useEffect(
     () => () => {
       if (timer.current !== null) clearTimeout(timer.current);
@@ -106,11 +73,6 @@ export function useUrlParams<S extends UrlParamSchema>(
   const flush = useCallback(
     (values: Record<string, unknown>, options: UrlWriteOptions = {}) => {
       timer.current = null;
-      // One transition for both: `BrowserRouter` applies a navigation inside
-      // `startTransition`, so clearing `pending` urgently would commit a frame
-      // with the old URL's values — the text box would flicker back, and a
-      // write in that frame would start from the stale query string.
-      // (`setValues` has already shown `values` urgently.)
       startTransition(() => {
         setPending({});
         const { location: shown, navigate: go, history: router } = latest.current;
@@ -136,13 +98,7 @@ export function useUrlParams<S extends UrlParamSchema>(
       }
       if (timer.current !== null) clearTimeout(timer.current);
       timer.current = null;
-      // Written straight through too, so a second call before the next render
-      // sees this one's value as its "before".
       latest.current = { ...latest.current, pending: next };
-      // Shown now, debounced or not — never only once the navigation's
-      // transition commits: a slow page holds that open, and a second click
-      // in the gap built on the old value (three quick picks kept only the
-      // last). `flush` clears it in the same transition that lands the URL.
       setPending(next);
       if (immediate || wait === 0) {
         flush(next, options);
@@ -157,22 +113,10 @@ export function useUrlParams<S extends UrlParamSchema>(
   return [values as UrlParamValues<S>, setValues];
 }
 
-/**
- * Where the router's history is *now*, if that is still the page `shown`
- * renders. The router applies a navigation in a transition, so every hook
- * renders the location before it until it commits; a write built on that —
- * a second pick, a Corp Wallet division switch's filter reset, a write after
- * Back — dropped what the history already holds. The history object updates
- * synchronously on push, replace and pop. `null` while a different page is
- * in flight: the write is dropped, never replaced over that navigation
- * (which undid it). A router whose navigator has no live location writes on
- * the rendered one, as before.
- */
 function currentLocation(
   router: ContextType<typeof NavigationContext>,
   shown: Location
 ): Location | null {
-  // BrowserRouter's and MemoryRouter's navigator is the history itself.
   const live = (router.navigator as { location?: Location }).location;
   if (live === undefined) return shown;
   const trim = (path: string) => path.replace(/\/+$/, '');
@@ -208,7 +152,6 @@ function writeParams(
   );
 }
 
-/** One URL-backed value; `useUrlParams` with a single key. */
 export function useUrlParam<T>(
   key: string,
   codec: UrlParamCodec<T>
@@ -223,12 +166,6 @@ export function useUrlParam<T>(
   return [(values as Record<string, T>)[key], setValue];
 }
 
-/**
- * A `DataTable`'s sort bound to one query key: spread the result onto the
- * table (`<DataTable {...sortProps} />`). A sort naming a column the table
- * does not have reads as `defaultSort`. `defaultSort` should be
- * a module constant; `columnIds` is only compared, so a fresh list is fine.
- */
 export function useUrlSort(
   key: string,
   defaultSort: UrlSort,
@@ -239,7 +176,6 @@ export function useUrlSort(
   return { sort: resolveSort(sort, defaultSort, columnIds), onSortChange: setSort };
 }
 
-/** A filter object's fields, read off a `useUrlParams`-shaped values record. */
 export function filterFromParamValues<F extends object>(
   values: Record<string, unknown>,
   fieldToParam: Record<keyof F & string, string>
@@ -252,7 +188,6 @@ export function filterFromParamValues<F extends object>(
   return result;
 }
 
-/** The inverse of `filterFromParamValues`: a whole filter object as a params patch. */
 export function paramsPatchFromFilter<F extends object>(
   next: F,
   fieldToParam: Record<keyof F & string, string>
@@ -265,30 +200,6 @@ export function paramsPatchFromFilter<F extends object>(
   return patch;
 }
 
-/**
- * A filter object backed by a `useUrlParams` group, unwrapped through a
- * field-to-param-key map — plain data, so (unlike a hook taking `unwrap`/
- * `wrap` callbacks) it costs no fresh closure identity every render as long
- * as the caller passes a module-scope map.
- *
- * Resets to `emptyParams` whenever `scopeKey` changes *after* mount (a
- * division switch, an owner toggle — whatever the caller's filter should
- * not survive) — never on mount itself, so a filter delivered by the URL on
- * first load is not immediately wiped. Build `scopeKey` from the same
- * synchronous source the URL itself reads from, not from anything that
- * settles asynchronously (an access check, a fetched list): if `scopeKey`
- * can read one value on the first render and a different one a render later
- * for reasons unrelated to the field it names, that settling looks
- * indistinguishable from a real change and the filter is wiped for it.
- *
- * The third element is the same filter through `useDeferredValue`: derive
- * rows from it, never the input. The debounce above only delays the URL
- * write — the immediate value changes on every keystroke — so filtering a
- * long table off it re-renders the whole table per key. The deferred copy
- * lets the keystroke paint first and the rows follow at lower priority. The
- * first two elements stay immediate: an input or a setter built from the
- * deferred copy would write stale text back over what was just typed.
- */
 export function useUrlFilter<F extends object>(
   scopeKey: string,
   schema: UrlParamSchema,
@@ -314,57 +225,14 @@ export function useUrlFilter<F extends object>(
   return [filter, setFilter, rowsFilter];
 }
 
-/**
- * The stored side of a `useRememberedUrlParams` group: a preference saved
- * long-term (a `useLocalSetting` store, say) that stands in for any field the
- * URL leaves out. Build it in a `useMemo` over the store's value.
- */
 export interface RememberedDefaults<S extends UrlParamSchema> {
-  /**
-   * The stored default for each field it covers. A field it leaves out has no
-   * stored default: it is URL-only, and the codec's own default applies.
-   */
   values: Partial<UrlParamValues<S>>;
-  /**
-   * False until the store has read its value. Only `adoptLinked` waits on
-   * it, and absent reads as false, so an adopting caller that forgets it
-   * never adopts against a not-yet-read default.
-   */
   hydrated?: boolean;
-  /** Persists an edit — called with only the covered fields the edit touched. */
   remember(patch: Partial<UrlParamValues<S>>): void;
-  /**
-   * Whether a value the URL states is usable. One it rejects (an id no
-   * catalogue has) reads as absent, so the stored default shows instead.
-   */
   accepts?: (key: keyof S & string, value: unknown) => boolean;
-  /**
-   * Opt-in exception to scope decision `20260922-221531`: once hydrated,
-   * copy each covered field the URL states into storage whenever the two
-   * differ. Market Browser only — see decision `20260926-201312`. Everyone
-   * else leaves it off, and nothing read from the URL is ever stored.
-   */
   adoptLinked?: boolean;
 }
 
-/**
- * A `useUrlParams` group with a remembered default behind some of its fields
- * (scope decision `20260922-221531`, ADR 0015):
- *
- * - **Per-field presence.** A field the URL states wins; one it leaves out
- *   reads the stored default. Presence is the raw query string's, since a
- *   parsed value equal to the codec default cannot tell "not given" from
- *   "the sender chose the default".
- * - **Edits go only where they belong.** The setter takes a patch or the
- *   whole displayed object (a `FilterBar` commits the whole thing on every
- *   edit) and diffs it against what is shown. Only the fields that actually
- *   changed are written — to the URL, and to storage when they have a stored
- *   default. An untouched field is never carried from one source into the
- *   other: a stored default is not mirrored into the URL, and a link's value
- *   is not written into storage.
- *
- * The third return value says whether the URL states a field right now.
- */
 export function useRememberedUrlParams<S extends UrlParamSchema>(
   schema: S,
   remembered: RememberedDefaults<S>
@@ -379,8 +247,6 @@ export function useRememberedUrlParams<S extends UrlParamSchema>(
   const { values: stored, accepts, hydrated = false, adoptLinked = false, remember } = remembered;
   const storedValues = stored as Record<string, unknown>;
 
-  // What the URL itself states, parsed from the query string rather than read
-  // off `urlValues` — that also carries a debounced edit not yet written.
   const linked = useMemo(() => {
     const raw = new URLSearchParams(search);
     const result = new Map<string, unknown>();
@@ -421,8 +287,6 @@ export function useRememberedUrlParams<S extends UrlParamSchema>(
           rememberAny = true;
         }
       }
-      // Called even when nothing changed, as `useUrlParams`' own setter would
-      // be: a commit flushes any debounced text still waiting.
       setUrlValues(changed as Partial<UrlParamValues<S>>, options);
       if (rememberAny) persist(toRemember as Partial<UrlParamValues<S>>);
     },

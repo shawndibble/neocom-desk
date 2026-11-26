@@ -1,4 +1,3 @@
-/** What stops the plan: every shortfall, with what would fix it. */
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';

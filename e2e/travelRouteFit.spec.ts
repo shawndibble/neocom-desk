@@ -1,10 +1,3 @@
-/**
- * Travel › Route Safety at the narrow end of the pointer-width range (#2591):
- * beside a side column at `lg` the route table got too little width, so the
- * page scrolled sideways and Avoid sat off-screen. The route and the Route
- * rules column (right of the route) sit side by side only from `xl`; below
- * that they stack, route table full width.
- */
 import { test, expect } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 import { expectNoPageOverflow } from './support/overflow';
@@ -25,15 +18,12 @@ for (const width of [1024, 1280, 1440]) {
     await page.setViewportSize({ width, height: 900 });
     await page.goto(`./travel/route?from=${JITA}&stops=${AMARR},${PERIMETER}`);
 
-    // Avoid lives in each row's ⋮ menu (#6710): the ⋮ must sit inside the page.
     const more = page
       .getByRole('main')
       .getByRole('table')
       .getByRole('button', { name: /^More actions for / });
     await expect(more.first()).toBeVisible({ timeout: 15000 });
     await expectNoPageOverflow(page);
-    // One in-page pass: the rows keep re-rendering as kills/jumps land, so a
-    // snapshot of locators goes stale.
     await expect
       .poll(() =>
         page.evaluate(() =>
@@ -43,7 +33,6 @@ for (const width of [1024, 1280, 1440]) {
         )
       )
       .toBe(true);
-    // The start and the stops cannot be avoided, so open a way-point's menu.
     await more.nth(1).click();
     await expect(page.getByRole('menuitem', { name: /^Avoid/ })).toBeVisible();
     await page.keyboard.press('Escape');

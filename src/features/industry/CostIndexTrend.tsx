@@ -16,21 +16,13 @@ import { useCheaperNearbySystems } from './useCheaperNearbySystems';
 const CHART_HEIGHT = 56;
 
 interface CostIndexTrendProps {
-  /** Live figure, pre-formatted. */
   value: string;
   systemId: number | undefined;
   systemName: string;
   activity: IndustryActivity;
-  /** Live index as a fraction, to compare neighbours against. */
   index: number | null;
 }
 
-/**
- * The facility's cost index figure. With 7+ days of history for the build
- * system it becomes a button (chart glyph after it) opening a popover with the
- * trend for the plan's activity; otherwise, and while loading or on a failed
- * read, it is just the figure.
- */
 export function CostIndexTrend({
   value,
   systemId,
@@ -108,7 +100,6 @@ export function CostIndexTrend({
   );
 }
 
-/** The popover's list of cheaper systems nearby. Renders nothing when there are none. */
 function CheaperNearby({
   systemId,
   activity,

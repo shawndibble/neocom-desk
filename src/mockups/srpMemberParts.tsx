@@ -1,4 +1,3 @@
-/** Pieces of the SRP member mockups: the file-a-claim card and My claims. */
 import { useId, type ReactNode } from 'react';
 import {
   Button,
@@ -54,20 +53,15 @@ export function Amount({ value }: { value: number | null }) {
   );
 }
 
-// ------------------------------------------------------------ File a claim
-
 export interface FormState {
   link?: string;
   linkError?: string;
   fleet?: string;
   fleetError?: string;
-  /** Hull the pasted link resolved to when the rule says Not covered. */
   blockedHull?: string;
-  /** The corp made Fleet or FC required. */
   fleetRequired?: boolean;
 }
 
-/** Paste a killmail link, Fleet or FC, File claim. The server fills hull, system, time and amount. */
 export function FileClaimForm({
   state = {},
   fullWidth = false,
@@ -145,7 +139,6 @@ export function FileClaimForm({
   );
 }
 
-/** Filing is blocked: the pasted hull is excluded by the corp's Hull Rule. */
 export function NotCoveredNote({ hull }: { hull: string }) {
   return (
     <NewComponent name="NotCoveredNote">
@@ -160,8 +153,6 @@ export function NotCoveredNote({ hull }: { hull: string }) {
     </NewComponent>
   );
 }
-
-// -------------------------------------------------------- Lost ships list
 
 export function ScopePrompt() {
   return (
@@ -236,14 +227,7 @@ export function LostShipsTable({ ships }: { ships: LostShip[] }) {
   );
 }
 
-export function FileClaimPanel({
-  form,
-  ships,
-}: {
-  form?: FormState;
-  /** Absent: scope not granted, the grant prompt shows in place of the list. */
-  ships?: LostShip[];
-}) {
+export function FileClaimPanel({ form, ships }: { form?: FormState; ships?: LostShip[] }) {
   return (
     <Panel title="File a claim">
       <div className="space-y-4">
@@ -256,8 +240,6 @@ export function FileClaimPanel({
     </Panel>
   );
 }
-
-// -------------------------------------------------------------- My claims
 
 const claimColumns: DataTableColumn<Claim>[] = [
   {
@@ -336,8 +318,6 @@ export function MyClaimsPanel({ claims = CLAIMS }: { claims?: Claim[] }) {
     </Panel>
   );
 }
-
-// ------------------------------------------------------------- Re-file dialog
 
 export function RefileDialog() {
   const id = useId();

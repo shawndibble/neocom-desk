@@ -1,11 +1,3 @@
-/**
- * Every blueprint-like name in the SDE, lower-cased — what the paste router
- * checks a pasted list against (`engine/import/blueprintList.ts`).
- *
- * Wider than the buildable catalog on purpose: an invention, research or
- * copying-only blueprint is still a blueprint, so a list full of them is
- * recognised and then reported as skipped rather than appraised.
- */
 import { loadBlueprints, loadTypes } from '@/sde/loadSde';
 import type { BlueprintMap, TypeMap } from '@/sde/types';
 
@@ -25,7 +17,7 @@ export function loadBlueprintNames(): Promise<ReadonlySet<string>> {
   namesPromise ??= Promise.all([loadTypes(), loadBlueprints()])
     .then(([types, blueprints]) => blueprintNamesFrom(types, blueprints))
     .catch((error: unknown) => {
-      namesPromise = null; // allow retry after failure
+      namesPromise = null;
       throw error;
     });
   return namesPromise;

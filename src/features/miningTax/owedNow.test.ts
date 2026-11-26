@@ -71,7 +71,6 @@ describe('loadOwedBalances', () => {
       ],
       characters: [{ characterId: CHAR, characterName: 'Miner' }],
       payeesByCharacter: new Map([[CHAR, [payee]]]),
-      // 100 ISK linked to the Payee pays its oldest day, whichever entry the pilot meant.
       paymentLinks: [
         {
           payeeId: 'p1',
@@ -89,7 +88,6 @@ describe('loadOwedBalances', () => {
     expect(unassignedCount).toBe(1);
     expect(balances[0]).toMatchObject({ payee: { id: 'p1' }, owed: 80 });
     expect(balances[0].members.map((m) => m.assignment.id)).toEqual(['a2', 'a3']);
-    // No book to overlay: the wallet is never read for in-flight donations.
     expect(mocks.made).not.toHaveBeenCalled();
   });
 });
@@ -111,8 +109,6 @@ describe('billedElsewhereOf', () => {
     expect([...out]).toEqual([['a1', 0.25]]);
   });
 
-  // A Default System's unpaid Assignment a book took part of: the book bills that part, so the
-  // Payee is owed only what stays with it (the rest of the day is no second bill).
   it('reads an Assignment a book took part of as the part it no longer keeps', () => {
     const out = billedElsewhereOf({
       alsoBilled: none,
@@ -122,7 +118,6 @@ describe('billedElsewhereOf', () => {
     expect(out.get('a1')).toBeCloseTo(0.6, 9);
   });
 
-  // A Conflict day: the personal Payee waits, so the book's row is the day's one bill.
   it('reads a contested Assignment as the share the Payee waits on', () => {
     const out = billedElsewhereOf({
       alsoBilled: none,
@@ -149,12 +144,9 @@ describe('billedElsewhereOf', () => {
       trimmed: new Map([['e1', new Map([['a1', { oreLines: [], valueShare: 0.4 }]])]]),
       absorbed: noneAbsorbed,
     });
-    // 0.4 stays after the trim, and half of that is billed again: 0.2 is the Payee's.
     expect(out.get('a1')).toBeCloseTo(0.8, 9);
   });
 
-  // The corporation's own Payee (or a Default System's day) a book took whole: the book's row
-  // stands for it, so its Payee owes none of it.
   it('reads an Assignment a book took whole as all of it', () => {
     const out = billedElsewhereOf({
       alsoBilled: none,
@@ -169,7 +161,11 @@ describe("a Corp Tax Book's figures by the selected Characters", () => {
   const book = (id: string, characterIds: number[], amount: number, days: number) => ({
     payee: { id },
     loaded: { characterIds },
-    summary: { credit: amount / 10, account: { owes: { amount, days, oldest: '2026-11-03' } } },
+    summary: {
+      credit: amount / 10,
+      estimate: 0,
+      account: { owes: { amount, days, oldest: '2026-11-03' } },
+    },
   });
   const view = {
     books: [book('corp-book:1', [1, 2], 1_000, 2), book('corp-book:2', [3], 2_000, 5)],
@@ -182,11 +178,21 @@ describe("a Corp Tax Book's figures by the selected Characters", () => {
     ]);
   });
 
-  // A book's figure is the book's whole account whatever the selector says, but the selector
-  // decides which books are shown at all.
   it('leaves out a book none of the selected Characters is in, and keeps the others whole', () => {
     expect([...bookOwesOf(view, new Set([2]))]).toEqual([['corp-book:1', 1_000]]);
     expect([...bookCreditsOf(view, new Set([3]))]).toEqual([['corp-book:2', 200]]);
+  });
+
+  it("adds an open day's estimate to what the book's account owes", () => {
+    const withEstimate = {
+      books: [
+        {
+          ...book('corp-book:1', [1], 1_000, 1),
+          summary: { ...book('corp-book:1', [1], 1_000, 1).summary, estimate: 250 },
+        },
+      ],
+    } as unknown as Parameters<typeof bookOwesOf>[0];
+    expect([...bookOwesOf(withEstimate)]).toEqual([['corp-book:1', 1_250]]);
   });
 
   it("counts a book's entries and oldest unpaid day off its account, not the visible rows", () => {

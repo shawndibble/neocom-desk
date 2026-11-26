@@ -28,7 +28,6 @@ const LAZY = ['market', 'industry'];
 const LEAVES = leafPaths(EN, LAZY);
 const refs = (code: string) => [...referencedLeaves(code, LEAVES, LAZY)].sort();
 
-/** Deep-merge `from` into `into`, the way `addResourceBundle(…, true, false)` does. */
 function merge(into: LocaleTree, from: LocaleTree): LocaleTree {
   for (const [key, value] of Object.entries(from)) {
     const current = into[key];
@@ -244,9 +243,6 @@ describe('staticImportClosure', () => {
 });
 
 describe('the real en.json against the real sources', () => {
-  // Every string a build can split, so a key added on any branch is covered
-  // the moment it lands: nothing it adds can fall out of both halves.
-  // The same inputs `localeSplitPlugin.ts` gives it.
   const all = import.meta.glob<string>(
     ['/src/**/*.{ts,tsx}', '!/src/**/*.test.{ts,tsx}', '!/src/**/*.d.ts', '!/src/test/**'],
     { query: '?raw', import: 'default', eager: true }
@@ -280,19 +276,6 @@ describe('the real en.json against the real sources', () => {
     }
   });
 
-  // Overview widget copy can never leave the shell (the Overview is a startup root), so each
-  // new Overview kind spends this budget.
-  //
-  // Raised 0.305 -> 0.306 for the bell panel's row actions (Stop these alerts,
-  // the Undo toasts, the topic eyebrow). The panel hangs off the header bell,
-  // so its copy is a startup root too and cannot be lazy. It went over by about
-  // 80 bytes, and there was nothing dead left to reclaim: the same change
-  // already deleted `dismiss`, `dismissAll` and `snoozeLabel`.
-  //
-  // The structural fix, when this budget next bites, is to put `alerts` on
-  // LAZY_SECTIONS: most of that section is the `/alerts` page, which is not a
-  // startup root, so the splitter would keep only the panel's keys in the shell
-  // and move the rest. That is its own change, not a line in a UI PR.
   it('moves most of the locale out of the shell', () => {
     const shellBytes = JSON.stringify(plan.shell).length;
     expect(shellBytes / JSON.stringify(en).length).toBeLessThan(0.306);

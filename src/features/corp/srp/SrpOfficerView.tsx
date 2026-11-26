@@ -1,8 +1,3 @@
-/**
- * `/corp/srp` Claims: the officer's queue. Picks the state `useSrpQueue` reports:
- * the queue itself, or a line for roles that do not open it. Hidden, never locked: only a
- * Director or Accountant sees this view at all.
- */
 import { useTranslation } from 'react-i18next';
 import { EmptyState, LoadFailedState, Spinner } from '@/components/ui';
 import { OfficerQueue } from './OfficerQueue';

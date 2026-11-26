@@ -1,16 +1,3 @@
-/**
- * Where the Market Browser's Order Book is looking, said above the book itself
- * — "Within 5 jumps of Badivefi · 6 stations", or the hub station and how far
- * it is — with the filters the finder's funnel holds, editable in place.
- *
- * The filters live beside the item search (the range is set before searching,
- * scope decision 20260929-204125, and is the finder's inline select); this bar
- * mirrors them on the results side, where a reader looks for "why is the book
- * showing this". The finder column is hidden below `lg` once an item is open,
- * so there this bar's funnel is the only way to reach the range and origin;
- * from `lg` up they stay in the finder and the bar only says them in words.
- * Both bars read and write one `BrowserFilterValue`, so they can never disagree.
- */
 import { fixed1 } from '@/lib/fixedFormat';
 import { JumpsLink } from '@/features/route/JumpsLink';
 import type { ReactNode } from 'react';
@@ -39,7 +26,6 @@ import { useSystemName } from '@/features/route/useSolarSystems';
 import { useIsDesktop } from '@/lib/useIsDesktop';
 import type { BrowserFilterValue } from './useBrowserFilters';
 
-/** A Min quantity box's text as a count; blank or junk is no minimum. */
 function parseMinQuantity(raw: string): number {
   const n = Number.parseInt(raw, 10);
   return Number.isSafeInteger(n) && n > 0 ? n : 0;
@@ -61,25 +47,13 @@ function rangeSelectProps(
 interface BrowserFilterFieldsProps {
   draft: BrowserFilterValue;
   setDraft: (next: BrowserFilterValue) => void;
-  /** Security and NPC stations only need a book of many stations: Region mode, or a set Jump Range. */
   regionMode: boolean;
-  /** The header's hub or region: what the book reads while no Jump Range is set. */
   scopeLabel: string;
   currentSystem: CurrentSystemState;
-  /**
-   * Whether the Jump Range select is in these fields. The finder shows it
-   * inline on its own line, so its box and sheet hold it only in the sheet;
-   * the scope bar holds it only where the finder is not beside the book.
-   */
   showRange: boolean;
-  /** Whether the "From system" picker (while a range is set) is in these fields. */
   showOrigin: boolean;
 }
 
-/**
- * The order book's filter fields, written once for both bars and both
- * surfaces (the pointer-width box and the phone sheet).
- */
 function BrowserFilterFields({
   draft,
   setDraft,
@@ -144,7 +118,6 @@ function BrowserFilterFields({
           />
         </FilterField>
       )}
-      {/* Any scope: a one-station Hub book can carry bait as well. */}
       <FilterField label={t('market.filterHideBait')} stretch={false} hideCaption>
         <FilterChip
           label={t('market.filterHideBait')}
@@ -161,22 +134,14 @@ function BrowserFilterFields({
 export interface BrowserFilterBarProps {
   value: BrowserFilterValue;
   onChange: (next: BrowserFilterValue) => void;
-  /** `activeBrowserFilters`: the pills under the search and the funnel's badge (the range is `inline`, so neither counts it). */
   active: readonly ActiveFilter<BrowserFilterValue>[];
   regionMode: boolean;
   scopeLabel: string;
   currentSystem: CurrentSystemState;
-  /** The item search: the funnel sits at the end of its line rather than a row of its own. */
   search: ReactNode;
   className?: string;
 }
 
-/**
- * The order book's filters behind a funnel beside the item search, like the
- * other search pages (BPC Sourcing, Courier). They sit in the finder column
- * rather than over the book: the range is where to look, set before searching,
- * not a property of one item.
- */
 export function BrowserFilterBar({
   value,
   onChange,
@@ -196,9 +161,6 @@ export function BrowserFilterBar({
       search={search}
       className={className}
       inline={(draft, setDraft) => (
-        // One line under the search box: the range with a caption ("Jita"
-        // alone does not say it is a distance) and, once one is set, the
-        // Current System it is measured from. Two filters, the cap (§4b).
         <div className="flex w-full items-end gap-2">
           <FilterField captionInline label={t('jumpRange.label')}>
             <JumpRangeSelect
@@ -230,32 +192,25 @@ export function BrowserFilterBar({
   );
 }
 
-/** What the book is reading, in the words the bar says it with. */
 export type OrderBookScope =
-  /** A measurable Jump Range: every station in reach of the Current System. */
   | { kind: 'range'; jumps: Exclude<BrowserFilterValue['jumps'], 'any'>; stationCount: number }
-  /** Trade Hub mode with no range: the hub's one station. */
   | {
       kind: 'station';
       stationName: string;
-      /** The station's solar system: the jump count links to the route there. */
       systemId: number;
       security: number | null;
       jumpsAway: number | null;
     }
-  /** Region mode with no range: every station in the picked region, or in every region. */
   | { kind: 'region'; regionName: string; stationCount: number };
 
 export interface OrderBookScopeBarProps {
   scope: OrderBookScope;
   filterValue: BrowserFilterValue;
   onFilterChange: (next: BrowserFilterValue) => void;
-  /** `activeBrowserFilters`, the same list the finder's bar shows. */
   active: readonly ActiveFilter<BrowserFilterValue>[];
   regionMode: boolean;
   scopeLabel: string;
   currentSystem: CurrentSystemState;
-  /** What still reads the header's hub or region while the book reaches further, behind an info tip. */
   note?: string | null;
 }
 
@@ -272,10 +227,6 @@ export function OrderBookScopeBar({
   const { t } = useTranslation();
   const originName = useSystemName(currentSystem.systemId);
   const ranged = scope.kind === 'range';
-  // Below `lg` the finder is hidden while an item is open (Market.tsx), so
-  // the range lives here; from `lg` up the finder holds it beside the book.
-  // `useIsDesktop` rather than `FilterBar`'s max-width form: this must match
-  // the query Market.tsx hides the finder on.
   const finderBeside = useIsDesktop();
 
   const summary = (() => {
@@ -283,8 +234,6 @@ export function OrderBookScopeBar({
       case 'range':
         return (
           <>
-            {/* In words at every width: it is where the origin system shows
-                from `lg` up, where the finder's select holds only the distance. */}
             <span className="font-semibold text-accent">
               {scope.jumps === 'system'
                 ? t('market.scope.inSystem', { system: originName ?? '…' })
@@ -296,8 +245,6 @@ export function OrderBookScopeBar({
             <span className="text-text-dim">
               {t('market.scope.stations', { count: scope.stationCount })}
             </span>
-            {/* The range is the one filter here that changes what the book
-                is; taking it off is one click, not a trip into the funnel. */}
             <button
               type="button"
               onClick={() => onFilterChange({ ...filterValue, jumps: DEFAULT_JUMP_RANGE })}
@@ -354,8 +301,6 @@ export function OrderBookScopeBar({
         <p
           className={cx(
             'm-0 flex min-w-0 flex-1 items-center gap-2',
-            // A station name needs the room; a range's count and Clear link
-            // do not, and share the line with the controls.
             !ranged && 'md:min-w-[18rem]'
           )}
         >
@@ -366,8 +311,6 @@ export function OrderBookScopeBar({
         <FilterBar
           value={filterValue}
           onChange={onFilterChange}
-          // From `lg` up the finder's inline select holds the range: not in
-          // this popover, so not in its badge or its Clear all either.
           active={finderBeside ? active.filter((filter) => !filter.inline) : active}
           title={t('market.scope.sheetTitle')}
           pointerSurface="popover"

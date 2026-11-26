@@ -53,9 +53,7 @@ describe('makeoverOptionsOf', () => {
   it('makes one option per row, priced by the row and keyed like the row', () => {
     const options = makeoverOptionsOf({ ...MAKEOVER, iskDelta: null }, (typeId) => typeId * 10);
     expect(options.map(optionKey)).toEqual(MAKEOVER_KEYS);
-    // a swap costs the new module minus the old, per copy
     expect(options[0].iskDelta).toBe((2048 - 1422) * 10);
-    // a rig is destroyed on removal: the full new rig, for each of its three slots
     expect(options[3].iskDelta).toBe(31796 * 10 * 3);
   });
   it('leaves the price null when a type has none', () => {
@@ -75,7 +73,6 @@ describe('singleGainsOf', () => {
       },
     ]);
     expect(gains.get(MAKEOVER_KEYS[0])).toBe(0.12);
-    // same type swap but over a different number of copies is a different swap
     expect(gains.has(MAKEOVER_KEYS[1])).toBe(false);
     expect(gains.size).toBe(1);
   });

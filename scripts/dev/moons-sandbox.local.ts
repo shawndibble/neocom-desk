@@ -18,18 +18,14 @@ const CORS = {
 };
 
 test('moons sandbox', async ({ page }) => {
-  // Every scope group, so no page stops on a "grant this scope" prompt.
   const scopes = [
     ...new Set([...SCOPES, ...SCOPE_GROUPS.flatMap((group) => scopesForGroup(group))]),
   ];
   await installSsoMock(page, scopes);
   await installEsiMock(page);
-  // The e2e suite's PI operation (four colonies with extractor programs). Installed first so the
-  // sandbox's own system names, registered after, win over its generic ones.
   await mockPlannerColonies(page);
   await installPersonalEsi(page);
   await installOpenPrices(page);
-  // The real mint verifies the token with CCP; the Auth emulator takes an unsigned custom token.
   await page.route('**/mintFirebaseToken', async (route) => {
     if (route.request().method() === 'OPTIONS')
       return route.fulfill({ status: 204, headers: CORS });
@@ -51,9 +47,6 @@ test('moons sandbox', async ({ page }) => {
       body: JSON.stringify({ result: { token, uid, ownerHash: OWNER_HASH } }),
     });
   });
-  // Officer checks read live ESI on the server, so answer them here for the fake corp and pass
-  // every other callable through to the emulator. SRP writes (approve, pay...) re-check ESI
-  // roles and so fail in the sandbox: the SRP pages are read-only here.
   const officerAnswers: Record<string, unknown> = {
     verifyCorpOfficerCallable: {
       corporationId: CORPORATION_ID,
@@ -104,7 +97,6 @@ test('moons sandbox', async ({ page }) => {
       body: JSON.stringify({ result: answer }),
     });
   });
-  // Vetting reads are server-computed behind the same EVE-token check, so they are answered here too.
   await page.route('**/vettingCall', async (route) => {
     const request = route.request();
     if (request.method() === 'OPTIONS') return route.fallback();

@@ -119,7 +119,6 @@ describe('skillCsvColumns', () => {
     const rows = skillCsvRows(groups);
     const columns = skillCsvColumns(identityT);
     const csv = toCsv(rows, columns);
-    // Raw 1234567, never the localized "1,234,567".
     expect(csv).toContain('1234567');
     expect(csv).not.toContain('1,234,567');
 

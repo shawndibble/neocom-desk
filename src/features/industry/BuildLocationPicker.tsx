@@ -23,58 +23,17 @@ import { MIN_SEARCH_LENGTH, searchBuildLocations } from './searchBuildLocations'
 import type { BuildLocationOption } from './buildLocations';
 
 interface BuildLocationPickerProps {
-  /** What the plan is set to right now, already translated. Always the plan's own values. */
   summary: string;
-  /** The plan's own location, already labelled. Shown whenever no search is in progress. */
   selectedLabel: string | null;
-  /** Facility and build system — revealed by "Override". */
   children: ReactNode;
   onPick: (option: BuildLocationOption) => void;
-  /** Which job the plan runs, so the search offers only places that can host it (issue #460). */
   activity: IndustryActivity;
-  /**
-   * Distinguishes this instance's DOM ids (listbox, option, label `for`) from
-   * any other `BuildLocationPicker` mounted on the same page — issue #698
-   * mounts a second one for the Reaction Location beside the plan's primary
-   * one. Defaults to the original hardcoded prefix, so the lone-picker case
-   * (every caller before #698) needs no change.
-   */
   idPrefix?: string;
-  /** Overrides the search box's label — the Reaction Location instance names itself. Defaults to `industry.buildLocation`. */
   labelKey?: string;
 }
 
-/** Read off the registry rather than spelled out here — this file stays hand-edit-free. */
 const SEARCH_SCOPE = ESI_REGISTRY.getCharacterSearch.scope;
 
-/**
- * Finds the station or structure the job runs in, and fills the fields that
- * follow from it: facility preset, build system, and the security band the
- * system settles.
- *
- * Those fields are behind "Override" rather than beside the box, because the
- * search answers all three and a pilot who has a structure in mind should not
- * have to translate it into a facility and a system by hand. The line under the
- * box states what the plan is actually set to, so nothing is hidden — only
- * folded. The link is always there, including for a Character whose token
- * predates the search scope: the fields are the whole feature for them.
- *
- * A search rather than a list, because the list ESI can give us is the wrong
- * one: a corporation's own structures leave out the alliance tower, the rented
- * Raitaru and every NPC station. `GET /characters/{id}/search` is the only
- * route that finds a structure by name, and it returns what this Character can
- * actually dock at — CCP's ACL, not ours.
- *
- * **The box states the plan's own stored pick** (`BuildPlanRecord.buildLocationId`),
- * so it survives a reload rather than blanking the moment a choice fills the
- * fields below it.
- *
- * Its scope is in the base grant, so a Character added from now on can search
- * straight away. One added *before* it existed holds a token without it —
- * `/industry` stays UNGATED, so they keep the whole route and are offered the
- * re-auth here, beside the control it unlocks, rather than behind a banner
- * across a page that otherwise works.
- */
 export function BuildLocationPicker({
   summary,
   selectedLabel,
@@ -91,39 +50,16 @@ export function BuildLocationPicker({
   const characterId = useActiveCharacter((state) => state.activeCharacterId);
   const granted = useGrantedScopes();
   const [overriding, setOverriding] = useState(false);
-  // `null` means "not searching" — the box then reads the plan's own pick
-  // rather than a typed fragment, which is what makes the choice outlive a
-  // reload. A typed empty string is a different state: the pilot cleared the
-  // box themselves, so it stays cleared until they pick again.
   const [query, setQuery] = useState<string | null>(null);
-  // What the pilot just chose, held until the plan comes back carrying it:
-  // the parent's write is a Dexie round-trip, and without this the box would
-  // state the *previous* location for a frame after the click.
   const [picked, setPicked] = useState<string | null>(null);
   const [results, setResults] = useState<BuildLocationOption[] | null>(null);
   const [searching, setSearching] = useState(false);
-  // Which result Arrow/Home/End has highlighted, without moving DOM focus off
-  // the input — the input stays the list's one tab stop.
-  // Held by record id, so a list that reshuffles under it never moves the highlight.
   const [highlightedId, setHighlightedId] = useState<number | null>(null);
-  // Escape hides an already-fetched list without re-searching: the query is
-  // untouched, so nothing in the effect below reruns until it changes.
   const [dismissed, setDismissed] = useState(false);
-  // Distinct from "no results": a 403, a 500 and being offline all used to
-  // render "Nothing found. Try more of the name.", which sends the pilot off
-  // retyping a name that was never the problem.
   const [failed, setFailed] = useState(false);
 
-  // In the base grant, so every Character signing in from now on has it. A
-  // Character who signed in before it existed holds a token without it, and
-  // gets the re-auth offer below rather than a control that would 403.
   const canSearch = granted !== undefined && granted.includes(SEARCH_SCOPE);
 
-  // What the effect is actually allowed to search for: empty until the query
-  // clears ESI's three-character floor and the scope is in hand. Derived
-  // during render, and the two display states reset with it — the same
-  // adjust-during-render idiom `BuildPlanDetail` uses for its snapshot key,
-  // and the reason nothing here sets state from inside an effect body.
   const trimmed = query?.trim() ?? '';
   const searchKey = canSearch && trimmed.length >= MIN_SEARCH_LENGTH ? trimmed : '';
   const [prevSearchKey, setPrevSearchKey] = useState(searchKey);
@@ -136,23 +72,16 @@ export function BuildLocationPicker({
     setDismissed(false);
   }
 
-  // Dropped as soon as the plan answers — including when it answers with
-  // nothing, which is what a manual facility or build-system edit leaves
-  // behind. Adjusted during render for the same reason `searchKey` is.
   const [prevSelectedLabel, setPrevSelectedLabel] = useState(selectedLabel);
   if (prevSelectedLabel !== selectedLabel) {
     setPrevSelectedLabel(selectedLabel);
     setPicked(null);
   }
 
-  // Only the newest query may write results: ESI answers out of order, and a
-  // three-letter search started first can land after the five-letter one.
   const latest = useRef(0);
   useEffect(() => {
     if (searchKey === '' || characterId === null) return;
     const ticket = ++latest.current;
-    // Aborted on cleanup as well as ignored: without it a superseded query
-    // still finishes its whole fan-out of per-hit lookups.
     const controller = new AbortController();
     const timer = setTimeout(() => {
       void searchBuildLocations(characterId, searchKey, activity, controller.signal)
@@ -173,25 +102,15 @@ export function BuildLocationPicker({
     };
   }, [searchKey, characterId, activity]);
 
-  // Narrowed rather than a plain boolean: every read below needs the array
-  // itself, and TS can carry the `results !== null` check through this
-  // ternary into the non-null branch, so nothing downstream needs `results!`.
   const openResults =
     !dismissed && !searching && results !== null && results.length > 0 ? results : null;
 
-  // Shared with the plan's own stored label, so a pick cannot change wording
-  // as the write lands. Feeds the row, the sr-only highlight announcement and
-  // `picked` below.
   function optionLabel(option: BuildLocationOption) {
     return buildLocationLabel(option.name, option.facility, option.systemName, t);
   }
 
   function pick(option: BuildLocationOption) {
     onPick(option);
-    // The box states the place chosen, not the fragment typed to find it:
-    // `picked` covers the gap until the plan's own label arrives. Clearing
-    // the query also resets results/highlight/dismissed through the
-    // searchKey block above, the same reset every other query edit takes.
     setQuery(null);
     setPicked(optionLabel(option));
   }
@@ -229,11 +148,6 @@ export function BuildLocationPicker({
     }
   }
 
-  // Named for the sr-only status region below: count alone on open, plus the
-  // highlighted row's own label once one is picked out — the two things
-  // "Arrow keys move a highlighted option ... a screen reader announces the
-  // option count and the highlighted option" (#505) asks a screen reader to
-  // say.
   const highlightedOption =
     openResults !== null && highlightedIndex !== null ? openResults[highlightedIndex] : null;
   const highlightedName = highlightedOption ? optionLabel(highlightedOption) : null;
@@ -247,10 +161,6 @@ export function BuildLocationPicker({
           value={query ?? picked ?? selectedLabel ?? ''}
           placeholder={t('industry.buildLocationPlaceholder')}
           onChange={(e) => setQuery(e.target.value)}
-          // Abandoning the search gives the box back to the plan. Escape
-          // keeps the typed text — a near-miss is still there to correct —
-          // but once focus is gone there is nothing to correct. Result rows
-          // cancel their own mousedown, so clicking one never blurs first.
           onBlur={() => setQuery(null)}
           onKeyDown={handleKeyDown}
           role="combobox"

@@ -1,12 +1,3 @@
-/**
- * The screen before the walk (issue #5156, ADR 0030): what EVE will be asked
- * for, and why, shown and confirmed before any sign-in starts. A tick in the
- * event list never starts a sign-in; the player reads this and presses
- * Continue. Notifications are the grant itself; location and mail are
- * optional and can be left out here, which keeps those alerts to while the
- * app is open. A permission a grant already holds is not listed (it is kept
- * either way, so a re-authorization never drops it).
- */
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Checkbox, Tooltip } from '@/components/ui';
@@ -21,7 +12,6 @@ import {
 import { DividedList } from '@/components/ui/DividedList';
 
 interface Props {
-  /** The Characters this walk would sign in, in order. */
   needs: readonly CharacterAlertsNeed[];
   names: ReadonlyMap<number, string>;
   busy: boolean;
@@ -31,7 +21,6 @@ interface Props {
 
 export function AlertsSignInConfirm({ needs, names, busy, onCancel, onContinue }: Props) {
   const { t } = useTranslation();
-  // On by default: the player ticked (or left) the events and is reading the list; unchecking leaves it out of this walk (ADR 0030).
   const [include, setInclude] = useState({ location: true, mail: true });
   const key = (name: string) => `settings.notifications.alertsWhenClosed.confirm.${name}`;
   const asked = ALERTS_PERMISSIONS.filter((permission) =>

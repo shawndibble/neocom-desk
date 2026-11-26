@@ -163,8 +163,6 @@ describe('recordFeedEntry / readFeed', () => {
       title: 't',
       body: 'b',
     };
-    // The push lands first, stamping its own arrival; the poller follows with
-    // the journal entry's real date.
     await recordFeedEntry({ ...entry, firedAt: 5000 });
     await recordFeedEntry({ ...entry, firedAt: 1000 });
     expect((await readFeed())[0].firedAt).toBe(1000);
@@ -181,7 +179,6 @@ describe('recordFeedEntry / readFeed', () => {
         firedAt: 10_000 + i,
       });
     }
-    // Older than every row already stored — the trim's own cut line.
     await recordFeedEntry({
       id: 'back-dated',
       characterId: 1,
@@ -230,21 +227,10 @@ describe('mergeFeedRecord', () => {
   });
 
   it('keeps a stored syncedAt that the incoming write knows nothing about', () => {
-    // The poller re-diffing an occurrence, or a push arriving for one already
-    // uploaded, must not make the row look un-uploaded (#1207) — that would
-    // re-push it on every pass for as long as it lives.
     const stored = { ...incoming, title: 'Stored copy', syncedAt: 4000 };
     expect(mergeFeedRecord(stored, incoming).syncedAt).toBe(4000);
   });
 
-  /**
-   * The fields that say *what an occurrence was about* are facts fixed when it
-   * fired, and not every writer knows them: a remote doc written by a build
-   * that predates the field, or a `pullDismiss` carrying one back, arrives
-   * without it. Letting the newest write blank them costs the row its
-   * per-type mute (`eveType`) or its deep link (`typeId`) for no reason
-   * anyone could see.
-   */
   it('keeps a subject the incoming write did not carry', () => {
     const stored = { ...incoming, eventId: 'marketOrderFilled', typeId: 34 };
     const pulled = { ...incoming, eventId: 'marketOrderFilled' };
@@ -270,9 +256,7 @@ describe('mergeFeedRecord', () => {
 
   it('takes the later dismissal from either side, so a re-record keeps one and a pull applies one', () => {
     const dismissedLocally = { ...incoming, firedAt: 1000, dismissedAt: 9000 };
-    // A re-record carries no dismissal of its own; the stored one survives.
     expect(mergeFeedRecord(dismissedLocally, incoming).dismissedAt).toBe(9000);
-    // A pull carrying a newer dismissal applies it.
     expect(
       mergeFeedRecord({ ...incoming, dismissedAt: 100 }, { ...incoming, dismissedAt: 9000 })
         .dismissedAt

@@ -42,9 +42,6 @@ describe('buildPwaShortcuts', () => {
   });
 
   it('gives each twa shortcut the icon field Bubblewrap reads', () => {
-    // Bubblewrap's ShortcutInfo throws "must have either chosenIconUrl or
-    // chosenMonochromeIconUrl" on a web-manifest-style `icons` array, so
-    // `bubblewrap update` fails before it builds anything.
     const twa = readTwa<{ shortcuts: Record<string, unknown>[] }>();
     for (const s of twa.shortcuts) {
       expect(s).not.toHaveProperty('icons');
@@ -74,8 +71,6 @@ describe('buildPwaShortcuts', () => {
   });
 
   it('keeps the twa minSdkVersion at what androidbrowserhelper needs', () => {
-    // androidbrowserhelper 2.7.x (bundled by Bubblewrap 1.27) declares minSdk 24;
-    // a lower value fails the Gradle manifest merge.
     const twa = readTwa<{ minSdkVersion: number }>();
     expect(twa.minSdkVersion).toBeGreaterThanOrEqual(24);
   });

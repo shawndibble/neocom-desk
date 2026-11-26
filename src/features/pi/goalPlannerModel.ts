@@ -1,42 +1,3 @@
-/**
- * The Goal Planner's adapter: the active Character's ESI colonies, the SDE
- * and the pilot's prefs in, the engine's `PlannerColony[]` out — plus the two
- * readings the engine leaves to its caller (hauling split out/in, and the
- * plain verdict).
- *
- * ## Loader
- *
- * `goalPlannerSnapshot.ts` is a slim loader over the *same* lower-level reads
- * (`loadCharacterPlanets`, `loadAllColonyDetails`, `loadSystemSecurity`,
- * `loadCustomsCodeExpertise`, `loadPlanPrices` ...). Both tabs therefore see
- * the same cached ESI. This module never fetches: the snapshot is a
- * parameter, and the prefs are applied here rather than in the loader so a
- * pref change recomputes without refetching.
- *
- * ## Each colony's facts, strongest source first
- *
- * - **Rate per ECU, per P0** (`ratePerEcu`): this colony's own program for that
- *   P0 re-projected at the pilot's restart cadence (`restartCadenceYield`) —
- *   per program, so two ECUs on one resource read as two samples, not a sum;
- *   else the mean of every program the pilot runs (`own-mean`); else the
- *   pilot's typed fallback (`assumed`). Keyed on exactly the P0s the planet
- *   type yields (`localResourcesFor`) — a P0 the planet cannot yield is
- *   absent, never zero.
- * - **Heads per ECU**: the colony's own mean when it runs ECUs. A colony with
- *   none would read 1 off `meanHeadsPerExtractor`, which undercharges exactly
- *   the colonies a plan re-targets, so it takes the pilot's own mean instead,
- *   else `DEFAULT_PLANNER_HEADS` — flagged `headsAssumed` either way.
- * - **Link cost**: the colony's own longest hop (`colonyPinLoad.newLinkLoad`),
- *   else the median of the pilot's other colonies (`linkCostBorrowed`), else
- *   the colony is excluded — fitting at a free link would overstate what fits.
- * - **Customs**: the pilot's per-system override, else the band default after
- *   Customs Code Expertise. Outside highsec that default is 0% only because a
- *   player office's rate is unknowable, so the row says `rateUnknown` and the
- *   plan is costed at `ASSUMED_UNKNOWN_CUSTOMS` (`taxAssumed`) until the pilot
- *   sets one — a 0% placeholder made unknown-rate colonies the cheapest hosts.
- *
- * Pure: no fetch, no Dexie, no clock.
- */
 import type { PiData } from '@/sde/types';
 import type { CharacterPlanet, CharacterPlanetDetail } from '@/esi/endpoints';
 import type {
@@ -66,31 +27,23 @@ import { type CustomsOverrides } from './customsOverride';
 import { resolveColonyCustoms } from './colonyCustoms';
 import { effectiveLocalResources, type RichnessByPlanet } from './effectiveResources';
 
-/** Heads per ECU when the pilot runs no extractor at all to read one off. */
 export const DEFAULT_PLANNER_HEADS = 10;
 
-/** What the loader hands over: ESI and SDE facts only, no prefs. */
 export interface PlannerSnapshot {
   pi: PiData;
   nowMs: number;
   colonies: readonly CharacterPlanet[];
-  /** A missing entry is a detail that did not load. */
   details: ReadonlyMap<number, CharacterPlanetDetail>;
   planetRadiusKm: ReadonlyMap<number, number>;
-  /** Null where the system's security did not resolve (read as highsec). */
   securityBySystem: ReadonlyMap<number, number | null>;
-  /** Customs Code Expertise; null when the character's skills never loaded. */
   customsSkill: number | null;
 }
 
 export interface PlannerPrefs {
   restartHours: number;
-  /** P0/h one ECU yields when nothing the pilot runs is measured. */
   fallbackRatePerHour: number;
   customsOverrides: CustomsOverrides;
-  /** Planet ids the pilot switched off. */
   disabled: ReadonlySet<number>;
-  /** The pilot's saved richness picks, by planet (`richnessOverride.ts`). */
   richness?: RichnessByPlanet;
 }
 
@@ -101,25 +54,19 @@ export interface PlannerColonyRow {
   systemId: number;
   upgradeLevel: number;
   planetType: CharacterPlanet['planet_type'];
-  /** In the plan: not switched off and not excluded. */
   enabled: boolean;
-  /** Null exactly when `excluded` is set. */
   colony: PlannerColony | null;
   excluded: ExcludedReason | null;
-  /** Today's colony as the Advisor reads it, for "what it earns now". Null without detail. */
   advice: BuiltColonyAdvice | null;
   taxRate: number;
   taxSource: CustomsRateSource;
   taxOverridden: boolean;
-  /** Outside highsec with no override: the band's 0% is a placeholder, not a reading. */
   rateUnknown: boolean;
-  /** `taxRate` is `ASSUMED_UNKNOWN_CUSTOMS`, standing in for an unknown rate. */
   taxAssumed: boolean;
   headsAssumed: boolean;
   linkCostBorrowed: boolean;
 }
 
-/** Per-ECU rate of each of these pins' programs at the cadence, by P0. Programs with no baseline are skipped. */
 function programRatesByP0(
   detail: CharacterPlanetDetail,
   restartHours: number
@@ -207,8 +154,6 @@ export function plannerColonies(
     const newLinkCost: PinLoad | null = own.pinLoad.newLinkLoad ?? borrowedLink;
     if (!newLinkCost) return excluded('no-link-cost');
 
-    // What the colony runs today stays rated whatever was picked: the capacity
-    // model refuses a layout whose P0 has no rate.
     const running = own.extractors.flatMap((e) =>
       e.productTypeId === null ? [] : [e.productTypeId]
     );
@@ -233,8 +178,6 @@ export function plannerColonies(
       ? meanHeadsPerExtractor(own)
       : (pilotHeads ?? DEFAULT_PLANNER_HEADS);
 
-    // Per P0, how many ECUs run it today: the capacity model accepts that
-    // layout as fitting, since the colony runs it (engine/pi/colonyCapacity.ts).
     const ecusByP0 = new Map<number, number>();
     for (const extractor of own.extractors) {
       if (extractor.productTypeId === null) continue;
@@ -262,7 +205,6 @@ export function plannerColonies(
   });
 }
 
-/** The colonies the solver plans over: enabled and not excluded. */
 export function goalPlannerInput(rows: readonly PlannerColonyRow[]): PlannerColony[] {
   return rows.flatMap((row) => (row.enabled && row.colony ? [row.colony] : []));
 }
@@ -279,10 +221,6 @@ export function plannerPolicy(options: {
   };
 }
 
-/**
- * What a sale fetches per unit: the hub's bid, or its ask where there is no
- * bid. A corp buyback pays `buybackPct` percent of that.
- */
 export function sellPrices(
   prices: { prices: Readonly<Record<number, number>>; buyPrices: Readonly<Record<number, number>> },
   buybackPct: number | null
@@ -294,19 +232,10 @@ export function sellPrices(
   );
 }
 
-/** The hub's books, plus which bids are really asks. */
 export interface HubBooks extends PriceBooks {
-  /** Types with a sell price but no buy order: their "bid" is the ask. */
   valuedAtAsk: ReadonlySet<number>;
 }
 
-/**
- * The hub's books. A sale is valued at the bid, falling back to the ask for a
- * type with no buy order — the Advisor's `revenuePrices` rule, so a thin bid
- * book does not turn the whole plan into `needs-price`. The fallback is named
- * in `valuedAtAsk` so the page can say which sales it flatters. Unknown
- * Accounting prices at level 0, the highest tax.
- */
 export function priceBooks(
   prices: { prices: Readonly<Record<number, number>>; buyPrices: Readonly<Record<number, number>> },
   accountingLevel: number | null,
@@ -316,7 +245,6 @@ export function priceBooks(
   return {
     ask: prices.prices,
     bid: sellPrices(prices, buybackPct),
-    // A corp buyback pays out of its own pocket: no market sale, no sales tax.
     salesTaxPct: buybackPct === null ? salesTaxPct(accountingLevel ?? 0, feeDiscountFactor) : 0,
     valuedAtAsk: new Set(
       Object.keys(prices.prices)
@@ -333,15 +261,11 @@ function volumeOf(typeId: number, pi: PiData): number {
 }
 
 export interface PlanHauling {
-  /** m3 per haul trip each colony ships out and takes in. */
   perColony: Map<number, { outM3: number; inM3: number }>;
-  /** Every leg once per trip; a colony-to-colony leg counts once. */
   planM3PerTrip: number;
-  /** What the Baseline would ship per trip: every colony's best P1. */
   baselineM3PerTrip: number;
 }
 
-/** The plan's hauling per trip at the pilot's haul cadence, against the Baseline's. */
 export function planHauling(
   plan: Pick<GoalPlan, 'flows'>,
   baseline: BaselineTotal,
@@ -359,7 +283,6 @@ export function planHauling(
   };
   let planM3PerTrip = 0;
   for (const flow of plan.flows) {
-    // The host feeding itself, or a goal bought and kept: nothing moves.
     if (flow.from === flow.to) continue;
     const m3 = flow.unitsPerHour * volumeOf(flow.typeId, pi) * haulHours;
     if (m3 <= 0) continue;
@@ -379,16 +302,10 @@ export function planHauling(
 
 export interface PlanVerdict {
   lift: 'more' | 'less' | 'same';
-  /**
-   * Hauling effort (m3 x jumps) over the Baseline's, minus one: -0.6 is 60%
-   * less. Null without a Baseline effort, or while any leg's distance is unknown.
-   */
   haulChange: number | null;
-  /** 'unknown' while any leg on either side has no distance yet: no claim either way. */
   distances: 'known' | 'unknown';
 }
 
-/** Below this an ISK/day Lift is rounding, not a difference worth a sentence. */
 const SAME_LIFT_ISK_PER_DAY = 1;
 
 export function planVerdict(
@@ -407,11 +324,6 @@ export function planVerdict(
   return { lift, haulChange, distances };
 }
 
-/**
- * What the enabled colonies earn as they stand today — `builtColonyEarnings`
- * per colony at that colony's own customs rate, summed. A colony with no
- * measured extraction is counted in `coloniesWithoutFigure`, never as zero.
- */
 export function earningsNow(
   rows: readonly PlannerColonyRow[],
   pi: PiData,
@@ -423,7 +335,6 @@ export function earningsNow(
   const leftOut: number[] = [];
   const byPlanet = new Map<number, number | null>();
   const perColony = rows.flatMap((row) => {
-    // The same colonies the Baseline counts: enabled and costable.
     if (!row.enabled || !row.advice || !row.colony) return [];
     const earned = builtColonyEarnings(row.advice, pi, {
       prices: prices.prices,

@@ -11,7 +11,6 @@ describe('HelpPanel', () => {
     expect(screen.getByRole('heading', { name: /bugs, ideas and chat/i })).toBeInTheDocument();
     const link = screen.getByRole('link', { name: /discord/i });
     expect(link).toHaveAttribute('href', DISCORD_URL);
-    // An external link opened in this tab loses whatever the pilot was doing.
     expect(link).toHaveAttribute('target', '_blank');
     expect(link).toHaveAttribute('rel', expect.stringContaining('noopener'));
   });
@@ -32,7 +31,6 @@ describe('HelpPanel', () => {
 
     expect(screen.getByRole('heading', { name: /say thanks/i })).toBeInTheDocument();
     expect(screen.getByText('Mero Otichoda')).toBeInTheDocument();
-    // "Welcome" and "expected" are different claims, and the copy makes both.
     expect(screen.getByText(/never expected/i)).toBeInTheDocument();
   });
 });

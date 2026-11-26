@@ -1,7 +1,3 @@
-/**
- * The attention-strip rows for the mining-tax "resolve" mockups, kept apart from the
- * components so the components file only exports components (react-refresh).
- */
 import type { ReactNode } from 'react';
 import { Button } from '@/components/ui';
 import type { AttentionItem } from '@/features/miningTax/AttentionStrip';
@@ -15,7 +11,6 @@ import {
   isk,
 } from './miningTaxResolveFixtures';
 
-/** The strip as `develop` draws it: every one of these ends in advice, not a control. */
 export const TODAY_ITEMS: AttentionItem[] = [
   {
     id: 'uncredited',
@@ -59,7 +54,6 @@ export const TODAY_ITEMS: AttentionItem[] = [
   },
 ];
 
-/** Proposal B's strip: one Resolve per problem, or the single fix where there is no choice. */
 export function proposedItems(
   resolve: ReactNode = <Button size="sm">Resolve</Button>
 ): AttentionItem[] {
@@ -97,7 +91,6 @@ export function proposedItems(
   ];
 }
 
-/** What still needs the pilot: only the bill an officer handed back, with what to do. */
 export const AFTER_ITEMS: AttentionItem[] = [
   {
     id: 'kept',

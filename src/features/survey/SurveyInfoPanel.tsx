@@ -1,18 +1,3 @@
-/**
- * The Survey's "Additional information" panel, under Field progress: where the
- * fleet is mining (a system, station or structure, with a Set waypoint button),
- * the moon tax when the scans show a moon ore, and the starter's notes.
- *
- * The pilot who started the Survey edits it (`SurveyInfoEditor`). A pick
- * stores the location at once; the notes store when the box loses focus, never
- * per keystroke, since every store is a new doc. Everyone else, in the app or on
- * the public page, gets `SurveyInfoReadout`: the same rows read-only, and the
- * whole panel is left out when the starter set none of them. Both start blank
- * for each survey; only what the survey itself stored comes back.
- *
- * The editor's box is plain text; readers get the notes as a small, safe slice
- * of Markdown (`SurveyNotes`), since anyone holding the link reads them.
- */
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, CollapsiblePanel, Fields, Panel, TextArea } from '@/components/ui';
@@ -45,12 +30,10 @@ import { useHydratedStore } from '@/lib/useHydratedStore';
 
 type Location = NonNullable<SurveyInfoShare['location']>;
 
-/** The stored survey this panel publishes to, with what is already stored there. */
 export interface InfoSurvey extends TaxSurvey {
   info: SurveyInfoShare | null;
 }
 
-/** What Assign Taxes connects, less the location (each panel knows its own). */
 export type SurveyToConnect = Omit<ConnectableSurvey, 'locationId' | 'locationName'>;
 
 export function SurveyInfoEditor({
@@ -63,9 +46,7 @@ export function SurveyInfoEditor({
   characterId: number;
   survey?: InfoSurvey;
   connect?: SurveyToConnect;
-  /** The scans show a moon ore, so the moon tax row applies. */
   moon: boolean;
-  /** A store landed: the page re-reads the survey so what it passes on (the chat message's location) is current. */
   onStored?: () => void;
 }) {
   const { t } = useTranslation();
@@ -74,12 +55,8 @@ export function SurveyInfoEditor({
   const [tax, setTax] = useState(() => initialTaxDraft(survey?.published));
   const templates = useSurveyTemplates((state) => state.value);
   useHydratedStore(useSurveyTemplates);
-  // The template last picked or saved here, for the strip that says so; it is not
-  // remembered between visits, since each survey starts from what it stored.
   const [appliedId, setAppliedId] = useState<string | null>(null);
   const [dialog, setDialog] = useState<'save' | 'manage' | null>(null);
-  // What was last stored, so a blur with nothing new (or a retry after a failed
-  // write) doesn't add a doc.
   const sent = useRef(JSON.stringify([survey?.info?.location ?? null, survey?.info?.notes ?? '']));
 
   function store(nextLocation: Location | null, nextNotes: string) {
@@ -98,7 +75,6 @@ export function SurveyInfoEditor({
     })
       .then(onStored)
       .catch(() => {
-        // Best effort, like the moon tax: allow the next blur or pick to try again.
         if (sent.current === key) sent.current = before;
       });
   }
@@ -119,9 +95,7 @@ export function SurveyInfoEditor({
     setNotes(next.notes);
     if (moon && template.tax) setTax({ name: template.tax.name, pct: String(template.tax.pct) });
     setAppliedId(template.id);
-    // Open, so the rows are there to settle and show what the template filled in.
     fold.open();
-    // The tax goes up on its own once the row settles, as when it is typed.
     store(next.location, next.notes);
   }
 
@@ -211,7 +185,6 @@ export function SurveyInfoEditor({
           </InfoRow>
         </Fields>
       </CollapsiblePanel>
-      {/* Outside the panel: the menu in its header opens these while the body is folded. */}
       {dialog === 'save' && (
         <SaveTemplateDialog
           fields={fields}
@@ -239,7 +212,6 @@ export function SurveyInfoReadout({
   connect,
 }: {
   info: SurveyInfoShare | null;
-  /** Already empty when the scans show no moon ore. */
   tax: SurveyTaxShare | null;
   connect?: SurveyToConnect;
 }) {

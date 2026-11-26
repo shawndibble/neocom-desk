@@ -1,12 +1,3 @@
-/**
- * Whether the Items board has anything to search *for* (issue #2921). Until it
- * does the page asks for a search instead of rendering the whole snapshot —
- * ~370k rows nobody asked to see — while the download carries on behind it.
- *
- * Any control off its default counts, not only the item name: "within 10
- * jumps", a price ceiling or a region is a search too. A blank-but-touched
- * text field does not, so it reads the same as the filter bar's own badge.
- */
 import { DEFAULT_JUMP_RANGE, type JumpRange } from '@/engine/route/jumpRange';
 
 export interface ItemsSearchControls {

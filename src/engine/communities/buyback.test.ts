@@ -128,7 +128,6 @@ describe('parseRate', () => {
 
 describe('priceQuote float safety', () => {
   it('does not lose an ISK to float error', () => {
-    // 100 * 4.35 is 434.99999999999994 in floating point.
     const quote = priceQuote([{ typeId: 1, name: 'A', quantity: 100, unitPrice: 4.35 }], 100);
     expect(quote.total).toBe(435);
   });

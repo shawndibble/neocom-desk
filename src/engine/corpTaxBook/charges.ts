@@ -1,9 +1,3 @@
-/**
- * Day charges (D4): tax is owed per day per character, from each Observed
- * Mining Entry at its date's prices and the rate in effect that day, and
- * rolls up to a Miner — one or more characters billed together (D18), one per
- * character by default.
- */
 import { minerIdFor, soloCharacterId } from '../../../functions/src/corpTaxBookDonationMatch';
 import { observedEntryKey } from './observed';
 import { resolveRate, type RateScope, type TaxRate } from './rates';
@@ -15,42 +9,24 @@ import type { ObservedMiningEntry, OreLine } from './types';
 export interface Miner {
   id: string;
   characterIds: number[];
-  /** The character that gets the mail. */
   mainCharacterId: number;
-  /** An officer closed this guest's account (#4184): no late notice mail after the final one. */
   closedAt?: string;
-  /** The final late notice the close issued, if anything was left to ask for (the legacy wire field). */
   finalStatementId?: string;
-  /** When the grouping was made: of two that list one character, the earlier bills it. */
   createdAt?: string;
-  /** The newest day the book has recorded as paid for this Miner (copied from `meta/paid` so the Miner can read it). */
   paidThrough?: string;
-  /** The Miner ids a regroup folded into this one: their codes and records are this Miner's now. */
   aliases?: string[];
-  /** Characters that left this grouping, by the day they left: it still bills them before it. */
   leftOn?: Record<number, string>;
 }
 
-/** The characters a Miner bills: its grouping's, or the one character of a Miner of its own. */
 export function characterIdsOfMiner(minerId: string, miners: readonly Miner[]): number[] {
   const grouped = miners.find((m) => m.id === minerId);
-  // A character that left still billed it before the day it left.
   if (grouped) return [...grouped.characterIds, ...Object.keys(grouped.leftOn ?? {}).map(Number)];
   const solo = soloCharacterId(minerId);
   return solo === undefined ? [] : [solo];
 }
 
-/**
- * The Miner a character is billed under: its earliest grouping (`earlierGrouping`), or a Miner of
- * its own. The shared rule, so the book and the server never bill a character to different Miners.
- */
 export { minerIdFor };
 
-/**
- * Every Miner of the book as a picker lists them: the groupings, and each Miner of its own that
- * `ids` (`solo:<character>` for each character the book's rows name) names whose character no
- * grouping holds. Once each.
- */
 export function bookMinersOf(grouped: readonly Miner[], ids: readonly string[]): Miner[] {
   const out = [...grouped];
   const seen = new Set(grouped.map((m) => m.id));
@@ -65,9 +41,7 @@ export function bookMinersOf(grouped: readonly Miner[], ids: readonly string[]):
   return out;
 }
 
-/** What one Observed Mining Entry owes, snapshotted with the inputs that priced it. */
 export interface DayCharge {
-  /** `observedEntryKey`: character + refinery + day. */
   key: string;
   minerId: string;
   characterId: number;
@@ -77,10 +51,7 @@ export interface DayCharge {
   date: string;
   isGuest: boolean;
   oreLines: OreLine[];
-  /** Per-unit price by raw type id on `date` at the book's hub and Ore Form. */
-  /** Records rather than Maps so a charge stores as plain data. */
   unitPrices: Record<number, number>;
-  /** Which price tier priced each raw type id. */
   priceSources: Record<number, TaxPriceSource>;
   taxPct: number;
   rateScope: RateScope;
@@ -89,7 +60,6 @@ export interface DayCharge {
   taxOwed: number;
 }
 
-/** The moon and Extraction a refinery was working on a date, when known. */
 export type PlaceOf = (
   structureId: number,
   date: string
@@ -97,20 +67,16 @@ export type PlaceOf = (
 
 export interface ChargeBook {
   corporationId: number;
-  /** The book's start date (D10): earlier mining is history that owes nothing. */
   startDate: string;
   miners: readonly Miner[];
   rates: readonly TaxRate[];
-  /** The day's prices at the book's hub and Ore Form (`priceObservedDay`). */
   pricesOn: (date: string) => Pick<DayPrices, 'prices' | 'sources'>;
   placeOf: PlaceOf;
 }
 
 export interface DayCharges {
   charges: DayCharge[];
-  /** Mining before the book's start date — "Before the book". */
   beforeBook: ObservedMiningEntry[];
-  /** Entries no rate covered yet — the caller asks for a corp default. */
   unrated: ObservedMiningEntry[];
 }
 

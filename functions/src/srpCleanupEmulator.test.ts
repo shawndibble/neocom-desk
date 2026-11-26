@@ -1,5 +1,3 @@
-// SRP retention sweep against the Firestore emulator (issue #4856, ADR 0026). Runs only
-// under the emulator (FIRESTORE_EMULATOR_HOST); a plain `npm test` skips it.
 import { afterAll, beforeEach, expect, it } from 'vitest';
 import { clearEmulator, emulatorDb as db, emulatorSuite } from './testSupport/emulator.js';
 import { sweepSrpClaims } from './srpCleanup.js';
@@ -8,7 +6,7 @@ import { SRP_RETENTION_MS } from './srpRetention.js';
 const CORP_A = 98000001;
 const CORP_B = 98000002;
 const NOW = Date.parse('2026-10-23T12:00:00Z');
-const OLD = NOW - SRP_RETENTION_MS; // closed exactly a year ago
+const OLD = NOW - SRP_RETENTION_MS;
 const DAY = 24 * 60 * 60 * 1000;
 
 const claims = (corp: number) => db.collection('corps').doc(String(corp)).collection('srpClaims');
@@ -37,10 +35,10 @@ emulatorSuite('SRP retention sweep (emulator)', () => {
   it('deletes Paid and Rejected claims at one year, keeps the rest, one count-only audit entry per corp', async () => {
     await put(CORP_A, 1, 'paid', OLD);
     await put(CORP_A, 2, 'rejected', OLD);
-    await put(CORP_A, 3, 'paid', OLD + 1); // 1 ms short
+    await put(CORP_A, 3, 'paid', OLD + 1);
     await put(CORP_A, 4, 'pending');
     await put(CORP_A, 5, 'approved');
-    await put(CORP_A, 6, 'pending', OLD - 100 * DAY); // re-filed: stale closedAt, pending
+    await put(CORP_A, 6, 'pending', OLD - 100 * DAY);
     await put(CORP_B, 7, 'paid', OLD - DAY);
 
     const result = await sweepSrpClaims(db, NOW);
@@ -79,7 +77,6 @@ emulatorSuite('SRP retention sweep (emulator)', () => {
     expect(second).toEqual({ deleted: 2, failed: 0, truncated: false });
     expect(await claimIds(CORP_A)).toEqual([]);
     expect(await claimIds(CORP_B)).toEqual([]);
-    // CORP_A: one entry (run 1). CORP_B: one entry per run.
     expect((await audit(CORP_A)).length + (await audit(CORP_B)).length).toBe(3);
   });
 
@@ -89,7 +86,7 @@ emulatorSuite('SRP retention sweep (emulator)', () => {
     const pilot = { by: 501, byName: 'Must Not Leak' };
     const officer = { by: 900, byName: 'Officer' };
     await put(CORP_A, 1, 'paid', OLD);
-    await put(CORP_A, 2, 'paid', OLD + DAY); // newer: kept, with its trail
+    await put(CORP_A, 2, 'paid', OLD + DAY);
     await log(CORP_A, 'a', { ...pilot, action: 'fileClaim', detail: { killmailId: 1 } });
     await log(CORP_A, 'b', {
       ...officer,
@@ -116,7 +113,6 @@ emulatorSuite('SRP retention sweep (emulator)', () => {
     await log(CORP_A, 'h', { ...officer, action: 'turnOn', detail: { reenabled: false } });
     await log(CORP_A, 'i', { ...officer, action: 'saveSettings', detail: {} });
     await log(CORP_A, 'j', { ...officer, action: 'addDoctrine', detail: { name: 'Fit' } });
-    // Another corp's log about the same killmail id is its own claim.
     await log(CORP_B, 'k', { ...pilot, action: 'fileClaim', detail: { killmailId: 1 } });
 
     expect(await sweepSrpClaims(db, NOW)).toEqual({ deleted: 1, failed: 0, truncated: false });

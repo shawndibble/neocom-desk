@@ -10,11 +10,6 @@ import {
 import { MD_UP_QUERY, useMediaQuery } from '@/lib/useMediaQuery';
 import { WALLET_RANGES, useWalletRange, type WalletRange } from './walletRange';
 
-/**
- * The Wallet page's 7 / 30 / 90 day range, in the page header level with its
- * icon buttons: segmented buttons from `md`, a select below it, where three
- * segments would crowd the title and Character picker.
- */
 export function WalletRangeControl() {
   const { t } = useTranslation();
   const wide = useMediaQuery(MD_UP_QUERY);

@@ -33,23 +33,14 @@ type Scope = 'all' | 'one';
 
 interface ListChargePickerProps {
   module: FittingModule;
-  /** This module's own calculated result: its charge groups. */
   result: FittingModuleResult | undefined;
   fitting: Fitting;
   catalogue: FittingCatalogue | null;
-  /** Null while the engine or pilot loads: the picker lists charges by name, without figures. */
   context: FittingContext | null;
   edit: (change: FittingChange) => void;
   className?: string;
 }
 
-/**
- * A List row's charge control (issue: the flat `<select>`): a button naming
- * the loaded charge that opens the Charge Picker — a popover under it on a
- * pointer screen, a bottom sheet on a phone — with "All N / This gun" for
- * whether the pick loads into every gun of the type or just this one, and
- * "No charge". The engine works the figures out only once it's open.
- */
 export function ListChargePicker({
   module,
   result,
@@ -131,11 +122,6 @@ export function ListChargePicker({
         aria-label={t('fittings.chargePicker.sheetTitle', { name: moduleName })}
         className="max-h-[min(36rem,80vh)] w-80 overflow-y-auto p-2"
         onEscapeKeyDown={(event) => {
-          // An Escape inside a dialog opened from the picker (the crystal
-          // guide's help) is that dialog's. The popover hears it first, on the
-          // document, and cancels it whether it closes or not, and a browser
-          // won't close a dialog on a cancelled Escape. So the popover stays
-          // open and hands the dialog its close request itself.
           const dialog =
             event.target instanceof Element
               ? event.target.closest<HTMLDialogElement>('dialog[open]')
@@ -169,7 +155,6 @@ function ChargePickerPanel({
     [fitting.modules, module.typeId]
   );
   const [scope, setScope] = useState<Scope>('all');
-  // Every module of this type shares this one's charge groups: all the hook needs.
   const moduleResults = useMemo(
     () =>
       fitting.modules.map((m): FittingModuleResult =>
@@ -187,10 +172,8 @@ function ChargePickerPanel({
   });
   const group = groups?.[0];
   const loaded = module.chargeTypeId;
-  // A charge the engine doesn't list for this module (pasted in, say) stays named, as the old select kept it.
   const offList =
     loaded !== undefined && group !== undefined && !group.choices.some((c) => c.typeId === loaded);
-  // Before the engine (or a pilot) is ready there are no figures: every charge its groups name, by name.
   const plainIds = useMemo(() => {
     if (group) return group.choices.map((c) => c.typeId);
     if (catalogue === null) return [];

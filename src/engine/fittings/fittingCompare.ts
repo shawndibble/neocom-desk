@@ -1,8 +1,3 @@
-/**
- * Fitting vs Fitting compare: up to three Fittings' stats and modules side
- * by side. Shares `fittingStatFields.ts`'s field list and rounding with
- * `variationDelta.ts`'s before/after diff, generalised here to N-way.
- */
 import {
   NUMERIC_FIELDS,
   round,
@@ -13,7 +8,6 @@ import { appliedDps, appliedDpsVsRange, bestRange, graphMaxRange } from './appli
 import type { TargetProfile } from './targetProfile';
 import type { CapacitorStatus, Fitting, FittingStats } from './types';
 
-/** `null` means the field has no "better"/"worse" side — CPU/PG/calibration used-or-total, mass — so no value is highlighted. */
 const STAT_DIRECTION: Readonly<Partial<Record<FittingStatKey, 'higher' | 'lower'>>> = {
   totalDps: 'higher',
   totalVolley: 'higher',
@@ -57,25 +51,19 @@ const STAT_DIRECTION: Readonly<Partial<Record<FittingStatKey, 'higher' | 'lower'
   warpSpeed: 'higher',
 };
 
-/** The two rows worked out against the selected Target Profile, not read off `FittingStats`. */
 export type AppliedCompareKey = 'appliedDps' | 'bestRange';
 
-/** Fit-wide sell/buy totals — the two figures this table needs out of `loadFittingPrice`'s wider `Appraisal.totals` (which also carries spread, refine, and unpriced-row counts this compare doesn't use). */
 export interface FittingPriceTotals {
   readonly sell: number;
   readonly buy: number;
 }
 
-/** The two rows a caller supplies once its (async, non-pure) price fetch has settled for every compared Fitting. */
 export type PriceCompareKey = 'priceSell' | 'priceBuy';
 
 export interface CompareRow {
   key: StatChangeKey | AppliedCompareKey | PriceCompareKey;
-  /** Index-parallel to the input fittings, rounded at the same digits `FittingStatsSections` displays. */
   values: readonly number[];
-  /** `false` when every fitting rounds to the same value. */
   differs: boolean;
-  /** Indices tied for best; empty when the field has no direction or nothing differs. */
   bestIndices: readonly number[];
 }
 
@@ -92,7 +80,6 @@ function bestIndicesFor(
   return values.flatMap((value, index) => (value === target ? [index] : []));
 }
 
-/** Stable beats unstable; among stable, higher percentage wins; among unstable, longer depletion wins. */
 function capacitorRank(status: CapacitorStatus): [stable: number, metric: number] {
   return status.stable ? [1, status.stablePercentage] : [0, status.depletesInSeconds];
 }
@@ -112,9 +99,6 @@ function capacitorRow(statsList: readonly FittingStats[]): CompareRow {
   }
   return {
     key: 'capacitor',
-    // Negated on the unstable side, matching `variationDelta.ts`'s own
-    // `capacitorChange` metric — `FittingCompareTable`'s `formatValue` reads
-    // that sign to tell stable from unstable back apart.
     values: statsList.map((s) =>
       round(s.capacitor.stable ? s.capacitor.stablePercentage : -s.capacitor.depletesInSeconds, 0)
     ),
@@ -123,10 +107,6 @@ function capacitorRow(statsList: readonly FittingStats[]): CompareRow {
   };
 }
 
-/**
- * Applied DPS and the range it peaks at (km), per fitting, on the same range axis the single-Fitting
- * page uses for a lone Fitting (`graphMaxRange`) so the numbers match. No firing weapons: 0 and 0.
- */
 function appliedRows(statsList: readonly FittingStats[], target: TargetProfile): CompareRow[] {
   const points = statsList.map(({ applied }) => {
     const at = bestRange(appliedDpsVsRange(applied, target, graphMaxRange([applied])));
@@ -145,12 +125,6 @@ function appliedRows(statsList: readonly FittingStats[], target: TargetProfile):
   ];
 }
 
-/**
- * No "better"/"worse" side for cost — a cheaper fit isn't necessarily the right pick for a doctrine, so neither
- * price row is highlighted. A `null` entry (that slot's price fetch failed) becomes `NaN` — `formatValue` renders
- * it as a dash, and `Set`'s same-value-zero equality treats every `NaN` as equal, so failed slots never register
- * as "differing" against each other.
- */
 function priceRows(prices: readonly (FittingPriceTotals | null)[]): CompareRow[] {
   const sell = prices.map((p) => (p ? round(p.sell, 0) : NaN));
   const buy = prices.map((p) => (p ? round(p.buy, 0) : NaN));
@@ -160,12 +134,6 @@ function priceRows(prices: readonly (FittingPriceTotals | null)[]): CompareRow[]
   ];
 }
 
-/**
- * Every stat row for N fittings side by side — the differences-only toggle filters `rows` by `differs` at the UI layer.
- * Passing a `target` adds the applied-DPS rows. Passing `prices` (index-parallel to `statsList`, `null` for a slot
- * whose price fetch failed) adds the sell/buy rows — the whole pair is omitted while any slot is still in flight,
- * but a settled failure on one slot doesn't hide the slots that priced.
- */
 export function compareFittingStats(
   statsList: readonly FittingStats[],
   target?: TargetProfile,
@@ -182,9 +150,7 @@ export function compareFittingStats(
           bestIndices: bestIndicesFor(values, STAT_DIRECTION[field.key]),
         },
       ];
-    // A figure no Fitting has (no tackle, no analyzer) is a row of zeros.
     if (values.every((value) => value === 0)) return [];
-    // Lower-is-better: a Fitting without the thing (0) is not the fastest or least wasteful.
     const ranked = field.direction === 'lower' ? values.map((v) => v || Infinity) : values;
     return [
       {
@@ -206,11 +172,9 @@ export function compareFittingStats(
 
 export interface ModuleDiffEntry {
   typeId: number;
-  /** Index-parallel to the input fittings; 0 when that fitting doesn't carry it. */
   counts: readonly number[];
 }
 
-/** Module type ids whose stack count is not identical across every fitting — a hull swap makes every module "differ". */
 export function modulesThatDiffer(fittings: readonly Fitting[]): ModuleDiffEntry[] {
   const typeIds = new Set<number>();
   const countsByFitting = fittings.map((fitting) => {
@@ -229,7 +193,6 @@ export function modulesThatDiffer(fittings: readonly Fitting[]): ModuleDiffEntry
   return result;
 }
 
-/** A sliding 2-column window over up to 3 compare slots for phone paging; 1-2 fittings show in full, never a lone column. */
 export function compareWindow(count: number, page: number): { start: number; end: number } {
   if (count <= 2) return { start: 0, end: count };
   const lastPage = count - 2;

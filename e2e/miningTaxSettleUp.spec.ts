@@ -1,9 +1,3 @@
-/**
- * Settle up for a personal Payee (decision 20261120-235011, "every Payee is paid oldest first"):
- * the pilot records what they sent, one link to the Payee, and it pays the Payee's oldest unpaid
- * days; a short payment part-pays the next day, and what is over is credit. Personal data only
- * (Dexie, no Firebase), so this runs in the main suite.
- */
 import type { Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
 import { CHARACTER_ID } from './support/fixtureData';
@@ -28,7 +22,6 @@ async function openTaxTab(page: Page) {
   await expect(page.getByRole('group', { name: ROOK.name })).toContainText(isk(OWED));
 }
 
-/** Settle up on Rook's card, recording `amount` (the amount owed when omitted). */
 async function settleUp(page: Page, amount?: number) {
   await page
     .getByRole('region', { name: 'You owe' })
@@ -113,7 +106,6 @@ test('an archived Payee in credit has no card, and comes back with Unarchive', a
   await page.getByRole('button', { name: 'Payees', exact: true }).click();
   const manage = page.getByRole('dialog', { name: 'Manage Payees' });
   await manage.getByRole('button', { name: `Archive ${ROOK.name}` }).click();
-  // Archived: listed under "Archived" with its credit, and gone from the tab behind.
   await expect(manage.getByRole('region', { name: 'Archived' })).toContainText(ROOK.name);
   await page.keyboard.press('Escape');
   await expect(card).toHaveCount(0);

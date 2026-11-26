@@ -1,23 +1,8 @@
-/**
- * A hook-sized value that starts from the last one loaded, instead of from
- * empty on every mount — `useRouteSnapshot`'s `cacheKey` for loaders that
- * aren't whole views (standings, account skills, owned stock).
- *
- * Opening a Build Plan from the Industry index used to reload each of these
- * from empty, and every one that landed re-rendered and re-priced the whole
- * plan although the index had just loaded the same data. Now the plan starts
- * from what the index had, and a value loaded within `WARM_LOAD_FRESH_MS`
- * isn't reloaded at all; an older one is, behind the warm start.
- *
- * Kept in `routeSnapshotCache.ts`, so a Character's values are forgotten with
- * its cache, and `ACCOUNT_SNAPSHOT_ID` values with any Character's.
- */
 import { useEffect, useState } from 'react';
 import { readRouteSnapshot, routeSnapshotEpoch, writeRouteSnapshot } from './routeSnapshotCache';
 import { useRouteSnapshotHydration } from './useRouteSnapshotHydration';
 import { MINUTE_MS } from '@/lib/age';
 
-/** A load this recent is reused as is: page-to-page navigation, not a refresh. */
 export const WARM_LOAD_FRESH_MS = MINUTE_MS;
 
 interface Stamped<T> {
@@ -25,16 +10,6 @@ interface Stamped<T> {
   loadedAt: number;
 }
 
-/**
- * @param name unique per value shape — two hooks sharing one would hand each
- * other the wrong data. Include anything the value depends on beyond `ownerId`.
- * @param ownerId the Character (or `ACCOUNT_SNAPSHOT_ID`) the value belongs
- * to; null loads nothing and returns `empty`.
- * @param load must close over nothing but its argument: the effect keys on
- * `name` and `ownerId` only. A rejection keeps what is showing.
- * @param empty returned before any load — pass a module constant so its
- * identity is stable.
- */
 export function useWarmLoad<T>(
   name: string,
   ownerId: number | null,

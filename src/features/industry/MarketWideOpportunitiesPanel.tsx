@@ -1,10 +1,3 @@
-/**
- * Market-Wide Build Opportunities (issue #819): a second panel on the
- * Opportunities tab, ranking manufacturable products market-wide by
- * ISK/hour, independent of ownership — a cold-start "what should I build,
- * starting from nothing" answer. Opt-in: nothing runs until the pilot hits
- * "Scan".
- */
 import { useMemo, useState, type ReactElement } from 'react';
 import type { CharacterModifiers } from '@/engine/industry/characterModifiers';
 import { useTranslation } from 'react-i18next';
@@ -61,32 +54,19 @@ import { useMarketWideRanking } from './useMarketWideRanking';
 interface MarketWideOpportunitiesPanelProps {
   hub: TradeHub;
   trees: MarketWideTreeMap | null;
-  /** The precomputed trees couldn't be loaded (not downloaded yet, no connection). */
   treesFailed?: boolean;
   onRetryTrees?: () => void;
   catalog: BlueprintCatalog | null;
   modifiers: CharacterModifiers;
-  /** For the standing toward `hub`'s NPC owner (issue #1238). Null while no character is active. */
   activeCharacterId: number | null;
-  /** The active Character's latest plan, whose settings the rows are priced with. */
   latestPlan?: BuildPlanRecord | null;
-  /**
-   * Resolves true once it has opened the new plan (see `StartPlanButton`).
-   * `research` is the ME/TE the row was priced at: the plan starts there, so
-   * its figures are the row's.
-   */
   onStartPlan: (
     entry: BlueprintCatalogEntry,
     research?: { me: number; te: number }
   ) => Promise<boolean>;
-  /** The active Character's blueprints and the assumed ME/TE: what rows are priced at. */
   ownedBlueprints: readonly CharacterBlueprint[];
   assumedMe: number;
   assumedTe: number;
-  /**
-   * The pilot owns blueprints, so Ranked builds is the panel they came for and
-   * this one starts folded to its header. Their own choice wins once made.
-   */
   startFolded?: boolean;
 }
 
@@ -110,14 +90,10 @@ export function MarketWideOpportunitiesPanel({
   const { t } = useTranslation();
   const online = useOnline();
   const unknownName = t('common.unknown');
-  // Below `lg` the ranking is cards, the same breakpoint Ranked and All owned switch at.
   const isDesktop = useIsDesktop();
   const tradeHubStandings = useTradeHubStandings(activeCharacterId);
   const standing = tradeHubStanding(tradeHubStandings, hub.id);
 
-  // Account-wide, not active-character: every character on the account, same
-  // precedent `OpportunitiesPanel`'s own multi-character fan-out sets. The
-  // scan reads the same set for whose blueprints, contracts and LP count.
   const characterNames = useCharacterNames();
   const characterIds = useMemo(() => [...characterNames.keys()], [characterNames]);
   const { filter, setFilter } = useMarketWideFilter();
@@ -153,7 +129,6 @@ export function MarketWideOpportunitiesPanel({
     online,
     startFolded,
   });
-  // `aria-disabled` while offline, not the native attribute, so the reason stays reachable.
   const scanButton = (
     <Button
       size="sm"
@@ -176,8 +151,6 @@ export function MarketWideOpportunitiesPanel({
       ),
     [t, skillGateByProductTypeID, catalog, characterNames]
   );
-  // `visibleRows`, not the table's `shownRows`: the table mounts the first
-  // page behind "Show more", the file holds every row the filter keeps.
   const marketWideExport = useTableExport({
     surface: 'market-wide-opportunities',
     rows: visibleRows,
@@ -192,10 +165,7 @@ export function MarketWideOpportunitiesPanel({
 
   const startPlanFromRow = useRowStartPlan(startPlanFor);
 
-  // Mounting `PriceHistoryPanel` is what fetches the item's market history, so
-  // it stays out of the tree until a pilot asks for one row's.
   const [historyItem, setHistoryItem] = useState<{ typeId: number; itemName: string } | null>(null);
-  // The same item menu Ranked builds rows carry, Price history included.
   const rowContextMenu = (row: MarketWideDayRow, tr: ReactElement) => (
     <ItemContextMenu
       typeId={row.productTypeID}
@@ -248,8 +218,6 @@ export function MarketWideOpportunitiesPanel({
       onSortChange(next);
     },
   };
-  // Cut under the active sort, so a re-sort ranks the whole scan rather than
-  // re-ordering whichever 200 the last sort happened to show.
   const shownRows = useMemo(
     () =>
       topRows(

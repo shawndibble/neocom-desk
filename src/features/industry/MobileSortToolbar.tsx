@@ -1,9 +1,3 @@
-/**
- * The phone card lists' one-line toolbar: how many cards there are, and a
- * borderless "Sort by" menu over the fields the list can sort on. Shared by
- * `MobileOpportunityList` and `MobileOwnedBlueprintList`; each keeps its own
- * URL sort state and passes it in.
- */
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { cx } from '@/lib/cx';
 import { useTranslation } from 'react-i18next';
@@ -19,11 +13,8 @@ import {
 import * as Icon from '@/components/ui/icons';
 
 interface MobileSortToolbarProps<Id extends string> {
-  /** Cards shown — identical copies fold into one, so this counts cards. */
   count: number;
-  /** Replaces the "N blueprints" count, for a list whose cards aren't blueprints. */
   summary?: string;
-  /** `firstDirection`: where a tap on an inactive field starts it (`firstSortDirection`'s rule); default `asc`. */
   fields: readonly { id: Id; label: string; firstDirection?: 'asc' | 'desc' }[];
   sort: DataTableSort;
   onSortChange: (next: DataTableSort) => void;

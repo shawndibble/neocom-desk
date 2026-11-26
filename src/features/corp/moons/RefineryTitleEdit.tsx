@@ -9,7 +9,6 @@ import { REFINERY_LABEL_MAX } from './RefineryLabels';
 
 const kl = (key: string) => `corpTaxBook.moons.refineryLabels.${key}`;
 
-/** The pencil beside a moon owner's refinery title: the label is edited in place. */
 export function RefineryTitleEdit({
   name,
   current,

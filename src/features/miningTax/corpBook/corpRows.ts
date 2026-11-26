@@ -1,11 +1,3 @@
-/**
- * Folds the engine's overlay (`overlayCorpBooks`) into the Tax tab's own row
- * model (#4065): the personal rows with the ore a book took removed from their
- * unassigned residual, plus one synthetic `DisplayRow` per decision the book
- * made, owed to a virtual Payee named for the corporation. Nothing here is
- * written to Dexie: the synthetic rows are display-only, and the tab keeps
- * every write action away from them (`DisplayRow.corp`).
- */
 import type { MiningTaxAssignmentRecord, MiningTaxAssignmentStatus, PayeeRecord } from '@/db';
 import type {
   BookLabelState,
@@ -17,10 +9,9 @@ import { payeesOfBookCorporation } from '@/engine/miningTax/payeeCorporation';
 import { isUnpaidDefault } from '@/engine/miningTax/defaultSystems';
 import { addLines, minusLines } from '@/engine/miningTax/oreLines';
 import { entryKey } from '@/engine/miningTax/types';
-import { flatten, type DisplayRow } from '../groupRows';
+import { allMembers, flatten, type DisplayRow } from '../groupRows';
 import type { MoonMiningTaxRow } from '../snapshot';
 
-/** What a Tax-tab row knows about the Corp Tax Book it came from. */
 export type CorpRowInfo =
   | { kind: 'row'; view: BookRowView; corpName: string }
   | { kind: 'label'; state: BookLabelState; corporationId: number; corpName: string };
@@ -33,10 +24,6 @@ export const isCorpPayeeId = (payeeId: string | undefined): payeeId is string =>
 export const corporationOfPayee = (payeeId: string): number =>
   Number(payeeId.slice(CORP_PAYEE_PREFIX.length));
 
-/**
- * Each book's virtual Payee mapped to the stored Payee that is the same corporation, so the Payee
- * filter lists the corporation once and a pick covers both sets of rows.
- */
 export function corpPayeeAliases(
   storedPayees: readonly PayeeRecord[],
   bookPayees: readonly PayeeRecord[]
@@ -53,18 +40,11 @@ export function corpPayeeAliases(
   return aliases;
 }
 
-/**
- * What the day is worth in tax, as every other row on the page reads it: the bill for a Paid day
- * (after any correction), what is still owed while Billed, and 0 only where the corporation
- * dismissed or waived it. The engine zeroes `taxOwed` once paid, so Paid reads the bill instead.
- */
 export const bookRowTax = (view: BookRowView): number =>
   view.state === 'paid' ? (view.correction?.after ?? view.billed) : (view.taxOwed ?? 0);
 
-/** The row is one the book decided (not a personal row relabelled). */
 export const isBookRow = (dr: DisplayRow): boolean => dr.corp?.kind === 'row';
 
-/** The synthetic Payee a book's rows are owed to: terms locked to the book, so never editable or assignable. */
 export function corpPayee(
   corporationId: number,
   characterId: number,
@@ -86,13 +66,10 @@ export function corpPayee(
 
 const STATUS_OF_STATE: Record<BookRowView['state'], MiningTaxAssignmentStatus> = {
   billed: 'outstanding',
-  // Visible and not owed: it needs a decision, but not the member's money.
+  estimate: 'outstanding',
   conflict: 'needs-review',
-  // Not owed and nothing to do yet, but kept beside the day's bill rather than in History.
-  settling: 'needs-review',
   paid: 'paid',
   dismissed: 'dismissed',
-  // Forgiven in full by an officer write-off (#4637): not owed, like a dismissal.
   waived: 'dismissed',
 };
 
@@ -108,7 +85,6 @@ function syntheticRow(view: BookRowView, characterName: string, corpName: string
     estimatedValue: view.estimatedValue,
     taxOwed: bookRowTax(view),
     status: STATUS_OF_STATE[view.state],
-    // The refinery, read beside the corporation in the Payee column (spec #4504).
     ...(view.refineryLabel ? { label: view.refineryLabel } : {}),
     updatedAt: 0,
   };
@@ -133,11 +109,6 @@ function syntheticRow(view: BookRowView, characterName: string, corpName: string
   };
 }
 
-/**
- * The tab's rows: with no overlay exactly `flatten(entries)`. With one, the
- * entries lose the free ore the books took, their remaining unassigned rows
- * carry a Pending / Unattributed label, and the books' own rows are added.
- */
 export function buildDisplayRows(
   entries: readonly MoonMiningTaxRow[],
   overlay: PersonalOverlay | null,
@@ -156,19 +127,16 @@ export function buildDisplayRows(
         }
       : row;
   });
-  // A Payee that is the corporation: its rows give way to the book's, which bills the same ore.
   const taken = (dr: DisplayRow) =>
     dr.assignment != null &&
     overlay.absorbed
       .get(entryKey(dr.row.characterId, dr.row.entry.date, dr.row.entry.solarSystemId))
       ?.has(dr.assignment.id) === true;
-  // An Assignment the books took part of reads as what stays with its Payee (#6203).
   const trim = (dr: DisplayRow, assignment: MiningTaxAssignmentRecord): DisplayRow => {
     const kept = overlay.trimmed
       .get(entryKey(dr.row.characterId, dr.row.entry.date, dr.row.entry.solarSystemId))
       ?.get(assignment.id);
     if (!kept) return dr;
-    // Per-type value overrides name the whole Assignment's lines, so the kept part drops them.
     const shrunk: MiningTaxAssignmentRecord = {
       ...assignment,
       oreLines: kept.oreLines,
@@ -210,16 +178,13 @@ export function buildDisplayRows(
   return [...flat, ...own];
 }
 
-/** The engine's view of the member's Mining Ledger Entries. */
 export function personalEntriesOf(rows: readonly MoonMiningTaxRow[]): PersonalEntry[] {
   return rows.map((row) => ({
     characterId: row.characterId,
     date: row.entry.date,
     solarSystemId: row.entry.solarSystemId,
     oreLines: row.entry.oreLines,
-    // Ore a book took off an Assignment is free to the book: it still bills it, never as a Conflict.
     freeOreLines: addLines(row.unassignedOreLines, row.releasedOreLines),
-    // A dismissed Assignment ("I don't pay tax on this") has no rate to compare.
     allocations: row.assignments
       .filter((a) => a.status !== 'dismissed')
       .map((a) => ({
@@ -228,9 +193,25 @@ export function personalEntriesOf(rows: readonly MoonMiningTaxRow[]): PersonalEn
         taxPct: a.taxPct,
         oreLines: a.oreLines,
         status: a.status,
-        // A Default System's Assignment after its Payee's paid-through is ore given to no Payee as
-        // far as the book goes. `status` is as the Payee's account reads it (`PayeeRunningAccounts.view`).
         ...(isUnpaidDefault(a) ? { releasable: true } : {}),
       })),
   }));
+}
+
+export function ownEntryRowOf(
+  entries: readonly MoonMiningTaxRow[],
+  overlay: PersonalOverlay,
+  view: Pick<BookRowView, 'characterId' | 'date' | 'solarSystemId'>
+): DisplayRow | undefined {
+  const ids = overlay.absorbed.get(entryKey(view.characterId, view.date, view.solarSystemId));
+  if (!ids) return undefined;
+  return flatten(entries).find((dr) =>
+    allMembers(dr).some(
+      (m) =>
+        ids.has(m.assignment.id) &&
+        m.row.characterId === view.characterId &&
+        m.row.entry.date === view.date &&
+        m.row.entry.solarSystemId === view.solarSystemId
+    )
+  );
 }

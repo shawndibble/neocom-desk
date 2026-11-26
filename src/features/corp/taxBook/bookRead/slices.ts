@@ -1,10 +1,3 @@
-/**
- * The one table of a book read (issue #5248, ADR 0032): each part (parts.ts) and the fields it
- * fills, how a field is read from the whole book, and what it holds when its part was not read.
- * Reading and merging both walk this table, so a new field is one entry here (and its place on
- * `BookData`). A scoped read (one Miner, one moon) swaps a field's reader for its own, never
- * leaves one out: a read's `parts` names exactly the parts it filled.
- */
 import { collection, doc, getDoc, getDocs } from 'firebase/firestore/lite';
 import type { Miner } from '@/engine/corpTaxBook/charges';
 import type { Dismissal } from '@/engine/corpTaxBook/dismissals';
@@ -40,21 +33,14 @@ import type { FeederViewSummary } from '../feederViewClient';
 import type { OpenBook } from '../openBook';
 import type { BookPart, BookPartSet } from './parts';
 
-/** A book read as a page joins it: the parts it asked for, and the scope it was read in. */
 export interface BookRead extends BookData {
-  /** The parts this read filled; every field of every other part is empty. */
   parts: BookPartSet;
-  /** A one-Miner read (#5258): the first day whose rows were read. */
   minerScope?: { from: string };
-  /** The moon page this read was for (#5716), whether its docs stood in or the whole book was read. */
   forMoon?: string;
-  /** The moon docs that stand in for the ledger rows of a moon page's earlier cycles. */
   moon?: { docs: ReadonlyMap<string, MoonDoc>; fromDocs: ReadonlySet<string> };
-  /** A refinery page's read (#6348): every moon doc the refinery has, by extraction id. */
   refinery?: { structureId: number; docs: ReadonlyMap<string, MoonDoc> };
 }
 
-/** One book read: the open book, and each field it reads once however many readers ask. */
 export interface ReadContext {
   readonly book: OpenBook;
   readonly characterId: number;
@@ -101,7 +87,6 @@ const meta = (ctx: ReadContext, id: string, slot: string) =>
     slot
   );
 
-/** Every feeder with its payouts. One stamp covers a feeder's record and its payouts: both live under `feeders`. */
 function feedersOf({ book, corporationId }: ReadContext): Promise<BookFeeder[]> {
   const payouts = (feeder: number) =>
     collection(book.db, 'corps', String(corporationId), 'feeders', String(feeder), 'payouts');
@@ -122,11 +107,6 @@ function feedersOf({ book, corporationId }: ReadContext): Promise<BookFeeder[]> 
   );
 }
 
-/**
- * The book's moon owners' view summaries, one doc each, nothing under them. An officer of the
- * book may read them (rules, #5717). One that is missing, or that the rules do not yet let this
- * officer read, is left out: the caller prices that moon owner from its ledger rows instead.
- */
 async function feederSummariesOf(ctx: ReadContext): Promise<Map<number, FeederViewSummary>> {
   const feeders = await readField(ctx, 'feeders');
   const found = await Promise.all(
@@ -160,7 +140,6 @@ const SLICES = {
       async (c) => readUncounted(await meta(c, 'uncounted', 'meta:uncounted')).donations
     ),
   },
-  // The ledger rows are a part of their own: a tab that needs none never reads them (#5717).
   observed: {
     observed: field<ObservedRow[]>(none, (c) => c.book.observed()),
   },
@@ -172,13 +151,11 @@ const SLICES = {
       (await c.book.list<Record<string, unknown>>('declarations')).map(bookDeclarationOf)
     ),
     adjustments: field<Adjustment[]>(none, (c) => c.book.list('adjustments')),
-    // Best effort, like disputes: nothing is read until a write stamped it, and a denied read is none.
     toleranceExemptions: field<ToleranceExemption[]>(none, async (c) =>
       c.book.written('toleranceExemptions')
         ? await c.book.list<ToleranceExemption>('toleranceExemptions').catch(none)
         : []
     ),
-    // #6206: best effort, so a book whose rules predate disputes still opens.
     disputes: field<OreDispute[]>(none, async (c) =>
       readDisputes(
         c.book.written('disputes') ? await c.book.list<unknown>('disputes').catch(none) : []
@@ -189,7 +166,6 @@ const SLICES = {
     groupingAnswers: field<GroupingAnswer[]>(none, async (c) =>
       groupingAnswersFrom(await meta(c, 'groupingAnswers', 'meta:answers'))
     ),
-    // Best effort: a book that never had a conflict has no doc, and a denied read is none.
     groupConflicts: field<GroupConflict[]>(none, async (c) =>
       groupConflictsFrom(
         await meta(c, 'groupConflicts', 'meta:groupConflicts').catch(() => undefined)
@@ -208,14 +184,12 @@ type Slices = typeof SLICES;
 type FieldsOf<P extends BookPart> = {
   [K in keyof Slices[P]]: Slices[P][K] extends Field<infer T> ? T : never;
 };
-/** Every field a read fills, each from the one part that holds it. */
 export type Fields = FieldsOf<'core'> &
   FieldsOf<'observed'> &
   FieldsOf<'ledger'> &
   FieldsOf<'answers'> &
   FieldsOf<'owners'>;
 export type FieldName = keyof Fields;
-/** A scoped read's own reader for a field, in place of the whole book's. */
 export type Overrides = { [K in FieldName]?: () => Promise<Fields[K]> };
 
 const PARTS = Object.keys(SLICES) as BookPart[];
@@ -223,19 +197,16 @@ const fieldsIn = (part: BookPart) =>
   Object.entries(SLICES[part]) as [FieldName, Field<Fields[FieldName]>][];
 const partOf = new Map(PARTS.flatMap((part) => fieldsIn(part).map(([name]) => [name, part])));
 
-/** A field as the whole book holds it, read once per read. */
 export function readField<K extends FieldName>(ctx: ReadContext, name: K): Promise<Fields[K]> {
   const slice = SLICES[partOf.get(name)!] as Record<K, Field<Fields[K]>>;
   return ctx.once(name, () => slice[name].read(ctx));
 }
 
-/** Starts reading these parts' fields; a failure surfaces where a field is read. */
 export function startReading(ctx: ReadContext, parts: readonly BookPart[]): void {
   for (const part of parts)
     for (const [name] of fieldsIn(part)) readField(ctx, name).catch(() => undefined);
 }
 
-/** Every field: the claimed parts' read (an override first), every other part's empty. */
 export async function readSlices(
   ctx: ReadContext,
   parts: BookPartSet,
@@ -253,7 +224,6 @@ export async function readSlices(
   return Object.fromEntries(entries) as Fields;
 }
 
-/** The fields as `BookData` holds them: the records the sync shares sit under `state`. */
 function shape(
   settings: BookSettings,
   minerPaidThrough: Map<string, string>,
@@ -279,26 +249,18 @@ function shape(
   };
 }
 
-/** A read's fields with the settings document and `meta/paid`, both always read fresh. */
 export async function bookOf(ctx: ReadContext, parts: BookPartSet, fields: Fields) {
   return shape(settingsFrom(ctx.book.data), await ctx.book.minerPaidThrough(), parts, fields);
 }
 
-/** The asked parts of the whole book, and the read model docs. */
 export async function readWhole(ctx: ReadContext, parts: BookPartSet): Promise<BookRead> {
   return bookOf(ctx, parts, await readSlices(ctx, parts));
 }
 
-/** The fields a read holds, `state`'s lifted out. */
 function fieldsFrom(data: BookData): Fields {
   return { ...data, ...data.state } as unknown as Fields;
 }
 
-/**
- * `extra`'s parts laid over `held`. The settings (top level and `state.book` alike) and the scope
- * (which Miner, which moon) stay `held`'s: the page's prices were built for those settings.
- * `meta/paid` is `extra`'s fresher copy.
- */
 export function mergeReads(held: BookRead, extra: BookRead): BookRead {
   const from = { held: fieldsFrom(held), extra: fieldsFrom(extra) };
   const fields = Object.fromEntries(

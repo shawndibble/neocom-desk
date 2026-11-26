@@ -1,8 +1,3 @@
-/**
- * Test-only builders for the goal planner's steps: the real `pi.json`, a
- * colony yielding every P0 its planet type can, and a plain policy. Excluded
- * from the build typecheck by name (`tsconfig.build.json`).
- */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { PiData } from '@/sde/types';
@@ -28,7 +23,6 @@ export const POLICY: PlannerPolicy = {
   buyTiers: [],
 };
 
-/** A colony yielding every P0 its planet type can, at `rate` per ECU. */
 export function colony(
   planetId: number,
   planetType: PlanetType,
@@ -52,7 +46,6 @@ export function colony(
   };
 }
 
-/** A goal at `perHour`, expressed per day the way the pilot types it. */
 export const goal = (typeId: number, perHour: number): Goal => ({
   typeId,
   unitsPerDay: perHour * 24,

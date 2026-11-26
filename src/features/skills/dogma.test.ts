@@ -6,8 +6,6 @@ import {
   sumAttributeBonuses,
 } from './dogma';
 
-// Fixture mirrors a live ESI response for type 10209, "Memory Augmentation -
-// Improved" (+5 Bonus to Memory; requires Cybernetics V via 182/277).
 const MEMORY_IMPLANT_DOGMA = [
   { attribute_id: 175, value: 0.0 },
   { attribute_id: 176, value: 0.0 },
@@ -18,8 +16,6 @@ const MEMORY_IMPLANT_DOGMA = [
   { attribute_id: 182, value: 3411.0 },
 ];
 
-// Fixture mirrors a live ESI response for type 587, "Rifter" (requires
-// Minmatar Frigate I via 182/277 only — no other requiredSkill pairs set).
 const RIFTER_DOGMA = [
   { attribute_id: 3, value: 0.0 },
   { attribute_id: 182, value: 3329.0 },
@@ -97,9 +93,9 @@ describe('extractRequiredSkills', () => {
       { attribute_id: 1285, value: 4 },
       { attribute_id: 1286, value: 4 },
       { attribute_id: 1289, value: 5 },
-      { attribute_id: 1287, value: 5 }, // requiredSkill5Level, NOT 1288
+      { attribute_id: 1287, value: 5 },
       { attribute_id: 1290, value: 6 },
-      { attribute_id: 1288, value: 6 }, // requiredSkill6Level, NOT 1287
+      { attribute_id: 1288, value: 6 },
     ];
     expect(extractRequiredSkills(dogma)).toEqual([
       { skillTypeID: 1, level: 1 },

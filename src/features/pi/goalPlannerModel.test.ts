@@ -76,7 +76,6 @@ function planet(planetId: number, systemId: number, type: CharacterPlanet['plane
   } satisfies CharacterPlanet;
 }
 
-/** A temperate colony pulling Microorganisms on two 7-head ECUs, linked to its pad. */
 const TEMPERATE_ID = 40000001;
 const temperateDetail: CharacterPlanetDetail = {
   pins: [
@@ -92,7 +91,6 @@ const temperateDetail: CharacterPlanetDetail = {
   routes: [],
 };
 
-/** An oceanic colony with only a pad: no extractors, no links. */
 const OCEANIC_ID = 40000002;
 const oceanicDetail: CharacterPlanetDetail = {
   pins: [pin(1, LAUNCHPAD)],
@@ -100,7 +98,6 @@ const oceanicDetail: CharacterPlanetDetail = {
   routes: [],
 };
 
-/** A gas colony in nullsec whose detail never loaded. */
 const GAS_ID = 40000003;
 
 function snapshot(overrides: Partial<PlannerSnapshot> = {}): PlannerSnapshot {
@@ -172,7 +169,6 @@ describe('plannerColonies', () => {
     ]);
     const full = plannerColonies(snapshot(), PREFS).find((row) => row.planetId === TEMPERATE_ID)!
       .colony!.ratePerEcu;
-    // The P0 the colony runs today stays rated, so its current layout still scores.
     expect(
       [...picked(new Map([[TEMPERATE_ID, [AQUEOUS_LIQUIDS]]])).keys()].sort((a, b) => a - b)
     ).toEqual([MICROORGANISMS, AQUEOUS_LIQUIDS].sort((a, b) => a - b));
@@ -187,7 +183,6 @@ describe('plannerColonies', () => {
     const rate = temperate.ratePerEcu.get(MICROORGANISMS)!;
     expect(rate.source).toBe('measured');
     expect(rate.unitsPerHour).toBeCloseTo(measuredAt(72), 6);
-    // A shorter cadence restarts nearer the curve's peak.
     const daily = plannerColonies(snapshot(), { ...PREFS, restartHours: 24 })
       .find((row) => row.planetId === TEMPERATE_ID)!
       .colony!.ratePerEcu.get(MICROORGANISMS)!;
@@ -205,7 +200,6 @@ describe('plannerColonies', () => {
     const unmeasured = plannerColonies(
       snapshot({
         details: new Map([
-          // Linked, so there is a hop to borrow, but no extractor to measure.
           [TEMPERATE_ID, { ...temperateDetail, pins: temperateDetail.pins.slice(2) }],
           [OCEANIC_ID, oceanicDetail],
         ]),
@@ -231,7 +225,6 @@ describe('plannerColonies', () => {
       }),
       PREFS
     );
-    // No link cost anywhere to borrow: excluded, and says why.
     expect(alone[0].excluded).toBe('no-link-cost');
     expect(DEFAULT_PLANNER_HEADS).toBeGreaterThan(0);
   });
@@ -260,8 +253,6 @@ describe('plannerColonies', () => {
     expect(temperate.rateUnknown).toBe(false);
 
     const oceanic = rows.find((row) => row.planetId === OCEANIC_ID)!;
-    // A player office's rate is unknowable, so until the pilot sets it the
-    // plan is costed at a conservative 10%, never the band's 0% placeholder.
     expect(oceanic.rateUnknown).toBe(true);
     expect(oceanic.taxAssumed).toBe(true);
     expect(oceanic.colony!.taxRate).toBe(ASSUMED_UNKNOWN_CUSTOMS);
@@ -344,7 +335,6 @@ describe('planHauling', () => {
     );
     const hauling = planHauling(best.plan, best.baseline, pi, 24);
     const p1Volume = pi.schematics[String(BACTERIA)].volume;
-    // Everything the plan moves is P1 here, so its total is units x volume x hours.
     const planUnits = best.plan.flows
       .filter((f) => f.from !== f.to)
       .reduce((sum, f) => sum + f.unitsPerHour, 0);
@@ -432,12 +422,9 @@ describe('earningsNow', () => {
       taxRate: temperate.taxRate,
       salesTaxPct: 3.6,
     });
-    // The oceanic colony extracts nothing, so it contributes no figure.
     expect(total.iskPerHour).toBeCloseTo(alone.iskPerHour!, 6);
     expect(total.coloniesWithoutFigure).toBe(1);
-    // Named, so the page can say which colony the figure leaves out.
     expect(total.leftOut).toEqual([OCEANIC_ID]);
-    // Per colony too, for a not-needed colony's switch tip.
     expect(total.byPlanet.get(TEMPERATE_ID)).toBeCloseTo(alone.iskPerHour!, 6);
     expect(total.byPlanet.get(OCEANIC_ID)).toBeNull();
 

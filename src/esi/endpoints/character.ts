@@ -3,12 +3,9 @@ import { esiFetch } from '../client';
 import type { EsiResult } from '../client';
 import type { EndpointOptions } from './options';
 
-// --- GET /characters/{character_id}/skills (esi-skills.read_skills.v1) ---
-
 export interface CharacterSkill {
   skill_id: number;
   trained_skill_level: number;
-  /** Can differ from trained due to alpha status / expert systems. */
   active_skill_level: number;
   skillpoints_in_skill: number;
 }
@@ -26,13 +23,10 @@ export function getCharacterSkills(
   return characterGet<CharacterSkills>('getCharacterSkills', characterId, options);
 }
 
-// --- GET /characters/{character_id}/skillqueue (esi-skills.read_skillqueue.v1) ---
-
 export interface SkillQueueEntry {
   skill_id: number;
   queue_position: number;
   finished_level: number;
-  /** Absent when the queue is paused. */
   start_date?: string;
   finish_date?: string;
   level_start_sp?: number;
@@ -47,15 +41,12 @@ export function getCharacterSkillQueue(
   return characterGet<SkillQueueEntry[]>('getCharacterSkillQueue', characterId, options);
 }
 
-// --- GET /characters/{character_id}/attributes (esi-skills.read_skills.v1) ---
-
 export interface CharacterAttributes {
   charisma: number;
   intelligence: number;
   memory: number;
   perception: number;
   willpower: number;
-  /** Cooldown end for the remap accrued over time. */
   accrued_remap_cooldown_date?: string;
   bonus_remaps?: number;
   last_remap_date?: string;
@@ -68,17 +59,12 @@ export function getCharacterAttributes(
   return characterGet<CharacterAttributes>('getCharacterAttributes', characterId, options);
 }
 
-// --- GET /characters/{character_id}/implants (esi-clones.read_implants.v1) ---
-
-/** Implant type IDs plugged into the active clone. */
 export function getCharacterImplants(
   characterId: number,
   options: EndpointOptions = {}
 ): Promise<EsiResult<number[]>> {
   return characterGet<number[]>('getCharacterImplants', characterId, options);
 }
-
-// --- GET /characters/{character_id} (public) ---
 
 export interface CharacterPublicInfo {
   name: string;
@@ -91,10 +77,8 @@ export interface CharacterPublicInfo {
   faction_id?: number;
   security_status?: number;
   description?: string;
-  /** Title in their corporation, a role bundle; not `character_title_id`. */
   corporation_title?: string;
   achievement_score?: number;
-  /** Cosmetic title, a `characterTitles` UUID; absent when none. */
   character_title_id?: string;
 }
 
@@ -108,16 +92,6 @@ export function getCharacterPublicInfo(
   });
 }
 
-// --- GET /characters/{character_id}/notifications (esi-characters.read_notifications.v1) ---
-
-/**
- * EVE's own server-pushed notification (issue #274) — a different,
- * non-overlapping set from every other Notification Event, which the app
- * synthesizes by diffing. `type` is deliberately `string`, not a closed
- * union: CCP adds types without notice (esi/esi-issues#1380), so this app
- * must render an unrecognised one generically rather than drop or throw on
- * it. `text` is a YAML payload whose shape varies per type.
- */
 export interface CharacterNotification {
   notification_id: number;
   type: string;
@@ -135,9 +109,6 @@ export function getCharacterNotifications(
   return characterGet<CharacterNotification[]>('getCharacterNotifications', characterId, options);
 }
 
-// --- GET /characters/{character_id}/search (esi-search.search_structures.v1) ---
-
-/** The categories this app's two callers ask for: Build Plan locations, and Forward's recipient picker. */
 export interface CharacterSearchResult {
   station?: number[];
   structure?: number[];
@@ -150,13 +121,6 @@ export interface CharacterSearchResult {
 export type SearchCategory =
   'station' | 'structure' | 'solar_system' | 'character' | 'corporation' | 'alliance';
 
-/**
- * Name search across the categories asked for, returning ids only.
- *
- * ESI requires at least three characters and, for `structure`, filters to what
- * this Character can actually dock at — the ACL is CCP's, not ours, so a
- * structure missing from the results is not a bug.
- */
 export function getCharacterSearch(
   characterId: number,
   categories: readonly SearchCategory[],
@@ -171,8 +135,6 @@ export function getCharacterSearch(
   });
 }
 
-// --- GET /characters/{character_id}/calendar (esi-calendar.read_calendar_events.v1) ---
-
 export interface CalendarEventSummary {
   event_id: number;
   event_date: string;
@@ -181,15 +143,12 @@ export interface CalendarEventSummary {
   event_response: 'declined' | 'not_responded' | 'accepted' | 'tentative';
 }
 
-/** Up to 50 events from now (or from `from_event`, unused here — v1 shows only the current page). */
 export function getCharacterCalendar(
   characterId: number,
   options: EndpointOptions = {}
 ): Promise<EsiResult<CalendarEventSummary[]>> {
   return characterGet<CalendarEventSummary[]>('getCharacterCalendar', characterId, options);
 }
-
-// --- GET /characters/{character_id}/calendar/{event_id} (esi-calendar.read_calendar_events.v1) ---
 
 export interface CalendarEventDetail {
   event_id: number;
@@ -216,12 +175,8 @@ export function getCharacterCalendarEvent(
   });
 }
 
-// --- PUT /characters/{character_id}/calendar/{event_id}/ (esi-calendar.respond_calendar_events.v1) ---
-
-/** Narrower than `CalendarEventSummary['event_response']` — ESI's write only accepts these three, not `not_responded`. */
 export type CalendarRsvpResponse = 'accepted' | 'declined' | 'tentative';
 
-/** The app's second ESI write (the first is `putCharacterMail`): sets a character's RSVP on a calendar event. Answers 204 No Content on success. */
 export function putCharacterCalendarResponse(
   characterId: number,
   eventId: number,
@@ -236,8 +191,6 @@ export function putCharacterCalendarResponse(
     endpointId: 'putCharacterCalendarResponse',
   });
 }
-
-// --- GET /characters/{character_id}/corporationhistory (public) ---
 
 export interface CorporationHistoryEntry {
   record_id: number;
@@ -256,18 +209,6 @@ export function getCharacterCorporationHistory(
   });
 }
 
-// --- GET /characters/{character_id}/roles (esi-characters.read_corporation_roles.v1) ---
-
-/**
- * Every field is optional: ESI omits an array rather than sending `[]`, so a
- * character with no corporation roles at all gets `{}` back. This endpoint has
- * no `x-required-roles` of its own, which is what lets it answer for every
- * character instead of 403-ing the ones with nothing to report.
- *
- * `roles` is the corporation-wide grant. The `roles_at_*` variants are scoped
- * to a single office and do not open the corporation-wide endpoints — see
- * `engine/corpRoles.ts`, which reads `roles` only.
- */
 export interface CharacterCorporationRoles {
   roles?: string[];
   roles_at_hq?: string[];
@@ -281,8 +222,6 @@ export function getCharacterRoles(
 ): Promise<EsiResult<CharacterCorporationRoles>> {
   return characterGet<CharacterCorporationRoles>('getCharacterRoles', characterId, options);
 }
-
-// --- GET /characters/{character_id}/clones (esi-clones.read_clones.v1) ---
 
 export interface JumpClone {
   jump_clone_id: number;
@@ -306,9 +245,6 @@ export function getCharacterClones(
   return characterGet<CharacterClones>('getCharacterClones', characterId, options);
 }
 
-// --- GET /characters/{character_id}/fatigue (esi-characters.read_fatigue.v1) ---
-
-/** Every field is absent for a Character who has never jumped. */
 export interface CharacterFatigue {
   jump_fatigue_expire_date?: string;
   last_jump_date?: string;
@@ -322,8 +258,6 @@ export function getCharacterFatigue(
   return characterGet<CharacterFatigue>('getCharacterFatigue', characterId, options);
 }
 
-// --- GET /characters/{character_id}/loyalty/points (esi-characters.read_loyalty.v1) ---
-
 export interface CharacterLoyaltyPoints {
   corporation_id: number;
   loyalty_points: number;
@@ -335,8 +269,6 @@ export function getCharacterLoyaltyPoints(
 ): Promise<EsiResult<CharacterLoyaltyPoints[]>> {
   return characterGet<CharacterLoyaltyPoints[]>('getCharacterLoyaltyPoints', characterId, options);
 }
-
-// --- GET /characters/{character_id}/location (esi-location.read_location.v1) ---
 
 export interface CharacterLocation {
   solar_system_id: number;
@@ -350,8 +282,6 @@ export function getCharacterLocation(
 ): Promise<EsiResult<CharacterLocation>> {
   return characterGet<CharacterLocation>('getCharacterLocation', characterId, options);
 }
-
-// --- GET /characters/{character_id}/ship (esi-location.read_ship_type.v1) ---
 
 export interface CharacterShip {
   ship_item_id: number;

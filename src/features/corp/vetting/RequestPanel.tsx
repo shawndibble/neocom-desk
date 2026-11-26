@@ -18,16 +18,11 @@ import { askedByReviewer } from './vettingView';
 
 interface RequestPanelProps {
   review: VettingReview;
-  /** The signed-in reviewer: tells "(you)" and whose Character sends the mail. */
   reviewerId: number;
   send: () => Promise<RequestMailRun>;
   preview: () => Promise<RequestMailPreview | null>;
 }
 
-/**
- * A review the member has not answered: who asked, for which role, whether the member was mailed
- * the link, and the mail actions. Stands where the report will be; "Nothing shared yet" follows.
- */
 export function RequestPanel({ review, reviewerId, send, preview }: RequestPanelProps) {
   const { t } = useTranslation();
   const now = useNow();
@@ -55,7 +50,6 @@ export function RequestPanel({ review, reviewerId, send, preview }: RequestPanel
       await writeToClipboard(requestLink());
       flash('copied');
     } catch {
-      // The clipboard was refused: nothing was copied, and the button says so.
       flash('failed');
     }
   };

@@ -1,8 +1,3 @@
-/**
- * Employment tab body for `PublicInfoModal`: the corporation history of the
- * Character the modal was opened on (not the active one). Lazy-loaded and
- * fetches on mount, so nothing is requested until the tab is first opened.
- */
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { EmptyState, Spinner } from '@/components/ui';

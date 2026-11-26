@@ -20,11 +20,6 @@ export type OwnedBlueprintTypes =
       learned: Map<number, number>;
     };
 
-/**
- * The blueprint types a Character owns, with names and market groups, for the
- * share picker. Reads the same ESI cache as the Industry pages (fetching when
- * it is empty); the picker sorts them into the market-group tree.
- */
 export function useOwnedBlueprintTypes(characterId: number, enabled = true): OwnedBlueprintTypes {
   const load = useCallback(async (): Promise<OwnedBlueprintTypes> => {
     let value: OwnedBlueprintTypes;

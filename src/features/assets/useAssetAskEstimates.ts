@@ -7,11 +7,6 @@ import { loadAssetAskEstimates } from '@/features/assets/assetAskEstimates';
 
 const NONE: ReadonlyMap<number, ContractAskEstimate> = new Map();
 
-/**
- * Contract ask estimates (issue #6431) for the owned types with no market
- * price, read once prices have landed and only for types the snapshot index
- * says have enough offers. Best-effort and never part of a total.
- */
 export function useAssetAskEstimates(
   assets: readonly { type_id: number; is_blueprint_copy?: boolean }[],
   priceByTypeId: ReadonlyMap<number, number>,

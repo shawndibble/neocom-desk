@@ -1,9 +1,3 @@
-/**
- * The hook that runs an Improve search of the open Fitting (`improveSearch/`)
- * while `enabled`, so a closed drawer costs nothing. It owns only the React
- * side: status, the "Show best so far" timer, Cancel, restart and the search's
- * own worker pool. The remembered settings are in `useImproveSettings`.
- */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { searchableGoal, type ImproveGoal } from '@/engine/fittings/improve';
 import { mutatedKept, type MutatedKept } from '@/engine/fittings/improve';
@@ -24,7 +18,6 @@ import {
 import type { FittingCatalogue } from './useFittingCatalogue';
 import type { VariantEvaluator } from './useFittingEvaluation';
 
-/** The open Fitting's hull as the catalogue knows it; undefined while either is unknown. */
 export function hullOf(
   fitting: Fitting | null | undefined,
   catalogue: FittingCatalogue | null
@@ -33,15 +26,12 @@ export function hullOf(
   return fitting && groupId !== undefined ? { typeId: fitting.shipTypeId, groupId } : undefined;
 }
 
-/** What the drawer asks of one search beyond the goal. */
 export type ImproveConfig = ImproveRequest['config'];
 
 type Done = Extract<ImproveOutcome, { status: 'done' }>;
 
-/** What `findCompletions` needs beyond the ticked set. */
 export type CompletionPool = Awaited<ReturnType<Done['completion']>>;
 
-/** After this long a search offers "Show best so far". */
 export const BEST_SO_FAR_AFTER_MS = 10_000;
 
 export type ImproveState =
@@ -51,35 +41,23 @@ export type ImproveState =
       checked: number;
       total: number;
       slow: boolean;
-      /** The Makeover search is running (after the single swaps): `checked` and `total` count its calculations. */
       makeover?: boolean;
     }
   | { status: 'cancelled' }
   | { status: 'failed' }
-  /** Over a budget, under the fit's price, or done (see `ImproveOutcome`). */
   | Exclude<ImproveOutcome, Done>
   | Omit<Done, 'recalc' | 'completion'>;
 
 export interface ImproveSearch {
-  /** The goal searched: the remembered one, or the hull role's default when this fit cannot score it. */
   goal: ImproveGoal;
-  /** The open Fitting's hull, for the goal chips' role unlock. */
   hull?: HullRef;
   state: ImproveState;
-  /** The open Fitting's stats before any swap, for each row's goal check; null until known. */
   before: FittingStats | null;
   cancel: () => void;
   showBestSoFar: () => void;
-  /** Runs the search again after a Cancel. */
   restart: () => void;
-  /** One whole-fit recalculation under the search's own conditions, for the ticked set; null before a search has run. */
   recalc: Done['recalc'] | null;
-  /**
-   * The swaps and prices that could cover a ticked set running the fit out of CPU,
-   * powergrid or calibration, fetched on the first ask (most sets never need them); null before a search has run.
-   */
   completion: Done['completion'] | null;
-  /** The fitted mutated modules this search leaves alone (#5800); none counted when swaps of them are allowed. */
   mutatedKept: MutatedKept;
 }
 
@@ -96,7 +74,6 @@ export function useImprove(
 ): ImproveSearch {
   const { hubId } = useHubFor('fittings');
   const percent = usePricePercentFor('fittings');
-  // The plan and config are new objects each render; the search reruns only when their content changes.
   const chargePlanKey = JSON.stringify(chargePlan);
   const configKey = JSON.stringify(config);
   const [state, setState] = useState<ImproveState>({ status: 'idle' });
@@ -104,11 +81,9 @@ export function useImprove(
   const [attempt, setAttempt] = useState(0);
   const cancelRef = useRef<() => void>(() => {});
   const stopRef = useRef(false);
-  // The search's own workers: started with the first search, ended when the drawer closes.
   const poolRef = useRef<WorkerPool | null>(null);
   const [recalc, setRecalc] = useState<ImproveSearch['recalc']>(null);
   const [completion, setCompletion] = useState<ImproveSearch['completion']>(null);
-  // A new object each render; the search reruns only when the hull changes.
   const hullKey = JSON.stringify(hullOf(variants?.fitting, catalogue) ?? null);
   const hull = useMemo(() => (JSON.parse(hullKey) as HullRef | null) ?? undefined, [hullKey]);
 
@@ -132,8 +107,6 @@ export function useImprove(
     };
     // eslint-disable-next-line react-hooks/set-state-in-effect -- a new search starts from nothing
     setState({ status: 'searching', checked: 0, total: 0, slow: false });
-    // The last fit's baseline must not decide this fit's goal chips.
-    setBefore(null);
     setRecalc(null);
     setCompletion(null);
     const searching = (
@@ -177,7 +150,6 @@ export function useImprove(
     );
     return () => {
       controller.abort();
-      // Its signal is aborted: a recalculation through it would fail.
       setRecalc(null);
       setCompletion(null);
       clearTimeout(slowTimer);
@@ -205,7 +177,6 @@ export function useImprove(
   const { allowMutated } = config;
   const kept = useMemo(() => {
     const modules = variants?.fitting.modules ?? [];
-    // Asked of the engine only when a mutated module is fitted.
     const pool =
       catalogue && variants && modules.some((m) => m.mutation)
         ? modulePool(catalogue, fitCheckOf(variants))

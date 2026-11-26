@@ -11,7 +11,6 @@ const server = mswServer();
 
 const found = (system: object) => ({ status: 'found', system });
 
-// The local solar-system table. Tests that exercise the ESI fallback make it unreadable.
 const LOCAL_SYSTEMS = [{ id: 30000142, name: 'Jita', security: 0.9459, regionId: 10000002 }];
 let localTable: 'ok' | 'down' = 'down';
 vi.mock('@/sde/loadMarketSde', () => ({
@@ -28,7 +27,6 @@ beforeEach(async () => {
   await db.esiCache.clear();
 });
 
-/** `/universe/systems/{id}`, which is where the security band comes from. */
 function systemHandler(security: number) {
   return http.get(`${ESI_BASE_URL}/universe/systems/:id`, ({ params }) =>
     HttpResponse.json({
@@ -39,7 +37,6 @@ function systemHandler(security: number) {
   );
 }
 
-/** Counts posts so the cache can be asserted on, and pins the mandatory headers. */
 function idsHandler(body: Record<string, unknown>, onCall?: () => void) {
   return http.post(`${ESI_BASE_URL}/universe/ids`, ({ request }) => {
     const bad = rejectBadEsiHeaders(request);
@@ -66,7 +63,6 @@ describe('resolveSolarSystem', () => {
   });
 
   it("bands the security the way the game does, not on ESI's raw float", () => {
-    // Balle: 0.4608891 in ESI, a 0.5 highsec system in game.
     server.use(
       idsHandler({ systems: [{ id: 30003888, name: 'Badivefi' }] }),
       systemHandler(0.4609)
@@ -99,8 +95,6 @@ describe('resolveSolarSystem', () => {
   });
 
   it('resolves the system with a null band when the security lookup fails', async () => {
-    // The name is still good; the caller keeps the band it has rather than
-    // guessing a rig multiplier from nothing.
     server.use(
       idsHandler({ systems: [{ id: 30003888, name: 'Badivefi' }] }),
       http.get(`${ESI_BASE_URL}/universe/systems/:id`, () => HttpResponse.error())
@@ -142,7 +136,6 @@ describe('resolveSolarSystem', () => {
   });
 
   it('returns notFound for a blank name without calling ESI', async () => {
-    // No handler registered: onUnhandledRequest 'error' fails the test on a call.
     expect(await resolveSolarSystem('   ')).toEqual({ status: 'notFound' });
   });
 
@@ -188,7 +181,6 @@ describe('resolveSolarSystem from the local solar-system table', () => {
   });
 
   it('resolves a name with no ESI call at all', async () => {
-    // No ESI handler registered: onUnhandledRequest 'error' fails on any call.
     expect(await resolveSolarSystem('jita')).toEqual(
       found({
         id: 30000142,

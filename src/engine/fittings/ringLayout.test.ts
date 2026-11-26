@@ -97,7 +97,6 @@ describe('ringSlotAngle', () => {
     for (let i = 1; i < order.length; i++) {
       expect(Math.min(...order[i])).toBeGreaterThan(Math.max(...order[i - 1]));
     }
-    // Lows wrap round to the rigs through the bottom-left.
     expect(Math.min(...angles('rig')) + 360).toBeGreaterThan(Math.max(...angles('low')));
   });
 
@@ -116,10 +115,8 @@ describe('ringSlotAngle', () => {
 
 describe('ringSlotAngles', () => {
   const tactical = { high: 7, medium: 5, low: 4, rig: 3, subsystem: 0 };
-  // A T3 cruiser's slots once its four subsystems are fitted.
   const t3 = { high: 6, medium: 5, low: 6, rig: 3, subsystem: 4 };
   const RING_ORDER = ['rig', 'subsystem', 'high', 'medium', 'low'] as const;
-  /** Every tile's angle in clockwise order from the rigs, unwrapped so they only rise. */
   const clockwise = (angles: Record<string, number[]>) => {
     const list = RING_ORDER.flatMap((rack) => angles[rack]);
     return list.map((a, i) => (i > 0 && a < list[0] ? a + 360 : a));
@@ -141,7 +138,6 @@ describe('ringSlotAngles', () => {
   it('puts a T3’s subsystems on the band between the rigs and the highs', () => {
     const list = clockwise(ringSlotAngles(t3));
     for (let i = 1; i < list.length; i++) expect(list[i]).toBeGreaterThan(list[i - 1]);
-    // And the lows still come round to the rigs.
     expect(list[0] + 360).toBeGreaterThan(list[list.length - 1]);
   });
 
@@ -151,7 +147,6 @@ describe('ringSlotAngles', () => {
   });
 
   it('closes a T3’s racks to one empty position apart, the spare room left between the lows and rigs', () => {
-    // A Tengu fit: fewer slots than the band has room for.
     const angles = ringSlotAngles({ high: 5, medium: 5, low: 3, rig: 3, subsystem: 4 });
     for (const rack of RING_ORDER) {
       for (const step of steps(angles[rack])) expect(step).toBeCloseTo(12, 6);
@@ -160,7 +155,6 @@ describe('ringSlotAngles', () => {
     const gaps = steps(list).filter((s) => s > 12.5);
     expect(gaps).toHaveLength(4);
     for (const gap of gaps) expect(gap).toBeCloseTo(24, 6);
-    // The lows-to-rigs gap, across the bottom, takes the rest.
     expect(list[0] + 360 - list[list.length - 1]).toBeGreaterThan(24);
   });
 
@@ -224,7 +218,6 @@ describe('RING_GAUGES', () => {
     const [, cpuEnd] = span(RING_GAUGES.cpu);
     const [pgStart] = span(RING_GAUGES.powergrid);
     expect(pgStart - cpuEnd).toBeGreaterThanOrEqual(12);
-    // CPU on the right half of the ring, powergrid on the left.
     for (const angle of span(RING_GAUGES.cpu)) expect(angle).toBeLessThan(180);
     for (const angle of span(RING_GAUGES.powergrid)) expect(angle).toBeGreaterThan(180);
   });
@@ -304,7 +297,6 @@ describe('hardpointGlyphAngle', () => {
   });
 
   it('leaves a glyph’s width clear on both sides: of the other glyph and of the first pip', () => {
-    // A glyph is about 3.3° wide at the gauge radius, a pip about 1.8°.
     const launcher = hardpointGlyphAngle('launcher');
     expect(launcher * 2).toBeGreaterThanOrEqual(3.3 + 2);
     expect(hardpointPipAngles('launcher', 1)[0] - launcher).toBeGreaterThanOrEqual(

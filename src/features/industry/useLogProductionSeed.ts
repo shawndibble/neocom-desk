@@ -2,19 +2,6 @@ import { useEffect, useRef, useState } from 'react';
 import type { IndustryBlueprint } from '@/engine/industry/types';
 import type { JobProductionSeed } from './logProductionFromJob';
 
-/**
- * `pendingLogProduction`'s application, keyed off `pendingLogProductionKey`
- * (`location.key`) rather than mount alone: a job whose matching plan is
- * the one already open navigates to this same route, which doesn't remount
- * the plan page, so a mount-only effect would treat a second "Log
- * production…" click as a no-op (issue #1787 review). Re-applying is keyed
- * to the *navigation*, not the render, so an unrelated re-render can't
- * replay it either. `logRequest`'s bump must still land as a genuine
- * increase *after* `ProductionRunsPanel`'s own mount/last-seen baseline —
- * that panel only opens on `logRequest > (whatever it last saw)` — which
- * reading the current value here (rather than a functional update)
- * guarantees.
- */
 export function useLogProductionSeed(
   blueprint: IndustryBlueprint | null,
   pendingLogProduction: JobProductionSeed | null | undefined,

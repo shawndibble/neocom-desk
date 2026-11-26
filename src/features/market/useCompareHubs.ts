@@ -1,14 +1,3 @@
-/**
- * Fetches each Compare Set item's best sell and buy at every Trade Hub's
- * station, for the drawer's Trade hubs view (issue #4697). One batched
- * station-price read per hub covers every item, so a view costs five reads
- * however large the set is. Only fetches while `enabled`, like
- * `useCompareAttributes.ts` — a closed drawer or one on another view must not
- * spend the reads.
- *
- * Also counts the jumps from the pilot's Current System to each hub, for the
- * column headers.
- */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { CompareSetItem } from './compareSet';
 import type { HubAggregate } from '@/market/fuzzwork';
@@ -22,14 +11,12 @@ export type HubId = ComparedHubId;
 
 export interface HubPrices {
   loading: boolean;
-  /** The price read failed: the hub's figures are unknown, not empty. */
   unreachable: boolean;
   prices: ReadonlyMap<number, HubAggregate>;
 }
 
 export interface UseCompareHubsResult {
   hubs: Readonly<Record<HubId, HubPrices>>;
-  /** Jumps from the Current System; null while counting, or with no route or location. */
   jumps: Readonly<Record<HubId, number | null>>;
 }
 
@@ -39,7 +26,6 @@ function allHubs<T>(value: T): Record<HubId, T> {
   return Object.fromEntries(COMPARED_HUBS.map((hub) => [hub.id, value])) as Record<HubId, T>;
 }
 
-/** One frozen object for "no counts yet", so a consumer's memo on `jumps` holds. */
 const NO_JUMPS: Readonly<Record<HubId, number | null>> = Object.freeze(allHubs(null));
 
 export function useCompareHubs(
@@ -47,13 +33,10 @@ export function useCompareHubs(
   enabled: boolean,
   refreshTick = 0
 ): UseCompareHubsResult {
-  // Tagged with the signature it was fetched for, so the first render after a
-  // change reads as loading rather than briefly as "no orders".
   const [fetched, setFetched] = useState<{ key: string; hubs: Record<HubId, HubPrices> } | null>(
     null
   );
 
-  // Value-stable typeId signature, same reasoning as `useCompareRows.ts`.
   const itemsRef = useRef(items);
   useEffect(() => {
     itemsRef.current = items;
@@ -67,7 +50,6 @@ export function useCompareHubs(
       setFetched(null);
       return;
     }
-    // A bumped refresh tick forces a read past the price cache's TTL.
     if (tickRef.current !== refreshTick) {
       tickRef.current = refreshTick;
       for (const hub of COMPARED_HUBS) invalidateHubPrices(hub.stationId, typeIds);

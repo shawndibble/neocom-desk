@@ -1,23 +1,3 @@
-/**
- * Settings → Notifications → "Alerts when closed" (ADR 0020): one row per
- * Character for the opt-in server-side alerts, on a screen of its own (a
- * dialog) opened from Delivery's one-line summary. The component stays
- * mounted while that screen is closed: the EVE round trip hands its outcome
- * back here, and the walk carries on from here, so neither may wait for
- * someone to open the screen. Off by default.
- *
- * One sign-in per Character covers everything its Device-ticked events need
- * (issue #5156, ADR 0030): notifications, plus location for the nearby alerts
- * and mail for new-mail alerts once the server takes them. Ticking an event
- * never starts a sign-in; this screen says what each Character is missing, and
- * "Sign in…" first shows the permissions and why (`AlertsSignInConfirm`), then
- * walks the Characters one at a time, because EVE's own page picks the
- * Character and each needs its own round trip. The token goes to our server and
- * never to this device.
- *
- * Every state is a word, never a colour alone (§6c). A row has Sign in… and
- * Turn off, so there is no ⋮ menu.
- */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -69,7 +49,6 @@ const NO_GRANTS: Record<number, AlertsGrantRecord> = {};
 
 type Notice = { tone: 'info' | 'warning'; text: string } | null;
 
-/** Sends EVE exactly this step's scopes. */
 const signInStep = (step: AlertsWalkStep) =>
   beginAlertsLogin(step.characterId, { nearby: step.nearby, mail: step.mail });
 
@@ -99,7 +78,6 @@ export function AlertsWhenClosedSection({ characters }: { characters: readonly C
     t(`settings.notifications.alertsWhenClosed.need.${permission}`);
   const list = (items: string[]) =>
     new Intl.ListFormat(i18n.language, { type: 'conjunction' }).format(items);
-  /** What this Character's grant reads, in words. */
   const covers = (characterId: number) =>
     t('settings.notifications.alertsWhenClosed.covers.line', {
       list: list(
@@ -112,8 +90,6 @@ export function AlertsWhenClosedSection({ characters }: { characters: readonly C
     characters.find((character) => character.characterId === characterId)?.name ??
     String(characterId);
 
-  // The Callback route hands the outcome back as router state, once. The
-  // notice is read from it on arrival, not set from an effect.
   const returned = (location.state as Partial<AlertsCallbackState> | null)?.alertsGrant;
   const [notice, setNotice] = useState<Notice>(() => {
     if (!returned) return null;
@@ -136,16 +112,10 @@ export function AlertsWhenClosedSection({ characters }: { characters: readonly C
     }
   });
   const [busyId, setBusyId] = useState<number | null>(null);
-  // The pre-walk screen, for these Characters (null: the list).
   const [confirming, setConfirming] = useState<number[] | null>(null);
   const isDesktop = useMediaQuery(MD_UP_QUERY);
-  // Closed to start, so the list never pushes the Topics below the fold; open on
-  // arrival from EVE, where it holds the outcome of the round trip.
   const [expanded, setExpanded] = useState(returned !== undefined);
 
-  // Side effects only: drop the state so a reload does not replay it, and
-  // carry on the sign-in walk after a success. Guarded, because
-  // StrictMode runs this twice and a second pass would skip a queued Character.
   const handled = useRef<typeof returned>(undefined);
   useEffect(() => {
     if (!returned || handled.current === returned) return;
@@ -160,7 +130,6 @@ export function AlertsWhenClosedSection({ characters }: { characters: readonly C
   }, [returned, navigate, location.pathname, location.search]);
 
   if (characters.length === 0) return null;
-  // Off Characters are left out: off is a choice (`nagsForSignIn`).
   const walking = needs.filter(nagsForSignIn);
   const summaryNeeds = summarizeAlertsNeeds(needs);
 

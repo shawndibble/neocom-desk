@@ -1,31 +1,6 @@
-/**
- * Route Safety's row model (issue #2328): every system on a stargate route,
- * joined to its security, region, and the last hour of traffic and kills ESI
- * publishes for the whole universe in one call each.
- *
- * States conditions, never verdicts (decision `20260912-172628`): a row says
- * "12 ship kills in the last hour", and nothing here scores a system or a
- * route as safe or not. That call is the pilot's.
- *
- * Unknown is kept apart from zero, the same split `localRoute.ts` keeps
- * between "no route" and "could not read the graph":
- * - ESI lists only systems that had activity, so a system missing from a
- *   response that *did* arrive had none — zero.
- * - A feed that could not be fetched at all is unknown for every system.
- * - Both feeds exclude wormhole space, so a J-space system is always unknown.
- *
- * Quiet stretches (issue #2474): a run of consecutive systems where every
- * figure is a known zero folds into one row. Unknown is never zero here
- * either — a system whose ESI or zKillboard figure is missing, or a J-space
- * system, never folds — and the ends of the list never fold, so a caller can
- * fold each leg of a multi-stop trip between its own ends.
- *
- * Pure, per CLAUDE.md: the caller supplies every lookup.
- */
 import { isGankChokepoint, chokepointsOnRoute } from '@/engine/route/chokepoints';
 import { securityBand, shownSecurity, type SecurityBand } from '@/engine/securityStatus';
 
-/** `GET /universe/system_kills/`'s row shape. */
 export interface SystemKillsEntry {
   system_id: number;
   ship_kills: number;
@@ -33,7 +8,6 @@ export interface SystemKillsEntry {
   npc_kills: number;
 }
 
-/** `GET /universe/system_jumps/`'s row shape. */
 export interface SystemJumpsEntry {
   system_id: number;
   ship_jumps: number;
@@ -55,30 +29,23 @@ export interface RouteSafetySystemEntry {
 export interface RouteSafetyInputs {
   systems: ReadonlyMap<number, RouteSafetySystemEntry>;
   regionNames: ReadonlyMap<number, string>;
-  /** `null` when the feed could not be read at all. */
   kills: ReadonlyMap<number, SystemKills> | null;
-  /** `null` when the feed could not be read at all. */
   jumps: ReadonlyMap<number, number> | null;
-  /** Systems under a lawless insurgency right now (issue #2870); absent or empty shows none. */
   lawless?: ReadonlySet<number>;
 }
 
 export interface RouteSafetyRow {
   systemId: number;
-  /** `null` for a system the snapshot does not know. */
   name: string | null;
-  /** Rounded to one decimal, as the game shows it. */
   security: number | null;
   band: SecurityBand | null;
   regionId: number | null;
   regionName: string | null;
-  /** Each `null` is unknown, never zero. */
   jumps: number | null;
   shipKills: number | null;
   podKills: number | null;
   npcKills: number | null;
   chokepoint: boolean;
-  /** Set only on a lawless system: a condition at this moment, not a verdict. */
   lawless?: boolean;
 }
 
@@ -88,17 +55,14 @@ export interface RouteSafetySummary {
   lowsec: number;
   nullsec: number;
   lowestSecurity: number | null;
-  /** `null` when any system on the route is unknown: a partial total would read low. */
   shipKills: number | null;
   podKills: number | null;
-  /** Named, in the order they are flown. */
   chokepoints: string[];
 }
 
 const WORMHOLE_SYSTEM_MIN = 31_000_000;
 const WORMHOLE_SYSTEM_MAX = 31_999_999;
 
-/** J-space by id: outside both ESI activity feeds, and never part of a quiet stretch. */
 export function isWormholeSystem(systemId: number): boolean {
   return systemId >= WORMHOLE_SYSTEM_MIN && systemId <= WORMHOLE_SYSTEM_MAX;
 }
@@ -152,11 +116,6 @@ function totalOf(values: readonly (number | null)[]): number | null {
   return total;
 }
 
-/**
- * The security figures a route's facts are read from. J-space is left out:
- * Thera's -0.99 is not a nullsec system flown through, and a jump into it is
- * counted as a wormhole jump instead.
- */
 function kspaceSecurities(rows: readonly RouteSafetyRow[]): number[] {
   return rows.flatMap((row) =>
     row.security === null || isWormholeSystem(row.systemId) ? [] : [row.security]
@@ -178,17 +137,11 @@ export function summarizeRouteSafety(rows: readonly RouteSafetyRow[]): RouteSafe
   };
 }
 
-/** A trip's legs as one route, and where along it each leg ends. */
 export interface JoinedLegs<R extends RouteSafetyRow = RouteSafetyRow> {
   rows: R[];
-  /** Index in `rows` of each leg's last system: the stops, in flying order. */
   stopIndexes: number[];
 }
 
-/**
- * A trip's legs end to end, for the whole-trip strip and facts (issue #2475).
- * Each leg starts where the last one ended, so that joining stop is kept once.
- */
 export function joinLegs<R extends RouteSafetyRow>(legs: readonly (readonly R[])[]): JoinedLegs<R> {
   const rows: R[] = [];
   const stopIndexes: number[] = [];
@@ -199,11 +152,6 @@ export function joinLegs<R extends RouteSafetyRow>(legs: readonly (readonly R[])
   return { rows, stopIndexes };
 }
 
-/**
- * The whole trip's facts. Jumps and bands count every system flown through,
- * as a leg's do; a system crossed on two legs still has one hour of kills and
- * is one Gank Chokepoint, so those count each system once.
- */
 export function summarizeTrip(legs: readonly (readonly RouteSafetyRow[])[]): RouteSafetySummary {
   const { rows } = joinLegs(legs);
   const distinct = [...new Map(rows.map((row) => [row.systemId, row])).values()];
@@ -216,22 +164,16 @@ export function summarizeTrip(legs: readonly (readonly RouteSafetyRow[])[]): Rou
   };
 }
 
-/** A fold needs at least this many systems: one quiet system is no shorter as a fold. */
 export const MIN_QUIET_RUN = 2;
 
 export type RouteStretch =
   | { kind: 'system'; row: RouteSafetyRow }
   | {
       kind: 'quiet';
-      /** In route order; always at least `MIN_QUIET_RUN`. */
       rows: RouteSafetyRow[];
       lowestSecurity: number;
     };
 
-/**
- * `zkillCount` is the system's zKillboard kills in the last hour, or `null`
- * while that figure is loading or could not be read.
- */
 function isQuiet(row: RouteSafetyRow, zkillCount: (systemId: number) => number | null): boolean {
   return (
     !isWormholeSystem(row.systemId) &&
@@ -243,14 +185,6 @@ function isQuiet(row: RouteSafetyRow, zkillCount: (systemId: number) => number |
   );
 }
 
-/**
- * Folds each run of quiet middle systems into one stretch. A system is quiet
- * only when ESI reported zero ship and pod kills, zKillboard reported zero
- * kills, it is not a Gank Chokepoint, its security is known and it is not in
- * J-space. NPC kills do not count. The list's first and last systems never
- * fold, and neither does a `pinned` one — either end of a wormhole jump
- * (issue #2476), so the hole's own row always has both its systems beside it.
- */
 export function foldQuietStretches(
   rows: readonly RouteSafetyRow[],
   zkillCount: (systemId: number) => number | null,
@@ -280,11 +214,6 @@ export function foldQuietStretches(
   return stretches;
 }
 
-/**
- * Which systems the route strip labels, as indexes in route order: both
- * ends, the first system at the route's lowest security, every Gank
- * Chokepoint, and — on a trip — each stop (`stopIndexes`, from `joinLegs`).
- */
 export function routeStripKeySystems(
   rows: readonly RouteSafetyRow[],
   stopIndexes: readonly number[] = []

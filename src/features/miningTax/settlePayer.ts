@@ -1,11 +1,3 @@
-/**
- * Who pays a Settle up. ISK leaves one Character's wallet, so a Payee balance
- * that spans Characters is really one transfer per Character: Settle up asks
- * which one is paying and ticks that one's entries. Pure, so the default rule
- * is testable without the dialog.
- */
-
-/** The slice of a Settle up row this needs. */
 export interface PayableRow {
   assignment: { characterId: number; taxOwed: number };
   characterName: string;
@@ -14,11 +6,9 @@ export interface PayableRow {
 export interface PayerOption {
   characterId: number;
   characterName: string;
-  /** Sum of `taxOwed` over this Character's rows. */
   subtotal: number;
 }
 
-/** One option per Character among `rows`, most owed first (ties by name). */
 export function payerOptions(rows: readonly PayableRow[]): PayerOption[] {
   const byCharacter = new Map<number, PayerOption>();
   for (const r of rows) {
@@ -36,12 +26,6 @@ export function payerOptions(rows: readonly PayableRow[]): PayerOption[] {
   );
 }
 
-/**
- * The payer Settle up opens with, from a balance card or a selection: the one
- * Character when every entry is theirs; else the active Character when it has
- * some; else the Character owing most. `null` with no rows. (From a single row,
- * the caller already knows: that row's Character.)
- */
 export function defaultPayer(
   rows: readonly PayableRow[],
   activeCharacterId: number | null

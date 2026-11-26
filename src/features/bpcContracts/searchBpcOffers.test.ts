@@ -1,8 +1,3 @@
-/**
- * Characterization of BPC Sourcing's search pipeline, pinned to what the panel
- * did inline before it moved here: per-source narrowing, the searched-types
- * rule for LP / Community rows, and the merge precedence.
- */
 import { describe, it, expect } from 'vitest';
 import {
   communityOfferToSearchRow,
@@ -191,16 +186,12 @@ describe('searchBpcOffers merge order', () => {
       'contract',
       'contract',
     ]);
-    // The contract BPO (runs -1) comes before the copy.
     expect(displayRows[4].runs).toBe(-1);
     expect(displayRows[5].runs).toBe(5);
   });
 
   it('is the tiebreak under any column sort: the pilot sorts first, this order breaks ties', () => {
     const { displayRows } = searchBpcOffers(full, query({ sources: ALL_SOURCES }));
-    // ME 10 on the owned, community and both contract rows, ME 0 on LP and
-    // market: descending puts the ME 10 rows first and, within each group,
-    // keeps source order.
     const byMe = sortRows(displayRows, { sortValue: (row) => row.me }, 'desc');
     expect(sourcesOf(byMe)).toEqual(['owned', 'community', 'contract', 'contract', 'lp', 'market']);
   });
@@ -461,7 +452,6 @@ describe('two-stage search', () => {
   });
 
   it('one prepared stage serves every type query and matches searchBpcOffers', () => {
-    // `prepareBpcOffers` takes no typeQuery, so typing never reruns it.
     const prepared = prepareBpcOffers(d, query());
     for (const typeQuery of ['', 'rif', 'cara']) {
       const q = query({ filter: { typeQuery } });

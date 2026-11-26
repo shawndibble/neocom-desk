@@ -116,7 +116,6 @@ describe('loadText', () => {
         drones: [],
         cargo: [],
       },
-      // The pilot never saw the EFT's lines, so a warning names the item, not a line number.
       unresolved: [{ text: 'Not A Real Module', reason: 'unknown item', kind: 'unknown-item' }],
     });
   });
@@ -150,7 +149,6 @@ describe('loadText', () => {
     const outcome = await loadText(WORKBENCH_LINK, src);
     expect(outcome).toMatchObject({ kind: 'fitting' });
     if (outcome.kind !== 'fitting') return;
-    // No line number (the pilot never saw this EFT), but the kind survives.
     expect(outcome.unresolved).toEqual([
       {
         text: '125mm Gatling AutoCannon I',

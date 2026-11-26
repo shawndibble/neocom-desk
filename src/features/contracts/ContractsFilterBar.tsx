@@ -10,13 +10,10 @@ interface ContractsFilterBarProps {
   onChange: (filter: ContractsFilter) => void;
   statusOptions: Contract['status'][];
   typeOptions: Contract['type'][];
-  /** The History table's column picker, drawn beside the filter trigger. */
   actions?: ReactNode;
-  /** Rows the filter leaves, for the phone sheet's done button. */
   resultCount?: number;
 }
 
-/** Search plus status/type filter chips above the contracts table (issue #417). */
 export function ContractsFilterBar({
   filter,
   onChange,

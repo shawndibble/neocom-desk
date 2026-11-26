@@ -18,7 +18,6 @@ describe('computeAssignmentValue', () => {
 
     const result = computeAssignmentValue(lines, prices, 10);
 
-    // 100*10 + 50*4 = 1200; 10% of 1200 = 120
     expect(result).toEqual({ estimatedValue: 1200, taxOwed: 120 });
   });
 
@@ -52,14 +51,12 @@ describe('computeAssignmentValue', () => {
       [A, 10],
       [B, 4],
     ]);
-    // A overridden to 900 (corp tool's own total); B left to the computed 50*4=200.
     const overrides = new Map([[A, 900]]);
 
     const result = computeAssignmentValue(lines, prices, 10);
     const overridden = computeAssignmentValue(lines, prices, 10, overrides);
 
     expect(result).toEqual({ estimatedValue: 1200, taxOwed: 120 });
-    // 900 + 200 = 1100; 10% of 1100 = 110
     expect(overridden).toEqual({ estimatedValue: 1100, taxOwed: 110 });
   });
 

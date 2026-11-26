@@ -20,18 +20,15 @@ import { buildSkillRequirements } from '../skillRequirements';
 import type { SkillCatalog } from '../skillMap';
 import { entryId } from './reorder';
 
-/** DOM id EntryList puts on each plan row — how the picker finds one to jump to. */
 function planEntryElementId(skillTypeID: number, targetLevel: number): string {
   return `plan-entry-${entryId({ skillTypeID, targetLevel })}`;
 }
 
-/** Vertically on-screen right now — good enough for "does the pilot need a jump link". */
 function isVerticallyInViewport(el: Element): boolean {
   const rect = el.getBoundingClientRect();
   return rect.top >= 0 && rect.bottom <= window.innerHeight;
 }
 
-/** How long the visible confirmation stays up before fading back to sr-only. */
 const ANNOUNCEMENT_VISIBLE_MS = 5000;
 
 const MAX_RESULTS = 20;
@@ -41,22 +38,10 @@ interface SkillPickerProps {
   trainedSkills: ReadonlyMap<number, TrainedSkill>;
   onAdd: (entry: PlanEntry) => void;
   className?: string;
-  /**
-   * Extra view controls (e.g. group-by, column visibility) rendered beside
-   * the search box on the same row, wrapping below it on narrow screens.
-   * These act on the entries list below, not the picker itself, but the
-   * search bar is this panel's one full-width row wide enough to hold them.
-   */
   controls?: ReactNode;
-  /** The plan's own entries, so a level button can flag one already added at or above it (#408) — distinct from `trainedSkills`, which flags one already trained in-game. */
   planEntries?: readonly PlanEntry[];
 }
 
-/**
- * Searchable skill picker: ranked search by name/group/description, narrow by
- * group, then pick a target level I-V, showing that skill's prerequisites and
- * unlocks.
- */
 export function SkillPicker({
   skills,
   catalog,
@@ -68,20 +53,12 @@ export function SkillPicker({
 }: SkillPickerProps) {
   const { t } = useTranslation();
   const [query, setQuery] = useState('');
-  // Debounced separately from `query`: the input itself stays instantly
-  // responsive, only the ~500-skill re-rank below waits out the debounce.
   const [debouncedQuery, setDebouncedQuery] = useDebouncedValue(query);
   const [selected, setSelected] = useState<number | null>(null);
   const [activeGroups, setActiveGroups] = useState<Set<string>>(new Set());
   const [announcement, setAnnouncement] = useState('');
-  // Sighted confirmation is shown only for a few seconds after a pick, then
-  // this same `role="status"` text goes back to sr-only — one live region,
-  // not a second one layered on top.
   const [announcementVisible, setAnnouncementVisible] = useState(false);
   const [jumpTargetId, setJumpTargetId] = useState<string | null>(null);
-  // Id of a just-added row not yet found in the DOM. Cleared once found;
-  // re-picking before that replaces it, so an older pick has nothing left to
-  // resolve into.
   const [pendingJumpElementId, setPendingJumpElementId] = useState<string | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const hideAnnouncementTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -93,27 +70,15 @@ export function SkillPicker({
     []
   );
 
-  // `planEntries` changes on the same render pass `EntryList` mounts the new
-  // row (both read off the same parent state), so re-checking whenever it
-  // changes needs no polling: the row exists by the time this reruns, or a
-  // newer pick has already replaced `pendingJumpElementId`.
   useEffect(() => {
     if (!pendingJumpElementId) return;
     const el = document.getElementById(pendingJumpElementId);
     if (!el) return;
-    // Measuring committed DOM layout, not deriving from render-time props —
-    // there's no non-effect way to know where the row actually landed.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setJumpTargetId(isVerticallyInViewport(el) ? null : el.id);
     setPendingJumpElementId(null);
   }, [pendingJumpElementId, planEntries]);
 
-  /**
-   * Ranked over every skill rather than capped at MAX_RESULTS, so a group
-   * chip both exists for, and can surface, a match that the unfiltered top-N
-   * would crowd out with a more common group. Affordable where the Market
-   * search's cap is not: the skill catalogue is ~500 entries, not ~9,000.
-   */
   const matches = useMemo(
     () =>
       rankedSearch(skills, debouncedQuery, {
@@ -154,9 +119,6 @@ export function SkillPicker({
     setDebouncedQuery('');
     setSelected(null);
     setActiveGroups(new Set());
-    // The results list just collapsed, unmounting the clicked button
-    // (WCAG 2.4.3) — refocus the search box and announce the add. Cleared
-    // first: an `aria-live` region only speaks on an actual DOM mutation.
     setAnnouncement('');
     window.setTimeout(() => {
       setAnnouncement(t('plans.addedAnnouncement', { skill: skillName, level: levelLabel }));
@@ -197,8 +159,6 @@ export function SkillPicker({
           aria-live="polite"
           data-testid="pick-status"
           className={
-            // After the controls, in the DOM as on screen: on a phone it takes a
-            // line of its own under the row, so the search box keeps them beside it.
             announcementVisible
               ? 'flex basis-full items-center gap-1.5 text-xs text-text-dim sm:basis-auto'
               : 'sr-only'
@@ -212,7 +172,6 @@ export function SkillPicker({
               onClick={() => {
                 const row = document.getElementById(jumpTargetId);
                 row?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                // Focus moves with the view; the handle, not the <li>, so no row ring.
                 row
                   ?.querySelector<HTMLElement>(`[${PLAN_HANDLE_ATTR}]`)
                   ?.focus({ preventScroll: true });
@@ -273,11 +232,6 @@ export function SkillPicker({
                     {[1, 2, 3, 4, 5].map((level) => {
                       const roman = romanLevel(level);
                       const trainedLevel = trainedSkills.get(skill.typeID)?.level ?? 0;
-                      // The highest of this skill's rows, not the first one:
-                      // a plan holds one entry per level, so `find` reports
-                      // Gunnery I for a plan that trains I–V, and every level
-                      // above it would offer an "add" the plan already covers
-                      // and `upsertEntry` would discard.
                       const planLevel = planEntries.reduce(
                         (highest, e) =>
                           e.skillTypeID === skill.typeID

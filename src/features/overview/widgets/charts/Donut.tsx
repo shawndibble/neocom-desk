@@ -2,11 +2,6 @@ import { donutSegments } from './geometry';
 import { CHART_COLOR } from './palette';
 import type { DonutChartModel } from './types';
 
-/**
- * A ring split into parts, the total in the hole and a legend that names every part. With
- * `legend={false}` the ring stands alone, for a caller that names it beside the ring (the
- * Military Campaigns figure's progress rings).
- */
 export function Donut({
   model,
   size,
@@ -18,7 +13,6 @@ export function Donut({
 }) {
   const values = model.parts.map((part) => part.value);
   const sum = values.reduce((total, value) => total + Math.max(0, value), 0);
-  // Out of `of`: a trailing share for the rest, never drawn, so the track shows through.
   const segments = donutSegments(
     model.of === undefined ? values : [...values, Math.max(0, model.of - sum)]
   ).slice(0, values.length);
@@ -45,8 +39,8 @@ export function Donut({
                 fill="none"
                 strokeWidth="5"
                 stroke={CHART_COLOR[part.color]}
-                strokeDasharray={`${segment.dash.toFixed(2)} ${segment.gap.toFixed(2)}`} // fixed format: SVG attribute
-                strokeDashoffset={segment.offset.toFixed(2)} // fixed format: SVG attribute
+                strokeDasharray={`${segment.dash.toFixed(2)} ${segment.gap.toFixed(2)}`}
+                strokeDashoffset={segment.offset.toFixed(2)}
               />
             );
           })}

@@ -12,55 +12,14 @@ import { CharacterAchievementLine } from './AchievementLine';
 
 interface CharacterHeaderProps {
   characterId: number;
-  /**
-   * Corrected total SP; null while loading, or when /skills is unavailable.
-   * The SP chips draw only when this or `unallocatedSp` is passed: the
-   * Overview and Employment History omit both.
-   */
   totalSp?: number | null;
-  /** ESI's unallocated_sp; null while loading, or when unavailable. */
   unallocatedSp?: number | null;
-  /**
-   * The Overview's layout: a narrower name column (`basis-36`) and the bell
-   * always shown. SP chips come from `totalSp`/`unallocatedSp` and the slots
-   * from `actions` (and `aside`), none of which this flag changes; the Overview just
-   * passes no SP (a Skill points widget carries it).
-   */
   overview?: boolean;
-  /** Beside the name, for a short fact about the Character itself; wraps under it when the name is long. Not a data age: that reads as the pilot being updated (see `OverviewSubNav`'s `trailing`). */
   aside?: ReactNode;
-  /** The page's `CharacterFilterControl`, first in the control cluster as on every `PageHeader` page. */
   scope?: ReactNode;
-  /** In the header's own flex row, ahead of the bell (the Overview's Next deadline and Customize; Employment History's Refresh and export). */
   actions?: ReactNode;
 }
 
-/**
- * The Character overview's shared header: portrait, name, corp/alliance, title · score, SP.
- *
- * `PageHeader` is still every *other* route's top line (docs/DESIGN.md §4);
- * this replaces it for the three views behind `OverviewSubNav`, which read as
- * one page split into tabs rather than three separate destinations. A per-view
- * title there only restated the tab directly beneath it, and the identity
- * block jumping in and out as you moved between tabs was the actual complaint.
- * The character's name is the `<h1>` — one per route, as before.
- *
- * Clones carries no controls of its own here: its `DataAgeBadge` and Refresh
- * belong to the data they describe, so they sit in its `Panel` toolbar below
- * the tabs. The Overview (`overview`) and Employment History instead put the
- * data age on the tab row (`OverviewSubNav`'s `trailing`) and their controls
- * ahead of the bell (`actions`): the Overview's widgets, and Employment's
- * timeline, are the page, with no panel title bar to hold them. No SP is drawn on either
- * (`totalSp` and `unallocatedSp` omitted). Switching Character is the rail
- * footer's and the command palette's job.
- *
- *
- * Identity is read here rather than passed in: it is the same on every tab and
- * comes from local state (Dexie) plus a session store, so threading it through
- * three route loaders would buy nothing. The SP pair is a prop because it is
- * an ESI read whose freshness belongs to the view's own load/refresh cycle —
- * see `characterSp.ts` for what the two scope-light tabs feed it.
- */
 export function CharacterHeader({
   characterId,
   totalSp,
@@ -75,9 +34,6 @@ export function CharacterHeader({
   const publicInfo = usePublicInfo((state) => state.byCharacterId[characterId]);
   const loadPublicInfo = usePublicInfo((state) => state.load);
 
-  // Fire-and-forget, and a no-op once cached or in flight: the header renders
-  // corp/alliance as they arrive rather than holding the view on that chain of
-  // public fetches.
   useEffect(() => {
     void loadPublicInfo(characterId);
   }, [characterId, loadPublicInfo]);
@@ -85,16 +41,12 @@ export function CharacterHeader({
   const sp = (value: number | null | undefined): string =>
     value == null ? t('common.unknown') : formatCount(value);
   const showSp = totalSp !== undefined || unallocatedSp !== undefined;
-  // Each link keeps a 24px target (WCAG 2.5.8) in a line of its own height. Side by side the
-  // targets overlap their neighbours' lines harmlessly; stacked below `md` on the Overview they would
-  // overlap each other, so the negative margin applies from `md` up there.
   const affiliationLinkClassName = cx('min-w-0 truncate py-1', overview ? 'md:-my-1' : '-my-1');
 
   return (
     <header
       className={cx(
         'flex flex-wrap items-center gap-x-3 gap-y-2',
-        // Below `md` the Overview's controls share one line under the name, packed to its end.
         overview && 'max-md:justify-end'
       )}
     >
@@ -104,29 +56,18 @@ export function CharacterHeader({
         priority
         alt={t('characters.portraitAlt', { name: character?.name ?? '' })}
       />
-      {/*
-        `basis-48` is what makes the header actually wrap on a phone. With a
-        bare `flex-1` (basis 0) this block is infinitely shrinkable, so the
-        chips below stayed on line one and truncated the character name down
-        to a single letter instead. Given a real basis, the chips wrap to
-        their own line and the name gets the full width.
-      */}
       <div
         className={cx(
           'min-w-0 flex-1',
           overview || actions ? 'basis-36' : 'basis-48',
-          // Below `md` the Overview's name takes the whole row beside the portrait (64px + the
-          // 12px gap, and a pixel of slack), so the controls wrap to a line of their own.
           overview && 'max-md:basis-[calc(100%-4.8rem)]'
         )}
       >
-        {/* `tabIndex={-1}`: route focus (`app/routeFocus.ts`) lands here after navigation. */}
         <div className="flex flex-wrap items-center gap-x-3">
           <h1
             tabIndex={-1}
             className={cx(
               'max-w-full min-w-0 text-xl font-semibold tracking-widest uppercase focus:outline-none',
-              // The Overview's name wraps below `md` rather than ending in an ellipsis.
               overview ? 'max-md:wrap-break-word md:truncate' : 'truncate'
             )}
           >
@@ -134,16 +75,9 @@ export function CharacterHeader({
           </h1>
           {aside}
         </div>
-        {/*
-          Each name truncates in its own box: truncating the line instead clipped the text but not
-          the links, whose boxes ran on under Customize and the bell (overlapping targets on a
-          phone, WCAG 2.5.8). No native `title` (off-limits outside the ui
-          primitives, §6c): each link's Show Info names it whole.
-        */}
         <p
           className={cx(
             'flex min-w-0 text-xs whitespace-nowrap text-text-dim',
-            // Below `md` the corporation and the alliance each get a line, so neither hides the other.
             overview && 'max-md:flex-col'
           )}
         >
@@ -173,7 +107,6 @@ export function CharacterHeader({
         </p>
         <CharacterAchievementLine characterId={characterId} />
       </div>
-      {/* Controls sit in this flex row, then the bell: the Overview's Next and Customize, Employment History's Refresh and export. */}
       {scope && (
         <PageHeaderClusterContext.Provider value={true}>{scope}</PageHeaderClusterContext.Provider>
       )}
@@ -184,7 +117,6 @@ export function CharacterHeader({
           <StatChip label={t('skills.unallocatedSp')} value={sp(unallocatedSp)} />
         </StatChips>
       )}
-      {/* This header stands in for `PageHeader` on Overview, Clones and Employment History. */}
       <AlertsBell showWhenEmpty={overview ? true : undefined} />
     </header>
   );

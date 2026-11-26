@@ -68,9 +68,7 @@ describe('placeNamesSystem', () => {
 
   it('is false when the name does not start with its system', () => {
     expect(placeNamesSystem('Home Fortizar', 'Efa')).toBe(false);
-    // Naming another system somewhere inside is not naming its own.
     expect(placeNamesSystem('Perimeter - Jita overflow', 'Jita')).toBe(false);
-    // A longer word that merely begins with the system's name is not it.
     expect(placeNamesSystem('Jitanomics Trade Hub', 'Jita')).toBe(false);
     expect(placeNamesSystem('Efatopia Keepstar', 'Efa')).toBe(false);
   });

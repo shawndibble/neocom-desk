@@ -9,19 +9,12 @@ import { screenshotSrc, screenshotSrcSet, type Screenshot } from './screenshots'
 import { ScreenshotZoom, ZoomBadge } from './ScreenshotZoom';
 import { SHOWCASE_TABS, type ShowcaseTab } from './showcaseTabs';
 
-/**
- * The features band: tabs by area, each showing one large, uncropped
- * screenshot in a window frame beside what that area does, and, where the tab
- * bundles more than its own name, an "Also includes" row of the other features.
- * Selecting a picture enlarges it.
- */
 export function FeatureShowcase() {
   const { t } = useTranslation();
   const tabsId = useTabsId();
   const [tabId, setTabId] = useState(SHOWCASE_TABS[0].id);
   const [zoomed, setZoomed] = useState<Screenshot | null>(null);
   const tab = SHOWCASE_TABS.find((entry) => entry.id === tabId) ?? SHOWCASE_TABS[0];
-  // A feature that only repeats the tab's own name says nothing the tab does not.
   const tabName = t(`login.showcase.${tab.id}.tab`);
   const alsoIncludes = tab.features.filter(
     ({ key }) => t(`login.features.${key}.name`) !== tabName
@@ -75,14 +68,12 @@ export function FeatureShowcase() {
   );
 }
 
-/** What selecting a picture does, appended to its alt text (a button's children are presentational). */
 function useEnlargeLabel() {
   const { t } = useTranslation();
   return (shot: Screenshot) =>
     t('login.screenshotEnlarge', { alt: t(`login.screenshots.${shot.key}.alt`) });
 }
 
-/** A window around the capture: a title bar carrying the caption, then the whole picture, never cropped. */
 function WindowFrame({ tab, onOpen }: { tab: ShowcaseTab; onOpen: (shot: Screenshot) => void }) {
   const { t } = useTranslation();
   const enlargeLabel = useEnlargeLabel();
@@ -104,7 +95,6 @@ function WindowFrame({ tab, onOpen }: { tab: ShowcaseTab; onOpen: (shot: Screens
   );
 }
 
-/** A capture that opens enlarged; explicit width/height reserve its box before the lazy image arrives. */
 function ShotButton({
   shot,
   label,

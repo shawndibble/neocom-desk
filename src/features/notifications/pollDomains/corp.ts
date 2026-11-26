@@ -60,18 +60,6 @@ import {
   universeTypeName,
 } from './shared';
 
-/* Corp domains (issue #299) -------------------------------------------------- */
-
-/**
- * The corp gate every domain below runs before its own ESI call (AC5): CCP
- * role-gates the corporation endpoints server-side, so a granted scope alone
- * does not mean the Character can read the data (`engine/corpRoles.ts`). Null
- * for "cannot fetch this poll" — corporation unknown, roles unreadable this
- * poll, or the specific role missing — always erring toward *not* calling the
- * endpoint rather than guessing. `loadCharacterRoles` is documented as cheap
- * enough to run for everyone (`features/corp/roles.ts`), and this only runs
- * for a Character whose `enabledEvents` for the domain is already non-empty.
- */
 async function corpContextFor(
   characterId: number,
   capability: CorpCapability
@@ -85,8 +73,6 @@ async function corpContextFor(
   return { corporationId };
 }
 
-/* Structure fuel low ------------------------------------------------------- */
-
 const isStructureFuelEntrySnapshot = shapeGuard<StructureFuelEntrySnapshot>({
   structureId: is.number,
   name: is.string,
@@ -94,13 +80,6 @@ const isStructureFuelEntrySnapshot = shapeGuard<StructureFuelEntrySnapshot>({
   thresholdMs: is.number,
 });
 
-/**
- * A Director's control towers (POS) as fuel entries beside the Upwell structures: a tower id and a
- * structure id never collide, so one snapshot and one alert cover both. Empty when this Character
- * cannot read towers (no Director role or no starbases grant); null when it can and the read
- * failed, so the poll is skipped rather than a baseline written without them — a tower missing
- * from it would announce as new once it reads again.
- */
 async function loadTowerFuel(
   characterId: number,
   corporationId: number,
@@ -125,7 +104,6 @@ async function loadTowerFuel(
   const entries: StructureFuelEntrySnapshot[] = [];
   for (const tower of list.cached.data) {
     const read = details.get(tower.starbase_id);
-    // An online tower whose bay cannot be read has no fuel clock this poll: skip, don't guess.
     if (tower.state === 'online' && (read === undefined || read.cached === null)) return null;
     const bay = read?.cached ? summariseBay(read.cached.data.fuels) : null;
     entries.push({
@@ -160,9 +138,6 @@ export const structureFuelDomain = defineDomain<
     if (result.needsReauth || result.cached === null) return null;
     const thresholds = await currentThresholds(characterId);
     const thresholdMs = thresholds.structureFuelLowDays * DAY_MS;
-    // Reuses the board's own ESI-to-engine adaptation (`boardSources.ts`)
-    // rather than re-parsing `fuel_expires` here — same underlying data the
-    // board already loads, per the ticket brief.
     const structures = toBoardStructures(result.cached.data).map((structure) => ({
       structureId: structure.structureId,
       name: structure.name,
@@ -173,9 +148,6 @@ export const structureFuelDomain = defineDomain<
     return towers === null ? null : [...structures, ...towers];
   },
   toSnapshot: (entries, nowMs) => ({ entries: [...entries], nowMs }),
-  // Same split as the colony domain: the baseline's baked-in `thresholdMs`
-  // stays for the diff, while the Projection uses the current fuel threshold
-  // so a Settings change rebuilt from that baseline (issue #1259) projects it.
   projection: async (characterId, characterName, snapshot, nowMs) => {
     const thresholdMs = (await currentThresholds(characterId)).structureFuelLowDays * DAY_MS;
     return projectStructureFuel(
@@ -188,8 +160,6 @@ export const structureFuelDomain = defineDomain<
   },
 });
 
-/* Skyhook raid windows (issue #4784) ---------------------------------------- */
-
 const isSkyhookEntrySnapshot = shapeGuard<SkyhookEntrySnapshot>({
   skyhookId: is.number,
   planetId: is.number,
@@ -200,15 +170,6 @@ const isSkyhookEntrySnapshot = shapeGuard<SkyhookEntrySnapshot>({
   minUnits: is.number,
 });
 
-/**
- * The corp's skyhooks through the Sovereignty widget's own cached reads
- * (`features/corp/sovereignty.ts`): the list plus one detail per skyhook, each
- * under ESI's roughly hourly corp cache, so the poll adds no request beyond
- * that window and never fans out past `ESI_FANOUT_CONCURRENCY`. A detail that
- * cannot be read skips the poll (`null`) instead of writing a baseline that
- * would announce that skyhook's window as new once it reads again. A skyhook
- * ESI sends no window for is kept with a null window: not raidable now.
- */
 export const skyhookDomain = defineDomain<
   SkyhookEntrySnapshot,
   SkyhookSnapshot,
@@ -244,7 +205,6 @@ export const skyhookDomain = defineDomain<
         planetId: skyhook.planet_id,
         windowStartMs: parseInstant(detail.theft_vulnerability?.start),
         windowEndMs: parseInstant(detail.theft_vulnerability?.end),
-        // A non-number is unknown, never "0 at risk".
         unsecuredUnits: unsecured !== undefined && Number.isFinite(unsecured) ? unsecured : null,
         leadMs: thresholds.skyhookRaidableLeadHours * HOUR_MS,
         minUnits: thresholds.skyhookRaidableMinUnits,
@@ -253,11 +213,6 @@ export const skyhookDomain = defineDomain<
     return entries;
   },
   toSnapshot: (entries, nowMs) => ({ entries: [...entries], nowMs }),
-  // As in the den domain: the baseline keeps the lead time the diff needs, while
-  // the Projection reads the current one so a Settings change rebuilt from that
-  // baseline projects the new warning time. Re-checks the role: a baseline
-  // outlives a lost Station_Manager role, and a Projection nothing re-verifies
-  // must not keep pushing for a corp the pilot can no longer read.
   projection: async (characterId, characterName, snapshot, nowMs) => {
     if ((await corpContextFor(characterId, 'canReadSkyhooks')) === null) return [];
     const thresholds = await currentThresholds(characterId);
@@ -281,8 +236,6 @@ export const skyhookDomain = defineDomain<
   },
   names: async (fire) => ({ planet: (await loadPlanetName(fire.planetId)) ?? undefined }),
 });
-
-/* Corp industry jobs --------------------------------------------------------- */
 
 const isCorpIndustryJobEntrySnapshot = shapeGuard<CorpIndustryJobEntrySnapshot>({
   jobId: is.number,
@@ -320,9 +273,6 @@ export const corpIndustryJobDomain = defineDomain<
     return result.cached.data;
   },
   toSnapshot: (jobs, nowMs) => ({ entries: jobs.map(toCorpIndustryJobEntrySnapshot), nowMs }),
-  // Re-checks the role: the baseline outlives a lost Factory Manager role, and
-  // a Projection nothing re-verifies must not keep pushing for a corp the
-  // pilot can no longer read.
   projection: async (characterId, characterName, snapshot, nowMs) => {
     if ((await corpContextFor(characterId, 'canReadIndustry')) === null) return [];
     const itemNames = await resolveProjectionNames(
@@ -341,19 +291,10 @@ export const corpIndustryJobDomain = defineDomain<
   names: async (fire) => ({ item: await typeNameOrAbsent(industryItemTypeId(fire)) }),
 });
 
-/* Corp roster ----------------------------------------------------------------- */
-
 const isCorpRosterMemberSnapshot = shapeGuard<CorpRosterMemberSnapshot>({
   characterId: is.number,
 });
 
-/**
- * `/members`, not `/membertracking` — the diff only needs identity, and the
- * page that needs the richer read (`routes/CorpMembers.tsx`, #333) is a
- * second, independent consumer of the same capability. Both answer to
- * `canReadMembers` (Director-only, `engine/corpRoles.ts`), matching that
- * route's existing gate rather than inventing a narrower one for this poller.
- */
 export const corpRosterDomain = defineDomain<
   number,
   CorpRosterSnapshot,
@@ -380,8 +321,6 @@ export const corpRosterDomain = defineDomain<
   }),
 });
 
-/* Corp wallet threshold --------------------------------------------------- */
-
 const isCorpWalletJournalEntrySnapshot = shapeGuard<CorpWalletJournalEntrySnapshot>({
   id: is.number,
   amount: is.nullable(is.number),
@@ -395,13 +334,6 @@ const isCorpWalletDivisionSnapshot = shapeGuard<CorpWalletDivisionSnapshot>({
   transactionCeilingIsk: is.number,
 });
 
-/**
- * Balance-below is checked across every division `/wallets` already returns
- * in one call; transaction-above is checked only on the master division's
- * journal, since ESI publishes no all-divisions journal and the seven are
- * separately paginated and role-gated (GLOSSARY.md round 43, `boardData.ts`'s
- * `MASTER_WALLET_DIVISION` reasoning).
- */
 export const corpWalletDomain = defineDomain<
   CorpWalletDivisionSnapshot,
   CorpWalletSnapshot,
@@ -422,10 +354,6 @@ export const corpWalletDomain = defineDomain<
       MASTER_WALLET_DIVISION
     );
     if (journalResult.needsReauth || journalResult.cached === null) return null;
-    // A truncated master-division journal could lower the high-water mark
-    // `diffCorpWalletThreshold` tracks, re-firing for entries already
-    // reported once the next complete poll sees them again (same reasoning
-    // as `walletDomain`'s truncation guard above).
     if (journalResult.cached.truncated) return null;
     const journalEntries = journalResult.cached.data;
     const thresholds = await currentThresholds(characterId);

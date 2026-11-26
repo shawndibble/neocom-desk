@@ -2,16 +2,8 @@ import { sum } from '../math';
 import { timeToTrain, trainingRate } from '../skills/sp';
 import type { AttributeName, Attributes, CloneState, Implants } from '../types';
 
-/**
- * How long does the active training queue take if the Character wore each of
- * their clones instead? Reuses `trainingRate` / `timeToTrain` from `sp.ts` (the
- * same `primary + secondary/2` formula `computeSchedule` uses), evaluating the
- * attribute pair per queue entry. Pure: no clock reads, no I/O.
- */
-
 export interface QueueEntryInput {
   skillTypeID: number;
-  /** SP still to train on this entry. */
   remainingSp: number;
   primary: AttributeName;
   secondary: AttributeName;
@@ -19,22 +11,17 @@ export interface QueueEntryInput {
 
 export interface CloneInput {
   id: string | number;
-  /** Attribute implant bonuses this clone carries (missing key = +0). */
   implants: Implants;
 }
 
 export interface CloneTrainingInput {
   queue: readonly QueueEntryInput[];
-  /** A paused queue has no ETA: every finish/total/delta is null. */
   paused?: boolean;
-  /** Character attributes without implants. */
   baseAttributes: Attributes;
   clones: readonly CloneInput[];
   wornCloneId: string | number;
   cloneState?: CloneState;
-  /** When the queue would start training. */
   now: Date;
-  /** When the pilot may next jump; only a time after `now` yields stayThenSwitch. */
   cooldownReadyAt?: Date | null;
 }
 
@@ -46,7 +33,6 @@ export interface CloneTrainingFigure {
 export interface CloneTrainingResult extends CloneTrainingFigure {
   cloneId: string | number;
   totalSeconds: number | null;
-  /** Keep training in the worn clone until the cooldown ends, then wear this one. */
   stayThenSwitch?: CloneTrainingFigure;
 }
 
@@ -63,7 +49,6 @@ function entryRate(
   );
 }
 
-/** Seconds each queue entry takes wearing `implants` the whole way. */
 export function queueEntrySeconds(
   queue: readonly QueueEntryInput[],
   base: Attributes,
@@ -73,7 +58,6 @@ export function queueEntrySeconds(
   return queue.map((e) => timeToTrain(e.remainingSp, entryRate(e, base, implants, cloneState)));
 }
 
-/** Seconds to finish `queue` wearing `implants` the whole way. */
 function queueSeconds(
   queue: readonly QueueEntryInput[],
   base: Attributes,
@@ -83,7 +67,6 @@ function queueSeconds(
   return sum(queueEntrySeconds(queue, base, implants, cloneState));
 }
 
-/** Seconds each entry takes wearing `stay` for `stayBudget` seconds, then `target`. */
 export function stayThenSwitchEntrySeconds(
   queue: readonly QueueEntryInput[],
   base: Attributes,

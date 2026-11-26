@@ -141,7 +141,6 @@ describe('StockTargetCell', () => {
     const { onChange, onRemove } = setup(10);
     await userEvent.click(screen.getByRole('button'));
     const input = screen.getByRole('spinbutton');
-    // jsdom does not model badInput; a browser sets it for text a number field cannot parse.
     Object.defineProperty(input, 'validity', { value: { badInput: true } });
     fireEvent.change(input, { target: { value: '' } });
     await userEvent.keyboard('{Enter}');

@@ -1,9 +1,3 @@
-/**
- * A skillbook's lowest sell at the Trade Hub station and anywhere in the
- * hub's region, from one region order book. Both matter: NPC-seeded books
- * sit in NPC stations all over a region, often none at the hub station itself
- * (Upwell Hauler: zero sells at Jita 4-4, two dozen elsewhere in The Forge).
- */
 interface SellCandidate {
   price: number;
   location_id: number;
@@ -11,9 +5,7 @@ interface SellCandidate {
 }
 
 export interface SkillSellPrices {
-  /** Lowest sell at the hub station; null when it has none. */
   hub: number | null;
-  /** Lowest sell anywhere in the region; null when the region has none. */
   region: number | null;
 }
 

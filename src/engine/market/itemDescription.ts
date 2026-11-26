@@ -1,16 +1,3 @@
-/**
- * Parses the small HTML-ish markup subset CCP embeds in ESI item
- * descriptions (`<font size><b>`, `<i>`, `<u>`, `<br>`, `<a href="showinfo:...">`)
- * into plain formatted runs. Never produces raw HTML: the caller renders
- * runs as React elements, not via `dangerouslySetInnerHTML` — descriptions
- * are CCP-authored, but the project has already rejected that XSS surface
- * for authored content once (docs/plans/feature-parity/briefs/K-libraries.md).
- * `showinfo:` is an EVE client protocol and dead in a browser, so `<a>` tags
- * are dropped and only their label text kept. Any tag this doesn't
- * recognize (`<font>`, `<color>`, legacy `<url>`, ...) is stripped the same
- * way — dropped, inner text kept, no style applied.
- */
-
 export interface DescriptionRun {
   text: string;
   bold: boolean;
@@ -42,7 +29,6 @@ function decodeEntities(text: string): string {
 
 const TAG = /<\/?([a-zA-Z][\w-]*)\b[^>]*?\/?>/g;
 
-/** Open-tag depth per style, so nested `<b>...<b>...</b>...</b>` stays bold until the outer close. */
 interface StyleDepth {
   b: number;
   i: number;
@@ -98,7 +84,7 @@ export function parseItemDescription(raw: string): DescriptionRun[] {
         append('\n');
         break;
       default:
-        break; // font, a, color, url, ... — dropped, inner text kept unstyled
+        break;
     }
     lastIndex = TAG.lastIndex;
   }

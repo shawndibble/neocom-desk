@@ -29,7 +29,6 @@ const view = () =>
               paidThrough: '2026-11-02',
               owes: { amount: 300.6, days: 2, oldest: '2026-11-03' },
               closableThrough: (today: string) => (today === '2026-11-05' ? '2026-11-02' : null),
-              // The account's own owed days (`owedDays`): settled and held ones are left out there.
               owedDays: () => [
                 { date: '2026-11-03', owed: 900, tax: 900 },
                 { date: '2026-11-04', owed: 400, tax: 1000 },

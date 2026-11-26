@@ -1,15 +1,3 @@
-/**
- * Auto Build, generalized to a Build Group (issue #696): the same one-shot
- * bulk build/buy control from #695 (`AutoBuildControl.tsx`,
- * `autoMakeOrBuy.ts`), run once per member independently. Each member's own
- * material tree is walked with its own facility/hub/security/blueprint/ME —
- * there is no single shared tree for a group the way `groupRollup.ts` merges
- * *display* totals — and only that member's own `buildHere` is ever patched.
- *
- * Lives in `features/industry`, not `src/engine`, because it fetches live
- * market data (`loadMarketSnapshots`) — the same reason `useComparedBuildResults.ts`
- * sits here instead of the engine.
- */
 import type { BuildPlanRecord } from '@/db';
 import type { CharacterModifiers } from '@/engine/industry/characterModifiers';
 import type { CharacterBlueprint } from '@/esi/endpoints';
@@ -47,7 +35,6 @@ interface ResolvedMember {
   plan: BuildPlanRecord;
   blueprint: IndustryBlueprint;
   facilityContext: PlanFacilityContext;
-  /** @see reactionPlanFacilityContextFor — `null` when this member has no Reaction Location configured (issue #698). */
   reactionPlanFacilityContext: PlanFacilityContext | null;
 }
 
@@ -62,14 +49,6 @@ function resolveMember(plan: BuildPlanRecord, catalog: BlueprintCatalog): Resolv
   };
 }
 
-/**
- * Craft Scope for the group's own chip row (issue #698): Manufacturing is
- * always eligible; Reactions lights up the moment any single member is
- * eligible for it (Include Reactions on, or that member's own activity is a
- * reaction) — an Auto Build pass still resolves each member's own scope
- * independently in `applyGroupAutoBuild`, this only answers whether the chip
- * should ever light up at all. Planetary stays reserved.
- */
 export function groupCraftScope(
   plans: readonly BuildPlanRecord[],
   catalog: BlueprintCatalog
@@ -86,20 +65,12 @@ export function groupCraftScope(
   return ['manufacturing'];
 }
 
-/** What a member's recipe lookup reads — the group-wide half; the member supplies its own corp toggle. */
 export interface GroupRecipeSources extends RecipeCatalog {
   ownedBlueprints: readonly CharacterBlueprint[];
   corpOwnedBlueprints?: CorpOwnedBlueprintsState;
   assumedMe: number;
 }
 
-/**
- * One member's recipe lookup: personal blueprints plus, only when that
- * member's own `includeCorpAssets` is on, the corp's — the same
- * `planOwnedBlueprints` rule the member's page and the Group Rollup price
- * with, so Auto Build and its depth control see each member at the ME it is
- * priced at.
- */
 export function memberRecipeFor(
   plan: Pick<BuildPlanRecord, 'includeCorpAssets'>,
   sources: GroupRecipeSources
@@ -116,22 +87,6 @@ export function memberRecipeFor(
   });
 }
 
-/**
- * The group's depth ceiling: the deepest level any single member's own
- * tree reaches, the same way a solo plan sizes its own control
- * (`BuildPlanDetail.tsx`'s `autoBuildMaxDepth`). Needs no live prices —
- * depth discovery never prices anything (`maxAutoBuildDepth`'s own doc comment)
- * — so, unlike `applyGroupAutoBuild`, this never waits on a market fetch.
- * A member whose blueprint no longer resolves contributes nothing, the same
- * "skip, don't zero" policy `groupRollup.ts` applies to an unresolvable
- * member.
- *
- * Walks at the stored `plan.me`, not the member's resolved ME
- * (`resolveMakeOrBuy`) that `applyGroupAutoBuild` uses: resolving it
- * needs live prices, and ME can't change depth anyway — every effective
- * quantity floors at `runs` (never zero), so the same recipes are reached at
- * any ME.
- */
 export function groupAutoBuildMaxDepth(
   plans: readonly BuildPlanRecord[],
   sources: GroupRecipeSources,
@@ -155,23 +110,6 @@ export function groupAutoBuildMaxDepth(
   return deepest;
 }
 
-/**
- * Applies one Build Strategy, at the group's own depth ceiling, to every member independently:
- * each member is priced at its own hub/build-system (batched by hub, the
- * same `loadPlanSnapshots` batch `useComparedBuildResults.ts` uses), then
- * walked with its own facility/ME/runs. Returns the picked `buildHere` set
- * per member — never writes to Dexie itself, so the caller decides how (and
- * whether) to patch each plan. A member whose blueprint no longer resolves
- * is left out of the returned map entirely, contributing nothing rather than
- * an empty set — as is one whose prices never landed, the same way its own
- * page's Auto Build waits on prices. Each member is walked at its resolved
- * ME (`resolveMakeOrBuy`), the same ME its own page walks at.
- *
- * Owned blueprints and the Reaction Location resolve per member through
- * `resolveBuildPlan.ts`'s own helpers — corp copies count only for a member
- * whose own `includeCorpAssets` is on, the same rule its page and the Group
- * Rollup price with.
- */
 export async function applyGroupAutoBuild(
   plans: readonly BuildPlanRecord[],
   catalog: BlueprintCatalog,
@@ -181,21 +119,9 @@ export async function applyGroupAutoBuild(
   assumedMe: number,
   options: { strategy: BuildStrategy; depth: number },
   corpOwnedBlueprints?: CorpOwnedBlueprintsState,
-  /** BPC Sourcing rows (all regions) — narrowed to each member's own Trade Hub region. */
   bpcRows: readonly BpcContractRow[] = [],
-  /** Community Offers (issue #3603): free Shared Blueprints, region-agnostic. */
   communityRows: readonly BpcSearchRow[] = [],
-  /**
-   * Account-wide trained skill levels: a material no listed character can
-   * install is forced to buy, the same gate a member's own page applies
-   * (`BuildPlanDetail`'s Auto Build). Absent = purely cost-based.
-   */
   accountSkills?: ReadonlyMap<number, SkillLevels>,
-  /**
-   * Standings per Trade Hub, as each member's own page resolves them: a
-   * Buy order member's materials carry the broker fee at its hub (#6167).
-   * Absent = zero standing, plus the hub's own Safety Tax.
-   */
   standings: TradeHubStandingsMap = new Map()
 ): Promise<Map<string, Set<number>>> {
   const members = plans.flatMap((plan) => {
@@ -203,7 +129,6 @@ export async function applyGroupAutoBuild(
     return member ? [member] : [];
   });
 
-  // Members keep their own hubs but price at the Industry percent (issue #6531).
   const snapshots = loadPlanSnapshots(
     members,
     { catalog, pi },
@@ -217,8 +142,6 @@ export async function applyGroupAutoBuild(
       const blueprintPurchaseOffersFor = await snapshots[index]!.blueprintOffers;
       const inventionMarket = await snapshots[index]!.inventionMarket;
       const hub = getTradeHub(member.plan.hubId) ?? DEFAULT_TRADE_HUB;
-      // A member whose prices never landed resolves to null and is left
-      // untouched: without real fees every verdict would read "build".
       const resolution = resolveMakeOrBuy(
         member.plan,
         {
@@ -243,7 +166,6 @@ export async function applyGroupAutoBuild(
         member.plan.id,
         autoBuildHere(blueprint, me, {
           recipeFor,
-          // Same gate a member's own page applies (BuildPlanDetail applyAutoBuild).
           ctx: { ...ctx, accountSkills },
           depth: options.depth,
           runs: member.plan.runs,

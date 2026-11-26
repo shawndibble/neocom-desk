@@ -33,8 +33,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** @summary Beside a primary button at the default `md` tier. */
 export const Default: Story = {};
 
-/** @summary The `sm` tier, beside an `sm` primary button. */
 export const Small: Story = { args: { size: 'sm' } };

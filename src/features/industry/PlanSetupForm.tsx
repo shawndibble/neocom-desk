@@ -40,10 +40,6 @@ interface PlanSetupFormProps {
   toggleIncludeReactions: (include: boolean) => void;
 }
 
-/**
- * The Setup form: slides open under the setup strip, attached to the card it
- * edits, rather than a second card that pushes the page down.
- */
 export function PlanSetupForm({
   open,
   id,
@@ -114,9 +110,6 @@ export function PlanSetupForm({
               movePlan={movePlan}
             />
 
-            {/* A reaction-activity plan never shows this: it reuses its own
-                  top-level facility/rig/security for a nested reaction
-                  sub-build instead (issue #698). */}
             {activity === 'manufacturing' && (
               <PlanReactionFields
                 plan={plan}

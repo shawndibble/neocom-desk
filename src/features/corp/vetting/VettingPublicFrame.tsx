@@ -2,7 +2,6 @@ import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { LogoMark } from '@/components/ui';
 
-/** The public apply page's frame: a visitor with no account sees the mark, not the rail. */
 export function VettingPublicFrame({ children }: { children: ReactNode }) {
   const { t } = useTranslation();
   return (
@@ -16,7 +15,6 @@ export function VettingPublicFrame({ children }: { children: ReactNode }) {
   );
 }
 
-/** The apply page's one `<h1>`: the corporation applied to, and a line on where the pilot is. */
 export function ApplyHeading({ name, ticker, sub }: { name: string; ticker: string; sub: string }) {
   const { t } = useTranslation();
   return (
@@ -30,7 +28,6 @@ export function ApplyHeading({ name, ticker, sub }: { name: string; ticker: stri
   );
 }
 
-/** Numbered steps: "How it works" and "What happens next". */
 export function VettingSteps({ steps }: { steps: readonly string[] }) {
   return (
     <ol className="space-y-2 text-sm">

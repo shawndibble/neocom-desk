@@ -103,7 +103,6 @@ const reference: NpcStandingsReference = {
       ownerCorporationId: ISHUKONE,
       ownerFactionId: CALDARI,
     },
-    // The level 3 agent's station
     {
       id: 1,
       name: 'Agent station',
@@ -131,7 +130,6 @@ describe('buildNpcStandingRows', () => {
   describe('nearest', () => {
     it("is a corporation's nearest station, and a faction's nearest of any of its corporations", () => {
       expect(row(NAVY).nearest).toEqual({ stationId: 12, systemId: 30000002, jumps: 4 });
-      // Ishukone's station is in the current system: the faction's nearest is 0 jumps
       expect(row(CALDARI).nearest).toEqual({ stationId: 13, systemId: 30000001, jumps: 0 });
     });
 
@@ -143,7 +141,6 @@ describe('buildNpcStandingRows', () => {
       expect(row(GURISTAS_CORP).nearest).toBeNull();
       expect(row(GURISTAS).nearest).toBeNull();
       expect(row(STORYLINE_AGENT).nearest).toBeNull();
-      // The level 1 agent's station is not in the snapshot
       expect(row(AGENT_L1).nearest).toBeNull();
     });
 
@@ -211,7 +208,6 @@ describe('buildNpcStandingRows', () => {
 
   describe('with skills', () => {
     it('lifts a positive standing by Connections', () => {
-      // 5 + (10 - 5) * 0.04 * 5
       expect(row(NAVY).effective).toBeCloseTo(6, 10);
     });
 
@@ -232,17 +228,14 @@ describe('buildNpcStandingRows', () => {
 
   describe('access', () => {
     it("is the highest level the best standing in the chain opens: a corporation's faction counts", () => {
-      // Ishukone 1.0 -> 2.8, Caldari 2.5 -> 4.0: the faction's 4.0 opens level 3
       expect(row(ISHUKONE).accessLevel).toBe(3);
     });
 
     it('counts the agent itself in an agent row', () => {
-      // Hanna 8.0 -> 8.4 beats Ishukone (2.8) and Caldari (4.0): level 5
       expect(row(AGENT_L3).accessLevel).toBe(5);
     });
 
     it('is level 1 when a link in the chain is at -2.0 or lower', () => {
-      // The level 1 agent is at -3.0 although the Navy is at 6.0
       expect(row(AGENT_L1).accessLevel).toBe(1);
       expect(row(GURISTAS_CORP).accessLevel).toBe(1);
     });
@@ -258,7 +251,6 @@ describe('buildNpcStandingRows', () => {
         owners,
         reference
       );
-      // 5.0 -> 6.0 alone: level 4
       expect(lone[0].accessLevel).toBe(4);
     });
 
@@ -270,7 +262,6 @@ describe('buildNpcStandingRows', () => {
       expect(row(NAVY, unread).accessLevel).toBeNull();
       expect(row(NAVY, unread).effective).toBeNull();
       expect(row(AGENT_L3, unread).accessLevel).toBeNull();
-      // A faction needs no corporation data: 2.5 -> 4.0 opens level 3.
       expect(row(CALDARI, unread).accessLevel).toBe(3);
     });
   });
@@ -323,7 +314,6 @@ describe('buildNpcStandingRows', () => {
     const bare = buildNpcStandingRows(entries, names, owners, NO_NPC_STANDINGS_REFERENCE);
     expect(bare.every((r) => r.belongsTo === null && r.effective === null)).toBe(true);
     expect(bare.every((r) => r.accessLevel === null)).toBe(true);
-    // No skills to lift it: even a faction's access stays unknown.
     expect(row(CALDARI, bare).accessLevel).toBeNull();
   });
 });
@@ -343,9 +333,7 @@ describe('filterNpcStandingRows', () => {
   });
 
   it('matches what the row belongs to', () => {
-    // Hanna works for Ishukone
     expect(filtered({ text: 'ishukone' })).toEqual([AGENT_L3, ISHUKONE]);
-    // the Navy and Ishukone belong to Caldari State
     expect(filtered({ text: 'Caldari State' })).toEqual([NAVY, CALDARI, ISHUKONE]);
   });
 

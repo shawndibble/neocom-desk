@@ -23,7 +23,6 @@ interface TaxPageDialogsProps {
   settingsOpen: boolean;
   onCloseSettings: () => void;
   onAutoContinueChange: (next: boolean) => void;
-  /** The Character the Payee manager opens on; null keeps it closed. */
   payeeManagerCharacterId: number | null;
   onClosePayeeManager: () => void;
   characters: TrackedCharacter[];
@@ -31,20 +30,14 @@ interface TaxPageDialogsProps {
   owedByPayee: ReadonlyMap<string, PayeeOwed>;
   systemsByPayee: ReadonlyMap<string, ReadonlySet<number>>;
   systemNames: ReadonlyMap<number, string>;
-  /** The Corp Tax Books' corporations, offered as links for a Payee named for one. */
   bookCorporations: readonly BookCorporation[];
-  /** Each personal Payee's Running account: Manage Payees reads credit off it. */
   accountOf?: (payeeId: string) => PayeeRunningAccount | undefined;
-  /** Opens a Payee's ledger from its Manage Payees row. */
   onOpenLedger?: (payeeId: string) => void;
-  /** Whether a Payee reads archived (`PayeeRunningAccounts.isArchived`). */
   isArchived?: (payeeId: string) => boolean;
-  /** The Corp Tax Book corporation a Payee is, when a book answers for it. */
   bookOwnerOf?: (payeeId: string) => string | undefined;
   refresh: () => void;
 }
 
-/** The dialogs opened from the page header's menus: ore tags, the page settings, and the Payee manager. */
 export function TaxPageDialogs({
   oreTagsOpen,
   onCloseOreTags,

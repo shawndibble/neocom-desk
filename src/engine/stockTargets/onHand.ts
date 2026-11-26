@@ -1,12 +1,3 @@
-/**
- * What a pilot has toward a market's **Stock List**: the units still listed on
- * their own sell orders there, and the units in their hangars at the same
- * station or structure, ready to list.
- *
- * Only the pilot's own orders count: the list is about the market they stock,
- * and reading every seller at a player structure would need a structure-market
- * scope the pilot may not hold there.
- */
 import type { DetectedOwnedStockMap } from '@/engine/industry/ownedStock';
 import type { StockTarget } from './stockLists';
 
@@ -15,7 +6,6 @@ export interface OnHandOrder {
   location_id: number;
   volume_remain: number;
   is_buy_order?: boolean;
-  /** Whose order it is: only needed for the per-Character split. */
   characterId?: number;
 }
 
@@ -27,7 +17,6 @@ export interface MarketCount {
 const isSellAt = (order: OnHandOrder, locationId: number) =>
   order.is_buy_order !== true && order.location_id === locationId;
 
-/** One count per listed type, at one market. */
 export function countAtMarket(
   detected: DetectedOwnedStockMap,
   orders: readonly OnHandOrder[],
@@ -49,7 +38,6 @@ export function countAtMarket(
   return counts;
 }
 
-/** One Character's share of a count. */
 export interface HolderCount {
   characterId: number;
   quantity: number;
@@ -60,7 +48,6 @@ export interface MarketHolders {
   inHangarBy: HolderCount[];
 }
 
-/** The units a holder list adds up to. */
 export const totalOf = (holders: readonly HolderCount[]): number =>
   holders.reduce((sum, holder) => sum + holder.quantity, 0);
 
@@ -68,17 +55,12 @@ function addHolder(shares: Map<number, number>, characterId: number, quantity: n
   shares.set(characterId, (shares.get(characterId) ?? 0) + quantity);
 }
 
-/** Per-Character shares as holders: zero shares dropped, biggest first. */
 export const biggestFirst = (shares: Map<number, number>): HolderCount[] =>
   [...shares]
     .map(([characterId, quantity]) => ({ characterId, quantity }))
     .filter((share) => share.quantity > 0)
     .sort((a, b) => b.quantity - a.quantity || a.characterId - b.characterId);
 
-/**
- * Whose units make up `countAtMarket`'s two counts, per type: attribution, not a
- * new count, so each list sums to its total. Biggest holder first.
- */
 export function holdersAtMarket(
   detected: DetectedOwnedStockMap,
   orders: readonly OnHandOrder[],
@@ -108,7 +90,6 @@ export function holdersAtMarket(
   return result;
 }
 
-/** Characters with a sell order at a market, most orders first: whose market it is. */
 export function sellersAtMarket(orders: readonly OnHandOrder[], locationId: number): number[] {
   const orderCounts = new Map<number, number>();
   for (const order of orders) {
@@ -118,10 +99,6 @@ export function sellersAtMarket(orders: readonly OnHandOrder[], locationId: numb
   return biggestFirst(orderCounts).map((share) => share.characterId);
 }
 
-/**
- * The pilot's sell orders at a market as Stock Targets of what is listed now,
- * in first-listed order: the starting point for a market they already stock.
- */
 export function listedAtMarket(orders: readonly OnHandOrder[], locationId: number): StockTarget[] {
   const totals = new Map<number, number>();
   for (const order of orders) {

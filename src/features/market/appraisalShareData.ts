@@ -1,14 +1,3 @@
-/**
- * A **Shared Appraisal** back into its read-only view: the stored snapshot
- * (`engine/market/appraisalSnapshot.ts`) rebuilt with the same
- * `buildAppraisal` the live tab runs, at the prices it was shared with.
- *
- * No session enters this path, so a signed-out visitor sees exactly what a
- * signed-in one would. That includes the refine-then-sell figures, which the
- * snapshot carries as the sharer's resolved yield rather than their skills
- * (`refine` below); `itemsWithMyRefine` swaps in the visitor's own.
- * `compareHubs` stays excluded: it is a primary-tab comparison.
- */
 import {
   buildAppraisal,
   computeAppraisalRefine,
@@ -27,16 +16,11 @@ import type { ReprocessingType } from '@/sde/types';
 export interface AppraisalShareView {
   hub: TradeHub;
   pricePercent: number;
-  /** Epoch seconds the appraisal was priced at. */
   generatedAt: number;
   appraisal: Appraisal;
-  /** The sharer's facility yield and tax; null on a link that carries no refine figures. */
   refining: { yieldRate: number; taxRate: number } | null;
-  /** Mineral names as shared, for the breakdown's table. */
   mineralNames: ReadonlyMap<number, string>;
-  /** Mineral buy prices as shared (100% of the hub's buy side), kept for recomputing at the visitor's own numbers. */
   mineralPrices: ReadonlyMap<number, number>;
-  /** The same on the sell side; undefined on a link from before the sell side travelled with it. */
   mineralSellPrices?: ReadonlyMap<number, number>;
 }
 
@@ -63,7 +47,6 @@ export function appraisalShareViewFromSnapshot(
       mineralPrices: new Map(
         minerals.flatMap((m): [number, number][] => (m.price === null ? [] : [[m.typeId, m.price]]))
       ),
-      // Absent, not empty, on a link from before the sell side travelled with it.
       mineralSellPrices: minerals.some((m) => m.sellPrice !== undefined)
         ? new Map(
             minerals.flatMap((m): [number, number][] =>
@@ -75,12 +58,6 @@ export function appraisalShareViewFromSnapshot(
   };
 }
 
-/**
- * The shared items refined at the visitor's own Refining Setup and skills
- * instead of the sharer's, still at the shared mineral prices, so the only
- * thing that moves is the numbers that are theirs. An item with no
- * reprocessing data on this side has no refine figure.
- */
 export function itemsWithMyRefine(
   view: Pick<AppraisalShareView, 'appraisal' | 'mineralPrices' | 'mineralSellPrices'>,
   mine: {

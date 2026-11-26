@@ -1,13 +1,5 @@
-/**
- * The Fitting editor's module browser narrows the market catalogue to what
- * fits the open hull (`useHullFit`, from the engine's own fit check) and
- * groups it by market group (`browserTree`); `classifyRuleBreaks` turns
- * what that check reports into "fits this hull" and "can fly".
- */
-
 import type { FittingSlotKind } from './types';
 
-/** A rack plus the drone bay — the same values as `FittingSlotAssignment` in `src/sde/types.ts`. */
 export type CandidateRack = FittingSlotKind | 'drone';
 
 export interface CandidateEntry {
@@ -27,22 +19,12 @@ export interface BrowserGroupNode {
 
 export interface BrowserNode<T extends CandidateEntry> {
   id: number;
-  /** The group's name — or a run of names ("Hull & Armor · Armor Plates") where single-child groups were merged. */
   label: string;
-  /** Items passing `include` anywhere under this node. */
   count: number;
   children: BrowserNode<T>[];
-  /** Items directly in this group. */
   items: T[];
 }
 
-/**
- * The module browser's tree (mockup A, the game's own fitting browser): the
- * market-group hierarchy cut down to the groups holding an item that passes
- * `include` — fits the hull, the chosen slot, the filters. A group left with
- * a single child and no items of its own merges into that child, so no
- * level is a lone click-through. Items whose group isn't known drop.
- */
 export function browserTree<T extends CandidateEntry>(
   entries: readonly T[],
   include: (entry: T) => boolean,
@@ -88,18 +70,6 @@ export function browserTree<T extends CandidateEntry>(
   return roots.map(finish).sort((a, b) => a.label.localeCompare(b.label));
 }
 
-/**
- * Rules (the engine's `Rule.type`) under which an item cannot go on this hull
- * at all, whatever else is fitted: wrong rack, no hardpoint, wrong rig size,
- * a hull-restricted or capital/structure item, a one-per-ship limit, a
- * type that is not a module or drone at all. (Candidates are only ever
- * probed in a rack or the drone bay, so the engine's other `not_a_*` rules —
- * fighter, implant, hull, mode, skill — cannot come up here.)
- * Resource overflow is not a hull rule (the game lets you fit an item that
- * overflows CPU or powergrid — it just can't online): it is its own answer,
- * `fitsResources`, since an item that overflows the bare hull alone can never
- * be used on it.
- */
 const HULL_RULES: ReadonlySet<string> = new Set([
   'wrong_slot',
   'wrong_slot_index',
@@ -116,21 +86,15 @@ const HULL_RULES: ReadonlySet<string> = new Set([
   'not_a_drone',
 ]);
 
-/** The resources a lone module can overflow the bare hull on, as `resource:<kind>`. */
 const FITTING_RESOURCE_RULES: ReadonlySet<string> = new Set([
   'resource:cpu',
   'resource:powergrid',
   'resource:calibration',
 ]);
 
-/**
- * `ruleTypes` are the engine's `Rule.type`s, a resource rule spelled
- * `resource:<kind>` (`resource:powergrid`) so the kinds can be told apart.
- */
 export function classifyRuleBreaks(ruleTypes: readonly string[]): {
   fitsHull: boolean;
   canFly: boolean;
-  /** Fits the bare hull's CPU, powergrid and calibration, with the pilot's skills. */
   fitsResources: boolean;
 } {
   return {

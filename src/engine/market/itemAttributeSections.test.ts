@@ -48,7 +48,6 @@ const DICTIONARY: AttributeDictionary = {
 const attrs = (pairs: Record<number, number>): RawDogmaAttribute[] =>
   Object.entries(pairs).map(([id, value]) => ({ attribute_id: Number(id), value }));
 
-/** Section headings in order, the resist grid as "RESISTS". */
 const order = (sections: AttributeSection[]) =>
   sections.map((s) => (s.kind === 'resists' ? 'RESISTS' : s.group.category));
 
@@ -168,7 +167,6 @@ describe('itemAttributeSections', () => {
     for (const id of [9, 263, 265, 267, 268, 269, 270, 271, 272, 273, 274, 109, 110, 111, 113]) {
       expect(rowIds).not.toContain(id);
     }
-    // What the grid doesn't carry stays in its group.
     expect(rowIds).toContain(479);
     expect(rowIds).toContain(4);
   });
@@ -180,7 +178,6 @@ describe('itemAttributeSections', () => {
   });
 
   it('keeps a module’s own structure HP out of the grid: it is not a layer it gives', () => {
-    // Damage Control II: resonance multipliers on every layer, 40 HP of its own.
     const sections = sectionsFor('module', {
       9: 40,
       4: 5000,
@@ -209,7 +206,6 @@ describe('itemAttributeSections', () => {
   });
 
   it('leads a module with fitting, then its main effect (its largest own group), then capacitor', () => {
-    // Gas Cloud Scoop II.
     const sections = sectionsFor('module', {
       9: 40,
       4: 0,
@@ -234,7 +230,6 @@ describe('itemAttributeSections', () => {
   });
 
   it('leads anything else with its largest groups, defences after them, Miscellaneous last', () => {
-    // A drone: damage, a little targeting and speed, layers of its own.
     const sections = sectionsFor('other', {
       54: 2100,
       114: 0,
@@ -250,7 +245,6 @@ describe('itemAttributeSections', () => {
   });
 
   it('leaves out omitted ids, from the grid as well as the rows', () => {
-    // A mutated module whose rolls already show the armor resists.
     const sections = sectionsFor('hull', ZEALOT, [267, 50]);
     const grid = sections.find((s) => s.kind === 'resists');
     expect(grid?.kind === 'resists' && grid.layers.map((l) => l.layer)).toEqual(['shield', 'hull']);
@@ -258,7 +252,6 @@ describe('itemAttributeSections', () => {
       s.kind === 'group' ? s.group.attributes.map((a) => a.attributeId) : []
     );
     expect(rowIds).not.toContain(267);
-    // The rest of the armor layer falls back to rows.
     expect(rowIds).toEqual(expect.arrayContaining([265, 268, 269, 270]));
   });
 });

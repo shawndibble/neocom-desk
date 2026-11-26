@@ -1,11 +1,3 @@
-// The slice of the Corp Tax Book engine (src/engine/corpTaxBook, issue #4059)
-// that the callables enforce. `functions/` is a separate NodeNext package that
-// cannot import `src/`, so — as marketOpenPrices.ts does for the trade hubs —
-// this is a small mirror kept honest by a parity test in the root suite
-// (src/engine/corpTaxBook/functionsMirror.test.ts), which runs both copies on
-// the same inputs. Change the engine first, then this file. Dependency-free on
-// purpose so that test can import it from the root package (`guards.ts` imports nothing).
-
 import { isPlainRecord } from './guards.js';
 import { DAY_MS, HOUR_MS } from './timeConstants.js';
 import { PAYOUT_LINK_WINDOW_DAYS } from './corpTaxBookTransferMatch.js';
@@ -18,16 +10,12 @@ export interface ObservedRow {
   date: string;
   quantity: number;
   cachedAt: string;
-  /** Where the refinery is and which moon it drilled, when the syncing officer's client knew (#4065). */
   solarSystemId?: number;
   moonId?: number;
-  /** The Extraction whose window covers this row's day (server-stamped). */
   extractionId?: string;
-  /** The feeder corporation that recorded the row; absent is the book's own. */
   sourceCorporationId?: number;
 }
 
-/** The upsert key: miner + ore + day + structure (engine `observedRowKey`). */
 export function observedRowKey(row: ObservedRow): string {
   return `${row.characterId}:${row.typeId}:${row.date}:${row.structureId}`;
 }
@@ -37,7 +25,6 @@ export interface ObservedMerge {
   changed: ObservedRow[];
 }
 
-/** Engine `mergeObservedRows`: quantity never goes down; an older ESI cache is ignored. */
 export function mergeObservedRows(
   existing: readonly ObservedRow[],
   fresh: readonly ObservedRow[]
@@ -62,7 +49,6 @@ export function shiftDate(date: string, days: number): string {
   return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10);
 }
 
-/** What tells one recorded corporation from a later one (engine `CorpRecord`). */
 export interface CorpRecord {
   characterId: number;
   date: string;
@@ -76,7 +62,6 @@ const readMs = (cachedAt: string | undefined) => {
   return Number.isNaN(ms) ? Number.NEGATIVE_INFINITY : ms;
 };
 
-/** Engine `recordedLater`: newer day, fresher read, higher refinery id, higher corporation id. */
 function recordedLater(a: CorpRecord, b: CorpRecord): boolean {
   if (a.date !== b.date) return a.date > b.date;
   const read = readMs(a.cachedAt) - readMs(b.cachedAt);
@@ -86,7 +71,6 @@ function recordedLater(a: CorpRecord, b: CorpRecord): boolean {
   return a.recordedCorporationId > b.recordedCorporationId;
 }
 
-/** Engine `latestRecordedCorp`: each character's latest recorded corporation. */
 export function latestRecordedCorp(
   rows: readonly CorpRecord[]
 ): Map<number, { date: string; corp: number }> {
@@ -100,13 +84,8 @@ export function latestRecordedCorp(
   );
 }
 
-/** Engine `MAX_RATE_BACKDATE_DAYS`. */
 export const MAX_RATE_BACKDATE_DAYS = 30;
 
-/**
- * Engine `rateStartRefusal`: never more than 30 days back, never on or before the last day a Late
- * notice listed (`lastNoticedDay`). The start-date rate at book creation skips it.
- */
 export function rateStartRefusal(
   effectiveFrom: string,
   today: string,
@@ -117,9 +96,6 @@ export function rateStartRefusal(
   return null;
 }
 
-// Book defaults (hand-off from #4059: they live in the backend, not the engine).
-// Grace, minimum Statement and Overdue days equal the engine's
-// DEFAULT_GRACE_HOURS, DEFAULT_MINIMUM_STATEMENT and DEFAULT_OVERDUE_DAYS.
 export const BOOK_DEFAULTS = {
   hubId: 'jita',
   oreForm: 'compressed',
@@ -130,20 +106,15 @@ export const BOOK_DEFAULTS = {
   cadence: { kind: 'monthly' },
 } as const;
 
-/** The longest wallet division name a book stores (#6161); mirrors `src/engine/corpTaxBook/divisionNames.ts`. */
 export const DIVISION_NAME_MAX = 50;
 
-/** Whether a payment is dated before the book's first day: counted, never credited. */
 export function isBeforeBook(at: string, startDate: string): boolean {
   return at.slice(0, 10) < startDate;
 }
 
-// --- Pull windows and dismissals ---------------------------------------------
-
 export const DEFAULT_EXPIRY_HOURS = 48;
 export const MAX_EXPIRY_HOURS = 96;
 
-/** A stored Extraction, as `syncBook` writes it. */
 export interface MirrorExtraction {
   structureId: number;
   moonId: number;
@@ -154,16 +125,10 @@ export interface MirrorExtraction {
   cancelledAt?: string;
 }
 
-/** Engine `extractionId`. */
 export function extractionIdOf(x: Pick<MirrorExtraction, 'structureId' | 'extractionStartTime'>) {
   return `${x.structureId}_${Date.parse(x.extractionStartTime)}`;
 }
 
-/**
- * Engine `moonOnDay`/`placeOfFactory`: the moon and Extraction a refinery was
- * working on a date, from the day the chunk fractured to the day its belt
- * expired. `expiryHours` is the book's per-structure override.
- */
 export function moonOnDay(
   extractions: readonly MirrorExtraction[],
   expiryHours: Readonly<Record<string, number>>,
@@ -191,32 +156,25 @@ export function moonOnDay(
   return {};
 }
 
-// --- Guest close-account (issue #4184) ---------------------------------------
-
-/** A guest's credit is forfeited without consent only after this many days with no reply. */
 export const FORFEIT_NO_REPLY_DAYS = 90;
 
 export type ForfeitBasis =
   { kind: 'consent'; note: string } | { kind: 'no-reply'; askedAt: string };
 
-/** Engine `forfeitAllowed`: consent is recorded in words, or 90 days passed since the guest was asked. */
 export function forfeitAllowed(basis: ForfeitBasis, today: string): boolean {
   if (basis.kind === 'consent') return basis.note.trim().length > 0;
   return basis.askedAt <= shiftDate(today, -FORFEIT_NO_REPLY_DAYS);
 }
 
-/** Engine `CoveragePeriod`: a feeder's covered UTC days, both ends inclusive. */
 export interface CoveragePeriod {
   from: string;
   to?: string;
 }
 
-/** Engine `isDayCovered`. */
 export function isDayCovered(periods: readonly CoveragePeriod[], day: string): boolean {
   return periods.some((p) => day >= p.from && (p.to === undefined || day <= p.to));
 }
 
-/** Engine `closePeriod`: ends the open period the day before `effectiveDay`. */
 export function closePeriod(
   periods: readonly CoveragePeriod[],
   effectiveDay: string
@@ -228,7 +186,6 @@ export function closePeriod(
   });
 }
 
-/** Engine `reopenPeriod`: a rejoin. Throws if a period is open or would overlap. */
 export function reopenPeriod(periods: readonly CoveragePeriod[], day: string): CoveragePeriod[] {
   for (const p of periods) {
     if (p.to === undefined) throw new Error('a coverage period is still open');
@@ -237,10 +194,8 @@ export function reopenPeriod(periods: readonly CoveragePeriod[], day: string): C
   return [...periods, { from: day }];
 }
 
-/** Engine `MAX_COVERAGE_BACKDATE_DAYS`. */
 export const MAX_COVERAGE_BACKDATE_DAYS = 30;
 
-/** Engine `clampCoverageFrom`: a join's first covered day, within 30 days back and never before a rejoin's gap. */
 export function clampCoverageFrom(
   periods: readonly CoveragePeriod[],
   requested: string | undefined,
@@ -258,7 +213,6 @@ export function clampCoverageFrom(
   return day;
 }
 
-/** Engine `reconnectCoverageFrom`: the day after the last covered day, 30 days back at most, never before joining. */
 export function reconnectCoverageFrom(
   periods: readonly CoveragePeriod[],
   today: string,
@@ -270,22 +224,16 @@ export function reconnectCoverageFrom(
   return clampCoverageFrom(periods, asked, today);
 }
 
-// --- Feeder ledger health (#4509) --------------------------------------------
-
-/** Engine `FEEDER_DISCONNECT_DAYS`. */
 export const FEEDER_DISCONNECT_DAYS = 30;
 
-/** Engine `FeederHealth`. */
 export interface FeederHealth {
   status: 'active' | 'disconnected';
   lastReadWellAt?: string;
   staleSince?: string;
 }
 
-/** Engine `FeederReadOutcome`. */
 export type FeederReadOutcome = 'ok' | 'stale' | 'none';
 
-/** Engine `advanceFeederHealth`. */
 export function advanceFeederHealth(
   prev: FeederHealth,
   outcome: FeederReadOutcome,
@@ -304,7 +252,6 @@ export function advanceFeederHealth(
   return next;
 }
 
-/** Engine `disconnectedCoverage` (with `lastBillableDate` inlined for a read that is its own clock). */
 export function disconnectedCoverage(
   periods: readonly CoveragePeriod[],
   health: Pick<FeederHealth, 'lastReadWellAt'>,
@@ -319,19 +266,14 @@ export function disconnectedCoverage(
   return closePeriod(periods, shiftDate(lastFull, 1));
 }
 
-// --- Feeder accrual and running balance (#4510) -------------------------------
-
-/** Engine `OwnerRateEntry`. */
 export interface OwnerRateEntry {
   kind: 'requested' | 'agreed';
   pct: number;
   effectiveFrom: string;
   recordedAt: string;
-  /** Engine `noBackdate`: an as-of entry never reaches back (#6347). */
   noBackdate?: true;
 }
 
-/** The entry of one kind in effect on `date`: latest effective-from on or before it, then latest recorded. */
 export function latestOwnerRate(
   history: readonly OwnerRateEntry[],
   kind: OwnerRateEntry['kind'],
@@ -364,10 +306,6 @@ function firstAgreedOwnerRate(history: readonly OwnerRateEntry[]): OwnerRateEntr
   return first;
 }
 
-/**
- * Engine `effectiveOwnerRate`, pct only: the agreed rate on `date`, else the first agreed rate
- * (backdated over the pending days). A requested rate never takes effect (#6209).
- */
 export function effectiveOwnerRatePct(
   history: readonly OwnerRateEntry[],
   date: string
@@ -376,19 +314,15 @@ export function effectiveOwnerRatePct(
   return (latestOwnerRate(history, 'agreed', date) ?? (first?.noBackdate ? undefined : first))?.pct;
 }
 
-/** Engine `FEEDER_VIEW_RULES`: the accrual rules a moon owner view summary is built under (#6209). */
 export const FEEDER_VIEW_RULES = 2;
 
-/** Engine `FeederMode`. */
 export type FeederMode = 'normal' | 'settled-otherwise';
 
-/** Engine `FeederModeChange`. */
 export interface FeederModeChange {
   from: string;
   mode: FeederMode;
 }
 
-/** Engine `FeederPayout`, the fields the balance reads. */
 export interface FeederPayoutAmount {
   amount: number;
   notAPayout: boolean;
@@ -400,7 +334,6 @@ function isSettledOn(changes: readonly FeederModeChange[], day: string): boolean
   return latest?.mode === 'settled-otherwise';
 }
 
-/** Engine `accrueValuedDays`. */
 export function accrueValuedDays(
   days: readonly { date: string; value: number }[],
   rules: {
@@ -429,7 +362,6 @@ export function accrueValuedDays(
   return { byDay, accrued: byDay.reduce((sum, d) => sum + d.due, 0), pending };
 }
 
-/** Engine `feederBalance`. */
 export function feederBalance(
   accrued: number,
   payouts: readonly FeederPayoutAmount[],
@@ -441,39 +373,30 @@ export function feederBalance(
   const balance = accrued - paid;
   const isk = Math.floor(Math.abs(balance));
   const kind = kindOf(isk, balance);
-  // Settled otherwise keeps what accrued before it owed (#6209); with nothing owed, no balance.
   if (settledOtherwise && kind !== 'owed')
     return { balance, display: { kind: 'none' as const, isk: 0 } };
   return { balance, display: { kind, isk } };
 }
 
-/** Engine `onPayList`. */
 export function onPayList(balance: { display: { kind: string } }): boolean {
   return balance.display.kind === 'owed';
 }
 
-/** The `payouts` subcollection document, Engine `FeederPayout`. Written only by callables. */
 export interface FeederPayout extends FeederPayoutAmount {
   date: string;
   method: 'donation' | 'other';
   status: 'recorded' | 'waiting-for-journal' | 'matched';
   journalRef?: number;
-  /** A donation without the payout reference, waiting for an officer to confirm it (#6209). */
   unconfirmed?: boolean;
-  /** When the moon owner flagged the payment as disputed (ms). */
   disputedAt?: number;
 }
 
-// --- Feeder view (#4512) -------------------------------------------------------
-
-/** Engine `dayClosesAt`: the instant `date` stops taking late ore (end of the UTC day plus the grace). */
 export function dayClosesAt(date: string, graceHours: number = BOOK_DEFAULTS.graceHours): string {
   return new Date(
     Date.parse(`${shiftDate(date, 1)}T00:00:00Z`) + graceHours * HOUR_MS
   ).toISOString();
 }
 
-/** Engine `feederBillableRule`: a day is Billable once a good read (ms) landed after it closed. */
 export function feederBillableRule(
   lastReadWellAt: number | undefined,
   graceHours: number
@@ -482,7 +405,6 @@ export function feederBillableRule(
     lastReadWellAt !== undefined && lastReadWellAt >= Date.parse(dayClosesAt(day, graceHours));
 }
 
-/** Engine `FeederRulesRecord`: what a feeder record holds of its rates and mode. */
 export interface FeederRulesRecord {
   joinedAt: number;
   mode?: FeederMode;
@@ -492,7 +414,6 @@ export interface FeederRulesRecord {
   modeChanges?: FeederModeChange[];
 }
 
-/** Engine `deriveOwnerRateHistory`: the stored history, or entries from the two rate fields dated the join day. */
 export function deriveOwnerRateHistory(record: FeederRulesRecord): OwnerRateEntry[] {
   if (record.ownerRateHistory) return record.ownerRateHistory;
   const effectiveFrom = new Date(record.joinedAt).toISOString().slice(0, 10);
@@ -505,7 +426,6 @@ export function deriveOwnerRateHistory(record: FeederRulesRecord): OwnerRateEntr
   return out;
 }
 
-/** Engine `deriveModeChanges`: the stored switches, or settled-otherwise from the join day. */
 export function deriveModeChanges(record: FeederRulesRecord): FeederModeChange[] {
   if (record.modeChanges) return record.modeChanges;
   return record.mode === 'settled-otherwise'
@@ -513,7 +433,6 @@ export function deriveModeChanges(record: FeederRulesRecord): FeederModeChange[]
     : [];
 }
 
-/** Engine `moonOwnerUnitPrice` (#4621): saved open buy, else open sell, else the billed price (#6209), else 0. */
 export function moonOwnerUnitPrice(
   side: { buy?: number | null; sell?: number | null } | undefined,
   billed?: number
@@ -524,7 +443,6 @@ export function moonOwnerUnitPrice(
   return 0;
 }
 
-/** Engine `oreFormTypeId`: the type a mined ore is valued as. */
 export function oreFormTypeId(
   rawTypeId: number,
   compressedByRaw: Readonly<Record<string, number>>,
@@ -533,22 +451,15 @@ export function oreFormTypeId(
   return compressed ? (compressedByRaw[String(rawTypeId)] ?? rawTypeId) : rawTypeId;
 }
 
-// --- Removing a moon owner (#4520); engine removal.ts ---------------------------
-
-/** How long a removal waits once its mail is sent. */
 export const REMOVAL_WAIT_MS = 24 * HOUR_MS;
 
-/** Code-only: the payee-force guard looks back this far from the start of a removal. */
 const PAYEE_LOOKBACK_MS = 48 * HOUR_MS;
 
-/** A started removal. The clock (`effectiveAt`) is set when the mail is sent, never before. */
 export interface Removal {
   startedAt: number;
   startedBy: number;
   startedByName: string;
-  /** When the notice went out (the mail queue's send time, or the officer's confirmation). */
   noticeAt?: number;
-  /** `noticeAt` plus 24 hours; absent until the notice is out. */
   effectiveAt?: number;
 }
 
@@ -559,7 +470,6 @@ export interface RemovalState {
   removal?: Removal;
 }
 
-/** A removal can start on an active moon owner only, and not twice. */
 export function canStartRemoval(state: RemovalState): boolean {
   return state.status === 'active';
 }
@@ -576,7 +486,6 @@ export function startRemoval(
   };
 }
 
-/** The notice went out: the 24 hours run from here. Idempotent: the first notice wins. */
 export function recordRemovalNotice(state: RemovalState, noticeAt: number): RemovalState {
   const { removal } = state;
   if (state.status !== 'pending-removal' || !removal || removal.effectiveAt !== undefined) {
@@ -588,19 +497,16 @@ export function recordRemovalNotice(state: RemovalState, noticeAt: number): Remo
   };
 }
 
-/** Any Collector Accountant or higher (the caller checks the role); back to active. */
 export function cancelRemoval(state: RemovalState): RemovalState {
   if (state.status !== 'pending-removal') throw new Error('no removal is pending');
   return { status: 'active' };
 }
 
-/** The wait is over. A removal whose notice never went out never takes effect on its own. */
 export function isRemovalDue(state: RemovalState, now: number): boolean {
   const at = state.removal?.effectiveAt;
   return state.status === 'pending-removal' && at !== undefined && at <= now;
 }
 
-/** Engine `moonOwnerMailRecipients` (ownerRateMail.ts): CEO and payee, once each. */
 export function moonOwnerMailRecipients(input: {
   ceoId: number | null;
   payee?: { kind: 'corporation' | 'character'; id: number };
@@ -610,17 +516,11 @@ export function moonOwnerMailRecipients(input: {
   return [...new Set([input.ceoId, payeeId].filter((id): id is number => typeof id === 'number'))];
 }
 
-/**
- * Whom the one mail goes to: the moon owner's CEO and its payee through the engine's shared
- * `moonOwnerMailRecipients` (#4515) first, since a copy to one of them starts the clock (#4617),
- * then the book's other officers. The officer who started it is not mailed; nobody twice.
- */
 export function removalRecipients(input: {
   officerIds: readonly number[];
   startedBy: number;
   ceoId: number | null;
   payee?: { kind: 'corporation' | 'character'; id: number };
-  /** The payee corporation's CEO, when the payee is a corporation. */
   payeeCeoId?: number | null;
 }): number[] {
   const out = new Set<number>(moonOwnerMailRecipients(input));
@@ -628,12 +528,6 @@ export function removalRecipients(input: {
   return [...out];
 }
 
-/**
- * May the payee end a removal at once? Not when the payee was set or changed
- * within 48 hours before the removal started, or at any time after it started,
- * and never when the accounting side set it (its officer could name their own alt
- * and skip the 24-hour wait). Deliberately silent in every player-facing surface.
- */
 export function payeeMayForce(input: {
   payeeChangedAt: number | undefined;
   removalStartedAt: number;
@@ -645,10 +539,6 @@ export function payeeMayForce(input: {
   return payeeChangedAt < removalStartedAt - PAYEE_LOOKBACK_MS;
 }
 
-/**
- * Who may use the payee's link: the payee when it is a player, the corporation's
- * CEO when it is a corporation.
- */
 export function isPayeeActor(input: {
   payee: { kind: 'corporation' | 'character'; id: number } | undefined;
   characterId: number;
@@ -661,7 +551,6 @@ export function isPayeeActor(input: {
     : input.payeeCorporationCeoId === characterId;
 }
 
-/** A payee set or changed: the new payee and when. Re-saving the same payee changes nothing. */
 export function withPayee<T extends { payee?: { kind: 'corporation' | 'character'; id: number } }>(
   rec: T,
   payee: { kind: 'corporation' | 'character'; id: number },
@@ -676,10 +565,6 @@ export function withPayee<T extends { payee?: { kind: 'corporation' | 'character
   };
 }
 
-// --- Payouts (#4514) -----------------------------------------------------------
-// Engine `payouts.ts`: recording a payout and attaching the journal's outgoing donation to it.
-
-/** A donation the accounting corporation's wallet sent. */
 export interface OutgoingDonation {
   refId: number;
   division: number;
@@ -699,7 +584,6 @@ export interface JournalEntryOut {
   reason?: string;
 }
 
-/** How far a recorded date may sit from the journal's day and still be the same payment (one copy). */
 export { PAYOUT_LINK_WINDOW_DAYS };
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -710,13 +594,11 @@ export const payoutId = (d: Pick<OutgoingDonation, 'division' | 'refId'>) =>
 const dayIndex = (date: string) =>
   Math.floor(Date.parse(`${date.slice(0, 10)}T00:00:00Z`) / DAY_MS);
 
-/** Engine `OUTGOING_REF_TYPES`: a corporation wallet's "Give ISK" is a withdrawal. */
 const OUTGOING_REF_TYPES: ReadonlySet<string> = new Set([
   'player_donation',
   'corporation_account_withdrawal',
 ]);
 
-/** ISK the corporation's wallet donated to someone else (the amount is negative on the journal). */
 export function outgoingDonationsFromJournal(
   entries: readonly JournalEntryOut[],
   division: number,
@@ -727,7 +609,6 @@ export function outgoingDonationsFromJournal(
     if (!OUTGOING_REF_TYPES.has(e.ref_type)) continue;
     if (!(typeof e.amount === 'number' && e.amount < 0)) continue;
     if (e.first_party_id !== corporationId || e.second_party_id === undefined) continue;
-    // A move between the corporation's own divisions pays nobody.
     if (e.second_party_id === corporationId) continue;
     if (!Number.isSafeInteger(e.id) || Number.isNaN(Date.parse(e.date))) continue;
     out.push({
@@ -742,28 +623,20 @@ export function outgoingDonationsFromJournal(
   return out;
 }
 
-/** `confirmedAt`: an officer's own record was folded into this journal row (#4617). */
 type StoredPayout = FeederPayout & { id: string; confirmedAt?: number };
 
 export interface PayoutReconciliation {
-  /** Journal entries that are the payment an officer already recorded. */
   attach: { id: string; journalRef: number }[];
-  /** Donations nobody recorded: each becomes a payout. */
   create: { id: string; payout: FeederPayout }[];
 }
 
 export type Payee = { kind: 'corporation' | 'character'; id: number };
 
-/** One payee and when it took over (ms). `from: 0` is a payee set before history was kept. */
 export interface PayeeChange {
   payee: Payee;
   from: number;
 }
 
-/**
- * Who a donation sent at `at` may go to for this moon owner: the payee in force then, and the
- * moon owner corporation itself. A record with no history falls back to its current payee.
- */
 export function payeeIdsAt(
   owner: { corporationId: number; payee?: Payee; payeeHistory?: readonly PayeeChange[] },
   at: string
@@ -780,7 +653,6 @@ export function payeeIdsAt(
   return ids;
 }
 
-/** The payee history after setting `payee` at `now`; seeds it from a record that had none. */
 export function withPayeeChange(
   rec: { payee?: Payee; payeeChangedAt?: number; payeeHistory?: readonly PayeeChange[] },
   payee: Payee,
@@ -796,33 +668,21 @@ export function withPayeeChange(
   return [...history, { payee, from: now }];
 }
 
-/** One moon owner's side of the book-wide reconcile. */
 export interface OwnerOutgoing {
   corporationId: number;
   payee?: Payee;
   payeeHistory?: readonly PayeeChange[];
   payouts: readonly StoredPayout[];
-  /** First covered day: older donations are never auto-recorded. */
   since: string;
 }
 
 const dayGap = (date: string, at: string) => Math.abs(dayIndex(date) - dayIndex(at));
 
-/** Engine `PAYOUT_REASON_PREFIX`: the reason text that marks a donation as a payout (#6209). */
 export const PAYOUT_REASON_PREFIX = 'Moon mining payout';
 
-/** Engine `carriesPayoutReference`. */
 export const carriesPayoutReference = (reason: string | undefined): boolean =>
   reason !== undefined && reason.toLowerCase().includes(PAYOUT_REASON_PREFIX.toLowerCase());
 
-/**
- * Attach each outgoing donation to the recorded payout with the same amount, date (within the
- * window) and recipient. A donation with no such record is recorded as a payout when its reason
- * carries the payout reference, else as not a payout and `unconfirmed` (#6209). One pass over
- * the whole book: a journal entry counts once across every moon owner, and a donation whose
- * recipient is the payee of more than one moon owner is never auto-recorded (an officer adds it
- * by hand). Only a donation payout takes a journal donation.
- */
 export function reconcileBookOutgoing(input: {
   owners: readonly OwnerOutgoing[];
   outgoing: readonly OutgoingDonation[];
@@ -892,11 +752,6 @@ export function reconcileBookOutgoing(input: {
 
 const AUTO_RECORDED = /^j\d+_\d+$/;
 
-/**
- * "I've sent it" or a manual add after the journal already auto-recorded the same payment: the
- * journal row with the same amount within the matching window, which the officer's record then
- * confirms instead of counting it twice. Only a donation, and only a row not yet confirmed.
- */
 export function payoutToMerge(
   stored: readonly StoredPayout[],
   recorded: { amount: number; date: string; method: 'donation' | 'contract' | 'other' }
@@ -919,7 +774,6 @@ export function payoutToMerge(
     )[0]?.id;
 }
 
-/** A payout an officer says they sent ("I've sent it", or added by hand). A contract counts as other. */
 export function buildRecordedPayout(input: {
   amount: number;
   date: string;
@@ -941,7 +795,6 @@ export function buildRecordedPayout(input: {
   };
 }
 
-/** The balance once `sent` ISK has gone out; credit when it is more than is owed. Whole ISK, rounded down. */
 export function balanceAfter(
   balance: number,
   sent: number
@@ -951,10 +804,6 @@ export function balanceAfter(
   return { kind: isk === 0 ? 'even' : left > 0 ? 'owed' : 'credit', isk };
 }
 
-/**
- * The days a payment covers: after the last payment, up to the last accrued
- * day. When nothing is newer than the last payment, every accrued day.
- */
 export function payoutPeriod(
   days: readonly { date: string }[],
   payouts: readonly Pick<FeederPayout, 'date' | 'notAPayout'>[]
@@ -971,27 +820,21 @@ export function payoutPeriod(
   return { from: (after[0] ?? dates[0]) as string, to };
 }
 
-/** The reason to paste into the in-game transfer. Never the miner rate or margin. */
 export function payoutReason(prefix: string, period: { from: string; to: string } | undefined) {
   return period ? `${prefix}, ${period.from} to ${period.to}` : prefix;
 }
-
-// --- Disputes that hold their day (resolving in the app) ------------------------
-// Mirror of src/engine/corpTaxBook/disputes.ts `disputeHold` and `heldByStatement`.
 
 export const DISPUTE_HOLD_DAYS = 14;
 
 export interface HoldingDispute {
   lines: readonly { recordKey: string; typeId: number; quantity: number }[];
   at: string;
-  /** A dispute filed again after a kept bill keeps the first one's hold window. */
   holdFrom?: string;
   resolution?: unknown;
   kind?: string;
   claimedPct?: number;
 }
 
-/** Mirror of `disputeHold`: unanswered, and its hold (from `holdFrom`, else `at`) under 14 days old. */
 export function disputeHolds(
   dispute: Pick<HoldingDispute, 'at' | 'resolution' | 'holdFrom'>,
   now: string
@@ -1000,12 +843,6 @@ export function disputeHolds(
   return Date.parse(now) < Date.parse(dispute.holdFrom ?? dispute.at) + DISPUTE_HOLD_DAYS * DAY_MS;
 }
 
-/**
- * Mirror of the client's `readDisputes` as far as holding goes: the same docs dropped (a missing
- * or malformed id, Miner, day, author, instant or line), the same malformed `resolution` read as
- * none (the dispute is still open). The server reads disputes raw otherwise and must never
- * throw on, or read differently from, a malformed one.
- */
 export function readHoldingDisputes(raw: readonly unknown[]): (HoldingDispute & {
   minerId: string;
 })[] {
@@ -1056,9 +893,6 @@ export function readHoldingDisputes(raw: readonly unknown[]): (HoldingDispute & 
   return out;
 }
 
-// --- Moon ore variants (engine `moonOreVariants.ts`) ------------------------
-
-/** Engine `MOON_ORE_VARIANTS`: base moon ore → its +15% and +100% variants. */
 export const MOON_ORE_VARIANTS: ReadonlyMap<number, readonly [number, number]> = new Map([
   [45490, [46280, 46281]],
   [45491, [46282, 46283]],
@@ -1086,16 +920,13 @@ const VARIANT_BASE = new Map(
   [...MOON_ORE_VARIANTS].flatMap(([base, variants]) => variants.map((v) => [v, base] as const))
 );
 
-/** Engine `moonOreBaseOf`. */
 export const moonOreBaseOf = (typeId: number): number => VARIANT_BASE.get(typeId) ?? typeId;
 
-// A private shape, not `corpTaxBookMoonDocs.ts`'s `OreQty`: that module imports this one.
 interface OreQty {
   typeId: number;
   quantity: number;
 }
 
-/** Engine `sumByType`. */
 function sumByType(lines: readonly OreQty[]): Map<number, number> {
   const sums = new Map<number, number>();
   for (const l of lines) sums.set(l.typeId, (sums.get(l.typeId) ?? 0) + l.quantity);
@@ -1105,7 +936,6 @@ function sumByType(lines: readonly OreQty[]): Map<number, number> {
 const familyOf = (base: number, lines: readonly OreQty[]): Map<number, number> =>
   sumByType(lines.filter((l) => l.quantity > 0 && moonOreBaseOf(l.typeId) === base));
 
-/** Engine `shareOut`. */
 function shareOut(total: number, weights: ReadonlyMap<number, number>): OreQty[] {
   const sum = [...weights.values()].reduce((s, w) => s + w, 0);
   const parts = [...weights]
@@ -1116,7 +946,6 @@ function shareOut(total: number, weights: ReadonlyMap<number, number>): OreQty[]
   return parts.map(({ typeId, quantity }) => ({ typeId, quantity }));
 }
 
-/** Engine `splitChunkVariants`. */
 export function splitChunkVariants(
   chunk: readonly OreQty[],
   mined: readonly OreQty[],
@@ -1150,7 +979,6 @@ export function splitChunkVariants(
   return out;
 }
 
-/** Engine `chunkMinedPct`. */
 export function chunkMinedPct(chunk: readonly OreQty[], mined: readonly OreQty[]): number | null {
   const got = sumByType(mined);
   const lines = splitChunkVariants(chunk, mined);

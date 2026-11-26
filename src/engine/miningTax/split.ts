@@ -1,38 +1,14 @@
 import type { OreLine, QuantityDiff } from './types';
 
 export interface SplitPlan {
-  /** What the original keeps, per type — lines that would hit zero are dropped. */
   kept: OreLine[];
-  /** What moves to the new Assignment — zero-quantity moves are dropped. */
   moved: OreLine[];
 }
 
-/**
- * The most ore a split may claim past what ESI holds of one type: as much again (a keep of at
- * most double). ESI trails the client by up to an hour, so a real claim is a session's last
- * stretch, not a second day — a bigger figure almost always counts ore mined after 00:00 UTC,
- * which ESI files on the next day's entry and would bill twice. See decision 20261115-205445.
- */
 export function maxUnreportedClaim(held: number): number {
   return held;
 }
 
-/**
- * The kept/moved halves of a quantity split (issue #523) — one shape shared
- * by the Split dialog's live preview and `splitAssignment`'s commit, so the
- * figures a pilot sees are exactly what gets stored. Throws on a move the
- * original cannot cover; clamping silently would let a typo move the wrong
- * amount of a real obligation.
- *
- * `unreported` is ore the pilot knows the original's Payee is owed but ESI
- * has not reported yet (issue #6180: the client's figure runs ahead of the
- * ledger). It is added to the kept side, so that side claims more than the
- * entry holds; `computeOwnership` then routes later ore to the kept side's
- * claim first, and only the excess to the growth collector. A type can take
- * a move or an unreported claim, never both — keeping more than held and
- * moving some of it away contradict each other — and a claim stays within
- * `maxUnreportedClaim`.
- */
 export function planSplit(
   original: readonly OreLine[],
   moves: readonly OreLine[],
@@ -75,11 +51,6 @@ export function planSplit(
   return { kept, moved };
 }
 
-/**
- * The ore a needs-review Assignment grew by — what the pilot usually wants to
- * hand to another Payee — as split moves: per diffed type, `after − before`,
- * capped at what `lines` (the fresh totals the split runs against) holds.
- */
 export function growthMoves(diffs: readonly QuantityDiff[], lines: readonly OreLine[]): OreLine[] {
   const moves: OreLine[] = [];
   for (const diff of diffs) {

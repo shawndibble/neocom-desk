@@ -5,10 +5,6 @@ import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { Modal } from './Modal';
 
-/**
- * A trigger plus a controlled Modal — the shape both real call sites use, and
- * the only way to assert focus returns to the element that opened it.
- */
 function Harness() {
   const [open, setOpen] = useState(false);
   return (
@@ -77,8 +73,6 @@ describe('Modal', () => {
     await user.click(screen.getByRole('button', { name: 'Inside' }));
     expect(screen.getByRole('button', { name: 'Inside' })).toBeInTheDocument();
 
-    // The ::backdrop is not an element of its own — such clicks surface with
-    // the <dialog> itself as the event target.
     await user.click(dialog);
     expect(screen.queryByRole('button', { name: 'Inside' })).not.toBeInTheDocument();
   });
@@ -86,7 +80,6 @@ describe('Modal', () => {
   it('does not close when a press begins inside and its release lands on the backdrop', async () => {
     const { dialog } = await open();
 
-    // Content reflowed away under the pointer: the click targets the dialog.
     fireEvent.pointerDown(screen.getByRole('button', { name: 'Inside' }));
     fireEvent.click(dialog);
     expect(screen.getByRole('button', { name: 'Inside' })).toBeInTheDocument();
@@ -107,8 +100,6 @@ describe('Modal', () => {
   });
 
   it('closes and restores focus when unmounted while open', async () => {
-    // PlanEditor gates ImportClipboardDialog on `{importOpen && …}`, so there
-    // "close" arrives as an unmount rather than an `open` flip.
     function UnmountHarness() {
       const [mounted, setMounted] = useState(false);
       return (
@@ -152,7 +143,6 @@ describe('Modal', () => {
     const dialog = screen.getByRole('dialog', { name: 'Filters' });
     const inside = screen.getByRole('button', { name: 'Inside' });
     const apply = screen.getByRole('button', { name: 'Apply' });
-    // The body is the one scroller: it carries `tabIndex={-1}` for open-time focus.
     const body = inside.closest('[tabindex="-1"]');
     expect(body).not.toBeNull();
     expect(body).not.toContainElement(apply);

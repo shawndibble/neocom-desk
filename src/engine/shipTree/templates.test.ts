@@ -33,7 +33,6 @@ describe('treeFor', () => {
   });
 
   it('re-hangs a class whose parent is missing on its nearest present ancestor', () => {
-    // Sansha has a Carrier but no Dreadnought.
     const tree = byId(treeFor(SANSHA, new Set([8, 16, 26, 33])));
     expect(tree.get(33)).toEqual({ id: 33, parent: 26, lane: 'capital' });
   });
@@ -42,8 +41,6 @@ describe('treeFor', () => {
     const tree = byId(treeFor(CONCORD, new Set([12, 18, 27, 35, 96])));
     expect(tree.get(35)).toEqual({ id: 35, parent: null, lane: 'main' });
     expect(tree.get(12)).toEqual({ id: 12, parent: null, lane: 'main' });
-    // Main-line parents fall through the missing hull sizes to none; the
-    // main line is ordered by the template, not by parent.
     expect(tree.get(18)).toEqual({ id: 18, parent: null, lane: 'main' });
     expect(tree.get(27)).toEqual({ id: 27, parent: null, lane: 'main' });
     expect([...tree.keys()]).toEqual([35, 12, 18, 27, 96]);

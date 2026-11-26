@@ -33,27 +33,17 @@ import {
   type SharedBlueprintColumnId,
 } from './sharedBlueprintColumns';
 
-/**
- * A Shared Blueprint's ⋮ (and right-click) menu: Show info, a Build Plan
- * seeded with this copy's ME / TE / runs, BPC Sourcing on this blueprint, and
- * the route to its system. Show info and View route repeat the name and the
- * Jumps count on purpose: the pilot asked for both ways in
- * (`docs/context/decisions/20261013-085734-community-shared-blueprint-row-actions-and-jumps.md`).
- */
 function SharedBlueprintMenu({
   row,
   systemId,
   children,
 }: {
   row: SharedBlueprintRow;
-  /** `undefined` while the system list loads, `null` when the system is not in it. */
   systemId: number | null | undefined;
   children: ReactElement;
 }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  // Resolved as the menu first opens and kept for this row, as
-  // `BuildPlanContextMenu` does.
   const { index, onOpenChange } = usePlannableIndexOnOpen();
   return (
     <RowActionsMenu
@@ -95,10 +85,6 @@ function SharedBlueprintMenu({
   );
 }
 
-/**
- * The table's column picker, for the Library's search row. Reads the same
- * store as `SharedBlueprintTable`; the menu only needs each column's header.
- */
 export function SharedBlueprintColumnPicker() {
   const { t } = useTranslation();
   const { visible, toggle, reset } = useColumnVisibility(
@@ -125,19 +111,6 @@ export function SharedBlueprintColumnPicker() {
   );
 }
 
-/**
- * The Community Library's "Shared in the Community" view: each shared
- * blueprint with who shares it, where it is (station or structure; its
- * system only when the name does not start with it), how many jumps that is
- * from the Character's Current System, ME / TE and runs (BPO, or the runs a
- * BPC has left). A stale Member's rows are greyed, never hidden. The name
- * opens Show info and the Jumps count Route Safety; the ⋮ holds those two,
- * a Build Plan and BPC Sourcing.
- *
- * `systemIds` finds a row's system id by its name (lowercase); `null` while
- * the system list is loading. A row whose system is not in it (or an empty
- * lookup, when the list could not be read) shows the Jumps placeholder.
- */
 export function SharedBlueprintTable({
   rows,
   systemIds,
@@ -150,8 +123,6 @@ export function SharedBlueprintTable({
     useVisibleSharedBlueprintColumns,
     SHARED_BLUEPRINT_COLUMN_IDS
   );
-  // Measured as BPC Sourcing measures its offers: from the Current System,
-  // over the pilot's own jump basis (Travel Settings, Route Safety's picks).
   const currentSystem = useCurrentSystem();
   const jumpFilter = useJumpRangeFilter(currentSystem, 'any');
   const systemIdOf = useCallback(
@@ -190,7 +161,6 @@ export function SharedBlueprintTable({
       id: 'member',
       header: t('communities.library.columns.member'),
       width: '26ch',
-      // The name truncates, the stale badge does not.
       render: (row) => (
         <span className="flex min-w-0 items-center">
           <span className="truncate">{row.memberName}</span>

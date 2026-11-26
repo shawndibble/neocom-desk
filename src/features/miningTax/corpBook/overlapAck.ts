@@ -1,10 +1,5 @@
 import { db } from '@/db';
 
-/**
- * "I paid it another way" on a day the corporation also bills (issue #4517): the
- * miner's own statement, kept on this device so the notice stops asking. The book
- * stays the authority; this changes nothing it bills.
- */
 const KEY = 'corpOverlapAcks';
 
 export const overlapAckKey = (

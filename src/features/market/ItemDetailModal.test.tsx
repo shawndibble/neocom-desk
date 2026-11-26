@@ -33,7 +33,6 @@ import type { RegionOrder } from '@/esi/endpoints';
 
 const OPEN_WINDOW_CHARACTER = 4242;
 
-/** Jita/The Forge, the default Trade Hub the modal falls back to unhydrated. */
 const JITA_REGION_ID = 10000002;
 
 vi.mock('@/sde/loadMarketSde', () => ({
@@ -55,8 +54,6 @@ vi.mock('@/sde/loadSde', () => ({
     abyssalTypeIds: [],
   })),
 }));
-// Default: the baked shard doesn't carry the type, so the ESI handlers below
-// serve it through the cached-ESI fallback.
 vi.mock('@/sde/loadTypeInfo', () => ({ loadTypeInfo: vi.fn(async () => null) }));
 
 const mockedLoadDictionary = vi.mocked(loadAttributeDictionary);
@@ -71,25 +68,16 @@ const TYPE_ID = 587;
 
 afterEach(async () => {
   vi.clearAllMocks();
-  // Group names are cached under the global sentinel and would otherwise
-  // leak a resolved name into the next test's "unresolvable" case.
   await db.esiCache.clear();
   await db.skillPlans.clear();
   await db.dynamicItems.clear();
   resetMutaplasmidLookupForTests();
   resetDynamicItemFailuresForTests();
-  // Order Book has its own 300s TTL cache, keyed by region+type — several
-  // tests reuse TYPE_ID, and a real Date.now would let one test's response
-  // leak into the next's.
   clearOrderBookCache();
   useActiveCharacter.setState({ activeCharacterId: null, hydrated: true });
 });
 
-// Registered after the `afterEach` above on purpose: hooks unwind last-in
-// first-out, so the server's reset runs before that async cleanup rather
-// than after it, and a late request cannot land on the previous test's handlers.
 const server = mswServer(
-  // Default: no orders anywhere. Individual price tests override with `server.use`.
   http.get(`${ESI_BASE_URL}/markets/:regionId/orders`, () => HttpResponse.json([]))
 );
 
@@ -118,7 +106,6 @@ describe('ItemDetailModal', () => {
         <ItemDetailModal typeId={TYPE_ID} itemName="Rifter" onClose={onClose} showOpenInMarket />
       </MemoryRouter>
     );
-    // One header action: Open in EVE. The market entry point is the tab.
     expect(await screen.findByRole('button', { name: 'Open in EVE: Rifter' })).toBeInTheDocument();
     const user = userEvent.setup();
     await user.click(await screen.findByRole('tab', { name: 'Market' }));
@@ -218,7 +205,7 @@ describe('ItemDetailModal', () => {
           dogma_attributes: [
             { attribute_id: 9, value: 1200 },
             { attribute_id: 37, value: 250 },
-            { attribute_id: 99999, value: 42 }, // no dictionary entry — must be skipped
+            { attribute_id: 99999, value: 42 },
           ],
         })
       )
@@ -506,13 +493,9 @@ describe('ItemDetailModal', () => {
       await screen.findByText('Brand Manager Expert System', { selector: 'b' })
     ).toBeInTheDocument();
     expect(screen.queryByText(/<font/)).not.toBeInTheDocument();
-    // The generic "Primary Skill required" row is folded into the dedicated
-    // Required Skills section instead of also rendering here.
     expect(screen.queryByText('Primary Skill required')).not.toBeInTheDocument();
     expect(screen.getByText('Required Skills')).toBeInTheDocument();
     expect(screen.getByText('Caldari Frigate')).toBeInTheDocument();
-    // No active Character in this test, so the section degrades to name +
-    // level only — no status icon, no Add to Skill Plan.
     expect(screen.getByText('Level 3')).toBeInTheDocument();
     expect(screen.queryByText('Add to Skill Plan')).not.toBeInTheDocument();
   });
@@ -568,12 +551,8 @@ describe('ItemDetailModal', () => {
     );
 
     expect(await screen.findByText(/^Caldari Frigate [IV]+$/)).toBeInTheDocument();
-    // Never trained -> the 3-state status icon reads "not trained", not the
-    // no-Character degraded "Level 3" text.
     expect(screen.getByLabelText('Not trained')).toBeInTheDocument();
 
-    // No plan yet -> "Create Skill Plan and add" (FitCheck/Mastery's shared label
-    // contract, issue #1378).
     await user.click(await screen.findByRole('button', { name: 'Create Skill Plan and add' }));
 
     expect(await screen.findByRole('button', { name: 'Added' })).toBeInTheDocument();
@@ -660,16 +639,12 @@ describe('ItemDetailModal', () => {
           published: true,
           volume: 5,
           dogma_attributes: [
-            // Requires Gunnery I — the gate the Sharpshooter bonus checks.
             { attribute_id: 182, value: GUNNERY_TYPE_ID },
             { attribute_id: 277, value: 1 },
             { attribute_id: OPTIMAL_RANGE_ATTR, value: 12000 },
           ],
         })
       ),
-      // No token provider configured (configureEsi runs only from App.tsx's
-      // real boot) -> /skills always degrades to empty here; untrained is
-      // the reachable case in this test environment.
       http.get(`${ESI_BASE_URL}/characters/${CHARACTER_ID}/skills`, () =>
         HttpResponse.json({ skills: [], total_sp: 0, unallocated_sp: 0 })
       )
@@ -726,13 +701,9 @@ describe('ItemDetailModal', () => {
     const skillLine = await screen.findByText('Sharpshooter: +5% per level');
     const popoverContent = skillLine.closest('div') as HTMLElement;
     expect(within(popoverContent).getByText('Not trained')).toBeInTheDocument();
-    // What the next levels would make the figure.
     expect(within(popoverContent).getByText('Level I: 12,600 m')).toBeInTheDocument();
     expect(within(popoverContent).getByText('Level III: 13,800 m')).toBeInTheDocument();
 
-    // Zero plans yet -> "Create Skill Plan and add", matching FitCheckPanel/MasteryPanel's
-    // convention. The item's own Required Skills section also has a button
-    // here (for Gunnery) — scope to this popover's own button.
     await user.click(
       within(popoverContent).getByRole('button', { name: 'Create Skill Plan and add' })
     );
@@ -740,8 +711,6 @@ describe('ItemDetailModal', () => {
     await waitFor(async () => {
       const plans = await db.skillPlans.where('characterId').equals(CHARACTER_ID).toArray();
       expect(plans).toHaveLength(1);
-      // Untrained -> "Add to Plan" trains one level, same convention as
-      // SkillPlanAdd's `Math.min(currentLevel + 1, 5)`.
       expect(plans[0].entries).toEqual([{ skillTypeID: SHARPSHOOTER_TYPE_ID, targetLevel: 1 }]);
     });
   });
@@ -865,8 +834,6 @@ describe('ItemDetailModal planetary production', () => {
   });
 
   it('still renders the item when the planetary payload cannot be read', async () => {
-    // A missing local payload costs one section, never the ESI-backed detail
-    // the modal exists for.
     serveType(REACTIVE_METALS, 'Reactive Metals');
     mockedLoadPi.mockRejectedValue(new Error('offline'));
 
@@ -932,7 +899,6 @@ describe('ItemDetailModal best sell/buy price', () => {
 
     render(<ItemDetailModal typeId={TYPE_ID} itemName="Rifter" onClose={() => {}} />);
 
-    // Shorthand on screen (#947); the exact figure is the accessible name.
     expect(await screen.findByText('450,000 ISK', { selector: '.sr-only' })).toBeInTheDocument();
     expect(screen.getByText('420,000 ISK', { selector: '.sr-only' })).toBeInTheDocument();
   });
@@ -980,13 +946,11 @@ describe('ItemDetailModal best sell/buy price', () => {
 
     const sell = await screen.findByRole('link', { name: /best sell/i });
     const buy = screen.getByRole('link', { name: /best buy/i });
-    // The visible compact figure leads the name, and there is no nested tab stop.
     expect(sell.textContent?.startsWith('450K')).toBe(true);
     expect(sell).toHaveAccessibleName(/^450K Best sell 450,000 ISK — open in Market Browser$/);
     expect(buy).toHaveAccessibleName(/^420K Best buy 420,000 ISK — open in Market Browser$/);
     expect(sell.querySelector('[tabindex]')).toBeNull();
     expect(buy.querySelector('[tabindex]')).toBeNull();
-    // Focusing the link reveals the exact figure in a tooltip.
     sell.focus();
     expect(await screen.findByRole('tooltip')).toHaveTextContent('450,000 ISK');
     expect(sell.getAttribute('href')).toMatch(new RegExp(`^/market/browser\\?.*type=${TYPE_ID}`));
@@ -1014,7 +978,6 @@ describe('ItemDetailModal best sell/buy price', () => {
       http.get(`${ESI_BASE_URL}/markets/${JITA_REGION_ID}/orders`, () =>
         HttpResponse.json([
           order({ order_id: 1, price: 500_000, location_id: 60003760 }),
-          // Cheaper, but in Perimeter — outside the hub station.
           order({ order_id: 2, price: 300_000, location_id: 60000004 }),
         ])
       )
@@ -1024,7 +987,6 @@ describe('ItemDetailModal best sell/buy price', () => {
 
     expect(await screen.findByText('500,000 ISK', { selector: '.sr-only' })).toBeInTheDocument();
     expect(screen.queryByText('300,000 ISK', { selector: '.sr-only' })).not.toBeInTheDocument();
-    // The figures name the market they were read at.
     expect(screen.getByText('At Jita 4-4:')).toBeInTheDocument();
   });
 
@@ -1108,12 +1070,9 @@ describe('ItemDetailModal best sell/buy price', () => {
     render(<ItemDetailModal typeId={TYPE_ID} itemName="Rifter" onClose={() => {}} />);
 
     expect(await screen.findByText('Volume: 27,289 m3')).toBeInTheDocument();
-    // The row shows a placeholder while the book is in flight, then drops out.
     await waitFor(() => expect(screen.queryByText('Best sell:')).not.toBeInTheDocument());
   });
   it('still renders from a stale cached type when ESI is unreachable', async () => {
-    // A row older than the static window: the live call is attempted, fails,
-    // and the cached copy is served rather than the error state.
     await db.esiCache.put({
       characterId: 0,
       key: `universeType:${TYPE_ID}`,
@@ -1247,7 +1206,6 @@ describe('ItemDetailModal — an owned abyssal module', () => {
       9: { name: 'Structure Hitpoints', unit: 'HP', category: 'Structure' },
       37: { name: 'Maximum Velocity', unit: 'm/sec', category: 'Speed and Travel' },
     });
-    // The abyssal type's own shard carries no hit points; the base's does.
     mockedLoadTypeInfo.mockImplementation(async (typeId: number) => ({
       description: '',
       effects: [],
@@ -1288,13 +1246,9 @@ describe('ItemDetailModal — an owned abyssal module', () => {
 
     const rolls = await screen.findByRole('table', { name: "This module's rolls" });
     expect(within(rolls).getByText('1,150')).toBeInTheDocument();
-    // The grouped attributes are the module's own, not its type's empty shard, and
-    // leave out what the rolls already show.
     expect(await screen.findByText('300 m/sec')).toBeInTheDocument();
     expect(screen.queryByText('1,150 HP')).not.toBeInTheDocument();
     expect(screen.queryByText('Best sell:')).not.toBeInTheDocument();
-    // No market order exists for an abyssal type: no book is read, no Market link offered,
-    // and no in-game market window to open (the type has no market group).
     expect(orderReads).toBe(0);
     expect(screen.queryByRole('link', { name: 'View in Market' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Open in EVE/ })).not.toBeInTheDocument();
@@ -1302,7 +1256,6 @@ describe('ItemDetailModal — an owned abyssal module', () => {
 });
 
 describe('ItemDetailModal header actions on a phone', () => {
-  /** jsdom's `matchMedia` never matches; the ⋮ branch needs the narrow query to. */
   const goNarrow = () => stubViewport(NARROW_QUERY);
 
   it('keeps its single action as a plain button, with no ⋮, even away from the Market Browser', async () => {

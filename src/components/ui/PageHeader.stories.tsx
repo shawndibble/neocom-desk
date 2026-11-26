@@ -17,10 +17,8 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** @summary Just the route's `<h1>`. */
 export const TitleOnly: Story = { args: { title: 'Overview' } };
 
-/** @summary Title with a meta note beside it and an action at the right. */
 export const WithMetaAndActions: Story = {
   args: {
     title: 'Assets',
@@ -29,12 +27,6 @@ export const WithMetaAndActions: Story = {
   },
 };
 
-/**
- * A route's `DataAgeBadge` goes in `meta`. It hides below `md`, so the phone
- * story shows the title and actions alone.
- *
- * @summary Title with a `DataAgeBadge` in `meta`, the shape of every ESI-backed route.
- */
 export const WithDataAge: Story = {
   args: {
     title: 'Wallet',
@@ -43,19 +35,11 @@ export const WithDataAge: Story = {
   },
 };
 
-/** @summary The same header at 390 wide: actions keep a 36px touch target. */
 export const Phone: Story = {
   ...WithMetaAndActions,
   globals: { viewport: { value: 'phone390', isRotated: false } },
 };
 
-/**
- * A stand-in for the page's Character picker, at the header tier the `scope`
- * slot gives the real one (36px tall below `md`, 36px from `md`): a glyph
- * and a caret, no words, at every width.
- * `ui` stories don't import `@/features`; the real picker in this slot is
- * `character/CharacterFilterControl`'s InPageHeader stories.
- */
 const scopeStandIn = (
   <button
     type="button"
@@ -67,12 +51,6 @@ const scopeStandIn = (
   </button>
 );
 
-/**
- * The cluster's fixed order: scope → text buttons → icon buttons (Refresh)
- * → ⋮ → bell, every control the same height.
- *
- * @summary `scope` slot (stand-in trigger): first in the cluster, level with the icon buttons, one line.
- */
 export const WithScope: Story = {
   args: {
     title: 'Market orders',
@@ -91,12 +69,6 @@ export const WithScope: Story = {
   },
 };
 
-/**
- * A page decides in JS which actions fit: at phone width the text action
- * moves into the ⋮ and the row stays on one line; the long title truncates.
- *
- * @summary `scope` at 390 wide: picker, Refresh, ⋮ and bell on one line; the title truncates.
- */
 export const WithScopePhone: Story = {
   args: {
     title: 'Market orders and history',

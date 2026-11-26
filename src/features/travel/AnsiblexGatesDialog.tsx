@@ -1,13 +1,3 @@
-/**
- * Route Safety's Ansiblex list (issue #2478): find the gates with each
- * character's structure search, paste a list, see what is known and remove
- * entries. The list is kept on this device only (`ansiblexGates.ts`).
- *
- * Each character's search finds only the gates that character can see, so
- * every character has its own Find, and each gate says who found it.
- * Conditions, never verdicts (decision `20260912-172628`): a gate is named
- * and placed, never judged.
- */
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { beginGrant } from '@/app/grantAction';
@@ -34,10 +24,8 @@ import {
   type FindGatesOutcome,
 } from '@/features/route/ansiblexGates';
 
-/** Which way in the dialog was opened for: the paste box takes focus for `paste`. */
 export type AnsiblexDialogMode = 'search' | 'paste';
 
-/** Names to systems, case-insensitively, off the systems snapshot. */
 function useSystemLookup(
   systems: ReadonlyMap<number, SolarSystemEntry> | null
 ): SystemLookup | null {
@@ -52,7 +40,6 @@ function useSystemLookup(
   }, [systems]);
 }
 
-/** One character's search: not run yet, running, or what it came to. */
 type SearchStatus = 'running' | FindGatesOutcome | undefined;
 
 function CharacterSearchRow({
@@ -63,7 +50,6 @@ function CharacterSearchRow({
 }: {
   character: CharacterRecord;
   status: SearchStatus;
-  /** Why Find is unavailable right now, or null when it can run. */
   disabledReason: string | null;
   onFind: () => void;
 }) {
@@ -170,7 +156,6 @@ export function AnsiblexGatesDialog({
     }
   }
 
-  /** One character after another: their finds merge, each keeping who found it. */
   async function findWithEvery() {
     for (const character of characters) await findWith(character.characterId);
   }

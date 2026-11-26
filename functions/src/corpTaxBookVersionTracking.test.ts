@@ -1,7 +1,3 @@
-// The version marker's write hook (issue #5047), with no backend: each Admin
-// SDK write route is called but nothing reaches the network — a batch's commit
-// is stubbed, and a BulkWriter is never flushed. What matters is the
-// recording, which happens when the write is built.
 import { describe, expect, it, vi } from 'vitest';
 import { Firestore, WriteBatch } from 'firebase-admin/firestore';
 import { bookPathOf } from './corpTaxBookVersionKeys.js';
@@ -13,10 +9,8 @@ import {
 
 installBookWriteTracking();
 const db = new Firestore({ projectId: 'demo-book-version', host: '127.0.0.1:9', ssl: false });
-// What `DocumentReference.set` and friends commit through: never let it leave the process.
 vi.spyOn(WriteBatch.prototype, 'commit').mockResolvedValue([]);
 
-/** Runs `run` in a scope and returns what each book's stamp was asked for. */
 async function touchedBy(run: () => unknown): Promise<Record<string, string[]>> {
   const stamped: Record<string, string[]> = {};
   const stamp: BookStamper = async (id, names) => {
@@ -76,7 +70,6 @@ describe('withBookVersions', () => {
   it('records a BulkWriter write (what recursiveDelete uses)', async () => {
     expect(
       await touchedBy(() => {
-        // Never flushed or closed, so nothing is sent.
         const writer = db.bulkWriter();
         ignore(writer.set(book.collection('writeOffs').doc('w1'), { a: 1 }));
         ignore(writer.delete(book.collection('adjustments').doc('a1')));
@@ -85,8 +78,6 @@ describe('withBookVersions', () => {
   });
 
   it('records a BulkWriter write when it is called, even once buffered past the pending limit', async () => {
-    // Past 500 pending operations a BulkWriter builds the write later, from
-    // another operation's completion, outside this scope's context.
     const writer = db.bulkWriter();
     expect(
       await touchedBy(() => {
@@ -166,7 +157,6 @@ describe('withBookVersions', () => {
       async () => {
         db.batch().set(db.collection('corps').doc('1').collection('miners').doc('m'), {});
         await pause(40);
-        // The first book is stamped while the job moves on to the next one.
         expect(stamps).toEqual([['1', ['miners']]]);
         db.batch().set(db.collection('corps').doc('2').collection('statements').doc('s'), {});
       },

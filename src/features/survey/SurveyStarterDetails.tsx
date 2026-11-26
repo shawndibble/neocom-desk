@@ -1,11 +1,3 @@
-/**
- * The details panel of the public Survey page for the device that started it
- * (`startedHere.ts`): location, moon tax and notes, stored on the Survey as they are
- * set, with or without an account. Anyone else on the page gets the read-only
- * `SurveyInfoReadout`. A change is stored when focus leaves the form or a place or
- * payee is picked, never per keystroke, since every store is a new doc; what was
- * already stored is not stored again.
- */
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { CollapsiblePanel } from '@/components/ui';
@@ -33,7 +25,6 @@ export function SurveyStarterDetails({
   expiresAt: number;
   info: SurveyInfoShare | null;
   tax: SurveyTaxShare | null;
-  /** A store landed: the page re-reads the survey. */
   onStored: () => void;
 }) {
   const { t } = useTranslation();
@@ -42,11 +33,9 @@ export function SurveyStarterDetails({
   const [payeeName, setPayeeName] = useState(tax?.name ?? '');
   const [rateText, setRateText] = useState(tax ? String(tax.pct) : '');
   const [notes, setNotes] = useState(info?.notes ?? '');
-  // What is stored already, so a blur with nothing new (or a retry after a failure) adds no doc.
   const sentInfo = useRef(JSON.stringify([info?.location ?? null, info?.notes ?? '']));
   const sentTax = useRef(JSON.stringify(tax ? [tax.name, tax.pct] : null));
   const characterId = activeId ?? undefined;
-  // Writes go one after another, so the latest draft is always the last one stored.
   const queue = useRef<Promise<unknown>>(Promise.resolve());
   const enqueue = (write: () => Promise<void>) => {
     const next = queue.current.then(write);

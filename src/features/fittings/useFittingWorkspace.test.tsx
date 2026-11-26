@@ -29,7 +29,6 @@ vi.mock('@/sde/loadSde', () => ({
 }));
 vi.mock('@/sync', () => ({ scheduleSync: vi.fn(), markFittingDeleted: vi.fn() }));
 vi.mock('./fittingPrice', () => ({ loadFittingPrice: async () => null }));
-// Stats land once this resolves; a test holds it to act before they do.
 const statsGate = vi.hoisted(() => ({ wait: Promise.resolve() as Promise<void> }));
 vi.mock('./dogmaFittingEngine', () => ({
   readyDogmaEngine: () => null,
@@ -37,7 +36,6 @@ vi.mock('./dogmaFittingEngine', () => ({
   computeFittingStats: async (fitting: Fitting) => {
     await statsGate.wait;
     return {
-      // A light drone draws 5 Mbit/s; the hull has room for four, the pilot controls five.
       droneBandwidthTotal: 20,
       maxActiveDrones: 5,
       droneBandwidthByType: { 2454: 5 },
@@ -124,7 +122,6 @@ describe('useFittingWorkspace editing', () => {
     }
     expect(view.result.current.navigationType).toBe('REPLACE');
 
-    // One Back undoes the whole run, not one count at a time.
     act(() => view.result.current.navigate(-1));
     await waitFor(() =>
       expect(view.result.current.workspace.fitting?.drones).toEqual(RIFTER.drones)
@@ -165,7 +162,6 @@ describe('useFittingWorkspace — the editor has its own path', () => {
       { wrapper }
     );
   }
-  // No drones: a Load's drone launch would rewrite the URL after the open.
   const NAKED: Fitting = { ...RIFTER, drones: [] };
   const inGame: LoadedFitting = {
     kind: 'fitting',
@@ -310,7 +306,6 @@ describe('useFittingWorkspace saving (My Fittings)', () => {
     const copy = rows.find((r) => r.id !== original!.id)!;
     expect(copy.name).toBe('Rifter copy');
     expect(copy.code).not.toBe(kept.code);
-    // Now editing the copy, not the original — on screen too.
     expect(view.result.current.workspace.savedId).toBe(copy.id);
     expect(view.result.current.workspace.fitting?.name).toBe('Rifter copy');
   });
@@ -326,7 +321,6 @@ describe('useFittingWorkspace saving (My Fittings)', () => {
 describe('useFittingWorkspace — drones on Load', () => {
   it('launches a pasted fit’s drones once its stats say how many fit, replacing the Load’s own new entry', async () => {
     const view = await renderAt(RIFTER);
-    // A Fitting to go Back to; the Load then adds an entry after it.
     const encoded = await encodeFittingShare(
       fittingToShareInput(addModule(RIFTER, 'medium', 0, 438))
     );
@@ -340,7 +334,6 @@ describe('useFittingWorkspace — drones on Load', () => {
         ['[Rifter, Drones]', '', 'Hobgoblin I x6'].join('\n')
       )
     );
-    // Bandwidth for four of the six.
     await waitFor(() =>
       expect(droneGroups(view.result.current.workspace.fitting!)).toEqual([
         { typeId: 2454, inSpace: 4, inBay: 2 },
@@ -348,9 +341,6 @@ describe('useFittingWorkspace — drones on Load', () => {
     );
     expect(view.result.current.navigationType).toBe('REPLACE');
 
-    // The launch overwrote the Load's own entry rather than adding another, so
-    // Back leaves the Load altogether — no in-bay copy of it to step through —
-    // and returns to the Fitting that was open before it.
     expect(view.result.current.location.search).not.toBe(loadedOver);
     act(() => view.result.current.navigate(-1));
     await waitFor(() => expect(view.result.current.location.search).toBe(loadedOver));

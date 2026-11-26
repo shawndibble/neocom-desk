@@ -18,7 +18,6 @@ const PULL = {
 };
 const PULL_ID = `1000_${Date.parse(PULL.extractionStartTime)}`;
 
-/** Just enough Firestore: one corp's book doc, `extractions`, `observed` rows and the `meta` marker. */
 function fakeDb(rows: Record<string, Row>, extractions: Row[] = [PULL], bookData: Row = {}) {
   const state = { rows, marked: undefined as Row | undefined, commits: 0, bookData };
   const snap = (id: string) => ({

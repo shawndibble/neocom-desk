@@ -10,25 +10,16 @@ import { removePledge, removeRequest, sweepRequests } from './communityRequestsC
 import { deleteMemberShares, purgeCharacterCommunities } from './communitiesStore.js';
 
 type Doc = Record<string, unknown>;
-/** Path prefix the fake gives a collection-group query. */
 const GROUP = '**/';
 
-/**
- * An in-memory stand-in for the slice of Firestore these functions touch:
- * `communities/{c}` (+ `members/{uid}`), `itemRequests/{r}` and
- * `itemRequests/{r}/pledges/{uid}`, addressed by path. Queries support the
- * single-field `where(<=)`, `where(==)`, `orderBy`, `startAfter` and `limit`.
- */
 function fakeDb(initial: Record<string, Doc>) {
   const docs = new Map<string, Doc>(Object.entries(initial));
   const recursiveDeletes: string[] = [];
   const bulkDeletes: string[] = [];
   const failOn = new Set<string>();
   const hooks: { afterQuery?: () => void } = {};
-  // `missingIndex`: collection-group queries fail as they do before the index is deployed.
   const stats = { queries: 0, listings: 0, missingIndex: false };
 
-  // A snapshot is a copy: it outlives a later delete, as a Firestore one does.
   const snap = (path: string) => {
     const data = docs.get(path);
     return {
@@ -217,7 +208,6 @@ describe('sweepRequests', () => {
 
   it('re-reads a candidate before deleting, so a Request extended meanwhile survives', async () => {
     const f = fakeDb({ [`${C}`]: {}, [`${C}/itemRequests/a`]: request({ expiresAt: 1 }) });
-    // The owner extends between the sweep's query and its delete.
     f.hooks.afterQuery = () =>
       void f.docs.set(`${C}/itemRequests/a`, request({ expiresAt: NOW + REQUEST_LIFETIME_MS }));
     expect((await sweepRequests(f.db, NOW)).deleted).toBe(0);
@@ -362,7 +352,6 @@ describe('leaving and removal delete a Member’s Requests and Pledges', () => {
       ...seeded,
       ['characters/char:2/communities/c1']: { communityId: 'c1' },
     });
-    // removeMemberData runs a transaction; the stand-in has none, so give it a thin one.
     (f.db as unknown as { runTransaction: unknown }).runTransaction = async (
       fn: (tx: unknown) => Promise<void>
     ) =>

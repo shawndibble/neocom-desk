@@ -22,16 +22,6 @@ export const colonyCopy: DomainCopy<ColonyFire, PlanetNames> & {
       hours: Math.round(fire.thresholdMs / HOUR_MS),
     });
   },
-  /**
-   * Hedged, unlike the live path's "has stopped": a pilot who restarted the
-   * programs in game before this fired never had an extraction stop at all.
-   *
-   * The **title** hedges too, which `structureFuelCopy.push` does not. A push
-   * is often read as a single line on a lock screen, so the title is the
-   * whole claim there — "Extraction done" over a colony still running is the
-   * exact sentence this was reported for, and softening only the body leaves
-   * the wrong half showing.
-   */
   push: (fire, character, names) => {
     const planet = names.planet ?? `#${fire.planetId}`;
     if (fire.eventId === 'planetaryExtractionDone') {

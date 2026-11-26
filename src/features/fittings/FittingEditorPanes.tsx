@@ -18,7 +18,6 @@ type RackListProps = ComponentProps<typeof FittingRackList>;
 
 interface FittingEditorPanesProps {
   view: FittingView;
-  /** Present on desktop and tablet: the Ring | List switch then sits in the panel's header. Absent on the phone, whose tab bar switches. */
   onViewChange?: (view: FittingView) => void;
   fitting: RackListProps['fitting'];
   stats: RackListProps['stats'];
@@ -31,20 +30,17 @@ interface FittingEditorPanesProps {
   unusableModuleKeys?: ReadonlySet<string>;
   typeName: RingProps['typeName'];
   onSlotSelect: RingProps['onSlotSelect'];
-  /** Drag-to-fit and drag-to-move are pointer-only: a touch tablet taps a slot and picks instead. */
   dragEnabled: boolean;
   onDropType: NonNullable<RingProps['onDropType']>;
   isPhone: boolean;
   onRackOpen: (rack: FittingSlotKind | 'drone') => void;
   hardpoints: ReturnType<typeof useFittingHardpoints>;
-  /** The page's "+ Add module" button; absent when the browser is docked. */
   addButton: ReactNode;
   dronesShown: boolean;
   fightersShown: boolean;
   onOpenMakeItFit: ComponentProps<typeof MakeItFitContext.Provider>['value'];
 }
 
-/** The editor column: the Ring or the List (per `view`), the drones panel beside the Ring, and the fighters panel. */
 export function FittingEditorPanes({
   view,
   onViewChange,
@@ -70,7 +66,6 @@ export function FittingEditorPanes({
   onOpenMakeItFit,
 }: FittingEditorPanesProps) {
   const { t } = useTranslation();
-  // The switch replaces the panel's visible title, so the heading stays for screen readers.
   const titleSwitch = onViewChange && (
     <span className="flex min-w-0 items-center pl-2">
       <h2 className="sr-only">
@@ -126,7 +121,6 @@ export function FittingEditorPanes({
             ) : undefined
           }
         />
-        {/* The phone overview has its Drones button among the rack buttons instead. */}
         {!isPhone && dronesShown && (
           <Panel title={t('fittings.list.drones')}>
             <DroneSection

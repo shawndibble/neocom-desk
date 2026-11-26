@@ -51,7 +51,6 @@ function displayRow(
   };
 }
 
-/** The accounts the balances read, from the same rows and some links. */
 const accountsOf = (rows: DisplayRow[], payees: PayeeRecord[], paid: [string, number][] = []) =>
   PayeeRunningAccounts.build({
     assignments: rows.flatMap((dr) => allMembers(dr).map((m) => m.assignment)),
@@ -96,7 +95,6 @@ describe('computePayeeBalances', () => {
       displayRow(assignment({ id: 'a4', payeeId: 'p1', taxOwed: 25, date: '2026-09-05' })),
     ];
 
-    // 60 ISK linked to Vega pays its oldest day's first 60.
     const balances = computePayeeBalances(rows, payees, accountsOf(rows, payees, [['p1', 60]]));
 
     expect(balances.map((b) => [b.payee.name, b.owed])).toEqual([
@@ -195,7 +193,6 @@ describe('a personal Payee that is a Corp Tax Book corporation', () => {
       assignment({ id: 'b', date: '2026-09-02', taxOwed: 100 }),
     ];
     const rows = days.map((a) => displayRow(a));
-    // 5,000 linked to the Payee: far more than its days, so it would read as credit.
     const accounts = PayeeRunningAccounts.build({
       assignments: days,
       payees: [own],

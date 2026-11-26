@@ -6,10 +6,6 @@ import type { Translate } from '@/lib/translate';
 import type { PinState } from './stationPins';
 import { nextPinLabelKey, type PlaceMenuAction } from './placeRowMenu';
 
-/**
- * The items of an Assets place row's menu, in the order `placeMenuActions`
- * chose. `placeId` is the station or structure the row is (or sits in).
- */
 export function PlaceRowMenuItems({
   actions,
   placeId,

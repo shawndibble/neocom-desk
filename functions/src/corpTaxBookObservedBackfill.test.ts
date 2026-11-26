@@ -4,7 +4,6 @@ import { backfillObservedUpdatedAt } from './corpTaxBookObservedBackfill.js';
 
 type Row = { updatedAt?: unknown };
 
-/** Just enough Firestore for the pass: one corp's `observed` rows and `meta` marker. */
 function fakeDb(rows: Record<string, Row>, marked = false) {
   const state = { rows, marked, commits: 0 };
   const ref = (id: string) => ({ id });

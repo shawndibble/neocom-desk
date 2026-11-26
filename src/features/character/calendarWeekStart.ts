@@ -1,11 +1,3 @@
-/**
- * Which day the Calendar's Month/Week grid starts on.
- *
- * Default `'monday'`, matching EVE's own in-game calendar. Device-local like
- * `calendarViewPref.ts`'s density: it changes how one grid draws, not data
- * worth syncing across devices, and a pilot's own read of "the start of the
- * week" is a screen preference the same way text size is.
- */
 import { createLocalSetting } from '@/lib/useLocalSetting';
 import type { WeekStart } from '@/lib/calendarGrid';
 

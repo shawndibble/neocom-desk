@@ -9,11 +9,10 @@ const pi = JSON.parse(
   readFileSync(resolve(process.cwd(), 'public/data/pi.json'), 'utf8')
 ) as PiData;
 
-const MICROORGANISMS = 2073; // P0, 0.005 m3
-const WATER = 3645; // P1, 0.19 m3
-const COOLANT = 9832; // P2, 0.75 m3
+const MICROORGANISMS = 2073;
+const WATER = 3645;
+const COOLANT = 9832;
 
-/** A fixed distance table; anything not in it is unknown. */
 function table(entries: Record<string, number>): JumpsFn {
   return (from, to) => entries[`${from}>${to}`] ?? null;
 }
@@ -65,7 +64,6 @@ describe('haulEffortOf', () => {
       pi,
       table({ '1>2': 3, '2>hub': 5 })
     );
-    // 100 × 0.19 × 3 + 10 × 0.75 × 5
     expect(effort.m3JumpsPerHour).toBeCloseTo(57 + 37.5);
     expect(effort.unknownLegs).toBe(0);
   });

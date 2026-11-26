@@ -416,14 +416,10 @@ describe('buildDeviceRegistration', () => {
 
     expect(result.registration).toEqual({ fcmToken: 'fcm-token', characterIds: [2] });
     expect(result.rejected).toEqual([1]);
-    // The rejected character's projection rows must not be written under a
-    // characterId its token did not verify to — same invariant as characterIds.
     expect(result.projections).toEqual([{ characterId: 2, rows: [] }]);
   });
 
   it('drops a character whose verified identity does not match the claimed characterId', async () => {
-    // A caller claiming characterId 1 but presenting a token that verifies as
-    // some other character must not be written under the claimed id.
     verifyMock.mockResolvedValue({
       characterId: 999,
       ownerHash: 'hash',

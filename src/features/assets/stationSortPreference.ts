@@ -1,8 +1,3 @@
-/**
- * Assets page's station-list sort field (issue #88): device-local view
- * preference, same pattern as `routePreference.ts` (issue #87) — never
- * synced (GLOSSARY.md round 7: view preferences aren't Editable Data).
- */
 import { createLocalSetting } from '@/lib/useLocalSetting';
 import type { StationSortField } from '@/engine/assetTree';
 

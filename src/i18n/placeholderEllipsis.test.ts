@@ -1,10 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import en from './locales/en.json';
 
-/** Doubles as an aria-label, so a trailing "…" would leak into the accessible name. */
 const ALLOWED_BARE = ['settings.notifications.searchPlaceholder'];
 
-/** Hold "..." as example fit text, not as a truncation mark. */
 const EXAMPLE_TEXT = ['fittings.load.pastePlaceholder'];
 
 function collectStrings(node: unknown, path: string, out: [string, string][]) {
@@ -19,7 +17,6 @@ function collectStrings(node: unknown, path: string, out: [string, string][]) {
   }
 }
 
-/** Not labels that open a dialog: a field prompt, a truncation mark, an inline example. */
 const NOT_DIALOG_LABELS = [
   'fittings.stats.unknownItemsMore_one',
   'fittings.stats.unknownItemsMore_other',
@@ -51,8 +48,6 @@ describe('en.json ellipsis convention', () => {
   });
 
   it('puts no trailing "…" on a label that opens a dialog (DESIGN.md §6c)', () => {
-    // What stays: placeholders, "Loading…"-style progress (a leading gerund, or a
-    // key that says so), and the few prompts listed above.
     const progressKey = /placeholder|loading|pending|checking|resolving|searching|saving|ing$/i;
     const bad = all
       .filter(([, value]) => value.endsWith('…'))

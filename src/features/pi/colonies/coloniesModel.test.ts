@@ -377,8 +377,6 @@ describe('todayCheck', () => {
   });
 });
 
-// --- Against the real adapter and the shared advice model ---------------------------
-
 const ECU = 2848;
 const LAUNCHPAD = 2256;
 const BASIC = 2469;
@@ -546,7 +544,6 @@ describe('colonyCheckRow against the shared advice model', () => {
     const d = detail(70);
     expect(colonyCheckRow(input(d, null)).load.linkLoadUnknown).toBe(false);
     const result = colonyCheckRow({ ...input(d, null), radiusKm: null });
-    // CPU and power still read, but without the links' draw: understated, so flagged.
     expect(result.load.cpu).toBeGreaterThan(0);
     expect(result.load.linkLoadUnknown).toBe(true);
   });

@@ -1,10 +1,3 @@
-/**
- * The Corp Tax Book this device last opened as an editor, and the corporations
- * already on it as moon owners (issue #6103). Remembered so "Finish setting up"
- * can offer a CEO's corporation for the book after a sign-in without opening the
- * book (a verified, priced Firestore read) or prompting for anything. Device-local
- * and advisory: the server re-checks the editor and the corporation on connect.
- */
 import { isId, isRecord } from '@/engine/guards';
 import { createLocalSetting } from '@/lib/useLocalSetting';
 
@@ -13,7 +6,6 @@ export const EDITED_BOOK_KEY = 'moonsEditedBook';
 export interface EditedBook {
   collectorCorporationId: number;
   editorCharacterId: number;
-  /** Corporations on the book in any live way; never offered again. */
   onBook: number[];
 }
 
@@ -34,7 +26,6 @@ export const useEditedBookStore = createLocalSetting<EditedBook | null>({
   parse: parseEditedBook,
 });
 
-/** Remember the book, writing only when it changed (the Moons page re-renders often). */
 export async function rememberEditedBook(book: EditedBook): Promise<void> {
   const store = useEditedBookStore.getState();
   if (!store.hydrated) await store.hydrate();

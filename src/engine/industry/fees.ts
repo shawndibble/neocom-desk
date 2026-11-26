@@ -1,23 +1,3 @@
-/**
- * Market fees for listing a sell order at an NPC trade hub.
- * Source: EVE University wiki "Trading" (verified 2026-08):
- *   sales tax % = 7.5% * (1 - 11% * Accounting level)      -> 3.375% at V
- *   broker fee % = 3% - 0.3%*BrokerRelations
- *                     - 0.03%*factionStanding - 0.02%*corpStanding
- *   minimum broker fee 100 ISK per order.
- * Relisting (editing an already-listed order's price) charges a different
- * schedule. Source: in-repo `public/data/skills.json`, "Advanced Broker
- * Relations" (typeID 16597):
- *   - the full broker fee rate applies to the INCREASE increment when the
- *     new price is higher than the old one; zero when it is not.
- *   - a Relist Discount (50% + 6%/level Advanced Broker Relations, 80% at V)
- *     is applied to the broker fee rate, and that discounted rate applies to
- *     the full new total. The two amounts add together.
- * A hub's Safety Tax is charged when an order is placed, not when it is
- * relisted (Manifest V, read in game 2026-11-02: 100 -> 5,000 ISK cost exactly
- * 147 + 75), so none of the relist functions take a surcharge.
- */
-
 const SALES_TAX_BASE_PCT = 7.5;
 const ACCOUNTING_REDUCTION_PER_LEVEL = 0.11;
 const BROKER_FEE_BASE_PCT = 3;
@@ -34,11 +14,6 @@ function assertLevel(name: string, level: number): void {
   }
 }
 
-/**
- * Sales (transaction) tax rate, percent. `discountFactor` is a hub's temporary
- * fee discount (`hubFeeDiscountFactor`, 0.5 at Amarr during the Deaconry of
- * Economic Oversight), multiplied onto the rate after skills; 1 is none.
- */
 export function salesTaxPct(accountingLevel: number, discountFactor = 1): number {
   assertLevel('Accounting', accountingLevel);
   return (
@@ -46,13 +21,6 @@ export function salesTaxPct(accountingLevel: number, discountFactor = 1): number
   );
 }
 
-/**
- * NPC-station broker fee rate, percent. Standings are unmodified -10..10.
- * `safetyTaxPct` is a hub's own extra points (Exordium's Safety Tax,
- * `TradeHub.safetyTaxPct`); it is added after the zero floor, because a
- * surcharge is not something skills or standing can reduce. It is a separate
- * line in game, so `brokerFee`'s 100 ISK minimum applies to the rest only.
- */
 export function brokerFeePct(
   brokerRelationsLevel: number,
   factionStanding = 0,
@@ -69,12 +37,10 @@ export function brokerFeePct(
   return Math.max(0, pct) * discountFactor + safetyTaxPct;
 }
 
-/** Sales tax in ISK on a filled order of `value` ISK. */
 export function salesTax(value: number, accountingLevel: number, discountFactor = 1): number {
   return (value * salesTaxPct(accountingLevel, discountFactor)) / 100;
 }
 
-/** Broker fee in ISK for listing an order of `value` ISK (100 ISK minimum). */
 export function brokerFee(
   value: number,
   brokerRelationsLevel: number,
@@ -84,29 +50,17 @@ export function brokerFee(
   discountFactor = 1
 ): number {
   if (value <= 0) return 0;
-  // The discount scales the rate, never the 100 ISK minimum (measured at Amarr).
   const skillFee =
     (value * brokerFeePct(brokerRelationsLevel, factionStanding, corpStanding, 0, discountFactor)) /
     100;
   return Math.max(MIN_BROKER_FEE_ISK, skillFee) + (value * safetyTaxPct) / 100;
 }
 
-/**
- * Relist Discount rate, percent, applied to the broker fee rate when
- * relisting (Advanced Broker Relations): 50% base, +6 points per level,
- * 80% at level V.
- */
 export function relistDiscountPct(advancedBrokerRelationsLevel: number): number {
   assertLevel('Advanced Broker Relations', advancedBrokerRelationsLevel);
   return RELIST_DISCOUNT_BASE_PCT + RELIST_DISCOUNT_PCT_PER_LEVEL * advancedBrokerRelationsLevel;
 }
 
-/**
- * Broker fee rate, percent, after the Relist Discount — what relisting to a
- * LOWER price charges on the full new total (the increase-increment
- * component of the relist fee is zero for a decrease, so this rate alone
- * covers that case).
- */
 export function relistBrokerFeePct(
   brokerRelationsLevel: number,
   advancedBrokerRelationsLevel: number,
@@ -125,13 +79,6 @@ export function relistBrokerFeePct(
   return (brokerPct * (100 - discountPct)) / 100;
 }
 
-/**
- * Broker fee in ISK for relisting (editing an existing order's price) from
- * `oldPrice` to `newPrice` a unit, across `quantity` units. Full broker rate
- * on the increase increment (zero when `newPrice` is not higher), plus the
- * Relist-Discounted rate on the full new total; the two sum, then the 100
- * ISK per-order minimum applies once. See the module doc for the source.
- */
 export function relistFee(
   oldPrice: number,
   newPrice: number,
@@ -184,14 +131,6 @@ function breakEvenPriceAtRate(
   return revenue / quantity;
 }
 
-/**
- * Net sell price per unit at which selling `quantity` units exactly covers
- * `totalCost` (profit = 0), after sales tax and broker fee. Solved directly
- * from the rate functions rather than back-solved from a `BuildResult`'s ISK
- * totals, which divides by revenue and breaks at zero revenue. Re-solves
- * against the 100 ISK broker-fee minimum when the percentage fee would land
- * below it. Returns `null` for a non-positive quantity.
- */
 export function breakEvenPrice(
   totalCost: number,
   quantity: number,
@@ -213,13 +152,6 @@ export function breakEvenPrice(
   return breakEvenPriceAtRate(totalCost, quantity, taxPct, brokerPct, safetyTaxPct);
 }
 
-/**
- * Like `breakEvenPrice`, but for RELISTING (editing an order's price) rather
- * than listing fresh: the broker fee rate is discounted by the Relist
- * Discount instead of charged in full. Assumes the relist is a price
- * DECREASE — the only direction a "floor" (how low can this safely go) is
- * meaningful for, since raising a price only ever improves margin.
- */
 export function relistBreakEvenPrice(
   totalCost: number,
   quantity: number,
@@ -241,12 +173,6 @@ export function relistBreakEvenPrice(
   return breakEvenPriceAtRate(totalCost, quantity, taxPct, brokerPct);
 }
 
-/**
- * `relistBreakEvenPrice` for a broker rate the caller already knows (a player
- * structure: the SCC surcharge plus the owner's percentage) rather than one
- * derived from NPC skills and standings. The Relist Discount still applies to
- * it. Returns `null` for a non-positive quantity.
- */
 export function relistBreakEvenPriceAtBrokerPct(
   totalCost: number,
   quantity: number,

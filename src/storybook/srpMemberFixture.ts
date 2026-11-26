@@ -1,8 +1,3 @@
-/**
- * Sample SRP data for the member page's stories: the corp's rules, the pilot's
- * claims in every state and their lost ships, answered in place of the backend through
- * `setSrpMemberBackendOverride`. Never imported by the app.
- */
 import type { SrpMemberBackend } from '@/features/corp/srp/srpMemberBackend';
 import type { LostLoss, MemberClaim } from '@/features/corp/srp/srpMemberModel';
 import type { SrpStatus } from '@/features/corp/srpTypes';
@@ -12,7 +7,6 @@ import { sampleCharacterPublicInfo } from './sampleData';
 
 const HASH = 'c'.repeat(40);
 
-// Real SDE ids, so the page names them as it would in the app.
 const FEROX = 16227;
 const CERBERUS = 11993;
 const GILA = 17715;
@@ -25,7 +19,6 @@ const AMARR = 30002187;
 const RENS = 30002510;
 const HEK = 30002053;
 
-/** The preview's price and loss facts, the same for every sample loss. */
 const PREVIEW_FACTS = {
   killedAt: Date.parse('2026-10-22T20:05:00Z'),
   solarSystemId: JITA,
@@ -40,12 +33,6 @@ const PREVIEW_FACTS = {
 
 export const SRP_FIXTURE_CORPORATION_ID = 98765432;
 
-/**
- * The public reads an SRP page makes for the pilot (their sheet, then their corporation).
- * Without them a story that paints before its seed lands reaches for the network and
- * shows the pilot as unknown.
- * `corporationOf` names the corporation a pilot's sheet reports, so it matches the story's seed.
- */
 export function srpPublicInfoRoutes(
   corporationOf: (characterId: number) => number = () => SRP_FIXTURE_CORPORATION_ID
 ): FixtureRoute[] {
@@ -71,7 +58,6 @@ export interface SrpFixtureOptions {
   requireFleetOrFc?: boolean;
   noClaims?: boolean;
   noLosses?: boolean;
-  /** The corp checks Hurricanes against a Doctrine Fit (see `previewDoctrine`). */
   doctrine?: boolean;
 }
 
@@ -173,8 +159,6 @@ export function createSrpMemberFixture(
       ];
 
   return {
-    // A Hurricane is checked: `ondoctrine` in the link matches, a lost-ship tap or any other
-    // Hurricane link is off doctrine, and every other hull is not checked.
     previewDoctrine: async (_c, _corp, killmail) => {
       const killmailId = Number(/(?:kill|killmails)\/(\d+)/.exec(killmail)?.[1] ?? 0);
       const hullTypeId = killmailId === 8003 ? FEROX : HURRICANE;
@@ -215,7 +199,6 @@ export function createSrpMemberFixture(
         },
       };
     },
-    // A Hurricane fit: 519 (Gyrostabilizer-class sample) twice and 2048 on the high rack, a rig, a drone.
     killmail: async (killmailId) => ({
       killmail_id: killmailId,
       killmail_time: new Date(now - DAY_MS).toISOString(),

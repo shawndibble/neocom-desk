@@ -507,12 +507,10 @@ describe('refineries seen (#6097)', () => {
     { structureId: 10, sourceCorporationId: A },
     { structureId: 11, sourceCorporationId: A },
     { structureId: 30, sourceCorporationId: B },
-    // The book's own Extraction belongs to no moon owner.
     { structureId: 99 },
   ]);
 
   it('counts the union of the ledger refineries and the Extraction refineries', () => {
-    // The ledger has refinery 10; the Extractions have 10 and 11.
     const row = rowOf(input({ extractionRefineries: extractions }));
     expect(row.refineryCount).toBe(2);
     expect(row.nothingSeen).toBeUndefined();
@@ -590,7 +588,6 @@ describe("the moon owner's own members' rate (#6210)", () => {
   ];
 
   it("shows what the owner's members pay at its refineries", () => {
-    // The default entry is recorded in the moon owner's own corporation.
     expect(rowOf(input({ rates })).minerRatePct).toBe(4);
     const guest = entry(A, '2026-10-05', 1000, { recordedCorporationId: 98000555 });
     expect(rowOf(input({ rates, entries: [guest] })).minerRatePct).toBe(15);

@@ -85,7 +85,6 @@ describe('MinerRunningAccount.build', () => {
   });
 
   it('forgives with every write-off, oldest day first: a late notice is no bill to pin one to', () => {
-    // The legacy pass dropped a write-off naming a notice; decision 20261120-235011.
     const account = MinerRunningAccount.build({
       days: [day('2026-11-01', 1e6), day('2026-11-02', 1e6)],
       payments: [],
@@ -150,7 +149,6 @@ describe('MinerRunningAccount.build: exemptions and officer charges', () => {
       storedPaidThrough: '2026-11-01',
       toleranceExemptions: new Map([['2026-11-01', 0]]),
     });
-    // 1 Nov stays paid for good; the payment pays it and 2 Nov is the one left owed.
     expect(account.day('2026-11-01')?.settled).toBe(true);
     expect(account.paidThrough).toBe('2026-11-01');
     expect(account.owes).toEqual({ amount: 1e6, days: 1, oldest: '2026-11-02' });
@@ -166,25 +164,20 @@ describe('MinerRunningAccount.build: exemptions and officer charges', () => {
       storedPaidThrough: '2026-11-02',
       toleranceExemptions: new Map([['2026-11-01', 0]]),
     });
-    // Both days stay paid for good but their two charges: owed once each, not again for the
-    // exempted day's whole tax.
     expect(account.owes?.amount).toBe(200_000);
   });
 
   it('never lets the tolerance forgive an officer charge, however small', () => {
-    // 1,000,000 mined, paid in full, then a 3,000 charge: under 0.5% of the day, still owed.
     const account = MinerRunningAccount.build({
       days: [{ date: '2026-11-01', tax: 1_003_000, charge: 3_000 }],
       payments: [payment('p1', 1e6, '2026-11-03T10:00:00Z')],
     });
     expect(account.owes?.amount).toBe(3_000);
-    // Money pays the mined part first, so what is short is the charge's, and stays owed.
     const short = MinerRunningAccount.build({
       days: [{ date: '2026-11-01', tax: 1_003_000, charge: 3_000 }],
       payments: [payment('p1', 1_002_000, '2026-11-03T10:00:00Z')],
     });
     expect(short.owes?.amount).toBe(1_000);
-    // A day with no charge keeps its tolerance.
     const plain = MinerRunningAccount.build({
       days: [day('2026-11-01', 1e6)],
       payments: [payment('p1', 997_000, '2026-11-03T10:00:00Z')],
@@ -195,7 +188,6 @@ describe('MinerRunningAccount.build: exemptions and officer charges', () => {
 
 describe('MinerRunningAccount.build: float residue (M6)', () => {
   it('treats under half an ISK left as done, so no day reads "owes 0 ISK"', () => {
-    // A credit correction that leaves 0.3 ISK, and a payment with no tolerance that leaves 0.4.
     const account = MinerRunningAccount.build({
       days: [day('2026-11-01', 1_000.3), day('2026-11-01', -1_000), day('2026-11-02', 2_000)],
       payments: [payment('p1', 1_999.6, '2026-11-03T10:00:00Z')],
@@ -289,7 +281,6 @@ describe('MinerRunningAccount.build from a closed-through checkpoint', () => {
       checkpoint: checkpoint(),
     });
     expect(account.closableThrough('2026-11-21')).toBe('2026-11-02');
-    // A day the checkpoint still owes holds it back until it is paid.
     const owing = MinerRunningAccount.build({
       days: [day('2026-11-02', 1e6)],
       payments: [payment('p1', 1e6, '2026-11-05T10:00:00Z')],
@@ -355,8 +346,6 @@ describe('MinerRunningAccount.build from a closed-through checkpoint', () => {
 });
 
 describe('MinerRunningAccount.build: a snapshot’s held day follows the live dispute', () => {
-  // An open dispute held 2026-10-20 when the snapshot was taken: owed, out of the balance, and
-  // the paid-through day passed it.
   const snapshot = checkpoint({
     owed: [{ date: '2026-10-20', remaining: 500_000, tax: 500_000, credited: 0, held: true }],
   });
@@ -392,7 +381,6 @@ describe('MinerRunningAccount.build: a snapshot’s held day follows the live di
     expect(account.day('2026-11-02')?.remaining).toBe(400_000);
     expect(account.balance).toBe(400_000);
     expect(account.paidThrough).toBe('2026-10-31');
-    // A waiver of part of the day (a rate dispute) leaves the rest owed.
     const part = build({ payments: [], disputeWaivers: new Map([['2026-10-20', 200_000]]) });
     expect(part.day('2026-10-20')?.remaining).toBe(300_000);
     expect(part.balance).toBe(1.3e6);
@@ -429,7 +417,6 @@ describe('MinerRunningAccount.checkpoint', () => {
     ).toEqual({
       minerId: 'm1',
       through: '2026-10-31',
-      // The day whole, and what money paid of it, so it is rebuilt with its whole tolerance (M1).
       owed: [{ date: '2026-10-02', remaining: 1_500_000, tax: 2e6, credited: 500_000 }],
       credit: 0,
       balance: 1_500_000,
@@ -464,7 +451,6 @@ describe('MinerRunningAccount.checkpoint', () => {
   });
 });
 
-/** A small deterministic generator, so a failure names the seed that made it. */
 function rng(seed: number) {
   let s = seed >>> 0 || 1;
   const next = () => {
@@ -480,10 +466,6 @@ function rng(seed: number) {
   };
 }
 
-/**
- * A book whose closed days do not change after they close, as ESI's ledgers guarantee: days and
- * money either side of `through`, some days held by a dispute, a mined day on `through` itself.
- */
 function randomBook(seed: number): { input: MinerRunningAccountInput; through: string } {
   const r = rng(seed);
   const date = (n: number) => `2026-11-${String(n).padStart(2, '0')}`;
@@ -512,7 +494,6 @@ function randomBook(seed: number): { input: MinerRunningAccountInput; through: s
       days,
       payments,
       ...(r.next() < 0.5 ? { startDate: date(r.int(1, 10)) } : {}),
-      // The day on `through` is not held, so "paid through" names it whichever way it is built.
       ...(r.next() < 0.3
         ? { heldDays: new Set(dates.filter((d) => d !== date(cut) && r.next() < 0.3)) }
         : {}),
@@ -545,8 +526,6 @@ describe('a checkpoint plus the later days is the whole history', () => {
   });
 });
 
-/** `randomBook` with what a checkpoint must still add up over: held days, officer charges on
- * days recorded paid, credit corrections, write-offs and the book's tolerance. */
 function harderBook(seed: number): { input: MinerRunningAccountInput; through: string } {
   const r = rng(seed * 7919);
   const base = randomBook(seed);
@@ -623,9 +602,6 @@ describe('a checkpoint plus the later days is the whole history, at the toleranc
       const resumed = MinerRunningAccount.build({ ...tolerant, checkpoint: cp });
       const context = `seed ${seed}`;
       expect(resumed.paidThrough, context).toBe(whole.paidThrough);
-      // The whole history pools every payment, so later money can still top up a day the
-      // tolerance closed before the checkpoint; the checkpoint keeps it closed, and that money
-      // pays later days or is credit instead. Each differs by no more than what was forgiven.
       const before = MinerRunningAccount.build({
         ...tolerant,
         days: tolerant.days.filter((d) => d.date <= through),
@@ -663,7 +639,6 @@ describe('MinerRunningAccount: what screens read off it (D1)', () => {
     expect(account.writtenOffDays([{ id: 'p1', at: '2026-11-05T10:00:00Z' }])).toEqual([
       { date: '2026-11-02', amount: 5_000, at: '2026-11-05T10:00:00Z', paymentId: 'p1' },
     ]);
-    // A day no payment reached is dated by itself.
     expect(account.writtenOffDays([])).toEqual([
       { date: '2026-11-02', amount: 5_000, at: '2026-11-02' },
     ]);
@@ -678,5 +653,50 @@ describe('MinerRunningAccount: what screens read off it (D1)', () => {
       payments: [payment('p1', 2e6, '2026-11-05T10:00:00Z')],
     });
     expect(priced.closableThrough('2026-11-21')).toBe('2026-11-01');
+  });
+});
+
+describe('MinerRunningAccount tolerance close-outs', () => {
+  it('names each day a payment closed within the tolerance, with only the money paid and the limit used', () => {
+    const account = MinerRunningAccount.build({
+      days: [day('2026-11-01', 1_000_000)],
+      payments: [payment('p1', 996_000, '2026-11-02T10:00:00Z')],
+    });
+    expect([...account.toleranceCloseOuts]).toEqual([
+      ['2026-11-01', { billed: 1_000_000, paid: 996_000, writtenOff: 4_000, limit: 5_000 }],
+    ]);
+  });
+
+  it("uses the day's exemption as its limit", () => {
+    const account = MinerRunningAccount.build({
+      days: [day('2026-11-01', 1_000_000)],
+      payments: [payment('p1', 980_000, '2026-11-02T10:00:00Z')],
+      toleranceExemptions: new Map([['2026-11-01', 25_000]]),
+    });
+    expect(account.toleranceCloseOuts.get('2026-11-01')).toMatchObject({
+      limit: 25_000,
+      writtenOff: 20_000,
+      exempt: true,
+    });
+  });
+
+  it('leaves out a day closed by the stored Paid through, one paid in full, and one short beyond the tolerance', () => {
+    const pinned = MinerRunningAccount.build({
+      days: [day('2026-11-01', 1_000_000)],
+      payments: [payment('p1', 999_000, '2026-11-02T10:00:00Z')],
+      storedPaidThrough: '2026-11-01',
+    });
+    expect(pinned.byDay.get('2026-11-01')?.writtenOff).toBe(1_000);
+    expect(pinned.toleranceCloseOuts.size).toBe(0);
+    const full = MinerRunningAccount.build({
+      days: [day('2026-11-01', 1_000_000)],
+      payments: [payment('p1', 1_000_000, '2026-11-02T10:00:00Z')],
+    });
+    expect(full.toleranceCloseOuts.size).toBe(0);
+    const short = MinerRunningAccount.build({
+      days: [day('2026-11-01', 1_000_000)],
+      payments: [payment('p1', 990_000, '2026-11-02T10:00:00Z')],
+    });
+    expect(short.toleranceCloseOuts.size).toBe(0);
   });
 });

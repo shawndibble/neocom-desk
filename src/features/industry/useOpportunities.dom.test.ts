@@ -6,8 +6,6 @@ import { DEFAULT_ACTIVITY_FACILITY_DEFAULTS } from './facilityDefaults';
 import type { OpportunityCandidate, OpportunityRow } from './opportunities';
 import type { UseOpportunitiesArgs } from './useOpportunities';
 
-// The hook is the seam (issue #4918): `OpportunitiesPanel.test.tsx` mocks it
-// wholesale, so only a hook test sees what a recompute does to the rows.
 const loadMarketSnapshots = vi.fn();
 vi.mock('./marketData', () => ({
   loadMarketSnapshots: (requests: unknown[]) => loadMarketSnapshots(requests),
@@ -79,8 +77,6 @@ describe('useOpportunities recompute (issue #4918)', () => {
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(ids(result.current.rows)).toEqual(['1:10', '1:11']);
 
-    // Character modifiers settle late: same contents, a new Map, so the
-    // recompute starts. Its prices are held until the test releases them.
     let release!: () => void;
     loadMarketSnapshots.mockImplementation((requests: unknown[]) =>
       requests.map(() => new Promise((resolve) => (release = () => resolve({}))))
@@ -114,7 +110,6 @@ describe('useOpportunities recompute (issue #4918)', () => {
   });
 
   it('does not reprice when the latest-plan lookup is rebuilt but nothing a row reads changed', async () => {
-    // The same inputs throughout but the lookup: each `argsWith` builds fresh Maps.
     const args = argsWith();
     const { result, rerender } = renderHook(
       (props: UseOpportunitiesArgs) => useOpportunities(props),
@@ -123,9 +118,7 @@ describe('useOpportunities recompute (issue #4918)', () => {
     await waitFor(() => expect(result.current.loading).toBe(false));
     const requests = loadMarketSnapshots.mock.calls.length;
 
-    // Any plan write rebuilds the lookup; a rename moves no price.
     rerender({ ...args, defaultsForCharacter: () => null });
-    // A reprice would have asked for snapshots in the effect that rerender ran.
     expect(loadMarketSnapshots).toHaveBeenCalledTimes(requests);
   });
 

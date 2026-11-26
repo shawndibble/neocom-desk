@@ -43,8 +43,6 @@ describe('exportBackup / importBackup', () => {
 
     const { contents } = await exportBackup(PASSWORD);
 
-    // Simulate a fresh device that already has character 1 (e.g. re-imported
-    // its own backup accidentally) but not character 2.
     await db.tokens.update(1, { refreshToken: 'still-r1-untouched' });
     await db.characters.delete(2);
     await db.tokens.delete(2);
@@ -77,7 +75,6 @@ describe('exportBackup / importBackup', () => {
     const { contents } = await exportBackup(PASSWORD);
     await db.characters.delete(2);
     await db.tokens.delete(2);
-    // The same payment's link, here under another Character, since the backup was made.
     await db.miningTaxPaymentLinks.put({ ...link, characterId: 1, amount: 2 });
 
     expect((await importBackup(contents, PASSWORD)).addedCharacterIds).toEqual([2]);
@@ -119,9 +116,6 @@ describe('exportBackup / importBackup', () => {
 
     const { contents } = await exportBackup(PASSWORD);
 
-    // Fresh device: doesn't have character 3 yet, and the write of its skill plans fails partway
-    // through the import, after `characters`/`tokens` would already have been written outside a
-    // transaction.
     await db.characters.delete(3);
     await db.tokens.delete(3);
     await db.skillPlans.clear();
@@ -137,22 +131,12 @@ describe('exportBackup / importBackup', () => {
 
     await expect(importBackup(contents, PASSWORD)).rejects.toThrow();
 
-    // Nothing from the failed import was committed, including the character
-    // and token writes that Dexie would otherwise have applied before
-    // reaching the failing table.
     await expect(db.characters.get(3)).resolves.toBeUndefined();
     await expect(db.tokens.get(3)).resolves.toBeUndefined();
     failing.mockRestore();
   });
 });
 
-/**
- * ADR 0014's file format is a promise to every backup already sitting in a
- * pilot's downloads folder. `__fixtures__/backup-v1.json` was written by the
- * export code as it stood before the synced-collection registry (issue
- * #2043), with one full row in every Editable Data table, so this fails if a
- * refactor stops restoring any table an existing file carries.
- */
 describe('restoring an existing-format backup file', () => {
   const FIXTURE = readFileSync(new URL('./__fixtures__/backup-v1.json', import.meta.url), 'utf8');
   const FIXTURE_PASSWORD = 'fixture password';
@@ -173,46 +157,15 @@ describe('restoring an existing-format backup file', () => {
     expect((await db.characters.get(1))?.name).toBe('Fixture Pilot');
     expect((await db.tokens.get(1))?.refreshToken).toBe('fixture-refresh');
     expect((await db.settings.get('sync.marketHub'))?.value).toBe('amarr');
-    // Never exported in the first place: only allow-listed `sync.` keys travel.
     expect(await db.settings.get('activeCharacterId')).toBeUndefined();
   });
 
-  /**
-   * `FULL_RECORDS` is the live "one full row per table" fixture, reused here
-   * for convenience — but `backup-v1.json` is frozen (see the file's own doc
-   * comment above) while `FULL_RECORDS` keeps growing as tables gain new
-   * optional fields. A field added to a record's type after the file was
-   * captured legitimately isn't in it, so restoring the file can never
-   * produce that field — comparing straight against `FULL_RECORDS` would
-   * fail for that table forever, not because restore broke, but because the
-   * frozen file predates the field. `LEGACY_OMISSIONS` lists exactly which
-   * fields to drop from `FULL_RECORDS`' expectation, per table, for this one
-   * test — `toEqual` treats an explicit `undefined` the same as the key being
-   * absent, so this doesn't need a real delete.
-   */
   const LEGACY_OMISSIONS: Partial<Record<keyof typeof FULL_RECORDS, string[]>> = {
-    // oreLineValues (grilling session, 2026-09-27) and rawOrePriced (Ore Form,
-    // 2026-10-06) and label (Moon / structure) postdate this fixture.
-    // override (Default Systems, 2026-11-03) and releasedTypeIds (decision 20261122-053305)
-    // postdate it too.
     miningTaxAssignments: ['oreLineValues', 'rawOrePriced', 'label', 'override', 'releasedTypeIds'],
-    // sourceJobId (Job History, #2866) postdates this fixture.
     productionRuns: ['sourceJobId'],
-    // costIndexOverridePct (J-Space cost index, 2026-10-12) and productSalePrice
-    // (#6391) postdate this fixture.
     buildPlans: ['costIndexOverridePct', 'productSalePrice'],
-    // entityKind (Payee verification, 2026-10-14), defaultSystems (Default Systems, 2026-11-03) and
-    // archivedAt (archived Payees, decision 20261122-030058) postdate this fixture.
     payees: ['entityKind', 'defaultSystems', 'archivedAt'],
   };
-  /**
-   * Like `LEGACY_OMISSIONS`, but for a field that was *reshaped* rather than
-   * merely added, so dropping it to `undefined` isn't enough — the frozen
-   * fixture's raw row still carries the old shape verbatim. `payment`'s
-   * single `journalRefId`/`contractId` became `journalLinks`/`contractLinks`
-   * arrays (manual/retroactive wallet-transaction linking, 2026-09-27),
-   * postdating this fixture the same way `oreLineValues` does.
-   */
   const LEGACY_RESHAPES: Partial<Record<keyof typeof FULL_RECORDS, (record: unknown) => unknown>> =
     {
       miningTaxAssignments: (record) => {
@@ -229,13 +182,13 @@ describe('restoring an existing-format backup file', () => {
         };
       },
     };
-  /** Tables created after the frozen file was captured: it holds no rows for them. */
   const POSTDATES_FIXTURE: ReadonlySet<string> = new Set([
     'netWorthSnapshots',
     'productionLosses',
     'characterAccelerators',
     'miningTaxPaymentLinks',
-  ]); // #2865, #2851, decision 20261120-235011
+    'miningTaxRecordChanges',
+  ]);
   const LEGACY_EXPECTED_RECORDS = Object.fromEntries(
     Object.entries(FULL_RECORDS)
       .filter(([table]) => !POSTDATES_FIXTURE.has(table))

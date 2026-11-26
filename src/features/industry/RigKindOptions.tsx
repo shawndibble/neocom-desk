@@ -11,12 +11,6 @@ const LINES_AND_TIERS = [
   ['te', 'T2'],
 ] as const;
 
-/**
- * The items of a rig slot's Select: "None" and the four rigs that apply to
- * every product, then one group per rig group (Capital Ship, Basic Capital
- * Component, ...) listing its ME and TE rigs, since a rig only boosts the
- * products its group covers (issue #6392).
- */
 export function RigKindOptions() {
   const { t } = useTranslation();
   return (

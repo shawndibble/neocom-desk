@@ -1,28 +1,13 @@
-/**
- * The corporations the player is CEO of through a Character on this account:
- * the candidates for "Add my other corps". Public data only (character
- * affiliations, then each corporation's public record), so it asks for no new
- * scope. Everything is read live and cross-checked (see `findOwnCeoCorps`).
- */
 import { useEffect, useMemo, useState } from 'react';
 import { getCorporationPublicInfo, postCharactersAffiliation } from '@/esi/endpoints';
 import { useCharacters } from '@/features/character/useCharacters';
 import { reportFailure } from '@/observability/reportFailure';
 import type { AddCorpsCandidate } from '@/engine/corpTaxBook/addCorpsRun';
 
-/**
- * Both reads are live, never the cached rows: a corporation changes CEO and a Character
- * changes corporation, and a cached pairing that is a day old is offered, signed in for,
- * then refused by the server (which reads ESI fresh) as "another corporation".
- */
 async function loadCorporationLive(corporationId: number) {
   return (await getCorporationPublicInfo(corporationId)).data ?? null;
 }
 
-/**
- * Every distinct corporation whose CEO is one of `characters` and is, right now, in that
- * corporation, minus `excludeCorporationId`. A pairing ESI no longer agrees on is dropped.
- */
 export async function findOwnCeoCorps(
   characters: readonly { characterId: number; name: string }[],
   excludeCorporationId: number | undefined
@@ -34,10 +19,8 @@ export async function findOwnCeoCorps(
   const byId = new Map(characters.map((c) => [c.characterId, c.name]));
   const found = await Promise.all(
     [...corpIds].map(async (corporationId): Promise<AddCorpsCandidate | null> => {
-      // One corporation ESI cannot answer for is left out, not a reason to blank the list.
       const info = await loadCorporationLive(corporationId).catch(() => null);
       if (!info || !byId.has(info.ceo_id)) return null;
-      // The CEO must be in the corporation by the same fresh read, or the pairing is stale.
       if (corpOf.get(info.ceo_id) !== corporationId) return null;
       return {
         corporationId,
@@ -52,13 +35,6 @@ export async function findOwnCeoCorps(
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
-/**
- * Whether `candidate` still holds: its CEO Character is in the corporation and the
- * corporation still names that Character CEO. Read live just before a login is sent to
- * EVE, so a corporation that changed since the list was built is never signed in for.
- * `unreachable` when ESI cannot answer (not a verdict on the pairing). "Live" is ESI's own
- * cache window, a few minutes to an hour, not real time.
- */
 export type PairingCheck = 'ok' | 'stale' | 'unreachable';
 
 export async function verifyOwnCeoCorp(candidate: AddCorpsCandidate): Promise<PairingCheck> {
@@ -74,7 +50,6 @@ export async function verifyOwnCeoCorp(candidate: AddCorpsCandidate): Promise<Pa
       ? 'ok'
       : 'stale';
   } catch (e) {
-    // ESI could not answer: not the same as a pairing that changed, so never recorded as one.
     reportFailure('esi', e);
     return 'unreachable';
   }
@@ -96,7 +71,6 @@ export function useOwnCeoCorps(excludeCorporationId?: number, enabled = true): O
         .join(',')}`,
     [characters, excludeCorporationId]
   );
-  // The result carries the lookup it answers, so a changed input reads as loading without a reset.
   const [done, setDone] = useState<{
     lookup: string;
     corps: AddCorpsCandidate[];
@@ -115,7 +89,6 @@ export function useOwnCeoCorps(excludeCorporationId?: number, enabled = true): O
     return () => {
       cancelled = true;
     };
-    // `lookup` stands for `characters`: a live query hands a new array on every write.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lookup, enabled]);
 

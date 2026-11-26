@@ -1,7 +1,3 @@
-/**
- * The "Skip to content" link (WCAG 2.4.1): first Tab stop at `md` and up,
- * absent below it, and Enter lands on the route outlet.
- */
 import { test, expect, PHONE, DESKTOP } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 
@@ -10,7 +6,6 @@ test('desktop: first Tab is the skip link, Enter moves focus past the rail', asy
   await signInAndGoto(page, './overview');
   await expect(page.locator('#route-outlet h1').first()).toBeVisible();
 
-  // Headless Chromium can report the page as unfocused, which swallows Tab.
   const cdp = await page.context().newCDPSession(page);
   await cdp.send('Emulation.setFocusEmulationEnabled', { enabled: true });
   await page.keyboard.press('Tab');

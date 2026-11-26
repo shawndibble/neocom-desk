@@ -1,8 +1,3 @@
-// mintFirebaseToken: exchange a verified EVE access token for a Firebase
-// custom token. The EVE *refresh* token never reaches this backend (ADR 0001);
-// the client sends only its short-lived access token, which is verified
-// against EVE's published JWKS before any Firebase credential is minted.
-
 import { callerFromAuth, signedInCharacter, verifyAccessToken, type Caller } from './actorAuth.js';
 import { onCall, onRequest, HttpsError } from 'firebase-functions/v2/https';
 import { createActionGroup, type CallableHandler } from './callableRouter.js';
@@ -367,22 +362,15 @@ import {
 } from './mutamarket.js';
 
 initializeApp();
-// Every write under `corps/{id}` restamps that book's version marker (issue #5047). Each
-// entry point that can reach a book runs inside `bookVersioned`, which does the stamping.
 installBookWriteTracking();
 const bookVersioned = <T>(handler: () => T | Promise<T>): Promise<T> =>
   withBookVersions((id, touched) => stampBook(firestore(), id, touched), handler, logError);
 
-// Built at cold start so a missing EVE_CLIENT_ID fails deployment/startup
-// loudly instead of silently accepting any EVE app's tokens per request.
-// The Firebase emulator's discovery pass loads this module without the env
-// files (the running functions get them), so only there a missing id is allowed.
 const verifyOptions = verifyOptionsFromEnv({
   allowMissingClientId: process.env.FUNCTIONS_EMULATOR === 'true',
 });
 
 export const mintFirebaseToken = onCall<{ accessToken?: unknown }>(
-  // Hobby-scale abuse cap; also bounds the JWKS fetch fan-out.
   { maxInstances: 5 },
   async (request) => {
     const accessToken = request.data?.accessToken;
@@ -390,8 +378,6 @@ export const mintFirebaseToken = onCall<{ accessToken?: unknown }>(
       throw new HttpsError('invalid-argument', 'accessToken (string) is required');
     }
 
-    // Client response stays opaque (don't leak which validation step failed),
-    // but the real cause still needs to be diagnosable from Cloud Logging.
     const claims = await verifyAccessToken(
       (token) => verifyEveAccessToken(token, verifyOptions),
       accessToken,
@@ -404,21 +390,11 @@ export const mintFirebaseToken = onCall<{ accessToken?: unknown }>(
     );
 
     const uid = uidForCharacter(claims.characterId);
-    // ownerHash rides along as a custom claim; Firestore rules compare it to the
-    // ownerHash field on each doc so a transferred character can't read the
-    // previous owner's data.
     const token = await getAuth().createCustomToken(uid, { ownerHash: claims.ownerHash });
     return { token, uid, ownerHash: claims.ownerHash };
   }
 );
 
-// registerDevice: register one device's FCM token against every Character it
-// holds, in one call — see registerDevice.ts and issue #356. Firestore rules
-// deny all client access to `deviceRegistrations`; this admin write is the
-// only path in. The doc is a wholesale `set` keyed by the device's own
-// (client-generated, device-local) id, never a token-keyed doc — that is what
-// makes re-registering after an FCM token rotation replace the entry instead
-// of accumulating one per token.
 const alertsActions = createActionGroup();
 const alertsAction = (name: CallableAction<'alerts'>, handler: CallableHandler): void => {
   alertsActions.register(name, handler);
@@ -460,17 +436,9 @@ alertsAction('registerDevice', async (request) => {
     quietHours: input.quietHours,
   });
 
-  // The types the server has seen for each Character (alertGrants, ADR 0020),
-  // so the client can offer a toggle for them. Only `seenTypes` is read out.
   const { store } = alertGrantDeps();
   const seenTypes: Record<string, string[]> = {};
-  // The Characters whose active grant can read the location (ADR 0028). Its
-  // presence also tells the client this server accepts the location scope, so
-  // it never asks EVE for a grant an older deployed function would refuse.
   let nearbyGrants: number[] | undefined = [];
-  // Likewise the Characters whose active grant can read mail headers (ADR 0029),
-  // present only from a server that takes the mail scope.
-  // Sent only when `nearbyGrants` is: both mark a server that takes the new scopes.
   const mailGrants: number[] = [];
   try {
     const grants = await store.getMany(registration.characterIds);
@@ -481,8 +449,6 @@ alertsAction('registerDevice', async (request) => {
       if (grant?.status === 'active' && grantCoversMail(grant)) mailGrants.push(characterId);
     }
   } catch (err) {
-    // The registration already landed; a failed read only delays new toggles.
-    // No `nearbyGrants` then, so the client keeps what it last learned.
     nearbyGrants = undefined;
     logError('Device registration: seenTypes read failed', {
       characterIds: registration.characterIds,
@@ -499,9 +465,6 @@ alertsAction('registerDevice', async (request) => {
   };
 });
 
-// Alerts Grant custody (issue #3753, ADR 0020). `ALERTS_TOKEN_KEY` is a Firebase
-// secret (base64, 32 bytes): `firebase functions:secrets:set ALERTS_TOKEN_KEY`.
-// Nothing here logs or returns a token; firestore.rules denies `alertGrants`.
 const ALERTS_TOKEN_KEY = defineSecret('ALERTS_TOKEN_KEY');
 const FEEDER_VIEW_SECRETS = [ALERTS_TOKEN_KEY, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY];
 
@@ -520,13 +483,10 @@ function alertGrantDeps(): AlertGrantDeps {
 
 function alertGrantHttpsError(err: unknown): never {
   if (err instanceof AlertGrantError) throw new HttpsError(err.code, err.message);
-  // Opaque: the cause could sit next to key material, so log the name only.
   logError('Alerts Grant call failed', { error: err instanceof Error ? err.name : 'unknown' });
   throw new HttpsError('internal', 'Alerts Grant call failed');
 }
 
-// The device's full-scope session is not involved: the callable's proof is the
-// notifications-only access token itself, verified like registerDevice does.
 alertsAction('saveAlertGrant', async (request) => {
   try {
     return await saveAlertGrantFor(alertGrantDeps(), parseSaveAlertGrantInput(request.data));
@@ -535,8 +495,6 @@ alertsAction('saveAlertGrant', async (request) => {
   }
 });
 
-// Deleting needs the Character's own signed-in session, so one Character
-// cannot drop another's grant.
 alertsAction('deleteAlertGrant', async (request) => {
   const characterId = signedInCharacter(callerOf(request));
   try {
@@ -546,35 +504,12 @@ alertsAction('deleteAlertGrant', async (request) => {
   }
 });
 
-// The device and Alerts Grant router (see callableRouter.ts). Clients call this. The secret is only used by the grant actions.
 export const alertsCall = onCall<unknown>(
   { maxInstances: 10, secrets: [ALERTS_TOKEN_KEY] },
   (request) => bookVersioned(() => alertsActions.route(request))
 );
 
-/**
- * dispatchProjections: fires whatever is due (issue #358, ADR 0010,
- * GLOSSARY.md round 45). Runs every 15 minutes. One of this deployment's few
- * Cloud Scheduler jobs, so other periodic work rides its tick instead of
- * owning a job (each job past the free three costs $0.10 a month).
- *
- * Holds no EVE token and makes no ESI call: every row already carries
- * rendered title/body text, uploaded by a device that read the real data
- * (ADR 0010). This function only decides *when* to fire what it was handed,
- * and pushes each row only to the device that uploaded it (issue #2240) —
- * see projectionStore.ts.
- *
- * The same tick polls the server-pushed price alerts (issue #5121, ADR 0027): a
- * public Fuzzwork read, still no EVE token, rather than a scheduled job of its own.
- *
- * The hourly tick (`isHourlyTick`) also ends every corp tax book removal whose 24 hours are up
- * (`finalizeDueRemovals`, issue #5072; it was `finalizeCorpTaxBookRemovals`, its own hourly job).
- * That is why this function holds the feeder-view secrets.
- */
 export const dispatchProjections = onSchedule(
-  // The timeout was sized for the paced zKillboard loss reads this tick used to
-  // make (removed; the open app reads losses itself); lower it once run
-  // durations settle.
   {
     schedule: 'every 15 minutes',
     timeoutSeconds: 540,
@@ -585,11 +520,8 @@ export const dispatchProjections = onSchedule(
     const db = firestore();
     const messaging = getMessaging();
     const serverStats = createRunStats(SERVER_POLL_STATS_KEYS);
-    // Independent halves: one failing must not stop the other.
     const [projected, polled] = await Promise.allSettled([
       dispatchDueProjections(db, messaging, Date.now(), logError),
-      // Price alerts for a closed app (issue #5121): public data, no EVE token,
-      // pushed to the devices that enabled them.
       pollServerEvents({
         listDevices: () => listPolledDevices(db, serverStats),
         fetchPrices: (stationId, typeIds) => fetchFuzzworkPrices(stationId, typeIds),
@@ -610,9 +542,7 @@ export const dispatchProjections = onSchedule(
       logError('Scheduled Push dispatch failed', { error: String(projected.reason) });
     if (polled.status === 'rejected')
       logError('Server event poll failed', { error: String(polled.reason) });
-    // One line per tick, counts only: query `jsonPayload.message="Server event poll finished"`.
     else logInfo('Server event poll finished', { ...polled.value, ...serverStats.snapshot() });
-    // Last, so a slow poll cannot starve the dispatch; its own failure is logged, not thrown.
     if (isHourlyTick(Date.now())) {
       try {
         const summary = await bookVersioned(() => finalizeDueRemovals(corpSyncDeps()));
@@ -624,12 +554,6 @@ export const dispatchProjections = onSchedule(
   }
 );
 
-/**
- * Community alerts for a closed app (issue #5121): a join request or a new
- * Member, pushed to the admin's devices the moment the backend writes it. One
- * trigger for every doc made directly under a Community; anything but the
- * waiting list and the roster returns at once (communityPush.ts decides).
- */
 export const pushCommunityAlert = onDocumentCreated(
   'communities/{communityId}/{collection}/{docId}',
   async (event) => {
@@ -647,7 +571,6 @@ export const pushCommunityAlert = onDocumentCreated(
   }
 );
 
-/** A Pledge on a Request (issue #5121): pushed to the requester's devices when it is written. */
 export const pushCommunityPledge = onDocumentCreated(
   'communities/{communityId}/itemRequests/{requestId}/pledges/{pledgerUid}',
   async (event) => {
@@ -665,16 +588,6 @@ export const pushCommunityPledge = onDocumentCreated(
   }
 );
 
-/**
- * pollEveNotifications (issue #3756, ADR 0020): every 15 minutes, reads each
- * active Alerts Grant's `/notifications/` feed and pushes the types a
- * registered device enabled. For a grant that also carries the location scope
- * (issue #5122, ADR 0028) it reads the Character's Current System with the same
- * token and pushes nearby Incursions and raidable skyhooks; for one that carries
- * the mail scope (issue #5143, ADR 0029) it reads the mail headers and pushes new mail. The only function
- * that holds an EVE token, and only the Alerts Grant's narrow one. Deploy is manual:
- * `firebase deploy --only functions:pollEveNotifications`.
- */
 export const pollEveNotifications = onSchedule(
   {
     schedule: 'every 15 minutes',
@@ -686,8 +599,6 @@ export const pollEveNotifications = onSchedule(
     const messaging = getMessaging();
     const stats = createRunStats(ALERTS_POLL_STATS_KEYS);
     const registrations = createRegistrationReader(firestore(), stats);
-    // The public lists are read once per run, whoever asks first: the candidates
-    // check before any location read and the nearby phase afterwards share them.
     const once = <T>(read: () => Promise<T>): (() => Promise<T>) => {
       let pending: Promise<T> | undefined;
       return () => (pending ??= read());
@@ -721,12 +632,10 @@ export const pollEveNotifications = onSchedule(
         fetchEsiNotifications(characterId, accessToken, etag),
       send,
       log,
-      // New mail (issue #5143, ADR 0029): the same run, the same refreshed token.
       mail: {
         fetchHeaders: (characterId, accessToken, etag) =>
           fetchMailHeaders(characterId, accessToken, etag),
       },
-      // Nearby alerts (issue #5122, ADR 0028): the same run, the same refreshed token.
       nearby: {
         fetchLocation: (characterId, accessToken) =>
           fetchCharacterLocation(characterId, accessToken),
@@ -735,7 +644,6 @@ export const pollEveNotifications = onSchedule(
             wanted.incursions ? incursions() : null,
             wanted.skyhooks ? skyhooks() : null,
           ]);
-          // A list that failed or asked to back off is not known to be empty.
           const empty = (read: { kind: string; value?: unknown[] } | null) =>
             read === null || (read.kind === 'ok' && read.value?.length === 0);
           return !(empty(incursionList) && empty(skyhookList));
@@ -754,21 +662,14 @@ export const pollEveNotifications = onSchedule(
           }),
       },
     });
-    // One line per run, counts only: query `jsonPayload.message="pollEveNotifications finished"`.
     logInfo('pollEveNotifications finished', { ...summary, ...stats.snapshot() });
   }
 );
 
-// Communities (issue #3596, ADR 0018). Every write that enforces a cap or
-// deletes another doc goes through these callables (communitiesStore.ts); the
-// client only writes a Member's own library chunks, directly, under the rules.
-
-/** The signed-in Character behind a callable: uid `char:{id}` + ownerHash claim. */
 function callerOf(request: { auth?: { uid: string; token: Record<string, unknown> } }): Caller {
   return callerFromAuth(request.auth);
 }
 
-// One deployed function per group instead of one per callable (see callableRouter.ts).
 const communityActions = createActionGroup();
 const communityAction = (name: CallableAction<'community'>, handler: CallableHandler): void => {
   communityActions.register(name, handler);
@@ -781,8 +682,6 @@ communityAction('createCommunityCallable', (request) =>
   createCommunity(firestore(), callerOf(request), parseCreateInput(request.data))
 );
 
-// Callable with no session on purpose: the invite page shows what the link is
-// for before a visitor signs in. Returns three public facts, see previewCommunity.
 communityAction('previewCommunityCallable', (request) =>
   previewCommunity(firestore(), parsePreviewInput(request.data).inviteCode)
 );
@@ -819,8 +718,6 @@ communityAction('transferCommunityAdminCallable', async (request) => {
   await transferAdmin(firestore(), callerOf(request), communityId, memberUid);
 });
 
-// Mail invites (issue #3604): the client sends the EVE mail with its own token,
-// so the cap, the one-per-target rule and the "Sent" stamp live in these three.
 communityAction('reserveCommunityMailInviteCallable', (request) => {
   const { communityId, targetCharacterId, targetName } = parseMailInviteInput(request.data);
   return reserveMailInvite(
@@ -862,8 +759,6 @@ communityAction('deleteCommunityCallable', async (request) => {
   );
 });
 
-// Community Requests (issue #3807, ADR 0021): posting counts the caller's open
-// Requests, so it is a callable; extend and close/reopen are the requester's own.
 communityAction('postCommunityRequestCallable', (request) =>
   postRequest(firestore(), callerOf(request), parsePostRequestInput(request.data))
 );
@@ -882,9 +777,6 @@ communityAction('setCommunityRequestClosedCallable', async (request) => {
   await setRequestClosed(firestore(), callerOf(request), communityId, requestId, closed);
 });
 
-// Pledge mail: the Pledger's client sends the EVE mail with its own token; the
-// 100-a-day cap and the once-per-Pledger-per-Request rule live in these three.
-// The recipient is the Request's owner, read server-side, never sent by a client.
 communityAction('reserveCommunityPledgeMailCallable', (request) => {
   const { communityId, requestId } = parseRequestIdInput(request.data);
   return reservePledgeMail(firestore(), callerOf(request), communityId, requestId);
@@ -900,15 +792,11 @@ communityAction('releaseCommunityPledgeMailCallable', async (request) => {
   await releasePledgeMail(firestore(), callerOf(request), communityId, requestId);
 });
 
-// The admin removes any Request or Pledge (issue #3812): no per-Community
-// switch, so the callables only check the caller is the Community's admin.
 communityAction('removeCommunityRequestCallable', async (request) => {
   const { communityId, requestId } = parseRequestIdInput(request.data);
   await removeRequest(firestore(), callerOf(request), communityId, requestId);
 });
 
-// Fleet Payouts (issue #4779): creating counts the caller's open ones and links
-// Members, so it is a callable; set-paid is the boss's own; remove is the boss or admin.
 communityAction('createCommunityFleetPayoutCallable', (request) =>
   createFleetPayout(firestore(), callerOf(request), parseCreateFleetPayoutInput(request.data))
 );
@@ -923,7 +811,6 @@ communityAction('removeCommunityFleetPayoutCallable', async (request) => {
   await removeFleetPayout(firestore(), callerOf(request), communityId, payoutId);
 });
 
-// A Community admin sees which corporations share moon pops into it, and blocks one (#6223).
 communityAction('listCommunityPopSharersCallable', (request) =>
   listCommunityPopSharers(
     sharedPopsReadDeps(),
@@ -946,11 +833,6 @@ communityAction('removeCommunityPledgeCallable', async (request) => {
   await removePledge(firestore(), callerOf(request), communityId, requestId, pledgeUid);
 });
 
-// Corp Tax Book (issue #4061, ADR 0023). Every write to a corporation's book
-// goes through these callables (corpTaxBookStore.ts) and lands in its audit
-// log; the client only reads, under firestore.rules. The caller sends a
-// short-lived EVE access token for the role check; it is used for ESI reads
-// and dropped, never stored or logged.
 const corpTaxBookDeps = (): BookDeps => ({
   db: firestore(),
   now: Date.now,
@@ -959,7 +841,6 @@ const corpTaxBookDeps = (): BookDeps => ({
   corporationAlliance: esiCorporationAlliance(),
 });
 
-// One per instance, so its few-minute affiliation cache is shared across calls (#6223).
 const sharedPopAffiliations = esiAffiliations();
 const sharedPopsReadDeps = (): SharedPopsReadDeps => ({
   db: firestore(),
@@ -968,12 +849,10 @@ const sharedPopsReadDeps = (): SharedPopsReadDeps => ({
 });
 
 const corpTaxBookActions = createActionGroup();
-/** A Corp Tax Book router action: no deployed function of its own. New callables use this. */
 const corpTaxBookAction = (name: CallableAction<'corpTaxBook'>, handler: CallableHandler): void => {
   corpTaxBookActions.register(name, handler);
 };
 
-// Collector books (issue #4507): invite links for a feeder corporation. Codes only; the UI maps them later.
 corpTaxBookAction('createCorpTaxBookFeederInviteCallable', (request) =>
   createFeederInvite(
     corpTaxBookDeps(),
@@ -990,7 +869,6 @@ corpTaxBookAction('revokeCorpTaxBookFeederInviteCallable', (request) =>
   )
 );
 
-// The consent screen's preview of a link: the accounting corporation and the offered rate.
 corpTaxBookAction('previewCorpTaxBookFeederInviteCallable', (request) =>
   previewFeederInvite(
     corpTaxBookDeps(),
@@ -999,11 +877,6 @@ corpTaxBookAction('previewCorpTaxBookFeederInviteCallable', (request) =>
   )
 );
 
-// Scheduled Corp Tax Book sync (issue #4068, ADR 0025). The second server-held EVE
-// token: an opt-in, narrow-scope grant per corporation, encrypted under the same
-// `ALERTS_TOKEN_KEY` secret (bound to its own purpose, so blobs do not cross
-// collections). Nothing here logs or returns a token; firestore.rules denies the
-// grant collection.
 function corpSyncDeps(): CorpSyncDeps {
   return {
     db: firestore(),
@@ -1017,25 +890,17 @@ function corpSyncDeps(): CorpSyncDeps {
     openPrices: r2OpenPrices,
     corporationAlliance: esiCorporationAlliance(),
     log: (message, data) => logWarn(message, data),
-    // A stop tells the book's editors (`corpTaxBookSyncStopped`, ADR 0027): FCM through the
-    // Admin SDK, so the scheduled sync needs no secret for it.
     push: getMessaging(),
   };
 }
 
-// The moon owner's view values ore at the book hub's daily open price in R2 (issue #4512).
-// Lazy, so a function without the R2 secrets only fails when it rebuilds a view.
 function r2OpenPrices(typeId: number): Promise<unknown | null> {
   return readOpenPricesFromR2(createR2Get(r2ConfigOrThrow()), typeId);
 }
-// Proven by the signed-in Character AND the grant's own access token, which must be
-// for that same Character; the corporation and its roles are read with the grant.
 corpTaxBookAction('saveCorpTaxBookSyncGrantCallable', (request) =>
   saveCorpSyncGrant(corpSyncDeps(), callerOf(request), parseSaveCorpSyncGrantInput(request.data))
 );
 
-// Collector books (issue #4511): the moon owner's side. The grant is a separate SSO login by
-// the Accountant alt (mining scope only); the first ledger pull is the role check.
 corpTaxBookAction('saveCorpTaxBookFeederGrantCallable', (request) =>
   saveFeederGrant(
     { ...corpSyncDeps(), esi: esiSyncReader(), lookupCorporation: esiCorporationLookup() },
@@ -1044,8 +909,6 @@ corpTaxBookAction('saveCorpTaxBookFeederGrantCallable', (request) =>
   )
 );
 
-// "Add my other corps": an editor adds (or removes) one of their own corporations as a moon
-// owner without an invite link; the CEO alt's mining-scope tokens travel in the same request.
 corpTaxBookAction('addOwnCorpTaxBookFeederCallable', (request) =>
   addOwnFeeder(
     { ...corpSyncDeps(), esi: esiSyncReader(), lookupCorporation: esiCorporationLookup() },
@@ -1058,7 +921,6 @@ corpTaxBookAction('removeOwnCorpTaxBookFeederCallable', (request) =>
   removeOwnFeeder(corpSyncDeps(), callerOf(request), parseRemoveOwnFeederInput(request.data))
 );
 
-// Sync now for moon owners (issue #6117): an editor reads every moon owner at once, rested per book.
 corpTaxBookAction('syncCorpTaxBookMoonOwnersNowCallable', (request) =>
   syncMoonOwnersNow(
     { ...corpSyncDeps(), esi: esiSyncReader() },
@@ -1075,8 +937,6 @@ corpTaxBookAction('getCorpTaxBookFeederStatusCallable', (request) =>
   getFeederStatus(corpSyncDeps(), callerOf(request), parseFeederCall(request.data))
 );
 
-// The moon owner's view (issue #4512): its officers (CEO, Director, Accountant; live role check)
-// get a 24h access record the rules read, may ask for a rate, and dismiss the after-leaving view.
 corpTaxBookAction('getCorpTaxBookFeederViewAccessCallable', (request) =>
   getFeederViewAccess(corpSyncDeps(), callerOf(request), parseFeederCall(request.data))
 );
@@ -1085,7 +945,6 @@ corpTaxBookAction('requestCorpTaxBookFeederRateCallable', (request) =>
   requestFeederRate(corpSyncDeps(), callerOf(request), parseRequestFeederRateInput(request.data))
 );
 
-// The moon owner flags a payment it disputes, or withdraws the flag (#6209).
 corpTaxBookAction('disputeCorpTaxBookFeederPayoutCallable', (request) =>
   disputeFeederPayout(
     corpSyncDeps(),
@@ -1094,8 +953,6 @@ corpTaxBookAction('disputeCorpTaxBookFeederPayoutCallable', (request) =>
   )
 );
 
-// The moon owner names its payee: its own CEO, Directors and Accountants. The accounting
-// corporation's officers set it too (#4653), through `setCorpTaxBookFeederPayeeFromBookCallable`.
 corpTaxBookAction('setCorpTaxBookFeederPayeeCallable', (request) =>
   setFeederPayee(
     corpSyncDeps(),
@@ -1105,7 +962,6 @@ corpTaxBookAction('setCorpTaxBookFeederPayeeCallable', (request) =>
   )
 );
 
-// The moon owner's Pop Sharing opt-out (#6222): one switch for all its moons.
 corpTaxBookAction('setCorpTaxBookFeederPopSharingCallable', (request) =>
   setFeederPopSharing(
     corpSyncDeps(),
@@ -1114,8 +970,6 @@ corpTaxBookAction('setCorpTaxBookFeederPopSharingCallable', (request) =>
   )
 );
 
-// Shared Pops (#6223, ADR 0034): every pop the caller's Characters may read now. The signed-in
-// Character counts; other Characters count when their access token verifies (used, never stored).
 corpTaxBookAction('listSharedPopsCallable', async (request) => {
   const caller = callerOf(request);
   const { accessTokens } = parseListSharedPopsInput(request.data);
@@ -1126,7 +980,6 @@ corpTaxBookAction('listSharedPopsCallable', async (request) => {
   return { pops: await sharedPopsFor(sharedPopsReadDeps(), viewers) };
 });
 
-// A Survey started from a pop's start link, linked back to that pop for everyone who sees it.
 corpTaxBookAction('linkSharedPopSurveyCallable', (request) =>
   linkSharedPopSurvey(
     sharedPopsReadDeps(),
@@ -1135,8 +988,6 @@ corpTaxBookAction('linkSharedPopSurveyCallable', (request) =>
   )
 );
 
-// The Sharing tab: for each Community the settings name, whether an officer of the book is a
-// Member there (else it shares nothing) and whether its admin blocked the book.
 corpTaxBookAction('getCorpTaxBookPopSharingCommunitiesCallable', async (request) => {
   const call = parseBookCall(request.data);
   await authorizeOfficer(corpTaxBookDeps(), callerOf(request), call, 'view', { live: false });
@@ -1150,8 +1001,6 @@ corpTaxBookAction('dismissCorpTaxBookFeederHistoryCallable', (request) =>
   dismissFeederHistory(corpSyncDeps(), callerOf(request), parseFeederCall(request.data))
 );
 
-// The accounting corporation's side of a moon owner (issue #4586): officers agree a rate, settle
-// otherwise and list open invite links. The view rebuild prices ore from R2, so these carry its secrets.
 const feederOwnerDeps = (): BookDeps => ({ ...corpTaxBookDeps(), openPrices: r2OpenPrices });
 corpTaxBookAction('setCorpTaxBookFeederRateCallable', (request) =>
   setFeederRate(feederOwnerDeps(), callerOf(request), parseSetFeederRateInput(request.data))
@@ -1161,13 +1010,10 @@ corpTaxBookAction('setCorpTaxBookFeederModeCallable', (request) =>
   setFeederMode(feederOwnerDeps(), callerOf(request), parseSetFeederModeInput(request.data))
 );
 
-// Refinery labels (issue #4640): the accounting side passes `feederCorporationId`; the moon owner's
-// own officers do not.
 corpTaxBookAction('setCorpTaxBookRefineryLabelCallable', (request) =>
   setRefineryLabel(feederOwnerDeps(), callerOf(request), parseSetRefineryLabelInput(request.data))
 );
 
-// Archive a moon owner's refinery, or restore it (issue #6298): the accounting side only.
 corpTaxBookAction('setCorpTaxBookRefineryArchiveCallable', (request) =>
   setRefineryArchive(
     feederOwnerDeps(),
@@ -1184,7 +1030,6 @@ corpTaxBookAction('setCorpTaxBookOwnRefineryLabelCallable', (request) =>
   )
 );
 
-// A refinery's system (issue #4650): a miner's client reports what its own ledger placed it in.
 corpTaxBookAction('learnCorpTaxBookRefinerySystemsCallable', (request) =>
   learnRefinerySystems(
     corpTaxBookDeps(),
@@ -1193,14 +1038,11 @@ corpTaxBookAction('learnCorpTaxBookRefinerySystemsCallable', (request) =>
   )
 );
 
-// Removing a moon owner (issue #4520): start, notice sent, cancel (officers), the payee's link.
 const removalDeps = (): BookDeps => ({
   ...feederOwnerDeps(),
   corporationCeo: esiCorporationCeoLookup(),
 });
 
-// Either side sets a moon owner's payee (#4653): this is the accounting corporation's officers'
-// side (Accountant or higher, live role check). The CEO lookup names whom the change is mailed to.
 corpTaxBookAction('setCorpTaxBookFeederPayeeFromBookCallable', (request) =>
   setBookFeederPayee(
     removalDeps(),
@@ -1243,8 +1085,6 @@ corpTaxBookAction('forceCorpTaxBookRemovalCallable', (request) =>
   )
 );
 
-// Paying a moon owner (issue #4514): record a payout, mark a journal row not a payout, and attach
-// the wallet journal's outgoing donations to the records. Each rebuilds the moon owner's view.
 corpTaxBookAction('recordCorpTaxBookFeederPayoutCallable', (request) =>
   recordFeederPayout(feederOwnerDeps(), callerOf(request), parseRecordPayoutInput(request.data))
 );
@@ -1265,17 +1105,10 @@ corpTaxBookAction('listCorpTaxBookFeederInvitesCallable', (request) =>
   listFeederInvites(corpTaxBookDeps(), callerOf(request), parseBookCall(request.data))
 );
 
-// The holder revokes their own; the CEO revokes anyone's (live role check, so it carries an access token).
 corpTaxBookAction('revokeCorpTaxBookSyncGrantCallable', (request) =>
   revokeCorpSyncGrant(corpSyncDeps(), callerOf(request), parseBookCall(request.data))
 );
 
-/**
- * syncCorpTaxBooks (issue #4068, ADR 0025): every 2 hours at 35 past (00:35 UTC first), syncs and settles each
- * opted-in corporation's Corp Tax Book with its grant holder's token. Never issues
- * a Statement or sends mail. Deploy is manual:
- * `firebase deploy --only functions:syncCorpTaxBooks`.
- */
 export const syncCorpTaxBooks = onSchedule(
   {
     ...SYNC_CORP_TAX_BOOKS_SCHEDULE,
@@ -1298,7 +1131,6 @@ corpTaxBookAction('turnOnCorpTaxBookCallable', (request) =>
   turnOnBook(corpTaxBookDeps(), callerOf(request), parseTurnOnInput(request.data))
 );
 
-// Whoever turned the book on (or the CEO) deletes it; the scheduled-sync grant is revoked with it.
 corpTaxBookAction('deleteCorpTaxBookCallable', (request) =>
   deleteBook(corpTaxBookDeps(), callerOf(request), parseBookCall(request.data), (corporationId) =>
     dropBookGrants(corpSyncDeps(), corporationId)
@@ -1309,7 +1141,6 @@ corpTaxBookAction('reclaimCorpTaxBookCallable', (request) =>
   reclaimBook(corpTaxBookDeps(), callerOf(request), parseBookCall(request.data))
 );
 
-// A sync is many small transactions (up to 2000 observer rows), so give it room.
 corpTaxBookAction('syncCorpTaxBookCallable', (request) =>
   syncBook(corpTaxBookDeps(), callerOf(request), parseSyncInput(request.data, Date.now()))
 );
@@ -1323,7 +1154,6 @@ corpTaxBookAction('editCorpTaxBookCallable', (request) =>
   )
 );
 
-// An officer takes a Character's answer to a grouping out of Needs you.
 corpTaxBookAction('dismissGroupingAnswer', (request) =>
   dismissGroupingAnswer(
     corpTaxBookDeps(),
@@ -1332,9 +1162,6 @@ corpTaxBookAction('dismissGroupingAnswer', (request) =>
   )
 );
 
-// SRP (ADR 0026): data under corps/{id}, written only by these callables. Router-only: each is
-// an action of `corpTaxBookCall`, never its own deployed function (a deploy has a per-minute
-// mutation quota). Clients call it through `callRouted`.
 const srpDeps = (): SrpDeps => ({
   ...corpTaxBookDeps(),
   lookupCorporation: esiCorporationLookup(),
@@ -1346,12 +1173,10 @@ corpTaxBookAction('verifySrpOfficerCallable', (request) =>
   verifySrpOfficer(srpDeps(), callerOf(request), parseBookCall(request.data))
 );
 
-// A member (no corp role, no corp scope): is SRP on for my corporation, and what are its rules.
 corpTaxBookAction('getSrpStatusCallable', (request) =>
   getSrpStatus(srpDeps(), callerOf(request), parseBookCall(request.data))
 );
 
-// A member files an SRP Claim against their own killmail: the server verifies the loss and prices it.
 corpTaxBookAction('fileSrpClaimCallable', (request) =>
   fileSrpClaim(
     srpFileDeps(),
@@ -1361,7 +1186,6 @@ corpTaxBookAction('fileSrpClaimCallable', (request) =>
   )
 );
 
-// A member sees the doctrine-fit result of their own loss before filing; nothing is written.
 corpTaxBookAction('previewSrpDoctrineCheckCallable', (request) =>
   previewSrpDoctrineCheck(
     srpFileDeps(),
@@ -1371,7 +1195,6 @@ corpTaxBookAction('previewSrpDoctrineCheckCallable', (request) =>
   )
 );
 
-// An officer reads a claim's ship and doctrine values (Jita, no cargo); nothing is written.
 corpTaxBookAction('getSrpClaimValuesCallable', (request) =>
   getSrpClaimValues(
     srpFileDeps(),
@@ -1381,7 +1204,6 @@ corpTaxBookAction('getSrpClaimValuesCallable', (request) =>
   )
 );
 
-// A Director adds or replaces a Doctrine Fit snapshot (the client builds it from pasted EFT or a Fitting).
 corpTaxBookAction('saveSrpDoctrineCallable', (request) =>
   saveSrpDoctrine(
     srpDeps(),
@@ -1391,7 +1213,6 @@ corpTaxBookAction('saveSrpDoctrineCallable', (request) =>
   )
 );
 
-// Any verified member lists the corp's Doctrine Fits for their Fittings library (#6202).
 corpTaxBookAction('listSrpDoctrineFitsCallable', (request) =>
   listSrpDoctrineFits(srpDeps(), callerOf(request), parseBookCall(request.data))
 );
@@ -1422,7 +1243,6 @@ corpTaxBookAction('saveSrpSettingsCallable', (request) =>
   )
 );
 
-// Officer queue: each re-checks Director/Accountant live and guards the state change in a transaction.
 corpTaxBookAction('approveSrpClaimCallable', (request) =>
   approveSrpClaim(
     srpDeps(),
@@ -1481,7 +1301,6 @@ corpTaxBookAction('reclaimSrpCallable', (request) =>
   reclaimSrp(srpDeps(), callerOf(request), parseBookCall(request.data))
 );
 
-// A player claims their own Unmatched donation (D5): uid-authorised, no officer role.
 corpTaxBookAction('claimCorpTaxBookPaymentCallable', (request) => {
   const { corporationId, paymentId, inReview } = parseClaimPaymentInput(request.data);
   return claimPayment(corpTaxBookDeps(), callerOf(request), corporationId, paymentId, {
@@ -1489,7 +1308,6 @@ corpTaxBookAction('claimCorpTaxBookPaymentCallable', (request) => {
   });
 });
 
-// A Miner's own "I paid this another way" and Conflict dispute (#6206): uid-authorised, no officer role.
 corpTaxBookAction('declareCorpTaxBookPaymentCallable', (request) =>
   declareOwnPayment(corpTaxBookDeps(), callerOf(request), parseDeclareOwnInput(request.data))
 );
@@ -1517,7 +1335,6 @@ corpTaxBookAction('declineCorpTaxBookLinkCallable', (request) => {
   return declineLink(corpTaxBookDeps(), callerOf(request), corporationId, minerId);
 });
 
-// Each access token proves its own character (Self-proven link); the handler verifies, never logs them.
 corpTaxBookAction('claimPlayerCharactersCallable', (request) =>
   claimPlayerCharactersHandler({
     store: firestorePlayerLayerStore(firestore()),
@@ -1531,13 +1348,10 @@ corpTaxBookAction('listPendingCorpTaxBookGroupingsCallable', (request) =>
   listPendingGroupings(corpTaxBookDeps(), callerOf(request))
 );
 
-// No session on purpose: the verify link is the credential (D27), so a miner
-// without an EVE login can read their Statement and stop reminders.
 corpTaxBookAction('readCorpTaxBookStatementCallable', (request) =>
   readStatementByToken(corpTaxBookDeps(), parseToken(request.data))
 );
 
-// A decline needs only the link; a confirm never does (it needs the character's own sign-in).
 corpTaxBookAction('declineCorpTaxBookGroupingByTokenCallable', (request) => {
   const { token, characterId } = parseDeclineByTokenInput(request.data);
   return declineGroupingByToken(corpTaxBookDeps(), token, characterId);
@@ -1548,19 +1362,11 @@ corpTaxBookAction('stopCorpTaxBookRemindersCallable', (request) => {
   return setRemindersByToken(corpTaxBookDeps(), token, stopped);
 });
 
-// The Corp Tax Book router: the union of its callables' secrets and the longest timeout (a sync is many
-// small transactions). Clients call this.
 export const corpTaxBookCall = onCall<unknown>(
   { maxInstances: 10, secrets: FEEDER_VIEW_SECRETS, timeoutSeconds: 120 },
   (request) => bookVersioned(() => corpTaxBookActions.route(request))
 );
 
-// Vetting: a router of its own. Its public actions (an applicant has no Neocom Desk session)
-// prove the caller by the EVE access token or the review key in `data`, never by `callerOf`.
-// Not `bookVersioned`: nothing a client caches is written here (every read is a callable), and
-// the vetting collections are in UNVERSIONED_COLLECTIONS. Logic: vettingStore.ts.
-// `push` tells reviewers' devices of a shared report (`vettingShared`, ADR 0027) from inside the
-// submit action: FCM through the Admin SDK, so the router needs no secret for it.
 const vettingDeps = (): VettingDeps => ({
   ...srpDeps(),
   esi: esiVettingReader(),
@@ -1671,30 +1477,6 @@ vettingAction('saveVettingSettingsCallable', (request) =>
   )
 );
 
-/**
- * dailyHousekeeping (was three scheduled functions, to stay under the deploy quota and the
- * Cloud Scheduler free tier):
- * - the Notification Feed purge (`runPurgeNotificationFeed`, issue #595): daily rather than every
- *   5 minutes since the retention is 30 days. It needs the collection-group index on `firedAt` in
- *   firestore.indexes.json: deploy indexes before this function.
- * - purgeStaleAccounts (issue #2065): deletes the synced data of accounts with no successful sync
- *   in 90 days. Retention is by inactivity, not by Character removal, so it reaches accounts whose
- *   devices are all gone. The run-wide pass cap leaves a large backlog for the next tick.
- * - sweepCommunityRequests (issue #3812, ADR 0021): deletes Requests expired a week ago and
- *   Requests closed a week ago, with their Pledges. Bounded to 500 deletes a run; up to 500
- *   sequential reads and recursive deletes, so the function takes the 9-minute maximum timeout.
- * - sweepCommunityFleetPayouts (issue #4779): deletes Fleet Payouts expired a week ago, with
- *   their Shares. Bounded to 500 deletes a run.
- * - sweepSrpClaims (ADR 0026): deletes Paid and Rejected SRP Claims a year after
- *   they close, with their SRP log entries. Bounded to 500 deletes a run.
- * - sweepVetting: deletes vetting drafts never shared (a day), requests never answered (30 days)
- *   and decided reviews 30 days after the decision, each with what was read into it.
- * - purgeFiredProjections: deletes Scheduled Push rows fired more than 30 days ago (was every
- *   `dispatchProjections` tick, an empty billed query 96 times a day).
- * The three sweeps and the stale-account purge read with one query each (collection-group for
- * the sweeps, indexes in firestore.indexes.json, deployed by hand) and fall back to the old
- * per-parent scan until those indexes exist (indexedSweep.ts).
- */
 export const dailyHousekeeping = onSchedule(
   { schedule: 'every 24 hours', secrets: [ALERTS_TOKEN_KEY], timeoutSeconds: 540 },
   () =>
@@ -1714,7 +1496,6 @@ export const dailyHousekeeping = onSchedule(
         },
         {
           name: 'purgeStaleAccounts',
-          // Removing a purged account's sync grant writes its book's status (issue #5047).
           run: () => bookVersioned(() => runPurgeStaleAccounts({ alertGrantDeps, corpSyncDeps })),
         },
         {
@@ -1748,9 +1529,6 @@ export const dailyHousekeeping = onSchedule(
           },
         },
         {
-          // The nightly pass over each book's server-built docs (ADR 0032, decision
-          // 20261120-235011): moon docs that can still change and the tab read models, rebuilt
-          // and repaired; the retired Miner totals deleted. Inside the daily job, not a new function.
           name: 'verifyBookDocs',
           run: async () => {
             const { books, failed, truncated } = await bookVersioned(() =>
@@ -1798,9 +1576,6 @@ export const dailyHousekeeping = onSchedule(
     )
 );
 
-// mutamarketEstimate (mutamarket.ts). Session required: an import publishes
-// the module on MutaMarket. `maxInstances: 1` keeps the proxy's cache and
-// import queue global.
 const mutamarket = new MutamarketProxy();
 
 export const mutamarketEstimate = onCall<unknown>(
@@ -1825,16 +1600,6 @@ export const mutamarketEstimate = onCall<unknown>(
   }
 );
 
-/**
- * shortStartLink (shortStartLink.ts): an HTTP endpoint, `POST` (JSON or form body) or `GET`
- * (query string), that turns a Survey start link's fields into a short `/s/<id>` link, for a
- * script that puts one in an EVE calendar event. It is an HTTP trigger and not a callable
- * action because a script has no Firebase session to call a callable with. It is the only
- * writer of `survey-start` shares: the rules refuse that type from any client. `maxInstances`
- * is the hobby-scale abuse cap; the same details always give the same id, so repeating a
- * request adds nothing. Called through `api.neocomdesk.com/short` (workers/short-link-proxy), which
- * names the caller in a header signed with `SHORT_LINK_PROXY_SECRET` (`callerAddress`).
- */
 const shortLinkStore: ShortLinkStore = {
   claim: (id, search, caller, now, expiresAt) => {
     const ref = firestore().collection('shares').doc(id);
@@ -1845,7 +1610,6 @@ const shortLinkStore: ShortLinkStore = {
         { payload?: { search?: unknown }; expiresAt?: { toMillis(): number } } | undefined;
       const live = data?.expiresAt !== undefined && data.expiresAt.toMillis() > now;
       if (held.exists && live && data?.payload?.search !== search) return 'taken' as const;
-      // Renewing a link that is already live is free; only a new one counts against the caller.
       if (!(held.exists && live)) {
         const stored = limit.data() as Partial<CallerState> | undefined;
         const state: CallerState | null =
@@ -1860,7 +1624,6 @@ const shortLinkStore: ShortLinkStore = {
         if (!check.ok) return { limitedFor: check.limitedFor, reason: check.reason };
         tx.set(limitRef, {
           ...check.next,
-          // Removed by the TTL policy on this field (firestore.indexes.json).
           expiresAt: Timestamp.fromMillis(check.next.windowStart + NEW_LINK_WINDOW_MS),
         });
       }

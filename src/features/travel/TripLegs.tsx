@@ -1,16 +1,3 @@
-/**
- * Route Safety's itinerary by Leg (issue #2475): a trip through several Stops,
- * one section per leg. Each header reads "Leg 1 · Sabusi → Jita · 11 j ·
- * lowest 0.5 · <chokepoints>"; the first leg opens and the others start
- * folded. Each open leg is its own `RouteSystemsTable`, so quiet stretches
- * fold between that leg's own ends.
- *
- * A leg no stargate route flies says so in place of its rows — the other legs
- * still draw.
- *
- * Each open leg lists its ways to fly beside its rows (`LegBody`, issue
- * #2477), and clicking a way pins it to the leg.
- */
 import { fixed1 } from '@/lib/fixedFormat';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -38,7 +25,6 @@ export function TripLegs({
   avoidAction: (leg: RouteSafetyLeg, row: RouteSafetyRow) => (() => void) | null;
   holes?: HoleRowProps;
   ways: Pick<LegWaysProps, 'now' | 'holes' | 'bridges' | 'onSetUpBridges'>;
-  /** Pins a way for the leg at `index`; `null` un-pins it. */
   onUse: (index: number, pin: string | null) => void;
 }) {
   const { t } = useTranslation();

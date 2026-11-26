@@ -1,18 +1,3 @@
-/**
- * The last Community data read while online, kept on this device so the
- * Communities page can still show it with no connection (read-only, labelled
- * cached). Firestore here is the `lite` build with no offline persistence, so
- * without this an offline visit shows nothing and every Community is out of
- * reach.
- *
- * Stored in `settings` under `communitySnapshot:{characterId}:{kind}[:{communityId}]`,
- * like the other small per-Character Community records (`shareSelection.ts`,
- * `requestBadge.ts`): no new table. A Community and its Members are already
- * visible to this Character, so the snapshot holds nothing it could not read
- * live; the prefix is per Character, so another Character never sees it, and
- * `deleteCommunitySnapshots` runs wherever the Character's rows are removed
- * (`removeCharacter`).
- */
 import { db } from '@/db';
 import { communityBackendOverride } from './backendOverride';
 import type { MemberLibrary } from '@/engine/communities/libraryMatrix';
@@ -25,14 +10,12 @@ const PREFIX = 'communitySnapshot:';
 const keyFor = (characterId: number, kind: SnapshotKind, communityId?: string) =>
   `${PREFIX}${characterId}:${kind}${communityId === undefined ? '' : `:${communityId}`}`;
 
-/** Remember what was just read. A write that fails (quota, private window) is dropped: this is only a fallback. */
 export async function saveCommunitySnapshot(
   characterId: number,
   kind: SnapshotKind,
   value: unknown,
   communityId?: string
 ): Promise<void> {
-  // A stand-in backend (Storybook) is not this Character's real Communities.
   if (communityBackendOverride()) return;
   try {
     await db.settings.put({ key: keyFor(characterId, kind, communityId), value });
@@ -41,7 +24,6 @@ export async function saveCommunitySnapshot(
   }
 }
 
-/** The last saved copy, or null when there is none (or it cannot be read). */
 export async function loadCommunitySnapshot<T>(
   characterId: number,
   kind: SnapshotKind,
@@ -55,12 +37,10 @@ export async function loadCommunitySnapshot<T>(
   }
 }
 
-/** Run inside `removeCharacter`'s transaction: a removed Character leaves no Community data behind. */
 export async function deleteCommunitySnapshots(characterId: number): Promise<void> {
   await db.settings.where('key').startsWith(`${PREFIX}${characterId}:`).delete();
 }
 
-/** Run when a Character leaves or deletes a Community: its saved roster and libraries go with it. */
 export async function deleteCommunitySnapshot(
   characterId: number,
   communityId: string
@@ -71,10 +51,6 @@ export async function deleteCommunitySnapshot(
   ]);
 }
 
-/**
- * After a live list: forget the snapshots of Communities the Character is no
- * longer in (removed by the admin, or left on another device).
- */
 export async function pruneCommunitySnapshots(
   characterId: number,
   keepIds: readonly string[]
@@ -101,24 +77,12 @@ const NETWORK_CODES = new Set([
   'deadline-exceeded',
 ]);
 
-/**
- * The read failed for want of a connection (a fetch error, an ESI-layer
- * offline error, Firestore's `unavailable`), as opposed to being refused: only
- * the former may show the saved copy. A refusal (`permission-denied` after a
- * removal) must surface, not be papered over by stale data.
- */
 export function isNetworkFailure(err: unknown): boolean {
   if (isOfflineFailure(err)) return true;
   const code = (err as { code?: unknown } | null)?.code;
   return typeof code === 'string' && NETWORK_CODES.has(code);
 }
 
-/**
- * Read live, save what came back, and fall back to the saved copy when the
- * read fails for want of a connection. While the browser knows it is offline
- * the saved copy answers at once: a dead uplink can leave a live read pending
- * with no rejection. Nothing saved means the live read is tried anyway.
- */
 export async function loadWithSnapshot<T>({
   characterId,
   kind,
@@ -147,7 +111,6 @@ export async function loadWithSnapshot<T>({
   }
 }
 
-/** What a library read returns: every Member's items, and which reads failed (those read as empty). */
 export interface LibraryRead {
   libraries: MemberLibrary[];
   failedUids: readonly string[];
@@ -155,13 +118,6 @@ export interface LibraryRead {
 
 const emptyLibrary = (uid: string): MemberLibrary => ({ uid, items: [] });
 
-/**
- * The Community Library's reads with the saved copy behind them. One Member
- * unreadable while online (just removed, say) reads empty and the rest still
- * show, as before; the snapshot is refreshed from the reads that worked and
- * keeps that Member's old copy. The saved copy is what shows only when the
- * browser is offline, the sign-in failed on the network, or every read failed.
- */
 export async function loadLibrariesWithFallback(
   characterId: number,
   communityId: string,
@@ -187,7 +143,6 @@ export async function loadLibrariesWithFallback(
   }
   const failed = new Set(read.failedUids);
   if (uids.length > 0 && failed.size >= uids.length) {
-    // Nothing could be read at all: a saved copy beats a wall of empty columns.
     if (saved) return fromSaved();
     return { libraries: read.libraries, cached: false };
   }

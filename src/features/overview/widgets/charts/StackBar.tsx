@@ -2,7 +2,6 @@ import { stackPercents } from './geometry';
 import { CHART_COLOR } from './palette';
 import type { StackChartModel } from './types';
 
-/** One bar split into parts, with a legend in bar order so colour is never the only signal. */
 export function StackBar({ model }: { model: StackChartModel }) {
   const percents = stackPercents(model.parts.map((part) => part.value));
   return (
@@ -13,7 +12,7 @@ export function StackBar({ model }: { model: StackChartModel }) {
             key={part.key}
             className="block h-full"
             style={{
-              width: `${percents[i]!.toFixed(1)}%`, // fixed format: CSS width
+              width: `${percents[i]!.toFixed(1)}%`,
               backgroundColor: CHART_COLOR[part.color],
             }}
           />

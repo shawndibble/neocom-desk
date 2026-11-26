@@ -1,20 +1,3 @@
-/**
- * Where the pilot's reactions run: the Reaction Location the pilot last set
- * from a Build Plan page — a manufacturing plan's Reaction Location, or a
- * reaction-activity plan's own location (`rememberLocationFromEdit.ts`).
- *
- * Read in two places: a manufacturing plan's Reaction Location starts here
- * the first time Include Reactions is turned on for it (issue #698), and a
- * fresh reaction-activity plan's primary location starts here
- * (`newBuildPlan`). Each plan keeps its own copy from then on; this record
- * only decides where the *next* one starts.
- *
- * Once a Settings control (issue #698); now remembered rather than set — see
- * `docs/context/decisions/20261001-114015-new-plans-start-at-the-last-location-set.md`.
- * Mirrors `facilityDefaults.ts` field-for-field, restricted to a refinery
- * (`athanor`/`tatara`) instead of any facility kind — the one the Reaction
- * Location picker itself is restricted to.
- */
 import { createSyncedSetting } from '@/lib/useSyncedSetting';
 import {
   EMPTY_RIG_FIT,
@@ -34,7 +17,6 @@ export interface ReactionFacilityDefaults extends RememberedLocationFields {
   facilityTaxPct: number | null;
 }
 
-/** An unfitted Athanor — the smaller, more commonly available refinery. */
 export const DEFAULT_REACTION_FACILITY_DEFAULTS: ReactionFacilityDefaults = {
   facility: 'athanor',
   rigFit: EMPTY_RIG_FIT,
@@ -43,23 +25,10 @@ export const DEFAULT_REACTION_FACILITY_DEFAULTS: ReactionFacilityDefaults = {
 
 const RIG_KINDS: readonly RigKind[] = ['none', 'meT1', 'meT2', 'teT1', 'teT2'];
 
-/**
- * The only facilities this setting may hold — the same restriction the
- * Reaction Location picker applies, so a pick from it can never produce a
- * value `normalizeReactionFacilityDefaults` would reject.
- */
 export const REACTION_FACILITY_PRESETS = Object.values(FACILITY_PRESETS).filter(
   (preset) => preset.activity === 'reaction'
 );
 
-/**
- * A facility whose preset isn't a reaction one is incoherent for this
- * setting — normalised to the default rather than rejected outright, the
- * same "the facility is what the pilot chose" reasoning
- * `normalizeFacilityDefaults` uses for a non-structure. There is no partial
- * fix here the way there is for a non-structure's rig/tax, since the whole
- * record — remembered place included — only means anything for a refinery.
- */
 export function normalizeReactionFacilityDefaults(
   value: ReactionFacilityDefaults
 ): ReactionFacilityDefaults {

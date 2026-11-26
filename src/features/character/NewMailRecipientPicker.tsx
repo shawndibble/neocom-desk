@@ -1,9 +1,3 @@
-/**
- * The recipient row of New Mail and Forward: typed chips plus one combobox
- * that lists the Character's joined mailing lists (local), optional quick
- * picks (Forward's contacts) and ESI search hits for characters,
- * corporations and alliances.
- */
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { GrantNote } from '@/app/GrantNote';
@@ -43,11 +37,8 @@ interface NewMailRecipientPickerProps {
   recipients: readonly ComposeRecipient[];
   onAdd: (recipient: ComposeRecipient) => void;
   onRemove: (recipient: ComposeRecipient) => void;
-  /** Id of the combobox input, for the caller's visible label. */
   inputId: string;
-  /** People shown before anything is typed, and filtered by it after (Forward's contacts). */
   quickPicks?: readonly ComposeRecipient[];
-  /** Focus the field on mount without popping its list open. */
   autoFocus?: boolean;
   invalid?: boolean;
   describedBy?: string;
@@ -146,7 +137,6 @@ export function NewMailRecipientPicker({
   function onKeyDown(e: KeyboardEvent<HTMLInputElement>) {
     if (e.key === 'Escape') {
       if (open) {
-        // Closes the list only; a full-pane composer must not also close.
         e.stopPropagation();
         setOpen(false);
       }
@@ -160,7 +150,6 @@ export function NewMailRecipientPicker({
     }
     if (combo.handleNavKey(e)) setOpen(true);
     else if (COMBOBOX_NAV_KEYS.includes(e.key)) {
-      // An empty list still opens, to show why it is empty.
       e.preventDefault();
       setOpen(true);
     }
@@ -271,7 +260,6 @@ export function NewMailRecipientPicker({
                       : 'hover:bg-panel-2'
                   )}
                   onMouseEnter={() => combo.setHighlight(i)}
-                  // Keeps the input focused; a click would blur it first and close the list.
                   onMouseDown={(e) => {
                     e.preventDefault();
                     pick(c);

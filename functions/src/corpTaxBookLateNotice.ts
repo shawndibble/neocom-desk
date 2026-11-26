@@ -1,64 +1,37 @@
-/**
- * A late notice (#6294, decisions 20261117-033049 and 20261117-043246): a record of what a Corp
- * Tax Book asked a Miner for, never a bill. Money pays the Miner's oldest unpaid day on their
- * account whatever code it carries, so a notice takes no payment and settles nothing; it reads as
- * settled once every day it listed is. A notice lists only the days no earlier notice listed.
- *
- * Shared by the client and the Cloud Functions (decision 20261117-230113): dependency-free, and
- * `src/engine/corpTaxBook/lateNotices.ts` re-exports it.
- *
- * Notices are stored as `corps/{id}/lateNotices` docs in this shape. A legacy `statements` doc
- * (`kind: 'notice'`) is no longer written; `corpTaxBookLateNoticeBackfill.ts` reads one into a
- * `LateNotice` for the one-time backfill.
- */
 import { isRecord } from './guards.js';
 import { DAY_MS, utcDayOf } from './timeConstants.js';
 
-/** `late`: the Miner is behind. `final`: their account was closed, so it is the last one. */
 export type LateNoticeKind = 'late' | 'final';
 
-/** `mined` and `late-ore` bill a day charge's ore; `correction` bills an officer's Adjustment. */
 export type LateNoticeLineKind = 'mined' | 'late-ore' | 'correction';
 
-/** One line of one day a notice asked for, as it was priced when the notice went out. */
 export interface LateNoticeLine {
   kind: LateNoticeLineKind;
   date: string;
-  /** The day charge, or `adjustment:<id>`, the line names: a later notice never lists it again. */
   key: string;
   characterId?: number;
   structureId?: number;
-  /** The ore it billed (for late ore, only the growth). */
   oreLines: { typeId: number; quantity: number }[];
-  /** Per-unit price by raw type id, and which price tier priced each: printed on the verify page. */
   unitPrices?: Record<number, number>;
   priceSources?: Record<number, string>;
   estimatedValue: number;
   taxPct?: number;
-  /** The rate's effective-from date (D28); absent for a per-record override. */
   rateEffectiveFrom?: string;
-  /** A correction's reason. */
   reason?: string;
-  /** What the line billed when the notice went out. */
   tax: number;
 }
 
 export interface LateNoticeMail {
-  /** Mails the book recorded for it. */
   sent: number;
   lastAt?: string;
-  /** Reminders an officer sent by hand; one is allowed after the Miner stopped them. */
   manualSent: number;
-  /** The Miner chose "Stop reminders" (D27). */
   remindersStopped: boolean;
 }
 
-/** D27: reminders run until the Miner stops them; after that an officer may send one by hand. */
 export function reminderAllowed(mail: LateNoticeMail): boolean {
   return !mail.remindersStopped || mail.manualSent < 1;
 }
 
-/** The names a guest's notice page prints: a guest cannot look a structure's name up (#4066). */
 export interface LateNoticeNames {
   corporationName?: string;
   minerName?: string;
@@ -68,41 +41,29 @@ export interface LateNoticeNames {
 export interface LateNotice {
   id: string;
   minerId: string;
-  /** The Miner's characters when it went out: whose own lines it is. */
   characterIds: number[];
   kind: LateNoticeKind;
   issuedAt: string;
-  /** The Character whose tab issued it. */
   issuedBy?: number;
-  /** The Reason code the mail printed, when it printed one: a donation carrying it is this Miner's. */
   code?: string;
-  /** The book's trade hub and Ore Form its lines were priced at (D11). */
   pricing?: { hubId: string; oreForm: 'compressed' | 'raw' };
-  /** Who may read it (`char:<id>`): the Miner's characters and anyone claiming them. */
   uids: string[];
-  /** The new days it asked for, oldest first. */
   lines: LateNoticeLine[];
-  /** What its lines billed when it went out (Σ line tax). */
   listed: number;
   mail: LateNoticeMail;
   names?: LateNoticeNames;
 }
 
-/** What a notice's days stand at, read off the Miner's account. */
 export interface LateNoticeStanding {
-  /** What its days still bill, less what open disputes hold. */
   due: number;
-  /** What open disputes hold of its days; absent when nothing is held. */
   held?: number;
   credited: number;
   forgiven: number;
   writtenOff: number;
   remaining: number;
-  /** Every day it listed is paid, forgiven or no longer billed. */
   settled: boolean;
 }
 
-/** The part of one account day `lateNoticeStanding` reads (`DaySettlement` on the client). */
 export interface LateNoticeDayState {
   tax: number;
   held: boolean;
@@ -113,44 +74,31 @@ export interface LateNoticeDayState {
   settled: boolean;
 }
 
-/**
- * The field a declaration and a verify token name their Late notice by. It keeps the wire name it
- * had when notices were stored as Statements, by decision 20261121-154806 (no rename, and no
- * support for older clients either way).
- */
 export const NOTICE_ID_FIELD = 'statementId';
 
-/** A line key that names an Adjustment rather than a day charge. */
 const ADJUSTMENT_PREFIX = 'adjustment:';
 
-/** The id a closing account's last notice is stored under (`closeAccount`). */
 const FINAL_PREFIX = 'final_';
 
-/** A notice id made safe for a Firestore doc id: a Miner id may carry any character. */
 export function noticeDocId(id: string): string {
   return id.replace(/[^A-Za-z0-9_:-]/g, '_');
 }
 
-/** Whether an id is a final notice's: only closing an account issues one. */
 export function isFinalNoticeId(id: string): boolean {
   return id.startsWith(FINAL_PREFIX);
 }
 
-/** The id of the final notice closing `minerId`'s account sends. */
 export function finalNoticeId(minerId: string): string {
   return noticeDocId(`${FINAL_PREFIX}${minerId}`);
 }
 
-/** The key a stored line names: its day charge, else its Adjustment, else its date. */
 export function lineKey(line: { chargeKey?: string; adjustmentId?: string; date: string }): string {
   return line.chargeKey ?? adjustmentLineKey(line.adjustmentId ?? line.date);
 }
 
-/** The key a correction's line carries (`adjustment:<id>`): a later notice never lists it again. */
 export const adjustmentLineKey = (adjustmentId: string): string =>
   `${ADJUSTMENT_PREFIX}${adjustmentId}`;
 
-/** The first and last day a notice listed (its lines are oldest first); its issue day with none. */
 export function noticeSpan(notice: { lines: readonly { date: string }[]; issuedAt: string }): {
   first: string;
   last: string;
@@ -159,11 +107,6 @@ export function noticeSpan(notice: { lines: readonly { date: string }[]; issuedA
   return { first, last: notice.lines.at(-1)?.date ?? first };
 }
 
-/**
- * Why a new notice is not sent, or null: a line another notice already listed (a notice lists only
- * new days), or the cooldown since the Miner's last late notice (`cooldownDays`) has not passed. So
- * two tabs never mail the same days. A final notice starts no cooldown.
- */
 export function lateNoticeRefusal(
   notice: { lines: readonly Pick<LateNoticeLine, 'key'>[] },
   earlier: readonly {
@@ -186,10 +129,6 @@ export function lateNoticeRefusal(
   return null;
 }
 
-/**
- * The Late notices among `lateNotices` docs, their server stamp dropped; anything that is no
- * notice (a malformed doc) is left out.
- */
 export function noticesOfDocs(docs: readonly unknown[]): LateNotice[] {
   return docs.flatMap((raw) => {
     if (!isRecord(raw)) return [];
@@ -201,16 +140,10 @@ export function noticesOfDocs(docs: readonly unknown[]): LateNotice[] {
   });
 }
 
-/** A notice as the date rules read it: its lines' kinds, days and Characters. */
 type NoticedLines = {
   lines: readonly Pick<LateNoticeLine, 'kind' | 'date' | 'characterId'>[];
 };
 
-/**
- * The days these notices listed: each mined or late-ore line's day (a correction bills no day),
- * one Character's alone when `characterId` is given. A day between two listed days was not
- * listed. What an issued notice asked never changes, so the date rules refuse to reprice these.
- */
 export function noticedDates(notices: readonly NoticedLines[], characterId?: number): Set<string> {
   const out = new Set<string>();
   for (const n of notices)
@@ -220,14 +153,12 @@ export function noticedDates(notices: readonly NoticedLines[], characterId?: num
   return out;
 }
 
-/** The latest day any of these notices listed, or null with none. */
 export function lastNoticedDay(notices: readonly NoticedLines[]): string | null {
   let last: string | null = null;
   for (const d of noticedDates(notices)) if (last === null || d > last) last = d;
   return last;
 }
 
-/** Every line key any of these notices listed. */
 export function listedKeys(
   notices: readonly { lines: readonly Pick<LateNoticeLine, 'key'>[] }[]
 ): Set<string> {
@@ -236,11 +167,6 @@ export function listedKeys(
   return out;
 }
 
-/**
- * A notice's standing on the Miner's account. Each date it listed counts at the share of that
- * day's tax its lines named (a day can grow after the notice went out); a held day is left out
- * of what is due, and a day that no longer bills anything reads as paid.
- */
 export function lateNoticeStanding(
   notice: { lines: readonly Pick<LateNoticeLine, 'date' | 'tax'>[] },
   byDay: ReadonlyMap<string, LateNoticeDayState>
@@ -260,7 +186,6 @@ export function lateNoticeStanding(
     const share = Math.min(1, tax / day.tax);
     if (day.held) {
       out.held += tax;
-      // A held day is left out of what is due, but it is not paid: the notice is not settled.
       if (!day.settled) settled = false;
       continue;
     }
@@ -275,17 +200,12 @@ export function lateNoticeStanding(
   return { ...rest, ...(held > 0 ? { held } : {}), settled };
 }
 
-/** A short Reason code, `MT` and six characters, hashed from `seed` (FNV-1a). */
 export function paymentCode(seed: string): string {
   let h = 2166136261;
   for (const ch of seed) h = Math.imul(h ^ ch.charCodeAt(0), 16777619) >>> 0;
   return `MT${h.toString(36).toUpperCase().padStart(7, '0').slice(-6)}`;
 }
 
-/**
- * The Reason code a Miner puts on a donation: one per Miner, since money pays their oldest day
- * whatever it names. Codes printed on notices already mailed were `paymentCode(notice id)`.
- */
 export function minerPaymentCode(minerId: string): string {
   return paymentCode(`miner:${minerId}`);
 }

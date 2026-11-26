@@ -1,17 +1,3 @@
-/**
- * Coming Up Rail's "Show all days" control touch target (issue #1077): once
- * a day is selected in the phone Day Ticker, the rail's header grows a
- * "Show all days" link to clear the filter. It was a bare `<button>` with no
- * height/padding-y class at all — its own hit box was ~16-18px, under both
- * the 36px touch tier and the 24px WCAG floor, even though the panel header
- * around it is already `min-h-9` (`Panel`'s header uses `items-center`
- * without stretching the action to fill that height). Fixed with
- * `flex min-h-9 items-center ... md:min-h-0`, the same precedent as
- * #1064's Open Orders Healthy toggle (identical prior className).
- *
- * No calendar-event fixture is needed: "Show all days" renders purely off
- * `selectedDayMs !== null`, independent of whether the rail has any items.
- */
 import type { Page } from '@playwright/test';
 import { test, expect, PHONE, DESKTOP } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
@@ -20,13 +6,6 @@ import { scopesForGroup } from '../src/esi/scopes';
 
 const HOUR_MS = 3_600_000;
 
-/**
- * Logs in, sets the viewport, opens Calendar and selects the first day —
- * the phone Day Ticker and the desktop Calendar Map grid share the same
- * `role="group"`/`aria-label="Calendar map"` pair but render mutually
- * exclusively (`Calendar.tsx`'s `isNarrow` ternary), so this locator is
- * unambiguous at either viewport.
- */
 async function selectFirstCalendarDay(page: Page, viewport: { width: number; height: number }) {
   await page.setViewportSize(viewport);
   await signInAndGoto(page, './calendar');
@@ -59,9 +38,6 @@ test('"Show all days" keeps its plain text-link size at and above md (1280px)', 
   await expect(clearDay).toBeVisible();
 
   const height = await clearDay.evaluate((el) => el.getBoundingClientRect().height);
-  // `md:min-h-6` drops the 36px touch floor to WCAG 2.5.8's 24px pointer
-  // target (#6559) — pinned to that measured height, not just "< 36", so a
-  // loose upper bound can't miss a partial regression toward the touch tier.
   expect(height).toBeGreaterThanOrEqual(24);
   expect(height).toBeLessThanOrEqual(28);
 });
@@ -136,7 +112,6 @@ test('a Station Manager sees a moon chunk on the phone rail, without overflow', 
   page,
 }) => {
   const now = Date.now();
-  // Registered after `installEsiMock` (the `page` fixture's setup), so these win.
   await page.route('https://esi.evetech.net/**', async (route) => {
     const path = new URL(route.request().url()).pathname;
     const json = (body: unknown) =>

@@ -1,4 +1,3 @@
-/** The member page's reads and writes, with a stand-in for Storybook and tests (never set by the app). */
 import { collection, getDocs, query, where } from 'firebase/firestore/lite';
 import { isSyncConfigured } from '@/app/syncStatus';
 import { db as localDb } from '@/db';
@@ -27,9 +26,7 @@ export interface SrpMemberBackend {
     input: FileSrpClaimInput
   ) => Promise<FiledSrpClaim>;
   lostLosses: (characterId: number, corporationId: number) => Promise<LostLoss[]>;
-  /** The public ESI killmail a modal shows the facts and fit of. */
   killmail: (killmailId: number, killmailHash: string) => Promise<Killmail | null>;
-  /** The doctrine check a filing of this killmail would store; nothing is written. */
   previewDoctrine: (
     characterId: number,
     corporationId: number,
@@ -39,7 +36,6 @@ export interface SrpMemberBackend {
 
 let override: SrpMemberBackend | null = null;
 
-/** Storybook and tests only. */
 export function setSrpMemberBackendOverride(next: SrpMemberBackend | null): void {
   override = next;
 }
@@ -47,7 +43,6 @@ export function setSrpMemberBackendOverride(next: SrpMemberBackend | null): void
 const STATES: readonly SrpClaimState[] = ['pending', 'approved', 'paid', 'rejected'];
 const num = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
 
-/** A claim document as the page shows it; null for one that is not a claim this client knows. */
 export function toMemberClaim(data: Record<string, unknown>): MemberClaim | null {
   const state = STATES.find((s) => s === data.state);
   if (
@@ -83,7 +78,6 @@ async function readMyClaims(characterId: number, corporationId: number): Promise
   const uid = await ensureSignedIn(characterId);
   const ownerHash = (await localDb.characters.get(characterId))?.ownerHash;
   if (ownerHash === undefined || uid !== uidForCharacter(characterId)) return [];
-  // Both fields are what the rule checks, so a query without either is refused outright.
   const snap = await getDocs(
     query(
       collection(getSyncFirestore(characterId), 'corps', String(corporationId), 'srpClaims'),
@@ -98,7 +92,6 @@ async function readMyClaims(characterId: number, corporationId: number): Promise
 }
 
 const real: SrpMemberBackend = {
-  // SRP lives in the cloud backend; with none configured there is no SRP to find, not a failed load.
   status: async (characterId, corporationId) =>
     isSyncConfigured()
       ? getSrpStatus(characterId, corporationId)

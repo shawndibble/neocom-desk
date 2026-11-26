@@ -41,7 +41,6 @@ const TRAIN_SKILLS_PATHS = [
 ] as const;
 const LIST = 'list-disc space-y-1 pl-5 marker:text-text-faint';
 const NEW_TO_EVE = 'settings.faq.a.newToEve';
-/** The EVE words "What do these EVE words mean?" defines, in the order a new pilot meets them. */
 const EVE_TERMS = [
   'sp',
   'isk',
@@ -70,7 +69,6 @@ const SECURITY_SPACES = [
   'securityWormhole',
 ] as const;
 
-/** One store group's description and lines, as a question's answer. */
 function StoreGroup({ group }: { group: WhatWeStoreGroup }) {
   const { t } = useTranslation();
   return (
@@ -97,7 +95,6 @@ function StoreGroup({ group }: { group: WhatWeStoreGroup }) {
   );
 }
 
-/** One retention group: what is kept, with how long beside it. */
 function RetentionList({ group }: { group: RetentionGroup }) {
   const { t } = useTranslation();
   return (
@@ -120,7 +117,6 @@ interface FaqEntry {
   readonly answer: ReactNode;
 }
 
-/** The question id a URL hash names (`#data-lag`), or an empty string. */
 function anchorOf(hash: string): string {
   try {
     return decodeURIComponent(hash.replace(/^#/, ''));
@@ -135,23 +131,11 @@ function storeGroup(id: string): WhatWeStoreGroup {
   return group;
 }
 
-/**
- * Help › FAQ: one collapsible card per question, all closed, so the page reads
- * as a list of questions to scan and open, not a wall of answers.
- *
- * The store groups (`whatWeStore.ts`) are a user-facing commitment, written
- * from what actually reaches a server; the answers here present them, they do
- * not restate them. No status colours: "synced" versus "stays on this device"
- * is said in words (DESIGN.md §6, §7).
- */
 export function FaqPanel() {
   const { t } = useTranslation();
   const [open, setOpen] = useState<ReadonlySet<string>>(new Set());
   const { hash } = useLocation();
 
-  // "New to EVE?" teaches the game, not the app: each answer points to the page
-  // that helps, and out to EVE University and CCP for the rest. Facts only, so
-  // the security answer gives no verdicts (the travel copy rule).
   const newToEve: readonly FaqEntry[] = [
     {
       id: 'eve-terms',
@@ -234,7 +218,6 @@ export function FaqPanel() {
           <p>
             <Trans
               i18nKey={`${NEW_TO_EVE}.securityRoute`}
-              // Route rules' own label, so the answer can't drift from it.
               values={{ preference: t(ROUTE_PREFERENCE_SHORT_LABEL_KEYS['prefer-highsec']) }}
               components={{ route: <Link to={tabPath(TRAVEL_TABS, 'route')} className={LINK} /> }}
             />
@@ -424,10 +407,6 @@ export function FaqPanel() {
     },
   ];
 
-  // A link to `/help/faq#<id>` (the landing page's, a toast's) opens that
-  // question and scrolls to it. Other questions keep whatever state they have.
-  // The open set follows the hash while rendering (not in an effect), so the
-  // linked question is already open on the first paint.
   const linked = [...newToEve, ...using, ...data].some((entry) => entry.id === anchorOf(hash))
     ? anchorOf(hash)
     : null;

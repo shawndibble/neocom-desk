@@ -1,8 +1,3 @@
-/**
- * The Overview's Stock card: every market the pilot stocks, worst first,
- * counted from cached assets and orders like the below-target alert — the
- * landing page never fans out a live asset read.
- */
 import { rankMarkets } from '@/engine/stockTargets/markets';
 import { buildStockRows, summarizeStock, type StockSummary } from '@/engine/stockTargets/stockRows';
 import type { DeadlineSeverity } from '@/engine/character/severity';
@@ -19,14 +14,11 @@ export interface StockBoardMarket {
 }
 
 export interface StockBoardData {
-  /** Worst first. */
   markets: StockBoardMarket[];
   totals: { out: number; low: number };
-  /** False before any order list is cached: the counts are then unknown, not zero. */
   counted: boolean;
 }
 
-/** Null when the pilot stocks no market, which is also what keeps the card off the board. */
 export async function loadStockBoard(): Promise<StockBoardData | null> {
   const [, hubId] = await Promise.all([useStockLists.getState().hydrate(), loadHubFor('market')]);
   const lists = useStockLists.getState().value;

@@ -74,7 +74,6 @@ describe('CharacterSwitcher', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Characters' }));
     await userEvent.click(await screen.findByRole('button', { name: /Permissions for Marsha$/ }));
     await waitFor(() => expect(useActiveCharacter.getState().activeCharacterId).toBe(3));
-    // The navigation follows the switch by a tick.
     await waitFor(() =>
       expect(screen.getByTestId('where')).toHaveTextContent('/settings/permissions')
     );

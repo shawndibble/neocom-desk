@@ -168,11 +168,9 @@ describe('rateChangeEvent', () => {
 
   it('is undefined when the effective rate did not change', () => {
     const before = [req(6, '2026-10-01'), agreed(8, '2026-10-05')];
-    // A feeder request after the override: recorded, but the rate stands.
     expect(
       rateChangeEvent({ before, after: [...before, req(4, '2026-10-08')], date: '2026-10-08' })
     ).toBeUndefined();
-    // The Collector agrees to what is already in force.
     expect(
       rateChangeEvent({ before, after: [...before, agreed(8, '2026-10-09')], date: '2026-10-09' })
     ).toBeUndefined();

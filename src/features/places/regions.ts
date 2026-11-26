@@ -1,9 +1,3 @@
-/**
- * A region's name and a solar system's region, for Place Info. Both read the
- * bundled tables first (offline, no ESI); a region outside `regions.json`
- * (no market) falls back to the cached `resolveNames`. Each resolves to
- * `null` when it cannot answer, never throws.
- */
 import { resolveNames } from '@/features/character/names';
 import { loadMarketRegions } from '@/sde/loadMarketSde';
 import { lookupSolarSystem } from '@/sde/solarSystems';

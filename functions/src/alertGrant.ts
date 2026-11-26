@@ -1,27 +1,9 @@
-// Alerts Grant custody (issue #3753, ADR 0020, ADR 0028): save/delete logic for
-// the one server-held EVE token — a refresh token scoped to notifications and,
-// when the user granted them, the Character's location (nearby alerts, ADR 0028)
-// and mail (new-mail alerts, ADR 0029). Pure of
-// Firebase: the Firestore store, key, verifier and SSO revoke are injected, so
-// it tests without an emulator (alertGrantStore.ts / index.ts wire the real
-// ones). A token is never logged, never put in an error, never returned.
-
 import { verifyAccessToken } from './actorAuth.js';
 import { encryptRefreshToken, decryptRefreshToken } from './alertGrantCrypto.js';
 import type { EveTokenClaims } from './verifyEveToken.js';
 
-/** The scope every Alerts Grant carries. */
 export const ALERTS_SCOPE = 'esi-characters.read_notifications.v1';
-/**
- * The one optional extra (ADR 0028): the Character's location, so the poller
- * can push nearby Incursions and raidable skyhooks. A grant saved before it
- * existed holds the notifications scope alone and keeps working for that.
- */
 export const ALERTS_LOCATION_SCOPE = 'esi-location.read_location.v1';
-/**
- * The second optional extra (ADR 0029): the Character's mail, so the poller can
- * push new mail to a closed app. Only the headers are ever read.
- */
 export const ALERTS_MAIL_SCOPE = 'esi-mail.read_mail.v1';
 const ALLOWED_SCOPES: ReadonlySet<string> = new Set([
   ALERTS_SCOPE,
@@ -29,12 +11,10 @@ const ALLOWED_SCOPES: ReadonlySet<string> = new Set([
   ALERTS_MAIL_SCOPE,
 ]);
 
-/** Whether a grant's token can read the Character's location (absent `scopes`: saved before ADR 0028). */
 export function grantCoversNearby(grant: Pick<AlertGrantDoc, 'scopes'>): boolean {
   return grant.scopes?.includes(ALERTS_LOCATION_SCOPE) === true;
 }
 
-/** Whether a grant's token can read the Character's mail headers (absent `scopes`: saved before ADR 0028). */
 export function grantCoversMail(grant: Pick<AlertGrantDoc, 'scopes'>): boolean {
   return grant.scopes?.includes(ALERTS_MAIL_SCOPE) === true;
 }
@@ -43,52 +23,24 @@ const SSO_TIMEOUT_MS = 10_000;
 const TOKEN_URL = 'https://login.eveonline.com/v2/oauth/token';
 const REVOKE_URL = 'https://login.eveonline.com/v2/oauth/revoke';
 
-/** `alertGrants/{characterId}` — function-only (firestore.rules denies clients). */
 export interface AlertGrantDoc {
-  /** AES-256-GCM blob, see alertGrantCrypto.ts. */
   encryptedRefreshToken: string;
-  /** The client_id the token was issued to; SSO revoke needs it. */
   clientId: string;
   enabledAt: number;
-  /** Highest notification_id already handled; the poller owns it. */
   highWaterId: number | null;
-  /** Last ETag from `/notifications/`; the poller owns it. */
   etag: string | null;
-  /** Every notification type seen for this Character; the poller owns it. */
   seenTypes: string[];
   status: 'active' | 'revoked';
-  /**
-   * The scopes the stored token carries, sorted (ADR 0028). Absent on a grant
-   * saved before the location scope existed, which means notifications only.
-   */
   scopes?: string[];
-  /**
-   * New-mail alerts (ADR 0029); the poller owns all three, and they exist only
-   * while the grant carries the mail scope. Ids and an ETag, never content.
-   * `null`/absent mark: the next mail read seeds silently instead of pushing.
-   */
   mailHighWaterId?: number | null;
   mailEtag?: string | null;
-  /** `deviceId|Occurrence Key` of mails already pushed to a device while the mark could not advance (a partial send). */
   mailPushed?: string[];
-  /**
-   * Set by the poller (issue #5144) when no live device wanted any notification
-   * type and it stopped reading the feed: the next read resumes from the wanting
-   * device's registration instead of replaying what passed meanwhile.
-   */
   notificationsIdle?: boolean;
-  /**
-   * When the poller next looks at this grant (issue #5236), epoch ms. The poller
-   * lists only grants whose value is `<=` now, so one it can already tell has
-   * nothing to do is not read every run. `0` is due now. Absent on a grant
-   * saved before this field: the poller's daily full listing finds those.
-   */
   nextPollAt?: number;
 }
 
 export interface AlertGrantStore {
   get(characterId: number): Promise<AlertGrantDoc | null>;
-  /** One round trip for many Characters; a Character with no grant maps to null. */
   getMany(characterIds: number[]): Promise<Map<number, AlertGrantDoc | null>>;
   set(characterId: number, doc: AlertGrantDoc): Promise<void>;
   delete(characterId: number): Promise<void>;
@@ -101,16 +53,12 @@ export interface RefreshedTokens {
 
 export interface AlertGrantDeps {
   store: AlertGrantStore;
-  /** Lazy: a missing secret must only fail calls that actually need the key. */
   key: () => Buffer;
   verify: (accessToken: string) => Promise<EveTokenClaims>;
-  /** Exchange a refresh token at SSO; returns the new access token and the rotated refresh token. */
   refresh: (clientId: string, refreshToken: string) => Promise<RefreshedTokens>;
   revoke: (clientId: string, refreshToken: string) => Promise<void>;
   now: () => number;
-  /** Receives only messages and ids — never a token. */
   log: (message: string, data?: Record<string, unknown>) => void;
-  /** Drop the Character's nearby-alerts state from its devices (ADR 0028); best effort. */
   forgetNearby?: (characterId: number) => Promise<void>;
 }
 
@@ -147,10 +95,6 @@ export async function saveAlertGrant(
 ): Promise<{ characterId: number; enabledAt: number; nearby: boolean; mail: boolean }> {
   const supplied = await verifyAlertsToken(deps, input.accessToken);
 
-  // The access token alone proves nothing about the refresh token beside it:
-  // anyone holding a stolen access token could otherwise swap in their own.
-  // Redeeming the refresh token at SSO proves it is a live token for this same
-  // Character, and hands back the rotated one, which is the one to store.
   let refreshed: RefreshedTokens;
   try {
     refreshed = await deps.refresh(supplied.clientId, input.refreshToken);
@@ -170,9 +114,6 @@ export async function saveAlertGrant(
   const existing = await deps.store.get(characterId);
   const previousActive = existing?.status === 'active' ? existing : null;
   const scopes = [...claims.scopes].sort();
-  // Mail state survives only a re-grant that keeps the mail scope: one that
-  // drops it forgets the mark, and one that adds it starts unmarked, so the
-  // first read seeds silently and enabling mail never replays the inbox.
   const withMail = scopes.includes(ALERTS_MAIL_SCOPE);
   const keptMail = withMail && previousActive !== null && grantCoversMail(previousActive);
   const doc: AlertGrantDoc = {
@@ -185,7 +126,6 @@ export async function saveAlertGrant(
     status: 'active',
     scopes,
     nextPollAt: 0,
-    // A re-grant keeps the idle mark with the stale high-water mark it guards.
     ...(previousActive?.notificationsIdle ? { notificationsIdle: true } : {}),
     ...(withMail
       ? {
@@ -197,8 +137,6 @@ export async function saveAlertGrant(
   };
   await deps.store.set(characterId, doc);
 
-  // The replaced token is now orphaned; revoke it, best effort. The refresh
-  // above usually rotated it already, so skip if it is the one just stored.
   if (existing) {
     await revokeStored(deps, characterId, existing, refreshed.refreshToken);
   }
@@ -221,7 +159,6 @@ async function verifyAlertsToken(
       }),
     toError: () => new AlertGrantError('unauthenticated', 'EVE access token rejected'),
   });
-  // Notifications, optionally with location and mail; nothing else, and no repeats.
   const scopes = new Set(claims.scopes);
   if (
     scopes.size !== claims.scopes.length ||
@@ -236,7 +173,6 @@ async function verifyAlertsToken(
   return claims;
 }
 
-/** Decrypt and revoke a stored token at SSO (unless it equals `keepToken`). False if it could not be done. */
 async function revokeStored(
   deps: AlertGrantDeps,
   characterId: number,
@@ -257,10 +193,6 @@ async function revokeStored(
   }
 }
 
-/**
- * Delete the grant, then revoke its token at SSO. The doc goes first: a revoke
- * failure must never leave a token we meant to drop sitting in Firestore.
- */
 export async function deleteAlertGrant(
   deps: AlertGrantDeps,
   characterId: number
@@ -277,7 +209,6 @@ export async function deleteAlertGrant(
   return { deleted: true, revoked: await revokeStored(deps, characterId, doc) };
 }
 
-/** SSO token revocation for a public (PKCE) client: client_id in the form body. */
 export async function revokeAtSso(
   clientId: string,
   refreshToken: string,
@@ -296,14 +227,8 @@ export async function revokeAtSso(
   if (!res.ok) throw new Error(`SSO revoke failed (${res.status})`);
 }
 
-/** The longest `error_description` kept: enough to tell the refusals apart, too short to carry a payload. */
 const SSO_DESCRIPTION_MAX = 200;
 
-/**
- * SSO's `error_description`, made safe to log: the submitted token, and any run that looks like
- * another token (24+ url-safe base64 characters, or a dotted JWT), become `[token]` before the
- * length cap, so a cut can never leave half of one behind. Blank: undefined.
- */
 export function sanitiseSsoDescription(raw: string, submittedToken: string): string | undefined {
   const exact = submittedToken === '' ? raw : raw.split(submittedToken).join('[token]');
   const safe = exact
@@ -314,20 +239,16 @@ export function sanitiseSsoDescription(raw: string, submittedToken: string): str
   return safe === '' ? undefined : safe;
 }
 
-/** An SSO refresh refusal. Carries the status, error code and SSO's own wording (redacted): no token. */
 export class SsoRefreshError extends Error {
   constructor(
     readonly status: number,
-    /** True when SSO answered `invalid_grant`: the token is dead (revoked, expired, wrong client). */
     readonly invalidGrant: boolean,
-    /** SSO's `error_description` ("Unable to migrate grant", a revoked token, ...): what a log line can say. */
     readonly description?: string
   ) {
     super(`SSO refresh failed (${status})`);
   }
 }
 
-/** Refresh-token grant for a public (PKCE) client. Errors carry the status only. */
 export async function refreshAtSso(
   clientId: string,
   refreshToken: string,

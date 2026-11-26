@@ -50,7 +50,6 @@ describe('loadCorporationBlueprints', () => {
     expect(row?.value).toEqual(BLUEPRINTS);
   });
 
-  /** Same guarantee #293 gives every corp-owned read: never serve one corporation's rows under another. */
   it('never serves one corporation rows under another', async () => {
     server.use(http.get(blueprintsUrl(CORP_ID), () => HttpResponse.json(BLUEPRINTS)));
     await loadCorporationBlueprints(CHAR_ID, CORP_ID);
@@ -70,8 +69,6 @@ describe('loadCorporationBlueprints', () => {
 
     const result = await loadCorporationBlueprints(CHAR_ID, CORP_ID);
 
-    // Director is the only role this endpoint accepts, so a 403 is the
-    // commonest corp answer of all — and no login can change it.
     expect(result.needsReauth).toBe(false);
     expect(result.cached).toBeNull();
   });

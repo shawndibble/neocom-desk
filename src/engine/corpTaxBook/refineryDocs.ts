@@ -1,29 +1,17 @@
-/**
- * What a refinery's page reads from its Extractions' moon docs (issue #6348, ADR 0032): the
- * ore mined in each Extraction's window and each Miner's share of it, valued at the unit prices
- * given. Pure: no fetch, DOM or Dexie. Mining outside an Extraction's window is not in a moon
- * doc, so it is not counted here.
- */
 import type { MoonDoc, OreQty } from '../../../functions/src/corpTaxBookMoonDocs';
 
-/** The unit price of an ore, 0 when it has none. */
 export type PriceOf = (typeId: number) => number;
 
-/** The value of mined ore lines at the given prices. */
 export const oreValue = (lines: readonly OreQty[], priceOf: PriceOf): number =>
   lines.reduce((sum, l) => sum + l.quantity * priceOf(l.typeId), 0);
 
 export interface RefineryMiner {
-  /** A grouping id, or `solo:<characterId>`. */
   minerId: string;
-  /** Extractions this Miner mined in. */
   pulls: number;
-  /** The pop of the newest Extraction they mined in (ISO). */
   lastPopAt: string;
   isk: number;
 }
 
-/** Every Miner in the docs, biggest first (ties by id). Never capped. */
 export function refineryMiners(docs: readonly MoonDoc[], priceOf: PriceOf): RefineryMiner[] {
   const byMiner = new Map<string, RefineryMiner>();
   for (const doc of docs) {
@@ -47,6 +35,5 @@ export function refineryMiners(docs: readonly MoonDoc[], priceOf: PriceOf): Refi
   return [...byMiner.values()].sort((a, b) => b.isk - a.isk || a.minerId.localeCompare(b.minerId));
 }
 
-/** How many Extractions had anyone mining: the "of N" under each Miner's count. */
 export const minedPullCount = (docs: readonly MoonDoc[]): number =>
   docs.filter((d) => d.miners.length > 0).length;

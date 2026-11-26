@@ -5,12 +5,6 @@ import { StatGroup, StatRow, StatRows } from './StatFacts';
 import { joinDetail } from './statKit';
 import { fixed0, fixed1 } from '@/lib/fixedFormat';
 
-/**
- * Fleet boosts: each running burst with the charge it carries, how strong,
- * far-reaching, long and slow to reload it is, then the industrial core's
- * compression — compressor range, and the fuel each activation burns. Only on
- * a fit that has one (`fleetSupport.ts`).
- */
 export function FleetBoostFacts({
   stats,
   typeName,

@@ -11,16 +11,13 @@ import * as Icon from '@/components/ui/icons';
 import { useOpenAfterMenu } from '@/components/ui/useOpenAfterMenu';
 
 interface MailRowMenuProps {
-  /** The trigger's accessible name. */
   label: string;
   isRead: boolean;
   onSetRead: (read: boolean) => void;
   onDelete: () => void;
-  /** `ghost` draws the hairline button the reader's Reply and Forward sit beside; a list row keeps the bare `plain` glyph. */
   variant?: 'plain' | 'ghost';
 }
 
-/** A row's ⋮ menu: Mark as unread / read, and Delete… (which asks first). */
 export function MailRowMenu({
   label,
   isRead,
@@ -29,7 +26,6 @@ export function MailRowMenu({
   variant = 'plain',
 }: MailRowMenuProps) {
   const { t } = useTranslation();
-  // Delete opens a confirm: hold it until the menu has closed, so focus returns to this button.
   const { run, onCloseAutoFocus } = useOpenAfterMenu();
   return (
     <DropdownMenu>

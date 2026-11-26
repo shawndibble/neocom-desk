@@ -47,7 +47,6 @@ import { plannedNotices } from './useNeedsYou';
 
 type Step = 'check' | 'send' | 'done';
 
-/** A Miner mailed a late notice within this long is left unticked in the run. */
 const RECENTLY_MAILED_MS = 7 * DAY_MS;
 
 function StepDot({
@@ -80,13 +79,6 @@ function StepDot({
   );
 }
 
-/**
- * Check → Send → Done (#4056 steps 10-12). Check shows the late notices the run would send
- * (#6294), plus any earlier notice whose mail never went out; Send issues each notice (which
- * creates its verify link, so it must come first) and hands the mails to the queue (#4064), which
- * paces them and shows its own chip on every page. On a desktop the chosen Miner's mail shows
- * beside Check and Send; below it, "Preview mail" opens it in a dialog.
- */
 export function LateNoticeRun() {
   const { t } = useTranslation();
   const ctx = useBook();
@@ -96,7 +88,6 @@ export function LateNoticeRun() {
   const [previewId, setPreviewId] = useState<string | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
   const inline = !useIsBelowDesktop();
-  // A dialog left open on a phone must not pop back after a trip through the desktop layout.
   const [wasInline, setWasInline] = useState(inline);
   if (wasInline !== inline) {
     setWasInline(inline);
@@ -117,19 +108,13 @@ export function LateNoticeRun() {
     return () => clearInterval(id);
   }, [step]);
   const queue = useLiveQuery(() => listQueue(corporationId), [corporationId], []);
-  /** The officer's own ticks; a Miner they have not touched follows the default (`recentlyMailed`). */
   const [ticks, setTicks] = useState<ReadonlyMap<string, boolean>>(new Map());
-  /**
-   * The officer's own wording for a mail, by preview key: what the queue sends instead. `basis`
-   * is the standard body it was edited from, so a later change to the figures is flagged.
-   */
   const [edits, setEdits] = useState<ReadonlyMap<string, MailEdit>>(new Map());
 
   const notices = useMemo(
     () => plannedNotices(view, settings.noticeRules),
     [view, settings.noticeRules]
   );
-  // Notices issued earlier whose mail never went out (a closed tab, a refused enqueue).
   const unmailed = useMemo(
     () =>
       view.input.notices.filter((n) => {
@@ -147,7 +132,6 @@ export function LateNoticeRun() {
   const nothingToDo = notices.length === 0 && unmailed.length === 0;
   const minerRow = (id: string) => view.miners.find((m) => m.id === id)!;
 
-  /** Everything the run will send: the new late notices, then earlier unmailed ones. */
   const previews = useMemo(() => {
     const out: { key: string; minerId: string; notice: LateNotice; amountDue: number }[] = [];
     for (const n of notices)
@@ -158,7 +142,6 @@ export function LateNoticeRun() {
         amountDue: n.owed,
       });
     for (const n of unmailed) {
-      // A Miner since unlinked or regrouped has no row to address the mail to; skip it rather than crash.
       const row = view.miners.find((m) => m.id === n.minerId);
       if (row)
         out.push({ key: `issued:${n.id}`, minerId: n.minerId, notice: n, amountDue: row.owed });
@@ -166,7 +149,6 @@ export function LateNoticeRun() {
     return out;
   }, [view, notices, unmailed]);
 
-  /** The last time any late notice of this Miner was mailed, if ever. */
   const lastMailedAt = (minerId: string): number | null => {
     let last: number | null = null;
     for (const n of view.input.notices) {
@@ -176,7 +158,6 @@ export function LateNoticeRun() {
     }
     return last;
   };
-  /** Mailed within the last 7 days: unticked unless the officer ticks them. */
   const recentlyMailed = (minerId: string): boolean => {
     const at = lastMailedAt(minerId);
     return at !== null && now - at < RECENTLY_MAILED_MS;
@@ -186,7 +167,6 @@ export function LateNoticeRun() {
   const chosen = new Set(previews.filter(isChosen).map((p) => p.key));
   const total = chosen.size;
 
-  /** The mail the run would send unedited, its verify link the preview one (`previewVerifyUrl`). */
   const standardMail = (item: (typeof previews)[number], corpName: string): MailPreviewContent => {
     const target = mailTarget(ctx, item.notice, minerRow(item.minerId));
     const mail = composeLateNoticeMail({
@@ -202,7 +182,6 @@ export function LateNoticeRun() {
       summarised: mail.detail !== 'lines',
     };
   };
-  /** The officer's edit was made from a standard mail that has since changed. */
   const isStale = (item: (typeof previews)[number]): boolean => {
     const edit = edits.get(item.key);
     return (
@@ -218,7 +197,6 @@ export function LateNoticeRun() {
       ? { to: standard.to, subject: edit.subject, body: edit.body, summarised: false }
       : standard;
   };
-  /** A mail's target for the queue, carrying the officer's edit when there is one. */
   const withEdit = (key: string, target: ReturnType<typeof mailTarget>) => {
     const edit = edits.get(key);
     return edit ? { ...target, edited: { subject: edit.subject, body: edit.body } } : target;
@@ -229,7 +207,6 @@ export function LateNoticeRun() {
     previewItem && corporationName && (showInline || previewOpen)
       ? previewFor(previewItem, corporationName)
       : null;
-  /** Previous / Next late notice in the run, wrapping round. */
   const stepPreview = (delta: number) => {
     if (previews.length === 0 || !previewItem) return;
     const next = (previews.indexOf(previewItem) + delta + previews.length) % previews.length;
@@ -240,17 +217,9 @@ export function LateNoticeRun() {
     if (corporationName === null) return;
     setBusy(true);
     setError(null);
-    // A failure part-way keeps what was issued (and queued); the next run plans the
-    // remaining notices and offers any notice whose mail never left.
     const sent = { queued: 0, skipped: 0, missingLink: 0 };
-    /** Each notice issued this run: its preview key, then its key as an issued, unmailed notice. */
     const issued: { from: string; to: string }[] = [];
-    /** Notices the queue refused for want of a verify link: they come back unmailed. */
     const notQueued: string[] = [];
-    /**
-     * The edits still wanted after this send: an issued notice's edit follows it, and after a
-     * send that finished only the notices left unmailed (`keep`) keep theirs.
-     */
     const carryEdits = (keep?: readonly string[]) =>
       setEdits((current) => {
         const next = new Map(current);
@@ -266,7 +235,6 @@ export function LateNoticeRun() {
       });
     const queueTargets = async (targets: ReturnType<typeof mailTarget>[]) => {
       if (targets.length === 0) return;
-      // Inside `try`: a chunk that will not load is an error shown, not a run stuck busy.
       const { enqueueLateNotices } = await import('@/features/corpTaxBook/mailQueue');
       const queued = await enqueueLateNotices({
         corporationId,
@@ -280,16 +248,13 @@ export function LateNoticeRun() {
       notQueued.push(...queued.missingLink);
     };
     try {
-      // Earlier notices whose mail never went out are the oldest; they go first.
       await queueTargets(
         unmailed
           .filter((n) => chosen.has(`issued:${n.id}`))
           .map((n) => withEdit(`issued:${n.id}`, mailTarget(ctx, n, minerRow(n.minerId))))
       );
-      // Late notices (#6294): each issued (which makes its verify link), then all queued.
       const noticeTargets = [];
       for (const n of notices) {
-        // A notice is rebuilt every run, so an unticked one is not issued at all.
         if (!chosen.has(`notice:${n.notice.minerId}`)) continue;
         const row = minerRow(n.notice.minerId);
         await issueLateNotice(characterId, corporationId, {
@@ -309,7 +274,6 @@ export function LateNoticeRun() {
       carryEdits(notQueued);
       setStep('done');
     } catch (e) {
-      // A notice issued before the failure comes back unmailed: its edit follows it.
       carryEdits();
       setError(editErrorMessage(e));
     } finally {
@@ -321,7 +285,6 @@ export function LateNoticeRun() {
   const order: Step[] = ['check', 'send', 'done'];
   const at = order.indexOf(step);
   const stateOf = (i: number) => (at > i ? 'done' : at === i ? 'now' : 'next');
-  /** The previewed mail with Edit; keyed by Miner, so an unsaved draft never moves to another. */
   const editablePreview = mail && previewItem && (
     <EditableMailPreview
       key={previewItem.key}
@@ -340,7 +303,6 @@ export function LateNoticeRun() {
       disabled={busy || !canEdit}
     />
   );
-  /** Whose mail the preview shows, with a visible label: the run's Miners by main Character. */
   const minerPicker = previews.length > 1 && previewItem && (
     <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
       <span id={previewLabelId} className="text-text-dim">

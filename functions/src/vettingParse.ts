@@ -1,5 +1,3 @@
-// Vetting: callable input parsing. Pure; every refusal is `invalid-argument`.
-
 import { HttpsError } from 'firebase-functions/v2/https';
 import { boundedString, record } from './communities.js';
 import { int } from './corpTaxBook.js';
@@ -30,7 +28,6 @@ const corporationId = (d: Record<string, unknown>) =>
 const accessToken = (d: Record<string, unknown>) =>
   boundedString(d.accessToken, 'accessToken', TOKEN_MAX);
 
-/** Optional free text: absent is empty; longer than `max` is refused, not cut. */
 function note(value: unknown, field: string, max: number): string {
   if (value === undefined || value === null) return '';
   if (typeof value !== 'string' || value.trim().length > max) {
@@ -47,13 +44,8 @@ function secret(value: unknown, field: string, min: number): string {
 }
 
 const INVITE_MAX = 64;
-/** The length of an invite code the server hands out. */
 export const VETTING_INVITE_CODE_LENGTH = 12;
 
-/**
- * The invite code an apply link carried, if any. Any short string is taken (a wrong one is
- * simply not a live invite); absent or empty is none.
- */
 function invite(d: Record<string, unknown>): { invite?: string } {
   const value = d.invite;
   if (value === undefined || value === null || value === '') return {};
@@ -94,7 +86,6 @@ export function parseVettingInviteCode(data: unknown): { code: string } {
   return { code };
 }
 
-/** Names a pilot's own review; the same shape the client keeps as its handle. */
 export interface VettingHandle {
   corporationId: number;
   reviewId: string;
@@ -125,7 +116,6 @@ export function parseVettingRemoveCharacter(
 
 export interface VettingSubmitInput extends VettingHandle {
   note: string;
-  /** What the pilot typed, per question; settled against the corp's questions by the store. */
   answers: { questionId: string; answer: string }[];
 }
 
@@ -158,7 +148,6 @@ export function parseVettingReviewId(data: unknown): { reviewId: string } {
 export interface VettingRawRowsInput {
   reviewId: string;
   source: VettingRawSource;
-  /** The `next` of the previous page; absent for the first. */
   cursor?: string;
 }
 
@@ -199,7 +188,6 @@ export function parseVettingRequest(data: unknown): { memberName: string; role: 
   };
 }
 
-/** A question as a patch carries it: `id` absent on one the server has not seen yet. */
 export interface VettingQuestionPatch {
   id?: string;
   label: string;
@@ -213,9 +201,7 @@ export interface VettingSettingsPatch {
   addWatchNames: string[];
   welcome?: string;
   contact?: string;
-  /** The whole list, in order. */
   questions?: VettingQuestionPatch[];
-  /** As sent; the store clamps them (`normalizeVettingSettings`). */
   minimums?: VettingMinimums;
   rejection?: VettingRejection;
   inviteOnly?: boolean;
@@ -223,7 +209,6 @@ export interface VettingSettingsPatch {
   mailDecision?: boolean;
 }
 
-/** A setting's text: longer than `max` is refused, not cut; empty clears it. */
 function settingText(value: unknown, field: string, max: number): string {
   if (typeof value !== 'string') {
     throw new HttpsError('invalid-argument', `${field} must be a string`);
@@ -256,7 +241,6 @@ function question(value: unknown): VettingQuestionPatch {
   };
 }
 
-/** Sign-offs a kind needs: a whole number, clamped to 1-3. */
 function signOffCount(value: unknown, field: string): number {
   if (typeof value !== 'number' || !Number.isFinite(value)) {
     throw new HttpsError('invalid-argument', `${field} must be a number`);

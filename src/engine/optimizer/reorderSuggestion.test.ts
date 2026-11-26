@@ -86,7 +86,6 @@ describe('suggestReorder', () => {
   });
 
   it('honors prerequisites across groups (prereq in a later group)', () => {
-    // Z (perc/will) requires Y1 (int/mem): the perc/will group must split around Y1.
     const skills = skillMap(
       skill(1, 'perception', 'willpower'),
       skill(2, 'intelligence', 'memory'),
@@ -119,7 +118,6 @@ describe('suggestReorder', () => {
     const result = suggestReorder(steps, skills);
     expect(sortedKey(result)).toBe(sortedKey(steps));
     expect(isValidOrder(result, skills)).toBe(true);
-    // Grouping should pull the free perc/will step 1:4 up next to 3:1.
     const pairAt = (s: PlanStep): string => {
       const sk = skills.get(s.skillTypeID)!;
       return `${sk.primary}|${sk.secondary}`;
@@ -172,7 +170,6 @@ describe('suggestReorder', () => {
     });
 
     it('never places a step before a lower-priority prerequisite it still needs', () => {
-      // Z (high, perc/will) requires Y1 (normal, int/mem).
       const skills = skillMap(
         skill(1, 'intelligence', 'memory'),
         skill(2, 'perception', 'willpower', [{ typeID: 1, level: 1 }])
@@ -207,8 +204,8 @@ describe('sortShortestFirst', () => {
 
   it('orders independent steps ascending by training time', () => {
     const skills = skillMap(
-      skill(1, 'perception', 'willpower', [], 5), // long
-      skill(2, 'intelligence', 'memory', [], 1) // short
+      skill(1, 'perception', 'willpower', [], 5),
+      skill(2, 'intelligence', 'memory', [], 1)
     );
     const steps = [step(1, 1), step(2, 1)];
     expect(sortShortestFirst(steps, skills, options)).toEqual([step(2, 1), step(1, 1)]);
@@ -216,8 +213,8 @@ describe('sortShortestFirst', () => {
 
   it('keeps a long prerequisite ahead of the short step it unblocks', () => {
     const skills = skillMap(
-      skill(1, 'perception', 'willpower', [], 5), // long prereq
-      skill(2, 'intelligence', 'memory', [{ typeID: 1, level: 1 }], 1) // short dependent
+      skill(1, 'perception', 'willpower', [], 5),
+      skill(2, 'intelligence', 'memory', [{ typeID: 1, level: 1 }], 1)
     );
     const steps = [step(2, 1), step(1, 1)];
     const result = sortShortestFirst(steps, skills, options);
@@ -232,8 +229,6 @@ describe('sortShortestFirst', () => {
   });
 
   it('places high-priority steps ahead of normal ones regardless of training time, including an effectively-high prereq', () => {
-    // 1: normal, fast, independent. 3: effectively-high prereq of 2, but slow.
-    // 2: high, depends on 3.
     const skills = skillMap(
       skill(1, 'intelligence', 'memory', [], 1),
       skill(2, 'perception', 'willpower', [{ typeID: 3, level: 1 }], 1),
@@ -289,10 +284,10 @@ describe('sortShortestFirst', () => {
       charisma: 17,
     };
     const skills = skillMap(
-      skill(1, 'perception', 'willpower'), // slow pair here
-      skill(2, 'intelligence', 'memory') // fast pair here, plus an implant bump
+      skill(1, 'perception', 'willpower'),
+      skill(2, 'intelligence', 'memory')
     );
-    const steps = [step(1, 1), step(2, 1)]; // slow skill listed first
+    const steps = [step(1, 1), step(2, 1)];
     const result = sortShortestFirst(steps, skills, {
       attributes: attrs,
       implants: { intelligence: 3 },

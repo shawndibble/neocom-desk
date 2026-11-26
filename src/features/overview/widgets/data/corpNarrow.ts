@@ -1,12 +1,3 @@
-/**
- * One corporation out of a read across every corporation (a widget scoped to a corporation).
- *
- * The All reads already hold each corporation's rows apart (a `corporations` list, or a
- * `corporationOf` map by row key, or a corporation on the row), and their per-corporation
- * reads are cached, so a widget on one corporation narrows the All read rather than
- * making a read of its own: two widgets on two corporations, or one on All and one on a
- * corporation, share the one feed. Pure: it never fetches.
- */
 import {
   changeKey,
   characterKey,
@@ -31,10 +22,8 @@ import type { FeedId, FeedState, Feeds } from './types';
 
 type Narrow = (data: never, corporationId: number) => unknown;
 
-/** A feed of `CorpAllFeed` shape: one entry per corporation. */
 function perCorporation(data: CorpAllFeed<CorpFeedBase>, corporationId: number) {
   const corporations = data.corporations.filter((read) => read.corporationId === corporationId);
-  // Another corporation's failed read is not this one's: flag only when this one is the one missing.
   return { ...data, corporations, partlyFailed: data.partlyFailed && corporations.length === 0 };
 }
 
@@ -45,10 +34,6 @@ function deadlines(data: CorpDeadlinesAllFeed, corporationId: number): CorpDeadl
   };
 }
 
-/**
- * A merged feed: `rows` is the array field, `keyOf` the key `corporationOf` is filed under.
- * The corporation's label stays and the others go, so the widget draws no Corporation column.
- */
 function merged<F extends CorpFeedBase, K extends keyof F>(
   field: K,
   keyOf: (row: never) => string
@@ -60,7 +45,6 @@ function merged<F extends CorpFeedBase, K extends keyof F>(
       ...data,
       [field]: (data[field] as unknown as unknown[]).filter(own),
       corporations: new Map(label ? [[corporationId, label]] : []),
-      // Another corporation's failed read is not this one's: flag only when this one is missing.
       partlyFailed: data.partlyFailed === true && label === undefined,
       corporationOf: new Map(
         [...(data.corporationOf ?? [])].filter(([, corporation]) => corporation === corporationId)
@@ -69,7 +53,6 @@ function merged<F extends CorpFeedBase, K extends keyof F>(
   };
 }
 
-/** The merged roster: one corporation's members, and the joins and leaves filed under it. */
 function membersOf(data: CorpMembersFeed, corporationId: number): CorpMembersFeed {
   const own = (key: string) => data.corporationOf?.get(key) === corporationId;
   const narrowed = merged<CorpMembersFeed, 'members'>('members', characterKey as never)(
@@ -85,7 +68,6 @@ function membersOf(data: CorpMembersFeed, corporationId: number): CorpMembersFee
   };
 }
 
-/** The merged audit: one corporation's holders and role changes, and only its label. */
 function roleAuditOf(data: CorpRoleAuditFeed, corporationId: number): CorpRoleAuditFeed {
   const own = (key: string) => data.corporationOf?.get(key) === corporationId;
   const label = data.corporations?.get(corporationId);
@@ -97,7 +79,6 @@ function roleAuditOf(data: CorpRoleAuditFeed, corporationId: number): CorpRoleAu
       changes: data.audit.changes?.filter((change) => own(changeKey(change.characterId))) ?? null,
     },
     corporations: new Map(label ? [[corporationId, label]] : []),
-    // Another corporation's failed read is not this one's: flag only when this one is missing.
     partlyFailed: data.partlyFailed === true && label === undefined,
     corporationOf: new Map(
       [...(data.corporationOf ?? [])].filter(([, corporation]) => corporation === corporationId)
@@ -105,7 +86,6 @@ function roleAuditOf(data: CorpRoleAuditFeed, corporationId: number): CorpRoleAu
   };
 }
 
-/** The merged SRP read: one corporation's claims, and its own switch and setup right. */
 function srpOf(data: CorpSrpFeed, corporationId: number): CorpSrpFeed {
   const own = data.byCorporation?.get(corporationId);
   return {
@@ -156,7 +136,6 @@ const NARROW: { readonly [K in FeedId]?: Narrow } = {
   }) as Narrow,
 };
 
-/** `feeds` with each corporation-spanning read cut down to `corporationId`; the rest as they are. */
 export function narrowFeedsToCorporation(feeds: Feeds, corporationId: number): Feeds {
   const out: Record<string, FeedState<unknown> | undefined> = { ...feeds };
   for (const [id, narrow] of Object.entries(NARROW) as [FeedId, Narrow][]) {

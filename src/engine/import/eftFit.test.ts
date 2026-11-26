@@ -87,10 +87,6 @@ describe('parseEftFit', () => {
     const result = parseEftFit(
       '[Rifter, My Fit]\n\n125mm Gatling AutoCannon II, Republic Fleet EMP S'
     );
-    // Only the charge half carries `isCharge` — the flag marks ammo a module
-    // was left loaded with, so Fit Import can decline to quote a launcher
-    // count as a production batch (issue #626). Both halves report the one
-    // source line they were written on.
     expect(result.items).toEqual([
       { name: '125mm Gatling AutoCannon II', quantity: 1, line: 3 },
       { name: 'Republic Fleet EMP S', quantity: 1, line: 3, isCharge: true },
@@ -200,7 +196,6 @@ describe('parseEftFit', () => {
   });
 });
 
-// Pyfa's mutated-item layout: see the eftFit.ts header.
 const PYFA_MUTATED = [
   '[Vexor Navy Issue, Abyssal]',
   'Damage Control II [1]',
@@ -243,7 +238,6 @@ describe('parseEftFit — Pyfa mutated items', () => {
         line: 11,
         baseName: 'Damage Control II',
         mutaplasmidName: 'Unstable Damage Control Mutaplasmid',
-        // An unreadable value is skipped, as Pyfa does.
         attributes: [
           { name: 'armorEmDamageResonance', value: 0.65 },
           { name: 'capacitorNeed', value: 0.9 },

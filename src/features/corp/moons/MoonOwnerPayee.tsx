@@ -12,17 +12,12 @@ import { readLocal, writeLocal } from '@/lib/safeLocalStorage';
 
 const k = (key: string) => `corpTaxBook.moons.ownerView.payee.${key}`;
 
-/**
- * "Who gets paid" on the moon owner's page, with Change for its officers. `setBy` says
- * which side set it and when; absent for a payee set before that was kept.
- */
 export function PayeeLine({
   name,
   setBy,
   onChange,
 }: {
   name: string;
-  /** The accounting corporation's name, or null for this side. */
   setBy?: { name: string | null; at: number };
   onChange?: () => void;
 }) {
@@ -53,19 +48,13 @@ export function PayeeLine({
   );
 }
 
-/**
- * Pick who the moon owner is paid as: a corporation or a player from the name
- * search. Only a picked one saves; an alliance cannot be paid.
- */
 export function ChangePayeeDialog({
   characterId,
   onClose,
   onSave,
 }: {
-  /** Whose token the name search runs under. */
   characterId: number;
   onClose: () => void;
-  /** The picked payee and its name, for the mail to the other side. */
   onSave: (payee: Payee, name: string) => Promise<void>;
 }) {
   const { t } = useTranslation();
@@ -117,32 +106,23 @@ export function ChangePayeeDialog({
 
 const DISMISSED = 'neocom-desk.payeeNotice.';
 
-/**
- * The other side changed the payee (#4653): one strip on the page until an officer dismisses it
- * on this device. A later change shows again. Never says anything about timing.
- */
 export function PayeeChangeStrip({
   storageKey,
   at,
   payeeName,
   byName,
 }: {
-  /** Which moon owner and book: one dismissal per page. */
   storageKey: string;
-  /** When it changed (ms). */
   at: number;
   payeeName: string;
-  /** The corporation whose officer changed it. */
   byName: string;
 }) {
   const zone = useTimeZone();
   const { t } = useTranslation();
-  // Read every render: the same strip may be handed another page's key.
   const [dismissedNow, setDismissedNow] = useState<string | null>(null);
   const seen = `${storageKey}:${at}`;
   if (dismissedNow === seen || readLocal(DISMISSED + storageKey) === String(at)) return null;
   const dismiss = () => {
-    // Blocked storage: dismissed for this visit only.
     writeLocal(DISMISSED + storageKey, String(at));
     setDismissedNow(seen);
   };

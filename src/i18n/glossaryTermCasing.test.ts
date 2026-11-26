@@ -1,8 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import en from './locales/en.json';
 
-// Industry's short labels and titles capitalise the glossary terms Build Plan / Build Group,
-// matching "Create Build Plan" and Stock Targets' "New Build Group". Prose stays as is.
 const INDUSTRY_LABEL_KEYS = [
   'addPlan',
   'compareTitle',

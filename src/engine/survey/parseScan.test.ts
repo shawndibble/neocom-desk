@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { isSurveyScanText, parseSurveyScan } from './parseScan';
 
-// Rows copied from the in-game Survey Scanner results (units, m3, ISK, distance).
 const SCAN = [
   'Pyroxeres\t8,016\t2,404 m3\t184,000.00 ISK\t33 km',
   'Pyroxeres II-Grade\t9,840\t2,952 m3\t221,000.00 ISK\t13 km',
@@ -57,19 +56,18 @@ describe('parseSurveyScan', () => {
   });
 
   it('skips the header of an ore group that has no rocks, wherever it sits', () => {
-    // As the scanner printed it: every grade gets a header, rocks or not.
     const text = [
       'Pyroxeres\t3,928\t1,178 m3\t90,000.00 ISK\t22 km',
       'Pyroxeres II-Grade',
       'Pyroxeres II-Grade\t3,644\t1,093 m3\t81,700.00 ISK\t21 km',
       'Scordite II-Grade',
       'Scordite II-Grade\t7,396\t1,109 m3\t128,000.00 ISK\t19 km',
-      'Scordite III-Grade', // empty, and the next header is another ore's
+      'Scordite III-Grade',
       'Veldspar',
       'Veldspar\t23,799\t2,379 m3\t223,000.00 ISK\t20 km',
       'Veldspar III-Grade',
       'Veldspar III-Grade\t34,126\t3,412 m3\t364,000.00 ISK\t19 km',
-      'Veldspar IV-Grade', // empty, and last
+      'Veldspar IV-Grade',
     ].join('\n');
     expect(parseSurveyScan(text)?.map((r) => r.ore)).toEqual([
       'Pyroxeres',
@@ -130,5 +128,18 @@ describe('isSurveyScanText', () => {
       { ore: 'Bitumens', units: 964, volume: 9640, isk: 356_000, distanceM: 1178 },
       { ore: 'Sylvite', units: 4718, volume: 47_180, isk: 1_820_000.5, distanceM: 224_396_806_050 },
     ]);
+  });
+
+  it('reads a scan pasted from a Swiss client, whose thousands mark is an apostrophe', () => {
+    const text = [
+      'Zeolites\t11’202\t112’020 m3\t8’370’000.00 ISK\t48 km',
+      'Brimful Sylvite',
+      "Brimful Sylvite\t2'836\t28'360 m3\t2'760'000.00 ISK\t7'035 m",
+    ].join('\n');
+    expect(parseSurveyScan(text)).toEqual([
+      { ore: 'Zeolites', units: 11_202, volume: 112_020, isk: 8_370_000, distanceM: 48_000 },
+      { ore: 'Brimful Sylvite', units: 2836, volume: 28_360, isk: 2_760_000, distanceM: 7035 },
+    ]);
+    expect(isSurveyScanText(text)).toBe(true);
   });
 });

@@ -1,9 +1,3 @@
-/**
- * `/corp/wallet` — the corporation's wallet, one division at a time (issues
- * #298, #570). It was the Corporation side of a switch on `/wallet` until it
- * moved into the Corp section; the last block pins that `/wallet` itself no
- * longer offers it, and that links from then still arrive here.
- */
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -140,8 +134,6 @@ const server = setupServer(
   http.get(
     `${BASE}/corporations/${CORP_ID}/wallets/:division/transactions`,
     ({ params, request }) =>
-      // The cursor is exclusive, so a second call must come back empty or the
-      // walk would never stop. Only the master division has traded.
       new URL(request.url).searchParams.has('from_id') || Number(params.division) !== 1
         ? HttpResponse.json([])
         : HttpResponse.json(corpTransactions)
@@ -180,11 +172,6 @@ async function seedSession() {
 
 beforeAll(async () => {
   server.listen({ onUnhandledRequest: 'error' });
-  // One throwaway render of the wallet page, so no test pays for the first
-  // one. A worker's first `App` render (compiling the lazy route chunks,
-  // warming jsdom and React) took ~5s here, and landed on whichever test ran
-  // first, timing out its 5s `findBy*` (the gate test, about one run in
-  // three). Done here under the hook's own budget.
   await routeChunks.loadCorpWallet();
   await seedSession();
   const { unmount } = render(<App />);
@@ -196,11 +183,6 @@ afterAll(() => server.close());
 afterEach(() => server.resetHandlers());
 beforeEach(seedSession);
 
-/**
- * `/corp/wallet` on its own (no App boot or shell), with `/wallet` beside it for
- * the old Corporation-side links that hand on to it. The App-level tests are
- * the deep link's URL and the rail.
- */
 function renderCorpWalletRoute() {
   return renderPageRoutes([
     ['/corp/wallet', <CorpWallet />],
@@ -208,19 +190,16 @@ function renderCorpWalletRoute() {
   ]);
 }
 
-/** The division strip, once the roles, scopes and balances have all resolved. */
 function findDivisions() {
   return screen.findByRole('group', { name: 'Wallet division' });
 }
 
-/** One division's button in the strip, by its name. */
 function divisionButton(name: string) {
   return within(screen.getByRole('group', { name: 'Wallet division' })).getByRole('button', {
     name: new RegExp(name),
   });
 }
 
-/** The journal panel's title-bar export button › Download CSV (jsdom has no hover intent). */
 async function exportJournalCsv(user: ReturnType<typeof userEvent.setup>) {
   fireEvent.pointerDown(screen.getByRole('button', { name: 'Export Journal' }), {
     button: 0,
@@ -262,7 +241,6 @@ describe('Corp Wallet: the gate', () => {
     await findDivisions();
   });
 
-  /** A page of its own, not a tab. */
   it('has no tab bar of its own', async () => {
     renderCorpWalletRoute();
     await findDivisions();
@@ -281,7 +259,6 @@ describe('Corp Wallet: divisions and the journal (AC 2, AC 3)', () => {
     expect(divisionButton('Master Wallet')).toHaveAttribute('aria-pressed', 'true');
     expect(divisionButton('SRP')).toHaveTextContent(/250\.00/);
     expect(divisionButton('SRP')).toHaveAttribute('aria-pressed', 'false');
-    // The Character's own balance and EverMarks are not on this page.
     expect(screen.queryByText(/4,500\.00/)).toBeNull();
     expect(screen.queryByText('EverMarks')).toBeNull();
   });
@@ -308,7 +285,6 @@ describe('Corp Wallet: divisions and the journal (AC 2, AC 3)', () => {
     const label = await within(screen.getByRole('group', { name: 'Wallet division' })).findByText(
       long
     );
-    // A Tooltip, not a native title: reachable by keyboard and touch (§6c).
     expect(label).not.toHaveAttribute('title');
     expect(label.closest('button')).not.toHaveAttribute('title');
     await userEvent.hover(label);
@@ -326,11 +302,8 @@ describe('Corp Wallet: divisions and the journal (AC 2, AC 3)', () => {
     expect(await screen.findByText('SRP division payout')).toBeInTheDocument();
     expect(screen.queryByText('Master division payout')).toBeNull();
     expect(divisionButton('SRP')).toHaveAttribute('aria-pressed', 'true');
-    // The same journal table `/wallet` draws. Scoped to the table: "Insurance"
-    // also names an <option> in the ref-type filter (issue #413).
     const table = screen.getByRole('table', { name: 'Journal' });
     expect(within(table).getByText('Insurance')).toBeInTheDocument();
-    // Never the Character's own journal.
     expect(screen.queryByText('My bounty')).toBeNull();
   });
 
@@ -394,7 +367,6 @@ describe('Corp Wallet: divisions and the journal (AC 2, AC 3)', () => {
     server.use(http.post(`${BASE}/universe/names`, () => HttpResponse.error()));
     renderCorpWalletRoute();
     await screen.findByText('Master division payout');
-    // The category lookup fails too, so no party is known to be a character: blank, not wrong.
     const table = screen.getByRole('table', { name: 'Journal' });
     expect(within(table).queryByText('#91000001')).toBeNull();
   });
@@ -479,7 +451,6 @@ describe('Corp Wallet: divisions and the journal (AC 2, AC 3)', () => {
     expect(screen.queryByText('No corp journal entries loaded')).toBeNull();
   });
 
-  /** A 403 here is the in-game role gate; a re-login button over it would be a lie. */
   it('does not offer a re-login over the corp role gate (403)', async () => {
     server.use(
       http.get(`${BASE}/corporations/${CORP_ID}/wallets`, () =>
@@ -497,7 +468,6 @@ describe('Corp Wallet: divisions and the journal (AC 2, AC 3)', () => {
     expect(screen.queryByText('Log in again to see your wallet')).toBeNull();
   });
 
-  /** On `<App />`: proves `/corp/wallet` and its query reach the page through App's routes. */
   it('opens straight to the division a ?division= deep link names (issue #419)', async () => {
     window.history.pushState({}, '', '/corp/wallet?division=2');
     render(<App />);
@@ -507,11 +477,6 @@ describe('Corp Wallet: divisions and the journal (AC 2, AC 3)', () => {
     expect(await screen.findByText('SRP division payout')).toBeInTheDocument();
   });
 
-  /**
-   * ESI divisions are 1-7 — a `?division=0` (or any other out-of-range value)
-   * must not reach `loadCorporationWalletJournal` as a division number, which
-   * is what a bare `Number.isInteger` check would let through.
-   */
   it('falls back to the first division for an out-of-range ?division= deep link', async () => {
     window.history.pushState({}, '', '/corp/wallet?division=0');
     renderCorpWalletRoute();
@@ -523,13 +488,10 @@ describe('Corp Wallet: divisions and the journal (AC 2, AC 3)', () => {
 });
 
 describe('Wallet no longer carries the corporation', () => {
-  /** On `<App />`: the rail's Corp Board link is the shell's. */
   it('offers no owner switch, division selector or Transactions tab on /wallet, even to a corp wallet reader', async () => {
     window.history.pushState({}, '', '/wallet');
     render(<App />);
     expect(await screen.findByText('EverMarks')).toBeInTheDocument();
-    // The switch used to appear only once corp access resolved to `ready`,
-    // which is also what puts Corp in the sidebar.
     expect(await screen.findByRole('link', { name: 'Corp Board' })).toBeInTheDocument();
 
     expect(screen.queryByRole('group', { name: 'Wallet owner' })).toBeNull();
@@ -537,7 +499,6 @@ describe('Wallet no longer carries the corporation', () => {
     expect(screen.queryByRole('tab', { name: /transactions/i })).toBeNull();
   });
 
-  /** The old vitals-rail link, and any bookmark of the Corporation side (issue #419). */
   it('sends a /wallet?owner=corporation link on to the same division on /corp/wallet', async () => {
     window.history.pushState({}, '', '/wallet/journal?owner=corporation&division=2');
     renderCorpWalletRoute();

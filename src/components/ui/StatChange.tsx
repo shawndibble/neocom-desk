@@ -8,12 +8,7 @@ import { flagWord } from '@/features/fittings/flagWord';
 
 interface StatChangeProps {
   change: StatChangeValue;
-  /** Layout and type only. The tones are the primitive's. */
   className?: string;
-  /**
-   * Values only, for a row that already names the stat (the stats column).
-   * The screen-reader name still carries it.
-   */
   bare?: boolean;
 }
 
@@ -32,14 +27,12 @@ const VALUE = '\u0000';
 const TONE = { better: 'text-success', worse: 'text-danger', neutral: 'text-text' } as const;
 type Verdict = keyof typeof TONE;
 
-/** A change's printed parts: the stat's name around the value (`lead` … `trail`), the two values, the verdict and the spoken name. */
 function useStatChangeParts(change: StatChangeValue) {
   const { t } = useTranslation();
   const verdict = changeVerdict(change);
   const isCapacitor = change.key === 'capacitor';
   const isFlag = FLAG_STATS.has(change.key);
   const digits = STAT_DIGITS[change.key];
-  // Capacitor values are stable % (positive) or a negated depletion time.
   const show = (value: number) =>
     isCapacitor
       ? value >= 0
@@ -72,16 +65,6 @@ function Values({ before, after, verdict }: { before: string; after: string; ver
   );
 }
 
-/**
- * One fit stat changing: the stat's name, then `before → after`. The before
- * value is dim; the arrow and the after value are `success` when the change is
- * better, `danger` when worse and plain when the stat is neutral (it only
- * moves with the hull). Colour is never the only cue: both numbers are printed,
- * and the screen-reader name adds "better" or "worse". Rounds at the stats
- * panel's `STAT_DIGITS`. Money is not a stat: ISK keeps `IskDelta`.
- *
- * @summary A fit stat's before → after, green when better, red when worse.
- */
 export function StatChange({ change, className, bare = false }: StatChangeProps) {
   const { lead, trail, before, after, verdict, spokenName } = useStatChangeParts(change);
   return (
@@ -99,10 +82,7 @@ export function StatChange({ change, className, bare = false }: StatChangeProps)
 function StatChangeRow({ change, last }: { change: StatChangeValue; last: boolean }) {
   const { lead, trail, before, after, verdict, spokenName } = useStatChangeParts(change);
   return (
-    // A real box sharing the list's columns (`subgrid`), not `contents`, which
-    // older WebKit strips of its role.
     <span role="listitem" className="col-span-2 grid grid-cols-subgrid">
-      {/* A pause between rows, so a neutral change does not run into the next. */}
       <span className="sr-only">{last ? spokenName : `${spokenName};`}</span>
       <span aria-hidden="true" className="min-w-0">
         {lead.trim()}
@@ -115,19 +95,11 @@ function StatChangeRow({ change, last }: { change: StatChangeValue; last: boolea
   );
 }
 
-/**
- * Several fit stats changing, one per row: the stat's name in one column, its
- * `before → after` and unit in the next, so a long list reads down instead of
- * running on as a sentence. Tones and spoken names as `StatChange`.
- *
- * @summary Fit stat changes as a two-column list.
- */
 export function StatChangeList({
   changes,
   className,
 }: {
   changes: readonly StatChangeValue[];
-  /** Layout and type only. */
   className?: string;
 }) {
   return (

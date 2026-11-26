@@ -3,16 +3,8 @@ import { exportFlag } from '@/lib/exportFlag';
 import { rowVolume } from '@/engine/industry/materialVolume';
 import type { MaterialCostLine } from '@/engine/industry/types';
 
-/** A Build Group buy-table row: the merged line plus its netted still-to-buy count. */
 export type GroupMaterialCsvRow = MaterialCostLine & { buyToShow: number };
 
-/**
- * Export columns for a Build Group's "Everything this group needs" table, in
- * its own order and on its own header keys. Volume is m3 (the table's unit);
- * a volume the SDE can't resolve and an owned quantity nobody has entered are
- * blank rather than a placeholder, and a covered row's still-to-buy is a real
- * 0 rather than the "Covered" the table writes.
- */
 export function groupMaterialsCsvColumns(
   t: CsvTranslate,
   nameFor: (typeID: number) => string,
@@ -26,7 +18,6 @@ export function groupMaterialsCsvColumns(
     { header: t('industry.ownedQuantity'), value: (row) => ownedFor(row.typeID) ?? null },
     { header: t('industry.stillToBuyColumn'), value: (row) => row.buyToShow },
     {
-      // The table flags a still-to-buy line with no price; its cost is then not in any total.
       header: t('industry.csvUnpriced'),
       value: (row) => exportFlag(t, row.unpriced && row.buyToShow > 0),
     },

@@ -8,7 +8,6 @@ import {
   timeToTrain,
 } from '@/engine/skills/sp';
 
-// Canonical cumulative SP totals for rank 1 (EVE University wiki, in-game values)
 describe('spForLevel', () => {
   it('matches canonical rank-1 totals', () => {
     expect(spForLevel(1, 1)).toBe(250);
@@ -24,13 +23,10 @@ describe('spForLevel', () => {
   });
 
   it('scales linearly with rank, rounded up after multiplying', () => {
-    // 45254.83... * 3 = 135764.5 -> 135765
     expect(spForLevel(3, 4)).toBe(135765);
     expect(spForLevel(2, 1)).toBe(500);
     expect(spForLevel(16, 5)).toBe(4096000);
-    // 1414.21... * 5 = 7071.06 -> 7072
     expect(spForLevel(5, 2)).toBe(7072);
-    // 250 * 2 * 2^2.5 = 2,828.43, rounded up; in-game observation (#2882).
     expect(spForLevel(2, 2)).toBe(2829);
   });
 
@@ -62,33 +58,17 @@ describe('spBetween', () => {
 
 describe('remainingSpForLevel', () => {
   it('is the whole level when the skill sits exactly at the level below', () => {
-    // A skill at exactly its boundary has banked nothing toward the next
-    // level. `spForLevel` rounds up, so an off-by-one here would invent a
-    // phantom credit on every skill in every plan.
-    //
-    // Anchored on literals, not on `spForLevel`/`spBetween`: expressing both
-    // sides in terms of the same function passes for any monotone
-    // implementation, including one crediting `currentSp - start + 1`, since
-    // the expected value would move with the bug.
     expect(remainingSpForLevel(1, 4, 8_000)).toBe(37_255);
     expect(remainingSpForLevel(1, 1, 0)).toBe(250);
     expect(remainingSpForLevel(6, 4, spForLevel(6, 3))).toBe(spBetween(6, 3, 4));
   });
 
   it('is the whole level when the skill is untrained', () => {
-    // One level's cost, not the cumulative to it: a level-3 step for an
-    // untrained skill still costs only level 3, since levels 1 and 2 are
-    // steps of their own.
     expect(remainingSpForLevel(1, 1, 0)).toBe(250);
     expect(remainingSpForLevel(2, 3, 0)).toBe(spBetween(2, 2, 3));
   });
 
   it('credits SP already banked inside the level in progress', () => {
-    // The user's Coherent Ore Processing IV: rank 6, memory/intelligence.
-    // L3 = 48,000 SP, L4 = 271,530 SP, so the level costs 223,530 SP. Their
-    // in-game queue reported 1d 9h left at 56.5 SP/min = 111,870 SP still to
-    // go, which is 159,660 SP already banked — a level half paid for that the
-    // plan was charging in full.
     expect(spForLevel(6, 3)).toBe(48_000);
     expect(spForLevel(6, 4)).toBe(271_530);
     expect(spBetween(6, 3, 4)).toBe(223_530);
@@ -102,8 +82,6 @@ describe('remainingSpForLevel', () => {
   });
 
   it('ignores SP below the level in progress rather than double-counting it', () => {
-    // Costing level 5 for a skill whose SP only reaches level 3 must not
-    // subtract that level-3 SP from level 5's own cost.
     expect(remainingSpForLevel(1, 5, spForLevel(1, 3))).toBe(spBetween(1, 4, 5));
   });
 
@@ -130,8 +108,6 @@ describe('progressToNextLevel', () => {
   });
 
   it('is the fraction of the next level already banked', () => {
-    // Level 1 -> 2 for rank 1: 250 -> 1415, a 1165 SP span. Halfway banked
-    // into it is 250 + 582.5 = 832.5 total SP.
     expect(progressToNextLevel(1, 1, 250 + 1165 / 2)).toBe(0.5);
     expect(progressToNextLevel(6, 3, spForLevel(6, 3) + spBetween(6, 3, 4) / 4)).toBe(0.25);
   });
@@ -168,7 +144,6 @@ describe('trainingRate', () => {
 
 describe('timeToTrain', () => {
   it('converts SP at SP/min rate to seconds', () => {
-    // 2700 SP at 27 SP/min = 100 min = 6000 s
     expect(timeToTrain(2700, 27)).toBe(6000);
     expect(timeToTrain(250, 25)).toBe(600);
   });
@@ -185,7 +160,6 @@ describe('timeToTrain', () => {
 
 describe('trainingRate clone state', () => {
   it('halves the rate for an Alpha clone', () => {
-    // Omega 20 + 20/2 = 30 SP/min; Alpha trains at half that.
     expect(trainingRate(20, 20, 'omega')).toBe(30);
     expect(trainingRate(20, 20, 'alpha')).toBe(15);
   });

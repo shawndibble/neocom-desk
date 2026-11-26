@@ -1,13 +1,3 @@
-/**
- * Market › History (Transactions) at 390px: a plain table, not cards or a
- * bespoke list (DESIGN.md §6c Restraint). It is a ledger read across
- * columns, so it keeps real columns, pins the item (`stickyStart`),
- * sheds its low-value columns (`phoneHidden`) and scrolls sideways inside its
- * own wrapper, never the page. The default-sort column stays visible.
- *
- * Playwright rather than jsdom: `max-sm:hidden`, `position: sticky` and the
- * page's scrollWidth are layout a real engine has to compute.
- */
 import type { Page } from '@playwright/test';
 import { test, expect, PHONE } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
@@ -30,8 +20,6 @@ function makeTransactions(count: number) {
 
 async function mockTransactions(page: Page, count = 1) {
   const body = JSON.stringify(makeTransactions(count));
-  // Before signing in: boot prefetch reads this, and an empty answer from the
-  // shared mock would be cached as fresh.
   await page.route(
     (url) => url.pathname === `/characters/${CHARACTER_ID}/wallet/transactions`,
     (route) =>
@@ -79,8 +67,6 @@ test.describe('Market history ledger at 390px', () => {
   });
 });
 
-// ~30 rows lay out as `table-layout: auto`, ~200 as windowed `fixed`; Item must
-// keep room to read in both (#5456).
 for (const width of [360, 390, 414]) {
   for (const count of [30, 200]) {
     test(`Item keeps 110px at ${width}px with ${count} rows`, async ({ page }) => {

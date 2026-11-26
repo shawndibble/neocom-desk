@@ -1,8 +1,3 @@
-/**
- * Corp assets, grouped by item (issue #4671): one row per item type with what
- * the corporation holds, its stock target and shortfall, and where it sits.
- * A row opens in place to list its stacks with their full paths.
- */
 import { useMemo, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { COL_ICON, COL_ISK, COL_QUANTITY } from '@/components/ui/dataTableWidths';
@@ -44,9 +39,7 @@ export interface ItemTableRow {
   categoryName: string | null;
 }
 
-/** Most chips a Where cell prints before folding the rest into "+N". */
 const MAX_PLACEMENT_CHIPS = 3;
-/** Most stacks an expanded row lists; a type held in thousands of stacks must not freeze the page. */
 const MAX_STACKS_SHOWN = 100;
 
 const BY_VALUE = { columnId: 'value', direction: 'desc' } as const;
@@ -77,9 +70,7 @@ export function CorpAssetItemTable({
 }: {
   rows: readonly ItemTableRow[];
   labels: LedgerLabels;
-  /** In-game ship/container names by item id, shown first on the stack that has one. */
   assetNames: AssetNameMap;
-  /** Below target is on: the table opens on the biggest shortfall. */
   below: boolean;
   blueprintTypeIds: ReadonlySet<number> | null;
   selectMode: boolean;
@@ -88,10 +79,8 @@ export function CorpAssetItemTable({
   canEditTargets: boolean;
   onSetTarget: (typeId: number, target: number) => void;
   onRemoveTarget: (typeId: number) => void;
-  /** The page's filter row, given this table's column picker for its `actions` slot. */
   renderToolbar: (columnPicker: ReactNode, exportMenu: ReactNode) => ReactNode;
   truncated: boolean;
-  /** Shown instead of the table when no row survives the filters. */
   emptyState: ReactNode;
 }) {
   const { t } = useTranslation();
@@ -128,7 +117,6 @@ export function CorpAssetItemTable({
         );
         return (
           <span className="flex min-w-0 items-center">
-            {/* Plain name: the row expands in place, and a row's primary action beats a name link (DESIGN.md §6c); Show info lives in the row menu. */}
             <span className="truncate">{r.name}</span>
             {kind && <BlueprintBadge kind={kind} t={t} />}
           </span>
@@ -152,7 +140,6 @@ export function CorpAssetItemTable({
       width: '12ch',
       sortValue: (r) => r.ledger.stock?.target,
       render: (r) =>
-        // A copy never counts toward its type's target, so it has no cell to set one in.
         r.ledger.isBlueprintCopy || !canEditTargets ? (
           <span className="text-text-dim tabular-nums">{r.ledger.stock?.target ?? '—'}</span>
         ) : (

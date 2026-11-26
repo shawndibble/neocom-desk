@@ -31,17 +31,13 @@ import { setStatus } from '@/sync/status';
 import { Corp } from './Corp';
 
 vi.mock('@/features/corp/useCorpAccess', () => ({ useCorpAccess: vi.fn() }));
-// Off by default, as in e2e; one test turns it on to hold a first edit until the first pull.
 const sync = vi.hoisted(() => ({ configured: false }));
 vi.mock('@/app/syncStatus', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/app/syncStatus')>()),
   isSyncConfigured: () => sync.configured,
 }));
-// The widget loaders gate on this before they fetch; the test sets it to the
-// same capabilities `useCorpAccess` reports, as the real two always agree.
 vi.mock('@/features/corp/corpReadAccess', () => ({
   resolveCorpReadAccess: vi.fn(),
-  // One corporation: no corp widget offers All.
   loadAccountCorpAccess: vi.fn(async () => []),
   corporationsReading: vi.fn(() => 1),
 }));
@@ -51,19 +47,13 @@ vi.mock('@/features/corp/boardData', async (importOriginal) => ({
   loadCorporationStructures: vi.fn(),
   loadCorporationMiningExtractions: vi.fn(),
 }));
-// The wallet and jobs reads belong to #298's modules; the board is a consumer.
 vi.mock('@/features/corp/wallet');
 vi.mock('@/features/corp/jobs');
-// The roster reads are #297's modules; the People rail is a second consumer.
-// Spread the original so `toMemberActivity` stays the real boundary adaptation —
-// the rail's figures have to be the ones `/corp/members` computes.
 vi.mock('@/features/corp/members', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/features/corp/members')>()),
   loadCorporationMemberIds: vi.fn(),
   loadCorporationMemberTracking: vi.fn(),
 }));
-// Replaced outright rather than spread: the real module builds a persisted
-// store at module scope, and this route only ever reads from it.
 vi.mock('@/features/corp/rosterState', () => ({
   readPreviousRoster: vi.fn(),
   recordRoster: vi.fn(),
@@ -73,30 +63,12 @@ vi.mock('@/features/character/typeNames', () => ({
     async (ids: readonly number[]) => new Map(ids.map((id) => [id, `Type ${id}`]))
   ),
 }));
-/**
- * The People panel's name resolution (#566). Unmocked, this file made a real
- * `/universe/names` call to ESI: `Corp.tsx`'s loader awaits `resolveNames` for
- * the highlighted members, this file runs no msw server, and nothing else
- * stubs `fetch` — so every test seeding a roster hung on live network until
- * `waitFor` gave up at `asyncUtilTimeout` (5s), failing a varying handful each
- * run depending on what CCP's API did that minute.
- *
- * Resolves to an empty map, which is what the assertions here were written
- * against and what the failing call was effectively returning: the panel then
- * prints `#id` via `label(names.get(id) ?? null, id)`. Naming a member is
- * therefore still uncovered by this file — worth its own test, but not one to
- * invent here, where the fix is "stop touching the network".
- *
- * Spread from the original like the mocks above, so the module's other exports
- * stay real for anything else in the tree that imports them.
- */
 vi.mock('@/features/character/names', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/features/character/names')>()),
   resolveNames: vi.fn(async () => new Map<number, string>()),
 }));
 
 const mockedAccess = vi.mocked(useCorpAccess);
-/** Every loader the route calls, wherever it lives, under one name. */
 const mocked = {
   ...vi.mocked(boardData),
   ...vi.mocked(corpWallet),
@@ -138,7 +110,6 @@ function cached<T>(data: T): StatusResult<T> {
   return { cached: result, needsReauth: false };
 }
 
-/** A read that fell back to its saved copy, three hours old. */
 function savedCopy<T>(data: T): StatusResult<T> {
   const result = cached(data).cached!;
   return {
@@ -147,7 +118,6 @@ function savedCopy<T>(data: T): StatusResult<T> {
   };
 }
 
-/** Fails the test if the route ever calls a loader the capabilities did not open. */
 function forbidden(name: string) {
   return vi.fn(() => {
     throw new Error(`${name} must not be called without its capability`);
@@ -164,13 +134,10 @@ function renderCorp() {
 
 beforeEach(async () => {
   vi.clearAllMocks();
-  // Each widget read keeps its last result per character across unmounts; a test must not inherit one.
   resetRouteSnapshots();
   sync.configured = false;
   await db.settings.clear();
   useCorpOverviewLayout.setState({ value: null, hydrated: false });
-  // The clock, not the timers: `waitFor` needs real ones, and every deadline
-  // in this file is written relative to `NOW`.
   vi.setSystemTime(NOW);
   useActiveCharacter.setState({ activeCharacterId: CHARACTER_ID, hydrated: true });
 
@@ -208,11 +175,6 @@ async function storedLayout(): Promise<OverviewLayout | undefined> {
 }
 
 describe('access states (AC1)', () => {
-  /**
-   * `unknown` is the one state where the route and the nav disagree, on
-   * purpose: the nav renders nothing rather than flicker, but bouncing a
-   * Director who deep-linked before their roles read landed would be a bug.
-   */
   it('waits rather than deciding while corp access is still resolving', () => {
     mockedAccess.mockReturnValue(accessOf('unknown', {}));
     renderCorp();
@@ -220,12 +182,6 @@ describe('access states (AC1)', () => {
     expect(screen.queryByRole('heading', { name: 'Corporation' })).not.toBeInTheDocument();
   });
 
-  /**
-   * The cold-load order every real user hits: `useCorpAccess` reports `unknown`
-   * with no capabilities for the first frames, and only then resolves. A grid
-   * mounted during `unknown` would build its board from an empty capability
-   * set, which is why it mounts on `ready`.
-   */
   it('loads once access resolves, not with the empty capabilities it mounted under', async () => {
     mockedAccess.mockReturnValue(accessOf('unknown', {}));
     const { rerender } = renderCorp();
@@ -264,12 +220,6 @@ describe('access states (AC1)', () => {
 });
 
 describe('per-widget capability gating (AC3)', () => {
-  /**
-   * A Station Manager who is not an Accountant gets the clocks and no money
-   * widgets, with no 403 surfaced and no empty state standing in for a widget
-   * they were never allowed to ask about. The `forbidden` loaders make "did not
-   * fetch" part of the assertion, not just "did not render".
-   */
   it('reads structures and moons for a Station Manager, and no wallet at all', async () => {
     mockedAccess.mockReturnValue(
       accessOf('ready', { canReadStructures: true, canReadMoonExtractions: true })
@@ -302,7 +252,6 @@ describe('per-widget capability gating (AC3)', () => {
     expect(await widget('Corp wallet')).toBeInTheDocument();
     expect(await widget('Cash flow')).toBeInTheDocument();
     expect(await widget('Income by source')).toBeInTheDocument();
-    // Let the wallet reads land here: one still in flight would fire into the next test's mocks.
     await waitFor(() => expect(mocked.loadCorporationWalletJournal).toHaveBeenCalled());
     expect(mocked.loadCorporationStructures).not.toHaveBeenCalled();
     expect(screen.queryByRole('region', { name: 'Structures' })).not.toBeInTheDocument();
@@ -376,18 +325,13 @@ describe('the layout', () => {
     await user.click(await screen.findByRole('button', { name: 'Add widget' }));
 
     const gallery = await screen.findByRole('dialog', { name: 'Add a widget' });
-    // It opens in Browse all, which hides what is already on the board.
     await user.click(within(gallery).getByRole('button', { name: 'Not on your board' }));
     expect(within(gallery).getByText('Inactive members')).toBeInTheDocument();
-    // Coming soon, listed for everyone.
     expect(within(gallery).getByText('Corp kills')).toBeInTheDocument();
-    // Not readable with these roles, so not offered.
     expect(within(gallery).queryByText('Corp wallet')).not.toBeInTheDocument();
-    // A character widget belongs to the Overview.
     expect(within(gallery).queryByText('Training')).not.toBeInTheDocument();
 
     await user.click(within(gallery).getByRole('button', { name: 'Add another Members' }));
-    // The whole default is saved, not this Character's slice: a Director main keeps its wallet.
     await waitFor(async () =>
       expect((await storedLayout())?.widgets.map((w) => w.kind)).toEqual([
         ...CORP_DEFAULT_SEEDS.map(seedKind),
@@ -404,15 +348,12 @@ describe('the layout', () => {
     mocked.loadCorporationMemberIds.mockResolvedValue(cached([]));
 
     renderCorp();
-    // No wait for the pull before drawing: a pilot who never edits never waits.
     expect(await widget('Members')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Customize' }));
     await user.click(await screen.findByRole('button', { name: 'Add widget' }));
     const gallery = await screen.findByRole('dialog', { name: 'Add a widget' });
-    // It opens in Browse all, which hides what is already on the board.
     await user.click(within(gallery).getByRole('button', { name: 'Not on your board' }));
     await user.click(within(gallery).getByRole('button', { name: 'Add another Members' }));
-    // The edit shows at once (the Gallery's own preview aside), though nothing is written yet.
     const onPage = screen
       .getAllByRole('region', { name: 'Members' })
       .filter((region) => !gallery.contains(region));

@@ -1,9 +1,3 @@
-/**
- * Picks the Target Profile applied DPS is worked out against, and manages the
- * pilot's custom ones (issue #1546) — create, edit, delete, all synced via
- * `targetProfiles.ts`. A target has a signature, a speed and, optionally,
- * a resist to each damage type — the twin of `DamageProfilePicker`.
- */
 import { useId, useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -33,7 +27,6 @@ type ResistDraft = Record<keyof TargetResists, string>;
 
 const NO_RESIST_DRAFT: ResistDraft = { em: '', thermal: '', kinetic: '', explosive: '' };
 
-/** "50/40/30/20" — whole percentages, EM first as the game orders them. */
 function resistSummary(resists: TargetResists): string {
   return RESIST_TYPES.map((type) => Math.round(resists[type] * 100)).join('/');
 }
@@ -52,7 +45,6 @@ interface Draft {
   name: string;
   signatureRadius: string;
   velocity: string;
-  /** Percent, as typed; empty is none. */
   resists: ResistDraft;
 }
 
@@ -82,10 +74,6 @@ function draftOf(profile: CustomTargetProfile): Draft {
   };
 }
 
-/**
- * Typed percentages as shares; `undefined` when every one is empty or 0, so
- * a profile without resists keeps the shape it had before resists existed.
- */
 function resistsOf(draft: ResistDraft): TargetResists | undefined {
   const resists = Object.fromEntries(
     RESIST_TYPES.map((type) => [type, draft[type] === '' ? 0 : Number(draft[type]) / 100])
@@ -117,7 +105,6 @@ function ProfileForm({
       setError(t('fittings.targetProfile.errorName'));
       return;
     }
-    // An empty speed is a stationary target; an empty signature is invalid.
     const typedResists = resistsOf(resists);
     const values: TargetProfile = {
       signatureRadius: signatureRadius === '' ? Number.NaN : Number(signatureRadius),
@@ -258,7 +245,6 @@ export function TargetProfilePicker({
   field = false,
 }: {
   targetProfiles: TargetProfiles;
-  /** In the stats column's `StatFields` grid: the label in its column, the profile's summary beneath. */
   field?: boolean;
 }) {
   const { t } = useTranslation();
@@ -311,7 +297,6 @@ export function TargetProfilePicker({
   );
   const manage = (
     <>
-      {/* Beside a label that already names it, "Manage" says enough; the full name stays its accessible one. */}
       <Button
         size="sm"
         aria-label={field ? t('fittings.targetProfile.manage') : undefined}
@@ -335,7 +320,6 @@ export function TargetProfilePicker({
     );
   return (
     <div className="flex flex-wrap items-center gap-x-1.5 gap-y-2 text-xs md:min-w-[22rem] md:flex-[1_1_0]">
-      {/* The label and its select never part; the summary and Manage wrap beneath if the row is tight. */}
       <div className="flex items-center gap-x-1.5">
         <span className="text-text-dim">{label}</span>
         {select}

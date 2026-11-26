@@ -16,11 +16,6 @@ import type { ComparedBuildRow } from '../useComparedBuildResults';
 const desktop = vi.hoisted(() => ({ value: true }));
 vi.mock('@/lib/useIsDesktop', () => ({ useIsDesktop: () => desktop.value }));
 
-/**
- * Prices every plan at 1M per run, so profit is (reward - 1M) x units. Rows are
- * memoised on `plans` like the real hook's state: a fresh array each render
- * would loop through `onPriced`.
- */
 vi.mock('../useComparedBuildResults', async () => {
   const { useMemo } = await import('react');
   return {
@@ -106,8 +101,8 @@ function renderPanel(
           characterId: 7,
           corporationId: 500,
           projects: [
-            project({ id: 'hurricane', typeId: 24702 }), // 7 units left: profit 4M x 7 = 28M
-            project({ id: 'drake', typeId: 24698, rewardEach: 9_000_000, contributed: 0 }), // 10 units: 80M
+            project({ id: 'hurricane', typeId: 24702 }),
+            project({ id: 'drake', typeId: 24698, rewardEach: 9_000_000, contributed: 0 }),
           ],
         },
       ]}
@@ -142,7 +137,6 @@ describe('CorpProjectsPanel', () => {
     expect(within(rows[1]!).getByText('Hurricane')).toBeInTheDocument();
     expect(within(rows[1]!).getByText(/7 units/)).toBeInTheDocument();
     expect(within(rows[1]!).getByText('Owned')).toBeInTheDocument();
-    // No copy for sale and no blueprint held: the amber assumption.
     expect(within(rows[0]!).getByText('Assuming a copy')).toBeInTheDocument();
   });
 
@@ -152,7 +146,7 @@ describe('CorpProjectsPanel', () => {
     expect(screen.queryByRole('button', { name: /to Compare/ })).toBeNull();
 
     await userEvent.click(screen.getByRole('checkbox', { name: /Select Drake/ }));
-    expect(screen.queryByRole('button', { name: /to Compare/ })).toBeNull(); // one is not a comparison
+    expect(screen.queryByRole('button', { name: /to Compare/ })).toBeNull();
     await userEvent.click(screen.getByRole('checkbox', { name: /Select Hurricane/ }));
     await userEvent.click(screen.getByRole('button', { name: 'Add 2 to Compare' }));
 

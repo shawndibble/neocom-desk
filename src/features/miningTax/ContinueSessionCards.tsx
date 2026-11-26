@@ -16,7 +16,6 @@ interface ContinueSessionCardsProps {
   onAutoContinueChange: (next: boolean) => void;
 }
 
-/** The offers to continue a previous session: all of them, or only the ones auto-continue skipped. */
 export function ContinueSessionCards({
   continuations,
   autoContinue,

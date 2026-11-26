@@ -1,7 +1,3 @@
-/**
- * Structure and moon-extraction builders. Same contract as `models.ts`:
- * pure, derived at render time.
- */
 import { DAY_MS } from '@/lib/age';
 import { worstSeverity, type DeadlineSeverity } from '@/engine/character/severity';
 import type { CorpBoardItem } from '@/engine/corp/board';
@@ -35,15 +31,8 @@ import { popShareMarkLabel } from '@/features/corp/taxBook/popShareMarkLabel';
 const C = 'overview.widgets.chart';
 const STRUCTURES_PAGE = '/corp/structures';
 
-// --- Structures -------------------------------------------------------------------
-
-/**
- * A full tank is not in the data (ESI gives only when the fuel runs out), so the
- * bar reads against a fixed horizon: 30 days of fuel is a full bar.
- */
 export const FUEL_BAR_HORIZON_MS = 30 * DAY_MS;
 
-/** The fuel clock's text, with a bar only for a real clock (not "Dry", "Offline" or "Soon"). */
 function fuelCell(item: CorpBoardItem, t: Translate): TableCell {
   const text = structureWhen(item, t);
   if (item.timing !== 'timed' || item.withinStaleWindow) return text;
@@ -51,11 +40,6 @@ function fuelCell(item: CorpBoardItem, t: Translate): TableCell {
   return bar === undefined ? text : { text, bar };
 }
 
-/**
- * The lowest fuel clock leads (the question a pilot asks of a fleet of
- * structures); with no fuel clock it falls back to the reinforcement count. A
- * zero count is never toned: a warning beside "0 Timers" contradicts itself.
- */
 function structuresNumber(
   t: Translate,
   items: readonly CorpBoardItem[],
@@ -85,10 +69,6 @@ function structuresNumber(
   };
 }
 
-/**
- * Problems only: how many structures need attention, the worst one named. Zero
- * never reaches here; the widget shows its good-news empty state instead.
- */
 function problemsNumber(
   t: Translate,
   rows: readonly { name: string; tone: DeadlineSeverity }[]
@@ -106,14 +86,11 @@ export const structures: Builder = (feeds, { t, now, show, scopeAll }) => {
   const raw = feed?.data ?? null;
   const to = STRUCTURES_PAGE;
   if (!raw) return blank(to, statusOf(feed));
-  // Control towers are structures too, and fuel is what a structure list is for. They only add
-  // rows: a Character who may not read them still gets the Upwell ones.
   const towerFeed = scopeAll ? feeds.corpStarbasesAll : feeds.corpStarbases;
   const towerData = towerFeed?.data?.readable ? towerFeed.data : null;
   const towers = towerData ? toStructureSources(towerData, now) : [];
   const view = structuresView(raw, now, towerData ? toBoardStarbases(towerData, now) : undefined);
   const items = view.items;
-  // A grant lapsed: ask for it. No roles: a grant would not fix that, so say so.
   if (items === null) {
     return {
       ...blank(
@@ -125,10 +102,8 @@ export const structures: Builder = (feeds, { t, now, show, scopeAll }) => {
     };
   }
 
-  // Read across several corporations: each row names its own.
   const corporations = new Map([...(towerData?.corporations ?? []), ...(raw.corporations ?? [])]);
   const labels = corporations.size > 1 ? corporations : undefined;
-  // One row per structure, healthy ones too: the pilot asks "is everything fuelled", not only "what is wrong".
   const all = structureRows([...(raw.structures ?? []), ...towers], items).map((row) => {
     const { source, fuel, timer, offline, lowFuel } = row;
     const corp =
@@ -161,7 +136,6 @@ export const structures: Builder = (feeds, { t, now, show, scopeAll }) => {
   const problemsOnly = show === 'problems';
   const { structureCount } = view;
   const rows = problemsOnly ? all.filter((row) => row.problem) : all;
-  // Problems only reads the board of the structures it lists, so no hidden one sets a deadline or the summary.
   const shown = problemsOnly ? rows.flatMap((row) => row.items) : items;
   const counts = structureCounts(shown);
   const clock = structuresDeadline(shown, now);
@@ -175,7 +149,6 @@ export const structures: Builder = (feeds, { t, now, show, scopeAll }) => {
         ? [{ key: 'corp', label: t('overview.widgets.structures.col.corp'), priority: 4 }]
         : []),
       { key: 'fuel', label: t('overview.widgets.structures.col.fuel'), align: 'end', priority: 1 },
-      // The row's severity dot and the fuel and timer cells say the same at phone width.
       {
         key: 'state',
         label: t('overview.widgets.structures.col.state'),
@@ -193,7 +166,6 @@ export const structures: Builder = (feeds, { t, now, show, scopeAll }) => {
       key: String(row.id),
       cells: row.cells,
       tone: row.tone,
-      // The page holds the full detail: every service, both clocks, the system.
       to: `${to}?structure=${row.id}`,
     })),
   };
@@ -201,7 +173,6 @@ export const structures: Builder = (feeds, { t, now, show, scopeAll }) => {
   return {
     ...blank(to, {
       ...statusOf(feed, { isEmpty: problemsOnly ? rows.length === 0 : structureCount === 0 }),
-      // One corporation of several failed: what the others gave still draws, flagged.
       ...(raw.partlyFailed || towerData?.partlyFailed ? { error: true } : {}),
     }),
     ...(problemsOnly && rows.length === 0 && structureCount > 0
@@ -254,8 +225,6 @@ export const structures: Builder = (feeds, { t, now, show, scopeAll }) => {
   };
 };
 
-// --- Moon extractions -------------------------------------------------------------
-
 export const moonChunks: Builder = (feeds, { t, now, scopeAll }) => {
   const feed = scopeAll ? feeds.moonChunksAll : feeds.moonChunks;
   const data = feed?.data ?? null;
@@ -271,7 +240,6 @@ export const moonChunks: Builder = (feeds, { t, now, scopeAll }) => {
       summary: moonChunksSummary(t, data, now),
     };
   }
-  // Rows are built at load time; a clock that has passed since would sit beside a Due soon count that already dropped it.
   const chunks = data.chunks
     .filter((chunk) => chunk.deadlineMs > now)
     .sort((a, b) => a.deadlineMs - b.deadlineMs);
@@ -282,11 +250,9 @@ export const moonChunks: Builder = (feeds, { t, now, scopeAll }) => {
   const untilOf = (deadlineMs: number) => formatCountdown(Math.max(0, deadlineMs - now) / 1000);
   const tone = moonChunksSeverity({ ...data, chunks }, now) ?? 'clear';
 
-  // Read across several corporations: each row names its own.
   const named =
     scopeAll && new Set(chunks.map((chunk) => chunk.corporation?.id).filter(Boolean)).size > 1;
   const corpOf = (chunk: BoardClockSource) => (named ? chunk.corporation : undefined);
-  // A Corp Tax Book officer sees which moons the book shares (#6226); a drill's id is its refinery.
   const drillCell = (chunk: BoardClockSource): TableCell => {
     const text = shortStructureName(chunk.subject);
     const mark = data.shareMarks?.[chunk.id];

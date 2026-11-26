@@ -1,11 +1,3 @@
-/**
- * Set waypoints in game (issue #2479): sends a trip's waypoints to the
- * Character's EVE client, one ESI call each, strictly in order. The first call
- * clears the client's own waypoints; the rest add after it.
- *
- * Which waypoints, and where a wormhole or bridge cuts them off, is
- * `engine/route/waypoints.ts`'s job — this only sends them.
- */
 import { isOfflineFailure, isUnconfirmedWrite } from '@/esi/client';
 import { EsiError } from '@/esi/errors';
 import { postAutopilotWaypoint } from '@/esi/endpoints';
@@ -15,15 +7,10 @@ export type SetWaypointsResult =
   | { ok: true; set: number }
   | {
       ok: false;
-      /** How many waypoints the client took before the failure. */
       set: number;
-      /** ESI's own words, or `null` when it gave none. */
       message: string | null;
-      /** ESI refused and the grant lacks the waypoint scope: a Grant fixes it. */
       needsPermission?: true;
-      /** The request never reached ESI (offline, a timeout): nothing was refused. */
       offline?: true;
-      /** The failure was a timeout after the request left: that waypoint may have been set. */
       unconfirmed?: true;
     };
 

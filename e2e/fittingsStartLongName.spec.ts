@@ -1,7 +1,3 @@
-/**
- * Fittings Start list (issue #2001): a long fitting name truncates inside its
- * row instead of pushing the row's actions menu and source badge out of line.
- */
 import { test, expect } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 
@@ -65,7 +61,6 @@ for (const size of [
     expect(nameDims.scrollWidth).toBeGreaterThan(nameDims.clientWidth);
 
     const listBox = (await list.boundingBox())!;
-    // The Active Fit (the mocked flown ship) leads with no source badge; only the library rows line up.
     const rows = list
       .locator('section')
       .filter({ hasNot: page.getByRole('heading', { name: 'Active fit' }) })

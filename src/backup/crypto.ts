@@ -1,6 +1,3 @@
-// Encrypted backup file crypto (issue #789). Browser-only: uses WebCrypto,
-// same tier as auth/pkce.ts. No Dexie/fetch/DOM — pure encrypt/decrypt.
-
 const ITERATIONS = 600_000;
 const SALT_BYTES = 16;
 const IV_BYTES = 12;
@@ -10,15 +7,11 @@ export interface BackupFile {
   version: 1;
   kdf: 'PBKDF2-SHA256';
   iterations: number;
-  /** base64 */
   salt: string;
-  /** base64 */
   iv: string;
-  /** base64 */
   ciphertext: string;
 }
 
-/** Thrown by {@link decryptExportPayload} on GCM auth-tag failure — wrong password or a corrupted file, deliberately not distinguished. */
 export class BackupDecryptError extends Error {
   constructor() {
     super('Unable to decrypt file');
@@ -60,7 +53,6 @@ async function deriveKey(
   );
 }
 
-/** Encrypts `payload` (JSON-serialized) under `password`, returning the self-describing file shape written to disk. */
 export async function encryptExportPayload(
   payload: unknown,
   password: string
@@ -81,7 +73,6 @@ export async function encryptExportPayload(
   };
 }
 
-/** Decrypts a {@link BackupFile} under `password`, returning the parsed payload. Throws {@link BackupDecryptError} on wrong password or corruption — the two are indistinguishable by design (GCM auth-tag failure either way). */
 export async function decryptExportPayload(file: BackupFile, password: string): Promise<unknown> {
   const salt = fromBase64(file.salt);
   const iv = fromBase64(file.iv);

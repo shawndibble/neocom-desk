@@ -18,7 +18,6 @@ import { useFittingItemActions, type FittingItemActions } from '../fittingItemAc
 import { OpenAfterMenuContext, slotName } from './menuContext';
 import { ChangeChargeItems, ChargeToCargoItem, GuardedMenuItem } from './shared';
 
-/** Load charge (from cargo) and "Load into all compatible", for one module. */
 function ModuleChargeItems({
   actions,
   module,
@@ -56,11 +55,6 @@ function ModuleChargeItems({
   );
 }
 
-/**
- * "Change charge (all N)" on a Ring tile or List row: the Charge Picker for
- * every fitted module of this type — the weapon group the Offense row's own
- * menu changes. Only with the editor's Fitting to work it out from.
- */
 function GroupChangeCharge({
   actions,
   module,
@@ -91,7 +85,6 @@ function GroupChangeCharge({
   );
 }
 
-/** A fitted module's actions — the Ring tile, the List row, the module dialog. */
 export function ModuleMenuItems({
   module,
   shownState,
@@ -100,17 +93,9 @@ export function ModuleMenuItems({
   takesCharges,
 }: {
   module: FittingModule;
-  /** The state it reached (what the radio ticks). */
   shownState: FittingItemState;
-  /** The highest it can reach; every state until known. */
   maxState?: FittingItemState;
-  /** Move up / down / to slot — the List's keyboard and touch way to reorder. */
   withMove?: boolean;
-  /**
-   * Whether the module takes a charge at all (its charge groups); false drops
-   * the "Load charge" entries a Damage Control would only show disabled.
-   * Unknown (undefined) until its calculation says, when they stay.
-   */
   takesCharges?: boolean;
 }) {
   const { t } = useTranslation();
@@ -120,7 +105,6 @@ export function ModuleMenuItems({
   const { slot: rack, slotIndex: index, typeId } = module;
   const name = actions.typeName(typeId);
   const count = actions.slotCount(rack);
-  // A subsystem can't be put offline, so its menu has no states to pick.
   const hasStates = rack !== 'subsystem';
   return (
     <>

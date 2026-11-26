@@ -1,10 +1,3 @@
-/**
- * Improve's "Train" section: the skill levels and the Tech II modules the
- * pilot can't fly yet that most raise the active Improve Goal's stat, from
- * What to train's own runs (`useSkillGains`, `useModuleUpgrades`). They cost
- * the fit nothing, so they sit above the swaps. Only for the active
- * Character's real skills, and only when something helps.
- */
 import { useContext, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
@@ -30,10 +23,8 @@ interface Props {
   goal: ImproveGoal;
   evaluator: SkillGainEvaluator | null;
   characterId: number | null;
-  /** Names the Skill Plan Add to plan creates when the Character has none yet. */
   fittingName: string;
   catalogue: FittingCatalogue | null;
-  /** Opens the stats column's What to train, for the "See all" link; absent: no link. */
   onShowWhatToTrain?: () => void;
 }
 
@@ -41,7 +32,6 @@ export function ImproveTrain({ goal, characterId, ...rest }: Props) {
   const overridden = useSkillOverrides((state) => hasSkillOverrides(state.skills));
   const sort = TRAIN_SORT[goal];
   if (characterId === null || overridden || !sort) return null;
-  // Keyed so an Undo toast can't outlive a Character switch.
   return <Train key={characterId} characterId={characterId} goal={goal} {...rest} />;
 }
 
@@ -82,7 +72,6 @@ function Train({
   );
 
   const count = skills.length + modules.length;
-  // Skills left open with nothing to show would be an empty panel.
   const empty = !evaluator || count === 0;
   const slotOpen = slot?.open ?? false;
   const slotToggle = slot?.onToggle;
@@ -159,7 +148,6 @@ function Train({
       onClose={() => setAdded(null)}
     />
   );
-  // Improve's header holds a Skills control with a count; its rows show only while it is open.
   return (
     <>
       {slot.trigger &&

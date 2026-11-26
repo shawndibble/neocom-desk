@@ -1,12 +1,3 @@
-/**
- * Every zKillboard URL. zKillboard is a third-party site that lists a
- * pilot's, corporation's, or alliance's kills and losses — data the ESI
- * public-info endpoints do not carry, so the Public Info Modal links out
- * to it rather than trying to show it inline.
- *
- * Shaped after `eveImages.ts`: one named helper per entity kind, so the
- * path segments live in one place instead of as template strings in JSX.
- */
 import type { KillmailHashLookup } from '@/engine/fittings/load';
 import type { KillmailVictim } from '@/engine/fittings/linkLoader';
 import { fetchWithTimeout } from '@/lib/fetchWithTimeout';
@@ -16,17 +7,11 @@ import type { RecentKill, RecentKillAttacker, RecentKillVictim } from '@/engine/
 import { isRecord } from '@/engine/guards';
 import { MINUTE_MS } from '@/lib/age';
 
-/**
- * Why a zKillboard request failed: no answer (`offline`, a thrown fetch or a
- * timeout), HTTP 429 (`rate-limited`), any other error status (`http`), or an
- * answer that was not the expected JSON (`parse`).
- */
 export type ZkillFailureReason = 'offline' | 'rate-limited' | 'http' | 'parse';
 
 type ZkillJson =
   { ok: true; body: unknown } | { ok: false; reason: ZkillFailureReason; status: number | null };
 
-/** One zKillboard GET, parsed. Never throws; no custom headers (scope decision `20260924-195833`). */
 async function zkillJson(url: string): Promise<ZkillJson> {
   let response: Response;
   try {
@@ -43,14 +28,8 @@ async function zkillJson(url: string): Promise<ZkillJson> {
   }
 }
 
-/**
- * Why each shared-cache load last failed, keyed `cache:key`. The caches carry
- * only a value or null, so a failure's cause is kept here; failures are still
- * never cached. Read after a cache `get` returns null.
- */
 const failureReasons = new Map<string, ZkillFailureReason>();
 
-/** Records a load's outcome: clears the key on success, notes the reason on failure. */
 function settle<T>(key: string, value: T | null, reason: ZkillFailureReason): T | null {
   failureReasons.delete(key);
   if (value === null) {
@@ -63,10 +42,8 @@ function settle<T>(key: string, value: T | null, reason: ZkillFailureReason): T 
   return value;
 }
 
-/** Keeps the map bounded: the oldest note goes first. */
 const FAILURE_REASONS_MAX = 200;
 
-/** Runs a cache loader; a throw is recorded as a failure rather than leaving a stale reason. */
 async function guarded<T>(key: string, load: () => Promise<T | null>): Promise<T | null> {
   try {
     return await load();
@@ -79,13 +56,6 @@ function failureReason(key: string): ZkillFailureReason {
   return failureReasons.get(key) ?? 'http';
 }
 
-/**
- * A zKillboard link carries only the killmail id, but ESI's killmail endpoint
- * also wants the hash — which only zKillboard's API knows. `not-found` when
- * zKillboard answers and has no such kill (a 404, or an empty list);
- * `unreachable` when it can't be asked at all (offline, a timeout, an error
- * status, an unreadable body), which says nothing about the kill.
- */
 export async function fetchKillmailHash(killmailId: number): Promise<KillmailHashLookup> {
   const result = await zkillJson(`https://zkillboard.com/api/killID/${killmailId}/`);
   if (!result.ok) return { status: result.status === 404 ? 'not-found' : 'unreachable' };
@@ -94,25 +64,16 @@ export async function fetchKillmailHash(killmailId: number): Promise<KillmailHas
   return typeof hash === 'string' ? { status: 'ok', hash } : { status: 'not-found' };
 }
 
-/** How many of a hull's most recent losses Popular fits reads. */
 const HULL_LOSS_LIMIT = 40;
 
-/**
- * One loss from zKillboard's losses API. zKillboard sends either the whole
- * killmail inline (`victim`, `killmail_time`) or only `{killmail_id, zkb}`;
- * `victim`/`time` are null in the second case, for the caller to read from
- * ESI with the hash.
- */
 export interface ZkillHullLoss {
   killmailId: number;
   hash: string;
-  /** zKillboard's ISK estimate of the fit (else of the whole loss); null when absent. */
   value: number | null;
   time: string | null;
   victim: KillmailVictim | null;
 }
 
-/** `ok: false` when zKillboard failed or rate-limited, so "no losses" and "couldn't load" differ. */
 export type HullLossesResult =
   { ok: true; losses: ZkillHullLoss[] } | { ok: false; losses: []; reason: ZkillFailureReason };
 
@@ -128,7 +89,6 @@ function parseVictim(value: unknown): KillmailVictim | null {
   };
 }
 
-/** Reads a losses-API body defensively: newest `limit` entries, malformed ones dropped. */
 export function parseHullLosses(body: unknown, limit = HULL_LOSS_LIMIT): ZkillHullLoss[] {
   if (!Array.isArray(body)) return [];
   const losses: ZkillHullLoss[] = [];
@@ -147,13 +107,8 @@ export function parseHullLosses(body: unknown, limit = HULL_LOSS_LIMIT): ZkillHu
   return losses.sort((a, b) => b.killmailId - a.killmailId).slice(0, limit);
 }
 
-/** Concurrent callers for one hull share one request; nothing is reused once it settles. */
 const hullLossesInflight = createTtlCache<ZkillHullLoss[]>({ ttlMs: 0, max: 50 });
 
-/**
- * A hull's most recent losses, for Popular fits. A browser fetch with no
- * custom headers, as `fetchKillmailHash` (scope decision `20260924-195833`).
- */
 export async function fetchHullLosses(shipTypeId: number): Promise<HullLossesResult> {
   const key = `hull:${shipTypeId}`;
   const losses = await hullLossesInflight.get(String(shipTypeId), () =>
@@ -168,23 +123,15 @@ export async function fetchHullLosses(shipTypeId: number): Promise<HullLossesRes
     : { ok: true, losses };
 }
 
-/** How many of a pilot's most-used hulls Pilot Lookup lists. */
 export const PILOT_TOP_SHIPS = 5;
 
-/** How long a pilot's zKillboard stats are reused before asking again. */
 export const PILOT_STATS_CACHE_MS = 10 * MINUTE_MS;
 
-/** One hull from zKillboard's all-time "ships used on kills" list. */
 export interface PilotTopShip {
   shipTypeId: number;
   kills: number;
 }
 
-/**
- * A pilot's zKillboard totals, as stated. `iskEfficiency` is
- * destroyed / (destroyed + lost), null when no ISK moved either way; the two
- * ratios are zKillboard's own 0-100 figures, null when it sends none.
- */
 export interface PilotStats {
   kills: number;
   losses: number;
@@ -195,14 +142,11 @@ export interface PilotStats {
   dangerRatio: number | null;
   gangRatio: number | null;
   topShips: PilotTopShip[];
-  /** The pilots zKillboard counts in a corporation or alliance; null for a pilot, or when unstated. */
   memberCount: number | null;
 }
 
-/** What zKillboard knows of a pilot: their stats, or that it has no kill or loss for them. */
 export type PilotStatsParse = { kind: 'stats'; stats: PilotStats } | { kind: 'no-history' };
 
-/** `failed` when the request failed or the body was unreadable — never cached. */
 export type PilotStatsResult = PilotStatsParse | { kind: 'failed'; reason: ZkillFailureReason };
 
 function countOrZero(value: unknown): number {
@@ -223,17 +167,8 @@ function parseTopShips(topAllTime: unknown): PilotTopShip[] {
   return ships.slice(0, PILOT_TOP_SHIPS);
 }
 
-/** zKillboard's answer for an id it has never recorded a kill or loss for. */
 const UNKNOWN_ID_ERROR = 'Invalid type or id';
 
-/**
- * Reads a `/api/stats/characterID/{id}/` body defensively. zKillboard answers
- * an id it has never seen with a 200 `{"error": "Invalid type or id"}`, and a
- * pilot with no kill or loss with a body that carries no counts — both are
- * "no history", distinct from a failure. zKillboard leaves a zero count out
- * of the body, so a missing count reads as 0. `null` (a failure) for any
- * other error body, and for a body that is not an object at all.
- */
 export function parsePilotStats(body: unknown): PilotStatsParse | null {
   if (!isRecord(body) || Array.isArray(body)) return null;
   if (body.error !== undefined) {
@@ -264,45 +199,29 @@ export function parsePilotStats(body: unknown): PilotStatsParse | null {
 
 type StatsEntity = 'characterID' | 'corporationID' | 'allianceID';
 
-/**
- * Lists kept at once. Each holds up to 200 full killmail bodies, so a long Local
- * list must not pin them all for the session: the oldest go first.
- */
 const PILOT_LIST_CACHE_MAX = 120;
 
-/** Keyed `kind:id`: a pilot, a corporation and an alliance can never share an answer. */
 const pilotStatsCache = createTtlCache<PilotStatsParse>({
   ttlMs: PILOT_STATS_CACHE_MS,
   max: 500,
 });
 
-/** Test seam: forget every cached pilot and corporation. */
 export function resetPilotStatsCache(): void {
   pilotStatsCache.clear();
   statsFetchedAt.clear();
   failureReasons.clear();
 }
 
-/**
- * zKillboard's stats for a pilot or a corporation — one body shape for both,
- * so `parsePilotStats` reads either. A browser fetch with no custom headers,
- * as `fetchKillmailHash` (scope decision `20260924-195833`). The URL 302s to
- * `.../kills/`; both legs are CORS-open, so the fetch follows it. Answers are
- * reused for `PILOT_STATS_CACHE_MS`, and concurrent callers share one request;
- * a failure never is reused.
- */
 async function fetchEntityStats(entity: StatsEntity, id: number): Promise<PilotStatsResult> {
   return (await fetchEntityStatsRead(entity, id)).result;
 }
 
-/** A stats answer plus when it was read and whether this call reused a cached read. */
 export interface PilotStatsRead {
   result: PilotStatsResult;
   fetchedAt: Date;
   fromCache: boolean;
 }
 
-/** When each cached stats answer was actually fetched, keyed like `pilotStatsCache`. */
 const statsFetchedAt = new Map<string, number>();
 
 async function fetchEntityStatsRead(entity: StatsEntity, id: number): Promise<PilotStatsRead> {
@@ -339,52 +258,42 @@ async function fetchEntityStatsRead(entity: StatsEntity, id: number): Promise<Pi
   };
 }
 
-/** A pilot's zKillboard stats, for Pilot Lookup and the Show Info Character tab. */
 export function fetchPilotStats(characterId: number): Promise<PilotStatsResult> {
   return fetchEntityStats('characterID', characterId);
 }
 
-/** An alliance's zKillboard stats, for the Show Info Alliance tab. */
 export function fetchAllianceStats(allianceId: number): Promise<PilotStatsResult> {
   return fetchEntityStats('allianceID', allianceId);
 }
 
-/** A corporation's zKillboard stats, for the Show Info Corporation tab. */
 export function fetchCorporationStats(corporationId: number): Promise<PilotStatsResult> {
   return fetchEntityStats('corporationID', corporationId);
 }
 
-/** Like `fetchCorporationStats`, with the read time and whether the cache answered. */
 export function fetchCorporationStatsRead(corporationId: number): Promise<PilotStatsRead> {
   return fetchEntityStatsRead('corporationID', corporationId);
 }
 
-/** How many of a pilot's most recent kills and losses Pilot Lookup lists. */
 export const PILOT_KILLMAIL_LIMIT = 25;
 
-/** Who was on one side of a killmail; any part null when the killmail doesn't say (an NPC, a structure). */
 export interface KillmailParty {
   characterId: number | null;
   corporationId: number | null;
   shipTypeId: number | null;
 }
 
-/** What a killmail body states: from zKillboard's inline entry or ESI's killmail, same shape. */
 export interface KillmailDetail {
   time: string | null;
   systemId: number | null;
   victim: KillmailVictim;
   victimParty: KillmailParty;
-  /** The final-blow attacker (else the first listed); null when none is listed. */
   finalBlow: KillmailParty | null;
 }
 
-/** One of a pilot's kills or losses. `detail` is null for zKillboard's hash-only shape. */
 export interface PilotKillmail {
   killmailId: number;
   hash: string;
   side: 'kill' | 'loss';
-  /** zKillboard's total value of the loss; null when absent. */
   value: number | null;
   detail: KillmailDetail | null;
 }
@@ -400,7 +309,6 @@ function readParty(value: Record<string, unknown>): KillmailParty {
   };
 }
 
-/** Reads a killmail body (zKillboard inline or ESI) defensively; null without a readable victim. */
 export function readKillmailDetail(body: unknown): KillmailDetail | null {
   if (!isRecord(body) || !isRecord(body.victim)) return null;
   const victim = parseVictim(body.victim);
@@ -416,7 +324,6 @@ export function readKillmailDetail(body: unknown): KillmailDetail | null {
   };
 }
 
-/** Reads a `kills/` or `losses/characterID` body defensively; entries without an id or hash are dropped. */
 export function parsePilotKillmails(body: unknown, side: PilotKillmail['side']): PilotKillmail[] {
   if (!Array.isArray(body)) return [];
   const entries: PilotKillmail[] = [];
@@ -442,21 +349,11 @@ const pilotListCache = createTtlCache<unknown[]>({
   max: PILOT_LIST_CACHE_MAX,
 });
 
-/** Test seam: forget every cached pilot's kills and losses. */
 export function resetPilotKillmailsCache(): void {
   pilotListCache.clear();
   failureReasons.clear();
 }
 
-/**
- * One pilot's `kills/` or `losses/` list as zKillboard sent it (first page,
- * newest first), asked for once however many readers want it: the kill history,
- * the Threat verdict's loss dates and Recent kills and losses all read the
- * same list, and the kills list is one URL for the first and the last. The
- * promise itself is cached, so two readers asking at once share one request,
- * and an answer is reused for `PILOT_STATS_CACHE_MS`. A failure, or a body
- * that is not a list, is never kept: the next reader asks again.
- */
 function fetchPilotList(characterId: number, path: PilotListPath): Promise<unknown[] | null> {
   const key = `${path}/${characterId}`;
   return pilotListCache.get(key, () =>
@@ -474,7 +371,6 @@ function pilotListFailure(characterId: number, path: PilotListPath): ZkillFailur
   return failureReason(`${path}/${characterId}`);
 }
 
-/** Drops one cached list, for a body that parsed as a list but could not be read. */
 function forgetPilotList(characterId: number, path: PilotListPath): void {
   pilotListCache.delete(`${path}/${characterId}`);
 }
@@ -487,14 +383,6 @@ async function fetchPilotSide(
   return body === null ? null : parsePilotKillmails(body, side);
 }
 
-/**
- * A pilot's most recent kills and losses, merged newest first (killmail ids
- * rise with time), for Pilot Lookup. A browser fetch with no custom headers,
- * as `fetchKillmailHash` (scope decision `20260924-195833`). Either list
- * failing fails the whole answer — kills alone would misstate the record.
- * Both lists come through `fetchPilotList`, shared with the kill history and
- * the Threat verdict.
- */
 export async function fetchPilotKillmails(characterId: number): Promise<PilotKillmailsResult> {
   try {
     const [kills, losses] = await Promise.all([
@@ -512,19 +400,12 @@ export async function fetchPilotKillmails(characterId: number): Promise<PilotKil
   }
 }
 
-/** zKillboard's page size for a `kills/` or `losses/` list: a full page means older ones exist. */
 export const PILOT_LIST_PAGE_SIZE = 200;
 
 export type PilotKillmailHistoryResult =
   | {
       ok: true;
-      /** Every kill and loss on the first page of each list, newest first; only entries that state a time. */
       entries: PilotKillmail[];
-      /**
-       * How far back the lists are known to reach, in ms: the newest of the
-       * oldest dates among lists that came back full. Null when no list was
-       * full, so the whole record is held.
-       */
       reachesBackTo: number | null;
     }
   | { ok: false; reason: ZkillFailureReason };
@@ -534,15 +415,6 @@ function timeOf(entry: PilotKillmail): number {
   return Number.isFinite(at) ? at : Number.NaN;
 }
 
-/**
- * A pilot's kills and losses as far back as zKillboard's first page of each
- * list reaches (200 each), for the Overview's Kills and losses widget. Both
- * lists come through `fetchPilotList`, so the request is shared with Pilot
- * Lookup and cached for `PILOT_STATS_CACHE_MS`, which is also the rate limit:
- * a refresh inside that window asks zKillboard nothing. Either list failing,
- * or lists that hold only hash-only entries (no time to count by), fail the
- * whole answer rather than read as "none".
- */
 export async function fetchPilotKillmailHistory(
   characterId: number
 ): Promise<PilotKillmailHistoryResult> {
@@ -590,11 +462,6 @@ const SPACE_BY_LABEL: Record<string, KillSpace> = {
   'loc:w-space': 'wormhole',
 };
 
-/**
- * Reads a `kills/characterID` body into the pilot's kill history: when, in
- * what kind of space (zKillboard's `loc:` label), the hull that died and the
- * hull this pilot flew. An entry with no readable time is dropped.
- */
 export function parseKillHistory(body: unknown, characterId: number): KillRecord[] {
   if (!Array.isArray(body)) return [];
   const kills: KillRecord[] = [];
@@ -624,26 +491,15 @@ export function parseKillHistory(body: unknown, characterId: number): KillRecord
 export type PilotKillHistoryResult =
   { ok: true; kills: KillRecord[] } | { ok: false; reason: ZkillFailureReason };
 
-/** Test seam: forget every cached kill history (and the lists beside it). */
 export function resetPilotKillHistoryCache(): void {
   pilotListCache.clear();
   failureReasons.clear();
 }
 
-/**
- * A pilot's latest kills (zKillboard's first page, newest first; up to 200),
- * for the Local list's per-space columns, the modal's chart and the Threat
- * verdict. Kills only: the verdict reads a pilot's losses separately and only
- * when it must. A browser fetch with no custom headers, as `fetchKillmailHash`
- * (decision `20260924-195833`). The request is shared with Recent kills and
- * losses (`fetchPilotList`); a failure is never reused.
- */
 export async function fetchPilotKillHistory(characterId: number): Promise<PilotKillHistoryResult> {
   const body = await fetchPilotList(characterId, 'kills');
   if (body === null) return { ok: false, reason: pilotListFailure(characterId, 'kills') };
   const kills = parseKillHistory(body, characterId);
-  // Entries that carry no killmail body (hash only) can't be dated: that is a
-  // list we couldn't read, never "no kills".
   if (body.length > 0 && kills.length === 0) {
     forgetPilotList(characterId, 'kills');
     return { ok: false, reason: 'parse' };
@@ -651,17 +507,14 @@ export async function fetchPilotKillHistory(characterId: number): Promise<PilotK
   return { ok: true, kills };
 }
 
-/** Who was on a killmail, from a `kills/` or `losses/characterID` entry: enough to say which side two pilots were on. */
 export interface KillInvolvement {
   killmailId: number;
   timeMs: number;
-  /** zKillboard's total value of the loss; null when absent. */
   value: number | null;
   victimCharacterId: number | null;
   attackerCharacterIds: number[];
 }
 
-/** Reads a pilot-list body into involvements; entries with no id or readable time are dropped. */
 export function parseKillInvolvements(body: unknown): KillInvolvement[] {
   if (!Array.isArray(body)) return [];
   const out: KillInvolvement[] = [];
@@ -686,11 +539,6 @@ export type PilotInvolvementsResult =
   | { ok: true; kills: KillInvolvement[]; losses: KillInvolvement[] }
   | { ok: false; reason: ZkillFailureReason };
 
-/**
- * A pilot's latest kills and losses (first page of each, up to 200) with who
- * was on each side, for Show Info's Interactions. Both lists come through
- * `fetchPilotList`, so nothing is requested that the profile has not already.
- */
 export async function fetchPilotInvolvements(
   characterId: number
 ): Promise<PilotInvolvementsResult> {
@@ -707,7 +555,6 @@ export async function fetchPilotInvolvements(
   }
 }
 
-/** `ok: false` when zKillboard failed or rate-limited, so "no kills" and "couldn't load" differ. */
 export type SystemRecentKillsResult =
   { ok: true; kills: RecentKill[] } | { ok: false; reason: ZkillFailureReason };
 
@@ -716,8 +563,6 @@ function parseAttacker(value: unknown): RecentKillAttacker | null {
   const attacker: RecentKillAttacker = {};
   if (typeof value.ship_type_id === 'number') attacker.shipTypeId = value.ship_type_id;
   if (typeof value.weapon_type_id === 'number') attacker.weaponTypeId = value.weapon_type_id;
-  // Who flew it, for the kill-location modal (issue #5929). NPCs and
-  // structures carry no character id.
   const characterId = finiteOrNull(value.character_id);
   const corporationId = finiteOrNull(value.corporation_id);
   const allianceId = finiteOrNull(value.alliance_id);
@@ -738,7 +583,6 @@ function parseKillVictim(value: unknown): RecentKillVictim | undefined {
   };
 }
 
-/** One killmail entry as a `RecentKill`; `null` for an NPC kill or one with no id or readable time. */
 function parseRecentKill(entry: unknown): RecentKill | null {
   if (!isRecord(entry) || typeof entry.killmail_id !== 'number') return null;
   const time = typeof entry.killmail_time === 'string' ? Date.parse(entry.killmail_time) : NaN;
@@ -759,17 +603,11 @@ function parseRecentKill(entry: unknown): RecentKill | null {
   };
 }
 
-/**
- * Reads a `kills/systemID` body defensively (issue #2329). zKillboard sends
- * the killmail inline; an entry without an id or a readable time is dropped,
- * and so is every NPC kill (`zkb.npc`) — Route Safety counts player kills.
- */
 export function parseSystemKills(body: unknown): RecentKill[] {
   if (!Array.isArray(body)) return [];
   return body.flatMap((entry) => parseRecentKill(entry) ?? []);
 }
 
-/** Reads a `kills/regionID` body as `parseSystemKills` does, grouped by `solar_system_id`. */
 export function parseRegionKills(body: unknown): Map<number, RecentKill[]> {
   const bySystem = new Map<number, RecentKill[]>();
   if (!Array.isArray(body)) return bySystem;
@@ -784,14 +622,8 @@ export function parseRegionKills(body: unknown): Map<number, RecentKill[]> {
   return bySystem;
 }
 
-/** Concurrent callers for one system share one request; nothing is reused once it settles. */
 const systemKillsInflight = createTtlCache<RecentKill[]>({ ttlMs: 0, max: 200 });
 
-/**
- * A solar system's player kills from the last hour, for Route Safety. A
- * browser fetch with no custom headers, as `fetchKillmailHash` (scope
- * decision `20260924-195833`).
- */
 export async function fetchSystemRecentKills(systemId: number): Promise<SystemRecentKillsResult> {
   const key = `system:${systemId}`;
   const kills = await systemKillsInflight.get(String(systemId), () =>
@@ -810,31 +642,19 @@ export async function fetchSystemRecentKills(systemId: number): Promise<SystemRe
   return kills === null ? { ok: false, reason: failureReason(key) } : { ok: true, kills };
 }
 
-/** zKillboard's page size: a page with this many entries may have a next page. */
 export const REGION_PAGE_SIZE = 1000;
 
-/** A backstop on paging, far above any real hour (a page holds 1,000 kills). */
 const REGION_MAX_PAGES = 10;
 
-/** `ok: false` when zKillboard failed or rate-limited, so "no kills" and "couldn't load" differ. */
 export type RegionRecentKillsResult =
   | { ok: true; bySystem: ReadonlyMap<number, RecentKill[]> }
   | { ok: false; reason: ZkillFailureReason };
 
-/**
- * A region's player kills from the last hour (or `pastSeconds`), grouped by system, for Route
- * Safety: one request covers every route system in the region, where the
- * system API needs one each (zKillboard no longer takes comma-separated ids).
- * Follows `/page/n/` while a page is full, so a busy region is never cut at
- * 1,000 kills; any page failing, or the page cap being hit, fails the whole answer. A browser fetch with
- * no custom headers, as `fetchKillmailHash`.
- */
 export async function fetchRegionRecentKills(
   regionId: number,
   pastSeconds: number = 3600
 ): Promise<RegionRecentKillsResult> {
   const bySystem = new Map<number, RecentKill[]>();
-  // New kills shift the pages while they are read, so one can show on two.
   const seen = new Set<number>();
   for (let pageNumber = 1; pageNumber <= REGION_MAX_PAGES; pageNumber += 1) {
     const suffix = pageNumber === 1 ? '' : `page/${pageNumber}/`;
@@ -843,7 +663,6 @@ export async function fetchRegionRecentKills(
     );
     if (!result.ok) return { ok: false, reason: result.reason };
     const { body } = result;
-    // An error body is a failure, not an empty hour.
     if (!Array.isArray(body)) return { ok: false, reason: 'parse' };
     for (const [systemId, kills] of parseRegionKills(body)) {
       const fresh = kills.filter((kill) => !seen.has(kill.killmailId));
@@ -854,7 +673,6 @@ export async function fetchRegionRecentKills(
     }
     if (body.length < REGION_PAGE_SIZE) return { ok: true, bySystem };
   }
-  // Still full at the page cap: a partial hour would read as quiet.
   return { ok: false, reason: 'parse' };
 }
 
@@ -864,7 +682,6 @@ export interface ZkillEntityHit {
   kind: 'character' | 'corporation' | 'alliance';
 }
 
-/** The corporations, alliances and characters in a zKillboard autocomplete answer; anything else (ships, systems) is dropped. */
 export function parseEntityAutocomplete(body: unknown): ZkillEntityHit[] {
   if (!Array.isArray(body)) return [];
   return body.flatMap((entry): ZkillEntityHit[] => {
@@ -877,11 +694,6 @@ export function parseEntityAutocomplete(body: unknown): ZkillEntityHit[] {
   });
 }
 
-/**
- * Partial-name search for corporations, alliances and characters, which ESI only
- * offers to a signed-in pilot with the search scope. Public and read-only; fails
- * to an empty list, since a suggestion that doesn't arrive is just no suggestion.
- */
 export async function searchZkillEntities(query: string): Promise<ZkillEntityHit[]> {
   const answer = await zkillJson(
     `https://zkillboard.com/autocomplete/${encodeURIComponent(query)}/`

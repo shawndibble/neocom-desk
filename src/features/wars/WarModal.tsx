@@ -1,11 +1,3 @@
-/**
- * What a pilot (and their corporation) wants from a war declaration, in one
- * glance and no more: who, when it bites, and how it is going. Each war is a
- * card: a red summary block with the aggressor and the status, four facts in
- * two columns, then the two kill tallies side by side. When wars are on more
- * than one of the account's corporations, the cards are grouped under the
- * corporation each is against.
- */
 import { useTranslation } from 'react-i18next';
 import { Eyebrow, Modal, IskAmount } from '@/components/ui';
 import { ExternalLink } from '@/components/ui/ExternalLink';
@@ -25,7 +17,6 @@ interface WarModalProps {
   open: boolean;
   onClose: () => void;
   wars: readonly WarAgainstMe[];
-  /** The account has several corporations: head each group with the one its wars are on. */
   nameCorporation?: boolean;
 }
 

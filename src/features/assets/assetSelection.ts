@@ -1,8 +1,3 @@
-/**
- * Pure Assets-tree multi-select helpers (issue #90): a `Set<item_id>` of
- * currently selected leaf items, and the tri-state a checkbox derives from
- * comparing a node's descendant ids against that set.
- */
 import { assetStackValue, type EngineAsset } from '@/engine/assetTree';
 
 export type SelectionState = 'checked' | 'unchecked' | 'indeterminate';
@@ -17,7 +12,6 @@ export function selectionStateForIds(
   return selectedCount === ids.length ? 'checked' : 'indeterminate';
 }
 
-/** Checking a node cascades to every descendant id at once — checked or indeterminate both fill in to fully selected; only a fully-checked node clears. */
 export function toggleSelection(
   selected: ReadonlySet<number>,
   ids: readonly number[]
@@ -31,14 +25,12 @@ export function toggleSelection(
   return next;
 }
 
-/** Forces every id into the selection, regardless of current state — unlike `toggleSelection`, never deselects (issue #415's "Select all in view"). */
 export function selectAll(selected: ReadonlySet<number>, ids: readonly number[]): Set<number> {
   const next = new Set(selected);
   for (const id of ids) next.add(id);
   return next;
 }
 
-/** One `Name xQty` line per distinct type, quantities summed — the multibuy/Appraisal paste format. */
 export function quantityLinesForSelection(
   itemIds: readonly number[],
   assetsByItemId: ReadonlyMap<number, { type_id: number; quantity: number }>,
@@ -69,20 +61,9 @@ export function namesForSelection(
 export interface SelectionTotals {
   isk: number;
   volume: number;
-  /**
-   * Selected stacks with no value: left out of `isk` and counted here. A
-   * blueprint copy with no value is not counted: a copy is worth nothing by
-   * design, not missing a price.
-   */
   unpriced: number;
 }
 
-/**
- * The select-mode bar's totals (issue #6165). Sums exactly the selected ids,
- * each at the Value column's stack value and quantity × the m³ column's unit
- * volume. A cascaded ship or container never adds its own hull: its checkbox
- * selects its contents' ids, not its own, the same rule Appraise follows.
- */
 export function selectionTotals(
   itemIds: Iterable<number>,
   assetsByItemId: ReadonlyMap<

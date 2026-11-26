@@ -15,10 +15,6 @@ const SECTIONS = [
   { id: 'importExport', title: 'Import / Export', content: <button type="button">Export</button> },
 ];
 
-/**
- * `closest('section')`, not `parentElement`: a heading shares a flex row with
- * its section's optional right-aligned actions.
- */
 function sectionFor(title: string): HTMLElement {
   const section = screen.getByRole('heading', { name: title }).closest('section');
   if (!section) throw new Error(`expected a section for "${title}"`);
@@ -29,7 +25,6 @@ describe('PlanToolsPane', () => {
   it('groups every tool into one panel of labelled sections, not one panel each', () => {
     render(<PlanToolsPane sections={SECTIONS} asDisclosure={false} />);
 
-    // One Panel: its title, plus a heading per section inside it.
     const pane = screen.getByRole('heading', { name: 'Plan tools' }).closest('section');
     if (!pane) throw new Error('expected the tools panel');
 
@@ -37,7 +32,6 @@ describe('PlanToolsPane', () => {
       expect(within(pane).getByRole('heading', { name: title })).toBeInTheDocument();
     }
 
-    // The controls themselves live inside that same single panel.
     expect(within(pane).getByRole('button', { name: 'Optimize remaps' })).toBeInTheDocument();
     expect(within(pane).getByRole('button', { name: 'Booster' })).toBeInTheDocument();
     expect(within(pane).getByRole('button', { name: 'Export' })).toBeInTheDocument();
@@ -48,8 +42,6 @@ describe('PlanToolsPane', () => {
 
     const sections = SECTIONS.map((s) => sectionFor(s.title));
 
-    // Every section but the last carries the separator; the last carries none,
-    // so the panel's own bottom border isn't doubled.
     expect(sections[0]).toHaveClass('border-b');
     expect(sections[1]).toHaveClass('border-b');
     expect(sections[2]).not.toHaveClass('border-b');
@@ -61,7 +53,6 @@ describe('PlanToolsPane', () => {
 
     const toggle = screen.getByRole('button', { name: /plan tools/i });
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
-    // Collapsed: none of the controls are rendered at all.
     expect(screen.queryByRole('button', { name: 'Optimize remaps' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Booster' })).toBeNull();
 
@@ -86,11 +77,8 @@ describe('PlanToolsPane', () => {
   it("renders a section's actions beside its heading, not inside its accessible name", () => {
     render(<PlanToolsPane sections={SECTIONS} asDisclosure={false} />);
 
-    // The badge is in the section's header row...
     const section = sectionFor('Attributes');
     expect(section.querySelector('time')).toHaveTextContent('2 days ago');
-    // ...but the heading is still named for the section alone, so a lookup by
-    // title can't drift with the badge's ticking text.
     expect(screen.getByRole('heading', { name: 'Attributes' }).textContent).toBe('Attributes');
   });
   it('folds a group into one closed Disclosure row with its summary, opened on click', async () => {
@@ -128,7 +116,6 @@ describe('PlanToolsPane', () => {
 
     expect(toggle).toHaveAttribute('aria-expanded', 'true');
     expect(screen.getByRole('button', { name: 'Inner control' })).toBeInTheDocument();
-    // hideTitle: the group's own row names it, so no second heading.
     expect(screen.queryByRole('heading', { name: 'Inner' })).toBeNull();
   });
 });

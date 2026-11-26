@@ -7,7 +7,6 @@ export interface ItemNames {
   readonly item?: string;
 }
 
-/** Product where the job has one, else the blueprint itself (copying, research). */
 export function industryItemTypeId(fire: {
   productTypeId: number | null;
   blueprintTypeId: number;
@@ -30,6 +29,5 @@ export const industryJobCopy: DomainCopy<IndustryJobNotificationFire, ItemNames>
       item: names.item ?? `#${industryItemTypeId(fire)}`,
     });
   },
-  // The job sits in Active Jobs until it is delivered, which is the point.
   subjectOf: (fire) => fire.jobId,
 };

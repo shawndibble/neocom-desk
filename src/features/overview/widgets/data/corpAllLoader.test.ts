@@ -2,7 +2,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const A = 98000001;
 const B = 98000002;
-/** Character 1 reads corporation A, Character 2 corporation B. */
 const CORP_OF: Record<number, number> = { 1: A, 2: B };
 
 const loadCorporationCustomsOffices = vi.fn();
@@ -63,7 +62,6 @@ describe('loadCorpCustomsAll', () => {
     ]);
     expect(feed.corporations!.get(B)!.ticker).toBe(`T${B}`);
     expect(feed.systemNames.get(30002813)).toBe('Tama');
-    // Only as fresh as the stalest corporation.
     expect(feed.fetchedAt).toEqual(new Date(1000));
     expect(feed.partlyFailed).toBe(false);
   });
@@ -99,7 +97,6 @@ describe('loadCorpContractsAll', () => {
     );
     const feed = await loadCorpContractsAll();
     expect(feed.contracts.map((c) => c.contract_id)).toEqual([5, 6]);
-    // Read first through corporation A, but B issued it.
     expect(feed.corporationOf!.get('5')).toBe(B);
   });
 });

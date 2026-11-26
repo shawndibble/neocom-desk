@@ -1,8 +1,3 @@
-/**
- * Which Pop Time the Calendar shows a Shared moon pop at: the one the officer chose when sharing
- * (`asShared`, the default), or Ready, or Auto-fracture. Device-local like the week start: it
- * changes how one screen draws, and never the notification, which stays on the officer's time.
- */
 import { createLocalSetting } from '@/lib/useLocalSetting';
 import type { SharedPopTimePref } from './calendarSharedPops';
 

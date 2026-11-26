@@ -39,54 +39,23 @@ interface AssignDialogProps {
   payees: readonly PayeeRecord[];
   systemName: string;
   typeNames: ReadonlyMap<number, string>;
-  /**
-   * Unit prices at the trade hub a Payee bills at (`PayeeRecord.hubId`;
-   * `undefined` means the default, Jita), on a given date. A lookup rather
-   * than one map, because *which* prices apply is decided by this dialog's
-   * own Payee selection: the pilot picking a different Payee re-values the
-   * same ore. The parent route's snapshot has already fetched every hub its
-   * Payees use, for every ore line, across every date any row needs, so this
-   * never re-fetches.
-   */
   pricesFor: (hubId: string | undefined, date: string) => ReadonlyMap<number, number>;
-  /**
-   * Hubs whose price source could not be reached (offline). A line with no
-   * price at one of them is valued at 0 ISK because the fetch failed, not
-   * because the ore is worthless, so the dialog warns before that 0 ISK is
-   * saved and synced. Decided for the selected Payee's hub only.
-   */
   unreachableHubs?: ReadonlySet<string>;
-  /** True while a sibling action (Mark as paid / Resolve / Undo) is in flight, so this form's own submit can't race it. */
   busy: boolean;
   onAssigned: () => void;
   onCancel: () => void;
-  /** Status-specific buttons (Dismiss / Mark as paid / Resolve) rendered alongside Assign and Cancel — RowDetailModal owns these, since which one applies depends on the row's status, not on this form. */
   extraActions?: ReactNode;
-  /** Opens the Payee manager from the no-Payees state. The dialog stays mounted underneath, so the form appears in place once a Payee exists. */
   onAddPayee?: () => void;
-  /**
-   * Which Payee this entry most likely belongs to, from the pilot's own
-   * history in its system (`suggestPayeeForSystem`) — pre-selected, and
-   * the order the Payee list is offered in.
-   */
   suggestion?: PayeeSuggestion;
 }
 
 interface IskFieldProps {
   ariaLabel: string;
   computedDefault: number;
-  /** Empty means "track `computedDefault`"; anything else is the pilot's own text, commas and all. */
   override: string;
   onOverrideChange: (raw: string) => void;
 }
 
-/**
- * The estimated-value/tax-owed fields: grouped digits at rest (`maskIsk`,
- * up to 2 decimals, none padded on) and the plain figure to type into, same
- * split `numberMask.ts`'s `SourcingInput` uses — reformatting on every
- * keystroke would fight the caret. `unmaskNumber` accepts what's typed or
- * pasted with or without its own commas.
- */
 function IskField({ ariaLabel, computedDefault, override, onOverrideChange }: IskFieldProps) {
   const [editing, setEditing] = useState(false);
   const effectiveValue =
@@ -111,35 +80,6 @@ function IskField({ ariaLabel, computedDefault, override, onOverrideChange }: Is
   );
 }
 
-/**
- * The Assign form (decision doc, and issue #523's row-detail merge): picks a
- * Payee for some or all of an entry's still-unassigned ore and creates a new
- * Assignment for it. Create-only — correcting an existing Assignment's Payee/
- * tax %/value/tax owed happens in `EntryEditDialog`, not here.
- *
- * Line checkboxes are the split-Payee mechanism: uncheck a line to leave it
- * for a second Assignment against a different Payee, the two-corps-one-
- * system-one-day case ESI itself cannot distinguish. Line membership is what
- * the sole-vs-split ownership rule (`engine/miningTax/rowStatus.ts`) keys off.
- *
- * Tax %, estimated value, and tax owed are prefilled from
- * `computeAssignmentValue`, but all three stay connected (`taxOwed =
- * estimatedValue * taxPct / 100`) as the pilot edits: changing tax % or
- * estimated value recomputes tax owed from the other two; changing tax owed
- * instead back-solves the estimated value, since tax % is the one figure a
- * pilot is unlikely to be correcting *from* a known tax-owed total. Clearing
- * a field back to empty returns both value fields to tracking their freshly
- * computed defaults.
- *
- * The ore is valued at the *selected* Payee's trade hub, re-derived on every
- * render rather than fetched: picking a different Payee can change what the
- * same ore is worth, because the hub belongs to the Payee (the figure is a
- * bill one player sends another, not a local viewing preference).
- *
- * It never marks anything paid: what is paid is read off the Payee's account,
- * so ore the pilot settled before recording it here is paid by linking that
- * payment to the Payee.
- */
 export function AssignDialog({
   row,
   payees,
@@ -157,10 +97,6 @@ export function AssignDialog({
   const { t } = useTranslation();
   const oreLines = row.unassignedOreLines;
 
-  // The Payee the pilot last used in this system (scope decision 20261004), then the one a
-  // Survey just handed this tab, then the system's Default Payee as the last resort. Still never
-  // `payees[0]`: with none of those, pre-selecting an arbitrary Payee would let a pilot in a
-  // hurry create a real Assignment against one they never chose.
   const surveyPayeeId = useSurveyPayeeId((state) => state.value);
   const autoMatch =
     (suggestion?.fromHistory ? suggestion.suggested : undefined) ??
@@ -174,16 +110,8 @@ export function AssignDialog({
   );
   const [label, setLabel] = useState('');
   const { pending: saving, error: saveError, run } = useLedgerAction();
-  // Empty means "track the computed default"; any other string is a pilot
-  // override that stops following `taxPct`/line-selection changes until
-  // cleared back to empty.
   const [estimatedValueOverride, setEstimatedValueOverride] = useState('');
   const [taxOwedOverride, setTaxOwedOverride] = useState('');
-
-  // No reset-on-reopen effect: `RowDetailModal` only ever renders one of
-  // these at a time, keyed off `detailTarget` going from `null` to a row, so
-  // this component remounts fresh (new `useState` initializers) every time
-  // it opens for a (possibly different) row rather than being reused in place.
 
   const selectedLines: OreLine[] = useMemo(
     () => oreLines.filter((line) => includedTypeIds.has(line.typeId)),
@@ -191,9 +119,6 @@ export function AssignDialog({
   );
   const pctValue = Number(taxPct);
   const selectedPayee = payees.find((p) => p.id === payeeId) ?? null;
-  // Before a Payee is picked there is no hub to bill against, so the preview
-  // shows the default one's figure — the same basis the row's Value column
-  // already used for still-unassigned ore.
   const hub = hubForPayee(selectedPayee?.hubId);
   const prices = pricesFor(selectedPayee?.hubId, row.entry.date);
 
@@ -203,8 +128,6 @@ export function AssignDialog({
     Number.isFinite(pctValue) ? pctValue : 0
   );
 
-  // Lines valued at 0 only because the price fetch failed, while the estimate
-  // still tracks that computed default (a typed override is the pilot's own).
   const unpricedOffline = unreachableHubs?.has(hub.id)
     ? selectedLines.filter((line) => (prices.get(line.typeId) ?? 0) <= 0)
     : [];
@@ -214,9 +137,6 @@ export function AssignDialog({
     estimatedValueOverride.trim() === ''
       ? computed.estimatedValue
       : (unmaskNumber(estimatedValueOverride) ?? NaN);
-  // Tracks the *current* estimated value and tax %, not the raw hub-priced
-  // default — so an edit to either one keeps this field's display in sync
-  // (the three fields are connected: taxOwed = estimatedValue * pct / 100).
   const taxOwed =
     taxOwedOverride.trim() === ''
       ? (estimatedValue * (Number.isFinite(pctValue) ? pctValue : 0)) / 100
@@ -226,7 +146,6 @@ export function AssignDialog({
     setIncludedTypeIds((previous) => toggleInSet(previous, typeId));
   }
 
-  /** Tax % changed: recompute tax owed from the *current* estimated value, leaving that value itself untouched. */
   function handleTaxPctChange(raw: string) {
     setTaxPct(raw);
     const pct = Number(raw);
@@ -235,7 +154,6 @@ export function AssignDialog({
     }
   }
 
-  /** Estimated value changed: recompute tax owed from the new value and the current tax %. Clearing back to empty resumes tracking both defaults. */
   function handleEstimatedValueChange(raw: string) {
     setEstimatedValueOverride(raw);
     if (raw.trim() === '') {
@@ -248,7 +166,6 @@ export function AssignDialog({
     }
   }
 
-  /** Tax owed changed: back-solve the estimated value from the current tax %, leaving the rate itself untouched. Clearing back to empty resumes tracking both defaults. */
   function handleTaxOwedChange(raw: string) {
     setTaxOwedOverride(raw);
     if (raw.trim() === '') {
@@ -263,8 +180,6 @@ export function AssignDialog({
 
   async function handleAssign() {
     if (!canAssign || !payeeId) return;
-    // A stale row (something else already claimed this ore) also lands on
-    // `onAssigned`: the refresh shows the Assignment that exists.
     await run(
       () =>
         assign({
@@ -274,7 +189,6 @@ export function AssignDialog({
           payeeId,
           oreLines: selectedLines,
           entryOreLines: row.entry.oreLines,
-          // Ore a Corp Tax Book took is not on offer here, but the game's ledger still reports it.
           releasedTypeIds: (row.bookTakenOreLines ?? []).map((l) => l.typeId),
           taxPct: pctValue,
           estimatedValue,
@@ -377,9 +291,6 @@ export function AssignDialog({
       )}
 
       <div className="flex flex-col gap-3 sm:flex-row">
-        {/* Narrow and fixed: a tax rate is a percentage, realistically
-            2 digits (rarely a decimal), so it never needs the room the
-            two ISK fields do. */}
         <div className="space-y-1 sm:w-16 sm:shrink-0">
           <p className={eyebrowClassName}>{t('miningTax.taxPctLabel')}</p>
           <TextInput
@@ -402,13 +313,6 @@ export function AssignDialog({
             override={estimatedValueOverride}
             onOverrideChange={handleEstimatedValueChange}
           />
-          {/* Only for a Payee billing somewhere other than the default: at
-              Jita this would be a line of standing noise, anywhere else it is
-              the explanation for a figure that doesn't match the ledger's
-              own Value column. Deliberately a statement about the *Payee*,
-              not about the number above it: once the pilot types their own
-              figure, "valued at X" would contradict the field it sits
-              under. */}
           {hub.id !== DEFAULT_TRADE_HUB.id && (
             <p className="text-[0.6875rem] text-text-dim">
               {t('miningTax.valuedAtHubHint', { hub: hub.systemName })}

@@ -1,17 +1,3 @@
-// A moon owner's observed rows, packed one document per day and refinery.
-//
-// The feeder view and the moon owner's status sum every row a feeder's refineries recorded,
-// and a capped read would drop an arbitrary slice of them. Scanning `observed` for them cost
-// one read per row on every rebuild. This mirror holds the same rows at the same grain,
-// `corps/{collector}/feederObserved/{feeder}_{structure}_{date}` -> `lines[characterId_typeId]`,
-// so a rebuild reads one document per day and refinery instead. Exact: `mergeObservedInto`
-// writes it in the same transaction as the row, with the stored row's own value (never an
-// increment, so a retried transaction repeats itself harmlessly).
-//
-// A feeder with no `ready_{feeder}` marker has not been backfilled: its rows are read the old
-// way, then copied in, and the marker is written. Rollup entries already present came from a
-// merge, so they are newer than that scan and the backfill never overwrites one.
-
 import {
   FieldValue,
   type DocumentReference,
@@ -59,11 +45,6 @@ export interface RollupChange {
   remove: string[];
 }
 
-/**
- * What a merge changes in the mirror. `changed` are the rows about to be written, `held` the
- * stored row each replaces (by `observedRowKey`). A row's entry is set
- * under its new feeder and removed from the old one when the feeder differs.
- */
 export function rollupChanges(
   changed: readonly ObservedRow[],
   held: ReadonlyMap<string, Pick<ObservedRow, 'sourceCorporationId'>>
@@ -93,7 +74,6 @@ export function rollupChanges(
   return out;
 }
 
-/** Stages the mirror writes for one merge chunk. Call after the transaction's reads. */
 export function writeRollupChanges(
   tx: Transaction,
   collection: FirebaseFirestore.CollectionReference,
@@ -110,7 +90,6 @@ export function writeRollupChanges(
   }
 }
 
-/** The rows one mirror document stands for. Pure. */
 export function rowsOfRollupDoc(data: {
   structureId?: unknown;
   date?: unknown;
@@ -136,7 +115,6 @@ export function rowsOfRollupDoc(data: {
   });
 }
 
-/** Lines of `rows` the stored document does not hold yet: the only ones a backfill may add. Pure. */
 export function missingLines(
   stored: Readonly<Record<string, unknown>> | undefined,
   rows: readonly ObservedRow[]
@@ -152,11 +130,6 @@ export function missingLines(
 
 const bookCollection = (book: DocumentReference, name: string) => book.collection(name);
 
-/**
- * Every row a feeder's refineries recorded, as `select`ed scan columns. The mirror when the
- * feeder is backfilled (one read per day and refinery); otherwise the full scan, which then
- * backfills the mirror so the next read is cheap.
- */
 export async function readFeederRows(
   db: Firestore,
   book: DocumentReference,
@@ -168,7 +141,6 @@ export async function readFeederRows(
     const snap = await mirror.where('feederCorporationId', '==', feeder).get();
     return snap.docs.flatMap((d) => rowsOfRollupDoc(d.data()));
   }
-  // Every row: what is owed sums every covered day, so a capped read would understate it.
   const scan = await bookCollection(book, OBSERVED_COLLECTION)
     .where('sourceCorporationId', '==', feeder)
     .select(
@@ -186,7 +158,6 @@ export async function readFeederRows(
   try {
     await backfill(db, book, mirror, feeder, rows);
   } catch (e) {
-    // The next read tries again; this one already has its rows.
     console.error('feeder rollup not backfilled', e instanceof Error ? e.message : e);
   }
   return rows;
@@ -208,9 +179,6 @@ async function backfill(
   for (const part of chunk(ids, BACKFILL_CHUNK)) {
     await db.runTransaction(async (tx) => {
       const snaps = await tx.getAll(...part.map((id) => mirror.doc(id)));
-      // The scan is older than this transaction: a row may have left the feeder since, and its
-      // line was deleted from the mirror, so a missing line is only added back if the stored
-      // row still belongs to the feeder (and the line takes that row's current value).
       const current = new Map<string, ObservedRow>();
       const wanted = part.flatMap((id) => byDoc.get(id) ?? []);
       const stored = await tx.getAll(

@@ -46,7 +46,6 @@ function makeDeps(over: Partial<AlertGrantDeps> = {}) {
     },
     key: () => KEY,
     verify: async () => claims(),
-    // SSO rotates: the refreshed token differs from the one supplied.
     refresh: vi.fn(async (_c: string, t: string) => ({
       accessToken: 'fresh-access',
       refreshToken: `${t}-rotated`,
@@ -108,7 +107,6 @@ describe('saveAlertGrant', () => {
     const res = await saveAlertGrant(deps, { accessToken: 'a', refreshToken: REFRESH });
     expect(res).toEqual({ characterId: 42, enabledAt: 1_000, nearby: true, mail: true });
     expect(grantCoversMail(docs.get(42)!)).toBe(true);
-    // A new mail grant starts unmarked: the first read seeds, nothing replays.
     expect(docs.get(42)).toMatchObject({ mailHighWaterId: null, mailEtag: null, mailPushed: [] });
   });
 

@@ -16,7 +16,6 @@ function problemFor(perHour: number, colonies: PlannerColony[]) {
 
 describe('fill and release', () => {
   it('adds the fewest ECUs that cover the rate, and release shrinks back to what is consumed', () => {
-    // One ECU at 6000 P0/h makes 40 Reactive Metals/h; two make 72.
     const problem = problemFor(60, [colony(1, 'barren')]);
     const state = new Map();
     expect(fill(problem, state, problem.rows[0], 60)).toBeCloseTo(72, 6);

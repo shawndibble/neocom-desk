@@ -1,17 +1,3 @@
-/**
- * The Skill Plan's Accelerator control (GLOSSARY.md **Accelerator**): the
- * Character's one cerebral accelerator, shared with the Characters table. EVE
- * has a single booster slot, so there is no list to build.
- *
- * - Nothing running and nothing detected: an "Add accelerator" button.
- * - Detected from the attribute sheet: its bonus is shown once, beside the
- *   heading, and the pilot sets the time left (EVE does not report it).
- * - Typed in: bonus and time are editable; Clear forgets it.
- *
- * An accelerator that has run out is deleted when this section mounts
- * (`useCharacterAccelerators` purges), so it falls back to the first two states
- * by itself: a new one is typed in, or the next sync's detection applies.
- */
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui';
@@ -30,12 +16,9 @@ export function AcceleratorSection({
   showTitle = true,
 }: {
   characterId: number;
-  /** The typed-in accelerator, only while it is still running. */
   running: CharacterAcceleratorRecord | null;
   detectedBonus: number | null;
-  /** Open straight on the editor when nothing is injected (the phone's sheet, opened to add one). */
   startAdding?: boolean;
-  /** False inside a container already titled "Accelerator" (the phone's sheet). */
   showTitle?: boolean;
 }) {
   const { t } = useTranslation();

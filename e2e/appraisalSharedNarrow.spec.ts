@@ -1,28 +1,10 @@
-/**
- * The **Shared Appraisal** page at 390px: a plain table, not stacked cards
- * (DESIGN.md §6c Restraint). Six numeric columns hang off the item name, a
- * table read across columns, so it keeps real columns on a phone — item pinned
- * (`stickyStart`), Buy each / Sell each / Split each shed (`phoneHidden`) — and the
- * page never scrolls sideways. History: #1113 paired the six values into a
- * two-up card; that card is gone.
- *
- * Playwright rather than jsdom: `max-sm:hidden` and the sticky column are CSS
- * a real engine has to evaluate.
- *
- * No login: a Share Link opens for anyone. The share itself is served by
- * mocking Firestore's document read — the e2e build carries a placeholder
- * project id for exactly this (`playwright.config.ts`'s `E2E_ENV`), and no API
- * key, so sync stays off.
- */
 import type { Page } from '@playwright/test';
 import { test, expect, PHONE, DESKTOP } from './support/testBase';
 
-/** The share view's `DataTable` label (`appraisalShare.title`) — not the live tab's `Appraisal`. */
 const TABLE = 'Shared appraisal';
 
 const SHARE_ID = 'e2eShare1';
 
-/** Tritanium and Pyerite, at quantities large enough that every total renders as a real multi-character ISK figure rather than a two-digit one that would fit anywhere. */
 const TRITANIUM = 34;
 const PYERITE = 35;
 
@@ -51,7 +33,6 @@ const SNAPSHOT = {
   ],
 };
 
-/** A JS value in Firestore's REST wire encoding — the shape a document read returns. */
 function toFirestoreValue(value: unknown): Record<string, unknown> {
   if (value === null) return { nullValue: null };
   if (typeof value === 'string') return { stringValue: value };
@@ -68,11 +49,6 @@ function toFirestoreValue(value: unknown): Record<string, unknown> {
   };
 }
 
-/**
- * Answers the share read. Firestore Lite's `getDoc` is a `documents:batchGet`
- * POST whose response is a JSON array of `{ found }` entries; the document's
- * own name is echoed from the request so the SDK matches it to the key.
- */
 async function mockShare(page: Page): Promise<void> {
   await page.route(/firestore\.googleapis\.com\/.*documents:batchGet/, async (route) => {
     const request = route.request().postDataJSON() as { documents: string[] };
@@ -115,19 +91,11 @@ interface CellBox {
 
 interface RowGeometry {
   display: string;
-  /** The `tr`'s own content box — what the cells have to share. */
   contentWidth: number;
   rowHeight: number;
   cells: CellBox[];
 }
 
-/**
- * One row's cells, measured. Addressed by `data-row-key` (`DataTable`'s
- * `rowKey`, the typeId here) rather than by position, so a sort order change
- * can't silently point this at a different item. Waited for first: the
- * measurement runs in one `evaluate`, so a row that never arrived would
- * otherwise surface as a TypeError instead of a locator timeout naming it.
- */
 async function readRow(page: Page, typeId: number): Promise<RowGeometry> {
   const row = page.locator(`table[aria-label="${TABLE}"] tr[data-row-key="${typeId}"]`);
   await expect(row).toBeVisible();
@@ -162,12 +130,6 @@ async function readRow(page: Page, typeId: number): Promise<RowGeometry> {
   );
 }
 
-/**
- * Cells clustered into the lines they actually render on, top-to-bottom then
- * left-to-right. A 1px tolerance rather than an exact match: grid stretches
- * the cells of one track row to a shared top, but a tolerance costs nothing
- * and will not split a line on a subpixel.
- */
 function lines(cells: CellBox[]): CellBox[][] {
   const grouped: CellBox[][] = [];
   for (const cell of [...cells].sort((a, b) => a.top - b.top || a.left - b.left)) {
@@ -194,13 +156,9 @@ test.describe('Shared appraisal — phone table', () => {
     const { display, cells } = await readRow(page, TRITANIUM);
     expect(display).toBe('table-row');
 
-    // Rendered cells only: `phoneHidden` columns are `display: none` here, so
-    // they have no box. Asserted as the whole row at once.
     const shown = cells.filter((cell) => cell.width > 0).map((cell) => cell.label);
     expect(shown).toEqual(['Item', 'Qty', 'Buy total', 'Sell total']);
 
-    // The item cell is pinned while the table scrolls sideways inside its
-    // wrapper, never the page.
     const sticky = await page
       .locator(`table[aria-label="${TABLE}"] tr[data-row-key="${TRITANIUM}"] td[data-label="Item"]`)
       .evaluate((td) => getComputedStyle(td).position);
@@ -227,7 +185,6 @@ test.describe('Shared appraisal — phone table', () => {
       login.boundingBox(),
       brand.boundingBox(),
     ]);
-    // The entry control is on the first screen, inside the header, and does not sit on the brand.
     expect(loginBox!.y + loginBox!.height).toBeLessThan(PHONE.height);
     expect(loginBox!.x).toBeGreaterThanOrEqual(0);
     expect(loginBox!.x + loginBox!.width).toBeLessThanOrEqual(PHONE.width);
@@ -250,17 +207,11 @@ test.describe('Shared appraisal — phone table', () => {
     await openShare(page);
 
     const { display, contentWidth, rowHeight, cells } = await readRow(page, PYERITE);
-    // Above `sm` nothing is shed: all six values plus the name on one line.
     expect(display).toBe('table-row');
     expect(labelLines(cells)).toEqual([
       ['Item', 'Qty', 'Buy each', 'Sell each', 'Split each', 'Buy total', 'Sell total'],
     ]);
-    // Not just "one line group": a single dense row of text, so a cell that
-    // started wrapping onto a second line would fail here rather than pass by
-    // sharing a top with its neighbours.
     expect(rowHeight).toBeLessThan(40);
-    // And no cell hoisted to title width — that is the stacked card's shape,
-    // not this one.
     for (const cell of cells) expect(cell.width).toBeLessThan(contentWidth * 0.9);
   });
 });

@@ -7,8 +7,6 @@ const VELDSPAR = 1230;
 const ICE = 16262;
 const UNREPROCESSABLE = 99;
 
-// Real SDE skill type ids (issue #1058), so a mixed-line test can show each
-// resolves independently rather than sharing one blended specialisation.
 const SIMPLE_ORE_PROCESSING = 60377;
 const ICE_PROCESSING = 18025;
 const SCRAPMETAL_PROCESSING = 12196;
@@ -29,7 +27,6 @@ describe('valueMiningYield', () => {
 
     const result = valueMiningYield(lines, rawPrices, new Map(), NO_SKILLS, {});
 
-    // 1000*5 + 100*40 = 9000
     expect(result.rawValue).toBe(9000);
     expect(result.lines.map((l) => l.rawValue)).toEqual([5000, 4000]);
   });
@@ -44,7 +41,6 @@ describe('valueMiningYield', () => {
       34: 3,
     });
 
-    // 200 units / 100 portion = 2 batches; 2*400*0.5 (base station rate) = 400 units of material 34
     expect(result.refineValue).toBe(400 * 3);
     expect(result.pricedAll).toBe(true);
   });
@@ -64,7 +60,6 @@ describe('valueMiningYield', () => {
       { refining: { stationRate: 0.6, taxRate: 0.1 } }
     );
 
-    // 2 batches x floor(400 x 2 x 0.6) = 480 Tritanium x 3 ISK = 1,440, less 10% tax
     expect(result.refineValue).toBeCloseTo(1440 * 0.9, 6);
     expect(result.efficiency).toBeCloseTo(0.6, 6);
   });
@@ -103,9 +98,6 @@ describe('valueMiningYield', () => {
 
   it('skips refine pricing and does not mark Partial for missing refine data when includeRefining is false (issue #1281)', () => {
     const lines: OreLine[] = [{ typeId: VELDSPAR, quantity: 200 }];
-    // No reprocessing map entry and no material price at all — with refining
-    // included this would flip Partial; with it excluded the raw side alone
-    // decides pricedAll.
     const result = valueMiningYield(
       lines,
       new Map([[VELDSPAR, 5]]),
@@ -147,7 +139,6 @@ describe('valueMiningYield line detail (issue: Mining Yield row detail)', () => 
       34: 3,
     });
 
-    // 250 units / 100 portion = 2 whole batches, 50 units left over.
     expect(result.lines[0].refineOutputs).toEqual([{ typeId: 34, quantity: 400 }]);
     expect(result.lines[0].batches).toBe(2);
     expect(result.lines[0].unitsLeftOver).toBe(50);
@@ -183,11 +174,6 @@ describe('valueMiningYield line detail (issue: Mining Yield row detail)', () => 
 
   it('reports the general-skills reprocessing efficiency the UI states, at the NPC station base rate', () => {
     const result = valueMiningYield([], new Map(), new Map(), NO_SKILLS, {});
-    // NPC station's 50% base rate with no skills — the assumption the UI must state.
-    // Deliberately excludes specialisation (issue #1058): a mixed entry can
-    // refine ore and ice under two different specialisations at once, so no
-    // single number could state that part honestly. `refineBasisHint` only
-    // ever names the two general skills, never a specialisation.
     expect(result.efficiency).toBe(0.5);
   });
 
@@ -228,7 +214,6 @@ describe('valueMiningYield per-type specialisation (issue #1058)', () => {
         },
       ],
     ]);
-    // Trained Simple Ore Processing V but not Ice Processing at all.
     const modifiers = characterModifiers({
       skills: { [SIMPLE_ORE_PROCESSING]: 5 },
       implantTypeIds: [],
@@ -245,9 +230,7 @@ describe('valueMiningYield per-type specialisation (issue #1058)', () => {
       { 34: 1 }
     );
 
-    // Veldspar: 0.5 base * (1 + 0.02*5) = 0.55 -> floor(100*0.55) = 55
     expect(result.lines[0].refineOutputs).toEqual([{ typeId: 34, quantity: 55 }]);
-    // Ice: untrained Ice Processing -> base rate only -> floor(100*0.5) = 50
     expect(result.lines[1].refineOutputs).toEqual([{ typeId: 34, quantity: 50 }]);
   });
 
@@ -269,7 +252,6 @@ describe('valueMiningYield per-type specialisation (issue #1058)', () => {
       { 34: 1 }
     );
 
-    // 0.5 base * (1 + 0.02*5) = 0.55 -> floor(100*0.55) = 55
     expect(result.lines[0].refineOutputs).toEqual([{ typeId: 34, quantity: 55 }]);
   });
 });

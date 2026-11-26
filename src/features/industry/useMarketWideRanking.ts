@@ -14,10 +14,6 @@ import { commonGateKey } from './marketWideSkillGate';
 import { useDailySales } from './useDailySales';
 import { priceVsMedianFor, usePriceVsMedian } from './usePriceVsMedian';
 
-/**
- * Turns the scan's ranked rows into what the panel shows: each row's skill-gate
- * verdict, its ISK/day and vs-90d figures, then the rows the filter keeps.
- */
 export function useMarketWideRanking({
   rows,
   hasRun,
@@ -59,10 +55,7 @@ export function useMarketWideRanking({
   const maxBuildCostIsk = BUILD_COST_CAP_ISK[filter.maxBuildCost];
   const hideRarelySold = filter.hideRarelySold;
   const rowTypeIds = useMemo(() => rows.map((row) => row.productTypeID), [rows]);
-  // Always fetched: ISK/day needs every ranked row's volume, not only the filter's.
   const dailySales = useDailySales(rowTypeIds, hub.regionId, hasRun);
-  // Daily sales reads the hub's published volume object, not ESI history, so
-  // this is normally the scan's one per-product ESI request.
   const vs90dTargets = useMemo(
     () => (hasRun ? rowTypeIds.map((typeId) => ({ hubId: hub.id, typeId })) : []),
     [hasRun, rowTypeIds, hub.id]

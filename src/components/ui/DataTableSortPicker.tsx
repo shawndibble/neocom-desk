@@ -8,7 +8,6 @@ import type { DataTableColumn, DataTableSort } from './DataTable';
 
 const SORT_ARROW = { asc: '↑', desc: '↓' } as const;
 
-/** `<select>` value for a sort; split on the *last* `:` so a column id may contain one. */
 function sortOptionValue(sort: DataTableSort): string {
   return `${sort.columnId}:${sort.direction}`;
 }
@@ -22,37 +21,15 @@ function parseSortOptionValue(value: string): DataTableSort | null {
 }
 
 interface DataTableSortPickerProps<T> {
-  /** The columns offered; only those with a `sortValue` are listed. */
   columns: readonly DataTableColumn<T>[];
-  /** The sort in force, or `undefined` before any. */
   sort: DataTableSort | undefined;
   onSortChange: (sort: DataTableSort) => void;
-  /** The rows sorted; they type each column, so its first option is the direction a header click starts at. */
   rows: readonly T[];
-  /**
-   * `md` (the default) is the 36px touch target of the bar above a table;
-   * `sm` matches the `size="sm"` buttons of a filter row it sits in.
-   */
   size?: ControlSize;
-  /**
-   * Renders a 36px square icon button instead of the labelled control, for a
-   * row with no width to spare. The native select still sits over it, so a
-   * phone keeps the OS picker; the sort in force moves to the accessible name.
-   */
   iconOnly?: boolean;
   className?: string;
 }
 
-/**
- * The phone sort picker `mobileSort` puts above a stacked table, on its own
- * for a page that wants it elsewhere (Mining Tax keeps it in its filter row,
- * so the Open list starts with its first row).
- *
- * A real `<select>` laid invisibly over its own label rather than
- * `Select`/`NativeSelect`: a phone should get the OS picker, and the closed
- * control reads "Sort: Price ↑" while each option is just "Price ↑" — a
- * native select can only show its option's text.
- */
 export function DataTableSortPicker<T>({
   columns,
   sort,
@@ -116,7 +93,6 @@ export function DataTableSortPicker<T>({
           if (next) onSortChange(next);
         }}
       >
-        {/* Matches `value=""` before any sort; never re-selectable. */}
         <option value="" disabled>
           {t('common.dataTable.sortNone')}
         </option>

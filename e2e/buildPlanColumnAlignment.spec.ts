@@ -1,9 +1,3 @@
-/**
- * Build Plans column-label strip vs. its rows: the strip's trailing spacer
- * used to be a fixed 36px while every row's trailing control
- * is `size-9 md:size-7` (28px at `md`+), so every label sat 7px left of its
- * figures at desktop widths. The spacer follows the same size now (the trailing ⋮, `w-11 md:w-7`).
- */
 import type { Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
@@ -49,7 +43,6 @@ async function seed(page: Page): Promise<void> {
   );
 }
 
-/** Right edge of the `nth` span of the given width class inside `scope`. */
 async function rightEdge(scope: ReturnType<Page['locator']>, widthClass: string) {
   const box = await scope.locator(`span.${widthClass}`).first().boundingBox();
   expect(box).not.toBeNull();
@@ -72,8 +65,6 @@ for (const width of [1440, 1024]) {
     await expect(planRow).toBeVisible();
     await expect(groupRow).toBeVisible();
 
-    // Profit (w-24, first), Verdict (w-14) and Runs (w-8) always show at
-    // these widths; the ISK/h and Margin columns are lg+ only (1440 here).
     const classes = ['w-24', 'w-14', 'w-8'];
     for (const cls of classes) {
       const label = await rightEdge(strip, cls);
@@ -84,7 +75,6 @@ for (const width of [1440, 1024]) {
       expect(Math.abs(label - (await rightEdge(groupRow, cls)))).toBeLessThanOrEqual(1);
     }
     if (width >= 1024) {
-      // Margin: the last lg+ w-16 column.
       const label = await rightEdge(strip, 'w-16');
       expect(Math.abs(label - (await rightEdge(planRow, 'w-16')))).toBeLessThanOrEqual(1);
     }

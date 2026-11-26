@@ -1,13 +1,3 @@
-/**
- * Every Communities surface keeps its inline controls at one height (DESIGN.md
- * §3). The Blueprints tab shipped "Browse in BPC Sourcing" at `sm` beside a
- * `SearchInput` and a `SelectTrigger` at `md`; this measures each tab and My
- * sharing at desktop and phone widths so the next row can't drift the same way.
- *
- * Dev server only: the page reads its Communities from the Storybook stand-in
- * (`backendOverride.ts` + `communitiesFixture.ts`), installed by importing
- * those `/src` modules into the running app — the e2e build has no Firebase.
- */
 import type { Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
@@ -30,25 +20,20 @@ const SURFACES: { name: string; path: string }[] = [
   { name: 'invites', path: `/communities?community=${ADMIN}&tab=invites` },
 ];
 
-/** Installs the sample Communities, then routes in-app so the page's loads read them. */
 async function openWithSampleCommunities(page: Page, path: string): Promise<void> {
   await signInAndGoto(page, './settings');
   await expect(page.locator('main')).toBeVisible();
   await routeInApp(page, path);
 }
 
-/** Routes in-app (no re-seed), so one test can visit several surfaces. */
 async function routeInApp(page: Page, path: string): Promise<void> {
   await page.evaluate(async (target) => {
-    // Indirected through variables so `tsc` leaves them alone: dev-server URLs,
-    // not paths this spec's module graph resolves. The casts are checked
-    // against the real signatures.
     const storeUrl = '/src/features/communities/backendOverride.ts';
     const fixtureUrl = '/src/storybook/communitiesFixture.ts';
-    const store = (await import(/* @vite-ignore */ storeUrl)) as {
+    const store = (await import(storeUrl)) as {
       setCommunityBackendOverride: typeof setCommunityBackendOverride;
     };
-    const fixture = (await import(/* @vite-ignore */ fixtureUrl)) as {
+    const fixture = (await import(fixtureUrl)) as {
       createCommunitiesFixture: typeof createCommunitiesFixture;
     };
     store.setCommunityBackendOverride(fixture.createCommunitiesFixture());
@@ -63,9 +48,6 @@ for (const width of CONTROL_ROW_WIDTHS) {
     test(`communities ${name}: inline controls share one height (${width}px)`, async ({ page }) => {
       await page.setViewportSize({ width, height: 900 });
       await openWithSampleCommunities(page, path);
-      // A `mine` link opens the My sharing panel. On a phone it is modal (the
-      // page behind goes inert, so its h1 leaves the accessibility tree): the
-      // panel is what proves the surface rendered.
       await expect(
         name.endsWith('mine')
           ? page.getByRole('dialog', { name: 'My sharing' })
@@ -76,15 +58,11 @@ for (const width of CONTROL_ROW_WIDTHS) {
   }
 }
 
-/** Row/header rhythm: same two-line row padding as Skill plans; one-line Library headers. */
 const RHYTHM_WIDTHS = [1440, 1024, 390] as const;
 
 async function firstHeight(page: Page, selector: string): Promise<number> {
   const row = page.locator(selector).first();
   await expect(row).toBeVisible();
-  // The row can re-render between the visibility check and the measurement
-  // (the list swaps in place after an in-app route), leaving no box for a
-  // moment; poll until it has one rather than reading it once.
   let height = 0;
   await expect
     .poll(

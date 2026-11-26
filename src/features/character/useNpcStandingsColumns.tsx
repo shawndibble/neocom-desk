@@ -19,20 +19,10 @@ import {
 } from '@/features/character/npcStandingsRows';
 import { AccessPips } from '@/features/standings/table/AccessPips';
 
-/** The number the game shows, or Base when the pilot's skills could not be read. */
 const standingsSort = (skillsKnown: boolean) =>
   ({ columnId: skillsKnown ? 'effective' : 'standing', direction: 'desc' }) as const;
 const ALL_COLUMN_IDS = ['name', ...NPC_STANDINGS_COLUMN_IDS];
 
-/**
- * The Standings tab's table: its columns, the optional-column picker's state
- * and the URL sort. The name opens the row's info modal through the table's
- * row click (DESIGN.md §6c: one accent cue per row, on the primary cell).
- *
- * `skillsKnown`: Standing (with skills) leads and Base is optional. With the
- * skills unknown Standing has nothing to say, so Base stands in for it, shown
- * whatever the column picker says.
- */
 export function useNpcStandingsColumns(skillsKnown: boolean) {
   const { t } = useTranslation();
   const visibility = useColumnVisibility(npcStandingsColumnsStore, NPC_STANDINGS_DEFAULT_COLUMNS);
@@ -48,7 +38,6 @@ export function useNpcStandingsColumns(skillsKnown: boolean) {
       belongsTo: {
         id: 'belongsTo',
         header: t('contacts.standings.columnBelongsTo'),
-        // A corporation's faction; an agent's corporation, level and division.
         render: (row) => {
           const { belongsTo } = row;
           if (belongsTo === null)
@@ -109,7 +98,6 @@ export function useNpcStandingsColumns(skillsKnown: boolean) {
           const { nearest } = row;
           if (nearest === null) return <EmptyCell />;
           const text = t('contacts.standings.jumpsValue', { count: nearest.jumps });
-          // Already there: no route to open.
           if (nearest.jumps === 0) return <span className="text-text-dim">{text}</span>;
           return (
             <JumpsLink systemId={nearest.systemId} stationId={nearest.stationId}>
@@ -123,8 +111,6 @@ export function useNpcStandingsColumns(skillsKnown: boolean) {
         id: 'access',
         header: t('contacts.standings.columnAccess'),
         headerTooltip: t('contacts.standings.columnAccessTooltip'),
-        // An agent row answers one question, can you use this agent; the rest
-        // show how far up the levels their chain reaches.
         render: (row) => {
           if (row.kind === 'agent') {
             const text = npcAgentAccessText(t, row);
@@ -152,7 +138,6 @@ export function useNpcStandingsColumns(skillsKnown: boolean) {
     [t, skillsKnown]
   );
 
-  // Standing leads; Base shows when asked, or in its place when the skills are unknown.
   const { isVisible } = visibility;
   const shownIds = useMemo(
     () =>
@@ -165,7 +150,6 @@ export function useNpcStandingsColumns(skillsKnown: boolean) {
       ),
     [skillsKnown, isVisible]
   );
-  // Standing is not offered when it would be empty.
   const availableIds = useMemo(
     () => NPC_STANDINGS_COLUMN_IDS.filter((id) => skillsKnown || id !== 'effective'),
     [skillsKnown]
@@ -184,8 +168,6 @@ export function useNpcStandingsColumns(skillsKnown: boolean) {
     ],
     [t, optionalColumns, shownIds]
   );
-  // The full catalog, not the visible ids: a sort in a shared link survives a
-  // hidden column (the Contacts table's own `characterSortProps`).
   const sortProps = useUrlSort('standings.sort', standingsSort(skillsKnown), ALL_COLUMN_IDS);
 
   return { columns, optionalColumns, availableIds, visibility, sortProps };

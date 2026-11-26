@@ -1,9 +1,3 @@
-/**
- * A claim's doctrine-fit result, for the pilot before filing and the officer on the claim:
- * "Matches <fit>", or "Off doctrine" with the diff against the nearest Doctrine Fit. A hull the
- * corp does not check (and a claim filed before the check existed) shows nothing. The label is
- * text, never colour alone.
- */
 import { useTranslation } from 'react-i18next';
 import { TypeIconLabel } from '@/components/TypeIconLabel';
 import { Pill } from '@/components/ui/Pill';
@@ -13,7 +7,6 @@ import { useDoctrineTypeNames } from './useDoctrineTypeNames';
 
 interface Props {
   check: DoctrineCheckRecord | undefined;
-  /** The pilot is told they can still file; the officer is told what the claim was checked against. */
   audience: 'pilot' | 'officer';
 }
 

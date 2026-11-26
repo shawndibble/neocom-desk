@@ -19,7 +19,6 @@ describe('fillsBeforeHaul', () => {
   });
 
   it('does not flag a rare hauler whose long cadence still outruns the colony', () => {
-    // A 200 h colony is not shorter than a 168 h (weekly) haul window.
     expect(fillsBeforeHaul(200, 168)).toBe(false);
   });
 });

@@ -1,24 +1,17 @@
 import type { CsvColumn, CsvTranslate } from '@/lib/csv';
 import { exportFlag } from '@/lib/exportFlag';
 
-/** Trained skills of one SDE group, as /skills builds them for display and export. */
 export interface SkillGroup {
   groupName: string;
-  /** `sp` is null when ESI withheld it: a queue entry credited the level but carried no level_end_sp. */
   skills: {
     skillTypeID: number;
     name: string;
     level: number;
     sp: number | null;
-    /** Markup-stripped skill description, for the row's tooltip. Null/absent when the skill has none. */
     description?: string | null;
-    /** Training time multiplier; feeds SkillBar's progress-toward-next-level segment. */
     rank: number;
-    /** In the character's ESI skills at all; false is a skill book still to inject. */
     injected: boolean;
-    /** The highest level waiting in the queue, only when above `level`. */
     queuedLevel: number | null;
-    /** The highest level any Skill Plan of this Character asks for; null when no plan lists the skill. */
     plannedLevel: number | null;
   }[];
 }
@@ -36,7 +29,6 @@ export interface SkillCsvRow {
   description: string;
 }
 
-/** One row per skill (injected or not), preserving the incoming group order and within-group order. */
 export function skillCsvRows(groups: readonly SkillGroup[]): SkillCsvRow[] {
   return groups.flatMap((group) =>
     group.skills.map((skill) => ({

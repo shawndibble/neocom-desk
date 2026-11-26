@@ -1,23 +1,3 @@
-/**
- * The two preferences behind SP Extraction monitoring (grilling session,
- * 2026-09-09): whether it's on at all, and the threshold that decides
- * "ready" (`engine/spExtraction.ts`'s `isSpExtractionReady`).
- *
- * Opt-in and off by default: nobody who hasn't turned this on should get an
- * alert or a column for it, and the poller must not fetch skills data for
- * this reason alone when it's off (`pollDomains/`'s `spExtractionDomain`
- * checks the enabled flag inside its own `load`).
- *
- * Both synced, not device-local: "alert me at 500k spare SP" and "yes, do
- * that" are facts about the pilot's own judgement call, not about whichever
- * screen happens to be open when the threshold is crossed — a pilot who sets
- * this on a laptop and never sees the alert because their phone still has it
- * off would reasonably call that a bug. Same "set to another value, never
- * unset" shape the five Defaults-panel preferences already carry
- * (`sync/syncedSettings.ts`), so the tombstone-expiry edge documented there
- * doesn't bite either key. No `legacyKey` for either: both are new, with no
- * device-local life to seed from.
- */
 import { createSyncedSetting } from '@/lib/useSyncedSetting';
 import { SP_EXTRACTION_CHUNK_SP } from '@/engine/skills/spExtraction';
 import {
@@ -39,25 +19,13 @@ export const useSpExtractionMonitoringEnabled = createSyncedSetting<boolean>({
 export const useSpExtractionThresholdSp = createSyncedSetting<number>({
   key: SP_EXTRACTION_THRESHOLD_KEY,
   defaultValue: DEFAULT_SP_EXTRACTION_THRESHOLD_SP,
-  // A non-finite or non-positive stored value can't have come from the
-  // control in Settings.tsx (a plain positive-number input) — treat it as damaged
-  // rather than let a poisoned row (bad sync payload, manual Dexie edit)
-  // reach isSpExtractionReady as a threshold of 0 or NaN.
   parse: (raw) => (typeof raw === 'number' && Number.isFinite(raw) && raw > 0 ? raw : null),
 });
 
 export const SP_FARM_CHARACTERS_KEY = 'sync.spFarmCharacters';
 
-/** Nobody marked — named so callers and tests never hand-roll a second empty array. */
 export const NO_SP_FARM_CHARACTERS: readonly number[] = [];
 
-/**
- * The Characters marked "SP Farm" (issue #5658): SP extraction readiness, its
- * column and its alert apply only to these. One synced key holding Character
- * ids — a judgement about the pilot's own roster, like the threshold. An
- * emptied list is stored as `[]`, never unset, so the tombstone-expiry edge
- * does not bite. A stored value that is not an array of ids is rejected whole.
- */
 export const useSpFarmCharacters = createSyncedSetting<readonly number[]>({
   key: SP_FARM_CHARACTERS_KEY,
   defaultValue: NO_SP_FARM_CHARACTERS,
@@ -66,5 +34,4 @@ export const useSpFarmCharacters = createSyncedSetting<readonly number[]>({
 
 export const isSpFarmCharacter = isCharacterStarred;
 
-/** Marks `characterId` when it isn't marked, unmarks it when it is. Never mutates `marked`. */
 export const withToggledSpFarm = withToggledStar;

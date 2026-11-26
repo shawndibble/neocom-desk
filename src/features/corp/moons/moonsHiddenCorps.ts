@@ -1,9 +1,3 @@
-/**
- * Which of the player's own CEO corporations they hid from "Add my other
- * corps", and which the picker has already shown them. Synced and account-wide
- * (a corporation is not a Character's). `seen` is the baseline that makes a
- * later arrival "new": the first-ever picker open records every candidate.
- */
 import { useCallback } from 'react';
 import { createSyncedSetting } from '@/lib/useSyncedSetting';
 
@@ -21,18 +15,12 @@ const ids = (raw: unknown): number[] =>
     ? [...new Set(raw.filter((n): n is number => Number.isInteger(n) && n > 0))]
     : [];
 
-/** Anything, keeping only well-formed ids (a bad value from another build costs nothing else). */
 export function parseMoonsHiddenCorps(raw: unknown): MoonsHiddenCorps {
   if (typeof raw !== 'object' || raw === null) return EMPTY;
   const r = raw as { hidden?: unknown; seen?: unknown };
   return { hidden: ids(r.hidden), seen: ids(r.seen) };
 }
 
-/**
- * Candidates that are new to the player: not hidden, not already shown to
- * them, and not already connected. Before the baseline exists (`seen` empty
- * and nothing hidden) nothing is new; the picker records it on first open.
- */
 export function newCorps<T extends { corporationId: number }>(
   candidates: readonly T[],
   state: MoonsHiddenCorps & { connected?: ReadonlySet<number> | readonly number[] }
@@ -47,7 +35,6 @@ export function newCorps<T extends { corporationId: number }>(
   );
 }
 
-// Never deleted via deleteSyncedSetting: unhiding rewrites the arrays.
 export const useMoonsHiddenCorpsStore = createSyncedSetting<MoonsHiddenCorps>({
   key: MOONS_HIDDEN_CORPS_KEY,
   defaultValue: EMPTY,

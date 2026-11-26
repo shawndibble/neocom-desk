@@ -17,16 +17,8 @@ import { useOnline } from '@/stores/network';
 import { communityBadgeClassName } from './communityBadge';
 import type { CommunityMember } from './communityStore';
 
-/** Above this many Members a name filter earns its row; a short roster is read at a glance. */
 const FILTER_FROM = 8;
 
-/**
- * The Members tab's roster: a portrait, the name and when their library was
- * last refreshed, an Admin or Stale badge, and, for the admin, a ⋮ on every
- * other Member (make admin, remove). Any other Member's Leave closes the tab,
- * set apart from the roster so it is never beside a row; the admin's Delete
- * is in the header's Manage menu.
- */
 export function CommunityMemberList({
   members,
   adminUid,
@@ -102,9 +94,6 @@ export function CommunityMemberList({
                 {isAdmin && !isAdminRow && online && <RowMoreActions />}
               </li>
             );
-            // Only the admin has actions, and only on another Member: a row
-            // with nothing to offer gets no ⋮ and no menu.
-            // Offline the member actions would only fail: the row stays, without its ⋮.
             return isAdmin && !isAdminRow && online ? (
               <RowActionsMenu
                 key={member.uid}

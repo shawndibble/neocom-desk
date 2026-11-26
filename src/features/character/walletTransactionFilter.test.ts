@@ -71,8 +71,6 @@ describe('filterWalletTransactions', () => {
   });
 
   it('matches an unresolved name on the text the table draws for it', () => {
-    // The whole point: the panel prints `Type #99999`, so searching for that
-    // must find the row rather than silently dropping it.
     expect(ids(filterWalletTransactions(ROWS, filter({ text: '99999' }), nameFor))).toEqual([3]);
     expect(ids(filterWalletTransactions(ROWS, filter({ text: 'type #' }), nameFor))).toEqual([3]);
   });
@@ -97,7 +95,6 @@ describe('filterWalletTransactions', () => {
 });
 
 describe('activeWalletTransactionFilters', () => {
-  // Echoes the key, except for the "+N" summary, so a station pick's value reads.
   function echo(key: string, options?: { values?: string; count?: number }): string {
     return options?.values === undefined ? key : `${options.values} +${options.count}`;
   }

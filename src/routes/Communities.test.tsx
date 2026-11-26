@@ -29,8 +29,6 @@ vi.mock('@/features/communities/communityStore', async (importOriginal) => ({
   ...store,
 }));
 vi.mock('@/sync/syncAuth', () => ({ ensureSignedIn: vi.fn() }));
-// The content views have their own tests; here each is a marker, so the page's
-// own structure (tabs, the sharing line, My sharing, Manage) is what is under test.
 vi.mock('@/features/communities/CommunityLibrary', () => ({
   CommunityLibrary: () => <p>everyone-blueprints</p>,
 }));
@@ -65,7 +63,6 @@ const members = [
   { uid: 'char:92', characterName: 'Friend', joinedAt: 2 },
 ];
 
-/** The router's current search string, on screen for assertions. */
 function SearchProbe() {
   return <output data-testid="search">{useLocation().search}</output>;
 }
@@ -79,19 +76,12 @@ function renderPage(path = '/communities') {
   );
 }
 
-/**
- * Clicks Copy and flushes the clipboard promise inside `act`, then the caller
- * reads the Toast synchronously. The notice lasts 2.5s, so polling for it
- * (`findByText`) can lose to a starved CI worker; nothing here waits on a timer.
- */
-/** Opens the admin's Manage menu and picks an item. */
 async function pickFromManage(item: string | RegExp) {
   const user = userEvent.setup();
   await user.click(await screen.findByRole('button', { name: /^Manage/ }));
   await user.click(await screen.findByRole('menuitem', { name: item }));
 }
 
-/** The admin's invite controls live in Manage › Invites. */
 async function openInvites() {
   await pickFromManage(/^Invites/);
   return screen.findByRole('dialog', { name: c.manage.invitesTitle });
@@ -116,15 +106,11 @@ async function seed() {
   useActiveCharacter.setState({ activeCharacterId: ME, hydrated: true });
 }
 
-// The worker's first render of the page, its dialogs and its Toast pays the
-// cold module load; do it once here, under its own timeout, so it never lands
-// on whichever test happens to run first.
 beforeAll(async () => {
   await seed();
   store.loadMyCommunities.mockResolvedValue([community()]);
   configureClipboard(async () => {});
   const view = renderPage('/communities?community=c1');
-  // Copy raises the page's Toast, the one piece the other tests meet cold.
   await openInvites();
   await screen.findByRole('button', { name: c.copyLink });
   await clickCopy();
@@ -175,7 +161,6 @@ describe('Communities page', () => {
       await screen.findByRole('button', { name: c.copyLink });
       await clickCopy();
       expect(writer).toHaveBeenCalledWith(expect.stringContaining('/communities/join/CODE123'));
-      // The Toast also feeds a live region, so the text can appear twice.
       expect(screen.getAllByText(c.copied).length).toBeGreaterThan(0);
       configureClipboard(null);
     });
@@ -193,11 +178,9 @@ describe('Communities page', () => {
 
       await user.click(await screen.findByRole('button', { name: c.revoke }));
       const revoke = await screen.findByRole('dialog', { name: c.revokeTitle });
-      // The refetch after the change sees the link revoked, as the backend would.
       store.loadMyCommunities.mockResolvedValue([community({ inviteCode: null })]);
       await user.click(within(revoke).getByRole('button', { name: c.revokeAction }));
       await waitFor(() => expect(store.revokeInvite).toHaveBeenCalledWith(ME, 'c1'));
-      // Revoke's own button is gone: focus lands on what the invite controls offer now.
       await waitFor(() =>
         expect(document.activeElement).toBe(screen.getByRole('button', { name: c.regenerate }))
       );
@@ -232,7 +215,6 @@ describe('Communities page', () => {
       store.decideJoinRequest.mockResolvedValue(undefined);
       const user = userEvent.setup();
       renderPage('/communities?community=c1');
-      // The waiting count shows on Manage, so a request is never out of sight.
       expect(await screen.findByRole('button', { name: 'Manage · 2 waiting' })).toBeInTheDocument();
       await pickFromManage('Invites · 2 waiting');
       const row = (await screen.findByText('Newbie')).closest('li')!;
@@ -295,7 +277,6 @@ describe('Communities page', () => {
       renderPage('/communities?community=c1');
       await pickFromManage(c.manage.transfer);
       const picker = await screen.findByRole('dialog', { name: c.manage.transferTitle });
-      // The admin is not offered to itself.
       expect(within(picker).queryByText('Me')).not.toBeInTheDocument();
       const row = (await within(picker).findByText('Friend')).closest('li')!;
       await user.click(within(row).getByRole('button', { name: c.makeAdminAction }));
@@ -350,7 +331,6 @@ describe('Communities page', () => {
       const panel = await screen.findByRole('dialog', { name: c.sharing.title });
       expect(within(panel).getByText('mine-fittings')).toBeInTheDocument();
       expect(within(panel).getByText(`${c.tabs.fittings} in Pals`)).toBeInTheDocument();
-      // The list stays on the page under it.
       expect(screen.getByText('everyone-fittings')).toBeInTheDocument();
       await user.click(within(panel).getByRole('button', { name: en.common.close }));
       await waitFor(() =>
@@ -384,7 +364,6 @@ describe('Communities page', () => {
         await screen.findByRole('dialog', { name: c.manage.invitesTitle })
       ).toBeInTheDocument();
       await waitFor(() => expect(screen.getByTestId('search').textContent).toBe('?community=c1'));
-      // Still open after the URL changes.
       expect(screen.getByRole('dialog', { name: c.manage.invitesTitle })).toBeInTheDocument();
     });
 
@@ -523,7 +502,6 @@ describe('Communities page without a connection', () => {
     const create = screen.getByRole('button', { name: c.createLabel });
     expect(create).toHaveAttribute('aria-disabled', 'true');
 
-    // Back online, the live list replaces the saved one.
     store.loadMyCommunities.mockResolvedValue([community({ name: 'Fresh' })]);
     setOnline(true);
     expect(await screen.findByText('Fresh')).toBeInTheDocument();

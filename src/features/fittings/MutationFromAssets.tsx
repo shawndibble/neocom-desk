@@ -1,8 +1,3 @@
-/**
- * "Load rolls from my assets": the active Character's abyssal items of the
- * types this module can be, each with its real base, mutaplasmid and rolls
- * (`features/abyssal/dynamicItems.ts`). Only on a press, so opening the dialog never reads assets or ESI.
- */
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { GrantMissingLink } from '@/app/GrantMissingLink';
@@ -37,16 +32,12 @@ type Found =
 
 interface Owned {
   items: OwnedItem[];
-  /** Matching items whose rolls ESI didn't give. */
   unread: number;
-  /** The asset list was cut short, so "none" may be wrong. */
   truncated: boolean;
 }
 
-/** Longer than assetShipLocation's 8 s: the user is waiting on a visible rolls panel, not a background open. */
 const ROLLS_TIMEOUT_MS = 15_000;
 
-/** Mean quality of `mutation`'s rolls against its base's own values. */
 async function meanQuality(
   mutation: ItemMutation,
   baseValues: Promise<BaseValue | null>,
@@ -67,7 +58,6 @@ async function findOwned(
   lookup: MutaplasmidLookup
 ): Promise<Owned> {
   const { cached } = await loadCharacterAssets(characterId);
-  // No list at all (ESI didn't answer, nothing saved) is unknown, never "none".
   if (cached === null) throw new Error('assets unread');
   const truncated = cached.truncated;
   const refs = cached.data
@@ -77,7 +67,6 @@ async function findOwned(
   const mutations = await mutationsForItems(refs, lookup, {
     signal: AbortSignal.timeout(ROLLS_TIMEOUT_MS),
   });
-  // Many owned items share a base: read each base's values once.
   const bases = new Map<number, Promise<BaseValue | null>>();
   const baseValuesOf = (typeId: number) => {
     let values = bases.get(typeId);
@@ -97,7 +86,6 @@ async function findOwned(
       ];
     })
   );
-  // Best-rolled first until the fit's effect is known.
   return {
     items: items.sort(byQuality),
     unread: refs.length - items.length,
@@ -116,12 +104,10 @@ export function MutationFromAssets({
   slotIndex,
 }: {
   characterId: number;
-  /** The abyssal types to look for. */
   typeIds: ReadonlySet<number>;
   lookup: MutaplasmidLookup;
   nameOf: (typeId: number) => string;
   onApply: (mutation: ItemMutation) => void;
-  /** The open Fitting's evaluator; null (still loading) leaves the list in quality order. */
   variants: VariantEvaluator | null;
   slot: FittingSlotKind;
   slotIndex: number;
@@ -134,13 +120,10 @@ export function MutationFromAssets({
     variants: VariantEvaluator;
     effects: ReadonlyMap<number, OwnedEffect>;
   } | null>(null);
-  // Rows whose price the pilot asked for: nothing calls MutaMarket until then.
   const [estimating, setEstimating] = useState<ReadonlySet<number>>(new Set());
   const focusAfterCommit = useFocusAfterCommit();
   const doneItems = found.kind === 'done' ? found.items : null;
 
-  // The top `RANK_CAP` by quality, one worker compare each, once the list is
-  // up (so only after the press that loaded it).
   useEffect(() => {
     if (!doneItems || !variants || doneItems.length === 0) return;
     const controller = new AbortController();
@@ -157,7 +140,6 @@ export function MutationFromAssets({
     return () => controller.abort();
   }, [doneItems, variants, slot, slotIndex, lookup]);
   const lacksScope = useCharacterLacksEndpoints(characterId, ['getCharacterAssets']);
-  // The button stays mounted until the list replaces it; then focus moves to the list.
   const [listRef, armListFocus] = useRetryFocus(
     found.kind === 'done' ? 'ok' : found.kind === 'failed' ? 'failed' : 'busy',
     characterId
@@ -301,7 +283,6 @@ export function MutationFromAssets({
                       size="sm"
                       onClick={() => {
                         setEstimating((open) => new Set(open).add(item.itemId));
-                        // The button that ran this unmounts: focus the estimate that replaces it.
                         focusAfterCommit(() =>
                           document.getElementById(`owned-estimate-${item.itemId}`)
                         );

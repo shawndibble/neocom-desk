@@ -1,9 +1,7 @@
-/** Pieces the "Make more from my planets" panels share. */
 import { useTranslation } from 'react-i18next';
 import { PiProductLink } from '../PiProductLink';
 import type { NamedItem } from '../planView';
 
-/** The shared tick state: ids of ticked rows and a toggle. */
 export interface Ticks {
   has: (id: string) => boolean;
   toggle: (id: string) => void;

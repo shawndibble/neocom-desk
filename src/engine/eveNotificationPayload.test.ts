@@ -1,12 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { parseEveNotificationPayload, reinforcementExitMs } from './eveNotificationPayload';
 
-/**
- * Robustness first (issue #300 AC2): the parser is fed a `text` blob CCP can
- * reshape without notice, so "returns nothing useful" is a first-class result
- * and throwing is never one. Only after that do the per-type happy paths
- * matter — every one of those fixtures is a real payload sample.
- */
 describe('parseEveNotificationPayload — degrades instead of throwing', () => {
   const HOSTILE: ReadonlyArray<[string, string]> = [
     ['empty string', ''],
@@ -40,9 +34,6 @@ describe('parseEveNotificationPayload — degrades instead of throwing', () => {
   });
 
   it('never throws when ESI omits `text` entirely, which the type system cannot prevent', () => {
-    // `EveNotificationFire.text` is typed `string`, but it comes from a
-    // response body TypeScript never sees — a `.split` on `undefined` is the
-    // one throw this module promises not to do.
     const notAString = undefined as unknown as string;
     expect(() => parseEveNotificationPayload(notAString)).not.toThrow();
     expect(parseEveNotificationPayload(notAString)).toEqual(parseEveNotificationPayload(''));
@@ -51,9 +42,6 @@ describe('parseEveNotificationPayload — degrades instead of throwing', () => {
 
 describe('parseEveNotificationPayload — YAML subset the payloads actually use', () => {
   it('strips the anchor CCP attaches to every structure id', () => {
-    // `structureID: &id001 1000000000001` is how every structure payload
-    // carries the id, so a parser that keeps the `&id001` finds nothing at
-    // all for eight of the types this ticket renders.
     expect(parseEveNotificationPayload('structureID: &id001 1000000000001').structureId).toBe(
       1_000_000_000_001
     );
@@ -73,8 +61,6 @@ describe('parseEveNotificationPayload — YAML subset the payloads actually use'
   });
 
   it('drops the quotes an emitter adds around a name that needs them', () => {
-    // A structure name containing a colon has to come back quoted; the quotes
-    // are YAML syntax, not part of what the pilot named the thing.
     expect(parseEveNotificationPayload("structureName: 'Chunk Line 3'").structureName).toBe(
       'Chunk Line 3'
     );
@@ -103,9 +89,6 @@ describe('parseEveNotificationPayload — YAML subset the payloads actually use'
   });
 
   it('accepts either spelling of the solar-system key CCP is inconsistent about', () => {
-    // Not rendered anywhere, but the inconsistency is real (`solarsystemID` on
-    // the structure types, `solarSystemID` on the moonmining ones) and is the
-    // reason keys are matched case-insensitively.
     expect(parseEveNotificationPayload('structureid: 42').structureId).toBe(42);
     expect(parseEveNotificationPayload('STRUCTUREID: 42').structureId).toBe(42);
   });
@@ -113,16 +96,11 @@ describe('parseEveNotificationPayload — YAML subset the payloads actually use'
 
 describe('parseEveNotificationPayload — EVE time encodings', () => {
   it("converts a `dueDate` from EVE's 100ns-since-1601 ticks to epoch ms", () => {
-    // BillOutOfMoneyMsg sample: dueDate 132936019800000000 is 2022-04-05T03:13Z.
     const payload = parseEveNotificationPayload('billTypeID: 7\ndueDate: 132936019800000000\n');
     expect(payload.dueDateMs).toBe(Date.parse('2022-04-05T03:13:00Z'));
   });
 
   it('converts `timeLeft` as a duration, not an instant', () => {
-    // StructureLostShields sample: 1727805401093 ticks is ~2 days of
-    // reinforcement, and the sibling `vulnerableTime: 9000000000` is exactly
-    // the documented 15-minute vulnerability window — which is what pins the
-    // 100ns tick scale.
     const payload = parseEveNotificationPayload('timeLeft: 1727805401093\n');
     expect(payload.timeLeftMs).toBe(172_780_540);
   });
@@ -225,7 +203,6 @@ describe('parseEveNotificationPayload — real payload samples', () => {
         '',
       ].join('\n')
     );
-    // `structureName` wins over the link text: it is the unmarked-up value.
     expect(payload.structureName).toBe('Chunk Line 3');
     expect(payload.structureId).toBe(1_000_000_000_002);
   });
@@ -321,7 +298,6 @@ describe('parseEveNotificationPayload — real payload samples', () => {
   });
 
   it('reads OrbitalReinforced: the planet and the reinforcement exit instant', () => {
-    // Real sample: reinforceExitTime 134259524910000000 ticks.
     const payload = parseEveNotificationPayload(
       [
         'aggressorCorpID: 98749616',
@@ -335,7 +311,6 @@ describe('parseEveNotificationPayload — real payload samples', () => {
       ].join('\n')
     );
     expect(payload.planetId).toBe(40121487);
-    // 134259524910000000 ticks (100ns since 1601-01-01) converts to this instant.
     expect(payload.reinforceExitMs).toBe(Date.parse('2026-06-14T23:14:51.000Z'));
   });
 
@@ -362,13 +337,6 @@ describe('parseEveNotificationPayload — real payload samples', () => {
   });
 });
 
-/**
- * The three moon-drill types issue #4058 allow-lists, plus the ore volumes the
- * moon chunk estimate reads (epic #4055, D13). Their shape is
- * taken from public samples (aa-moonmining's fixtures), not from CCP, and is
- * unverified against live data — so every field is optional and the ore
- * block is read defensively: one bad line costs that line, never the rest.
- */
 describe('parseEveNotificationPayload — moon drill', () => {
   const STARTED = [
     'autoTime: 132052212600000000',
@@ -395,7 +363,6 @@ describe('parseEveNotificationPayload — moon drill', () => {
     expect(payload.moonId).toBe(40_161_708);
     expect(payload.moonName).toBe('Dital II - Moon 1');
     expect(payload.startedById).toBe(92_168_909);
-    // 132052104600000000 ticks = 2019-06-17T02:01:00Z; autoTime is 3h later.
     expect(payload.readyTimeMs).toBe(Date.parse('2019-06-17T02:01:00Z'));
     expect(payload.autoTimeMs).toBe(Date.parse('2019-06-17T05:01:00Z'));
     expect(payload.oreVolumes).toEqual([
@@ -438,8 +405,6 @@ describe('parseEveNotificationPayload — moon drill', () => {
         '  46682: 9',
       ].join('\n')
     );
-    // 46680 is a deeper nesting level than the block's own keys; 46682 sits
-    // under a different key. Neither is this block's.
     expect(payload.oreVolumes).toEqual([
       { typeId: 45490, volumeM3: 100.5 },
       { typeId: 46681, volumeM3: 8 },
@@ -479,11 +444,6 @@ describe('parseEveNotificationPayload — moon drill', () => {
   });
 });
 
-/**
- * Round 36's rule, extracted so `projection.ts` (issue #359) can reuse the
- * identical derivation `eveNotificationText.ts`'s `timerEnd` renders from,
- * rather than a second copy that could drift.
- */
 describe('reinforcementExitMs', () => {
   it('adds the envelope timestamp to the payload timeLeft duration', () => {
     const payload = parseEveNotificationPayload('timeLeft: 1727805401093\n');

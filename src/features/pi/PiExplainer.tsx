@@ -8,16 +8,10 @@ import { TierChip } from './DirectiveRow';
 
 const EVE_UNI_PI = 'https://wiki.eveuniversity.org/Planetary_Industry';
 
-/** Ionic Solutions (P0), Electrolytes (P1), Coolant (P2). */
 const IONIC = 2309;
 const ELECTROLYTES = 2327;
 const COOLANT = 9832;
 
-/**
- * "New to PI?": the 60-second explainer in a drawer, shared by every PI tab.
- * It teaches the P0 to P1 to P2 chain with real item icons, then names each
- * building a pilot meets in a colony.
- */
 export function PiExplainer({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { t } = useTranslation();
   return (

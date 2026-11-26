@@ -90,9 +90,6 @@ export function useAssetsRows(assetsData: AssetsData) {
     [wildcard]
   );
 
-  // Multi-select and bulk actions (issue #90): select mode is off by default and
-  // browsing (select mode off) renders exactly as it did before this ticket.
-  // Turning select mode off clears the selection rather than merely hiding it.
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<ReadonlySet<number>>(new Set());
   function toggleSelectMode() {
@@ -109,18 +106,11 @@ export function useAssetsRows(assetsData: AssetsData) {
   const setStationSortField = useStationSort((state) => state.setValue);
   useHydratedStore(useStationSort);
 
-  // Opens on the pilot's Travel default; the picker here changes this view only.
-  // It shows only under the Jumps away sort, so a hidden pick never moves a jump count.
   const [routeOverride, setRouteOverride] = useState<RoutePreferenceKind | null>(null);
   const assetsRoute = useJumpBasis(stationSortField === 'jumpsAway' ? routeOverride : null);
   const routePreference = assetsRoute.rules.preference;
 
-  // The flat (search / All Items) list's own sort, remembered the same way the
-  // station list's is. Ungated on `hydrated`: this only reorders a list that is
-  // already in memory, so the worst a late hydrate does is re-sort it — there
-  // is no request to spend on the default first.
   const sortField = useAssetSort((state) => state.value);
-  // The level's plain items, re-sorted from their column labels; null keeps name order.
   const [levelSort, setLevelSort] = useState<DataTableSort | null>(null);
   function toggleLevelSort(columnId: LevelSortColumn) {
     setLevelSort((prev) => nextDataTableSort(prev, columnId, columnId === 'name' ? 'asc' : 'desc'));
@@ -128,14 +118,10 @@ export function useAssetsRows(assetsData: AssetsData) {
   const setSortField = useAssetSort((state) => state.setValue);
   useHydratedStore(useAssetSort);
 
-  // Jumps-away distances (issue #87): the active character's current solar
-  // system, fetched once per page load (not polled) via ESI's location
-  // endpoint. Re-fetched whenever the active character changes.
   const [characterSystemId, setCharacterSystemId] = useState<number | null>(null);
   const [characterLocationResolved, setCharacterLocationResolved] = useState(false);
   useEffect(() => {
     if (activeCharacterId === null) return;
-    // Resets the resolved flag for the newly active character before its fetch.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setCharacterLocationResolved(false);
     let cancelled = false;
@@ -149,27 +135,18 @@ export function useAssetsRows(assetsData: AssetsData) {
     };
   }, [activeCharacterId]);
 
-  // Each scoped station's system, security and jumps away: see the effect-free
-  // adjust-state-during-render below for which stations. The refs live in state
-  // up here because the station sort reads the jumps, and the scoped set is
-  // itself derived from that sort.
   const [scopedPlaceRefs, setScopedPlaceRefs] = useState<readonly PlaceRef[]>([]);
   const placeDetails = usePlaceDetails(scopedPlaceRefs, {
     scopeId: activeCharacterId,
     enabled: activeCharacterId !== null,
     origin: { systemId: characterSystemId, resolved: characterLocationResolved },
     basis: assetsRoute,
-    // Names come from the page's own bulk lookups.
     names: false,
   });
   const placeDetailFor = (locationId: number) =>
     placeDetails.get(placeKey({ locationId, characterId: activeCharacterId }));
   const jumpsAwayOf = (locationId: number) => placeDetailFor(locationId)?.jumps;
 
-  // The tree is built from every asset: search no longer filters it (results
-  // are a separate flat list), so clearing a search never has to rebuild it.
-  // Category, Blueprints and min value (issue #5601) prune it afterwards, so a
-  // match keeps its container path and every total covers the matches only.
   const fullTree = useMemo(
     () => buildAssetTree(mergedAssets, priceByTypeId, itemValueByItemId),
     [mergedAssets, priceByTypeId, itemValueByItemId]
@@ -229,12 +206,7 @@ export function useAssetsRows(assetsData: AssetsData) {
 
   const nodeIndex = useMemo(() => indexAssetNodes(sortedTree), [sortedTree]);
   const totalValue = useMemo(() => totalEstimatedValue(sortedTree), [sortedTree]);
-  // Root location list only: drilled-in views keep their own node totals, and
-  // flat search/all-items mode sums matches rather than the tree. Hidden with no
-  // assets (the empty state covers it).
   const showTotalValueChip = !flatModeActive && pathStationId === null && sortedTree.length > 0;
-  // A Character filter narrowing below every Character means the figure is not
-  // the whole portfolio — flag it so it is never mistaken for one.
   const totalValueFiltered =
     crossCharacterCandidates.length > 1 &&
     resolvedCrossCharacterFilter !== 'all' &&
@@ -251,7 +223,6 @@ export function useAssetsRows(assetsData: AssetsData) {
       : (mergedTypeNames.get(node.asset.type_id) ?? `Type #${node.asset.type_id}`);
   }
 
-  /** Ancestor labels for a search hit, outermost first — where this item actually lives. */
   function trailFor(asset: CharacterAsset): string[] {
     const { chain, rootLocationId, rootLocationType } = assetHolderChain(asset, assetsByItemId);
     return [
@@ -267,39 +238,20 @@ export function useAssetsRows(assetsData: AssetsData) {
     ];
   }
 
-  /** Where a search hit sits in the drill-down tree; null when the tree does not hold it. */
   function nodePathFor(asset: CharacterAsset) {
     return nodeIndex.get(asset.item_id) ?? null;
   }
 
-  /** The station a search hit belongs to, for the link back into the drill-down. */
   function rootStationIdFor(asset: CharacterAsset): number | null {
     const { rootLocationId, cyclic } = assetHolderChain(asset, assetsByItemId);
-    // A cycle points at a node `buildAssetTree`'s cycle guard already absorbed, so no orphan
-    // station carries this id. Otherwise the root is a real location, or the chain broke on a
-    // missing parent, which `buildAssetTree` made an orphan group of that same id.
     return cyclic ? null : rootLocationId;
   }
 
-  // Also requires a non-empty `debouncedSearch` when flat mode is driven by
-  // the search box, not just `searchActive`: for up to SEARCH_DEBOUNCE_MS
-  // after the first keystroke, `searchActive` (which tracks the
-  // instantly-responsive `search`) is already true while `debouncedSearch`
-  // is still `''` — `matchAssets` reads an empty query as "match
-  // everything", which would otherwise flash the full unfiltered list as
-  // "search results" for that one debounce window. The permanent "All
-  // items" view (issue #414) has no such flash to guard against — showing
-  // everything with no query is its resting state, not a stale debounce —
-  // so it skips the guard.
   const searchMatches = useMemo(() => {
     if (!flatModeActive) return [];
     if (!allItemsView && debouncedSearch.trim().length === 0) return [];
     return matchAssets(mergedAssets, mergedTypeNames, debouncedSearch, assetNames);
   }, [flatModeActive, allItemsView, mergedAssets, mergedTypeNames, debouncedSearch, assetNames]);
-  // Min-value filter and sort (issue #414) apply to both the search results
-  // list and the permanent all-items view — the same flat shape either way.
-  // Value is computed once per match up front (not inside the comparator),
-  // which both the filter and the sort then reuse.
   const flatMatches = useMemo(() => {
     if (!flatModeActive) return [];
     const valued: ValuedAssetMatch[] = searchMatches.map((match) => ({
@@ -325,7 +277,6 @@ export function useAssetsRows(assetsData: AssetsData) {
     sortField,
   ]);
 
-  // The three list shapes, reduced to one row array for one virtualizer.
   const rows = useMemo<BrowseRow[]>(() => {
     if (flatModeActive) {
       return flatMatches.map((match) => ({
@@ -336,8 +287,6 @@ export function useAssetsRows(assetsData: AssetsData) {
     }
     if (pathStationId !== null) {
       const { bays, containers, items } = splitLevelNodes(resolved.children);
-      // A ship or container sorts by what its row shows: its game name, the
-      // items inside and their value; its hull volume is the one hidden figure.
       const sortedContainers = sortLevelNodes(containers, levelSort, {
         name: (node) => assetNames[node.asset.item_id] ?? nodeLabel(node),
         quantity: (node) => node.itemCount,
@@ -432,38 +381,19 @@ export function useAssetsRows(assetsData: AssetsData) {
     t,
   ]);
 
-  // The md+ label strip names the item cells, so it only shows on a level that
-  // actually has item rows (not in the location list, and not in flat search
-  // results, whose rows are a different shape).
   const showItemColumns = !flatModeActive && pathStationId !== null && hasItemRows(rows);
 
   const { scrollParentRef, rowVirtualizer } = useAssetRowVirtualizer({
     rows,
     baseRowHeight,
-    // Every level change is a different list; keep the new one at the top.
     resetKey: `${wildcard}|${flatModeActive}`,
   });
 
-  // Level-heading focus (issue #1485): a location/container/search-result
-  // link, or Back, unmounts the control the pilot just activated — without
-  // this, focus falls back to the page body with no cue what happened (WCAG
-  // 2.4.3). Keyed on the drill-down path only, not `wildcard` (which also
-  // carries the tab segment: arrowing onto Items would pull focus out of the
-  // tab strip) and not `flatModeActive` (which flips true the instant a
-  // search keystroke lands and would yank focus off the search box).
-  // `levelHeadingRef` is shared by whichever of the three header blocks below
-  // is actually rendered (root list / drilled level); only one exists at a
-  // time.
   const levelHeadingRef = useRef<HTMLHeadingElement>(null);
   const levelKey = `${pathStationId ?? ''}/${pathSegments.join('/')}`;
   useFocusHeading(levelHeadingRef, levelKey);
   const searchRef = useRef<HTMLInputElement>(null);
 
-  // Locations with a row in the virtualizer's current visible range — the
-  // "currently visible" half of GLOSSARY.md round 14's "only for pinned and
-  // currently visible/expanded stations". Keyed on the range's indices, not
-  // `getVirtualItems()`'s array (a fresh reference every render), so this
-  // only recomputes when the visible window actually moves.
   const rangeStart = rowVirtualizer.range?.startIndex ?? null;
   const rangeEnd = rowVirtualizer.range?.endIndex ?? null;
   const visibleStationLocationIds = useMemo(() => {
@@ -476,11 +406,6 @@ export function useAssetsRows(assetsData: AssetsData) {
     return ids;
   }, [rangeStart, rangeEnd, rows]);
 
-  // Lazy, scoped to pinned locations, locations in the virtualizer's visible
-  // range, and the location currently drilled into (GLOSSARY.md round 14:
-  // "only for pinned and currently visible/expanded stations") — bounds the
-  // route-call fan-out to what's pinned or actually on screen, rather than
-  // every station a character owns.
   const jumpsAwayScopedStations = useMemo(() => {
     return sortedTree.filter((station) => {
       if (isUnresolvedParent(station, mergedLocationNames)) return false;
@@ -498,13 +423,6 @@ export function useAssetsRows(assetsData: AssetsData) {
     mergedLocationNames,
   ]);
 
-  // Narrows the places the hook reads to the station *set*, not the memo
-  // above's array identity (issue #415): `pins` is a live Dexie query that gets
-  // a new array on every write, including a pin toggle for a station that
-  // isn't even in this scoped set. React's sanctioned "adjust state during
-  // render" pattern keeps the last reference until the set really changes.
-  // A resolved orphan (see isUnresolvedParent) is a structure id in every case
-  // seen so far, so it resolves through the same call that named it.
   const scopedPlaceRefsNext = jumpsAwayScopedStations.map((station) => ({
     locationId: station.locationId,
     kind: placeKindForStation(station.locationType),
@@ -522,14 +440,11 @@ export function useAssetsRows(assetsData: AssetsData) {
     return placeDetailFor(locationId)?.security;
   }
 
-  // Bulk actions (issue #90): the three actions the item context menu already
-  // offers per row, applied to every selected item_id at once.
   function handleBulkAddToQuickbar() {
     if (activeCharacterId === null) return;
     let items = itemActions.quickbar.items;
     for (const id of selectedIds) {
       const asset = assetsByItemId.get(id);
-      // Abyssal: no market; the row menu skips Quickbar too.
       if (!asset || abyssal.isAbyssalType?.(asset.type_id)) continue;
       const name = mergedTypeNames.get(asset.type_id) ?? `Type #${asset.type_id}`;
       items = addQuickbarItem(items, { typeId: asset.type_id, name });
@@ -551,7 +466,6 @@ export function useAssetsRows(assetsData: AssetsData) {
     void writeToClipboard(lines.join('\n'));
   }
 
-  /** Every leaf item_id currently in `rows` — whichever of the three list shapes is on screen (issue #415's "Select all in view"). */
   function collectRowItemIds(): number[] {
     return rows.flatMap((row) => {
       switch (row.kind) {

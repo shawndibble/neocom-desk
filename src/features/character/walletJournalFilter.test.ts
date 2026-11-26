@@ -145,7 +145,6 @@ describe('journalRefTypes', () => {
   });
 });
 
-/** Echoes the key, so a test reads which pills are on rather than their English. */
 const t = ((key: string) => key) as unknown as TFunction;
 
 describe('activeWalletJournalFilters', () => {

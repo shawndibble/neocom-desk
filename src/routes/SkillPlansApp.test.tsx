@@ -16,10 +16,6 @@ vi.mock('@/app/syncStatus', async (importOriginal) =>
 );
 vi.mock('@/sde/loadSde', async () => (await import('@/test/skillPlansMocks')).loadSdeMock());
 
-// The Skills section's App-level wiring: the `/skills` index redirect, moving
-// between its pages through the real route table, and the shell's sync note.
-// Everything the pages do on their own is tested without `App`
-// (`renderSkillsRoutes`, in SkillPlans*.test.tsx and Skills.test.tsx).
 installSkillPlansHarness({ app: true });
 
 describe('Skills opens on Plans', () => {
@@ -35,7 +31,6 @@ describe('Skills opens on Plans', () => {
     const user = userEvent.setup({ delay: null });
     render(<App />);
 
-    // The sub-nav's own link: the rail lists Skills › Trained too.
     const subNav = await screen.findByRole('navigation', { name: 'Skills' });
     await user.click(within(subNav).getByRole('link', { name: 'Trained' }));
     await waitFor(() => expect(window.location.pathname).toBe('/skills/trained'));

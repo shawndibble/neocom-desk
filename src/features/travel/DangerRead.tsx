@@ -15,7 +15,6 @@ import { Well } from '@/components/ui/Well';
 
 const P = 'travel.pilot.dscan.danger.';
 
-/** Tone -> glyph and text colour. The glyph and a written word always travel together. */
 const MARK: Record<'ok' | 'warn' | 'bad' | 'info', { glyph: typeof Icon.Warn; className: string }> =
   {
     ok: { glyph: Icon.SeverityClear, className: 'text-success' },
@@ -37,7 +36,6 @@ const LEVEL_EDGE: Record<DangerLevel, string> = {
   busy: 'border-l-accent',
 };
 
-/** An icon plus its word: status is never colour alone (DESIGN.md §7). */
 function StatusMark({ tone, children }: { tone: keyof typeof MARK; children: ReactNode }) {
   const { glyph: Glyph, className } = MARK[tone];
   return (
@@ -58,11 +56,6 @@ function groupTone(g: WatchGroup): keyof typeof MARK {
   return 'bad';
 }
 
-/**
- * The answer to "am I in danger?": a level, one sentence built from counts, the
- * pattern the scan reads as, what is new, and how old the scan is. Wording stays
- * a condition, never a verdict (decision 20260912-172628).
- */
 export function DangerAnswer({
   read,
   names,
@@ -73,13 +66,9 @@ export function DangerAnswer({
 }: {
   read: DangerReadData;
   names: ReadonlyMap<number, string>;
-  /** Null for a Shared D-Scan: nobody knows when it was taken. */
   age: ScanAge | null;
-  /** The smallest hole each ship needs, in wormhole space only; else null. */
   holes: string | null;
-  /** "Your ship" as an editable line of text, beside the level. */
   shipControl: ReactNode;
-  /** Anything the card should say beneath the read, such as the Grant note. */
   notes?: ReactNode;
 }) {
   const { t } = useTranslation();
@@ -190,7 +179,6 @@ export function DangerAnswer({
   );
 }
 
-/** What to watch, ranked: one row per group of identical hulls, capped, with the reason in text. */
 export function WatchCard({
   read,
   names,
@@ -293,13 +281,11 @@ const TRIPWIRE_KEY: Record<ThreatKind, 'catch' | 'more' | 'kill' | 'find'> = {
   find: 'find',
 };
 
-/** What would change the answer, each line with today's live count. */
 export function TripwireCard({
   tripwires,
   firstScan,
 }: {
   tripwires: readonly Tripwire[];
-  /** True on the live view's first scan: there is nothing to compare yet. */
   firstScan: boolean;
 }) {
   const { t } = useTranslation();

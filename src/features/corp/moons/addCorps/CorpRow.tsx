@@ -16,7 +16,6 @@ const STATE_TONE: Record<CorpState, PillTone> = {
   'needs-ore': 'warning',
 };
 
-/** One corporation's state as a word on a tint. */
 export function CorpStatePill({ state }: { state: CorpState }) {
   const { t } = useTranslation();
   return (
@@ -24,7 +23,6 @@ export function CorpStatePill({ state }: { state: CorpState }) {
   );
 }
 
-/** "CEO: <name>" as a dim line: who leads the corp, and so who to log in as. */
 export function CorpCeo({ name }: { name: string }) {
   const { t } = useTranslation();
   return (
@@ -34,7 +32,6 @@ export function CorpCeo({ name }: { name: string }) {
   );
 }
 
-/** A corporation and its CEO on one line, with whatever sits at the right. Used by the picker, the hidden list and the sign-in list. */
 export function CorpRow({
   name,
   ceoName,

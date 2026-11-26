@@ -1,7 +1,3 @@
-// Firestore side of the nearby phase (issue #5122, ADR 0028): the registered
-// devices that want nearby alerts, read from `deviceRegistrations`, and the
-// poller's own `nearbyState` on each registration doc. Logic lives in pollNearby.ts.
-
 import { FieldValue, type Firestore } from 'firebase-admin/firestore';
 import type { NearbyRouteRules } from './nearbyAlerts.js';
 import type { NearbyDevice, NearbyDeviceState, NearbyStore } from './pollNearby.js';
@@ -23,7 +19,6 @@ const asRecord = (value: unknown): Record<string, unknown> =>
     ? (value as Record<string, unknown>)
     : {};
 
-/** The poller's stored state on a registration doc; anything malformed reads as none. */
 function readNearbyState(raw: unknown): NearbyDeviceState {
   const state = asRecord(raw);
   const pushed: Record<string, number> = {};
@@ -36,7 +31,6 @@ function readNearbyState(raw: unknown): NearbyDeviceState {
   };
 }
 
-/** Each Character's nearby N, from its `serverInputs` (issue #5121's per-Character inputs). */
 function nearbyJumpsOf(raw: unknown): NearbyDevice['nearbyJumpsByCharacter'] {
   return Object.fromEntries(
     Object.entries(asRecord(raw)).map(([id, inputs]) => {
@@ -56,11 +50,9 @@ function nearbyJumpsOf(raw: unknown): NearbyDevice['nearbyJumpsByCharacter'] {
   );
 }
 
-/** Firestore side of the nearby phase (issue #5122): see `NearbyStore`. */
 export function firestoreNearbyStore(
   db: Firestore,
   options: {
-    /** Shared with the grant poller so a registration is read once per run (issue #5144). */
     registrations?: RegistrationReader;
     stats?: RunStats;
   } = {}
@@ -92,8 +84,6 @@ export function firestoreNearbyStore(
       return devices;
     },
     async writeState(deviceId, state) {
-      // `update`, not `set`: a registration deleted meanwhile (a dead token) must
-      // stay deleted, so this throws instead of recreating a doc with no token.
       await registrations.doc(deviceId).update({ nearbyState: state });
       stats?.add('firestoreWrites');
     },
@@ -105,10 +95,6 @@ export function firestoreNearbyStore(
   };
 }
 
-/**
- * Drop one Character's nearby state from every device that holds it: the
- * Alerts Grant was deleted, so the system it was last counted from goes too.
- */
 export async function forgetNearbyCharacter(db: Firestore, characterId: number): Promise<void> {
   const snap = await db
     .collection(DEVICE_REGISTRATIONS_COLLECTION)

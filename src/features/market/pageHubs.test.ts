@@ -41,7 +41,6 @@ describe('parsePageHubs', () => {
     expect(ownChoice({ contracts: 'amarr' }, 'contracts')).toBe('amarr');
     expect(ownChoice({ contracts: 'closest' }, 'contracts')).toBe('closest');
     expect(ownChoice({ contracts: 'nowhere' }, 'contracts')).toBeUndefined();
-    // An edit keeps what it cannot read.
     expect(setPageHub({ moonbase: 'jita' }, 'contracts', 'hek')).toEqual({
       moonbase: 'jita',
       contracts: 'hek',
@@ -71,7 +70,6 @@ async function reset(rows: { key: string; value: unknown }[]) {
   useClosestHubs.setState({ byCharacter: {} });
 }
 
-/** Character 91 is active and its Closest hub already worked out (`null`: no location). */
 async function activeAt(closest: 'amarr' | 'hek' | null) {
   await db.settings.put({ key: 'activeCharacterId', value: 91 });
   useActiveCharacter.setState({ activeCharacterId: 91, hydrated: true });
@@ -108,7 +106,6 @@ describe('picking a hub for a page', () => {
   });
 
   it('switching to the page starts it at the hub in use, so nothing re-prices', async () => {
-    // Nothing set aside: the seeded `amarr` entry is forgotten, not parked.
     await usePageHubs.getState().hydrate();
     await usePageHubs.getState().setValue({});
     await useMarketHub.getState().setValue('hek');
@@ -147,7 +144,6 @@ describe('Closest hub', () => {
     expect(await loadHubFor('contracts')).toBe('rens');
     expect(await tradeHubIdFor(91)).toBe('amarr');
 
-    // A page switched to its own hub starts on Closest too; a hub pick on Global ends Closest.
     await setHubScope('market', 'page');
     expect(usePageHubs.getState().value).toEqual({ contracts: 'rens', market: 'closest' });
     await pickHubFor('fittings', 'dodixie');

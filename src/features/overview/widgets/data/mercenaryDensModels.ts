@@ -1,8 +1,3 @@
-/**
- * Mercenary Dens builder (issue #4791): each den's state, ready operations and
- * Anarchy, worst first. Same contract as `models.ts`: pure, derived at render
- * time.
- */
 import {
   ANARCHY_SIPHON_LEVEL,
   type DenOperation,
@@ -26,19 +21,12 @@ import type { BoardDeadline } from '../nextDeadline';
 import type { DetailTone, NumberModel, RowDetailModel, TableCell, TableColumn } from './types';
 import type { Translate } from '@/lib/translate';
 
-/**
- * This kind's copy key. A helper rather than `` `${W}.x` `` templates: the
- * locale splitter reads a `${…}.x` template as naming every `x` key in every
- * lazy section, and keeps them all in the startup shell.
- */
 const k = (key: string) => `overview.widgets.mercenaryDens.${key}`;
 
-/** Den detail is an hour-old read, so its reinforcement clock never counts minutes inside that hour. */
 function reinforcementText(t: Translate, remainingMs: number): string {
   return remainingMs < HOUR_MS ? t(k(`underHour`)) : formatCountdown(remainingMs / 1000);
 }
 
-/** Operations are a five-minute read: their countdown is exact. */
 function operationText(remainingMs: number): string {
   return formatCountdown(remainingMs / 1000);
 }
@@ -175,7 +163,6 @@ function detailOf(
       },
       { label: t(k(`col.character`)), value: row.characterName },
       { label: t(k(`detail.owner`)), value: owner },
-      // No list to show: say so, unknown when the read had a gap, never an empty heading.
       ...(row.operationsRead && row.operations.length > 0
         ? []
         : [
@@ -224,7 +211,6 @@ export const mercenaryDens: Builder = (feeds, { t, now, activeCharacterId, scope
   const feed = feeds.mercenaryDens;
   const data = feed?.data ?? null;
   if (!data) return blank(null, statusOf(feed));
-  // The read covers every Character; a widget on one Character narrows to the header's.
   const everyone = scopeAll || activeCharacterId === null;
   const own = everyone ? null : activeCharacterId;
   const granted = own === null ? data.granted.length > 0 : data.granted.includes(own);
@@ -238,10 +224,8 @@ export const mercenaryDens: Builder = (feeds, { t, now, activeCharacterId, scope
     isEmpty: rows.length === 0,
   });
   if (!granted) return blank(null, status);
-  // A Character whose own read failed shows Retry, not an empty list.
   if (ownFailed) return blank(null, { ...status, error: true, hasData: false });
 
-  // Each row's severity and state cell, worked out once.
   const views = rows.map((row) => ({
     row,
     severity: denSeverity(row, now),
@@ -280,7 +264,6 @@ export const mercenaryDens: Builder = (feeds, { t, now, activeCharacterId, scope
     };
   }
 
-  // Only All characters names whose den it is, and only when there is more than one Character.
   const showCharacter = everyone && data.granted.length > 1;
   const columns: TableColumn[] = [
     { key: 'planet', label: t(k(`col.planet`)), priority: 0, minWidth: 96 },
@@ -312,7 +295,6 @@ export const mercenaryDens: Builder = (feeds, { t, now, activeCharacterId, scope
   };
 
   const reinforced = rows.filter((row) => denStateAt(row, now) === 'reinforced').length;
-  // On All characters an alt that could not be read is named, so its dens are not read as none.
   const unread = everyone ? data.failed.length : 0;
   return {
     ...blank(null, status),

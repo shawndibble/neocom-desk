@@ -105,13 +105,11 @@ describe('buildCorpBookView', () => {
     });
     const cases = [
       payee('verified', { entityId: CORP, entityKind: 'corporation' }),
-      // Same name, no link at all: the corporation (EVE names are unique), linked on load.
       payee('label', {}),
       payee('character', { entityId: CORP, entityKind: 'character' }),
       payee('other', { entityId: CORP + 1, entityKind: 'corporation' }),
     ];
     const seen: string[][] = [];
-    // The overlay reads ownPayeeIds only through the allocation it absorbs, so assert via an allocation per Payee.
     for (const c of cases) {
       const row = input().rows[0];
       const view = buildCorpBookView(

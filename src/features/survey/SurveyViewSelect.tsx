@@ -8,11 +8,6 @@ const VIEW_LABEL: Record<SurveyChartView, string> = {
   isk: 'survey.viewIsk',
 };
 
-/**
- * Which view fills the Survey's whole chart area (ore left, depletion by ore,
- * ISK left). Unlabelled: the aria-label names it. Controlled: the caller owns
- * the pick and passes only the views available right now.
- */
 export function SurveyViewSelect({
   value,
   onChange,

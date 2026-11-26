@@ -14,17 +14,12 @@ import { walletFixtureRoutes } from './esiFixtureRoutes';
 import { SAMPLE_ACTIVE_CHARACTER, SAMPLE_CHARACTERS, samplePortraitDataUri } from './sampleData';
 import { HOUR_MS } from '@/lib/age';
 
-/** Scopes the sample Characters hold: enough for the wallet pages, nothing that makes the shell poll more. */
 const SAMPLE_SCOPES = ['esi-wallet.read_character_wallet.v1', 'esi-characters.read_loyalty.v1'];
 
 export interface AppShellParameters {
-  /** Where the page sits, e.g. `/wallet/balance`. */
   path: string;
-  /** ESI answers for this page; defaults to the wallet routes. Keep the reference stable (module-level). */
   routes?: () => FixtureRoute[];
-  /** Scopes the sample Characters hold; defaults to the wallet's. Keep the reference stable (module-level). */
   scopes?: readonly string[];
-  /** Writes the page's own Dexie rows after the sample account is seeded. Keep the reference stable (module-level). */
   seed?: () => Promise<void>;
 }
 
@@ -34,7 +29,6 @@ declare module 'storybook/internal/csf' {
   }
 }
 
-/** `App.tsx` wires these at module load; a story renders without `App`, so the shell does it. */
 function wireEsiToStoredTokens() {
   configureEsi({ getToken: (characterId) => getAccessTokenReportingFailures(characterId) });
   configureActiveCharacter(() => useActiveCharacter.getState().activeCharacterId);
@@ -78,13 +72,11 @@ async function seedSampleAccount(
   if (isCancelled()) return;
   await seed?.();
   if (isCancelled()) return;
-  // `App`'s Root does this at boot; the shell stands in for it.
   await useActiveCharacter.getState().hydrate();
 }
 
 const PORTRAIT_PATH = /^\/characters\/(\d+)\/portrait$/;
 
-/** Points a Character portrait at its offline tile, so the page makes no image request either. */
 function localisePortrait(img: HTMLImageElement) {
   const url = new URL(img.src, document.baseURI);
   if (url.origin !== new URL(characterPortraitUrl(0, 64)).origin) return;

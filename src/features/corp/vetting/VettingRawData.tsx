@@ -1,12 +1,3 @@
-/**
- * "Data we read": every row a review kept, a page of its own below the report
- * (`/corp/vetting/open/<id>/data/<source>`). A tab per source, a character switcher, and one
- * source's table. The source is in the path and the character and the flagged-only chip in the
- * query, so a flag on the report can link straight to its rows.
- *
- * The same gate as the report: an officer, and not the person asked about or the one who asked.
- * No new log line: the report's open is the review's one.
- */
 import { useEffect, useState, type ReactNode } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -40,7 +31,6 @@ import { dataPath, reviewPath } from './vettingTabs';
 import { reviewKindLabel } from './vettingText';
 
 const ALL = '__all';
-/** A joined group fits "All" and three characters; past that a Select takes over. */
 const SEGMENTED_MAX = 3;
 
 type Load =
@@ -91,7 +81,6 @@ export function VettingRawData({ characterId, corporationId, reviewId, tab, sour
     return () => {
       live = false;
     };
-    // The load settles once per key and Retry.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, attempt]);
 
@@ -131,7 +120,6 @@ export function VettingRawData({ characterId, corporationId, reviewId, tab, sour
     );
   }
   if (load.review.rawCounts === undefined) {
-    // Stored before rows were kept: nothing to browse.
     return frame(
       <Panel>
         <EmptyState title={t('vetting.data.noneKeptTitle')} hint={t('vetting.data.noneKeptHint')} />
@@ -174,7 +162,6 @@ function Browser({
   const [params, setParams] = useSearchParams();
   const skills = useSkillNames();
   const data = useVettingRawRows(characterId, corporationId, review.id, source);
-  // The caller only draws this for a review that kept rows (`rawCounts`).
   const counts = review.rawCounts!;
   const characters = review.reportCharacters;
   const asked = Number(params.get('character'));

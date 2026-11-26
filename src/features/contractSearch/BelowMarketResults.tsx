@@ -1,12 +1,3 @@
-/**
- * Contracts › Item search with "Below market" on (#3989): one row per public
- * contract worth more than it asks — Value · Other · Asking · Profit · Jumps,
- * best Profit first. Value is the hub market only; Other is what lines with
- * no market would fetch at other contracts' asks, and is never in Profit
- * unless the Include Other filter says so (#5427). The valuation is `engine/contracts/belowMarket.ts`; the
- * prices come from `belowMarketData.ts`. The panel owns the filters and hands
- * over only the contracts that pass them.
- */
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -37,17 +28,13 @@ const SORT = { columnId: 'profit', direction: 'desc' } as const;
 
 interface BelowMarketResultsProps {
   state: BelowMarketState;
-  /** The contracts that pass the bar's filters; `state`'s own list is unfiltered. */
   contracts: readonly BelowMarketContract[];
-  /** ms since epoch of the contract snapshot behind the valuation. */
   lastSyncedAt: number | null;
-  /** Which side of the hub book values the Value column. */
   side: PriceSide;
   typeNames: ReadonlyMap<number, string>;
   offerLocations: ReadonlyMap<number, OfferLocation>;
   offerJumps: (row: PublicContractOfferRow) => JumpsCellValue;
   onOpen: (row: PublicContractOfferRow) => void;
-  /** Resets the bar's filters, offered when they leave nothing. */
   onResetFilters: () => void;
 }
 
@@ -74,7 +61,6 @@ export function BelowMarketResults({
         className: 'truncate',
         sortValue: (row) => belowMarketItemLabel(row.lead, typeNames, t),
         render: (row) => (
-          // Span, not a Link: the row opens the contract modal, whose lines link to Market.
           <span>
             <span className={entityLinkClassName()}>
               {belowMarketItemLabel(row.lead, typeNames, t)}
@@ -215,9 +201,7 @@ export function BelowMarketResults({
   );
 
   const hubName = state.status === 'ready' ? state.hub.systemName : null;
-  /** Contracts exist; the bar's filters leave none. */
   const filteredOut = state.status === 'ready' && state.contracts.length > 0;
-  // The header's Data Age badge is hidden on a phone; this line is not.
   const note =
     lastSyncedAt === null
       ? null

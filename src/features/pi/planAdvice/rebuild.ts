@@ -21,7 +21,6 @@ import {
 } from '../stopTierModel';
 import type { PlanColonyAdvice } from './types';
 
-/** The P0s a product needs, and the factories in the order they are set (inputs first). */
 export function recipeOf(typeId: number, pi: PiData): RebuildCandidate['recipe'] {
   const extracts = new Set<number>();
   const makes: { typeId: number; facility: 'basic' | 'advanced' | 'highTech' }[] = [];
@@ -50,17 +49,6 @@ export function safeVolume(typeId: number, pi: PiData): number | null {
   }
 }
 
-/**
- * What a layout earns a day, absolute: units sold at the sell market, less
- * sales tax, less the colony's customs on the one export. Nothing between tiers
- * is taxed on one planet.
- *
- * `ScoredStopTier.marginPerHour` is not this. For a made tier it is net of the
- * raw P0 the layout consumes, a margin over selling the ore, and `Today`
- * (`builtColonyEarnings`) is an absolute income. Comparing a rebuild with today
- * has to be absolute against absolute, so the figure is rebuilt here from the
- * scorer's own unit rate. Null when the sell market does not price the product.
- */
 export function iskPerHourOf(
   entry: ScoredStopTier,
   books: SellBooks,
@@ -98,7 +86,6 @@ function candidateOf(
     }),
   };
 }
-/** Scored P1 and P2 candidates: one-planet recipes only, never raw P0. */
 function recipeEntries(advice: StopTierAdvice): ScoredStopTier[] {
   const entries: readonly StopTierEntry[] = advice.entries;
   return entries.filter(isScoredRecipe);
@@ -127,7 +114,6 @@ export function rebuildFacts(args: {
   books: SellBooks;
   haulHours: number;
   ccSkill: number | null;
-  /** The pilot's saved richness pick for this planet (`richnessOverride.ts`). */
   picked: readonly number[] | undefined;
   todayM3PerDay: number | null;
 }): RebuildFacts | { refused: string } {
@@ -157,8 +143,6 @@ export function rebuildFacts(args: {
     if (candidate) candidates.set(candidate.typeId, candidate);
   }
 
-  // What a higher Command Center would host, within the pilot's trained skill.
-  // Each recipe is scored at the lowest level that hosts it.
   const reach = args.ccSkill === null ? 0 : colonyBudget(args.ccSkill, pi).level;
   for (let level = row.upgradeLevel + 1; level <= reach; level += 1) {
     const higher = scoreAt(colonyBudget(level, pi).budget);

@@ -20,7 +20,6 @@ const skillsPayload = {
   unallocated_sp: 12_000,
 };
 
-/** Finished before NOW, so /skills' total_sp is missing its SP. */
 const queuePayload = [
   {
     skill_id: 3300,
@@ -59,8 +58,6 @@ describe('loadCharacterSpSummary', () => {
       )
     );
 
-    // 5,000,000 + (512,000 - 90,000): the level the queue finished and
-    // /skills has not counted yet.
     expect(await loadCharacterSpSummary(CHAR_ID, NOW)).toEqual({
       totalSp: 5_422_000,
       unallocatedSp: 12_000,
@@ -88,9 +85,6 @@ describe('loadCharacterSpSummary', () => {
   });
 
   it('fetches nothing at all when the skills scope was never granted', async () => {
-    // The header rides along on Employment History, which is public: a call
-    // here would 401 and raise the shell's stale-grant notice on a view that
-    // needs no grant.
     await seedGrant([]);
     let skillCalls = 0;
     server.use(
@@ -128,9 +122,6 @@ describe('loadCharacterSpSummary', () => {
 });
 
 describe('getLastKnownSpSummary', () => {
-  // Its own character id: `loadCharacterSpSummary` above populates the same
-  // module-level cache, and a shared id would make this describe's outcome
-  // depend on suite ordering.
   const OTHER_CHAR_ID = 92;
 
   it('is empty for a character nothing has loaded yet', () => {
@@ -158,9 +149,6 @@ describe('getLastKnownSpSummary', () => {
   });
 
   it('keeps the last good value rather than overwriting it with an all-null read', async () => {
-    // Simulates a tab whose own load can't reach /skills (no grant, offline,
-    // whatever) mounting after another tab already found real numbers — it
-    // must not blank what the previous tab already established.
     await db.tokens.delete(OTHER_CHAR_ID);
 
     expect(await loadCharacterSpSummary(OTHER_CHAR_ID, NOW)).toEqual(NO_SP_SUMMARY);

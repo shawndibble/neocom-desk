@@ -41,16 +41,10 @@ describe('lookupNpcStation', () => {
   });
 
   it('answers null — not undefined — for an id a loaded snapshot does not hold', async () => {
-    // The whole point of item E's discriminator: stations.json is the entire
-    // staStations table, so "loaded, and this id is not in it" means player
-    // structure, which is a definitive answer rather than a lookup miss.
     expect(await lookupNpcStation(1000000000001)).toBeNull();
   });
 
   it('answers undefined when the snapshot itself cannot be read', async () => {
-    // stations.json sits outside the install precache on purpose, so a first
-    // offline visit legitimately has no snapshot — and concluding "player
-    // structure" from that would send every NPC station to the wrong endpoint.
     loadNpcStations.mockRejectedValue(new Error('offline'));
 
     expect(await lookupNpcStation(60003760)).toBeUndefined();

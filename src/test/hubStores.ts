@@ -7,11 +7,6 @@ import { useMarketPricePercent } from '@/features/market/pricePercent';
 import { DEFAULT_PI_SETTINGS, usePiSettings } from '@/features/pi/piSettings';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 
-/**
- * Puts every Trade Hub store back to unread (Global Jita, no page hubs, no
- * Closest, every page percent 100), so a hub or percent one test picked never leaks into the next. Call after clearing
- * `db.settings`; the stores then read it again on first use.
- */
 export function resetHubStores(): void {
   useDefaultMarketHub.setState({ value: 'jita', hydrated: false });
   useHubByCharacter.setState({ value: {}, hydrated: false });

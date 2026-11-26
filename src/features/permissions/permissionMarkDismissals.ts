@@ -1,16 +1,3 @@
-/**
- * The Permissions the pilot said "Don't ask again" for on a `PermissionCellMark`
- * (issue #6704). Per Permission and account-wide: one dismissal silences that
- * Permission's mark for every Character, present and future, on every device,
- * and stays until undone on Settings › Permissions. Not per Character, unlike
- * Standings' device-local dismissal: twenty Characters must not mean twenty
- * clicks (docs/context/decisions/20261123-164921-campaign-turn-ins-rewards-from-campaign-objectives-one.md,
- * "Don't ask again is per Permission, account-wide"; storage in
- * 20261123-172548-permissioncellmark-is-a-popover-at-every-width-dont.md).
- *
- * Stored as plain strings, not `ScopeGroup`s: a Permission a newer build added
- * must survive an older build rewriting the list.
- */
 import { useCallback, useEffect } from 'react';
 import type { PermissionCellMarkStatus } from '@/components/ui/PermissionCellMark';
 import type { ScopeGroup } from '@/esi/registry';
@@ -32,11 +19,6 @@ export function withoutDismissed(list: readonly string[], group: string): string
   return list.includes(group) ? list.filter((g) => g !== group) : (list as string[]);
 }
 
-/**
- * The mark's state from the Permissions a Character lacks and the dismissed
- * list. `asking` is the missing Permissions not dismissed: what the popover
- * names, grants and dismisses.
- */
 export function markStatus(
   missing: readonly ScopeGroup[],
   dismissed: readonly string[]
@@ -46,7 +28,6 @@ export function markStatus(
   return { status: asking.length === 0 ? 'dismissed' : 'missing', asking };
 }
 
-// Never deleted via deleteSyncedSetting: Ask again rewrites the list.
 export const usePermissionMarkDismissalsStore = createSyncedSetting<string[]>({
   key: PERMISSION_MARK_DISMISSALS_KEY,
   defaultValue: [],

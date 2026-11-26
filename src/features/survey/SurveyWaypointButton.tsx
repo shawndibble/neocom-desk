@@ -1,16 +1,6 @@
-/**
- * "Set waypoint" for the Survey's location: sends it to the viewer's own EVE
- * client as their autopilot destination (`useSetDestination`, shared with the
- * order book). The button is the same one the Moon tax row's "Assign Taxes"
- * uses, on its right on a wide screen and wrapping under the location on a
- * phone. Without a Character, or without the waypoint scope, it is disabled
- * with the reason right under it, aligned to it, rather than a click that
- * fails; logged out, the reason is the same short "Log in to…" line Manage
- * Taxes shows ("Log in", as on EVE's own button). The status lines take the
- * whole row, so the caller's row wraps them under the button.
- */
 import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
+import { OutcomeNote } from '@/components/OutcomeNote';
 import { Button } from '@/components/ui';
 import { useSetDestination } from '@/features/travel/useSetDestination';
 import { useActiveCharacter } from '@/stores/activeCharacter';
@@ -29,7 +19,6 @@ export function SurveyWaypointButton({ location }: { location: { id: number; nam
         <Button
           size="sm"
 
-          // Stays focusable with its reason linked, rather than the native attribute (DESIGN §6c Disabled).
           aria-disabled={blockedReason !== null || undefined}
           aria-describedby={blockedReason !== null ? hintId : undefined}
           loading={sending}
@@ -44,16 +33,7 @@ export function SurveyWaypointButton({ location }: { location: { id: number; nam
           </span>
         )}
       </div>
-      {outcome && (
-        <span
-          role={outcome.tone}
-          className={
-            outcome.tone === 'alert' ? 'w-full text-xs text-danger' : 'w-full text-xs text-success'
-          }
-        >
-          {outcome.text}
-        </span>
-      )}
+      <OutcomeNote outcome={outcome} className="w-full" />
     </>
   );
 }

@@ -1,16 +1,9 @@
-/**
- * Net loss of a destroyed ship (issue #2852): hull + fitted modules + cargo
- * (including what dropped) priced from a caller-supplied price map, minus the
- * insurance payout. Insurance pays on the hull only. Pure: prices and the
- * wallet journal come in as arguments.
- */
 import type { KillmailVictim } from '@/engine/fittings/linkLoader';
 import { parseInstant } from '../esiInstant';
 import { MINUTE_MS, HOUR_MS } from '@/lib/age';
 
 export interface LossInsurance {
   amount: number;
-  /** True when the payout was a guess (several candidates in the window). */
   estimate: boolean;
 }
 
@@ -18,24 +11,15 @@ export interface NetLoss {
   hull: number;
   fitted: number;
   cargo: number;
-  /** The part of fitted + cargo that survived as loot; already inside both totals. */
   dropped: number;
   lost: number;
   insurance: LossInsurance | null;
   net: number;
-  /** zKillboard's kill-time value, for reference. */
   zkbValue: number | null;
-  /** Type ids with no price; they count as zero in the totals, so the totals are partial. */
   unpricedTypes: number[];
-  /**
-   * Abyssal (mutated) modules on the loss, destroyed or dropped. Never priced:
-   * each is worth its own rolls, and a killmail names only the type. Out of
-   * the totals, like `unpricedTypes`.
-   */
   abyssalItems: number;
 }
 
-/** Slot flags (low/mid/high/rig/subsystem) are fitted; every other flag is hold contents. */
 function isFittedFlag(flag: number): boolean {
   return (flag >= 11 && flag <= 34) || (flag >= 92 && flag <= 99) || (flag >= 125 && flag <= 132);
 }
@@ -45,7 +29,6 @@ export function computeNetLoss(input: {
   prices: ReadonlyMap<number, number | null>;
   insurance: LossInsurance | null;
   zkbValue: number | null;
-  /** Abyssal (mutated) types; omitted, none are. */
   isAbyssalType?: (typeId: number) => boolean;
 }): NetLoss {
   const { victim, prices, insurance, zkbValue, isAbyssalType } = input;
@@ -92,7 +75,6 @@ export function computeNetLoss(input: {
   };
 }
 
-/** The wallet-journal fields insurance matching reads. */
 export interface InsuranceJournalRow {
   id: number;
   date: string;
@@ -101,17 +83,9 @@ export interface InsuranceJournalRow {
   description: string;
 }
 
-/** Insurance pays out within minutes of the loss; later positive rows belong to other losses. */
 export const INSURANCE_WINDOW_MS = HOUR_MS;
-/** Journal and killmail clocks come from different services; allow a few minutes either way. */
 const INSURANCE_SKEW_MS = 5 * MINUTE_MS;
 
-/**
- * The payout for a loss: positive `insurance` journal rows (premiums are
- * negative and skipped) from the kill time to an hour after. One candidate is
- * exact; several are ambiguous, so the closest in time is returned as an
- * estimate. Null when none.
- */
 export function matchInsurance(
   journal: readonly InsuranceJournalRow[],
   killTimeMs: number
@@ -128,11 +102,6 @@ export function matchInsurance(
   return { amount: candidates[0].amount, estimate: candidates.length > 1 };
 }
 
-/**
- * The loss an insurance payout belongs to: the one whose kill time is closest
- * to the payout, from a few minutes after it to an hour before. The mirror of
- * `matchInsurance`. Null when none is in the window.
- */
 export function matchLossToPayout<T extends { timeMs: number }>(
   losses: readonly T[],
   payoutMs: number

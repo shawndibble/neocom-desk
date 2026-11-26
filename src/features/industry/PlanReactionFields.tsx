@@ -35,7 +35,6 @@ interface PlanReactionFieldsProps {
   toggleIncludeReactions: (include: boolean) => void;
 }
 
-/** Include Reactions and, when on, the Reaction Location's own picker, system, rigs and tax. Manufacturing plans only. */
 export function PlanReactionFields({
   plan,
   includeReactions,
@@ -97,8 +96,6 @@ export function PlanReactionFields({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {/* Reaction-capable structures only — an
-                                  engineering complex cannot host a reaction. */}
                   {REACTION_FACILITY_PRESETS.map((f) => (
                     <SelectItem key={f.kind} value={f.kind}>
                       {f.name}

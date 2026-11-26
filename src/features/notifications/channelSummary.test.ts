@@ -19,7 +19,6 @@ describe('summarizeChannels', () => {
   });
 
   it('is indeterminate where characters disagree and names the minority', () => {
-    // character 3 alone has the device channel off
     const summary = summarizeChannels(
       [1, 2, 3],
       (id, channel) => !(id === 3 && channel === 'browser')
@@ -63,7 +62,6 @@ describe('summarizeChannels', () => {
 
 describe('applyToAllFlips', () => {
   it('names only the Characters that differ from the majority, per channel', () => {
-    // character 3 alone has the device channel off
     const flips = applyToAllFlips([1, 2, 3], (id, channel) => !(id === 3 && channel === 'browser'));
     expect(flips).toEqual({ browser: [3], feed: [] });
   });

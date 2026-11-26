@@ -1,18 +1,3 @@
-/**
- * Assignment record writes for the Moon Mining Tax ledger (issue #523): links
- * a Mining Ledger Entry (or a split slice of its ore lines) to a Payee,
- * snapshotting tax % and the hub-priced ISK value **at assignment time**
- * (invoice semantics — see `engine/miningTax/valuation.ts`). The hub is the
- * Payee's own (`PayeeRecord.hubId`, Jita when it names none), since the figure
- * is a bill one player sends another.
- *
- * These are primitives, not actions: none of them schedules a sync, and a
- * multi-step change is only safe when its steps share one transaction. The UI
- * reaches them through `ledgerActions.ts`, which wraps each action in one
- * Dexie transaction (covering `db.settings` too, for delete tombstones) and
- * schedules the sync after it commits. Every write here is Dexie-only, so it
- * can run inside that transaction.
- */
 import { normalizeLabel } from './assignmentLabel';
 import { db, type MiningTaxAssignmentRecord, type MiningTaxOreLine } from '@/db';
 import { appendTombstones, tombstoneKey } from '@/sync/localBookkeeping';
@@ -26,11 +11,6 @@ import { hubForPayee, loadUnitPricesOnDate } from './pricing';
 import { currentCompressedOre, withOreFormMarker } from './oreForm';
 import { putAssignments } from './storedAssignments';
 
-/**
- * Thrown when a new Assignment would claim ore an existing one already does
- * for the same Mining Ledger Entry — the pilot's view was stale (another tab
- * or device assigned it first), and saving would bill the same ore twice.
- */
 export class AlreadyAssignedError extends Error {
   constructor() {
     super('This ore is already assigned');
@@ -38,16 +18,6 @@ export class AlreadyAssignedError extends Error {
   }
 }
 
-/**
- * Re-reads the database, not the caller's snapshot, and refuses when what
- * `oreLines` asks for, added to what stored Assignments (a dismissal included)
- * on this entry already claim, exceeds what the entry holds — the twin case,
- * two records each claiming all of it. `entryOreLines` is the ledger's ore for
- * the entry; comparing quantities rather than ore types keeps a legitimate
- * claim on growth ESI reported for a type another Assignment already holds
- * (`computeOwnership`'s unassigned residual) from being refused. Without it
- * there is nothing to measure against, so any second claim on a type refuses.
- */
 function assertUnclaimed(
   covering: readonly MiningTaxAssignmentRecord[],
   oreLines: readonly MiningTaxOreLine[],
@@ -69,26 +39,6 @@ function assertUnclaimed(
   if (clash) throw new AlreadyAssignedError();
 }
 
-/**
- * Checks a new Assignment's claim on its entry (`assertUnclaimed`) and
- * returns what to write: the record, plus, when the entry's growth collector
- * is paid, that paid record with its `collectsGrowth` flag handed over to the
- * new one. A paid Assignment never grows (ADR 0024), so its late ore is left
- * unassigned for the pilot to assign as a new entry; that entry then collects
- * the rest of the day, so a session still mining after payment folds into one
- * unpaid row instead of spawning a fresh one on every ledger refresh. Moving
- * the flag (not adding a second) keeps one collector per entry, which
- * `SplitDialog` and coalescing rely on; the paid record's status, ore and tax
- * stay as they are. `takesGrowth` moves the flag the same way whatever the
- * collector's status (a Survey connection's ore). Meant to run inside the
- * write's transaction.
- */
-/**
- * Every stored Assignment on `record`'s Mining Ledger Entry (same character,
- * day and system). Returns Dexie's own promise, not an `async` wrapper: an
- * extra native await inside a write's transaction commits it too early
- * (`PrematureCommitError`).
- */
 function entryAssignments(
   record: Pick<MiningTaxAssignmentRecord, 'characterId' | 'date' | 'solarSystemId'>
 ): Promise<MiningTaxAssignmentRecord[]> {
@@ -101,7 +51,6 @@ function entryAssignments(
 
 async function claimNewOre(
   record: MiningTaxAssignmentRecord,
-  /** What is paid, off the Payees' accounts (`PayeeRunningAccounts.isPaid`): never a stored mark. */
   isPaid: (a: MiningTaxAssignmentRecord) => boolean,
   entryOreLines?: readonly MiningTaxOreLine[],
   takesGrowth = false
@@ -128,54 +77,26 @@ export interface AssignInput {
   solarSystemId: number;
   payeeId: string;
   oreLines: MiningTaxOreLine[];
-  /** The entry's full ore from the ledger the pilot is looking at — what the double-assignment guard measures claims against. */
   entryOreLines?: readonly MiningTaxOreLine[];
-  /** The Payee's default, or the user's override in the Assign dialog. */
   taxPct: number;
-  /**
-   * The hub-priced default, or the pilot's own correction — the Assign
-   * dialog prefills both from `computeAssignmentValue` (at the chosen Payee's
-   * hub) but leaves them editable, since a hub price or a Payee's default rate
-   * can be wrong for a specific haul. Taken as given here rather than
-   * recomputed, so a pilot's edit is what actually gets persisted.
-   */
   estimatedValue: number;
   taxOwed: number;
-  /** Optional "Moon / structure" note; metadata only. */
   label?: string;
-  /** Ore types a Corp Tax Book took from what was offered (`bookTakenTypeIds`): never grown back in. */
   releasedTypeIds?: readonly number[];
-  /**
-   * Make this the entry's growth collector even over an unpaid one: a Survey
-   * connection's ore (issue #4684), so ore mined after it goes to the moon
-   * now being mined rather than growing into an earlier moon's Assignment.
-   */
   takesGrowth?: boolean;
-  /**
-   * Whether an Assignment's day is paid on its Payee's account (`PayeeRunningAccounts.isPaid`), read
-   * before the write: a paid growth collector hands the flag to the new Assignment.
-   */
   isPaid: (a: MiningTaxAssignmentRecord) => boolean;
-  /**
-   * A Payee's Default Systems made this, not the pilot: the row is written with `override: false`
-   * (`MiningTaxAssignmentRecord.override`), so a Survey connection or the Corp Tax Book can still
-   * claim the ore. Every other writer leaves it out, which is what "a pilot acted" means.
-   */
   byDefault?: boolean;
 }
 
-/** A pilot act on an Assignment a Default System made: from now on it is an ordinary Assignment. */
 function asPilotAct(record: MiningTaxAssignmentRecord): MiningTaxAssignmentRecord {
   delete record.override;
   return record;
 }
 
-/** The `rawOrePriced` marker for a value snapshotted under the Ore Form setting as it stands now. */
 function oreFormMarker(): { rawOrePriced?: true } {
   return currentCompressedOre() ? {} : { rawOrePriced: true };
 }
 
-/** Creates one Assignment, snapshotting the (possibly pilot-corrected) value and tax right now. */
 export async function createAssignment(input: AssignInput): Promise<MiningTaxAssignmentRecord> {
   const now = Date.now();
   const record: MiningTaxAssignmentRecord = {
@@ -195,8 +116,6 @@ export async function createAssignment(input: AssignInput): Promise<MiningTaxAss
     ...oreFormMarker(),
     updatedAt: now,
   };
-  // Check and write in one transaction so two tabs cannot both pass the check
-  // (under a ledger action this joins the action's own transaction).
   await db.transaction('rw', db.miningTaxAssignments, db.settings, async () => {
     await putAssignments(
       await claimNewOre(record, input.isPaid, input.entryOreLines, input.takesGrowth)
@@ -210,18 +129,9 @@ export interface DismissInput {
   date: string;
   solarSystemId: number;
   oreLines: MiningTaxOreLine[];
-  /** Informational only — a dismissed entry owes no tax regardless. */
   estimatedValue: number;
 }
 
-/**
- * Dismisses entries ("I don't pay tax on this") — no Payee, no tax owed — in
- * one write, whether one row's or the ledger's bulk Dismiss (issue #539).
- * Still snapshots `oreLines` and still participates in `reconcileAssignments`
- * the same way a real Assignment does: growth on a dismissed entry surfaces
- * for reconsideration (`needs-review`) rather than being silently absorbed
- * into a standing "never taxed" verdict.
- */
 export async function dismissEntries(
   inputs: readonly DismissInput[]
 ): Promise<MiningTaxAssignmentRecord[]> {
@@ -246,36 +156,16 @@ export async function dismissEntries(
 export interface CombinedMemberValues {
   estimatedValue: number;
   taxOwed: number;
-  /**
-   * The pilot's per-ore corrections for this day. Replaces whatever was
-   * stored outright, and omitting it removes them, rather than merging: the
-   * edit form always sends the whole map, so a merge would resurrect a
-   * correction the pilot just cleared.
-   */
   oreLineValues?: Record<number, number>;
 }
 
 export interface UpdateCombinedInput {
   payeeId: string;
   taxPct: number;
-  /**
-   * The "Moon / structure" label for every day (blank removes it). Omitted
-   * leaves each day's stored label as it is.
-   */
   label?: string;
-  /** Each member's own figures, keyed by Assignment id. A member missing here keeps its stored ones. */
   members: Readonly<Record<string, CombinedMemberValues>>;
 }
 
-/**
- * Saves an entry's edit form (`EntryEditDialog`) in one write: one Payee and
- * one tax % for every day of it, plus each day's own value and tax owed. A
- * Payee or rate change keeps the `groupId` — a combined entry moves
- * together, which is exactly what keeps the "one obligation, one Payee, one
- * rate" rule true. `oreLines` stay as they are (line membership is what the
- * sole-vs-split ownership rule in `rowStatus.ts` keys off), and so do status
- * and payment: correcting a Paid entry's figures doesn't un-pay it.
- */
 export async function updateCombinedAssignments(
   assignments: readonly MiningTaxAssignmentRecord[],
   input: UpdateCombinedInput
@@ -306,12 +196,6 @@ export async function updateCombinedAssignments(
   return updated;
 }
 
-/**
- * "Take out of combined" / "Uncombine all": clears `groupId` and nothing
- * else, so each day goes back to being its own row with its Payee, figures,
- * status and payment intact. Taking one day out of a two-day entry leaves a
- * lone `groupId`, which already renders as an ordinary row (`flatten`).
- */
 export async function uncombineAssignments(
   assignments: readonly MiningTaxAssignmentRecord[]
 ): Promise<void> {
@@ -327,12 +211,6 @@ export async function uncombineAssignments(
   await putAssignments(updated);
 }
 
-/**
- * Deleting a Payee that is still owed (scope decision 20261004): its
- * Assignments move to another Payee rather than turning into "Unknown
- * Payee". Only the Payee changes — the figures were the bill as it stood,
- * and a combined entry moves whole, so its `groupId` stays.
- */
 export async function moveAssignmentsToPayee(
   assignments: readonly MiningTaxAssignmentRecord[],
   payeeId: string
@@ -347,39 +225,16 @@ export interface JoinMemberInput {
   characterId: number;
   date: string;
   solarSystemId: number;
-  /** The member's existing Assignment, or `null` when this date was still unassigned and `joinAssignments` should create one. */
   assignment: MiningTaxAssignmentRecord | null;
-  /** Required (and only meaningful) when `assignment` is `null`. */
   oreLines?: MiningTaxOreLine[];
-  /** The member entry's full ledger ore, for the double-assignment guard — see `AssignInput.entryOreLines`. */
   entryOreLines?: readonly MiningTaxOreLine[];
 }
 
-/**
- * Joins 2+ Mining Ledger Entries into one combined obligation ("join
- * entries", issue #523) — a moon-mining session spanning midnight UTC shows
- * up as separate per-day entries in ESI's ledger even though a corp's own
- * billing treats it as one. Every member ends up sharing one `groupId`, so
- * `flatten()` (MoonMiningTax.tsx) renders them as a single row.
- *
- * An already-assigned member is only ever re-tagged with the shared
- * `groupId` — its Payee, tax %, value, and status are left exactly as they
- * are. The caller is responsible for having verified, before calling this,
- * that every already-assigned member shares one Payee and tax % (the
- * decision doc's merge rule) — this function does not re-check it. A
- * still-unassigned member gets a brand new Assignment created against
- * `payeeId`/`taxPct`, valued from its own `oreLines` at `pricesOn(m.date)` —
- * never a blended or split value across members. `pricesOn` rather than one
- * flat map: a join can combine members with *different* mined dates (that is
- * its whole purpose — one moon-mining session spanning midnight UTC), so one
- * shared map would misprice whichever member's date it wasn't fetched for.
- */
 export async function joinAssignments(
   members: readonly JoinMemberInput[],
   payeeId: string,
   taxPct: number,
   pricesOn: (date: string) => ReadonlyMap<number, number>,
-  /** What is paid, off the Payees' accounts: a paid growth collector hands its flag over. */
   isPaid: (a: MiningTaxAssignmentRecord) => boolean
 ): Promise<MiningTaxAssignmentRecord[]> {
   const groupId =
@@ -406,8 +261,6 @@ export async function joinAssignments(
       updatedAt: now,
     };
   });
-  // Only the members this call would *create* are checked — an already-assigned
-  // member is just re-tagged, and adds no claim. Same transaction as the write.
   await db.transaction('rw', db.miningTaxAssignments, db.settings, async () => {
     const handedOver: MiningTaxAssignmentRecord[] = [];
     for (const [i, m] of members.entries()) {
@@ -419,63 +272,22 @@ export async function joinAssignments(
   return records;
 }
 
-/** Which side of a split becomes the Growth Collector. */
 export type SplitCollector = 'original' | 'new';
 
 export interface SplitInput {
-  /** Units to move out of `original`, per ore type — each at most what `original` holds of that type; zero-quantity lines are ignored. */
   moves: readonly MiningTaxOreLine[];
-  /**
-   * Ore the original's Payee is owed that ESI has not reported yet (issue
-   * #6180) — the pilot's in-game figure running ahead of the ledger. Added to
-   * the kept side (`planSplit`), so later ore fills that claim before any
-   * reaches the new side. Needs `collector: 'new'`, and never on a paid
-   * original: paid stays paid (ADR 0024).
-   */
   unreported?: readonly MiningTaxOreLine[];
-  /** The second Payee, and the rate the moved ore is taxed at. */
   payeeId: string;
   taxPct: number;
-  /**
-   * Which side collects any further ore ESI reports for this day
-   * (`engine/miningTax/ownership.ts`). Either side takes the flag over from a
-   * third Assignment on the same entry, so the entry keeps one Growth
-   * Collector. Omit to leave both unflagged and any third collector as it is.
-   */
   collector?: SplitCollector;
-  /** "Moon / structure" note for the NEW slice; the kept slice keeps its own. */
   label?: string;
 }
 
-/**
- * Per-unit prices for each side of a split. Two maps, not one: a split hands
- * ore to a *different* Payee by construction, and two Payees can bill at two
- * different trade hubs — pricing both sides from one book would misstate
- * whichever bill it did not come from. They are the same map whenever the two
- * Payees share a hub, which is the ordinary case. Both are resolved at the
- * *original* Assignment's mined date (`splitAssignment`'s own doc comment) —
- * a split only changes who is billed, never when the ore was mined.
- */
 export interface SplitPrices {
-  /** The original Payee's hub — what the units staying put are worth. */
   kept: ReadonlyMap<number, number>;
-  /** The second Payee's hub — what the moved units are worth. */
   moved: ReadonlyMap<number, number>;
 }
 
-/**
- * Splits one assigned day by quantity between its Payee and a second one
- * (issue #523: two local-time sessions at two corps' moons land in one
- * EVE/UTC ledger entry). The moved units become a fresh Outstanding
- * Assignment; the original keeps its status — a Paid day can be split after
- * the fact, and the paid figure stays with the kept side — and its remaining
- * units.
- *
- * Both sides are re-priced at their own Payee's hub, at the original entry's
- * mined date (`SplitPrices`'s own doc comment), rather than apportioning the
- * original's possibly hand-edited value: two independently priced obligations
- * is the same rule "join entries" chose.
- */
 export async function splitAssignment(
   original: MiningTaxAssignmentRecord,
   input: SplitInput,
@@ -490,7 +302,6 @@ export async function splitAssignment(
   if (movedLines.length === 0 && unreported.length === 0) throw new Error('Nothing to move');
   if (keptLines.length === 0) throw new Error('Cannot move every unit — unassign instead');
   if (unreported.length > 0) {
-    // The claim is only a cap if someone else takes the ore past it.
     if (input.collector !== 'new') throw new Error('Unreported ore needs the new side to collect');
     if (original.status === 'paid') throw new Error('A paid day cannot claim more ore');
   }
@@ -505,13 +316,6 @@ export async function splitAssignment(
     taxOwed: keptValue.taxOwed,
     updatedAt: now,
   };
-  // A per-ore-type override (`oreLineValues`) names typeIds against the
-  // *original*'s line set — splitting changes which lines this record
-  // covers, so a carried-over override would either dangle (a moved type no
-  // longer here) or silently misprice a kept line the pilot never corrected
-  // for this half of the split. Both sides re-price independently
-  // (`SplitPrices`'s own doc comment); a hand-edited correction does not
-  // survive that same way.
   delete kept.oreLineValues;
   delete kept.collectsGrowth;
   delete kept.rawOrePriced;
@@ -519,8 +323,6 @@ export async function splitAssignment(
   Object.assign(kept, marker);
   if (input.collector === 'original') kept.collectsGrowth = true;
   if (original.status === 'needs-review') {
-    // Splitting is how the growth gets settled, so the kept side re-opens
-    // exactly as `planNeedsReviewResolution` would leave it.
     kept.status = 'outstanding';
     delete kept.reviewDiff;
   }
@@ -543,8 +345,6 @@ export async function splitAssignment(
     updatedAt: now,
   };
 
-  // One Growth Collector per entry (coalescing and `SplitDialog` rely on it):
-  // a side that takes the flag takes it from whichever sibling held it.
   const handedOver = input.collector
     ? (await entryAssignments(original))
         .filter((a) => a.id !== original.id && a.collectsGrowth === true)
@@ -559,12 +359,6 @@ export async function splitAssignment(
   return { kept, created };
 }
 
-/**
- * Deletes Assignments and tombstones each one under its character, so the
- * deletion syncs instead of the next pull resurrecting it. Run inside a
- * transaction covering `db.settings` as well, or a failure between the two
- * writes leaves a row deleted here that comes back from the remote copy.
- */
 export async function deleteAssignments(
   assignments: readonly Pick<MiningTaxAssignmentRecord, 'id' | 'characterId'>[]
 ): Promise<void> {
@@ -581,16 +375,11 @@ export async function deleteAssignments(
   }
 }
 
-/** What "Let the corporation bill it" re-prices the kept ore at, and the Ore Form it priced in. */
 export interface ReleasePrices {
   prices: ReadonlyMap<number, number>;
   compressed: boolean;
 }
 
-/**
- * The prices `releaseOreFromAssignment` needs: the Assignment's Payee's hub on its mined
- * day, in the current Ore Form. Run before the write's transaction: it reads market data.
- */
 export async function loadReleasePrices(
   assignment: MiningTaxAssignmentRecord,
   remaining: readonly MiningTaxOreLine[]
@@ -609,18 +398,10 @@ export async function loadReleasePrices(
   return { prices, compressed };
 }
 
-/**
- * "Let the corporation bill it" (issue #4517): takes ore off an Assignment because
- * the Corp Tax Book bills it. What is left is re-priced per ore type at `priced`
- * (`loadReleasePrices`), as a split re-prices each side (`splitAssignment`): a
- * hand-edited value or per-ore-type correction does not survive. Nothing left
- * deletes it. Returns the changed record, or undefined when it was deleted.
- */
 export async function releaseOreFromAssignment(
   assignment: MiningTaxAssignmentRecord,
   remaining: readonly MiningTaxOreLine[],
   priced: ReleasePrices,
-  /** A Survey connection taking its ore off a default's Assignment: what is left is still the default's. A pilot's release is a pilot act. */
   keepOverride = false
 ): Promise<MiningTaxAssignmentRecord | undefined> {
   const kept = remaining.filter((l) => l.quantity > 0);
@@ -633,8 +414,6 @@ export async function releaseOreFromAssignment(
     priced.prices,
     assignment.taxPct
   );
-  // Remember what went, or the game's ledger, which still reports it, grows it straight back in.
-  // A Survey connection's takeover is not the book's: its ore is assigned elsewhere.
   const keptBy = new Map(kept.map((l) => [l.typeId, l.quantity]));
   const released = keepOverride
     ? []
@@ -653,34 +432,6 @@ export async function releaseOreFromAssignment(
   return next;
 }
 
-/**
- * Plans accepting a `needs-review` Assignment's growth (the write is the
- * caller's): re-prices and re-snapshots
- * its own ore lines to the entry's current fresh totals — a new valuation
- * moment, exactly like a fresh assignment — and clears `reviewDiff`.
- *
- * Reverts the stored status to `outstanding`: a full re-review is a simpler,
- * and never *under*-stating, choice than trying to carve the delta into a
- * second record. What is paid is read off the Payee's account, so whatever the
- * Payee was already paid still pays the regrown day, oldest first; an older
- * client's paid mark is never cleared (`putAssignments`).
- *
- * `siblings` (every Assignment covering this entry — this one included, or
- * it re-snapshots to nothing) decides how much of the fresh entry it re-snapshots to: a sole Assignment
- * claims the whole entry, including any brand-new ore type; on a split entry
- * only the growth collector grows (`engine/miningTax/ownership.ts`).
- *
- * The re-price happens at this Assignment's *Payee's* hub, looked up here
- * rather than passed in: every caller reaches this from a row action that has
- * only the record, and a fresh invoice moment billed at some other hub's book
- * would restate a bill the landlord never quoted. A dismissal (no Payee) and
- * an Assignment whose Payee has since been deleted both fall back to Jita.
- *
- * Priced at `assignment.date` — the entry's mined date, not "now" (issue #523
- * follow-up decision doc): a re-review is re-snapshotting the *same* mined
- * ore's value, and the day it was mined didn't change just because the pilot
- * came back to reconcile it later.
- */
 export async function planNeedsReviewResolution(
   assignment: MiningTaxAssignmentRecord,
   freshEntry: MiningLedgerEntry,
@@ -715,9 +466,6 @@ export async function planNeedsReviewResolution(
     compressed
   );
   delete updated.reviewDiff;
-  // Same reason `splitAssignment` drops it: `oreLineValues` names typeIds
-  // against the pre-review line set, and growth can add or resize lines —
-  // a carried-over override would misprice this fresh re-snapshot.
   delete updated.oreLineValues;
   return updated;
 }

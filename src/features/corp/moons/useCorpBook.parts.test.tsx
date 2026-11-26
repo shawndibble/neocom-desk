@@ -1,16 +1,13 @@
-// Which slices of the book `useCorpBook` reads as the page's tab changes (issue #5248).
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { BookPart } from '../taxBook/bookClient';
 import type { BookRead } from '../taxBook/bookRead';
 
 type BookPartSet = ReadonlySet<BookPart>;
-/** Every read the hook makes, the ones `extendBook` makes for it included. */
 const readBook = vi.hoisted(() => vi.fn());
 vi.mock('../taxBook/bookRead', async (orig) => ({
   ...(await orig<typeof import('../taxBook/bookRead')>()),
   readBook,
-  // The real contract (bookRead tests): read only the wanted slices not held, and add them.
   extendBook: async (c: number, b: number, held: BookRead, wanted: BookPartSet) => {
     const missing = new Set([...wanted].filter((p) => !held.parts.has(p)));
     if (missing.size === 0) return held;
@@ -106,7 +103,6 @@ describe('useCorpBook read plan', () => {
     expect(readBook.mock.calls[1]?.[2].parts).toEqual(new Set(['ledger']));
     await waitFor(() => expect(result.current.state.status).toBe('ready'));
 
-    // Going back, and on to a tab the held slices cover, reads nothing.
     rerender({ tab: 'extractions' });
     rerender({ tab: 'late-notices' });
     expect(readBook).toHaveBeenCalledTimes(2);
@@ -133,7 +129,6 @@ describe('useCorpBook read plan', () => {
           : {}),
         ...(summaries ? { feederSummaries: summaries as never } : {}),
       }));
-    // An Extraction settles has-own-refineries; the moon owner has no summary: rows needed.
     owners(
       [
         {
@@ -153,7 +148,6 @@ describe('useCorpBook read plan', () => {
     ]);
     first.unmount();
 
-    // The same book with no way to tell (no Extraction, one moon owner) also reads the rows.
     readBook.mockClear();
     owners([], new Map());
     const second = renderHook(() => useCorpBook(SYNC, bookPartsFor('moon-owners', null)));

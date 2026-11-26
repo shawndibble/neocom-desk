@@ -1,14 +1,3 @@
-/**
- * BPC Sourcing's LP Store source: every blueprint copy an LP store the pilot
- * holds points with sells (`findLpOfferMatches` — ESI has no "who sells this
- * type" search, so a corporation the pilot holds no LP with is never read),
- * priced the way the Blueprint Acquisition modal prices them: ISK + LP at the
- * pilot's LP Value (else free: LP already earned) + the turn-ins they would
- * still buy at the hub.
- *
- * Loaded once per character/hub/LP Value, not per search: a corporation's
- * offers are one cached fetch each, so the search only narrows what is shown.
- */
 import { useCallback } from 'react';
 import { useKeyedLoad } from '@/lib/useAsyncLoad';
 import { blueprintLpRate } from '@/engine/loyalty/marketLpValue';
@@ -29,10 +18,8 @@ export function useLpBlueprintOffers({
 }: {
   characterId: number | null;
   enabled: boolean;
-  /** Every blueprint the SDE knows; stable across renders. */
   blueprintTypeIds: readonly number[];
   hub: TradeHub;
-  /** The pilot's own ISK per LP; 0 means "use each store's market value". */
   lpValue: number;
 }): { rows: readonly BpcSearchRow[]; loading: boolean } {
   const key = `${characterId}:${hub.id}:${lpValue}:${blueprintTypeIds.length}`;
@@ -71,7 +58,6 @@ export function useLpBlueprintOffers({
           );
       }
     } catch {
-      // Best-effort, like Appraisal's LP lookup: no LP scope or no network is no LP rows.
       rows = NONE;
     }
     return rows;

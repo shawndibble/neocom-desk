@@ -74,7 +74,6 @@ function row(e: MiningLedgerEntry, assignments: MiningTaxAssignmentRecord[]): Mo
   };
 }
 
-/** Yesterday's owed day, and today's still-unassigned entry continuing it. */
 function continuation(previous: MiningTaxAssignmentRecord): SessionContinuation {
   const nextRow = row(entry('2026-09-05', 50), []);
   const next: DisplayRow = {
@@ -188,7 +187,6 @@ describe('undoContinue', () => {
     await db.miningTaxAssignments.put(previous);
     const continued = await continueSession(continuation(previous), () => PRICES);
     if (!continued.ok) throw new Error('continue failed');
-    // A reload in between absorbed growth into the previous day.
     await db.miningTaxAssignments.update(previous.id, { estimatedValue: 1500, taxOwed: 150 });
 
     await undoContinue(continued.value);
@@ -484,10 +482,8 @@ describe('deletePayee', () => {
     amount: 100,
   };
 
-  /** One Combined Entry under A: a day its link paid (oldest first), and a day still owed. */
   const paidDay = assignment({ id: 'g1', groupId: 'g', status: 'paid', payment });
   const owedDay = assignment({ id: 'g2', groupId: 'g', date: '2026-09-05' });
-  /** A's link: pays 100 ISK, so the oldest 100-ISK day, whatever any stored mark says. */
   const linkOfA = (payeeId = 'p1') => ({
     id: 'journal:41',
     characterId: CHAR,
@@ -523,7 +519,6 @@ describe('deletePayee', () => {
     expect(syncMock.scheduleSync).toHaveBeenCalledWith(CHAR, {
       collections: ['miningTaxAssignments', 'payees'],
     });
-    // The link goes with the Payee, in the same write.
     expect((await db.miningTaxPaymentLinks.get('journal:41'))?.payeeId).toBe('p2');
 
     await coalesceAssignments(CHAR);
@@ -531,7 +526,6 @@ describe('deletePayee', () => {
   });
 
   it("decides paid off the Payee's account, never a stored mark", async () => {
-    // Marked paid by an older client, but no link pays it: it is owed, and moves.
     const markedOnly = assignment({ id: 'm1', date: '2026-09-01', status: 'paid', payment });
     await db.miningTaxAssignments.bulkPut([markedOnly]);
     expect((await deletePayee(payeeA, 'p2')).ok).toBe(true);
@@ -545,7 +539,6 @@ describe('deletePayee', () => {
       assignment({ id: 'h2', groupId: 'h', date: '2026-08-03' }),
     ];
     await db.miningTaxAssignments.bulkPut([standalonePaid, ...settledGroup, owedDay]);
-    // 300 ISK pays the three oldest days; the owed day stays owed.
     await db.miningTaxPaymentLinks.put({ ...linkOfA(), amount: 300 });
 
     expect((await deletePayee(payeeA, 'p2')).ok).toBe(true);
@@ -567,7 +560,6 @@ describe('deletePayee', () => {
   });
 
   it('re-points the links to the rest of a merged Payee when its primary record is deleted', async () => {
-    // The same recipient on two Characters: p1 is the group's primary, so links name it.
     const alt: PayeeRecord = { ...payeeA, id: 'p9', characterId: 2 };
     await db.payees.put(alt);
     await db.miningTaxPaymentLinks.put(linkOfA());

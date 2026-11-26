@@ -77,7 +77,6 @@ describe('fetchAggregates', () => {
     expect(requestedBatches[0]).toHaveLength(200);
     expect(requestedBatches[1]).toHaveLength(200);
     expect(requestedBatches[2]).toHaveLength(50);
-    // Every requested type ID still gets an entry back.
     expect(result.size).toBe(450);
   });
 
@@ -126,7 +125,6 @@ describe('fetchAggregates', () => {
   it('reports null price (not 0) when a type is missing from the response', async () => {
     server.use(
       http.get(FUZZWORK_AGGREGATES_URL, () =>
-        // 35 has no key at all in the response.
         HttpResponse.json({
           34: {
             buy: { min: '2.5', max: '3.71', volume: '100', orderCount: '1' },
@@ -170,7 +168,7 @@ describe('fetchAggregates', () => {
         HttpResponse.json({
           34: {
             buy: { max: 'not-a-number', volume: '100', orderCount: '5' },
-            sell: { volume: '200', orderCount: '3' }, // min field missing entirely
+            sell: { volume: '200', orderCount: '3' },
           },
         })
       )
@@ -218,7 +216,6 @@ describe('fetchOrderCounts', () => {
       buyVolume: 700,
       sellVolume: 1100,
     });
-    // No orders and no entry at all both read as zero orders, never unknown.
     expect(result.get(35)).toEqual({ buyOrders: 0, sellOrders: 0, buyVolume: 0, sellVolume: 0 });
     expect(result.get(36)).toEqual({ buyOrders: 0, sellOrders: 0, buyVolume: 0, sellVolume: 0 });
   });

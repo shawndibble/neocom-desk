@@ -1,9 +1,3 @@
-/**
- * The whole-account plan, worked out off the main render. One plan is dozens of
- * solver searches, so the engine's generator runs in short slices between
- * frames (`SLICE_MS`) and the answer is kept for the last set of inputs: leaving
- * Find best and coming back does not plan again.
- */
 import { useEffect, useMemo, useState } from 'react';
 import type { PiData } from '@/sde/types';
 import { planAccount, type AccountPlan } from '@/engine/pi/accountPlan';
@@ -19,15 +13,12 @@ import { useHubTradesPerDay } from './useHubTradesPerDay';
 
 export interface AccountPlanState {
   plan: AccountPlan | null;
-  /** The planner threw: no plan will come for these inputs. */
   failed: boolean;
-  /** Still planning (or still counting jumps). */
   pending: boolean;
 }
 
 let cached: { key: string; plan: AccountPlan | null } | null = null;
 
-/** Test seam: forget the last plan. */
 export function resetAccountPlan(): void {
   cached = null;
 }
@@ -53,14 +44,11 @@ export function useAccountPlan(
     () => accountPool(colonies, pi, prices, buying),
     [colonies, pi, prices, buying]
   );
-  // The plan waits for the hub's volumes: ranking and capping on a half-read set would plan twice.
   const { trades, pending: tradesPending } = useHubTradesPerDay(pool, regionId);
   const candidates = useMemo(
     () => accountCandidates(colonies, pi, prices, buying, trades),
     [colonies, pi, prices, buying, trades]
   );
-  // The colonies and assumptions the solver reads, and the SDE it reads them from. Without
-  // hauling there are no distances to wait for, so the jump key is left out.
   const key = useMemo(() => {
     if ((haul && inputsKey === null) || tradesPending) return null;
     return JSON.stringify([
@@ -121,7 +109,6 @@ export function useAccountPlan(
     };
     timer = setTimeout(slice, 0);
     return () => clearTimeout(timer);
-    // `key` stands for the inputs.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
 

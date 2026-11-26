@@ -1,8 +1,3 @@
-/**
- * Test-only `FittingItemActions`: every edit a mock, names from a small map,
- * charge loading answered by `takes` — so a component test states only the
- * one behaviour it is about.
- */
 import { vi } from 'vitest';
 import type { CandidateRack } from '@/engine/fittings/candidates';
 import type { FittingItemActions } from '../fittingItemActions';
@@ -16,11 +11,8 @@ export function fakeItemActions(
     racks = {},
   }: {
     names?: Record<number, string>;
-    /** Charge type id -> the `moduleKey`s of the modules that take it. */
     takes?: Record<number, string[]>;
-    /** What a module's "Load charge" lists. */
     cargoCharges?: number[];
-    /** Type id -> the rack it fits; anything absent is no module. */
     racks?: Record<number, CandidateRack>;
   } = {},
   overrides: Partial<FittingItemActions> = {}

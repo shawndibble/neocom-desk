@@ -12,17 +12,9 @@ interface RealizedProfitCellProps {
   row: ProductionRunSummary;
   label: string;
   skills: SkillLevels;
-  /** The standing the row's own `profit` was already computed with (issue #1238) — for the breakdown's display only. */
   standing?: ResolvedStandings;
 }
 
-/**
- * The realized-profit figure plus, once something has sold, a trigger that
- * opens `RealizedProfitBreakdown` for that row (issue #824) —
- * `quantitySold === 0` means `grossRevenue` is also 0 and `marginPct` is
- * null, so there is nothing realized yet to explain and the trigger is
- * withheld rather than shown disabled.
- */
 export function RealizedProfitCell({ row, label, skills, standing }: RealizedProfitCellProps) {
   const [open, setOpen] = useState(false);
   const value = formatIsk(row.profit.profit);

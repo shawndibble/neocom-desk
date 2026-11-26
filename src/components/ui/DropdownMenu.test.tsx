@@ -40,12 +40,6 @@ async function openMenu(props?: { onRefresh?: () => void; onDisabledSelect?: () 
 }
 
 describe('DropdownMenu', () => {
-  /**
-   * `Modal` runs on `showModal()`, so the dialog sits in the browser's top
-   * layer with everything outside it inert. A surface portalled to
-   * `document.body` — Radix's default — would render behind it and take no
-   * clicks; see `portalContainer.ts`.
-   */
   it('portals its menu inside a Modal, not to the body', async () => {
     const user = userEvent.setup();
     render(

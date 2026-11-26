@@ -4,7 +4,6 @@ import { improveCandidates, type ModulePool } from './improve';
 import { buildVariationIndex } from '../../market/variations';
 import type { FittingModule } from '../types';
 
-// 10 is the Tech I root; 11 Tech II, 12 Faction, 13 Officer, 14 Deadspace, 15 a high-slot sibling, 16 unlisted, 17 unflyable.
 const index = buildVariationIndex(
   {
     10: { parentTypeId: null, metaGroupId: 1 },

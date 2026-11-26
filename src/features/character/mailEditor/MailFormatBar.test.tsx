@@ -42,7 +42,7 @@ describe('MailFormatBar', () => {
     const c = commands();
     render(<MailFormatBar commands={c} phone={false} />);
     const bold = screen.getByRole('button', { name: 'Bold' });
-    expect(fireEvent.pointerDown(bold)).toBe(false); // default prevented
+    expect(fireEvent.pointerDown(bold)).toBe(false);
     expect(fireEvent.mouseDown(bold)).toBe(false);
     await userEvent.setup().click(bold);
     expect(c.toggleMark).toHaveBeenCalledWith('bold');
@@ -211,8 +211,6 @@ describe('MailFormatBar', () => {
 });
 
 describe('MailFormatBar placement and Source', () => {
-  // The bar is the card's top strip on a phone too, never `fixed`: inside the
-  // reader Panel (`backdrop-filter`) a fixed bar was placed against the Panel.
   it('is shown in the flow on a phone, with no editor focus', () => {
     render(<MailFormatBar commands={commands()} phone />);
     const bar = screen.getByRole('toolbar');
@@ -250,7 +248,6 @@ describe('bar structure', () => {
     const bold = screen.getByRole('button', { name: 'Bold' });
     expect(bold.className).not.toMatch(/(^|\s)border(\s|$)/);
     const toolbar = screen.getByRole('toolbar');
-    // Three dividers between the four groups inside the scroller, one before the pinned Source.
     const scroller = bold.closest('.overflow-x-auto') as HTMLElement;
     expect(scroller.querySelectorAll('span[aria-hidden].w-px')).toHaveLength(3);
     const source = screen.getByRole('button', { name: 'Edit source' });

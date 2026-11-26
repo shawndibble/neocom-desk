@@ -12,9 +12,8 @@ vi.mock('@/sde/loadSde', () => ({ loadNpcCorporationsFile: npcFile }));
 const NPC: NpcCorporationEntry[] = [
   { id: 1000035, name: 'Caldari Navy', ticker: 'CN', factionId: 500001 },
   { id: 1000002, name: 'Caldari Provisions', ticker: 'CP', factionId: 500001 },
-  // No station, no LP store: still a pirate corporation, through the file.
   { id: 1000140, name: 'Pirate Remnant', ticker: 'PR', factionId: 500019 },
-  { id: 1000130, name: 'Sisters of EVE', ticker: 'SoE' }, // factionless
+  { id: 1000130, name: 'Sisters of EVE', ticker: 'SoE' },
 ];
 
 describe('corporationFactionMap', () => {

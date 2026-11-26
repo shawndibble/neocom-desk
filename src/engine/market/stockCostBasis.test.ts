@@ -21,7 +21,6 @@ function run(date: string, quantity: number, unitCost: number): ProductionLot {
 describe('stockCostBasis', () => {
   it('prices held units as the weighted average of the newest lots', () => {
     const trades = [trade('2026-01-01T00:00:00Z', 100, 10), trade('2026-01-02T00:00:00Z', 100, 20)];
-    // Holding 150: the newest 100 at 20 and 50 of the older at 10.
     expect(stockCostBasis({ trades, runs: [], typeId: 34, held: 150 })).toEqual({
       unitCost: (100 * 20 + 50 * 10) / 150,
       totalCost: 100 * 20 + 50 * 10,

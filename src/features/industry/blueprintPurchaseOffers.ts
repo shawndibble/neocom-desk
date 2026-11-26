@@ -1,22 +1,5 @@
 import { idSetKey } from '@/lib/idSetKey';
 import { useKeyedLoad } from '@/lib/useAsyncLoad';
-/**
- * The Blueprint Acquisition sources automatic tier selection reads beyond
- * public contracts: the cheapest sell order anywhere in the blueprint's
- * market region (the Trade Hub's, or its Global Market Region), and every LP
- * Store redemption any of the account's Characters could make — so a plan
- * never opens with an empty blueprint price while the market or an LP Store
- * sells the blueprint.
- *
- * An LP redemption is priced ISK + LP × the pilot's LP Value
- * (`blueprintLpRate`: their own when set, else free — LP already earned)
- * + whatever turn-in items
- * the pilot does not already hold in their assets, at hub sell price (`loadLpTurnInPricer`) — the same number the Blueprint
- * Acquisition modal's LP rows and an LP Store "Plan in Industry" use. One
- * Fuzzwork call per region covers every blueprint in the plan, and the LP
- * lookup reads only corps a Character holds LP with — both cached — so this
- * costs no per-blueprint request.
- */
 import { useCallback, useMemo } from 'react';
 import { db } from '@/db';
 import type { BpcOffer } from '@/engine/industry/blueprintAcquisition';
@@ -40,13 +23,11 @@ import { loadInventionMarket, type InventionMarket } from './inventionSources';
 import { EMPTY_OWNED_STOCK_SNAPSHOT, loadOwnedStockSnapshot } from './ownedStockDetection';
 import { usePricePercentFor } from '@/features/market/pagePricePercents';
 
-/** Every purchase offer for one blueprint type the loader found. */
 export type BlueprintOffersLookup = (blueprintTypeID: number) => readonly BpcOffer[];
 
 const NO_OFFERS: readonly BpcOffer[] = [];
 export const NO_BLUEPRINT_PURCHASE_OFFERS: BlueprintOffersLookup = () => NO_OFFERS;
 
-/** The blueprint typeIDs among a plan's `typeIds` (`buildPlanTypeIds` mixes them with materials). */
 export function blueprintTypeIdsIn(
   typeIds: readonly number[],
   catalog: Pick<BlueprintCatalog, 'byBlueprintTypeID'>
@@ -64,14 +45,8 @@ function redemptionOf(offer: LoyaltyStoreOffer): LpBlueprintRedemption {
   };
 }
 
-/** What one offer's turn-ins cost the pilot (owned ones free), or null when unknowable. */
 export type LpTurnInPricer = (offer: LoyaltyStoreOffer) => number | null;
 
-/**
- * Prices LP offers' turn-ins: every unit the pilot doesn't already hold in
- * their assets, at `hub`'s sell price. Loads the hub prices and the asset
- * snapshot (cache-first) only when some offer has turn-ins at all.
- */
 export async function loadLpTurnInPricer(
   hub: TradeHub,
   offers: readonly LoyaltyStoreOffer[]
@@ -93,7 +68,6 @@ export async function loadLpTurnInPricer(
     );
 }
 
-/** `characterId` plus every other Character on the account; just `characterId` if the table can't be read. */
 async function accountCharacterIds(characterId: number | null): Promise<number[]> {
   const others = await db.characters
     .toArray()
@@ -102,12 +76,6 @@ async function accountCharacterIds(characterId: number | null): Promise<number[]
   return [...new Set([...(characterId === null ? [] : [characterId]), ...others])];
 }
 
-/**
- * Every LP offer any of the account's Characters could redeem for `ids`,
- * one entry per distinct corp offer. An alt's LP counts: the copy it buys
- * can be handed to whoever builds — the same reach the Market-Wide scan's
- * "LP store" source has.
- */
 async function accountLpMatches(
   characterIds: readonly number[],
   ids: readonly number[]
@@ -130,7 +98,6 @@ async function accountLpMatches(
   return byType;
 }
 
-/** The lowest sell anywhere in each blueprint's market region — its Global Market Region when it has one. */
 async function marketSellPrices(
   hub: TradeHub,
   ids: readonly number[]
@@ -149,11 +116,6 @@ async function marketSellPrices(
   return prices;
 }
 
-/**
- * Loads every market and LP Store offer for `blueprintTypeIds`. Best-effort
- * throughout: any source that cannot be read contributes no offers rather
- * than failing the plan's pricing.
- */
 export async function loadBlueprintPurchaseOffers(
   characterId: number | null,
   hub: TradeHub,
@@ -196,13 +158,6 @@ export async function loadBlueprintPurchaseOffers(
   return (blueprintTypeID) => byType.get(blueprintTypeID) ?? NO_OFFERS;
 }
 
-/**
- * What one LP Store redemption costs as a blueprint pick — the price an LP
- * Store "Plan in Industry" seeds the plan with (`parseBlueprintPriceSeed`).
- * Priced exactly as automatic selection and the modal price it: ISK + LP ×
- * its LP Value + the turn-ins the pilot doesn't already own, at `hub`.
- * `null` when a turn-in still to buy has no price.
- */
 export async function lpBlueprintPickPrice(
   offer: LoyaltyStoreOffer,
   hub: TradeHub
@@ -216,28 +171,18 @@ export async function lpBlueprintPickPrice(
   return Math.round(lpPickPrice(offer.isk_cost, offer.lp_cost, rate) + turnInsCost);
 }
 
-/** `useBlueprintPurchaseOffers`' result: the offers, and whether they are the ones for the current inputs. */
 export interface BlueprintPurchaseOffersState {
   offersFor: BlueprintOffersLookup;
-  /** Invention recipes and prices for the same blueprints (issue #3990); null when none is invented. */
   inventionMarket: InventionMarket | null;
-  /** False until the load for the current inputs lands — the plan's blueprint prices are provisional until then. */
   ready: boolean;
 }
 
-/**
- * `loadBlueprintPurchaseOffers` (and `loadInventionMarket`) for a page. Reloads when the Character, hub,
- * blueprints or LP Value change; until the new load lands it keeps serving
- * the last one (so a price doesn't blank and come back) but reports
- * `ready: false`.
- */
 export function useBlueprintPurchaseOffers(
   characterId: number | null,
   hub: TradeHub,
   blueprintTypeIds: readonly number[]
 ): BlueprintPurchaseOffersState {
   const rate = useLpValue((state) => state.value);
-  // Datacores and decryptors price at the Industry percent (issue #6531).
   const pricePercent = usePricePercentFor('industry');
   const idsKey = idSetKey(blueprintTypeIds);
   const key = `${characterId ?? ''}|${hub.id}|${rate}|${pricePercent}|${idsKey}`;

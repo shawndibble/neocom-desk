@@ -1,7 +1,3 @@
-/**
- * PI Map: hovering a planet type floats the what-if preview over the board,
- * so the page below it never jumps.
- */
 import type { Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
@@ -15,7 +11,6 @@ async function open(page: Page): Promise<void> {
   await page.goto('./planetary-industry/map');
 }
 
-/** Height of the box and the Y of whatever follows it. */
 async function measure(page: Page) {
   return page.getByTestId('map-whatif').evaluate((el) => {
     let node: Element | null = el;
@@ -39,12 +34,10 @@ for (const [label, viewport] of [
     if (label === 'phone') {
       await page.getByRole('button', { name: 'Show full map' }).click({ timeout: 20_000 });
     }
-    // The phone also has a Planets filter row; the board's own tile is the one that previews.
     const scope = label === 'phone' ? page.getByTestId('pi-map-scroll') : page;
     const missing = scope.getByRole('button', { name: /^Lava planet, you don't have one/ });
     await expect(missing).toBeVisible({ timeout: 20_000 });
 
-    // Let late images and prices settle so only the hover's own shift is counted.
     await page.waitForLoadState('networkidle');
     await expect
       .poll(() => page.evaluate(() => [...document.images].every((image) => image.complete)))
@@ -60,7 +53,6 @@ for (const [label, viewport] of [
     await missing.hover();
     await expect(page.getByTestId('map-whatif')).toContainText('What if I add a Lava planet?');
     const hover = await measure(page);
-    // Page-wide layout shift across the hover stays at zero, not just this box (a tick opens the detail, which is meant to).
     await page.evaluate(
       () =>
         new Promise<void>((done) =>
@@ -72,8 +64,6 @@ for (const [label, viewport] of [
     );
     expect(hover).toEqual(rest);
     await missing.click();
-    // Hovering a second type while the first is ticked drops the "best recipe" text. (Phone
-    // opens a sheet over the board on tick, so only the docked panel can hover on.)
     if (label === 'desktop') {
       await scope.getByRole('button', { name: /^Ice planet, you don't have one/ }).hover();
       await expect(page.getByTestId('map-whatif')).toContainText('What if I add an Ice planet?');

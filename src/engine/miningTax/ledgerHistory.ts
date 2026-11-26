@@ -1,13 +1,3 @@
-/**
- * Mining ledger history kept on the device (issue #1278). ESI's personal
- * mining ledger only returns the last 30 days; each fetch is merged into what
- * is already held so older days survive, up to `LEDGER_HISTORY_DAYS`.
- *
- * The prune counts back from the newest day held, not from the wall clock:
- * the result depends only on its inputs, and a pilot who stops mining for a
- * while keeps their history until the next fetch brings a newer day. The
- * Overview's range filter still hides anything outside the chosen window.
- */
 import type { MiningLedgerRow } from './types';
 import { shiftDate } from './yieldRange';
 
@@ -17,13 +7,6 @@ function rowKey(row: MiningLedgerRow): string {
   return `${row.date}|${row.solar_system_id}|${row.type_id}`;
 }
 
-/**
- * `fresh` over `stored`: the same day/system/type takes the fresh quantity
- * (ESI's ledger row for today grows through the day); rows only `stored`
- * holds are kept. Rows one fetch reports more than once for the same key are
- * summed first, the same way `groupMiningYield` sums them — replacing would
- * drop all but the last. Sorted by date, then system, then type.
- */
 export function mergeLedgerHistory(
   stored: readonly MiningLedgerRow[],
   fresh: readonly MiningLedgerRow[]

@@ -21,7 +21,6 @@ import {
 
 type Run = { phase: 'idle' } | { phase: 'running'; done: number; total: number };
 
-/** What the last download ended in, for the line under the button; `null` before one has run. */
 type Result =
   | { kind: 'complete' }
   | { kind: 'failed'; count: number }
@@ -29,17 +28,8 @@ type Result =
   | { kind: 'noServiceWorker' }
   | null;
 
-/** The pack lines catch up this often while a download runs. */
 const REFRESH_EVERY_FILES = 8;
 
-/**
- * Settings → Offline data. What the app has stored for use with no
- * connection (the lazy SDE files, grouped by pack, and the fitting engine),
- * how much storage that is, whether the browser may evict it, and one button
- * that downloads everything regardless of the cellular / Save-Data gate the
- * background warm obeys. Status is read from Cache Storage, so it shows what
- * is really there, not what a past download reported.
- */
 export function OfflineDataPanel() {
   const { t } = useTranslation();
   const online = useOnline();
@@ -92,12 +82,9 @@ export function OfflineDataPanel() {
       outcome = await downloadEverything((done, total) => {
         if (!mounted.current) return;
         setRun({ phase: 'running', done, total });
-        // Pack lines move as the files land, not only at the end.
         if (done % REFRESH_EVERY_FILES === 0) void refresh();
       });
-    } catch {
-      // Whatever did not arrive shows in the re-read status below.
-    }
+    } catch {}
     const after = await refresh();
     if (!mounted.current) return;
     const missing = after.total - after.totalCached;
@@ -125,7 +112,6 @@ export function OfflineDataPanel() {
     return () => {
       mounted.current = false;
       unsubscribe();
-      // Leaving the page stops the pass after the file in flight; a hung file costs up to its idle timeout.
       cancelDownload();
     };
   }, [refresh]);
@@ -138,7 +124,6 @@ export function OfflineDataPanel() {
       const outcome = await requestPersistence();
       const now = await readPersisted();
       if (!mounted.current) return;
-      // The Protect button leaves once storage is persisted: focus its wrapper, not `<body>`.
       if (outcome === 'granted') focusAfterCommit(persistRef);
       setPersisted(outcome === 'granted' ? true : now);
       clearStorageAttention();

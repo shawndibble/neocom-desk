@@ -1,7 +1,3 @@
-/**
- * Fighters through every format a Fitting leaves and comes back in: EFT, DNA
- * (chat link), the game's XML, and In-game Fittings (ESI).
- */
 import { describe, expect, it } from 'vitest';
 import { loadEftFitting, type EftSlotLookup } from './eftLoader';
 import { fittingToEft as legacyEft } from './eftExport';

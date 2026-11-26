@@ -1,7 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { yieldToEventLoop } from './yieldToEventLoop';
 
-/** Resolves after `depth` chained microtasks — all of which run before any macrotask. */
 async function microtaskChain(depth: number): Promise<void> {
   for (let i = 0; i < depth; i++) await Promise.resolve();
 }
@@ -29,8 +28,6 @@ describe('yieldToEventLoop', () => {
       microtaskChain(50).then(() => order.push('microtasks')),
     ]);
 
-    // An `await` on an already-settled promise would land first here — and
-    // leave every variant calculation in one long task.
     expect(order).toEqual(['microtasks', 'yield']);
   });
 

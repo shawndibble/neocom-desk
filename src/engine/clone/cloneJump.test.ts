@@ -25,7 +25,6 @@ describe('cloneJumpCooldown', () => {
   });
 
   it('is not on cooldown once readyAt has passed', () => {
-    // 24h - 3 = 21h cooldown; last jump was 22h before now.
     const lastJump = new Date(now.getTime() - 22 * 3_600_000).toISOString();
     const result = cloneJumpCooldown(lastJump, 3, now);
     expect(result.onCooldown).toBe(false);
@@ -33,7 +32,6 @@ describe('cloneJumpCooldown', () => {
   });
 
   it('is on cooldown while readyAt is still in the future', () => {
-    // 21h cooldown; last jump was 10h before now, 11h left.
     const lastJump = new Date(now.getTime() - 10 * 3_600_000).toISOString();
     const result = cloneJumpCooldown(lastJump, 3, now);
     expect(result.onCooldown).toBe(true);

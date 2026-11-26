@@ -29,8 +29,6 @@ vi.mock('@/app/syncStatus', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/app/syncStatus')>()),
   isSyncConfigured: () => true,
 }));
-// One layer under the share store, so its "same appraisal, same link" reuse
-// runs for real: Firestore's write and the Firebase session are the seams.
 const setDoc = vi.hoisted(() => vi.fn(async () => undefined));
 vi.mock('firebase/firestore/lite', () => ({
   setDoc,
@@ -119,11 +117,6 @@ function outcome(overrides: Partial<AppraisalOutcome> = {}): AppraisalOutcome {
   };
 }
 
-/**
- * Every priced row carries a Market link and an `ItemContextMenu`, both of
- * which call `useLocation`/`useNavigate` unconditionally — so any render that
- * produces rows needs a Router ancestor, same as `VariationsTable.test.tsx`.
- */
 function renderPanel(
   props: Partial<Parameters<typeof AppraisalPanel>[0]> = {},
   { route = '/market/appraisal?hub=jita' }: { route?: string } = {}
@@ -150,11 +143,6 @@ function renderPanel(
   return { onPricePercentChange, actions };
 }
 
-/**
- * jsdom's `matchMedia` stub never matches, which `useIsDesktop` reads as a
- * phone — where a result folds the paste card away (#3135). Every test here
- * but the phone block below is about the desktop two-column layout.
- */
 beforeEach(() => stubViewport(DESKTOP_QUERY));
 
 describe('AppraisalPanel — folded paste card on a phone (issue #3135)', () => {
@@ -212,7 +200,6 @@ describe('AppraisalPanel — folded paste card on a phone (issue #3135)', () => 
     );
     const { rerender } = render(ui(first));
     await user.click(screen.getByRole('button', { name: /Edit list/ }));
-    // A re-price (new result, no Appraise) leaves the form where the pilot is typing.
     rerender(ui({ ...first, result: outcome() }));
     expect(screen.getByLabelText(/Items from inventory/)).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Appraise' }));
@@ -249,12 +236,10 @@ describe('AppraisalPanel', () => {
   it('renders a priced row with both sides', () => {
     renderPanel({ controller: controller({ result: outcome() }) });
     const row = screen.getByRole('row', { name: /Damage Control II/ });
-    // Totals render as shorthand (#947); the exact figure is the accessible name.
     expect(within(row).getByText('1,345,950 ISK', { selector: '.sr-only' })).toBeInTheDocument();
     expect(within(row).getByText('1,382,400 ISK', { selector: '.sr-only' })).toBeInTheDocument();
   });
 
-  /** A null price is "nobody is trading this", not "this is free". */
   it('shows a dash, not a zero, where a side has no orders', () => {
     renderPanel({ controller: controller({ result: outcome() }) });
     const row = screen.getByRole('row', { name: /Civilian Gatling Railgun/ });
@@ -321,8 +306,6 @@ describe('AppraisalPanel', () => {
           volume: 1,
         },
         {
-          // Unpriced on the buy side only, so it must count toward the list
-          // net but drop out of the instant net.
           typeId: 999,
           name: 'Civilian Gatling Railgun',
           quantity: 4,
@@ -373,9 +356,6 @@ describe('AppraisalPanel', () => {
 
     it('excludes a row unpriced on the buy side from the instant net only', () => {
       renderPanel({ controller: controller({ result: netOutcome() }) });
-      // Only row 1 has a buy price: 10,000 raw total, scaled by the default
-      // 90% Price % to 9,000, less 7.5% sales tax (Accounting 0) — 8,325.
-      // Row 2 contributes nothing.
       expect(
         screen.getByRole('button', { name: 'Copy Buy: Sell now, after tax, 8,325 ISK' })
       ).toBeInTheDocument();
@@ -468,9 +448,6 @@ describe('AppraisalPanel', () => {
     });
   });
 
-  // The reflow itself is CSS behind a media query and is measured in
-  // `e2e/marketAppraisalNarrow.spec.ts`; this only guards the opt-in from
-  // being dropped, the same pairing `PriceHistoryChart.test.tsx` asserts.
   describe('Compare hubs', () => {
     const COMPARE_ROWS: HubComparisonRow[] = COMPARED_HUBS.map((hub, index) => ({
       hub,
@@ -487,7 +464,6 @@ describe('AppraisalPanel', () => {
       return screen.findByRole('list', { name: 'Compare hubs' });
     }
 
-    /** The card for one hub, found by the hub name it is titled with. */
     function hubCard(list: HTMLElement, systemName: string): HTMLElement {
       const card = within(list)
         .getAllByRole('listitem')
@@ -509,8 +485,6 @@ describe('AppraisalPanel', () => {
       const list = await compareCards();
       expect(within(list).getAllByRole('listitem')).toHaveLength(COMPARED_HUBS.length);
       for (const hub of COMPARED_HUBS) {
-        // Both sides are labelled on every card, so the buy/sell figures can
-        // never be told apart by position alone.
         const card = hubCard(list, hub.systemName);
         expect(within(card).getByText('Sell total')).toBeInTheDocument();
         expect(within(card).getByText('Buy total')).toBeInTheDocument();
@@ -543,11 +517,6 @@ describe('AppraisalPanel', () => {
       expect(within(hubCard(list, TRADE_HUBS[0].systemName)).getByText('—')).toBeInTheDocument();
     });
 
-    /**
-     * The clipboard gets the *exact* figure, never the "4.0K" shorthand the
-     * card renders — a pasted appraisal total that had been rounded for
-     * display would be wrong wherever it landed.
-     */
     it('copies a total in full when it is clicked, and says so', async () => {
       const written: string[] = [];
       configureClipboard(async (text) => {
@@ -557,7 +526,6 @@ describe('AppraisalPanel', () => {
       const list = await compareCards();
       const amarr = hubCard(list, TRADE_HUBS[1].systemName);
 
-      // COMPARE_ROWS indexes Amarr at 1: sell 4,000, buy 2,000.
       await userEvent.click(within(amarr).getByRole('button', { name: 'Copy 4,000 ISK' }));
       expect(written).toEqual(['4,000']);
       expect(screen.getAllByText('Copied to clipboard').length).toBeGreaterThan(0);
@@ -571,7 +539,6 @@ describe('AppraisalPanel', () => {
     it('leaves a hub with no orders on a side unclickable', async () => {
       renderPanel({ controller: controller({ result: outcome(), compare: COMPARE_ROWS }) });
       const list = await compareCards();
-      // Jita's buy is null here, so only its sell total is a copy target.
       expect(
         within(hubCard(list, TRADE_HUBS[0].systemName)).getAllByRole('button', { name: /^Copy / })
       ).toHaveLength(1);
@@ -586,8 +553,6 @@ describe('AppraisalPanel', () => {
       const list = await compareCards();
       const amarr = hubCard(list, TRADE_HUBS[1].systemName);
 
-      // The title stretches over the whole card in CSS (`after:inset-0`),
-      // which jsdom can't lay out, so the title button stands in for the card.
       await userEvent.click(
         within(amarr).getByRole('button', { name: `Appraise at ${TRADE_HUBS[1].systemName}` })
       );
@@ -699,7 +664,6 @@ describe('AppraisalPanel', () => {
     it('adds a refine column and total when a row carries refine data', () => {
       renderPanel({ controller: controller({ result: refineOutcome() }) });
       const veldsparRow = screen.getByRole('row', { name: /Veldspar/ });
-      // With no leftover units the two refine columns agree.
       expect(within(veldsparRow).getAllByText('8,000 ISK', { selector: '.sr-only' })).toHaveLength(
         2
       );
@@ -725,7 +689,6 @@ describe('AppraisalPanel', () => {
     it('hides the Refine total chip with the Refine column, and brings it back with it', async () => {
       renderPanel({ controller: controller({ result: refineOutcome() }) });
       expect(screen.getByText('Refine total')).toBeInTheDocument();
-      // Yield and tax are edited in the page settings now, not beside the total.
       expect(screen.queryByText('Facility base yield')).not.toBeInTheDocument();
       expect(screen.queryByText('Reprocessing tax')).not.toBeInTheDocument();
 
@@ -769,12 +732,6 @@ describe('AppraisalPanel', () => {
       expect(screen.queryAllByText('Refine total')).toHaveLength(0);
     });
 
-    /**
-     * Regression for issue #1048: a quantity that is not whole batches left
-     * the refine side charged for units it never refined, so a row that
-     * refines for more than it sells for was highlighted as a sell. The
-     * leftover units are still there to sell, and now count.
-     */
     it('highlights refine when the batches plus the leftover beat selling it all', () => {
       const partBatch = refineOutcome();
       partBatch.appraisal.rows[0] = {
@@ -791,7 +748,6 @@ describe('AppraisalPanel', () => {
       };
       renderPanel({ controller: controller({ result: partBatch }) });
       const oreRow = screen.getByRole('row', { name: /Mercoxit III-Grade/ });
-      // The figure is a button inside the highlighted span (it opens the breakdown).
       const refineCell = within(oreRow)
         .getByText('15,436,890 ISK', { selector: '.sr-only' })
         .closest('button')?.parentElement;
@@ -814,7 +770,6 @@ describe('AppraisalPanel', () => {
       };
       renderPanel({ controller: controller({ result: partBatch }) });
       const oreRow = screen.getByRole('row', { name: /Mercoxit III-Grade/ });
-      // 15,436,890 of minerals; with the 99 leftover units at 16,000 each, 17,020,890.
       expect(
         within(oreRow).getByText('15,436,890 ISK', { selector: '.sr-only' })
       ).toBeInTheDocument();
@@ -823,15 +778,9 @@ describe('AppraisalPanel', () => {
       ).toBeInTheDocument();
     });
 
-    /**
-     * Regression: the buy-total highlight must never fire on a row with
-     * nothing to compare against — a row with no refine value is not a
-     * winner just because its refine verdict is not `'refine'`.
-     */
     it('does not bold the buy total on a row with no refine comparison', () => {
       renderPanel({ controller: controller({ result: refineOutcome() }) });
       const dcuRow = screen.getByRole('row', { name: /Damage Control II/ });
-      // The highlight lives on the cell wrapper around the shorthand figure.
       const buyCell = within(dcuRow).getByText('1,345,950 ISK', { selector: '.sr-only' })
         .parentElement?.parentElement;
       expect(buyCell?.className).not.toContain('text-isk-pos');
@@ -944,8 +893,6 @@ describe('AppraisalPanel', () => {
     it("never spells out the corp name as plain cell text — only the icon link's accessible name", () => {
       renderPanel({ controller: controller({ result: lpOutcome() }) });
       const asteroRow = screen.getByRole('row', { name: /Astero/ });
-      // Keeps the column narrow at any width: the full breakdown lives on the
-      // link's label/tooltip, never as a second visible text node in the cell.
       expect(within(asteroRow).queryByText('Sisters of EVE')).not.toBeInTheDocument();
     });
 
@@ -1089,10 +1036,6 @@ describe('AppraisalPanel', () => {
     expect(onPricePercentChange).toHaveBeenLastCalledWith(85);
   });
 
-  /**
-   * Clearing the box to retype must not snap the value back — a field that
-   * rewrites itself mid-edit cannot be edited.
-   */
   it('does not commit an empty or out-of-range percentage', async () => {
     const user = userEvent.setup();
     const { onPricePercentChange } = renderPanel();
@@ -1154,14 +1097,12 @@ describe('AppraisalPanel', () => {
 });
 
 describe('AppraisalPanel — Copy lists', () => {
-  // Rows are Price-Percent-scaled (90%); the lists read `items`, unscaled.
   const LISTS_OUTCOME = outcome({
     appraisal: {
       ...APPRAISAL,
       items: [
         { typeId: 2048, name: 'Damage Control II', quantity: 3, buy: 498_500, sell: 512_000 },
         { typeId: 999, name: 'Civilian Gatling Railgun', quantity: 4, buy: null, sell: 1_000 },
-        // The undercut (150) is no better than the buy order, so it sells now.
         { typeId: 555, name: 'Cheap Widget', quantity: 7, buy: 200, sell: 151 },
       ],
     },
@@ -1370,11 +1311,6 @@ describe('AppraisalPanel — Columns', () => {
 });
 
 describe('AppraisalPanel — the row as an item', () => {
-  /**
-   * The link points at `/market/browser` directly (ADR 0015) — the tab is
-   * part of the path now, so there is no `section` left to carry through
-   * that would otherwise land the pilot back on the tab they clicked from.
-   */
   it('links an item name into the Market Browser, keeping the hub it was priced at', () => {
     renderPanel({ controller: controller({ result: outcome() }) });
     const link = screen.getByRole('link', { name: 'Damage Control II' });
@@ -1433,7 +1369,6 @@ describe('AppraisalPanel — the row as an item', () => {
     });
   });
 
-  /** Without this the Build Plan action sits on "Checking…" forever. */
   it('asks for the blueprint catalog the first time a row menu opens', () => {
     const { actions } = renderPanel({
       controller: controller({ result: outcome() }),
@@ -1458,7 +1393,6 @@ describe('AppraisalPanel — the row as an item', () => {
       resetShareLinksForTests();
     });
 
-    /** The `shares/<id>` doc each stored share was written to, in order. */
     function storedPaths(): string[] {
       return setDoc.mock.calls
         .map((call) => (call as unknown[])[0] as { path: string })
@@ -1559,7 +1493,6 @@ describe('AppraisalPanel — the row as an item', () => {
       return written;
     }
     const withSkills = () => outcome({ accountingLevel: 0, brokerRelationsLevel: 0 });
-    /** The digits in a copy area's accessible name ("Copy Sell total, 1,386,400 ISK"). */
     const digitsOf = (button: HTMLElement) =>
       /(-?[\d,]+) ISK$/.exec(button.getAttribute('aria-label') ?? '')![1];
 
@@ -1575,10 +1508,8 @@ describe('AppraisalPanel — the row as an item', () => {
       expect(second).toHaveAccessibleName(/^Copy Sell: List it, after fees, [\d,]+ ISK$/);
       const net = digitsOf(second);
       expect(net).not.toBe('1,386,400');
-      // No shorthand under the divider either.
       expect(second).toHaveTextContent(`List it, after fees${net}`);
 
-      // Each area has its own live region and its own bubble; one does not speak for the other.
       const said = () =>
         within(card)
           .getAllByRole('status')
@@ -1760,8 +1691,6 @@ describe('AppraisalPanel — shopping list (#2868)', () => {
   });
 
   it('disables Minus owned with a grant note without the assets permission', async () => {
-    // The note judges the active Character's grant; pinned here rather than
-    // left to whatever an earlier test set.
     useActiveCharacter.setState({ activeCharacterId: 1, hydrated: true });
     await seedGrant(1, []);
     renderPanel({ controller: controller({ result: LIST_OUTCOME }) });

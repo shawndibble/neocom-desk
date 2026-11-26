@@ -219,7 +219,6 @@ describe('removal notices (#4617)', () => {
   it('only a copy to the moon owner side starts the 24 hours', () => {
     expect(startsRemovalClock(notice(1, { startsClock: true }))).toBe(true);
     expect(startsRemovalClock(notice(1, { startsClock: false }))).toBe(false);
-    // Queued before the flag existed: as before, any copy starts it.
     expect(startsRemovalClock(notice(1))).toBe(true);
     expect(startsRemovalClock(item(1))).toBe(false);
     expect(startsRemovalClock(notice(1, { kind: 'removalCancelled' }))).toBe(false);

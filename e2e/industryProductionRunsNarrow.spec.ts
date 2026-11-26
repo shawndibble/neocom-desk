@@ -1,10 +1,3 @@
-/**
- * Production Runs header summary on a phone (issue #3226): the one-line
- * "N logged · profit realized · N open" read used to be squeezed beside the
- * header controls into a ~90px column, wrapping to four lines and clipping a
- * long figure. It now takes its own full-width row. Real layout only, so a
- * browser test.
- */
 import { test, expect, PHONE } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 import { CHARACTER_ID } from './support/fixtureData';
@@ -64,7 +57,6 @@ test('Production Runs summary reads in at most two lines and does not clip at 39
   const summary = page.getByText(/logged · .* realized · .* open/);
   await expect(summary).toBeVisible();
 
-  // Row 2: the summary sits beneath the title row, not squeezed beside it.
   const titleBox = (await page.getByRole('heading', { name: 'Production Runs' }).boundingBox())!;
   expect((await summary.boundingBox())!.y).toBeGreaterThanOrEqual(titleBox.y + titleBox.height - 1);
 

@@ -1,10 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import en from './locales/en.json';
 
-/** DESIGN.md §6c Cue vocabulary: no typed arrow ends a link label. */
 const TRAILING_ARROW = /[→↗›]\s*$/;
 
-/** Bare between-items separators, not link labels. */
 const SEPARATORS = ['travel.stops.orderSeparator'];
 
 function collectStrings(node: unknown, path: string, out: [string, string][]) {

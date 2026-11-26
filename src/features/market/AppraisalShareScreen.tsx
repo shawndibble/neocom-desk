@@ -40,18 +40,11 @@ import { useRefineMineralNames } from './useRefineMineralNames';
 const NO_ROWS: readonly AppraisalRow[] = [];
 const NO_ITEMS: readonly AppraisalItem[] = [];
 
-/**
- * A per-unit price, exact — same split as `AppraisalPanel`, so a share link
- * reads like the tab it was shared from. Stays on `formatIskAuto`: an
- * each-price runs from a 5 ISK mineral to a billion-ISK hull, and shorthand
- * rounds the cheap end into nonsense. A missing price is a dash, never a zero.
- */
 function eachCell(value: number | null): string {
   if (value === null) return '—';
   return formatIskAuto(value);
 }
 
-/** A line total as scannable shorthand, exact value one gesture away. */
 function totalCell(value: number | null): ReactNode {
   if (value === null) return '—';
   return <IskAmount value={value} decimals={0} />;
@@ -62,30 +55,20 @@ export type AppraisalShareState =
 
 interface AppraisalShareScreenProps {
   state: AppraisalShareState;
-  /** Epoch millis the Share Link dies at — shown, since the recipient never saw the sender's "works for 7 days". */
   expiresAt: number;
   openInApp?: OpenInApp;
 }
 
-/**
- * The **Shared Appraisal** a Share Link opens (`routes/SharedLink.tsx`), at
- * the prices it was shared with. Read-only: no paste box, no hub or percent
- * controls — "Open Neocom Desk" carries the same pile into the live tab for
- * that. Never a redirect, even for a signed-in visitor: the live tab
- * re-prices, and the sender's figures would be gone before anyone read them.
- */
 export function AppraisalShareScreen({ state, expiresAt, openInApp }: AppraisalShareScreenProps) {
   const { t } = useTranslation();
   const timeZone = useTimeZone();
   const isPhone = useIsPhone();
   const view = state.status === 'ready' ? state.view : null;
-  // The refine breakdown: null closed, `typeId: null` the whole pile, else one item's.
   const [refineModal, setRefineModal] = useState<{ typeId: number | null } | null>(null);
   const [source, setSource] = useState<'shared' | 'mine'>('shared');
   const [askedForMine, setAskedForMine] = useState(false);
   const mine = useMyRefine(view, askedForMine || refineModal !== null);
   const usingMine = source === 'mine' && mine.status === 'ready';
-  // The sharer's figures, or the visitor's own at the same prices: the table, chip and breakdown all follow.
   const appraisal = useMemo(() => {
     if (view === null) return null;
     return usingMine ? buildAppraisal(mine.items, view.pricePercent) : view.appraisal;
@@ -93,8 +76,6 @@ export function AppraisalShareScreen({ state, expiresAt, openInApp }: AppraisalS
   const setup = usingMine
     ? { yieldRate: mine.setup.stationRate, taxRate: mine.setup.taxRate }
     : (view?.refining ?? null);
-  // The visitor's own remembered price basis, like on the live tab; a link from before the sell
-  // side was carried can only be priced on the buy orders.
   const storedBasis = useRefineBasis((state) => state.value);
   const setStoredBasis = useRefineBasis((state) => state.setValue);
   const basisReady = useHydratedStore(useRefineBasis);
@@ -102,12 +83,10 @@ export function AppraisalShareScreen({ state, expiresAt, openInApp }: AppraisalS
     appraisal !== null && basisAvailable(appraisal, storedBasis) ? storedBasis : 'buy';
   const pile = appraisal === null ? null : pileFigures(appraisal.rows, refineBasis);
   const hasRefine = basisReady && setup !== null && (pile?.refinable ?? false);
-  // A Shared Appraisal carries no fee context, so the fee figures are never read here.
   const figures = (row: AppraisalRow) => rowFigures(row, refineBasis, null);
   const refineRange = hasRefine && appraisal ? refineEfficiencyRange(appraisal.items) : null;
   const refineEfficiency = refineRange ? efficiencyText(refineRange.min, refineRange.max) : null;
   const shareRows = appraisal ? appraisal.rows : NO_ROWS;
-  // A link made before the names had loaded carries empty ones; read them here rather than show "#id".
   const loadedNames = useRefineMineralNames(appraisal?.items ?? NO_ITEMS);
   const mineralNames = useMemo(() => {
     const names = new Map(loadedNames);
@@ -121,7 +100,6 @@ export function AppraisalShareScreen({ state, expiresAt, openInApp }: AppraisalS
     columns: csvColumns,
   });
 
-  /** The full figure a pilot pastes into a contract, but shorthand with the exact value in a tooltip on a phone, where it would not fit. */
   function totalFigure(value: number): ReactNode {
     return isPhone ? <IskAmount value={value} decimals={0} /> : <FullIskTotal value={value} />;
   }
@@ -286,9 +264,6 @@ export function AppraisalShareScreen({ state, expiresAt, openInApp }: AppraisalS
                 rows={shareRows}
                 rowKey={(row) => row.typeId}
                 label={t('appraisalShare.title')}
-                // Six numeric columns hang off the item name: a table read across
-                // columns, so it stays a table on a phone (each prices and volume
-                // shed, item pinned) rather than a card per line (§6c Restraint).
                 responsive="table"
               />
             </div>

@@ -1,7 +1,3 @@
-/**
- * A Local list row's Threat level, split from `pilotListData` so the view can
- * read it without pulling in the loader (which its tests replace wholesale).
- */
 import {
   needsLossHistory,
   threatVerdict,
@@ -14,19 +10,6 @@ import {
 } from '@/engine/pilotList/threatContext';
 import type { PilotListRow } from './pilotListData';
 
-/**
- * A row's Threat level, `pending` while its danger ratio is still on the way
- * (the level could still change), and null for a row with no kill list to
- * read: friendly, not found, still loading or unreachable. A pilot with no recent
- * kill whose losses could not be read or dated gets none either: "inactive" would
- * be a guess, and a wrong one for a pilot who just lost a ship.
- */
-/**
- * The row's Threat as `rowThreat` reads it, plus how context moved it: the
- * level shown, the level before context, which way it moved and why. Context
- * is where you are and who of their organization is in Local; without it the
- * level is the pilot's own.
- */
 export function rowThreatRead(
   row: PilotListRow,
   nowMs: number,
@@ -53,7 +36,6 @@ export function rowThreatRead(
     : threatInContext(base, row.kills.kills, nowMs, context);
 }
 
-/** `rowThreatRead`'s level alone, for what only sorts, groups or tints by it. */
 export function rowThreat(
   row: PilotListRow,
   nowMs: number,

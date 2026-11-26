@@ -1,15 +1,3 @@
-/**
- * Which Payee a payment the pilot already made was for (issue #540, decision 20261120-235011,
- * "linking money under one payment model"). A Made Payment links to one Payee and pays its oldest
- * unpaid days (`PayeeRunningAccount`), so a suggestion only has to name the recipient: never entries, and
- * no day window, since back taxes are paid weeks later. The recipient is known by the entity a
- * Payee learned, then by its name, across every record of a merged Payee, so an alt's payment is
- * found too. An amount alone is the weakest hint, offered only when exactly one Payee owes it, and
- * never for a donation a Corp Tax Book counts: that money is the book's.
- *
- * Pure: the route feeds it the normalized payments (`madePayments.ts`), the Payees with what they
- * owe, and which payments a link or a book already holds.
- */
 import { utcDayOf } from '../../../functions/src/timeConstants';
 import type { MiningTaxPaymentMethod, PayeeRecord } from '@/db';
 import { matchesStatedTransfer } from '../../../functions/src/corpTaxBookTransferMatch';
@@ -17,46 +5,26 @@ import type { PayeePaymentLink } from '@/engine/miningTax/payeeRunningAccount';
 import { isCorpPayeeId } from './corpBook/corpRows';
 import { amountsMatch } from './paymentMatches';
 
-/**
- * One payment the pilot has already made, normalized across its two sources: an outgoing
- * wallet-journal entry, or an item-exchange contract they issued at no price (payment in kind).
- */
 export interface MadePayment {
-  /** `journal:<id>` or `contract:<id>` (`paymentLinkKey`): the two id spaces collide. */
   key: string;
   kind: 'journal' | 'contract';
   refId: number;
-  /** The paying character. */
   characterId: number;
-  /** ISO timestamp the ISK (or the cargo) left. */
   date: string;
-  /**
-   * Positive ISK. `null` for a payment-in-kind contract: its cargo is never priced (the decision
-   * doc rules out a second valuation model), so the pilot gives its figure when linking it.
-   */
   amount: number | null;
-  /** Decided once at the source from the journal `ref_type` (or the fact that it is a contract). */
   method: MiningTaxPaymentMethod;
-  /** Who received it: the journal's `second_party_id` or the contract's `assignee_id`. */
   counterpartyId?: number;
   counterpartyName?: string;
-  /** One-line description for the picker: a humanized ESI ref type, or the contract's title. */
   label: string;
 }
 
-/** How the recipient was known, best first. */
 export type LinkConfidence = 'entity' | 'name' | 'amount';
 
-/** A personal Payee a payment may be linked to: every record of one recipient. */
 export interface LinkablePayee {
-  /** The merged Payee's primary record id: the link names it. */
   id: string;
   name: string;
-  /** Every record of the recipient, the primary first. */
   members: readonly PayeeRecord[];
-  /** What its account owes now. */
   owed: number;
-  /** Whether anything was ever billed to it: a Payee nothing bills is no one's recipient yet. */
   billed: boolean;
 }
 
@@ -66,19 +34,12 @@ export interface LinkSuggestion {
   confidence: LinkConfidence;
 }
 
-/** What a suggestion is weighed against. */
 export interface LinkContext {
   payees: readonly LinkablePayee[];
-  /** The keys of the payments a link already holds (`paymentLinkKey`). */
   linked: ReadonlySet<string>;
-  /**
-   * The corporations of the member's Corp Tax Books: a donation to one is the book's (held, or in
-   * flight), and never a personal Payee's.
-   */
   bookCorporations: ReadonlySet<number>;
 }
 
-/** The payments a pilot may still link: no link holds them, and no book counts them. */
 export function linkablePayments(
   payments: readonly MadePayment[],
   ctx: Pick<LinkContext, 'linked' | 'bookCorporations'>
@@ -90,11 +51,6 @@ export function linkablePayments(
   );
 }
 
-/**
- * How one record knows the recipient: `entity` is the id it learned from an earlier link (or the
- * pilot verified); `name` is the weaker bootstrap for a record that learned nothing. A record that
- * learned an entity is never matched by name.
- */
 function identityKind(payee: PayeeRecord, payment: MadePayment): 'entity' | 'name' | null {
   if (payee.entityId !== undefined && payment.counterpartyId !== undefined)
     return payee.entityId === payment.counterpartyId ? 'entity' : null;
@@ -104,10 +60,6 @@ function identityKind(payee: PayeeRecord, payment: MadePayment): 'entity' | 'nam
     : null;
 }
 
-/**
- * The personal Payee a payment went to: the one whose records know its recipient, by entity
- * first, then by name. Undefined when none does, or two Payees answer equally (the pilot picks).
- */
 export function recipientOf(
   payment: MadePayment,
   payees: readonly LinkablePayee[]
@@ -125,11 +77,6 @@ export function recipientOf(
   return undefined;
 }
 
-/**
- * The Payee a payment was most likely for, or null: its recipient (a Payee anything was billed
- * to), else, for a payment whose recipient is unknown, the one Payee whose owed figure it
- * matches. A payment to a known recipient who is none of the Payees is never offered by amount.
- */
 export function suggestLink(payment: MadePayment, ctx: LinkContext): LinkSuggestion | null {
   if (linkablePayments([payment], ctx).length === 0) return null;
   const known = recipientOf(
@@ -137,7 +84,6 @@ export function suggestLink(payment: MadePayment, ctx: LinkContext): LinkSuggest
     ctx.payees.filter((p) => p.billed)
   );
   if (known) return { payment, ...known };
-  // A payment to someone the app knows, who is none of the Payees, went to someone else.
   if (payment.amount === null || payment.counterpartyId !== undefined) return null;
   const amount = payment.amount;
   const byAmount = ctx.payees.filter(
@@ -146,10 +92,6 @@ export function suggestLink(payment: MadePayment, ctx: LinkContext): LinkSuggest
   return byAmount.length === 1 ? { payment, payee: byAmount[0]!, confidence: 'amount' } : null;
 }
 
-/**
- * What `payeeId` was already sent that nothing accounts for yet: its suggestions, counted. Above 0
- * its owed figure is overstated until they are linked, which the Payee card and Settle up both say.
- */
 export function unlinkedSentFor(
   suggestions: readonly LinkSuggestion[],
   payeeId: string
@@ -159,7 +101,6 @@ export function unlinkedSentFor(
   return { count: mine.length, amount: mine.reduce((sum, s) => sum + (s.payment.amount ?? 0), 0) };
 }
 
-/** Every payment worth offering, the surest first, then newest. */
 export function suggestLinks(payments: readonly MadePayment[], ctx: LinkContext): LinkSuggestion[] {
   const rank: Record<LinkConfidence, number> = { entity: 0, name: 1, amount: 2 };
   return payments
@@ -171,13 +112,6 @@ export function suggestLinks(payments: readonly MadePayment[], ctx: LinkContext)
     );
 }
 
-/**
- * A recorded payment (Settle up, before its transaction showed up) and the one transaction behind
- * it: to its Payee's recipient, the transfer it states by the shared rule (`matchesStatedTransfer`:
- * its payer, its amount, within two days of the day it gave). One to one or nothing: a recorded
- * payment with two candidates, or a transaction two recorded payments could be, is left for the
- * pilot.
- */
 export function autoMatchRecorded(
   payments: readonly MadePayment[],
   recorded: readonly PayeePaymentLink[],
@@ -200,7 +134,6 @@ export function autoMatchRecorded(
                   {
                     ...(link.characterId !== undefined ? { characterId: link.characterId } : {}),
                     amount: link.amount,
-                    // A day, stated: its middle, so the two days either way cover it whole.
                     at: `${link.paidOn}T12:00:00.000Z`,
                   },
                   { characterId: p.characterId, amount: p.amount, at: p.date }
@@ -220,7 +153,6 @@ export function autoMatchRecorded(
   );
 }
 
-/** The link a Made Payment becomes once linked to `payeeId`: a payment in kind takes `amount`. */
 export function linkFor(
   payment: MadePayment,
   payeeId: string,

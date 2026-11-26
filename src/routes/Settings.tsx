@@ -56,21 +56,11 @@ import { NotificationsPanel } from '@/features/notifications/NotificationsPanel'
 import { CharacterPermissionStrip } from '@/features/permissions/CharacterPermissionStrip';
 import { PermissionsPanel } from '@/features/permissions/PermissionsPanel';
 
-/**
- * Links that predate the sectioned page: the `?` shortcut and the corp prompt
- * pointed at an anchor on the old General tab. A bookmark of either still
- * lands on the default section (`TabRoute` drops an unknown segment but keeps
- * the hash), and this is what carries it on to where the anchor's content now
- * lives.
- */
 const LEGACY_HASH_TARGETS: Readonly<Record<string, string>> = {
-  // Shortcuts left Settings for Help (scope decision
-  // `20261002-165816-shortcuts-move-to-help-always-on-and-lose`).
   '#shortcuts': tabPath(HELP_TABS, 'shortcuts'),
   '#corp-access': tabPath(SETTINGS_TABS, 'permissions'),
 };
 
-/** `/settings` on a phone: the grouped list of sections. */
 function PhoneSettingsIndex({ groups }: { groups: readonly SettingsGroup[] }) {
   const summaries = usePhoneSummaries();
   return <SettingsIndex groups={groups} summaries={summaries} />;
@@ -87,11 +77,6 @@ export function Settings() {
   const setNumberFormat = useNumberFormat((state) => state.setValue);
   const weekStart = useCalendarWeekStart((state) => state.value);
   const setWeekStart = useCalendarWeekStart((state) => state.setValue);
-  // Unlike `fontScale`/`timeFormat`, `App.tsx` does not hydrate this store for
-  // the whole shell — it is otherwise only read from within `Calendar.tsx`
-  // after that page's own `hydrate()` — so a cold load straight to `/settings`
-  // needs its own hydrate here too, or the chip would paint the default until
-  // Calendar happened to be visited (see `useHydratedStore`'s doc comment).
   const weekStartHydrated = useHydratedStore(useCalendarWeekStart);
   const singleKeyShortcuts = useSingleKeyShortcuts((state) => state.value);
   const setSingleKeyShortcuts = useSingleKeyShortcuts((state) => state.setValue);
@@ -99,7 +84,6 @@ export function Settings() {
   const { hash } = useLocation();
   const navigate = useNavigate();
   const [section] = usePageTab(SETTINGS_TABS);
-  // An old `#shortcuts` link is about to be carried on to where it lives now: skip the list.
   const isIndex = useIsPageIndex(SETTINGS_TABS) && !Object.hasOwn(LEGACY_HASH_TARGETS, hash);
   const corpAccess = useCorpAccess();
   const groups = useMemo(
@@ -107,17 +91,12 @@ export function Settings() {
     [corpAccess.state]
   );
 
-  // One bounded check per visit to Settings, whatever the URL, so the index row,
-  // the rail dot and the App & backup line are settled before they are read.
-  // Moving between sections keeps this component mounted and checks nothing.
-  // The Offline data dot is read the same way.
   useEffect(() => {
     void checkForUpdate();
     void checkStorageAtRisk();
   }, []);
 
   useEffect(() => {
-    // `hasOwn`: a hash like `#constructor` must not resolve to an inherited member.
     if (!Object.hasOwn(LEGACY_HASH_TARGETS, hash)) return;
     navigate({ pathname: LEGACY_HASH_TARGETS[hash] }, { replace: true });
   }, [hash, navigate]);
@@ -163,14 +142,6 @@ export function Settings() {
                         ))}
                       </div>
                     </Field>
-                    {/*
-                  EVE runs on UTC and so does every timer other players quote,
-                  which is why one column already rendered it before this was
-                  settable. The Calendar grids are deliberately excluded — they
-                  bucket events into local-day cells, so converting only the
-                  rendered string would file a late-evening event under the wrong
-                  day.
-                */}
                     <SegmentedRow
                       label={t('settings.timeFormatLabel')}
                       hint={t('settings.timeFormatHint')}
@@ -220,12 +191,6 @@ export function Settings() {
               {isNarrow && <MobileTabsPanel />}
             </>
           )}
-          {/*
-            The Corporation row in here is the only way in to corp access for a
-            Character that dismissed the one-time prompt (corp UI is hidden
-            rather than locked), which is why `#corp-access` keeps redirecting
-            to this section.
-          */}
           {section === 'permissions' && (
             <>
               <CharacterPermissionStrip />
@@ -244,7 +209,6 @@ export function Settings() {
           {section === 'characters' && <CharacterDefaultsPanel />}
           {section === 'corporation' && <CorpDefaultsPanel />}
           {section === 'travel' && <TravelSettingsPanel />}
-          {/* The Overview feed's "Settings" link targets `/settings/notifications` directly. */}
           {section === 'notifications' && <NotificationsPanel />}
           {section === 'app' && (
             <>

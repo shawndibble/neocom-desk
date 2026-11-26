@@ -21,7 +21,6 @@ const server = setupServer();
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 beforeEach(async () => {
   configureEsi({ getToken: vi.fn(async () => 'tok') });
-  // `shouldAdvanceTime` so msw's own timers still run under a faked clock.
   vi.useFakeTimers({ shouldAdvanceTime: true });
   await db.esiCache.clear();
 });
@@ -161,7 +160,6 @@ describe('loadCalendarEvents retention', () => {
     const running = summary(1, new Date(2026, 8, 8, 12, 0, 0), 'Fleet Op');
     const upcoming = summary(2, new Date(2026, 8, 8, 20, 0, 0), 'Structure Timer');
 
-    // First read: ESI still lists both.
     server.use(
       http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/calendar`, () =>
         HttpResponse.json([running, upcoming])
@@ -169,7 +167,6 @@ describe('loadCalendarEvents retention', () => {
     );
     expect((await loadCalendarEvents(CHAR_ID)).cached?.data).toEqual([running, upcoming]);
 
-    // Second read: the op has started, so ESI no longer returns it.
     await db.esiCache.delete([CHAR_ID, 'calendar']);
     server.resetHandlers();
     server.use(
@@ -179,12 +176,10 @@ describe('loadCalendarEvents retention', () => {
     );
     expect((await loadCalendarEvents(CHAR_ID)).cached?.data).toEqual([running, upcoming]);
 
-    // Ten days on it is still history the pilot can look back at.
     vi.setSystemTime(new Date(2026, 8, 18, 9, 0, 0));
     await db.esiCache.delete([CHAR_ID, 'calendar']);
     expect((await loadCalendarEvents(CHAR_ID)).cached?.data).toEqual([running, upcoming]);
 
-    // Past two weeks it ages out.
     vi.setSystemTime(new Date(2026, 8, 23, 9, 0, 0));
     await db.esiCache.delete([CHAR_ID, 'calendar']);
     expect((await loadCalendarEvents(CHAR_ID)).cached?.data).toEqual([upcoming]);
@@ -202,7 +197,6 @@ describe('loadCalendarEvents retention', () => {
         HttpResponse.json([undated, dated])
       )
     );
-    // Present, and sunk to the end rather than sorted against a NaN.
     expect((await loadCalendarEvents(CHAR_ID)).cached?.data).toEqual([dated, undated]);
   });
 
@@ -217,8 +211,6 @@ describe('loadCalendarEvents retention', () => {
     await loadCalendarEvents(CHAR_ID);
     const first = await db.esiCache.get([CHAR_ID, 'calendar:seen']);
 
-    // A second load a minute later reads the same events; the poller does this
-    // every five minutes per character and must not pay a write for it.
     vi.setSystemTime(new Date(2026, 8, 8, 14, 1, 0));
     await db.esiCache.delete([CHAR_ID, 'calendar']);
     await loadCalendarEvents(CHAR_ID);
@@ -253,7 +245,6 @@ describe('loadCalendarEvents retention', () => {
     );
     await loadCalendarEvents(CHAR_ID);
 
-    // Scope revoked: the seen-list must not resurrect a list to show.
     await db.esiCache.delete([CHAR_ID, 'calendar']);
     server.resetHandlers();
     server.use(
@@ -267,15 +258,6 @@ describe('loadCalendarEvents retention', () => {
   });
 });
 
-/**
- * The seam, end to end. `diffCalendarEventStarting` looks for an entry whose
- * start is newly in the past — which, before retention, was an entry ESI had
- * already dropped from the list the poller reads. The unit tests either side
- * of this one each prove half: that retention keeps the event, and that the
- * diff fires given a snapshot containing it. Only driving the real
- * `loadCalendarEvents` through the domain's own `toSnapshot` and `diff` shows
- * that the half the poller actually gets is the half the diff needs.
- */
 describe('the calendar poll domain, fed by the real loader', () => {
   it('fires calendarEventStarting for an event ESI dropped the moment it began', async () => {
     const event = {
@@ -286,7 +268,6 @@ describe('the calendar poll domain, fed by the real loader', () => {
       event_response: 'accepted' as const,
     };
 
-    // Poll one, half an hour before the op: ESI still lists it.
     const before = new Date(2026, 8, 8, 12, 30, 0).getTime();
     vi.setSystemTime(before);
     server.use(
@@ -295,7 +276,6 @@ describe('the calendar poll domain, fed by the real loader', () => {
     const first = await calendarDomain.load(CHAR_ID);
     const prev = calendarDomain.toSnapshot(first!, before) as CalendarSnapshot;
 
-    // Poll two, half an hour after it started: ESI returns nothing at all.
     const after = new Date(2026, 8, 8, 13, 30, 0).getTime();
     vi.setSystemTime(after);
     await db.esiCache.delete([CHAR_ID, 'calendar']);
@@ -348,8 +328,6 @@ describe('the calendar poll domain, fed by the real loader', () => {
       after
     ) as CalendarSnapshot;
 
-    // It re-enters the list this device reads, but its id is below the
-    // high-water mark, which is exactly what that mark is for.
     expect(
       calendarDomain.diff(CHAR_ID, prev, next, new Set(['newCalendarEvent'] as const))
     ).toEqual([]);

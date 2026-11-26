@@ -63,7 +63,6 @@ describe('rosterCoreMap', () => {
     const row = core.get(2);
     expect(row?.jobSlotSkills).toBeUndefined();
     expect(row?.totalSp).toBeUndefined();
-    // stats is always present, even with nothing fetched yet
     expect(row?.stats.name).toBe('NoSkills');
   });
 
@@ -133,8 +132,6 @@ describe('mergeRosterCore', () => {
     expect(previous.get(1)?.totalSp).toBe(5000);
     expect(previous.get(1)?.jobSlotSkills?.massProduction).toBe(4);
 
-    // A "Refresh all" pass where this character's /skills call failed:
-    // `entry.skills` comes back null, but the character isn't dropped.
     const failedRefresh = entry({
       characterId: 1,
       name: 'A',
@@ -145,7 +142,6 @@ describe('mergeRosterCore', () => {
 
     expect(merged.get(1)?.totalSp).toBe(5000);
     expect(merged.get(1)?.jobSlotSkills?.massProduction).toBe(4);
-    // stats/queue still take the fresh (now-unknown) reading, unlike the two skill-derived fields.
     expect(merged.get(1)?.stats.skillPoints).toBeUndefined();
   });
 });

@@ -1,7 +1,3 @@
-/**
- * Warnings about weapons and miners that hold nothing: damage goals can't
- * score an empty weapon, and Mine more compares on the best crystals.
- */
 import { useTranslation } from 'react-i18next';
 import { Button, LiveNote } from '@/components/ui';
 import type { UnloadedWeapons } from '@/engine/fittings/improve';
@@ -18,7 +14,6 @@ interface UnloadedProps {
   onLoadBestCrystal?: () => void;
 }
 
-/** Weapons holding no charge, which damage goals can't score, and Mine more's miners without the best crystals. */
 export function ImproveUnloadedNotices({
   unloaded,
   onLoadBestCharge,

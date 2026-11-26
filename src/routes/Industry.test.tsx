@@ -18,13 +18,10 @@ installIndustryHarness();
 
 describe('Industry: data that fails to load', () => {
   it('says the blueprint data could not load instead of spinning, and loads it on Try again', async () => {
-    // Several mount-time readers call `loadBlueprints`; a one-shot rejection goes to whichever asks
-    // first, which is load-dependent, so fail every call until Try again.
     vi.mocked(loadBlueprints).mockRejectedValue(new Error('offline'));
     const user = userEvent.setup();
     await renderIndustryRoutes();
 
-    // Once visible, once announced by the always-mounted live region.
     expect((await screen.findAllByText("Blueprint data couldn't load")).length).toBeGreaterThan(0);
     vi.mocked(loadBlueprints).mockImplementation(async () => BLUEPRINTS);
     await user.click(screen.getByRole('button', { name: 'Try again' }));
@@ -136,19 +133,13 @@ describe('Industry: Build Plan CRUD', () => {
     expect(stored).toHaveLength(1);
     expect(stored[0].blueprintTypeID).toBe(638);
     expect(stored[0].name).toBe('Rifter');
-    // No prior plan to default from: falls back to the historical hardcoded defaults (#456).
     expect(stored[0].facility).toBe('npcStation');
     expect(stored[0].rigFit).toEqual(['none', 'none', 'none']);
     expect(stored[0].security).toBe('highsec');
     expect(stored[0].hubId).toBe(DEFAULT_TRADE_HUB.id);
     expect(stored[0].facilityTaxPct).toBeUndefined();
-    // Creating stays on the index — a search-and-add is a list-management
-    // action, not "go start editing this" (that's what clicking the row, or
-    // a `?product=` deep link, is for).
     expect(window.location.pathname).toBe('/industry/plans');
 
-    // Move-to-group, rename, duplicate and delete are the row's one trailing
-    // ⋮ (also its right-click menu).
     const rifterRow = screen.getByRole('button', { name: 'Rifter' }).closest('li')!;
     await user.click(within(rifterRow).getByRole('button', { name: 'More actions for Rifter' }));
     await user.click(await screen.findByRole('menuitem', { name: 'Rename' }));
@@ -158,14 +149,12 @@ describe('Industry: Build Plan CRUD', () => {
     expect(await screen.findByRole('button', { name: 'Rifter run' })).toBeInTheDocument();
 
     const row = screen.getByRole('button', { name: 'Rifter run' }).closest('li')!;
-    // No standalone Delete button: it is a danger item in the ⋮.
     expect(within(row).queryByRole('button', { name: /^Delete/ })).not.toBeInTheDocument();
 
     fireEvent.contextMenu(within(row).getByRole('button', { name: 'Rifter run' }));
     await user.click(await screen.findByRole('menuitem', { name: 'Duplicate' }));
     expect(await screen.findByRole('button', { name: 'Rifter run (copy)' })).toBeInTheDocument();
     expect(await db.buildPlans.where('characterId').equals(CHAR_ID).count()).toBe(2);
-    // Duplicate also stays on the index, same reasoning as create.
     expect(window.location.pathname).toBe('/industry/plans');
 
     const originalRow = screen.getByRole('button', { name: 'Rifter run' }).closest('li')!;
@@ -173,12 +162,10 @@ describe('Industry: Build Plan CRUD', () => {
       within(originalRow).getByRole('button', { name: 'More actions for Rifter run' })
     );
     await user.click(await screen.findByRole('menuitem', { name: 'Delete' }));
-    // No dialog: the row hides at once and an Undo toast names the plan.
     expect(screen.queryByRole('dialog', { name: 'Delete Build Plan' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Rifter run' })).not.toBeInTheDocument();
     expect(await screen.findByRole('button', { name: 'Undo' })).toBeVisible();
     expect(screen.getAllByText('Deleted "Rifter run"').length).toBeGreaterThan(0);
-    // Nothing is written until the toast ends.
     expect(await db.buildPlans.where('characterId').equals(CHAR_ID).count()).toBe(2);
     await user.click(screen.getByRole('button', { name: 'Undo' }));
     expect(await screen.findByRole('button', { name: 'Rifter run' })).toBeInTheDocument();
@@ -188,7 +175,6 @@ describe('Industry: Build Plan CRUD', () => {
     const againRow = screen.getByRole('button', { name: 'Rifter run' }).closest('li')!;
     await user.click(within(againRow).getByRole('button', { name: 'More actions for Rifter run' }));
     await user.click(await screen.findByRole('menuitem', { name: 'Delete' }));
-    // Closing the toast commits the delete at once.
     await user.click(await screen.findByRole('button', { name: 'Close' }));
     await waitFor(() =>
       expect(screen.queryByRole('button', { name: 'Rifter run' })).not.toBeInTheDocument()
@@ -202,8 +188,6 @@ describe('Industry: Build Plan CRUD', () => {
   });
 
   it('starts a new plan at the remembered location, with the hub from the most-recently-updated plan', async () => {
-    // The location the pilot last set from a plan page — the Raitaru in Tama
-    // — is what a new plan builds at, whatever plan was touched last.
     await db.settings.put({
       key: FACILITY_DEFAULTS_SETTING_KEY,
       value: {
@@ -218,8 +202,6 @@ describe('Industry: Build Plan CRUD', () => {
         setOnPlanPage: true,
       },
     });
-    // Older plan first: its hub must lose to the newer one below, proving the
-    // hub still comes from the most-recently-updated plan (#456).
     await db.buildPlans.add(
       seedPlan({
         id: 'bp-old',
@@ -229,8 +211,6 @@ describe('Industry: Build Plan CRUD', () => {
         updatedAt: 3,
       })
     );
-    // The newest plan builds somewhere else entirely; none of its location
-    // carries — only its hub.
     await db.buildPlans.add(
       seedPlan({
         id: 'bp-parts',
@@ -269,9 +249,6 @@ describe('Industry: Build Plan CRUD', () => {
     expect(created?.facilityTaxPct).toBe(0.25);
     expect(created?.buildSystemId).toBe(30002813);
     expect(created?.buildSystemName).toBe('Tama');
-    // The place the pilot actually named comes along with the fields it filled
-    // (#527): a new plan whose facility/system/band all came from the Raitaru
-    // in Tama must not show an empty location box.
     expect(created?.buildLocationId).toBe(1035466617946);
     expect(created?.buildLocationName).toBe('Tama - Sosala Raitaru');
   });
@@ -299,9 +276,6 @@ describe('Industry: "jump to a Build Plan" from the Market Browser (issue #6)', 
   });
 
   it('opens the matching plan even when it is not the first plan for the character', async () => {
-    // A different (unrelated) plan seeded first, so "just open plans[0]" is
-    // the wrong answer — this is what the naive version of this feature
-    // looked like before the fix.
     await db.buildPlans.add(seedPlan({ id: 'bp-0', name: 'Other plan', blueprintTypeID: 9841 }));
     await db.buildPlans.add(seedPlan({ id: 'bp-1', name: 'Rifter run' }));
     window.history.pushState({}, '', '/industry?product=587');

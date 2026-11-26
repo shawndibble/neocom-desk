@@ -1,6 +1,3 @@
-// SRP claim values: the lost ship's Jita value (no cargo) beside the nearest Doctrine Fit's, for the
-// officer reading a claim. The pilot's own preview carries the ship's values (srpDoctrineStore.ts).
-
 import { fail, type Caller } from './actorAuth.js';
 import type { BookCall } from './corpTaxBook.js';
 import { readDoctrines } from './srpDoctrineRead.js';
@@ -14,10 +11,6 @@ import {
 import { authorizeSrpOfficer, claimRef, softJita, type SrpFileDeps } from './srpStore.js';
 import type { DoctrineFit, SrpClaimValues } from './srpTypes.js';
 
-/**
- * Appraises the victim's hull and its fitted modules and rigs (the same parts a Doctrine Fit lists,
- * so the comparison is like for like: no charges or drones), and the doctrine's list, if any.
- */
 export async function claimValuesOf(
   source: SrpKillmailSource,
   victim: EsiKillmail['victim'],
@@ -40,7 +33,6 @@ export async function claimValuesOf(
   };
 }
 
-/** An officer reads one claim's ship and doctrine values; nothing is written. */
 export async function getSrpClaimValues(
   deps: SrpFileDeps,
   caller: Caller,
@@ -71,7 +63,6 @@ export async function getSrpClaimValues(
   );
 }
 
-/** `{ killmailId }` of the request; the claim id is the killmail id. */
 export function parseClaimValuesInput(data: unknown): { killmailId: number } {
   const id = (data as { killmailId?: unknown } | null)?.killmailId;
   if (typeof id !== 'number' || !Number.isInteger(id) || id < 1 || id > 2_147_483_647) {

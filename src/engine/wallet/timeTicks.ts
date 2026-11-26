@@ -1,17 +1,9 @@
 import { HOUR_MS, DAY_MS } from '@/lib/age';
-/**
- * Tick positions for the Wallet Balance chart's time axis. Pure: the chart
- * scales its X axis by timestamp, so Recharts' own "nice" numbers would land
- * on arbitrary instants and repeat a date label; these fall on day boundaries
- * in the viewer's zone instead.
- */
 
-/** Below this span a date-only label would repeat, so ticks carry a time. */
 const TIME_TICK_SPAN_MS = 2 * DAY_MS;
 
 export interface TimeAxisTicks {
   ticks: number[];
-  /** True when the labels must show time of day, not just the date. */
   showTime: boolean;
 }
 
@@ -42,11 +34,9 @@ function zoneParts(ts: number, timeZone: string | undefined) {
   };
 }
 
-/** The instant the wall-clock date `y-m-d` (00:00) begins in `timeZone`. */
 function zonedMidnight(y: number, m: number, d: number, timeZone: string | undefined): number {
   const wall = Date.UTC(y, m - 1, d);
   let guess = wall;
-  // Offset depends on the instant, so settle it in two passes (covers DST edges).
   for (let i = 0; i < 2; i++) {
     guess = wall - (zoneParts(guess, timeZone).asUtc - guess);
   }

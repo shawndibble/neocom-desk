@@ -12,7 +12,6 @@ vi.mock('@/features/industry/blueprintCatalog', () => ({
   loadBlueprintCatalog: vi.fn(),
 }));
 
-// The real modal reads ESI; what's under test here is that a page has one.
 vi.mock('./ItemDetailModal', () => ({
   ItemDetailModal: ({ itemName, onClose }: { itemName: string; onClose: () => void }) => (
     <div role="dialog" aria-label={itemName}>

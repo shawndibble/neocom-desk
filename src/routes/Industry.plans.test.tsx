@@ -30,9 +30,6 @@ describe('Industry: a Build Plan seeded from a BPC listing (issue #637)', () => 
 
     expect(await screen.findByRole('heading', { name: 'Rifter' })).toBeInTheDocument();
     const created = await db.buildPlans.where('characterId').equals(CHAR_ID).first();
-    // Named for the copy it quotes: a pilot can hold a plain plan and several
-    // seeded plans for one blueprint, and rows all reading "Rifter" would be
-    // unusable.
     expect(created?.name).toBe('Rifter 10/20 ×5');
     expect(created?.me).toBe(10);
     expect(created?.te).toBe(20);
@@ -41,7 +38,6 @@ describe('Industry: a Build Plan seeded from a BPC listing (issue #637)', () => 
   });
 
   it('beats an owned copy of the same blueprint at different research', async () => {
-    // The pilot is judging a copy they might buy, not the one in the hangar.
     server.use(
       http.get(`https://esi.evetech.net/characters/${CHAR_ID}/blueprints`, () =>
         HttpResponse.json([
@@ -73,8 +69,6 @@ describe('Industry: a Build Plan seeded from a BPC listing (issue #637)', () => 
 
     await screen.findByRole('heading', { name: 'Rifter' });
     await waitFor(() => expect(window.location.search).toBe(''));
-    // The plain plan is untouched, and exactly one plan was added — the create
-    // effect must settle rather than re-fire once the seeded plan exists.
     expect(await db.buildPlans.where('characterId').equals(CHAR_ID).count()).toBe(2);
     expect((await db.buildPlans.get('bp-1'))?.me).toBe(0);
   });
@@ -93,8 +87,6 @@ describe('Industry: a Build Plan seeded from a BPC listing (issue #637)', () => 
   });
 
   it('leaves the unseeded path alone when only some of the three numbers arrive', async () => {
-    // A truncated or hand-edited URL is not a half-seeded intent: it falls all
-    // the way back to the ordinary `?product=` behaviour.
     await db.buildPlans.add(seedPlan());
     window.history.pushState({}, '', '/industry?product=587&me=10');
     await renderIndustryRoutes();
@@ -177,13 +169,10 @@ describe('Industry: "View in Industry as material" from Assets (issue #414)', ()
 
     await waitFor(() => expect(window.location.pathname).toBe('/industry/plans/bp-1'));
     await waitFor(() => expect(window.location.search).toBe(''));
-    // Never creates a plan — only opens among the character's existing ones.
     expect(await db.buildPlans.where('characterId').equals(CHAR_ID).count()).toBe(1);
   });
 
   it('opens the correct plan when it is not the only one seeded', async () => {
-    // Material 35 (Pyerite) is a Rifter-only input — 9841 (Mechanical Parts)
-    // doesn't consume it, unlike Tritanium (34), which both blueprints share.
     await db.buildPlans.add(seedPlan({ id: 'bp-0', name: 'Other plan', blueprintTypeID: 9841 }));
     await db.buildPlans.add(seedPlan({ id: 'bp-1', name: 'Rifter run', blueprintTypeID: 638 }));
     window.history.pushState({}, '', '/industry?material=35');
@@ -195,7 +184,6 @@ describe('Industry: "View in Industry as material" from Assets (issue #414)', ()
 
   it('clears the query param without opening or creating anything when no plan consumes that material', async () => {
     await db.buildPlans.add(seedPlan({ blueprintTypeID: 9841 }));
-    // 999: not a material of either fixture blueprint.
     window.history.pushState({}, '', '/industry?material=999');
     await renderIndustryRoutes();
 
@@ -215,9 +203,7 @@ describe('Industry: owned-blueprint reauth', () => {
     );
     await renderIndustryRoutes();
 
-    // The test grant lacks the blueprints scope, so the banner names that Permission.
     expect(await screen.findByText(/: grant Industry$/)).toBeInTheDocument();
-    // The Build Plan list and Active Jobs panel still render.
     expect(await screen.findByRole('searchbox', { name: 'Add Build Plan' })).toBeInTheDocument();
     expect(screen.getByText('Jobs')).toBeInTheDocument();
   });
@@ -247,11 +233,6 @@ describe('Industry: Opportunities "Add to Compare" for an alt-owned row (issue #
       http.get(`https://esi.evetech.net/characters/${ALT_ID}/skillqueue`, () =>
         HttpResponse.json([])
       ),
-      // Both Characters' industry modifiers read implants. Left unhandled,
-      // those reads error and the modifiers settle late — after the rows are
-      // on screen — so the recompute swaps the rows out under the second
-      // click. (Masked until the Foreground Poller stopped warming the same
-      // reads at mount.)
       http.get('https://esi.evetech.net/characters/:id/implants', () => HttpResponse.json([])),
       http.get(`https://esi.evetech.net/characters/${ALT_ID}/blueprints`, () =>
         HttpResponse.json([
@@ -285,17 +266,12 @@ describe('Industry: Opportunities "Add to Compare" for an alt-owned row (issue #
     await renderIndustryRoutes();
     const user = userEvent.setup();
 
-    // The page defaults to "This character" (91, no blueprints); switch to
-    // "All characters" to see the alt's two Rifter/Mechanical Parts BPOs.
-    // Industry's one picker, in the page header, drives Opportunities and
-    // Active Jobs alike.
     await screen.findByRole('heading', { name: 'Build Opportunities' });
     const pageHeader = screen
       .getByRole('heading', { level: 1, name: 'Industry' })
       .closest('header')!;
     await user.click(await within(pageHeader).findByRole('button', { name: 'This character' }));
     await user.click(await screen.findByRole('menuitemradio', { name: /^All characters/ }));
-    // The filter lives in the URL, so a reload keeps it.
     expect(new URLSearchParams(window.location.search).get('industry.chars')).toBe('all');
 
     await user.click(
@@ -304,8 +280,6 @@ describe('Industry: Opportunities "Add to Compare" for an alt-owned row (issue #
     await user.click(
       screen.getByRole('checkbox', { name: 'Select Mechanical Parts to compare plans' })
     );
-    // Below `lg` (jsdom matches no media query) Compare lives in the phone
-    // list's bar pinned above the tab bar, not the panel header.
     const compareBar = screen.getByRole('region', { name: 'Compare selected blueprints' });
     await user.click(within(compareBar).getByRole('button', { name: 'Compare' }));
 
@@ -320,9 +294,6 @@ describe('Industry: Opportunities "Add to Compare" for an alt-owned row (issue #
 
 describe('Industry: Build Opportunities waits for the pricing-settings hydration gate (#2054)', () => {
   it('shows a spinner in place of the panel, and never mounts it, until Assumed ME hydrates', async () => {
-    // The workspace's own mount effect (`buildPlanPricingInputs.ts`) hydrates
-    // the store once this page renders; held here so the gated frame can't be
-    // raced past by a fast Dexie read.
     const assumedMe = holdHydration(useAssumedMe, 0);
     window.history.pushState({}, '', '/industry/opportunities');
     try {
@@ -337,13 +308,9 @@ describe('Industry: Build Opportunities waits for the pricing-settings hydration
       assumedMe.restore();
     }
 
-    // Mounts once the (real, Dexie-backed) hydrate() call settles. Market-Wide
-    // Build Opportunities reads no pricing input, so it's unaffected and
-    // renders alongside the now-mounted panel.
     expect(await screen.findByRole('heading', { name: 'Build Opportunities' })).toBeInTheDocument();
     const profitable = screen.getByRole('heading', { name: "What's profitable" });
     expect(profitable).toBeInTheDocument();
-    // Owning no blueprints leaves the order alone: the market-wide scan leads.
     expect(
       profitable.compareDocumentPosition(
         screen.getByRole('heading', { name: 'Build Opportunities' })

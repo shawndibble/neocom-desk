@@ -25,11 +25,9 @@ import {
 } from './planQuestion';
 
 interface Props extends GoalPlannerPanelProps {
-  /** A `?type=` seed is on its way to becoming a goal. */
   seedingGoal: boolean;
 }
 
-/** What each answer does. */
 const QUESTION_HINT: Record<PlanQuestion, string> = {
   'make-more': 'piPlan.picker.makeMoreHint',
   'find-best': 'piPlan.picker.findBestHint',
@@ -47,7 +45,6 @@ function Option({
   selected: boolean;
   onSelect: () => void;
   title: string;
-  /** Why an unavailable option can't be picked, beside its title. */
   note?: string;
 }) {
   return (
@@ -72,11 +69,6 @@ function Option({
   );
 }
 
-/**
- * The Plan tab: a question picker over three answers. "Make more from my
- * planets" and "Find the best thing to build" read the recommendation model;
- * "Make a specific product" is the Goal Planner, in place, with every deep link it had (`?goals=`, `?off=`).
- */
 export function PlanPanel(props: Props) {
   const { t } = useTranslation();
   const { characterId, goals, seedingGoal } = props;
@@ -84,9 +76,6 @@ export function PlanPanel(props: Props) {
   const { snapshot, failed, retrying, retry } = usePiSnapshot(characterId);
   const { hash } = useLocation();
   const [urlQuestion, setUrlQuestion] = useUrlParam('q', planQuestionParam);
-  // `#customs` (the "Set the rate" links) opens the Goal Planner, where the rate is edited,
-  // until the pilot picks a question. A pick always writes `?q=` (the opening question depends
-  // on colonies, so it is no fixed default) and drops the hash.
   const picked = pickedQuestion(urlQuestion, hash);
   const setPicked = (question: PlanQuestion) => setUrlQuestion(question, { clearHash: true });
 
@@ -105,10 +94,7 @@ export function PlanPanel(props: Props) {
       </div>
     );
   }
-  // The colony read failed: colonies are unknown, not none. Plan runs as for a pilot with no
-  // colonies (Find best opens), and the notice sits in the colony slot, above the answers.
   const esiFailed = snapshot.fetchFailed;
-  // A refused read (re-login needed) is unknown too, but the page banner owns that notice.
   const unknown = colonyCountUnknown(snapshot);
   const colonyCount = snapshot.colonies.length;
   const opening = openingQuestion({
@@ -116,7 +102,6 @@ export function PlanPanel(props: Props) {
     colonyCount,
   });
   const wanted = picked ?? opening.question;
-  // The URL may still say make-more; the view shows Find best until the colonies can be read.
   const question = unknown && wanted === 'make-more' ? 'find-best' : wanted;
 
   const hint =
@@ -129,7 +114,6 @@ export function PlanPanel(props: Props) {
           { count: colonyCount }
         );
 
-  // A failed read and an empty colony list are state the pilot must see; the "opened because" and per-question notes ride a tooltip.
   const hintVisible =
     unknown || esiFailed || (question === 'make-more' && colonyCount === 0 && picked !== null);
 
@@ -146,7 +130,6 @@ export function PlanPanel(props: Props) {
       )}
       <div ref={resultRef} tabIndex={-1} className="space-y-4 outline-none">
         <Panel padded={false}>
-          {/* Heading sr-only: the options name the picker visibly. */}
           <h2 id={pickerHeadingId} className="sr-only">
             {t('piPlan.picker.title')}
           </h2>
@@ -174,7 +157,6 @@ export function PlanPanel(props: Props) {
                 title={t('piPlan.picker.product')}
               />
             </div>
-            {/* Why this question opened, then what it does: a note, not a line of its own. */}
             {!hintVisible && (
               <div className="flex shrink-0 items-center border-l border-line px-3">
                 <InfoTooltip label={t('piPlan.picker.hintLabel')} glyph="info" content={hint} />

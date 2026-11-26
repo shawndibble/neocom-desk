@@ -1,11 +1,3 @@
-/**
- * The pace figures under the Survey's charts, on the same time axis as the chart
- * above them: `TotalPaceFigure` (Ore left) is the mining rate between each pair
- * of scans as one area; `ByOrePaceFigure` (Depletion by ore) is, per interval, each ore's
- * share of the progress made (a 100% bar). Each carries its hidden data table.
- * Statically imports `recharts`, so — same rule as `SurveyCharts.tsx` — this must only
- * be reached through a dynamic `import()` from `SurveyBoard.tsx`.
- */
 import { scalePx } from '@/lib/fontScale';
 import { useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -33,7 +25,6 @@ import {
 } from './surveyChartParts';
 import { PaceByOreChart } from './SurveyViewCharts';
 
-/** Room a rate label needs, in px: "1,116" at 10px. */
 const RATE_LABEL_GAP = 34;
 
 function PaceFigure({
@@ -77,19 +68,14 @@ export function TotalPaceFigure({ summary }: { summary: SurveySummary }) {
     [summary, t]
   );
 
-  // The rate is one flat block per pair of scans, from the earlier scan to the
-  // later: a step area drawn from each interval's start, closed at the last
-  // scan. The values are labelled at the middle of each block.
   const last = summary.intervals[summary.intervals.length - 1];
   if (last === undefined) return null;
-  // A squeezed gap has no rate: nothing was measured across it, so it draws at zero, unlabelled.
   const rateSteps = [
     ...summary.intervals.map((i) => ({ at: i.from, rate: i.gap ? 0 : i.rate })),
     { at: last.to, rate: last.gap ? 0 : last.rate },
   ];
   const measured = summary.intervals.filter((i) => !i.gap);
   const rateLabels = measured.map((i) => ({ at: (i.from + i.to) / 2, rate: i.rate }));
-  // Labels are thinned to the ones that fit; the tooltip carries the rest.
   const shown = thinLabels(
     rateLabels.map((r) => ({ at: r.at, weight: r.rate })),
     domain,
@@ -181,7 +167,6 @@ export function ByOrePaceFigure({ summary }: { summary: SurveySummary }) {
         header: t('survey.tableProgress'),
         render: (i: PaceInterval) => `${formatPace(i.progress)}%`,
       },
-      // One column per ore: its share of the interval's progress, then its raw percent in brackets.
       ...pace.activeOres.map((ore) => ({
         id: `ore:${ore}`,
         header: ore,

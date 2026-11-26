@@ -1,9 +1,3 @@
-/**
- * The trip's estimated flight time (issue #6282): one muted line under the
- * facts strip. "≈ 24 min warp to 0 · ≈ 41 min autopilot" for the route ship,
- * a prompt to pick one when there is none, and nothing while loading or when
- * the figure cannot be known.
- */
 import { useTranslation } from 'react-i18next';
 import { HintText } from '@/components/ui/HintText';
 import type { RouteSafetyTrip } from '@/engine/route/routeSafetyTrip';

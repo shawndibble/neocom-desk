@@ -1,15 +1,3 @@
-/**
- * Sample Communities for page stories: an in-memory stand-in for the
- * Community backend (`setCommunityBackendOverride`), so the page shows a
- * populated list with no network or sign-in. Stateful, so approving a request,
- * removing a Member or regenerating the link behaves in Storybook.
- *
- * Two Communities: one the active sample Character admins (every control
- * shows, a join request waits) and one it is only a Member of (Leave shows).
- * Both carry shared blueprints, Fittings and Skill plans, so the content
- * tabs' Everyone views fill, and the sample Character's own share shows under
- * Mine.
- */
 import type {
   CommunityRequest,
   PledgeEntry,
@@ -39,12 +27,6 @@ const ME = uidForCharacter(SAMPLE_ACTIVE_CHARACTER.characterId);
 const OTHER = uidForCharacter(SAMPLE_CHARACTERS[1].characterId);
 
 export interface CommunitiesFixtureOptions {
-  /**
-   * Adds the Member's delivery states to the board's Request panel (issue
-   * #3809): a copy delivered with 5 runs where 10 were asked (flagged), and a
-   * delivered amount the Member typed (manual). Off by default so the board's
-   * pictured counts stay as the mockup shows them.
-   */
   deliveryDemo?: boolean;
 }
 
@@ -159,7 +141,6 @@ export function createCommunitiesFixture(
     source,
     name,
     hull,
-    // A sample, not a decodable Fitting Share Code: the list only links to it.
     code: `sample-${key}`,
     updatedAt: now - DAY_MS,
   });
@@ -301,7 +282,6 @@ export function createCommunitiesFixture(
   if (options.deliveryDemo) {
     myReactivePledge[2] = { quantity: 175000, delivered: 40000, contractIds: [], manual: 40000 };
   }
-  // Request id to its Pledges, per Community: the board's pictured progress and statuses.
   const pledges: Record<string, Record<string, RequestPledge[]>> = {
     [SAMPLE_ADMIN_COMMUNITY_ID]: {
       'req-1': [
@@ -360,7 +340,6 @@ export function createCommunitiesFixture(
   });
   const fleetPayouts: Record<string, FleetPayout[]> = {
     [SAMPLE_ADMIN_COMMUNITY_ID]: [
-      // Mine, half paid.
       fleetPayout(
         'fp-1',
         ME,
@@ -371,9 +350,7 @@ export function createCommunitiesFixture(
         2,
         4
       ),
-      // Someone else's, with me on the list.
       fleetPayout('fp-2', 'char:2119000002', 'Dax Orrelin', 'Wormhole ratting', 5, [ME], 0, 3),
-      // Past its 30 days: the page does not show it.
       fleetPayout('fp-3', ME, SAMPLE_ACTIVE_CHARACTER.name, 'Old moon pop', 40, [], 3, 3),
     ],
   };

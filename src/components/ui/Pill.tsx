@@ -11,7 +11,6 @@ const PILL_TONE_CLASS: Record<PillTone, string> = {
   danger: 'bg-danger/15 text-danger',
 };
 
-/** Outlined badge: a 1px edge and a faint fill, for a tag that must hold up beside a name in a dense row. */
 const PILL_OUTLINED_CLASS: Record<PillTone, string> = {
   neutral: 'border-line-bright text-text-dim',
   accent: 'border-accent/45 bg-accent/10 text-accent',
@@ -22,24 +21,11 @@ const PILL_OUTLINED_CLASS: Record<PillTone, string> = {
 
 interface PillProps {
   children: ReactNode;
-  /** Tint of the fill and text; `neutral` is the quiet default. */
   tone?: PillTone;
-  /**
-   * An edged badge at a fixed 18px height that never shrinks in a flex row
-   * (the PI verb and flag tags). Still static: the edge is a tag's outline,
-   * not a control's box, so it carries no hover or focus state.
-   */
   outlined?: boolean;
-  /** Spacing and layout only; the type recipe and tint are fixed. */
   className?: string;
 }
 
-/**
- * A tinted inline badge: uppercase label on a flat fill at one tone, no box
- * (it is static, and a box means "you can click this" — DESIGN.md §6).
- *
- * @summary A static tinted badge beside a name or status ("Done", "Closed", "Corp").
- */
 export function Pill({ children, tone = 'neutral', outlined = false, className }: PillProps) {
   return (
     <span

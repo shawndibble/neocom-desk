@@ -19,13 +19,9 @@ const BACTERIA = 2393;
 const TEST_CULTURES = 2319;
 const NANITES = 2463;
 
-/** The Bacteria schematic, which is what ESI reports on a factory pin. */
 const BACTERIA_SCHEMATIC = 131;
-/** The Water schematic — also Basic Industry Facility, made from Aqueous Liquids. */
 const WATER_SCHEMATIC = 121;
-/** The Test Cultures schematic — Advanced Industry Facility, made from Bacteria and Water. */
 const TEST_CULTURES_SCHEMATIC = 86;
-/** Nanites — Advanced, from Bacteria and Reactive Metals, the second of which no temperate planet has. */
 const NANITES_SCHEMATIC = 78;
 
 function colony(overrides: Partial<BuiltColonyAdvice> = {}): BuiltColonyAdvice {
@@ -66,20 +62,12 @@ describe('saleableOutputPerHour', () => {
   });
 
   it('credits a made tier at its fed rate, not its built one', () => {
-    // The reported colony: eight Basic Industry Facilities on Bacteria fed by
-    // 21,201 Microorganisms/hr — `factoryBalanceModel.ts`'s own worked
-    // example, 141.34 Bacteria/hr, a supply figure and not a pin count.
     const out = saleableOutputPerHour(colony(), pi);
     expect(out.size).toBe(1);
     expect(out.get(BACTERIA)).toBeCloseTo((21_201 / 6_000) * 40, 5);
   });
 
   it('nets a two-hop local chain down to just the top tier', () => {
-    // A full P0 -> P1 -> P2 chain built entirely on this planet: Bacteria and
-    // Water each saturate exactly one pin, and Test Cultures saturates one
-    // more off both of them. Every P0 and every P1 is fully consumed locally,
-    // so only Test Cultures — the tier that actually leaves the planet —
-    // should survive the netting.
     const out = saleableOutputPerHour(
       colony({
         extractors: [
@@ -102,10 +90,6 @@ describe('saleableOutputPerHour', () => {
   });
 
   it('reports nothing for a colony whose own extraction exists but could not be projected', () => {
-    // Extractor pins are present, but none of them yielded a rate — every
-    // local factory would otherwise read as fed from off-planet and be
-    // credited at its built pin count, manufacturing a figure out of zero
-    // measurement.
     const out = saleableOutputPerHour(
       colony({
         extractors: [
@@ -119,10 +103,6 @@ describe('saleableOutputPerHour', () => {
   });
 
   it('credits a genuinely import-fed colony at its built pin count', () => {
-    // No extractor pins at all — this colony's Bacteria and Water arrive from
-    // a sibling planet, which `factoryBalance.ts` already handles by crediting
-    // the built count. Two Advanced Industry Facilities on Test Cultures, 5/hr
-    // each.
     const out = saleableOutputPerHour(
       colony({
         extractors: [],
@@ -150,7 +130,6 @@ describe('builtColonyEarnings', () => {
       taxRate: 0.1,
       salesTaxPct: 0,
     });
-    // 1,000 - 0.1*400 = 960/unit, times the fed rate, not eight pins' worth.
     expect(result.iskPerHour).toBeCloseTo((21_201 / 6_000) * 40 * 960, 2);
     expect(result.unpriced).toEqual([]);
   });
@@ -202,11 +181,6 @@ describe('totalColonyEarnings', () => {
 
 describe('saleableOutputPerHour, against a line with one imported input', () => {
   it('does not sell the Bacteria its own Nanite pins are eating', () => {
-    // The reported colony: 6,865 Microorganisms an hour into four Bacteria
-    // pins, feeding eight Advanced pins on Nanites. Nanites also want Reactive
-    // Metals, which this planet has none of, so that line reads
-    // `inputs-not-local` — and its 320/hr appetite for the Bacteria made here
-    // used to vanish with it, leaving 45.8/hr on the books as sellable.
     const saleable = saleableOutputPerHour(
       colony({
         extractors: [
@@ -221,8 +195,6 @@ describe('saleableOutputPerHour, against a line with one imported input', () => 
       pi
     );
     expect(saleable.has(BACTERIA)).toBe(false);
-    // What the colony genuinely has to sell: the Nanites themselves, credited
-    // at the built pin count the imported route is assumed to feed.
     expect(saleable.get(NANITES)).toBeCloseTo(8 * 5, 6);
   });
 });

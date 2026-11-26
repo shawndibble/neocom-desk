@@ -1,15 +1,3 @@
-/**
- * The data behind the LP Store landing's Stores and Offers views
- * (`lpLanding.ts`): the LP offers snapshot (R2), every offer priced the way a
- * single store prices it (`computeLoyaltyOfferRows`, at the page's hub and
- * price basis, with the Character's skills and standing), each store's
- * market LP Value, the Character's balances, factions, item categories and
- * the jumps from the Current System.
- *
- * Every offer is priced in one market fetch and one pass. The pass waits for
- * the catalog, prices, names and daily volume, so the sales floor never
- * flashes a list that then shrinks.
- */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRetryableLoad } from '@/lib/useRetryableLoad';
 import { useActiveCharacter } from '@/stores/activeCharacter';
@@ -56,26 +44,17 @@ export interface LpLandingOption {
 
 export interface LpStoreLandingState {
   status: LpLandingStatus;
-  /** When the backend last published the offers snapshot. */
   syncedAt: number | null;
   stores: LpLandingStoreFacts[];
-  /** Empty until every offer is priced (`pricing`). */
   offers: LpLandingOffer[];
-  /** Offers are still being priced. */
   pricing: boolean;
-  /** LP Values are still being worked out. */
   valuing: boolean;
-  /** The Character's balances have been read (an empty list then means none held). */
   balancesKnown: boolean;
-  /** The balances read has finished, read or failed, or there is no Character to read. */
   balancesSettled: boolean;
   systemName: (systemId: number) => string | null;
   factionName: (factionId: number) => string | null;
-  /** The Current System is set and distances are resolved. */
   jumpsStatus: 'no-origin' | 'loading' | 'unknown' | 'ready';
-  /** Factions with an LP Store, by name; empty when ESI's faction list is unavailable. */
   factions: LpLandingOption[];
-  /** Root Market Groups of the offered items, by name. */
   categories: LpLandingOption[];
 }
 
@@ -84,12 +63,6 @@ interface Categories {
   names: ReadonlyMap<number, string>;
 }
 
-/**
- * `active` false while a store's modal covers the landing: nothing is priced
- * until the landing has been on screen once, so a store opened by a link does
- * not price every other store behind it. Once priced, a modal opened over the
- * landing keeps it priced.
- */
 export function useLpStoreLanding(active = true): LpStoreLandingState {
   const [warmed, setWarmed] = useState(active);
   if (active && !warmed) setWarmed(true);
@@ -115,7 +88,6 @@ export function useLpStoreLanding(active = true): LpStoreLandingState {
     clear: clearCatalogFailure,
   } = useRetryableLoad();
   const [catalog, setCatalog] = useState<BlueprintCatalog | null>(null);
-  // Keyed like the balances: a switch never prices with the previous Character's skills.
   const [skillsFor, setSkillsFor] = useState<{ characterId: number | null; skills: SkillLevels }>({
     characterId: activeCharacterId,
     skills: {},
@@ -158,11 +130,9 @@ export function useLpStoreLanding(active = true): LpStoreLandingState {
     };
   }, []);
 
-  // The market type list is large; read once the landing has been on screen.
   useEffect(() => {
     if (!warmed) return;
     let cancelled = false;
-    // Categories only add a filter: a failed read leaves every offer uncategorised.
     void Promise.all([loadMarketTypes(), loadMarketGroups()])
       .then(([types, groups]) => {
         if (cancelled) return;
@@ -186,7 +156,6 @@ export function useLpStoreLanding(active = true): LpStoreLandingState {
       (cat) => {
         if (!cancelled) setCatalog(cat);
       },
-      // Offers still list; blueprint offers just carry no build cost.
       () => {
         if (cancelled) return;
         setCatalog(EMPTY_BLUEPRINT_CATALOG);
@@ -198,7 +167,6 @@ export function useLpStoreLanding(active = true): LpStoreLandingState {
     };
   }, [catalogAttempt, failCatalog, clearCatalogFailure]);
 
-  // Keyed on the Character, so a switch never shows the previous one's balances.
   const [balances, setBalances] = useState<{
     characterId: number | null;
     list: CharacterLoyaltyPoints[] | null;
@@ -221,7 +189,6 @@ export function useLpStoreLanding(active = true): LpStoreLandingState {
       })
       .catch((err: unknown) => {
         console.warn('LP balances could not be read', err);
-        // Unread stays unknown, but the store list stops waiting on it.
         if (!cancelled) setBalances({ characterId: activeCharacterId, list: null, settled: true });
       });
     return () => {
@@ -232,7 +199,6 @@ export function useLpStoreLanding(active = true): LpStoreLandingState {
   useEffect(() => {
     if (activeCharacterId === null) return;
     let cancelled = false;
-    // Unread skills price at untrained, the same as no Character.
     void loadCorrectedSkills(activeCharacterId, Date.now(), { skipQueueWithoutScope: true })
       .then((corrected) => {
         if (cancelled) return;
@@ -259,7 +225,6 @@ export function useLpStoreLanding(active = true): LpStoreLandingState {
   useEffect(() => {
     if (!warmed || allOffers.length === 0) return;
     let cancelled = false;
-    // Unnamed offers still price; they fall back to the catalog's names or `#typeId`.
     void loadTypeNames(collectNameableTypeIds(allOffers))
       .then((names) => {
         if (!cancelled) setItemNames(names);
@@ -278,7 +243,6 @@ export function useLpStoreLanding(active = true): LpStoreLandingState {
   );
   const { snapshot, loading: snapshotLoading } = useMarketSnapshot(hub, hubHydrated ? typeIds : []);
 
-  // Market LP Values: priced for no particular pilot, the figure every other page uses.
   const [lpValues, setLpValues] = useState<{
     hubId: string;
     values: Map<number, number | null>;
@@ -290,14 +254,12 @@ export function useLpStoreLanding(active = true): LpStoreLandingState {
       .then((values) => {
         if (!cancelled) setLpValues({ hubId: hub.id, values });
       })
-      // Unvalued, not still valuing: every LP Value reads "—".
       .catch(() => {
         if (!cancelled) setLpValues({ hubId: hub.id, values: new Map() });
       });
     return () => {
       cancelled = true;
     };
-    // `hub` is derived from `hubId`; the id is the stable dependency.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [warmed, hubHydrated, hubId, offersByCorp]);
   const valuesForHub = lpValues?.hubId === hub.id ? lpValues.values : null;
@@ -343,7 +305,6 @@ export function useLpStoreLanding(active = true): LpStoreLandingState {
     catalog !== null && snapshot !== null && itemNames !== null && volumeSettled && demandSettled;
   const rows = useMemo(() => {
     if (!ready) return null;
-    // Every hub price on the page at the LP Store's price percent (issue #6531).
     const priced = lpPricesAtPercent(snapshot, demand?.types, pricePercent);
     return computeLoyaltyOfferRows({
       offers: allOffers,
@@ -357,7 +318,6 @@ export function useLpStoreLanding(active = true): LpStoreLandingState {
       standing,
       materialSourcing: undefined,
       itemNames,
-      // Affordability is per store here (`lpLanding.ts`), from each balance.
       playerLp: null,
       sellsPerDayByType: volume,
       tradedPrices: priced.tradedPrices,

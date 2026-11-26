@@ -10,10 +10,7 @@ import {
 import type { PushSender } from './projectionStore.js';
 import type { ServerEventFire } from './serverEvents.js';
 
-// Just enough Firestore for this module: docs by path, `where` with
-// array-contains / array-contains-any, get/update/delete.
 type Data = Record<string, unknown>;
-// Loose on purpose: the module under test only reaches these members.
 type FakeDocRef = Record<string, unknown> & { id: string };
 type FakeCollection = Record<string, unknown>;
 

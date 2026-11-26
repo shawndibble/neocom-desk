@@ -46,8 +46,6 @@ vi.mock('virtual:pwa-register/react', () => ({
   }),
 }));
 
-// The panel is a tab on Industry, so mounting it mounts Industry's own
-// loaders too — `loadPi` included. Same stub set as Industry.test.tsx.
 vi.mock('@/sde/loadSde', () => ({
   loadSkills: vi.fn(async () => []),
   loadTypes: vi.fn(async () => ({})),
@@ -56,11 +54,6 @@ vi.mock('@/sde/loadSde', () => ({
   loadMarketWideTrees: vi.fn(async () => ({})),
 }));
 
-// Turning `isSyncConfigured` on lets `App` fire a real sync at boot (and the
-// background sweep), which initializes Firebase; its heartbeat then opens
-// IndexedDB and can call back after jsdom has torn down ("self is not
-// defined", an unhandled error that fails the shard). The UI under test only
-// needs the flag, not a sync.
 vi.mock('@/sync', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/sync')>()),
   triggerSync: vi.fn(async () => {}),
@@ -90,10 +83,6 @@ vi.mock('@/features/industry/data', () => ({
   findOwnedBlueprint: vi.fn(),
 }));
 
-// Location resolution (`blueprintLocation.ts`) goes through the SDE snapshot
-// and, for player structures, ESI — neither of which this file otherwise
-// mocks. Mocked directly at the module boundary so Space-filter/column tests
-// control what each `location_id` resolves to without needing a real fetch.
 const loadBlueprintLocation = vi
   .fn<
     (
@@ -119,8 +108,6 @@ vi.mock('@/features/bpcContracts/blueprintLocation', () => ({
   loadContractLocationInfo: (...args: [number]) => loadContractLocationInfo(...args),
 }));
 
-// The Jump Range's origin and distances. No game location unless a test says
-// otherwise, so the range filter reads "set your system" and filters nothing.
 const loadCharacterSolarSystemId = vi.fn<(characterId: number) => Promise<number | null>>();
 vi.mock('@/features/character/location', () => ({
   loadCharacterSolarSystemId: (characterId: number) => loadCharacterSolarSystemId(characterId),
@@ -134,8 +121,6 @@ vi.mock('@/features/route/localRoute', async (importOriginal) => {
   };
 });
 
-// BPO cards place a station by its system (issue #1241), through the same
-// local SDE lookups Item Offers uses. Only the Jita hub station is known.
 vi.mock('@/sde/npcStations', () => ({
   lookupNpcStation: vi.fn(async (stationId: number) =>
     stationId === 60003760
@@ -155,7 +140,6 @@ vi.mock('@/sde/solarSystems', async (importOriginal) => {
   };
 });
 
-// Market BPO lookups (issue #1241). Empty books unless a test says otherwise.
 const getOrderBook =
   vi.fn<
     (
@@ -171,26 +155,22 @@ vi.mock('@/features/market/orderBook', async (importOriginal) => {
   };
 });
 
-// LP Store source: the pilot's LP corporations' blueprint offers. None unless a test says otherwise.
 const findLpOfferMatches = vi.fn();
 vi.mock('@/features/market/appraisalLpAcquisition', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/features/market/appraisalLpAcquisition')>();
   return { ...actual, findLpOfferMatches: (...args: unknown[]) => findLpOfferMatches(...args) };
 });
 
-// No item trades in a Global Market Region unless a test says otherwise.
 const loadGlobalMarkets = vi.fn<() => Promise<GlobalMarketEntry[]>>();
 vi.mock('@/sde/loadMarketSde', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/sde/loadMarketSde')>();
   return { ...actual, loadGlobalMarkets: () => loadGlobalMarkets() };
 });
 
-// Community source: the Shared Blueprints other Members hold. None unless a test says so.
 const communityRows = vi.hoisted(() => ({ value: [] as BpcSearchRow[] }));
 vi.mock('@/features/bpcContracts/useCommunityBlueprintOffers', () => ({
   useCommunityBlueprintOffers: () => ({ rows: communityRows.value, loading: false }),
 }));
-// "Ask to copy…" opens the Requests compose dialog; its own test covers the roster load.
 vi.mock('@/features/communities/AskToCopyDialog', () => ({
   AskToCopyDialog: ({
     offer,
@@ -310,10 +290,6 @@ async function resetSession() {
   usePublicInfo.setState({ byCharacterId: {} });
   usePublicInfoModalStore.setState({ request: null });
   useTimeFormat.setState({ value: DEFAULT_TIME_FORMAT, hydrated: false });
-  // These two are Dexie-backed singletons (`createLocalSetting`): once
-  // hydrated, `hydrate()` no-ops, so a value one test writes (e.g. toggling
-  // the Space chips or a column) would otherwise leak into every later test
-  // in this file despite `db.settings.clear()` above.
   useSpaceFilter.setState({ value: DEFAULT_SPACE_FILTER, hydrated: false });
   useBpcSources.setState({ value: DEFAULT_SOURCE_TOGGLES, hydrated: false });
   useVisibleBpcSearchColumns.setState({
@@ -347,11 +323,6 @@ async function resetSession() {
 }
 
 beforeAll(async () => {
-  // One throwaway render of the panel, so no test pays for the first one. A
-  // worker's first render — compiling the route's chunks, warming jsdom and
-  // React — took ~4.5s even on a quiet machine, against the 5s `findBy*`
-  // budget, and failed whichever test ran first on a loaded CI shard. Done
-  // here under the hook's own budget.
   await resetSession();
   loadPublicBpcContracts.mockResolvedValue(
     cachedSnapshot([row({ contractId: 1, typeId: 638, regionId: 10000002 })])
@@ -359,11 +330,9 @@ beforeAll(async () => {
   const { unmount } = renderIndustry();
   await screen.findByRole('table', { name: 'BPC Sourcing' }, { timeout: 25_000 });
   unmount();
-  // The shell's chunk, for the one test that renders `<App />`.
   await routeChunks.loadLayout();
 }, 30_000);
 
-/** The Industry page (Sourcing is its tab) on its route, without App's boot or the shell. */
 function renderIndustry() {
   return renderPageRoute('/industry', <Industry />);
 }
@@ -373,12 +342,10 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-/** Every `FilterBar` keeps its controls behind the funnel, so open it first. */
 async function openFilters(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByRole('button', { name: /^Filters/ }));
 }
 
-/** Which filter dropdown each option lives in. */
 const FILTER_FIELD: Record<string, string> = {
   Contracts: 'Source',
   Owned: 'Source',
@@ -392,18 +359,15 @@ const FILTER_FIELD: Record<string, string> = {
   Wormhole: 'Space',
 };
 
-/** Opens the option's filter dropdown and returns its checkbox; close with Escape. */
 async function openFilterOption(
   user: ReturnType<typeof userEvent.setup>,
   option: string,
   scope: Pick<typeof screen, 'getAllByRole'> = screen
 ) {
-  // The trigger, not the table's same-named column header.
   const trigger = scope
     .getAllByRole('button', { name: new RegExp(`^${FILTER_FIELD[option]}:`) })
     .find((button) => button.getAttribute('aria-haspopup') === 'menu');
   await user.click(trigger!);
-  // `^`: an option with a description line carries it in its accessible name.
   return screen.findByRole('menuitemcheckbox', { name: new RegExp(`^${option}`) });
 }
 
@@ -432,8 +396,6 @@ describe('BpcSourcingPanel', () => {
     const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
     expect(within(table).getByText('Rifter Blueprint')).toBeInTheDocument();
     expect(within(table).getByText('10')).toBeInTheDocument();
-    // The price cell shows shorthand ("5M"); its accessible name carries the
-    // exact figure.
     expect(
       within(table).getByText('5,000,000.00 ISK', { selector: '.sr-only' })
     ).toBeInTheDocument();
@@ -448,13 +410,11 @@ describe('BpcSourcingPanel', () => {
 
     const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
     await within(table).findByText('Rifter Blueprint');
-    // The real ask is still shown, just marked — not silently hidden.
     expect(
       within(table).getByText('5,000,000.00 ISK', { selector: '.sr-only' })
     ).toBeInTheDocument();
     expect(within(table).getByText('Whole contract')).toBeInTheDocument();
 
-    // ISK/run is not a default-visible column — switch it on first.
     await user.click(await screen.findByRole('button', { name: 'Columns' }));
     await user.click(await screen.findByRole('menuitemcheckbox', { name: 'ISK/run' }));
     await user.keyboard('{Escape}');
@@ -470,7 +430,6 @@ describe('BpcSourcingPanel', () => {
         row({ contractId: 2, typeId: 638, price: 5_000_000 }),
         row({ contractId: 3, typeId: 638, price: 5_000_000 }),
         row({ contractId: 4, typeId: 638, price: 6_000_000 }),
-        // Two copies of another blueprint: not a going rate, so blank.
         row({ contractId: 5, typeId: 870, price: 1_000_000 }),
         row({ contractId: 6, typeId: 870, price: 2_000_000 }),
       ])
@@ -480,7 +439,6 @@ describe('BpcSourcingPanel', () => {
 
     const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
     await within(table).findAllByText('Rifter Blueprint');
-    // Hidden by default, like the other optional columns.
     expect(table.querySelector('[data-label="vs peers"]')).toBeNull();
 
     await user.click(await screen.findByRole('button', { name: 'Columns' }));
@@ -490,11 +448,9 @@ describe('BpcSourcingPanel', () => {
     const cells = Array.from(table.querySelectorAll('[data-label="vs peers"]')).map((cell) =>
       cell.textContent?.trim()
     );
-    // 4M against peers 5M, 5M, 6M (median 5M); 6M against 4M, 5M, 5M.
     expect(cells).toContain('−20.0%');
     expect(cells).toContain('+20.0%');
     expect(cells.filter((text) => text === '')).toHaveLength(2);
-    // The 5M copies sit on the median: a level 0.0%, not blank.
     expect(cells.filter((text) => text === '0.0%')).toHaveLength(2);
   });
 
@@ -514,7 +470,6 @@ describe('BpcSourcingPanel', () => {
     await openFilters(user);
     await user.type(screen.getByRole('textbox', { name: 'Max price' }), '1b');
 
-    // Filtering re-renders the table, so look it up afresh.
     await waitFor(() => {
       const filtered = screen.getByRole('table', { name: 'BPC Sourcing' });
       expect(within(filtered).queryByText('Caracal Blueprint')).not.toBeInTheDocument();
@@ -550,7 +505,6 @@ describe('BpcSourcingPanel', () => {
       screen.getByRole('button', { name: /^Exclude/ }),
       screen.getByRole('button', { name: /^Space/ }),
     ];
-    // The 36px `md` tier: a stray `sm` field would carry `md:h-7`.
     for (const field of fields) {
       expect(field.className).toContain('h-9');
       expect(field.className).not.toContain('md:h-7');
@@ -613,16 +567,11 @@ describe('BpcSourcingPanel', () => {
 
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Build Plan' }));
 
-    // 587 (Rifter), not 638 (its blueprint): Industry resolves `?product=` via
-    // the catalog's `byProductTypeID`, so handing it the blueprint's own
-    // typeID would silently create nothing.
     await waitFor(() => {
       expect(window.location.search).toContain('product=587');
     });
   });
 
-  // Issue #1498 (WCAG 2.1.1): a visible, keyboard-reachable equivalent of the
-  // row's right-click menu, offering the identical item list.
   it('gives an offer row a focusable "More actions" button opening the same items as right-click', async () => {
     loadPublicBpcContracts.mockResolvedValue(
       cachedSnapshot([row({ contractId: 1, typeId: 638, regionId: 10000002 })])
@@ -639,14 +588,8 @@ describe('BpcSourcingPanel', () => {
     expect(moreActionsButton).toBeInTheDocument();
 
     await user.click(moreActionsButton);
-    // Waits for the Build Plan label to settle (it starts as "checking…"
-    // until the blueprint index resolves), so this list isn't captured
-    // mid-load.
     await screen.findByRole('menuitem', { name: 'Build Plan' });
     const buttonItems = screen.getAllByRole('menuitem').map((el) => el.textContent);
-    // The row also has `onRowClick` (opens the contract detail modal) —
-    // `DataTable`'s `ROW_CONTROL_SELECTOR` is supposed to exempt this button
-    // from that handler. Checked here rather than assumed.
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     await user.keyboard('{Escape}');
 
@@ -654,14 +597,11 @@ describe('BpcSourcingPanel', () => {
     await screen.findByRole('menuitem', { name: 'Build Plan' });
     const contextItems = screen.getAllByRole('menuitem').map((el) => el.textContent);
 
-    // "Grant missing Permissions" follows the active Character's grant, which
-    // settles on its own clock in each menu; the shared items are what this compares.
     const shared = (items: (string | null)[]) =>
       items.filter((item) => item !== 'Grant missing Permissions');
     expect(shared(buttonItems)).toEqual(shared(contextItems));
   });
 
-  // The one App-level test here: the /bpc-contracts redirect lives in App's route table.
   it('still lands on the sourcing tab from the old /bpc-contracts link', async () => {
     loadPublicBpcContracts.mockResolvedValue(cachedSnapshot([row({ contractId: 1, typeId: 638 })]));
     window.history.pushState({}, '', '/bpc-contracts');
@@ -711,14 +651,12 @@ describe('BpcSourcingPanel', () => {
   });
 
   it('judges an opened copy against every similar copy listed, however the board is filtered', async () => {
-    // A minimum ME of 10 hides the three similar copies from the board, but
-    // they are still for sale, so they still set the going rate.
     loadPublicBpcContracts.mockResolvedValue(
       cachedSnapshot([
-        row({ contractId: 1 }), // 1,000,000 a run
-        row({ contractId: 2, me: 8, price: 4_000_000 }), // 800,000
-        row({ contractId: 3, me: 9, price: 5_500_000 }), // 1,100,000
-        row({ contractId: 4, me: 9, te: 18, price: 6_000_000 }), // 1,200,000
+        row({ contractId: 1 }),
+        row({ contractId: 2, me: 8, price: 4_000_000 }),
+        row({ contractId: 3, me: 9, price: 5_500_000 }),
+        row({ contractId: 4, me: 9, te: 18, price: 6_000_000 }),
       ])
     );
     window.history.pushState({}, '', '/industry/sourcing?sourcing.type=638&sourcing.minMe=10');
@@ -731,7 +669,7 @@ describe('BpcSourcingPanel', () => {
     const check = await screen.findByRole('region', {
       name: 'Is it fair? · 3 similar copies for sale now',
     });
-    expect(within(check).getByText('1,100,000 ISK')).toBeInTheDocument(); // the median
+    expect(within(check).getByText('1,100,000 ISK')).toBeInTheDocument();
   });
 
   it('suggests matching blueprints as you type, with how many offers each has', async () => {
@@ -815,15 +753,12 @@ describe('BpcSourcingPanel', () => {
     await user.click(within(suggestions).getByRole('option'));
 
     expect(screen.getByText('3 offers on contract')).toBeInTheDocument();
-    // Scoped to the chips: these figures also appear in the region strip and
-    // the table, which is the point — all three have to agree.
     expect(screen.getByText('Cheapest').parentElement).toContainElement(
       screen.getAllByText('3,000,000.00 ISK', { selector: '.sr-only' })[0]
     );
     expect(screen.getByText('Median').parentElement).toContainElement(
       screen.getAllByText('5,000,000.00 ISK', { selector: '.sr-only' })[0]
     );
-    // The suggestion list closes once a blueprint is pinned.
     expect(screen.queryByRole('listbox', { name: 'Matching blueprints' })).not.toBeInTheDocument();
   });
 
@@ -843,7 +778,6 @@ describe('BpcSourcingPanel', () => {
     const suggestions = screen.getByRole('listbox', { name: 'Matching blueprints' });
     await user.click(within(suggestions).getByRole('option'));
 
-    // The two chips disagree: total price picks the 1-run copy, per-run picks the 10-run one.
     expect(screen.getByText('Cheapest').parentElement).toContainElement(
       screen.getAllByText('6,000,000.00 ISK', { selector: '.sr-only' })[0]
     );
@@ -868,7 +802,6 @@ describe('BpcSourcingPanel', () => {
         cachedSnapshot([
           row({ contractId: 1, typeId: 638, price: 5_000_000, regionId: 10000002 }),
           row({ contractId: 2, typeId: 638, price: 3_000_000, regionId: 10000002 }),
-          // Domain and Sinq Laison are neither the hub (Jita) nor near anything known.
           row({ contractId: 3, typeId: 638, price: 9_000_000, regionId: 10000043 }),
           row({ contractId: 4, typeId: 638, price: 1_000_000, regionId: 10000032 }),
         ])
@@ -920,9 +853,6 @@ describe('BpcSourcingPanel', () => {
   });
 
   it('sorts price on what a row costs, so a stray buyout on an exchange cannot jump the queue', async () => {
-    // EVE Ref's CSV carries a buyout on non-auction contracts whenever the
-    // field parses, so `buyout ?? price` sorted this 5M exchange row to the
-    // top at 0 while rendering it at 5M.
     loadPublicBpcContracts.mockResolvedValue(
       cachedSnapshot([
         row({ contractId: 1, typeId: 638, price: 5_000_000, buyout: 0, isAuction: false }),
@@ -932,7 +862,6 @@ describe('BpcSourcingPanel', () => {
     renderIndustry();
 
     const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
-    // Row 0 is the header; the cheapest row must lead under the default sort.
     expect(
       within(within(table).getAllByRole('row')[1]).getByText('1,000,000.00 ISK', {
         selector: '.sr-only',
@@ -1019,12 +948,6 @@ describe('BpcSourcingPanel active filter pills', () => {
 });
 
 describe('BpcSourcingPanel search matching', () => {
-  /**
-   * Every blueprint in the catalogue is named "… Blueprint", so a substring
-   * search over the whole name made any query that is a substring of that one
-   * shared word match all ~2,900 types — a search for "b" returned fifty
-   * unrelated blueprints, which is what a user hit in practice.
-   */
   it('does not match every blueprint through the shared "Blueprint" word', async () => {
     loadPublicBpcContracts.mockResolvedValue(
       cachedSnapshot([
@@ -1038,13 +961,10 @@ describe('BpcSourcingPanel search matching', () => {
     const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
     expect(within(table).getByText('Caracal Blueprint')).toBeInTheDocument();
 
-    // "rif" reaches Rifter; it is not a substring of "Caracal Blueprint".
     await user.type(screen.getByPlaceholderText(/search/i), 'rif');
     expect(within(table).getByText('Rifter Blueprint')).toBeInTheDocument();
     expect(within(table).queryByText('Caracal Blueprint')).not.toBeInTheDocument();
 
-    // "blue" is in both names but only through the shared suffix, so it must
-    // narrow to nothing rather than to everything.
     await user.clear(screen.getByPlaceholderText(/search/i));
     await user.type(screen.getByPlaceholderText(/search/i), 'blue');
     expect(within(table).queryByText('Rifter Blueprint')).not.toBeInTheDocument();
@@ -1061,31 +981,15 @@ describe('BpcSourcingPanel search matching', () => {
     await screen.findByRole('table', { name: 'BPC Sourcing' });
     await user.type(screen.getByPlaceholderText(/search/i), 'Rifter Blueprint');
 
-    // Re-queried rather than reused: a mid-typing query like "Rifter B"
-    // matches nothing, which swaps the table for the empty state, so the
-    // element captured before typing is detached by the time this runs.
     const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
     expect(within(table).getByText('Rifter Blueprint')).toBeInTheDocument();
   });
 });
 
 describe('BpcSourcingPanel row identity', () => {
-  /**
-   * A contract routinely lists the same blueprint on several item lines — one
-   * per copy — so `contractId:typeId` is not unique. Measured against a live
-   * EVE Ref pull, 70% of rows shared a key with another row and one key
-   * repeated 528 times. React cannot reconcile a changing list under
-   * duplicate keys, which left rows from the previous render in the table:
-   * picking a blueprint showed its offers *alongside* unrelated ones, while
-   * the summary above (computed from data, not the DOM) read correctly.
-   *
-   * Every other fixture here gives each row its own contractId, which is why
-   * nothing caught this.
-   */
   it('drops the previous blueprint rows when a contract repeats one type', async () => {
     loadPublicBpcContracts.mockResolvedValue(
       cachedSnapshot([
-        // One contract, the same blueprint four times — four identical keys.
         row({ contractId: 1, typeId: 638, price: 1_000_000 }),
         row({ contractId: 1, typeId: 638, price: 1_000_000 }),
         row({ contractId: 1, typeId: 638, price: 1_000_000 }),
@@ -1118,7 +1022,6 @@ describe('BpcSourcingPanel page header', () => {
     await user.click(screen.getByRole('button', { name: 'Refresh BPC Sourcing' }));
 
     await waitFor(() => expect(loadPublicBpcContracts.mock.calls.length).toBeGreaterThan(calls));
-    // One Refresh button on the page: the panel keeps none of its own.
     expect(screen.getAllByRole('button', { name: 'Refresh BPC Sourcing' })).toHaveLength(1);
   });
 });
@@ -1175,12 +1078,6 @@ describe('BpcSourcingPanel source multiselect', () => {
     expect(within(table).queryByText('Rifter Blueprint')).not.toBeInTheDocument();
   });
 
-  /**
-   * The synced contract snapshot can run to six figures (ADR 0013), while a
-   * character's owned blueprints realistically number in the dozens. The
-   * owned row is free, so it sorts ahead of every priced contract row and
-   * never falls past the result cap (issues #1777, BPC Sourcing rework).
-   */
   it('lists an owned row first, ahead of far more contract rows than fit on screen', async () => {
     loadPublicBpcContracts.mockResolvedValue(
       cachedSnapshot(
@@ -1222,7 +1119,6 @@ describe('BpcSourcingPanel source multiselect', () => {
     const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
     await within(table).findByText('Rifter Blueprint');
 
-    // Runs is not a default-visible column — switch it on first.
     await user.click(await screen.findByRole('button', { name: 'Columns' }));
     await user.click(await screen.findByRole('menuitemcheckbox', { name: 'Runs' }));
     await user.keyboard('{Escape}');
@@ -1232,8 +1128,6 @@ describe('BpcSourcingPanel source multiselect', () => {
   });
 
   it('shows no owned rows, not a crash, when the blueprints scope needs re-login', async () => {
-    // Reauth messaging is Industry's page-level banner's job — assert Owned
-    // just goes empty here.
     loadPublicBpcContracts.mockResolvedValue(cachedSnapshot([row({ contractId: 1, typeId: 638 })]));
     loadCharacterBlueprints.mockResolvedValue(ownedResult([], true));
     const user = userEvent.setup({ delay: null });
@@ -1241,7 +1135,6 @@ describe('BpcSourcingPanel source multiselect', () => {
     const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
     expect(within(table).getByText('Rifter Blueprint')).toBeInTheDocument();
 
-    // The test grant lacks the blueprints scope, so the banner names that Permission.
     expect(await screen.findByText(/: grant Industry$/)).toBeInTheDocument();
 
     await openFilters(user);
@@ -1304,10 +1197,6 @@ describe('BpcSourcingPanel source multiselect', () => {
   });
 
   it('a region filter matches an owned row once its location resolves into that region', async () => {
-    // Region options come from synced contract rows only, so the contract
-    // here shares the region the owned blueprint's location resolves
-    // into — the point under test is that the owned row survives the
-    // filter too, not that it displaces the contract row.
     loadPublicBpcContracts.mockResolvedValue(
       cachedSnapshot([row({ contractId: 1, typeId: 638, regionId: 10000002 })])
     );
@@ -1414,7 +1303,6 @@ describe('BpcSourcingPanel Auctions/PLEX filters (issue #1105)', () => {
 });
 
 describe('BpcSourcingPanel remembered Source', () => {
-  /** A fresh visit to the bare tab path — what the Industry tab strip and the rail link do. */
   function revisit(unmount: () => void) {
     unmount();
     window.history.pushState({}, '', '/industry/sourcing');
@@ -1472,7 +1360,6 @@ describe('BpcSourcingPanel remembered Source', () => {
     await toggleFilterOption(user, 'Market BPOs');
     await toggleFilterOption(user, 'Contracts');
     await toggleFilterOption(user, 'Owned');
-    // Nothing left matches, so Reset filters is the way back to the defaults.
     await user.click(await screen.findByRole('button', { name: 'Reset filters' }));
 
     await revisit(unmount);
@@ -1517,11 +1404,6 @@ describe('BpcSourcingPanel Location/Space', () => {
     expect(within(table).getByText('Caracal Blueprint')).toBeInTheDocument();
     expect(within(table).getByText('Rifter Blueprint')).toBeInTheDocument();
 
-    // Space column is hidden by default (issue #796) — toggle it on via the
-    // shared column picker before asserting on its text. The menu stays open
-    // (multi-select) and Radix marks the rest of the page aria-hidden while
-    // it is, so close it first (Characters.tsx's own column-picker tests do
-    // the same) before querying anything outside the menu.
     await user.click(await screen.findByRole('button', { name: 'Columns' }));
     await user.click(await screen.findByRole('menuitemcheckbox', { name: 'Space' }));
     await user.keyboard('{Escape}');
@@ -1539,10 +1421,6 @@ describe('BpcSourcingPanel Location/Space', () => {
     loadCharacterBlueprints.mockResolvedValue(
       ownedResult([ownedBlueprint({ item_id: 1, type_id: 870, location_id: 60003760 })])
     );
-    // A resolved, real space — the Space filter's chip state is not reset
-    // between tests in this file (unlike the Zustand stores `beforeEach`
-    // does reset), so a preceding test's narrowed filter can otherwise
-    // exclude this fixture's default unresolved (null) space entirely.
     loadBlueprintLocation.mockResolvedValue({
       name: 'Jita IV - Moon 4',
       regionId: 10000002,
@@ -1560,7 +1438,6 @@ describe('BpcSourcingPanel Location/Space', () => {
       expect(within(table).queryByRole('columnheader', { name })).not.toBeInTheDocument();
     }
 
-    // Same close-the-menu-before-querying rule the Space test above follows.
     await user.click(await screen.findByRole('button', { name: 'Columns' }));
     await user.click(await screen.findByRole('menuitemcheckbox', { name: 'ME' }));
     await user.click(await screen.findByRole('menuitemcheckbox', { name: 'Source' }));
@@ -1568,16 +1445,11 @@ describe('BpcSourcingPanel Location/Space', () => {
 
     expect(within(table).queryByRole('columnheader', { name: 'ME' })).not.toBeInTheDocument();
     expect(within(table).getByRole('columnheader', { name: 'Source' })).toBeInTheDocument();
-    // Every other default-visible column is untouched.
     expect(within(table).getByRole('columnheader', { name: 'TE' })).toBeInTheDocument();
   });
 });
 
 describe('BpcSourcingPanel Source/Space filter collapse (issue #807)', () => {
-  /**
-   * jsdom's `matchMedia` stub never matches, which `useIsNarrow` reads as a
-   * pointer viewport — flip it so the shared `FilterBar` renders its sheet.
-   */
   function useNarrowViewport(): () => void {
     return stubViewport(NARROW_QUERY);
   }
@@ -1594,8 +1466,6 @@ describe('BpcSourcingPanel Source/Space filter collapse (issue #807)', () => {
 
       expect(screen.queryByRole('button', { name: /^Source:/ })).not.toBeInTheDocument();
       expect(screen.queryByRole('button', { name: /^Space:/ })).not.toBeInTheDocument();
-      // The column picker is a display preference, not a filter — it stays in
-      // the row rather than collapsing with Source/Space.
       expect(screen.getByRole('button', { name: 'Columns' })).toBeInTheDocument();
 
       await user.click(screen.getByRole('button', { name: /^Filters/ }));
@@ -1697,7 +1567,6 @@ describe('BpcSourcingPanel Source/Space filter collapse (issue #807)', () => {
       loadPublicBpcContracts.mockResolvedValue(cachedSnapshot([row({ contractId: 1 })]));
       renderIndustry();
       await screen.findByRole('table', { name: 'BPC Sourcing' });
-      // Past the lookup debounce, so a pending fan-out would have started.
       await vi.advanceTimersByTimeAsync(400);
       expect(getOrderBook).not.toHaveBeenCalled();
     });
@@ -1712,7 +1581,6 @@ describe('BpcSourcingPanel Source/Space filter collapse (issue #807)', () => {
       renderIndustry();
       const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
       const badge = (await within(table).findByText(/BPO on contract: 4M/)).parentElement!;
-      // Short visible text; price and location live in the tooltip.
       expect(badge).toHaveTextContent(/BPO may be cheaper$/);
     });
 
@@ -1736,7 +1604,6 @@ describe('BpcSourcingPanel Source/Space filter collapse (issue #807)', () => {
     it('badges the cheapest copy across the whole set, even when the snapshot lists it last', async () => {
       loadPublicBpcContracts.mockResolvedValue(
         cachedSnapshot(
-          // Cheapest last in snapshot order; the price sort brings it to the top.
           Array.from({ length: 60 }, (_, i) =>
             row({ contractId: i + 1, price: (60 - i) * 1_000_000 })
           ),
@@ -1774,11 +1641,9 @@ describe('BpcSourcingPanel Source/Space filter collapse (issue #807)', () => {
         within(screen.getByRole('listbox', { name: 'Matching blueprints' })).getByRole('option')
       );
 
-      // Inline beside Cheapest by region, one headed group per BPO source.
       expect(await screen.findByText('Market BPOs', { selector: 'p' })).toBeInTheDocument();
       expect(screen.getByText('Contract BPOs', { selector: 'p' })).toBeInTheDocument();
       expect(screen.getByText('Cheapest by region', { selector: 'p' })).toBeInTheDocument();
-      // The market book lands after the contract snapshot (debounced lookup).
       const marketList = await screen.findByRole('list', { name: 'Market BPOs' });
       const marketCard = within(marketList).getByRole('listitem');
       const contractCard = within(screen.getByRole('list', { name: 'Contract BPOs' })).getByRole(
@@ -1787,35 +1652,25 @@ describe('BpcSourcingPanel Source/Space filter collapse (issue #807)', () => {
       expect(
         within(marketCard).getByText('2,000,000.00 ISK', { selector: '.sr-only' })
       ).toBeInTheDocument();
-      // The NPC-seeded caveat is a hint beside the price, not a line of text.
       expect(
         within(marketCard).getByRole('button', { name: 'About this market price' })
       ).toBeInTheDocument();
       expect(marketCard).not.toHaveTextContent('NPC-seeded');
-      // System plus its security, never the station or region name.
       await waitFor(() => expect(marketCard).toHaveTextContent('Jita 0.9'));
       expect(marketCard).not.toHaveTextContent('Jita IV - Moon 4');
       expect(marketCard).not.toHaveTextContent('The Forge');
-      // 2M is at or below the cheapest copy (3M); 40M is not. Said on the
-      // price itself (accent + hint), not as an extra line.
       expect(
         within(marketCard).getByRole('button', { name: 'BPO may be cheaper' })
       ).toBeInTheDocument();
       expect(
         within(contractCard).getByText('40,000,000.00 ISK', { selector: '.sr-only' })
       ).toBeInTheDocument();
-      // The group header names the source: no per-card "BPO" cue line, so
-      // the card is as tall as a region card (two lines).
       expect(within(contractCard).queryByText('BPO')).not.toBeInTheDocument();
-      // Accent only on the cheapest box in the row: the 2M market BPO beats
-      // every copy (3M+) and the 40M contract BPO, so it alone is lit.
       expect(marketCard).toHaveClass('border-accent-dim');
       expect(contractCard).not.toHaveClass('border-accent-dim');
       expect(contractCard).not.toHaveClass('bg-accent/10');
-      // Two lines, as tall as a region cell: price, then system.
       expect(marketCard.children).toHaveLength(2);
       expect(contractCard.children).toHaveLength(2);
-      // The research reads "8/16", the full wording on hover.
       expect(contractCard).toHaveTextContent('8/16');
       expect(contractCard).not.toHaveTextContent('ME 8');
       await waitFor(() => expect(contractCard).toHaveTextContent('Jita 0.9'));
@@ -1823,7 +1678,6 @@ describe('BpcSourcingPanel Source/Space filter collapse (issue #807)', () => {
       expect(contractCard).not.toHaveTextContent('The Forge');
       expect(contractCard).not.toHaveTextContent('BPO may be cheaper');
 
-      // Said once, in the cards: no row badge, and no duplicate chip.
       expect(within(table).queryByText(/BPO on/)).not.toBeInTheDocument();
       expect(screen.queryByText('Cheapest BPO')).not.toBeInTheDocument();
     });
@@ -1860,7 +1714,6 @@ describe('BpcSourcingPanel Source/Space filter collapse (issue #807)', () => {
 
       const badge = (await within(table).findByText(/BPO on market: 2M/)).parentElement!;
       expect(badge).toHaveTextContent('BPO may be cheaper');
-      // "All regions" reads the pilot's market hub (Jita by default) region.
       expect(getOrderBook).toHaveBeenCalledWith(10000002, 638);
       expect(getOrderBook.mock.calls.every(([regionId]) => regionId === 10000002)).toBe(true);
       expect(screen.getByText(/Market BPOs: Jita region/)).toBeInTheDocument();
@@ -1870,12 +1723,10 @@ describe('BpcSourcingPanel Source/Space filter collapse (issue #807)', () => {
       ).not.toBeInTheDocument();
       await openFilters(user);
       await toggleFilterOption(user, 'Market BPOs');
-      // The market row itself: its order price, and its station.
       expect(
         await within(table).findByText('2,000,000.00 ISK', { selector: '.sr-only' })
       ).toBeInTheDocument();
       expect(within(table).getAllByText('Jita IV - Moon 4').length).toBeGreaterThan(0);
-      // The hub's own station is marked (location 60003760 is the Jita hub).
       expect(within(table).getByText('Trade hub')).toBeInTheDocument();
     });
 
@@ -1934,10 +1785,6 @@ describe('BpcSourcingPanel Source/Space filter collapse (issue #807)', () => {
         ]),
         requiredItemTypeIds: [],
       });
-      // The pilot's own LP Value, so no market rate is fetched. Set on the
-      // store too: `beforeAll`'s warm-up render already hydrated it at 0, so the
-      // db row alone is never re-read and the lookup fetched a real market rate
-      // (~2.5s) before pricing the row.
       await db.settings.put({ key: 'sync.loyaltyLpValue', value: 1_000 });
       useLpValue.setState({ value: 1_000, hydrated: true });
       window.history.pushState({}, '', '/industry/sourcing?sourcing.src=contract,lp');
@@ -2030,7 +1877,6 @@ describe('BpcSourcingPanel Jump Range', () => {
         row({ contractId: 2, typeId: 870, locationId: 60008494 }),
       ])
     );
-    // Unplaced: a range it cannot back drops it.
     loadCharacterBlueprints.mockResolvedValue(
       ownedResult([ownedBlueprint({ item_id: 1, type_id: 870, location_id: 1_000_000_000_001 })])
     );
@@ -2077,8 +1923,6 @@ describe('BpcSourcingPanel Jump Range', () => {
         within(jumpsCell(jitaRow as HTMLElement) as HTMLElement).getByText('0')
       ).toBeInTheDocument();
     });
-    // Amarr has no entry in the mocked `localJumpDistances` map above — a
-    // settled but unreachable row, not a pending one.
     expect(
       within(jumpsCell(amarrRow as HTMLElement) as HTMLElement).getByText('—')
     ).toBeInTheDocument();
@@ -2086,8 +1930,6 @@ describe('BpcSourcingPanel Jump Range', () => {
 
   it('shows the Jumps cell as pending, not unavailable, while the distance snapshot is still resolving', async () => {
     loadCharacterSolarSystemId.mockResolvedValue(JITA);
-    // Never resolves — the same "still loading" state a fresh page load or a
-    // slow Dexie read leaves the cell in, regardless of the filter's range.
     localJumpDistances.mockReturnValue(new Promise(() => {}));
     renderIndustry();
     const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
@@ -2100,9 +1942,6 @@ describe('BpcSourcingPanel Jump Range', () => {
   });
 
   it('explains a missing Jumps cell as no current system, not an unreachable stargate route', async () => {
-    // Jita is a *resolved* location (`loadContractLocationInfo` places it) —
-    // unlike the Rifter row's unresolved one, this row's own systemId is
-    // known, so the missing cell can only be the filter's no-origin state.
     loadCharacterSolarSystemId.mockResolvedValue(null);
     renderIndustry();
     const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
@@ -2111,9 +1950,6 @@ describe('BpcSourcingPanel Jump Range', () => {
     const jitaRow = rows.find((r) => within(r).queryByText('Jita IV - Moon 4'));
     expect(jitaRow).toBeDefined();
     const jumpsCell = (jitaRow as HTMLElement).querySelector('[data-label="Jumps"]');
-    // The dash is a HintText trigger now (no native title). waitFor: the cell can
-    // still show the "…" pending placeholder for a tick after
-    // loadCharacterSolarSystemId's mock resolves.
     const trigger = await waitFor(() => {
       const el = (jumpsCell as HTMLElement).querySelector<HTMLElement>('[tabindex="0"]');
       expect(el).not.toBeNull();
@@ -2130,7 +1966,6 @@ describe('BpcSourcingPanel Jump Range', () => {
     renderIndustry();
     const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
 
-    // The notice is visible and announced: its text sits in a LiveNote twice.
     await waitFor(() =>
       expect(screen.getAllByText('Set your current system to filter by distance.')).toHaveLength(2)
     );
@@ -2155,7 +1990,6 @@ describe('Ask to copy on a Community Offer row', () => {
       systemName: 'Jita',
       ...over,
     });
-  // A contract row keeps the table up (the page lists what contracts offer first).
   const openCommunity = () => {
     loadPublicBpcContracts.mockResolvedValue(
       cachedSnapshot([row({ contractId: 1, typeId: 870, price: 5_000_000 })])

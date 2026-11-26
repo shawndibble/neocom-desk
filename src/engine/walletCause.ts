@@ -1,24 +1,3 @@
-/**
- * Which contract event explains a wallet journal line, and how to fold the
- * line into that event's alert instead of raising a second one.
- *
- * A contract finishing moves ISK, so a Character with both
- * `contractCompleted` and `walletBalanceChanged` on would hear about one
- * thing twice. ESI names the cause on the journal line itself
- * (`context_id_type: 'contract_id'`, `context_id`, and a `contract_*`
- * `ref_type`), which is what links the two.
- *
- * The journal is cached for an hour and the contract list for five minutes,
- * so the line usually lands long after the contract alert. `absorbWalletFires`
- * therefore does two things: a contract fire in the same poll takes the amount
- * into its own copy, and a line whose contract alert fired in an earlier poll
- * comes back as a `revision` for the caller to write onto that alert's feed
- * row. Either way the wallet fire itself is dropped.
- *
- * Only the contract events the Character actually has switched on absorb
- * anything (`isEnabled`): a line whose cause would not be heard about stays a
- * wallet alert. Pure — the caller decides what "enabled" means per channel.
- */
 import type { ContractNotificationFire, WalletNotificationFire } from './notificationDiffs';
 import type { OccurrenceFire } from './occurrenceKey';
 
@@ -35,17 +14,6 @@ export interface ContractCause {
   eventId: ContractCauseEventId;
 }
 
-/**
- * `ref_type` -> the transition that moves the ISK. Deliberately short: ESI
- * says a line's context varies by `ref_type`, so only the types whose
- * transition is certain are listed. A type absent here (the issuer's escrow
- * when a courier is created, every refund and reversal) stays a wallet alert
- * rather than risk filing ISK under the wrong contract event.
- *
- * `contractFailed` fires only for status `failed` (a courier past its
- * deadline); cancelled, expired and deleted contracts are silent, which is why
- * the refund types are not claimed — nothing would speak for them.
- */
 const EVENT_BY_REF_TYPE: Readonly<Record<string, ContractCauseEventId>> = {
   contract_price: 'contractCompleted',
   contract_price_payment_corp: 'contractCompleted',
@@ -67,7 +35,6 @@ export function contractCauseOf(line: WalletLineRef): ContractCause | null {
   return eventId === undefined ? null : { contractId: line.contextId, eventId };
 }
 
-/** A wallet amount to write onto a contract alert that already fired. */
 export interface WalletRevision {
   characterId: number;
   contractId: number;
@@ -94,13 +61,6 @@ function isContractCauseFire(
   );
 }
 
-/**
- * `isEnabled` says whether the Character hears about a contract event on the
- * channel being built, and gates the same-poll fold. `alertExists` is the proof
- * a cross-poll absorption needs: the contract alert's feed row is there to
- * revise. Without one of the two, the wallet fire stays — a line is only ever
- * dropped when something actually carries it.
- */
 export function absorbWalletFires<TFire extends OccurrenceFire>(
   fires: readonly TFire[],
   isEnabled: (eventId: ContractCauseEventId) => boolean,
@@ -116,7 +76,6 @@ export function absorbWalletFires<TFire extends OccurrenceFire>(
       samePoll.add(key(fire.characterId, fire.contractId, fire.eventId));
     }
   }
-  // Which absorbed lines belong to which contract alert, with their ISK summed.
   const totals = new Map<string, WalletRevision>();
   const absorbed = new Set<TFire>();
   for (const fire of fires) {
@@ -154,6 +113,5 @@ export function absorbWalletFires<TFire extends OccurrenceFire>(
     }
     kept.push(fire);
   }
-  // Whatever no same-poll contract fire took is for an alert raised earlier.
   return { fires: kept, revisions: [...totals.values()] };
 }

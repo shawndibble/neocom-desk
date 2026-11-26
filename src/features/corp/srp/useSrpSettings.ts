@@ -1,10 +1,3 @@
-/**
- * `/corp/srp` Settings' data: verify the Character as an SRP officer first (it
- * records the 24-hour officer access the rules need), then read `corps/{id}/srp/settings`,
- * the same order the Corp Tax Book's `useCorpBook` uses. Firestore is the `lite` build with no
- * listeners, so every change reloads. Settings need a Director (the CEO counts as one), which
- * the verdict says; an Accountant gets `not-director`.
- */
 import { useCallback, useEffect, useState } from 'react';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useActiveCorporationId } from '../owner';
@@ -21,12 +14,9 @@ import type { SrpOfficerVerdict, SrpSettings, SrpSettingsPatch } from '../srpTyp
 
 export type SrpSettingsState =
   | { status: 'loading' }
-  /** The roles do not open SRP (or the Character is not in this corporation). */
   | { status: 'denied' }
   | { status: 'failed'; message: string }
-  /** An officer who may approve claims but not change settings (an Accountant). */
   | { status: 'not-director'; verdict: SrpOfficerVerdict }
-  /** SRP was never turned on here: the first-time state. */
   | { status: 'never-on'; verdict: SrpOfficerVerdict }
   | { status: 'ready'; verdict: SrpOfficerVerdict; settings: SrpSettings };
 
@@ -36,7 +26,6 @@ export interface SrpSettingsData {
   corporationId: number | null;
   reload: () => void;
   turnOn: () => Promise<void>;
-  /** Saves the patch, then turns SRP on or off when `enabled` differs from the saved flag. */
   save: (patch: SrpSettingsPatch, enabled: boolean | null) => Promise<void>;
   reclaim: () => Promise<void>;
 }
@@ -48,7 +37,6 @@ export function useSrpSettings(): SrpSettingsData {
   const corporationId = useActiveCorporationId();
   const key =
     characterId === null || corporationId === null ? null : `${characterId}:${corporationId}`;
-  // Tagged with the Character and corporation it was read for, so a switch shows loading, never the old corp's form.
   const [loaded, setLoaded] = useState<{ key: string; state: SrpSettingsState } | null>(null);
   const state: SrpSettingsState =
     loaded !== null && loaded.key === key ? loaded.state : { status: 'loading' };
@@ -70,9 +58,6 @@ export function useSrpSettings(): SrpSettingsData {
           setState({ status: 'not-director', verdict });
           return;
         }
-        // verifySrpOfficer records officer access only once a settings doc exists, so before
-        // SRP was ever turned on the rules refuse the read (and the SDK logs it): the verdict
-        // says so instead. A server that predates `settingsExist` is read, refusal and all.
         const settings =
           verdict.settingsExist === false
             ? null
@@ -81,7 +66,6 @@ export function useSrpSettings(): SrpSettingsData {
                 throw error;
               });
         if (cancelled) return;
-        // What the server holds is the nav's answer too (the rail, More sheet and /srp sub-view).
         recordSrpProbe(characterId, corporationId, settings?.enabled === true);
         setState(
           settings ? { status: 'ready', verdict, settings } : { status: 'never-on', verdict }
@@ -122,7 +106,6 @@ export function useSrpSettings(): SrpSettingsData {
           recordSrpProbe(characterId, corporationId, false);
         }
       } finally {
-        // Even a half-done save changed something: show what the server holds.
         reload();
       }
     },

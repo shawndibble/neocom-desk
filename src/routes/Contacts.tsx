@@ -65,13 +65,6 @@ import {
   loadContactsSnapshot,
 } from '@/features/character/contactsSnapshot';
 
-/**
- * The filter bar, in the URL (ADR 0015) as one group — including the Across
- * tab's own "disagreements only" (issue #1282): two separate `useUrlParams`
- * groups writing in the same tick would each start from the URL as last
- * rendered and the second would drop the first (see `useUrlState.ts`'s own
- * doc comment), so every key `ContactsFilterBar` can change belongs here.
- */
 const FILTER_PARAMS = {
   q: textParam(),
   types: enumSetParam(ALL_CONTACT_KINDS),
@@ -79,7 +72,6 @@ const FILTER_PARAMS = {
   'across.disagree': boolParam(),
 };
 
-/** Contacts: standings, blocked/watched state, searchable and filterable by type and standing. */
 export function Contacts() {
   const characterCount = useCharacterCount();
   const { t } = useTranslation();
@@ -94,8 +86,6 @@ export function Contacts() {
     () => ({ text: filterParams.q, types: filterParams.types, standings: filterParams.standing }),
     [filterParams]
   );
-  // Rows derive from a deferred copy so a keystroke paints the box first
-  // (`useUrlFilter`'s rule); the bar and its setter keep the immediate one.
   const rowsFilter = useDeferredValue(filter);
   const setFilter = (next: ContactsFilter) =>
     setFilterParams({ q: next.text, types: next.types, standing: next.standings });
@@ -104,15 +94,9 @@ export function Contacts() {
   const standings = useContactsStandings(activeCharacterId ?? 0, tab === 'standings');
   const { open: openPublicInfo } = usePublicInfoModal();
 
-  // Lifted out of `AcrossCharactersPanel` (issue #1282): its chip now lives in
-  // the shared `ContactsFilterBar`, which neither tab's panel owns.
   const disagreementsOnly = filterParams['across.disagree'];
   const setDisagreementsOnly = (next: boolean) => setFilterParams({ 'across.disagree': next });
   const [disagreementCount, setDisagreementCount] = useState(0);
-  // Lifted the same way `disagreementCount` is (issue #2164): the page
-  // header's CSV export needs the Across tab's own filtered rows, and only
-  // `AcrossCharactersPanel` has the fetch state (`effectiveLists`) they come
-  // from.
   const [acrossVisibleRows, setAcrossVisibleRows] = useState<readonly AcrossCharactersRow[]>([]);
   const [acrossTruncated, setAcrossTruncated] = useState(false);
 
@@ -130,7 +114,6 @@ export function Contacts() {
   const acrossLists = data?.acrossLists ?? NO_LISTS;
   const ownAffiliation = data?.ownAffiliation ?? NO_OWN_AFFILIATION;
 
-  // Set on the first open of the export menu: Title / Score are read only once asked for.
   const [exportArmed, setExportArmed] = useState(false);
   const contacts = useMemo(() => contactsResult?.data ?? [], [contactsResult]);
   const {
@@ -159,13 +142,6 @@ export function Contacts() {
     [contacts]
   );
 
-  // Refreshing bumps useRouteSnapshot's epoch, which clears `data` (and so
-  // `contactsResult`/`counts`) until the new load lands — remember
-  // the last successful counts so the filter chips (and the user's active
-  // selection) stay on screen through a refresh instead of disappearing.
-  // Switching character bumps the same epoch, so the remembered counts must
-  // be dropped there too — otherwise the outgoing character's chips would
-  // linger under the incoming one until its own load lands.
   const [lastGoodCounts, setLastGoodCounts] = useState<ContactCounts | null>(null);
   const [lastGoodCharacterId, setLastGoodCharacterId] = useState(activeCharacterId);
   if (activeCharacterId !== lastGoodCharacterId) {
@@ -180,25 +156,15 @@ export function Contacts() {
     [contacts, rowsFilter, contactNames]
   );
 
-  // `/contacts/across` with a single Character falls back to this Character's
-  // view — but only once the snapshot says so: before it loads the list is
-  // empty for everyone, and a reload of the across tab must not bounce.
   const view =
     tab === 'across' && (data === undefined || acrossLists.length > 1) ? 'across' : 'character';
 
-  // Labels only, for the picker's menu — the real columns (with their
-  // `render`) are built inside `AcrossCharactersPanel`, which alone has the
-  // fetch state (`effectiveLists.length`) one of them needs. `ColumnPickerMenu`
-  // never calls `render`, so the stub here can't drift into what's on screen.
   const acrossColumnsById: Record<ContactsAcrossColumnId, DataTableColumn<AcrossCharactersRow>> = {
     type: { id: 'type', header: t('contacts.type'), render: () => null },
     held: { id: 'held', header: t('contacts.acrossCharacters'), render: () => null },
     standings: { id: 'standings', header: t('contacts.acrossStandings'), render: () => null },
   };
 
-  // One `ColumnPickerMenu` in the shared `FilterBar`, controlling whichever
-  // tab's table is showing (issue #1282) — each tab keeps its own visibility
-  // setting, so switching tabs never carries one's hidden columns onto the other's.
   const columnPickerActions =
     view === 'across' ? (
       <ColumnPickerMenu
@@ -224,8 +190,6 @@ export function Contacts() {
       />
     );
 
-  // One export button in the page header, exporting whichever tab's table is showing —
-  // each tab keeps its own surface so the two files never share a name.
   const characterCsvColumns = useMemo(
     () => contactsCsvColumns(t, contactNames, affiliationRows, contactLabels, achievements),
     [t, contactNames, affiliationRows, contactLabels, achievements]
@@ -235,7 +199,6 @@ export function Contacts() {
     rows: filteredContacts,
     columns: characterCsvColumns,
     truncated: contactsTruncated || achievementsPending,
-    // Title / Score are read once any export menu opens (header or a row's).
     onExportIntent: () => setExportArmed(true),
   });
   const acrossCsvColumns = useMemo(
@@ -253,8 +216,6 @@ export function Contacts() {
   }
   if (activeCharacterId === null) return <Navigate to="/characters" replace />;
 
-  // `across` is a scope of the contacts list, picked by the header's This character /
-  // All characters control, not a tab of its own (its path stays, so links keep working).
   const shownTab = tab === 'standings' ? 'standings' : 'character';
   const tabBar = (
     <Tabs
@@ -283,9 +244,6 @@ export function Contacts() {
                 />
               )
         }
-        // Not on Standings: that tab reads the active Character's standings only.
-        // Always the control otherwise, so the header's one-line lock never flips:
-        // with one Character it hides itself (nothing to compare the roster with).
         scope={
           tab === 'standings' ? undefined : (
             <CharacterFilterControl
@@ -332,10 +290,6 @@ export function Contacts() {
           standings.content
         ) : (
           <>
-            {/* Shared with the second tab: a name typed into the box, or a type
-          switched off, means the same thing on either. The standing chips do
-          not — a row there carries several standings — so that tab ignores
-          them and says so with a chip of its own. */}
             {lastGoodCounts && (
               <ContactsFilterBar
                 filter={filter}
@@ -364,8 +318,6 @@ export function Contacts() {
                 tableExport={acrossExport}
               />
             ) : contactsNeedsReauth && (!contactsResult || contacts.length === 0) ? (
-              // A lapsed grant with no saved contacts: the full banner. With
-              // saved contacts the table stays and a small note sits above it.
               <GrantBanner characterId={activeCharacterId} endpoints={['getCharacterContacts']} />
             ) : error ? (
               <LoadFailedState title={t('common.loadFailed.contacts')} onRetry={refresh} />

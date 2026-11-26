@@ -1,15 +1,3 @@
-/**
- * Wars declared on a pilot's corporation, with no fetch or DOM in it.
- *
- * ESI cannot list the wars of one corporation, so the app reads a short list
- * of every open war that the active-wars job publishes to R2
- * (`active-wars/wars.json`) and picks its own out of it here. A war's
- * `allies` are always on the defender's side: only a defender can hire them,
- * so an ally is as much "at war" as the target is.
- *
- * Times are epoch ms, converted from ESI's ISO strings by the writer.
- */
-
 import { isRecord } from './guards';
 
 export interface WarParty {
@@ -27,9 +15,7 @@ export interface WarAlly {
 export interface StoredWar {
   id: number;
   declared: number;
-  /** Absent until ESI reports one. */
   started?: number;
-  /** Absent while the war has no end set. A future value is a war on its way out. */
   finished?: number;
   mutual: boolean;
   openForAllies: boolean;
@@ -39,12 +25,10 @@ export interface StoredWar {
 }
 
 export interface StoredWars {
-  /** Epoch ms the sweep last confirmed this list. */
   updatedAt: number;
   wars: StoredWar[];
 }
 
-/** Whose wars to look for: a corporation, and the alliance it is in, if any. */
 export type WarEntityIds = WarAlly;
 
 export type WarStatus =
@@ -65,7 +49,6 @@ export interface WarAgainstMe {
   war: StoredWar;
   side: WarSide;
   status: Exclude<WarStatus, { kind: 'over' }>;
-  /** The account's corporation (and alliance) the war is on. */
   against: WarEntityIds;
 }
 
@@ -80,20 +63,11 @@ function matches(
 }
 
 function sideFor(war: StoredWar, me: WarEntityIds): WarSide | null {
-  // A war `me` declared is not "against" me.
   if (matches(war.aggressor, me)) return null;
   if (matches(war.defender, me)) return 'defender';
   return war.allies.some((ally) => matches(ally, me)) ? 'ally' : null;
 }
 
-/**
- * The wars still running (or about to) with one of the account's
- * corporations on the receiving end. `parties` is every corporation the
- * account's Characters are in, the active Character's first. Each war is
- * listed once, tied to the first party it is against, so a war on an alliance
- * two of them share is not counted twice. Ordered by party, then an active war
- * ahead of a pending one, then newest declared first.
- */
 export function warsAgainst(
   wars: readonly StoredWar[],
   parties: readonly WarEntityIds[],
@@ -154,11 +128,6 @@ function isStoredWar(value: unknown): value is StoredWar {
   );
 }
 
-/**
- * The Firestore doc as a typed list, or null for a doc that is not the shape
- * the writer produces. One bad row is dropped rather than losing the list: a
- * pilot should still see the war that did parse.
- */
 export function parseStoredWars(doc: unknown): StoredWars | null {
   if (!isRecord(doc) || !isNum(doc.updatedAt) || !Array.isArray(doc.wars)) return null;
   return { updatedAt: doc.updatedAt, wars: doc.wars.filter(isStoredWar) };
@@ -186,11 +155,6 @@ function esiParty(value: unknown): WarParty | null {
   };
 }
 
-/**
- * One `GET /wars/{id}` body as a war, or null when it is not one. The same
- * mapping the active-wars sweep applies (`functions/src/activeWars.ts`), kept here
- * as well because the functions package shares no code with the app.
- */
 export function parseEsiWar(body: unknown): StoredWar | null {
   if (!isRecord(body)) return null;
   const declared = isoMs(body.declared);

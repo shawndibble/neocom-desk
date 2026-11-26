@@ -1,7 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { cx } from '@/lib/cx';
 
-/** What the tree's marks mean: gold is Mastery V, bright can fly, dim can't yet, Ω needs Omega. */
 export function Legend({ className }: { className?: string }) {
   const { t } = useTranslation();
   return (

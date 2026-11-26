@@ -1,36 +1,3 @@
-/**
- * Shared, read-only public-info lookup (GLOSSARY.md rounds 49-50): a tabbed
- * Character / Corporation / Alliance view any feature can open by id + kind,
- * via `openPublicInfoModal`/`usePublicInfoModal` (`stores/publicInfoModal.ts`).
- * Mounted once in `App.tsx`, needed here because unlike a per-route detail
- * modal (`ContractDetailModal`, `ItemDetailModal`), this one is opened from
- * several unrelated features rather than one route that already owns local
- * `selected` state.
- *
- * Opening with a character id resolves the whole chain (character -> its
- * corp -> its alliance) in one shot, per the issue; opening directly with a
- * corp or alliance id skips straight to that tab. A tab is only shown once
- * its kind has actually entered the chain — an alliance-less character (or
- * corp) never puts the Alliance tab into `loading`, so it never appears,
- * which is what keeps that case tab-hidden rather than tab-with-an-error.
- *
- * The Character tab is Pilot Lookup's result (`PilotProfileView`): identity,
- * zKillboard stats and recent kills and losses, so a character reads the same
- * wherever it's opened. Its corporation and alliance come from the live
- * affiliation `loadPilotProfile` resolves, and the Corporation and Alliance
- * tabs follow those ids, not the cached public record's, so the two agree.
- * The dialog is `wide`: each tab is a full profile now. The NPC views below are the
- * exception: `medium` (a full-height sheet on a phone).
- *
- * A link inside the modal that changes page (Open in Fittings) closes it: `info`
- * leaves the URL, which `EntityInfoRoute` turns into a cleared request. Back from
- * that page returns to this one with `info` still in the URL, so the modal reopens.
- *
- * NPC entities get the standings view instead (`features/standings/modal`): an
- * NPC corporation's Corporation tab, an NPC agent's card with the standings
- * cards below it, and a `faction` request, which has no tabs and is its own
- * modal. Pilots and player corporations are unchanged.
- */
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { cx } from '@/lib/cx';
 import { inlineLinkClassName } from '@/components/ui/controlStyles';
@@ -77,7 +44,6 @@ const LazyInteractionsTab = lazy(() =>
 const LazyAllianceTab = lazy(() =>
   guarded(() => import('@/features/character/PublicInfoAllianceTab'))
 );
-// Lazy: the NPC views read the standings, agent and station data only an NPC id needs.
 const LazyNpcCorporationView = lazy(() =>
   guarded(() => import('@/features/standings/modal/NpcCorporationView'))
 );
@@ -85,7 +51,6 @@ const LazyNpcInfoView = lazy(() => guarded(() => import('@/features/standings/mo
 const LazyFactionModal = lazy(() =>
   guarded(() => import('@/features/standings/modal/FactionModal'))
 );
-// Lazy: its killmail fits pull in Fittings, and this modal is mounted app-wide.
 const LazyPilotProfileView = lazy(() =>
   guarded(() => import('@/features/travel/PilotProfileView'))
 );
@@ -93,7 +58,6 @@ const LazyPilotProfileView = lazy(() =>
 type TabState<T> =
   { status: 'idle' } | { status: 'loading' } | { status: 'error' } | { status: 'ready'; data: T };
 
-/** `unknown` is ESI having no such character, apart from `error`, ESI not answering. */
 type CharacterState = TabState<PilotProfile> | { status: 'unknown' };
 
 const IDLE: TabState<never> = { status: 'idle' };
@@ -111,10 +75,7 @@ export function PublicInfoModal() {
   const [chosenTab, setActiveTab] = useState<PublicInfoKind | 'employment' | 'interactions'>(
     'character'
   );
-  // The URL's `infoTab` opens Interactions (so Back from a row's page lands here); no `infoTab`
-  // leaves the modal's own tab choice.
   const focusAfterCommit = useFocusAfterCommit();
-  // The pressed button lives in the tab we leave, so it unmounts: land on the tab we switched to.
   const openTab = (id: PublicInfoKind) => {
     setActiveTab(id);
     if (urlTab !== null) setUrlTab(null);
@@ -123,10 +84,7 @@ export function PublicInfoModal() {
   const [character, setCharacter] = useState<CharacterState>(IDLE);
   const [corporation, setCorporation] = useState<TabState<PublicCorporationInfo>>(IDLE);
   const [alliance, setAlliance] = useState<TabState<PublicAllianceInfo>>(IDLE);
-  // Bumped by Try again on a failed tab, to run the lookups again in place.
   const [attempt, setAttempt] = useState(0);
-  // Interactions is offered for another pilot, to a viewer with a Character to look from. A URL
-  // naming the tab for anyone else (an NPC, your own Character) falls back to the chosen tab.
   const interactionsOffered =
     request?.kind === 'character' &&
     !isNpcCharacterId(request.id) &&
@@ -136,7 +94,6 @@ export function PublicInfoModal() {
   const activeTab = urlTab === 'interactions' && interactionsOffered ? 'interactions' : chosenTab;
   const activeState =
     activeTab === 'character' ? character : activeTab === 'corporation' ? corporation : alliance;
-  // Try again unmounts while the lookups re-run, so the always-mounted wrapper holds focus.
   const [resultRef, , holdFocus] = useRetryFocus<HTMLDivElement>(
     activeTab === 'employment' ||
       activeTab === 'interactions' ||
@@ -153,7 +110,6 @@ export function PublicInfoModal() {
     setAttempt((n) => n + 1);
   };
 
-  /** The request whose tab was last chosen, so a retry re-runs the lookups without jumping tabs. */
   const tabChosenFor = useRef<typeof request>(null);
   useEffect(() => {
     if (!request) {
@@ -169,7 +125,6 @@ export function PublicInfoModal() {
       setCharacter(request.kind === 'character' ? { status: 'loading' } : IDLE);
       setCorporation(request.kind === 'corporation' ? { status: 'loading' } : IDLE);
       setAlliance(request.kind === 'alliance' ? { status: 'loading' } : IDLE);
-      // A faction is one view with nothing to look up here: it loads its own facts.
       if (request.kind === 'faction') return;
 
       let corporationId: number | undefined;
@@ -191,7 +146,6 @@ export function PublicInfoModal() {
         setCharacter({ status: 'ready', data: profile });
         corporationId = profile.corporationId;
         allianceId = profile.allianceId ?? undefined;
-        // Known up front, so its tab shows now rather than after the corporation loads.
         if (allianceId !== undefined) setAlliance({ status: 'loading' });
       } else if (request.kind === 'corporation') {
         corporationId = request.id;
@@ -204,7 +158,6 @@ export function PublicInfoModal() {
         const info = await loadPublicCorporationInfo(corporationId);
         if (cancelled) return;
         setCorporation(info ? { status: 'ready', data: info } : { status: 'error' });
-        // A character's alliance is its live affiliation's; the cached corp record can lag.
         if (request.kind === 'corporation') allianceId = info?.alliance_id;
       }
 
@@ -236,10 +189,7 @@ export function PublicInfoModal() {
   if (corporation.status !== 'idle')
     tabs.push({ id: 'corporation', label: t('publicInfo.corporationTab') });
   if (alliance.status !== 'idle') tabs.push({ id: 'alliance', label: t('publicInfo.allianceTab') });
-  // Only a character has a corporation history to show — and not one EVE has no record
-  // of, nor an NPC agent, whose "history" is the one corporation CCP placed it in.
   const npcCharacter = request.kind === 'character' && isNpcCharacterId(request.id);
-  // An NPC's view is the standings cards, which want a narrower dialog than a pilot's killboard.
   const npcView =
     npcCharacter || (request.kind === 'corporation' && isNpcCorporationId(request.id));
   if (
@@ -249,13 +199,11 @@ export function PublicInfoModal() {
     character.status !== 'unknown'
   )
     tabs.push({ id: 'employment', label: t('publicInfo.employmentTab') });
-  // Interactions: what this account has done with the pilot.
   if (interactionsOffered) tabs.push({ id: 'interactions', label: t('interactions.tab') });
 
   const activeData =
     activeTab === 'corporation' ? corporation : activeTab === 'alliance' ? alliance : character;
   const title = activeData.status === 'ready' ? activeData.data.name : t('publicInfo.title');
-  // The id the active tab shows (Employment is the character's): the one "Open in EVE" opens.
   const characterProfile = character.status === 'ready' ? character.data : undefined;
   const activeEntityId =
     activeTab === 'corporation'
@@ -290,7 +238,6 @@ export function PublicInfoModal() {
             value={activeTab}
             onChange={(id) => {
               setActiveTab(id as PublicInfoKind | 'employment' | 'interactions');
-              // Only Interactions rides the URL; any other tab clears it.
               if (id === 'interactions' || urlTab !== null)
                 setUrlTab(id === 'interactions' ? id : null);
             }}
@@ -341,14 +288,7 @@ export function PublicInfoModal() {
   );
 }
 
-function TabStatus({
-  status,
-  onRetry,
-}: {
-  status: 'loading' | 'error';
-  /** Offered when the lookup failed. */
-  onRetry?: () => void;
-}) {
+function TabStatus({ status, onRetry }: { status: 'loading' | 'error'; onRetry?: () => void }) {
   const { t } = useTranslation();
   if (status === 'loading') {
     return <Spinner block="panel" label={t('common.loading')} />;
@@ -379,7 +319,6 @@ function CharacterTab({
 }: {
   onRetry: () => void;
   state: CharacterState;
-  /** An NPC agent (CCP's id block): a slim card, no killboard. */
   npc: boolean;
   corporation: TabState<PublicCorporationInfo>;
   onOpenCorporation: () => void;
@@ -435,12 +374,7 @@ function CorporationTab({
 }: {
   onRetry: () => void;
   state: TabState<PublicCorporationInfo>;
-  /**
-   * A character's live alliance (null: none), which wins over the cached corp
-   * record's so this row and the Alliance tab agree. Undefined for a corp request.
-   */
   allianceId?: number | null;
-  /** Filled in once the alliance fetch resolves; a bare id shows until then. */
   allianceName?: string;
   onOpenAlliance?: () => void;
 }) {
@@ -488,11 +422,6 @@ function AllianceTab({
   );
 }
 
-/**
- * An NPC agent's Character tab. Pilot Lookup's view would show an empty
- * killboard and a 2003 "character age" for someone CCP placed in a station,
- * so an agent gets who it is and who it works for, and nothing else.
- */
 function NpcCharacterCard({
   profile,
   factionId,

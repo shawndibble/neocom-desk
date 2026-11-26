@@ -7,7 +7,6 @@ import { PlanMap } from './PlanMap';
 import { useRetryFocus } from '@/lib/useRetryFocus';
 import { useMapAdvice } from './useMapAdvice';
 
-/** The Map tab: loads what the recommendation model needs, then draws the explorer. */
 export function PiMapTab({ characterId }: { characterId: number }) {
   const { t } = useTranslation();
   const planetLabel = useCallback((id: number) => t('pi.planetLabel', { id }), [t]);

@@ -1,23 +1,3 @@
-/**
- * `/corp/members` — who is in this corporation, and are they still here.
- *
- * The one question no other view in the app can answer. Every other page is
- * about what a Character owns; this one is about people, and about the people
- * who have stopped showing up in particular — which is why the table opens
- * sorted by Last seen, newest first (the silent ones sort to the end and
- * the Inactive filter and dark tone find them), not alphabetically.
- *
- * **Director-only, and the whole page rather than a panel.** `membertracking`
- * declares `Director` in ESI's `x-required-roles` and nothing else, so
- * `canReadMembers` maps to that one role (`engine/corpRoles.ts`) and an
- * Accountant gets nothing useful here at all. `/corp` degrades panel by panel
- * because its panels answer to four different roles; this page has exactly one
- * gate, so it hides whole (GLOSSARY.md round 35) rather than rendering a shell
- * over a permission no login can grant.
- *
- * The `unknown` / `ready` asymmetry and the mount-on-`ready` split are
- * `useCorpRouteGate`'s, shared with `/corp` and `/corp/assets` — see that hook.
- */
 import { useCallback, useMemo, useState } from 'react';
 import { Navigate, useLocation, useSearchParams } from 'react-router-dom';
 import { useHydratedStore } from '@/lib/useHydratedStore';
@@ -108,24 +88,20 @@ import { tabPath } from '@/lib/pageTabs';
 import { usePageTab } from '@/lib/usePageTab';
 import { CORP_MEMBERS_TABS } from '@/features/corp/corpMembersTabs';
 
-/** The roster's filters, in the URL (ADR 0015); the table's sort is `CorpRosterTable`'s `?sort=`. */
 const FILTER_PARAMS = {
   q: textParam(),
   dark: boolParam(),
   ship: optionalIdParam(),
   loc: optionalIdParam(),
-  /** Characters (today's flat table) or Players (officers with an active book). */
   view: enumParam(['characters', 'players'] as const, 'characters'),
 };
 
-/** The funnel's share of the filters — everything but the search box, which acts immediately. */
 interface RosterFilter {
   dark: boolean;
   ship: number | null;
   loc: number | null;
 }
 
-/** "Any" sentinel for the ship/location selects: Radix reads `''` as "nothing selected". */
 const ANY = '__any';
 
 interface RosterOption {
@@ -133,11 +109,6 @@ interface RosterOption {
   label: string;
 }
 
-/**
- * The distinct ids one field takes across the roster, labelled the way the
- * table prints them. Built from the whole roster, not the filtered rows, so
- * picking a ship does not empty the location list of every other choice.
- */
 function rosterOptions(
   rows: readonly RosterRow[],
   pick: (row: RosterRow) => { id: number | null; name: string | null }
@@ -152,11 +123,6 @@ function rosterOptions(
     .sort((a, b) => a.label.localeCompare(b.label));
 }
 
-/**
- * The funnel's filters that are on, as `FilterBar` pills. A ship or place
- * reads as the select prints it; one no longer on the roster (a stale link)
- * falls back to its id, as the table does.
- */
 function activeMemberFilters(
   filter: RosterFilter,
   labels: {
@@ -170,7 +136,6 @@ function activeMemberFilters(
   const optionLabel = (options: readonly RosterOption[], id: number) =>
     options.find((option) => option.id === id)?.label ?? label(null, id);
   const active: ActiveFilter<RosterFilter>[] = [];
-  // The chip's own text ("Dark 30d+") says what it keeps, so it needs no value.
   if (filter.dark)
     active.push({ label: labels.darkLabel, clear: (next) => ({ ...next, dark: false }) });
   if (filter.ship !== null)
@@ -190,27 +155,13 @@ function activeMemberFilters(
 
 interface MembersSnapshot {
   corporationId: number | null;
-  /** The corporation's CEO; null when unreadable. */
   ceoId: number | null;
-  /**
-   * `null` when the tracking read produced nothing (offline, ESI down): that is
-   * "couldn't load", not the empty roster `[]` of a corporation EVE reported no
-   * rows for.
-   */
   members: MemberActivity[] | null;
-  /** Corporation-wide roles by member, for the optional roles column (issue #1766). */
   roles: ReadonlyMap<number, readonly string[]>;
   labels: MemberLabels;
   diff: RosterDiff;
-  /**
-   * Oldest `fetchedAt` across the roster and tracking reads — the badge speaks
-   * for the whole view. Roles are left out: an off-by-default column's stale
-   * fallback must not age the badge for everyone.
-   */
   fetchedAt: Date | null;
-  /** Either of those two reads fell back to its saved copy. */
   fromCache: boolean;
-  /** Captured in the loader: `Date.now()` in render is impure. */
   loadedAt: number;
 }
 
@@ -232,14 +183,10 @@ async function loadMembersSnapshot(
 ): Promise<MembersSnapshot> {
   const corporationId = await loadCorporationId(characterId);
   const loadedAt = Date.now();
-  // No corporation id means no corp-scoped cache key to read under; inventing
-  // one would file rows as `corp:undefined:` (#293).
   if (corporationId === null || signal.cancelled) {
     return { ...EMPTY_SNAPSHOT, corporationId, loadedAt };
   }
 
-  // Roles only fill a column that is off by default, so a failed read costs
-  // that column its contents — an empty map, a dash per cell — and nothing else.
   const [roster, tracking, memberRoles, ceoId] = await Promise.all([
     loadCorporationMemberIds(characterId, corporationId),
     loadCorporationMemberTracking(characterId, corporationId),
@@ -248,29 +195,15 @@ async function loadMembersSnapshot(
   ]);
 
   const memberIds = roster.cached?.data ?? null;
-  // The baseline is read *and* replaced in the same pass, so the summary
-  // reports each change exactly once. Two things must not consume it:
-  //
-  // - A roster we could not read at all. Overwriting the baseline with nothing
-  //   would silently swallow every change made since the last successful read.
-  // - A run whose result is about to be thrown away. `useRouteSnapshot`
-  //   discards a stale response, but a write already made is not discarded with
-  //   it — a cancelled run would consume the change and the user would never see
-  //   the summary. Skipping the write is the safe direction: the next run diffs
-  //   against the older baseline and reports the change again.
   let diff = EMPTY_ROSTER_DIFF;
   if (memberIds !== null) {
     diff = diffRoster(await readPreviousRoster(characterId, corporationId), memberIds);
-    // Nor while the page is saying "couldn't load" (no tracking rows): the change would be
-    // consumed unseen.
     if (!signal.cancelled && tracking.cached)
       await recordRoster(characterId, corporationId, memberIds, loadedAt);
   }
 
   const members = tracking.cached ? toMemberActivity(tracking.cached.data) : null;
   const roles = toMemberRoles(memberRoles.cached?.data ?? []);
-  // Members who left are in neither read any more, so their names are asked for
-  // explicitly — the summary is the only place they appear.
   const labels = await loadMemberLabels(characterId, members ?? [], diff.left);
 
   const fetchedAts = [roster, tracking]
@@ -286,11 +219,6 @@ async function loadMembersSnapshot(
   return { corporationId, ceoId, members, roles, labels, diff, fetchedAt, fromCache, loadedAt };
 }
 
-/**
- * Characters | Players. From `sm` a labelled two-segment control; below it that control cannot
- * share the search box's line with the column picker and funnel (§4b), so an icon menu opens the
- * same choices and its name carries the current one (§6c Header controls, decision 20261104-064915).
- */
 function ViewSwitch({
   value,
   onChange,
@@ -339,31 +267,21 @@ function ViewSwitch({
   );
 }
 
-/** Mounted only once Corp Access is `ready` — see the `/corp` loader note. */
 function CorpMembersView({ tabs }: { tabs: MembersTabsSlot | null }) {
   const { t } = useTranslation();
-  // The corp's own inactivity policy. Feeds `memberStanding` here so the
-  // table's tone, the stat strip's count and the dark-only filter all narrow
-  // to the same set — the invariant the engine's single constant used to hold.
   const darkAfterDays = useDarkThreshold((state) => state.value);
   useHydratedStore(useDarkThreshold);
   const snapshot = useRouteSnapshot<MembersSnapshot>(loadMembersSnapshot, undefined, {
-    // Keeps the roster on screen during a manual refresh (issue #418).
     staleWhileRevalidate: true,
     cacheKey: 'corp-members',
   });
   const data = snapshot.data;
   const activeCharacterId = useActiveCharacter((s) => s.activeCharacterId);
 
-  // Officers with an active book can group characters from here (the Player's corp layer).
   const grouping = useRosterGrouping(activeCharacterId, data?.corporationId ?? null);
   const [groupingFor, setGroupingFor] = useState<number | null>(null);
   const onGroupWith = useCallback((row: RosterRow) => setGroupingFor(row.characterId), []);
-  // One navigation sets both params; the Players table mounts with `?highlight` still in the URL
-  // (the Characters table latched null on its own mount), so it is the one that spends it.
   const [searchParams, setSearchParams] = useSearchParams();
-  // A cold `?view=players&highlight=` link shows the Characters table until the groups load, and
-  // that table spends the param on mount. Latch it here so the Players table still gets it.
   const [coldHighlight, setColdHighlight] = useState<number | null>(() =>
     searchParams.get('view') === 'players'
       ? parsePositiveInt(searchParams.get(HIGHLIGHT_PARAM))
@@ -412,17 +330,10 @@ function CorpMembersView({ tabs }: { tabs: MembersTabsSlot | null }) {
     }));
   }, [data, darkAfterDays, activeCharacterId, grouping]);
 
-  // Search + dark-only/ship/location filters (issue #421, AC2/AC3):
-  // AND-composed, same stacking rule as Mail's search-and-label filters
-  // (GLOSSARY.md round 55). The stat strip's dark count stays computed from the
-  // full roster — only the table narrows.
-  // All in the URL (ADR 0015); the dark *threshold* is a synced setting and
-  // stays out of it.
   const [filterParams, setFilterParams] = useUrlParams(FILTER_PARAMS);
   const search = filterParams.q;
   const darkOnly = filterParams.dark;
   const { ship, loc } = filterParams;
-  // Players groups characters by stored group, which only an officer with an active book can read.
   const playersView = grouping.canGroup && filterParams.view === 'players';
   const rosterIds = useMemo(() => new Set(rows.map((r) => r.characterId)), [rows]);
   const rosterFilter = useMemo<RosterFilter>(
@@ -468,9 +379,6 @@ function CorpMembersView({ tabs }: { tabs: MembersTabsSlot | null }) {
     columns: csvColumns,
   });
 
-  // The tracking read did not come back (or the whole load failed). Not the same
-  // answer as a roster EVE reported empty, so it never reaches the table's
-  // "no member activity" line.
   const loadFailed = data === null || data.members === null;
 
   if (!snapshot.hydrated) return <Spinner />;
@@ -631,8 +539,6 @@ function CorpMembersView({ tabs }: { tabs: MembersTabsSlot | null }) {
                   }
                 />
               ) : rows.length > 0 && visibleRows.length === 0 ? (
-                // The roster has members; the search/filters hid them all. The
-                // table's own empty state says EVE sent nothing, which would be wrong here.
                 <EmptyState
                   title={t('corp.members.noFilterMatches')}
                   hint={t('corp.members.noFilterMatchesHint')}
@@ -677,13 +583,6 @@ function CorpMembersView({ tabs }: { tabs: MembersTabsSlot | null }) {
   );
 }
 
-/**
- * Members, plus a Roles tab for a Director whose grant holds the titles scope
- * (`canReadRoleAudit`; otherwise no tab bar at all: hide, do not lock, and the
- * Roles path moves to the roster). Exactly one tab's view is mounted: the
- * roster's loader records the roster baseline (`rosterState`), so it must not
- * run, and consume a change unseen, while the Roles tab is the one on screen.
- */
 function CorpMembersTabs({ canReadRoleAudit }: { canReadRoleAudit: boolean }) {
   const { t } = useTranslation();
   const tabsId = useTabsId();

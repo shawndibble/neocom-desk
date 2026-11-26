@@ -1,11 +1,3 @@
-/**
- * Jump drive legs (issue #3147): a route that mixes stargates with jump-drive
- * hops. Pure, per CLAUDE.md. A jump may start in any system but may only land
- * where a drive can target (`isUntargetable`), so a destination or waypoint
- * that cannot be jumped to is reached by gate. Whether a cyno or beacon is lit
- * there is runtime state the app cannot know; callers say so rather than
- * claim it.
- */
 import {
   decayFatigue,
   isUntargetable,
@@ -16,26 +8,19 @@ import {
 } from './jumpDrive';
 import { CostQueue, stepCostFor, type FindJumpRouteOptions, type JumpGraph } from './jumpRoute';
 
-/** The pilot's drive, from the hull: range, fuel per ly and fatigue distance factor. */
 export interface JumpDriveOptions {
   rangeLy: number;
   fuelPerLy: number;
   distanceFactor: number;
 }
 
-/** A hull's base drive as baked: `[rangeLy, fuelTypeId, fuelPerLy]`. */
 export type HullJumpDrive = readonly [number, number, number];
 
 const BLACK_OPS_GROUP_ID = 898;
 const JUMP_FREIGHTER_GROUP_ID = 902;
-/** Jump Drive Calibration: +20% range a level; Jump Fuel Conservation: -10% fuel a level. */
 const RANGE_GAIN_AT_V = 1 + 0.2 * 5;
 const FUEL_FACTOR_AT_V = 1 - 0.1 * 5;
 
-/**
- * A hull's drive with both skills at V, the planning assumption (no skill
- * changes fatigue: the hull's group sets the share of a jump that counts).
- */
 export function hullJumpDrive(
   groupId: number,
   [rangeLy, fuelTypeId, fuelPerLy]: HullJumpDrive
@@ -56,23 +41,11 @@ export type JumpHop =
 export type JumpLegRoute =
   { kind: 'route'; systems: number[]; hops: JumpHop[] } | { kind: 'no-route' };
 
-/**
- * What a jump costs beside the system it lands in, in gate-hop equivalents:
- * the cyno, the fuel and the reactivation timer all weigh against a gate. A
- * jump therefore pays only where it saves more than about two gates, and
- * never turns every route into one long jump.
- */
 const JUMP_FLAT_COST = 1.5;
 const JUMP_COST_PER_LY = 0.05;
 
-/** One gate hop, with the warp and align, in minutes — an estimate for the arrive time. */
 const GATE_HOP_MINUTES = 1;
 
-/**
- * The cheapest route from `from` to `to` over stargates and jump hops, or
- * `no-route` when no jump leg is on it: that is the gate way, not a way by
- * jump drive. `systems` is every system the drive knows a position for.
- */
 export function routeWithJumps(
   graph: JumpGraph,
   systems: readonly JumpSystem[],
@@ -85,7 +58,6 @@ export function routeWithJumps(
     return { kind: 'no-route' };
   }
   const byId = new Map(systems.map((system) => [system.id, system]));
-  // Sorted by x, so an origin only measures the landings inside its x window.
   const landings = systems
     .filter((system) => graph.has(system.id) && !isUntargetable(system))
     .sort((a, b) => a.x - b.x);
@@ -165,17 +137,10 @@ export interface JumpWayFacts {
   jumps: number;
   totalLy: number;
   fuel: number;
-  /** Fatigue left on the pilot after the last jump, in minutes. */
   fatigueMinutes: number;
-  /** Minutes from departure to arrival: the timers waited out between jumps, plus the gates. */
   arriveMinutes: number;
 }
 
-/**
- * The fuel, light years, fatigue and time a route's jump hops cost. The
- * pilot starts with no fatigue; fatigue decays with the reactivation wait
- * between one jump and the next.
- */
 export function jumpWayFacts(
   hops: readonly JumpHop[],
   drive: Pick<JumpDriveOptions, 'fuelPerLy' | 'distanceFactor'>
@@ -195,7 +160,6 @@ export function jumpWayFacts(
     jumps += 1;
     totalLy += hop.distanceLy;
     fuel += jumpFuel(hop.distanceLy, drive.fuelPerLy);
-    // The previous jump's timer runs while the gates in between are flown.
     minutes += Math.max(wait, gateMinutes);
     gateMinutes = 0;
     fatigue = decayFatigue(fatigue, wait);

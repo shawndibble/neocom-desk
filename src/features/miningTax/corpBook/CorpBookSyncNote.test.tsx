@@ -18,6 +18,7 @@ const book = (over: Partial<CorpBookViewBook['summary']> = {}, rest = {}): CorpB
       lastSyncedAt: '2026-10-18T12:00:00Z',
       closedThrough: '2026-10-17',
       credit: 0,
+      estimate: 0,
       hubId: 'jita',
       oreForm: 'compressed',
       ...over,
@@ -105,16 +106,64 @@ describe('CorpBookSyncNote', () => {
     ).toBeInTheDocument();
   });
 
-  it('does not call a closed day safe while ore on it is still settling', () => {
+  it("says what it owes includes the open day's estimate, and when that day is billed", () => {
     render(
-      <CorpBookSyncNote book={book({}, { settlingFrom: '2026-10-17' })} owedNow={1} now={NOW} />
+      <CorpBookSyncNote
+        book={book(
+          {
+            estimate: 666_000,
+            account: {
+              paidThrough: null,
+              owes: { amount: 100_000, days: 1, oldest: '2026-10-17' },
+            },
+          },
+          { estimateFrom: '2026-10-18' }
+        )}
+        owedNow={766_000}
+        now={NOW}
+        showStanding
+      />
     );
-    expect(screen.queryByText(/Safe to pay/)).not.toBeInTheDocument();
     expect(
       screen.getByText(
-        "17 Oct is still settling: Brass Meridian Logistics's refinery log hasn't caught up with all your mining that day (synced 2h ago). Paying now pays only what is billed so far."
+        'You owe 766,000 ISK. 666,000 ISK of it is 18 Oct, billed after 06:00 UTC on 19 Oct.'
       )
     ).toBeInTheDocument();
+    expect(screen.queryByText(/Safe to pay/)).not.toBeInTheDocument();
+  });
+
+  it("in the pay dialog says the amount includes the open day's estimate", () => {
+    render(
+      <CorpBookSyncNote
+        book={book({ estimate: 666_000 }, { estimateFrom: '2026-10-18' })}
+        owedNow={666_000}
+        now={NOW}
+        showStanding={false}
+        inDialog
+      />
+    );
+    expect(
+      screen.getByText('666,000 ISK of it is 18 Oct, billed after 06:00 UTC on 19 Oct.')
+    ).toBeInTheDocument();
+  });
+
+  it('calls a day that is over and the book holds all of safe to pay, before the book bills it', () => {
+    render(
+      <CorpBookSyncNote
+        book={book(
+          { estimate: 666_000, closedThrough: '2026-10-16' },
+          { finalThrough: '2026-10-17' }
+        )}
+        owedNow={666_000}
+        now={NOW}
+        showStanding
+      />
+    );
+    expect(
+      screen.getByText('Safe to pay — 17 Oct is closed (Brass Meridian Logistics synced 2h ago).')
+    ).toBeInTheDocument();
+    expect(screen.getByText('You owe Brass Meridian Logistics 666,000 ISK.')).toBeInTheDocument();
+    expect(screen.queryByText(/billed after/)).not.toBeInTheDocument();
   });
 
   it('names the day still open and when it closes', () => {
@@ -166,7 +215,6 @@ describe('CorpBookSyncNote', () => {
     expect(container).toBeEmptyDOMElement();
   });
 
-  // `LeftCorpNotice` says it, with Pay and Stop showing: saying it here too only repeated it.
   it('leaves a leaver to the left-the-corp notice', () => {
     const { container } = render(
       <CorpBookSyncNote book={book({}, { left: true })} owedNow={0} now={NOW} />

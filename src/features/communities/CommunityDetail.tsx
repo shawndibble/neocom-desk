@@ -69,22 +69,8 @@ type Dialog =
   | { kind: 'regenerate' | 'revoke' | 'leave' | 'delete' }
   | { kind: 'remove' | 'makeAdmin'; member: CommunityMember };
 
-/** The admin's Manage windows. */
 type ManagePanel = 'invites' | 'transfer';
 
-/**
- * One Community, as the open Character sees it (scope decisions
- * `20261012-224358-communities-page-leads-with-shared-content` and
- * `20261013-072418-communities-my-sharing-slide-out-and-community-header`):
- * a header card with the admin's Manage menu in its corner, then what its
- * Members share. Blueprints, Fittings and Skill plans each show the
- * Community's content, under a line saying what this Character shares there;
- * the line's My sharing opens that tab's share controls in a slide-out.
- * Members is the roster, its count on the tab. Manage holds Invites (join
- * requests, approval, the link, mail invites), Transfer admin and Delete. Any
- * other Member leaves from the foot of the Members tab. Every change
- * refetches through `onChanged`, since Firestore here has no listeners.
- */
 export function CommunityDetail({
   community,
   characterId,
@@ -98,30 +84,21 @@ export function CommunityDetail({
 }: {
   community: CommunitySummary;
   characterId: number;
-  /** Refetch the list in the background. */
   onChanged: () => void;
-  /** Apply a known result at once, so the view never waits on the refetch to stop offering admin controls. */
   onPatch: (patch: Partial<CommunitySummary>) => void;
-  /** The Community no longer lists this Character (left, or deleted). */
   onGone: () => void;
-  /** The tab to open on (`?tab=`); Blueprints unless a link says otherwise. */
   initialTab?: CommunityTab;
-  /** Open the opening tab's My sharing (an old `?view=mine` link). */
   initialSharing?: boolean;
-  /** A Manage window to open on (`?tab=invites`, the old Invites tab's link). */
   initialPanel?: ManagePanel;
-  /** A Request to open the side panel on (`?request=`): a link from a buyback contract. */
   initialRequestId?: string;
 }) {
   const { t } = useTranslation();
   const isPhone = useIsPhone();
   const admin = isCommunityAdmin(community, characterId);
   const myUid = uidForCharacter(characterId);
-  // Read once per mount: "as of" ages and the 30-day stale line need no ticking.
   const [now] = useState(() => Date.now());
   const [members, setMembers] = useState<CommunityMember[] | null>(null);
   const [membersFailed, setMembersFailed] = useState(false);
-  // The roster is the last one read while online (`communityCache.ts`).
   const [membersCached, setMembersCached] = useState(false);
   const online = useOnline();
   const reconnects = useReconnectCount();
@@ -131,19 +108,15 @@ export function CommunityDetail({
   const tabsId = useTabsId();
   const [tab, setTab] = useState<CommunityTab>(initialTab);
   const [requests, setRequests] = useState<JoinRequest[]>([]);
-  // The board is read once its tab has been opened, then kept for the tab's count.
   const [requestsOpened, setRequestsOpened] = useState(initialTab === 'requests');
   const board = useCommunityRequests(characterId, community.id, requestsOpened);
-  // Same lazy read for Payouts; its tab count is the viewer's own unfinished payouts as boss.
   const [payoutsOpened, setPayoutsOpened] = useState(initialTab === 'payouts');
   const fleet = useFleetPayouts(characterId, community.id, payoutsOpened);
   const myOpenPayouts = fleet.payouts?.filter(
     (p) => p.ownerUid === myUid && !fleetPayoutProgress(p).done && !isExpired(p, now)
   ).length;
   const openRequests = board.requests?.filter((r) => isOpenRequest(r, now)).length;
-  // Looking at the Requests tab is what makes them not new for the Communities nav badge.
   const requestsShown = tab === 'requests' && board.requests !== null;
-  // Again whenever the board changes while shown: a Request that arrives under the viewer is seen.
   const shownRequests = requestsShown ? board.requests : null;
   useEffect(() => {
     if (!requestsShown) return;
@@ -160,8 +133,6 @@ export function CommunityDetail({
   useTimedToast(copied, () => setCopied(null), NOTICE_MS);
 
   const [sharingOpen, setSharingOpen] = useState(initialSharing && isContentTab(initialTab));
-  // Bumped as My sharing closes: the tab's list and its sharing line reread
-  // what changed there, since the list stays on screen under the slide-out.
   const [contentKey, setContentKey] = useState(0);
   const { sharing, onFittingsMine, onPlansMine } = useTabSharing(
     characterId,
@@ -173,14 +144,11 @@ export function CommunityDetail({
     setContentKey((n) => n + 1);
   };
 
-  // Bumped after a change that alters the Member list, to refetch it.
   const [reload, setReload] = useState(0);
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        // Offline, the saved roster answers; a refusal (removed from the
-        // Community) shows as a failure, never as stale data.
         const { value, cached } = await loadWithSnapshot({
           characterId,
           kind: 'members',
@@ -200,7 +168,6 @@ export function CommunityDetail({
     };
   }, [characterId, community.id, community.memberCount, reload, reconnects]);
 
-  // The admin's waiting list. A failed read (a backend not yet updated) is an empty list.
   const [requestsReload, setRequestsReload] = useState(0);
   useEffect(() => {
     if (!admin) return;
@@ -225,12 +192,9 @@ export function CommunityDetail({
   };
   const memberNames = new Map((members ?? []).map((m) => [m.uid, m.characterName]));
   const others = (members ?? []).filter((member) => member.uid !== community.adminUid);
-  // A changed or revoked link swaps the buttons out from under the confirm:
-  // focus goes back to the invite controls' first action instead of the page top.
   const invitesBody = useRef<HTMLDivElement>(null);
   const inviteFocus = () =>
     invitesBody.current?.querySelector<HTMLElement>('[data-invite-focus]') ?? null;
-  // Manage is the admin's; if the role moves away, its windows close with it.
   const shownPanel = admin ? panel : null;
   const waiting = admin ? requests.length : 0;
 
@@ -240,7 +204,6 @@ export function CommunityDetail({
     fittings: t('communities.tabs.fittings'),
     plans: t('communities.tabs.plans'),
   };
-  // What each content tab shows: the Community's content, and, in My sharing, this Character's.
   const everyoneViews: Record<ContentTab, () => ReactNode> = {
     blueprints: () => (
       <CommunityLibrary {...ids} members={members} membersFailed={membersFailed} now={now} />
@@ -323,14 +286,12 @@ export function CommunityDetail({
             {
               id: 'members',
               label: t('communities.members'),
-              // The roster once loaded, so the tab and the header card never disagree.
               count: members?.length ?? community.memberCount,
             },
           ]}
           value={tab}
           onChange={(id) => {
             const next = id as CommunityTab;
-            // My sharing follows the content tabs; the roster has none.
             if (!isContentTab(next) && sharingOpen) closeSharing();
             if (next === 'requests') setRequestsOpened(true);
             if (next === 'payouts') setPayoutsOpened(true);
@@ -452,7 +413,6 @@ export function CommunityDetail({
           />
           <CommunityPopSharers communityId={community.id} characterId={characterId} />
         </div>
-        {/* Inside the window that raised it: the page behind is inert while it is open. */}
         {copied && <Toast message={copied} onClose={() => setCopied(null)} />}
       </Modal>
       <Modal

@@ -17,7 +17,6 @@ describe('ratioMeterColor', () => {
   });
 
   it('stays out of yellow and orange until past half: gray, blue, then green', () => {
-    // Below 50% the green channel leads red, so the colour is cool, never warm.
     for (const pct of [0, 10, 20, 30, 40, 45, 50]) {
       const hex = ratioMeterColor(pct);
       const r = parseInt(hex.slice(1, 3), 16);

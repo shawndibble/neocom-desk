@@ -1,19 +1,3 @@
-/**
- * `/corp/moons`'s data (issue #4063): the whole Corp Tax Book read back from
- * Firestore, priced with the personal tab's loaders, joined into one
- * `BookView` (`engine/corpTaxBook/bookView.ts`), and the names the tables
- * print. Sync, the stale warning and the mining-scope prompt are
- * `useCorpTaxBook()`'s; this hook only reads and joins.
- *
- * Reads go through the officer rules, so it verifies the Character first
- * (`verifyOfficer`, access token only, ADR 0023). A reload after every edit
- * is the caller's: Firestore here is the `lite` build, with no listeners.
- *
- * `options.minerId` names the Miner whose page is open. The book is then that Miner's read-model
- * slice (#5258) instead of the whole ledger. `options.extractionId` names the pull whose moon page
- * is open: the book is then its window's rows plus the moon docs (#5716), or the whole book when a
- * doc is missing. `readBook` (taxBook/bookRead) decides which.
- */
 import { soloCharacterId } from '../../../../functions/src/corpTaxBookDonationMatch';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { buildBookView, type BookView, type BookViewInput } from '@/engine/corpTaxBook/bookView';
@@ -55,16 +39,9 @@ import { MINUTE_MS } from '@/lib/age';
 
 export interface BookNames {
   character: (id: number) => string;
-  /** A corporation (a moon owner) by id. */
   corporation: (id: number) => string;
-  /**
-   * A refinery through the label chain: an officer label, the structure name, the system, else
-   * "Refinery <id>". Never the moon owner's name, so it is safe on a miner's line or mail.
-   */
   refinery: (id: number) => string;
-  /** A refinery shown by a name the viewer's character cannot dock at to read for itself (the server read it). */
   undockable?: (id: number) => boolean;
-  /** The same chain, falling back to the moon owner's name plus the id: officer screens about a moon owner only. */
   ownerRefinery: (id: number) => string;
   moon: (id: number) => string;
   ore: (typeId: number) => string;
@@ -75,7 +52,6 @@ const EMPTY_NAMES = {
   refineries: new Map<number, string>(),
   ores: new Map<number, string>(),
   moons: new Map<number, string>(),
-  /** False until the name lookups have answered: a refinery is not "undockable" while still being asked about. */
   resolved: false,
   undockable: new Set<number>(),
 };
@@ -95,14 +71,8 @@ type Fetched =
 
 export type CorpBookState =
   | { status: 'loading' }
-  /**
-   * No corporation, or the Character's roles cannot open the book. `unverified`: the server
-   * could not check the token, which says nothing about the roles.
-   */
   | { status: 'denied'; message?: string; unverified?: boolean }
-  /** `message` is a dim details line (an error code), never a sentence to read. */
   | { status: 'failed'; message: string }
-  /** The corporation has no active book yet. */
   | { status: 'off'; verdict: OfficerVerdict }
   | {
       status: 'ready';
@@ -111,15 +81,12 @@ export type CorpBookState =
       view: BookView;
       names: BookNames;
       data: BookData;
-      /** A refinery page's moon docs (#6348); absent on every other page. */
       refinery?: BookRead['refinery'];
     };
 
 export interface CorpBook {
   state: CorpBookState;
-  /** Re-reads the book; call after an edit. */
   reload: () => void;
-  /** Reads the ledger rows a tab opened without; see `BookContextValue.requestRows`. */
   requestRows: () => void;
   characterId: number | null;
   corporationId: number | null;
@@ -129,7 +96,6 @@ function utcNow() {
   return new Date().toISOString();
 }
 
-/** A refused read ends the page's book: a lost role wipes the local rows (ADR 0031). */
 async function failedFetch(
   error: unknown,
   characterId: number,
@@ -148,11 +114,6 @@ async function failedFetch(
         };
 }
 
-/**
- * `wanted` is what the open page joins (`bookPartsFor`); default the whole book. Only those
- * parts are read, and a page that wants more reads just the parts it adds. Until they
- * are in, the state is `loading`.
- */
 export function useCorpBook(
   sync: CorpTaxBookSync,
   wanted: ReadonlySet<BookPart> = bookPartsFor(),
@@ -168,7 +129,6 @@ export function useCorpBook(
   const [now, setNow] = useState(utcNow);
   const [names, setNames] = useState(EMPTY_NAMES);
   const [memberIds, setMemberIds] = useState<ReadonlySet<number> | undefined>(undefined);
-  // Built from one read: a newer read (reload, late rows, another scope) must not borrow its prices.
   const [builtSurvey, setSurvey] = useState<
     | {
         from: Fetched;
@@ -182,10 +142,8 @@ export function useCorpBook(
   const surveyOreLines = survey?.lines;
   const surveyMeasured = survey?.measured;
   const reload = useCallback(() => setAttempt((n) => n + 1), []);
-  // The Moon owners tab reads no ledger rows unless its summaries cannot stand in (#5717).
   const needsRows =
     fetched.status === 'loaded' && needsRowsFallback(wanted, fetched.data, now, corporationId);
-  // A dialog that prices from rows asks for them (`requestRows`); the page stays ready meanwhile.
   const [rowsAsked, setRowsAsked] = useState(false);
   const requestRows = useCallback(() => setRowsAsked(true), []);
   const required = useMemo(
@@ -197,19 +155,16 @@ export function useCorpBook(
     [required, rowsAsked]
   );
   const wantedKey = [...asked].sort().join(',');
-  // A stable copy: the full read below and the tab-switch read both start from the latest ask.
   const wantedRef = useRef(asked);
   useEffect(() => {
     wantedRef.current = asked;
   }, [asked]);
 
-  // A page left open turns stale and rolls a day over (the sync hook's known gap).
   useEffect(() => {
     const id = window.setInterval(() => setNow(utcNow()), MINUTE_MS);
     return () => window.clearInterval(id);
   }, []);
 
-  // A finished sync changes the book: read it again.
   const finishedAt = sync.run.phase === 'done' ? sync.run.finishedAt : 0;
 
   useEffect(() => {
@@ -219,7 +174,6 @@ export function useCorpBook(
       try {
         const verdict = await verifyOfficer(characterId, corporationId);
         if (cancelled) return;
-        // An officer record that no longer lets this Character view takes the local rows with it (ADR 0031).
         if (!verdict.canView) await forgetObservedCopy(characterId, corporationId).catch(() => {});
         if (!verdict.bookActive) {
           setFetched({ status: 'off', verdict });
@@ -231,7 +185,6 @@ export function useCorpBook(
           ...(scopedMoon !== undefined ? { extractionId: scopedMoon } : {}),
           ...(scopedRefinery !== undefined ? { structureId: scopedRefinery } : {}),
         });
-        // The page moved on while this read ran: take the parts it now wants.
         const data =
           read && (await extendBook(characterId, corporationId, read, wantedRef.current));
         if (cancelled) return;
@@ -239,8 +192,6 @@ export function useCorpBook(
           setFetched({ status: 'off', verdict });
           return;
         }
-        // Prices for every ore on every day it was mined, at the book's hub and Ore Form. A Miner's
-        // slice prices only its open window: a day before its checkpoint is closed and needs no price.
         const { pricesOn, moonOwnerPricesOn } = await loadBookPrices(data, data.minerScope?.from);
         if (cancelled) return;
         setFetched({
@@ -260,7 +211,6 @@ export function useCorpBook(
     };
   }, [characterId, corporationId, attempt, finishedAt, scopedMiner, scopedMoon, scopedRefinery]);
 
-  // A page that wants parts the book was opened without reads just those.
   useEffect(() => {
     if (fetched.status !== 'loaded' || characterId === null || corporationId === null) return;
     if (holdsParts(fetched.data, wantedRef.current)) return;
@@ -269,7 +219,6 @@ export function useCorpBook(
     extendBook(characterId, corporationId, held, wantedRef.current)
       .then(async (merged) => {
         if (cancelled || merged === held) return;
-        // Rows that arrive late (the Moon owners tab's fallback) need their own prices.
         const prices =
           merged.parts.has('observed') && !held.parts.has('observed')
             ? await loadBookPrices(merged)
@@ -286,10 +235,8 @@ export function useCorpBook(
     return () => {
       cancelled = true;
     };
-    // `wantedKey` is the dependency: the ref carries the set itself.
   }, [fetched, wantedKey, characterId, corporationId]);
 
-  // Current membership comes from the public affiliation endpoint, so an Accountant sees leavers too (#4194).
   useEffect(() => {
     if (fetched.status !== 'loaded' || corporationId === null) return;
     const { data } = fetched;
@@ -309,8 +256,6 @@ export function useCorpBook(
     };
   }, [fetched, corporationId]);
 
-  // A chunk with no notification takes its ore from a linked Moon Ore Survey (D13). One with a
-  // notification reads it too: until its ore is mined, the survey splits a base ore into variants.
   useEffect(() => {
     if (fetched.status !== 'loaded') return;
     const { data } = fetched;
@@ -321,7 +266,6 @@ export function useCorpBook(
       const found = new Map<string, { typeId: number; quantity: number }[]>();
       const measuredIds = new Set<string>();
       if (wanted.length > 0) {
-        // Only a link made before the book kept its scan reads the Survey itself (7-day link).
         const typeIdByName = wanted.every((x) => x.surveyScan)
           ? new Map<string, number>()
           : await loadMoonOreTypeIdByName();
@@ -342,8 +286,6 @@ export function useCorpBook(
           })
         );
       }
-      // The survey's ores are priced like the notified ones: the read's prices never saw them.
-      // A failed price load keeps the lines (and their names); the read's own prices stand in.
       const prices =
         found.size > 0
           ? await loadBookPrices(data, data.minerScope?.from, surveyTypeIdsOf(found)).catch(
@@ -375,28 +317,21 @@ export function useCorpBook(
     return moon ? withMoonDocs(built, moon.docs, moon.fromDocs) : built;
   }, [fetched, now, corporationId, memberIds, survey, surveyOreLines, surveyMeasured]);
 
-  // Names, resolved after the figures so the tables never wait on them.
   useEffect(() => {
     if (!view || characterId === null) return;
     let cancelled = false;
     const characterIds = new Set<number>();
     for (const m of view.miners) for (const id of m.characterIds) characterIds.add(id);
-    // A grouped Miner with no charge is in no view row; the book's record still names its main.
     for (const m of view.input.miners) characterIds.add(m.mainCharacterId);
     for (const p of view.input.payments) characterIds.add(p.characterId);
-    // Whoever recorded a correction is named beside it, not shown as an ID.
     for (const a of view.input.adjustments) characterIds.add(a.by);
     if (fetched.status === 'loaded') {
       for (const a of fetched.data.groupingAnswers ?? []) characterIds.add(a.characterId);
-      // A refinery page reads no ledger row, so a Miner in no grouping is known only by the id in a moon doc.
       for (const d of fetched.data.refinery?.docs.values() ?? [])
         for (const m of d.miners) {
           const solo = soloCharacterId(m.minerId);
           if (solo !== undefined) characterIds.add(solo);
         }
-      // Moon owners are corporations; the universe names lookup resolves both kinds.
-      // A payee the moon owner named is a player or another corporation.
-      // The book's own corporation is named beside a moon owner's on Extractions (#6097).
       if (
         corporationId !== null &&
         view.input.extractions.some((x) => x.sourceCorporationId !== undefined)
@@ -406,7 +341,6 @@ export function useCorpBook(
         characterIds.add(f.corporationId);
         if (f.payee) characterIds.add(f.payee.id);
       }
-      // Systems too, for a refinery whose structure name is not readable (a moon owner's).
       const facts = refineryFacts(
         fetched.data.observed,
         learnedSystemsOf(fetched.data.feeders ?? [])
@@ -416,7 +350,6 @@ export function useCorpBook(
     const refineryIds = new Set<number>([
       ...view.input.extractions.map((x) => x.structureId),
       ...view.charges.map((c) => c.structureId),
-      // The Sharing tab lists the book's refineries with no Extraction yet too (#6240).
       ...(fetched.status === 'loaded' ? (fetched.data.scheduledSync?.refineryIds ?? []) : []),
     ]);
     const moonIds = [
@@ -434,12 +367,6 @@ export function useCorpBook(
         loadMoonNames(moonIds).catch(() => new Map<number, string>()),
       ]);
       const refineries = new Map<number, string>();
-      // A name the server read with the moon owner's own grant is used as it is,
-      // so no roster sweep is made for it. This character's own access is still
-      // checked (one lookup per refinery, then cached, and a refusal is
-      // remembered for a day), because a refinery you cannot dock at is worth
-      // saying so. Only a confirmed refusal counts: offline or a failed request
-      // says nothing about docking rights.
       const serverNamed =
         fetched.status === 'loaded'
           ? structureNamesOf(fetched.data.feeders ?? [])
@@ -465,10 +392,8 @@ export function useCorpBook(
     () =>
       fetched.status === 'loaded'
         ? {
-            // A moon owner's rows rarely carry a system; miners' own ledgers teach it (#4650).
             ...refineryFacts(fetched.data.observed, learnedSystemsOf(fetched.data.feeders ?? [])),
             labels: officerLabelsOf(fetched.data.feeders ?? []),
-            // Read by the server with the moon owner's own grant (#4654).
             structureNames: structureNamesOf(fetched.data.feeders ?? []),
           }
         : null,
@@ -489,7 +414,6 @@ export function useCorpBook(
       character: (id) => names.characters.get(id) ?? `#${id}`,
       corporation: (id) => names.characters.get(id) ?? `#${id}`,
       refinery,
-      // Only worth a chip when a real name is showing: the stand-in already says it.
       undockable: (id) => names.undockable.has(id) && !isRefineryPlaceholder(refinery(id), id),
       ownerRefinery: refineryLabeler({
         ...sources,
@@ -505,8 +429,7 @@ export function useCorpBook(
 
   const state: CorpBookState =
     fetched.status === 'loaded'
-      ? // A book read for another page's scope is not this page's: wait for the right one.
-        view &&
+      ? view &&
         fetched.data.scopedMiner === scopedMiner &&
         fetched.data.forMoon === scopedMoon &&
         fetched.data.refinery?.structureId === scopedRefinery &&
@@ -525,10 +448,6 @@ export function useCorpBook(
   return { state, reload, requestRows, characterId, corporationId };
 }
 
-/**
- * Whether the Moon owners tab, read without ledger rows, must read them after all: a moon owner
- * its summary cannot stand in for (#5717).
- */
 export function needsRowsFallback(
   wanted: ReadonlySet<BookPart>,
   data: BookData,

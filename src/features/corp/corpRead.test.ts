@@ -39,10 +39,6 @@ describe('loadCorpWithCacheStatus', () => {
     expect(await db.esiCache.get([CHAR_ID, KEY])).toBeUndefined();
   });
 
-  /**
-   * The whole point of the wrapper: a caller cannot forget the corp reading of
-   * a 403, because it never names `detectAuthFailure` at all.
-   */
   it('treats a 403 as the in-game role gate, not a re-login prompt', async () => {
     server.use(http.get(URL, () => HttpResponse.json({ error: 'Forbidden' }, { status: 403 })));
 
@@ -75,9 +71,6 @@ describe('loadCorpWithCacheStatus', () => {
       { staleAfterMs: 0 }
     );
 
-    // staleAfterMs: 0 means the stale row is not served fresh, so the live
-    // call (which fails) is attempted and the cached row is the fallback —
-    // proving the option still reaches through the wrapper.
     expect(result.cached?.data).toEqual({ ok: 'stale' });
     expect(result.cached?.fromCache).toBe(true);
   });

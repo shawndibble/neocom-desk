@@ -1,35 +1,18 @@
-/**
- * The Command Palette's Market Items group (#2319): every market item by
- * name, off the market catalogue (`loadMarketTypes`, ~1.5 MB, deliberately
- * outside the install precache). Loading it must never hold up typing, so the
- * group answers from the in-memory index when it is warm and with a Promise
- * (the palette's loading row) while it is cold.
- *
- * Matching is a linear scan over a name index built once — lowercased and
- * pre-sorted, so a keystroke does no sort and no lowercasing of its own. Its
- * own scan rather than `rankedSearch` (same ranking) for that reason:
- * measured in node over the real ~19.5k entries, 0.1–0.8 ms a keystroke
- * against `rankedSearch`'s ~1.5 ms. Either is well under the ticket's 8 ms
- * budget, so no worker and no debounce.
- */
 import { queryTokens, searchKey, tokenPrefixMatch, wordsOf } from '@/lib/tokenSearch';
 import { isOnline } from '@/stores/network';
 import { loadMarketTypes } from '@/sde/loadMarketSde';
 import type { MarketTypeEntry } from '@/sde/marketTypes';
 import { GROUP_LIMIT, type PaletteProvider, type PaletteResult } from './types';
 
-/** Same threshold as the Market Browser's tree search: shorter matches half the catalogue. */
 export const MARKET_ITEMS_MIN_QUERY_LENGTH = 3;
 
 interface IndexedItem {
   readonly typeId: number;
   readonly name: string;
   readonly lower: string;
-  /** `lower` split into words, once, for the any-order tier. */
   readonly words: readonly string[];
 }
 
-/** Sorted by name, so each rank's matches come out alphabetical without a per-query sort. */
 export type MarketItemIndex = readonly IndexedItem[];
 
 export function buildMarketItemIndex(catalogue: readonly MarketTypeEntry[]): MarketItemIndex {
@@ -41,11 +24,6 @@ export function buildMarketItemIndex(catalogue: readonly MarketTypeEntry[]): Mar
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
-/**
- * Exact, then prefix, then substring match on the name, then every query word
- * a prefix of a name word in any order (digit = roman numeral); alphabetical
- * within each. Same tiers as `rankedSearch`.
- */
 export function searchMarketItems(
   index: MarketItemIndex,
   query: string,
@@ -62,7 +40,6 @@ export function searchMarketItems(
     const { lower } = item;
     if (lower === q) exact.push(item);
     else if (lower.startsWith(q)) {
-      // Nothing below prefix can make the cut once prefix alone fills it.
       if (exact.length + prefix.length < limit) prefix.push(item);
     } else if (exact.length + prefix.length + substring.length < limit && lower.includes(q)) {
       substring.push(item);
@@ -79,13 +56,7 @@ export function searchMarketItems(
 }
 
 export interface MarketItemCatalogue {
-  /**
-   * The index, loading the catalogue on first call. A failed load stays
-   * failed until a call asks to `retry` (the palette's next opening), so an
-   * offline pilot's keystrokes do not each refetch the whole catalogue.
-   */
   load(options?: { retry?: boolean }): Promise<MarketItemIndex>;
-  /** The index if it has already loaded — lets a warm search answer synchronously. */
   peek(): MarketItemIndex | null;
 }
 
@@ -114,12 +85,6 @@ export function createMarketItemCatalogue(
   };
 }
 
-/**
- * The session's one catalogue: loaded on first palette open, kept until
- * reload. The loader is read at call time, not at import: the shell imports
- * this module on every page, and a test that mocks `loadMarketSde` without
- * `loadMarketTypes` would otherwise fail on import alone.
- */
 export const marketItemCatalogue = createMarketItemCatalogue(() => loadMarketTypes());
 
 export interface ShownMarketItem {
@@ -129,7 +94,6 @@ export interface ShownMarketItem {
 
 export interface MarketItemsProviderOptions {
   readonly catalogue: MarketItemCatalogue;
-  /** Opens the item in the Market Browser. */
   readonly onSelect: (item: ShownMarketItem) => void;
 }
 
@@ -147,10 +111,6 @@ export function createMarketItemsProvider({
     id: 'marketItems',
     labelKey: 'commandPalette.groups.marketItems',
     order: 8,
-    // The catalogue is fetched on first use, not precached: offline, a failure
-    // here is "never downloaded". Online it is some other failure, so the
-    // generic copy reads. A getter, so the browser's state is read when the
-    // row is drawn.
     get errorKey() {
       return isOnline() ? undefined : 'commandPalette.itemSearchNeedsDownload';
     },

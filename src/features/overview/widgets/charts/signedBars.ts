@@ -1,27 +1,15 @@
-/**
- * Geometry for vertical bars that may dip below a zero axis and carry a
- * reference line (a daily average). Pure, like `geometry.ts`; separate file so
- * the shared geometry module stays untouched.
- */
-
-/** A bar that is not zero is never thinner than this, so a small value still reads as there. */
 const MIN_BAR_PERCENT = 3;
 
 export interface SignedBar {
-  /** Distance of the bar's bottom edge above the plot floor, in percent of the plot height. */
   from: number;
-  /** The bar's height in percent of the plot height. */
   size: number;
   negative: boolean;
 }
 
 export interface SignedBarGeometry {
   bars: SignedBar[];
-  /** Where the zero axis sits above the floor, in percent; 0 when nothing is negative. */
   baseline: number;
-  /** Where the reference line sits above the floor, in percent; null when none was asked for or it cannot be placed. */
   ref: number | null;
-  /** Index of the first tallest positive bar; null when no bar is above zero. */
   peak: number | null;
 }
 

@@ -1,8 +1,3 @@
-/**
- * The Appraisal's campaign turn-ins (issue #6706): the facts row's Turn in
- * total opening `TurnInBreakdown`, the Turn in column, the copy menu's Turn in
- * entry split per Item Trader, and the Buy/Sell totals left alone.
- */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -38,7 +33,6 @@ vi.mock('@/features/campaigns/useTurnIns', async (importOriginal) => ({
 }));
 vi.mock('@/app/loginFlow', () => ({ beginEveLogin: vi.fn().mockResolvedValue(undefined) }));
 
-// Sell now 50K each against ~60K turned in: turning in beats selling the reports.
 const ITEMS: AppraisalItem[] = [
   {
     typeId: FAILOVER.typeId,
@@ -122,11 +116,9 @@ afterEach(() => {
 describe('AppraisalPanel — campaign turn-ins (issue #6706)', () => {
   it('shows the Turn in total in the facts row and keeps it out of the Buy and Sell totals', async () => {
     renderPanel();
-    // 300 + 200 × 60K = 30M turned in.
     const total = await screen.findByRole('button', { name: /Open the turn-in breakdown/ });
     expect(total).toHaveTextContent('~30M');
     expect(screen.getByText('2 items')).toBeInTheDocument();
-    // Buy is 25M + 4,000 sold into the buy orders, never the turn-in.
     expect(screen.getByRole('region', { name: 'Buy' })).toHaveTextContent('25,004,000');
   });
 

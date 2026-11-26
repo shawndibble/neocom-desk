@@ -14,13 +14,6 @@ import { FAILOVER, FAILOVER_UNPRICED, PHONE, STRATEGIC_INTEL } from './turnInSto
 import { TurnInSampleMark } from './TurnInSampleMark';
 import type { TurnInOfferDetail } from './useTurnIns';
 
-/**
- * `TurnInDetail`: the one single-item popover every surface opens on a
- * campaign turn-in, from its own trigger (`TurnInGlyph` after a figure, or the
- * figure itself as `TurnInFigureButton`). Drawn here with every read made
- * (`TurnInDetailView`); the amber marks are `PermissionCellMark`, which
- * `GrantCellMark` wires up in the app.
- */
 interface Variant {
   caption: string;
   participate: ParticipateLine;
@@ -150,13 +143,10 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** @summary Every TurnInDetail variant side by side: each Participate line, each Set destination state, LP unpriced and surface lines. */
 export const AllVariants: Story = {};
 
-/** @summary The variants on a phone: one column. */
 export const AllVariantsPhone: Story = { globals: PHONE };
 
-/** @summary Military Campaigns missing: the mark by "Pays only if…" pressed, its grant popover open. */
 export const MilitaryCampaignsMarkOpen: Story = {
   render: () => (
     <div className="p-4 pb-64">
@@ -167,7 +157,6 @@ export const MilitaryCampaignsMarkOpen: Story = {
   ),
 };
 
-/** @summary Autopilot waypoints missing: Set destination aria-disabled, the mark after it opened. */
 export const WaypointsMarkOpen: Story = {
   render: () => (
     <div className="p-4 pb-64">
@@ -178,7 +167,6 @@ export const WaypointsMarkOpen: Story = {
   ),
 };
 
-/** @summary The glyph trigger after a figure (Assets, Hauling, a buy order), its popover open. */
 export const GlyphTrigger: Story = {
   render: () => (
     <div className="p-4 pb-96 text-sm">
@@ -194,7 +182,6 @@ export const GlyphTrigger: Story = {
   ),
 };
 
-/** @summary The figure itself as the trigger, dashed underlined (Appraisal's Turn in column, the Market item). */
 export const FigureTrigger: Story = {
   render: () => (
     <div className="p-4 pb-96 text-sm">

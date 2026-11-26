@@ -6,13 +6,6 @@ import { HandledByCard } from './HandledByCard';
 import { MoonOwnerView } from './MoonOwnerView';
 import { useFeederView } from './useFeederView';
 
-/**
- * After leaving: "Previously handled by <accounting corporation>" above the
- * `children` (the own-book / paste-an-invite choice), the history below. When
- * there is nothing to show (never handled, dismissed, or the view cannot be
- * read) it renders only the `children`. `collectorCorporationId` names one accounting
- * corporation it left (#4621); absent, the last one.
- */
 export function MoonOwnerPrevious({
   characterId,
   corporationId,

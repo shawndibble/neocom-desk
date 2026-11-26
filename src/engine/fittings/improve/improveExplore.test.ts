@@ -14,7 +14,6 @@ import { baseFittingStats } from '../__fixtures__/fittingStats';
 
 const index = buildVariationIndex({}, {});
 
-// 1 analyzer, 2 better analyzer, 3 probe launcher, 10 CPU rig (engineering), 11 hacking rig, 12 speed rig, 13 tank rig.
 const GROUP: Record<number, number> = {
   1: 538,
   2: 538,
@@ -65,7 +64,6 @@ const ANALYZER = (analyzer: number, rig: number) => ({
   cycleSeconds: 10,
 });
 
-/** Strength 60 on analyzer 1, 70 on 2; the hacking rig 11 adds 10; `cpu` is what each rig leaves used. */
 function figures(fit: Fitting, cpu: Record<number, number> = {}): FittingStats {
   const [analyzer, rig] = [fit.modules[0]!.typeId, fit.modules[1]!.typeId];
   const base = baseFittingStats();

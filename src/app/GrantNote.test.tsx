@@ -18,11 +18,6 @@ const SCOPE = ESI_REGISTRY.getCharacterStandings.scope;
 const CONTEXT = 'Assumes base standings';
 const ACTIVE_TITLE = 'Active: grant Character details';
 
-/**
- * A note that does show (its Character has no token), rendered beside the one
- * under test: both read the grant in the same commit, so once this one is up
- * the other's answer has landed too, and an absence means something.
- */
 const CONTROL_ID = 9;
 function Control() {
   return (
@@ -132,7 +127,6 @@ describe('GrantNote', () => {
     );
     expect(await screen.findByText(ACTIVE_TITLE)).toBeInTheDocument();
 
-    // Synchronously after the switch the query still holds ACTIVE_ID's answer.
     rerender(
       <>
         <GrantNote endpoints={ENDPOINTS} characterId={ALT_ID} title={CONTEXT} />
@@ -216,7 +210,6 @@ describe('GrantBanner', () => {
     expect(await screen.findByText('Alt: grant Mail, Character details')).toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: 'Grant in EVE' })).toHaveLength(1);
     expect(screen.queryByText('Alt: grant Mail')).toBeNull();
-    // The other panel is never left blank: it says the page's prompt covers it.
     expect(screen.getByText('Alt: covered by the login prompt on this page.')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Grant in EVE' }));
     expect(beginEveLogin).toHaveBeenCalledWith({
@@ -245,10 +238,8 @@ describe('GrantBanner', () => {
       </>
     );
 
-    // The full banner speaks for the note, not the other way round.
     expect(await screen.findByText('Alt: grant Mail, Character details')).toBeInTheDocument();
     expect(screen.getByText('Alt: covered by the login prompt on this page.')).toBeInTheDocument();
-    // The standalone note keeps its own banner and context.
     expect(screen.getByText('Assumes no mail')).toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: 'Grant in EVE' })).toHaveLength(2);
   });

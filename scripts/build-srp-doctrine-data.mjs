@@ -1,5 +1,3 @@
-// Writes functions/src/data/srpDoctrineData.ts from public/data (functions cannot import
-// public/). Run after the SDE data changes; functions/src/srpDoctrineData.test.ts fails on drift.
 import { readFileSync, writeFileSync } from 'node:fs';
 
 const read = (p) =>

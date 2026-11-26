@@ -40,7 +40,6 @@ describe('maxJobSlots', () => {
     expect(maxJobSlots({ ...NO_SKILLS, massReactions: 5, advancedMassReactions: 5 }).reaction).toBe(
       11
     );
-    // The user's own worked example: Mass Reactions IV, Advanced Mass Reactions untrained.
     expect(maxJobSlots({ ...NO_SKILLS, massReactions: 4 }).reaction).toBe(5);
   });
 });
@@ -52,9 +51,6 @@ describe('jobSlotCategory', () => {
   });
 
   it('maps every research/copying/invention activity to the shared science category', () => {
-    // Invention (8) is classed as a science job and draws from the same
-    // laboratory slots as research and copying (support.eveonline.com
-    // "Invention").
     expect(jobSlotCategory(3)).toBe('science');
     expect(jobSlotCategory(4)).toBe('science');
     expect(jobSlotCategory(5)).toBe('science');
@@ -76,11 +72,11 @@ describe('runningJobCountsByCategory', () => {
   it('counts only jobs not yet ended, per category', () => {
     const counts = runningJobCountsByCategory(
       [
-        job(1, NOW + 1000), // manufacturing, running
-        job(1, NOW - 1000), // manufacturing, done
-        job(3, NOW + 1000), // science, running
-        job(8, NOW + 1000), // science (invention), running
-        job(11, NOW - 1000), // reaction, done
+        job(1, NOW + 1000),
+        job(1, NOW - 1000),
+        job(3, NOW + 1000),
+        job(8, NOW + 1000),
+        job(11, NOW - 1000),
       ],
       NOW
     );
@@ -126,9 +122,7 @@ describe('aggregateJobSlotSummary', () => {
 
   it('sums open/max across characters with known skills and jobs', () => {
     const characters: JobSlotCharacterInput[] = [
-      // 1 base + 4 trained = 5 max, 1 running -> 4 open.
       { skills: skills(4), jobs: [job(1, NOW + 1000)] },
-      // 1 base + 2 trained = 3 max, 0 running -> 3 open.
       { skills: skills(2), jobs: [] },
     ];
     expect(aggregateJobSlotSummary(characters, NOW).manufacturing).toEqual({ open: 7, max: 8 });
@@ -136,9 +130,9 @@ describe('aggregateJobSlotSummary', () => {
 
   it('excludes a character missing skills or jobs from the sum rather than guessing zero', () => {
     const characters: JobSlotCharacterInput[] = [
-      { skills: skills(4), jobs: [] }, // 5 max, 0 running -> 5 open.
-      { skills: undefined, jobs: [] }, // skills unknown: excluded entirely.
-      { skills: skills(0), jobs: undefined }, // jobs unknown: excluded entirely.
+      { skills: skills(4), jobs: [] },
+      { skills: undefined, jobs: [] },
+      { skills: skills(0), jobs: undefined },
     ];
     expect(aggregateJobSlotSummary(characters, NOW).manufacturing).toEqual({ open: 5, max: 5 });
   });

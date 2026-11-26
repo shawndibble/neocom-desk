@@ -1,16 +1,3 @@
-/**
- * Ship fighters (carriers, supercarriers, and the few other hulls with
- * fighter tubes): each fighter type's class — light, support or heavy, which
- * decides the tubes it may take — and its squadron size. Structure fighters
- * are left out, with structures (`20260924-150509`).
- *
- * Read out of the pinned `@eveshipfit/sde` `sde.dat` (2026-09-25): every
- * published type in the Light (1652), Support (1537) and Heavy (1653)
- * Fighter groups, its `fighterSquadronIsLight/Support/Heavy` and
- * `fighterSquadronMaxSize`. The app's baked `fittingSlots.json` covers
- * modules and drones only, so this is the one place a fighter is told apart.
- * Bump with the SDE if CCP adds a fighter.
- */
 import type { FittingFighter } from './types';
 
 export type FighterClass = 'light' | 'support' | 'heavy';
@@ -52,21 +39,14 @@ export function fighterClass(typeId: number): FighterClass | null {
   return FIGHTERS.get(typeId)?.class ?? null;
 }
 
-/** A full squadron of the type; 1 for anything that isn't a fighter. */
 export function squadronSize(typeId: number): number {
   return FIGHTERS.get(typeId)?.squadronSize ?? 1;
 }
 
-/** Every ship fighter type id — for a picker to search among. */
 export function fighterTypeIds(): number[] {
   return [...FIGHTERS.keys()];
 }
 
-/**
- * A stack of fighters as squadrons: a full squadron each, the remainder a
- * short one — how an exported "Templar I x18" comes back as three squadrons
- * of six. Loaded in the bay; launching is the pilot's call.
- */
 export function squadronsOf(typeId: number, quantity: number): FittingFighter[] {
   const size = squadronSize(typeId);
   const squadrons: FittingFighter[] = [];

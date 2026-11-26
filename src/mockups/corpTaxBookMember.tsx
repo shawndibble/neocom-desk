@@ -1,15 +1,3 @@
-/**
- * The member's side of the Corp Tax Book mockups (#4056): today's Moon Mining
- * Tax tab (same header, balances card, filter row, Open table, History grouped
- * by month, row detail) with only the corp-book additions, and the guest's
- * read-only verify page.
- *
- * The tab mirrors `src/features/miningTax/TaxTab.tsx`: Character column when
- * several characters are tracked, Open then History (newest month open, Paid
- * and Dismissed muted, no checkboxes), a ghost Payees button, export through
- * `TableActionsMenu`, the phone sort picker, and `AttentionStrip`. The row
- * detail mirrors `RowDetailModal` for an owed row.
- */
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useState } from 'react';
 import {
@@ -72,10 +60,8 @@ import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
 import { formatNumber } from '@/lib/numberLocale';
 
 const ME = SAMPLE_ACTIVE_CHARACTER.characterId;
-/** As `TaxTab`: the ledger's Characters, which the picker's faces follow. */
 const LEDGER_CHARACTER_IDS = SAMPLE_CHARACTERS.slice(0, 2).map((c) => c.characterId);
 const ME_NAME = SAMPLE_ACTIVE_CHARACTER.name;
-/** The page just read, as today's header says ("just now"). */
 const LOADED_AT = new Date();
 const ORE_TYPE: Record<string, number> = {
   Zeolites: 45490,
@@ -144,7 +130,6 @@ const BILLED_ROW = member(
   BILLED.tax ?? 0
 );
 
-/** The real balances card, fed the book's figures: Billed plus the payment still in flight. */
 const CORP_BALANCE: PayeeBalance = {
   payee: CORP_PAYEE_RECORD,
   owed: (BILLED.tax ?? 0) + (WAITING.tax ?? 0),
@@ -164,7 +149,6 @@ const CORP_PILL: Record<Exclude<PersonalState, 'Paid'>, string> = {
   'Dismissed by corp': 'text-text-dim',
 };
 
-/** Today's `StatusPill` look, with the corp-book values added. */
 function CorpStatusPill({ row }: { row: PersonalRow }) {
   if (row.state === 'Paid') return <StatusPill status="paid" label="Paid" hint={row.note} />;
   return (
@@ -300,7 +284,6 @@ function usePersonalColumns(withSelect: boolean): DataTableColumn<PersonalRow>[]
   ];
 }
 
-/** D12's "Safe to pay" wording for the corp Payee, under its balance card. */
 export function CorpBookSyncNote() {
   return (
     <NewComponent name="CorpBookSyncNote">
@@ -317,7 +300,6 @@ export function CorpBookSyncNote() {
   );
 }
 
-/** A History month's fold row, as the Tax tab prints it. */
 function HistoryMonthHeader({
   month,
   count,
@@ -359,7 +341,6 @@ export function PersonalF({ detail, diff }: { detail?: boolean; diff?: boolean }
   const [historySort, setHistorySort] = useState<DataTableSort>(DEFAULT_SORT);
   const openColumns = usePersonalColumns(true);
   const historyColumns = usePersonalColumns(false);
-  // History has no checkboxes but keeps a same-width spacer on desktop, so its columns sit under Open's.
   const historyWithSpacer: DataTableColumn<PersonalRow>[] = phone
     ? historyColumns
     : [
@@ -403,7 +384,6 @@ export function PersonalF({ detail, diff }: { detail?: boolean; diff?: boolean }
         }
         actions={
           <>
-            {/* As `TaxTab`: Payees folds into the ⋮ below `md`. */}
             {payeesFit && <Button variant="ghost">Payees</Button>}
             <IconButton icon={<Icon.Refresh />} label="Refresh" />
             <HeaderMoreMenu>
@@ -512,7 +492,6 @@ export function PersonalF({ detail, diff }: { detail?: boolean; diff?: boolean }
                 key: (row) => row.date.slice(0, 7),
                 allWidths: true,
                 minSize: 1,
-                // The newest month opens; older ones stay folded.
                 defaultExpanded: (rows) => rows[0].date.slice(0, 7) === HISTORY_NEWEST,
                 renderHeader: (rows) => (
                   <HistoryMonthHeader
@@ -539,7 +518,6 @@ export function PersonalF({ detail, diff }: { detail?: boolean; diff?: boolean }
   );
 }
 
-/** Today's row detail for an owed row, with the corp's status, terms and dispute added. */
 function RowDetail({ open }: { open: boolean }) {
   const phone = useIsPhone();
   const { assignment } = BILLED_ROW;
@@ -624,8 +602,6 @@ function RowDetail({ open }: { open: boolean }) {
   );
 }
 
-// ---------------------------------------------------------------- Guest verify
-
 const verifyColumns: DataTableColumn<DayLine>[] = [
   { id: 'date', header: 'Day', render: (r) => r.date },
   {
@@ -670,7 +646,6 @@ const verifyColumns: DataTableColumn<DayLine>[] = [
   },
 ];
 
-/** B's layout; on a phone the order is Balance due, Terms, lines, payments, Stop reminders. */
 export function VerifyF() {
   const paid = VERIFY.payments.reduce((total, p) => total + p.amount, 0);
   return (

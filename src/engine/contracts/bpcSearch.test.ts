@@ -231,11 +231,6 @@ describe('ownedBlueprintToSearchRow', () => {
     expect(result.space).toBe('wormhole');
   });
 
-  /**
-   * ESI's `quantity` is a count only when positive — a single original comes
-   * back as -1 and a single copy as -2. Rendering either sentinel as-is would
-   * show "-2 owned" for one blueprint, so both normalize to the real count: 1.
-   */
   it("normalizes ESI's single-original sentinel (-1) to a quantity of 1", () => {
     expect(ownedBlueprintToSearchRow(ownedInput({ quantity: -1 })).quantity).toBe(1);
   });
@@ -798,11 +793,6 @@ describe('blueprintSearchName', () => {
     expect(blueprintSearchName('Blueprint Efficiency Blueprint')).toBe('Blueprint Efficiency');
   });
 
-  /**
-   * Stripping is what stops a one-letter query matching all ~2,900 types
-   * through the shared word, but it must never strip a name down to nothing —
-   * that would make the entry unmatchable rather than merely over-matched.
-   */
   it('keeps the name when stripping would empty it', () => {
     expect(blueprintSearchName('Blueprint')).toBe('Blueprint');
   });

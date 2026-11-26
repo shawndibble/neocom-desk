@@ -1,4 +1,3 @@
-/** Fetch + cache layer for the Wallet view: balance, journal, transactions. */
 import {
   getCharacterWallet,
   getCharacterWalletJournal,
@@ -34,7 +33,6 @@ export const KEYS = {
 
 const WALLET_SCOPE = ESI_REGISTRY.getCharacterWallet.scope;
 
-/** ISK balance. ESI or cache. */
 export function loadWalletBalance(characterId: number): Promise<CachedResult<number> | null> {
   const { fetchLive, conditional } = conditionalFetch((options) =>
     getCharacterWallet(characterId, options)
@@ -42,10 +40,6 @@ export function loadWalletBalance(characterId: number): Promise<CachedResult<num
   return loadWithCache(characterId, KEYS.balance, fetchLive, { conditional });
 }
 
-/**
- * Same data as loadWalletBalance, with the auth-failure state exposed for views
- * that show a re-login affordance instead of a silent "offline" state.
- */
 export function loadWalletBalanceWithStatus(characterId: number): Promise<StatusResult<number>> {
   const { fetchLive, conditional } = conditionalFetch((options) =>
     getCharacterWallet(characterId, options)
@@ -57,23 +51,14 @@ export interface CharacterWalletBalance {
   characterId: number;
   characterName: string;
   balanceResult: CachedResult<number> | null;
-  /** Granted the wallet scope but the live read still failed auth — distinct from `skipped`, which never granted it at all. */
   needsReauth: boolean;
 }
 
 export interface WalletBalancesSnapshot {
   entries: CharacterWalletBalance[];
-  /** Never granted the wallet scope — listed, never fetched (same policy as `openOrdersData.ts`). */
   skipped: { characterId: number; name: string }[];
 }
 
-/**
- * Every authenticated Character's wallet balance, for the Wallet page's
- * cross-character view (issue #607). Scope pre-check, skipping and ordering
- * live in `fanOutAllCharacters`. A Character WITH the scope whose live call
- * still answers `needsReauth` stays in `entries` (not `skipped`) so its row
- * can show its own re-auth prompt instead of the row simply vanishing.
- */
 export function loadAllCharactersWalletBalances(): Promise<WalletBalancesSnapshot> {
   return fanOutAllCharacters<CharacterWalletBalance>({
     scope: WALLET_SCOPE,
@@ -84,12 +69,6 @@ export function loadAllCharactersWalletBalances(): Promise<WalletBalancesSnapsho
   });
 }
 
-/**
- * When the oldest saved-copy balance among the given Characters was read (ms),
- * or null when none of them is a saved copy. A total over several Characters is
- * only as fresh as its stalest cached part; a Character outside the list
- * (filtered out of the view) does not age it.
- */
 export function oldestCachedBalanceAt(
   entries: readonly CharacterWalletBalance[],
   characterIds: ReadonlySet<number>
@@ -102,7 +81,6 @@ export function oldestCachedBalanceAt(
   return times.length > 0 ? Math.min(...times) : null;
 }
 
-/** Journal. `truncated` on the result means pages were missing. */
 export async function loadWalletJournal(
   characterId: number,
   options: { archive?: boolean } = {}
@@ -117,12 +95,6 @@ export async function loadWalletJournal(
   return options.archive ? journalWithArchive(characterId, archived) : archived;
 }
 
-/**
- * Same data as loadWalletJournal, with the auth-failure state exposed —
- * the Foreground Poller (features/notifications) needs to distinguish a
- * revoked scope from a transient offline failure the same way the other
- * pollable domains do (features/character/contracts.ts).
- */
 export async function loadWalletJournalWithStatus(
   characterId: number
 ): Promise<StatusResult<WalletJournalEntry[]>> {
@@ -132,16 +104,10 @@ export async function loadWalletJournalWithStatus(
   const status = await loadPaginatedWithCacheStatus(characterId, KEYS.journal, fetchLive, {
     conditional,
   });
-  // The poll domain loads through here too, so background polls feed the archive.
   await archiveResult('journal', characterId, status.cached);
   return status;
 }
 
-/**
- * The Journal page's read: the live fetch plus archived entries
- * ESI no longer returns. Kept apart from `loadWalletJournalWithStatus`, whose
- * other readers (the poller's snapshot) want only ESI's current window.
- */
 export async function loadWalletJournalHistory(
   characterId: number
 ): Promise<StatusResult<WalletJournalEntry[]>> {
@@ -149,12 +115,10 @@ export async function loadWalletJournalHistory(
   return { ...status, cached: await journalWithArchive(characterId, status.cached) };
 }
 
-/** Whether the character granted the wallet scope — checked up front so callers never provoke a live 403. */
 export async function hasWalletScope(characterId: number): Promise<boolean> {
   return (await loadGrantedScopes(characterId)).has(WALLET_SCOPE);
 }
 
-/** Transactions. `truncated` means the fetch stopped at the page cap. */
 export async function loadWalletTransactions(
   characterId: number
 ): Promise<CachedResult<WalletTransaction[]> | null> {
@@ -165,7 +129,6 @@ export async function loadWalletTransactions(
   return result && { ...result, data: uniqueTransactions(result.data) };
 }
 
-/** Transactions plus archived ones ESI no longer returns. */
 export async function loadWalletTransactionsHistory(
   characterId: number
 ): Promise<CachedResult<WalletTransaction[]> | null> {
@@ -174,11 +137,6 @@ export async function loadWalletTransactionsHistory(
   return merged && { ...merged, data: uniqueTransactions(merged.data) };
 }
 
-/**
- * Same data as loadWalletTransactions, with the auth-failure state exposed —
- * Market's Transactions view shows a Grant banner for a declined or revoked
- * Wallet Permission rather than a "reconnect" empty state (issue #2236).
- */
 export async function loadWalletTransactionsWithStatus(
   characterId: number,
   options: { archive?: boolean } = {}
@@ -190,7 +148,6 @@ export async function loadWalletTransactionsWithStatus(
   );
   await archiveResult('transactions', characterId, cached);
   const live = cached && { ...cached, data: uniqueTransactions(cached.data) };
-  // `archive` adds fills older than ESI's window, so a date range reaching back is not cut short.
   const merged = options.archive ? await transactionsWithArchive(characterId, live) : live;
   return {
     cached: merged && { ...merged, data: uniqueTransactions(merged.data) },

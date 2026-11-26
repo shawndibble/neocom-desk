@@ -6,11 +6,6 @@ import { TextInput } from '@/components/ui/TextInput';
 import { utcDay } from '@/engine/localDay';
 import { lockDateFor } from '../../../../functions/src/corpTaxBookCheckpoint';
 
-/**
- * Takes a Character out of a Miner grouping, asking the day it left (a sale reported late): the
- * grouping keeps billing it before that day. The day is today unless changed, and never before
- * the lock date.
- */
 export function UnlinkConfirm({
   title,
   body,

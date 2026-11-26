@@ -6,7 +6,6 @@ import { useTicker } from '@/lib/ticker';
 import type { CorpBookViewBook } from './corpBookView';
 import { utcDay } from '@/engine/localDay';
 
-/** "17 Oct": an EVE/UTC calendar date, day first as the book's wording prints it ("12 Jul is closed"). */
 function shortDate(date: string, language: string): string {
   return new Date(`${date}T00:00:00Z`).toLocaleDateString(language === 'en' ? 'en-GB' : language, {
     day: 'numeric',
@@ -15,15 +14,6 @@ function shortDate(date: string, language: string): string {
   });
 }
 
-/**
- * D12's "Safe to pay" wording under the corp's balance card: until a sync after
- * the grace period the corp's record is not final ("Safe to pay once <Corp>
- * syncs (last synced 2d ago)"), then "Safe to pay — 12 Jul is closed". Also
- * the account's credit; paid through a day or how far behind, and
- * only true overpayment as "ahead". A corporation the member left says so in its own notice
- * (`LeftCorpNotice`), with Pay and Stop showing beside it. A donation still waiting
- * for the corp to credit it is left unsaid: that is the corp's side to handle.
- */
 export function CorpBookSyncNote({
   book,
   owedNow,
@@ -32,13 +22,9 @@ export function CorpBookSyncNote({
   inDialog = false,
 }: {
   book: CorpBookViewBook;
-  /** What the book's rows owe right now. */
   owedNow: number;
-  /** Test seam; the note reads the shared minute ticker otherwise. */
   now?: number;
-  /** Whether to say how far behind the account is; the pay dialog already shows the amount. */
   showStanding?: boolean;
-  /** Under a title that already names the corporation: the wording leaves its name out. */
   inDialog?: boolean;
 }) {
   const here = inDialog ? 'Here' : '';
@@ -48,23 +34,45 @@ export function CorpBookSyncNote({
   const { summary, corpName, loaded } = book;
   const synced = summary.lastSyncedAt;
   const ago = synced ? formatAge(Math.max(0, now - Date.parse(synced)), t) : null;
-  const closedThrough = summary.closedThrough;
-  // Shown on the Tax page and in the pay dialog alike (#6204): credit is money the member has.
+  const finalThrough =
+    book.finalThrough !== undefined &&
+    (summary.closedThrough === undefined || book.finalThrough > summary.closedThrough)
+      ? book.finalThrough
+      : undefined;
+  const closedThrough = finalThrough ?? summary.closedThrough;
   const credit = summary.credit > 0;
-  // A running account (#6294) says where the member stands: paid through a day, or how far behind.
   const account = summary.account;
+  const estimateFrom = summary.estimate > 0 ? book.estimateFrom : undefined;
+  const estimateClosesAt = estimateFrom
+    ? new Date(dayClosesAt(estimateFrom, loaded.graceHours))
+    : null;
+  const estimateWords = estimateFrom &&
+    estimateClosesAt && {
+      estimate: formatIsk(summary.estimate, 0),
+      date: shortDate(estimateFrom, i18n.language),
+      time: estimateClosesAt.toISOString().slice(11, 16),
+      closeDate: shortDate(utcDay(estimateClosesAt.getTime()), i18n.language),
+      corp: corpName,
+    };
   const standing =
-    showStanding && account?.owes
-      ? t('miningTax.corpBook.sync.behind', {
-          amount: formatIsk(account.owes.amount, 0),
-          count: account.owes.days,
-          date: shortDate(account.owes.oldest, i18n.language),
-          corp: corpName,
+    showStanding && estimateWords
+      ? t('miningTax.corpBook.sync.owesWithEstimate', {
+          ...estimateWords,
+          amount: formatIsk((account?.owes?.amount ?? 0) + summary.estimate, 0),
         })
-      : null;
-  // The balance an officer rolled over from another system, until they reverse it.
-  // A note of where the account started, so it shows only while a balance is open: owing it, or
-  // holding credit.
+      : showStanding && summary.estimate > 0
+        ? t('miningTax.corpBook.sync.owes', {
+            amount: formatIsk((account?.owes?.amount ?? 0) + summary.estimate, 0),
+            corp: corpName,
+          })
+        : showStanding && account?.owes
+          ? t('miningTax.corpBook.sync.behind', {
+              amount: formatIsk(account.owes.amount, 0),
+              count: account.owes.days,
+              date: shortDate(account.owes.oldest, i18n.language),
+              corp: corpName,
+            })
+          : null;
   const rolled = (loaded.adjustments ?? [])
     .filter((a) => a.kind === 'opening' && !a.reversed)
     .reduce((sum, a) => sum + a.amount, 0);
@@ -78,25 +86,17 @@ export function CorpBookSyncNote({
     Math.abs(opening) >= 1;
   if (!hasWords) return null;
 
-  // A closed day whose ore is still Settling is not safe yet: more of it may still be billed.
-  const settlingFrom = closedThrough !== undefined ? book.settlingFrom : undefined;
   const safe =
-    owedNow > 0 || book.pendingFrom !== undefined
-      ? settlingFrom
-        ? t(`miningTax.corpBook.sync.settling${here}`, {
-            date: shortDate(settlingFrom, i18n.language),
+    (owedNow > 0 || book.pendingFrom !== undefined) && !(estimateWords && showStanding)
+      ? closedThrough
+        ? t(`miningTax.corpBook.sync.safe${here}`, {
+            date: shortDate(closedThrough, i18n.language),
             corp: corpName,
             ago,
           })
-        : closedThrough
-          ? t(`miningTax.corpBook.sync.safe${here}`, {
-              date: shortDate(closedThrough, i18n.language),
-              corp: corpName,
-              ago,
-            })
-          : synced
-            ? t(`miningTax.corpBook.sync.safeOnce${here}`, { corp: corpName, ago })
-            : t(`miningTax.corpBook.sync.neverSynced${here}`, { corp: corpName })
+        : synced
+          ? t(`miningTax.corpBook.sync.safeOnce${here}`, { corp: corpName, ago })
+          : t(`miningTax.corpBook.sync.neverSynced${here}`, { corp: corpName })
       : null;
   const closesAt = book.pendingFrom
     ? new Date(dayClosesAt(book.pendingFrom, loaded.graceHours))
@@ -104,15 +104,19 @@ export function CorpBookSyncNote({
   return (
     <p className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-xs">
       {safe && (
-        <span
-          className={
-            closedThrough && !settlingFrom ? 'font-semibold text-success' : 'text-text-dim'
-          }
-        >
+        <span className={closedThrough ? 'font-semibold text-success' : 'text-text-dim'}>
           {safe}
         </span>
       )}
-      {book.pendingFrom && closesAt && (
+      {estimateWords && !showStanding && (
+        <span className="text-text-dim">
+          {t(`miningTax.corpBook.sync.estimate${here}`, {
+            ...estimateWords,
+            amount: estimateWords.estimate,
+          })}
+        </span>
+      )}
+      {book.pendingFrom && closesAt && book.pendingFrom !== estimateFrom && (
         <span className="text-text-dim">
           {t(`miningTax.corpBook.sync.openDay${here}`, {
             date: shortDate(book.pendingFrom, i18n.language),

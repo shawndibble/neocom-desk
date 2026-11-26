@@ -25,14 +25,12 @@ interface MailRowsInput {
   hideRead: boolean;
   locallyReadKeys: ReadonlySet<string>;
   locallyUnreadKeys: ReadonlySet<string>;
-  /** Mail deleted this session: gone from the list at once, before any reload. */
   deletedKeys: ReadonlySet<string>;
   now: number;
   timeZone: 'UTC' | undefined;
   weekStart: WeekStart;
 }
 
-/** Merged mail rows → folder → search → Hide read → display cap → age sections, plus which empty state applies. */
 export function useMailRows({
   owners,
   ownerById,
@@ -77,14 +75,11 @@ export function useMailRows({
     () => allRows.filter((row) => !deletedKeys.has(row.key)),
     [allRows, deletedKeys]
   );
-  // The folder chips' unread counts are ESI's label counts, read before this session's
-  // changes: this is how far this session has moved them.
   const unreadDelta = useMemo(
     () => unreadDeltaByTab(allRows, locallyReadKeys, locallyUnreadKeys, deletedKeys),
     [allRows, locallyReadKeys, locallyUnreadKeys, deletedKeys]
   );
 
-  // Folder, then search, then Hide read, kept per stage for `listState` below.
   const folderRows = useMemo(
     () => rows.filter((row) => folders.includes(row.tab)),
     [rows, folders]
@@ -105,25 +100,17 @@ export function useMailRows({
     [searchRows, hideRead, locallyReadKeys, locallyUnreadKeys]
   );
 
-  // Rendered-list cap (issue #416): applied after every filter, so it caps
-  // what's actually mapped into DOM rows rather than the underlying fetch
-  // list — "load more"'s own pagination cursor is untouched by this.
   const { headers: cappedRows, truncated: headersTruncated } = useMemo(
     () => capHeadersForDisplay(visibleRows),
     [visibleRows]
   );
 
-  // Grouped after the cap, so a header only ever covers rows actually
-  // rendered, and "load more" just regroups the longer list: a bucket that
-  // gains rows keeps its one header instead of repeating at the page seam.
   const rowSections = useMemo(
     () =>
       groupMailByAge(cappedRows, (row) => row.header.timestamp, new Date(now), timeZone, weekStart),
     [cappedRows, now, timeZone, weekStart]
   );
 
-  // Each empty state is named by the first stage that emptied the list, so
-  // its one action always brings rows back: an empty folder has none to offer.
   const listState = (() => {
     if (visibleRows.length > 0) return 'rows';
     if (folders.length === 0) return 'no-folders';

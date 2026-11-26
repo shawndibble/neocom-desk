@@ -33,7 +33,6 @@ const BUNDLES = {
   others: [bundle('others', 0), bundle('others', 1)],
 };
 
-/** Serves each URL's body; anything else is a 404. */
 function serve(files: Record<string, unknown>) {
   const fetchMock = vi.fn(async (url: string) => {
     if (url in files) return new Response(JSON.stringify(files[url]), { status: 200 });

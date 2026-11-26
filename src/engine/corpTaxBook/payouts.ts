@@ -3,38 +3,20 @@ import type { JournalEntryLike } from './sync';
 import { DAY_MS } from '@/lib/age';
 import { PAYOUT_LINK_WINDOW_DAYS } from '../../../functions/src/corpTaxBookTransferMatch';
 
-/**
- * Payouts to a moon owner (feeder): recording one, and attaching the wallet
- * journal's outgoing donation to it later ("paying backwards", like
- * `paymentLinks.ts`). Pure. Mirrored in `functions/src/corpTaxBookEngine.ts`
- * (`functionsMirror.test.ts` keeps the two equal). Payouts never reach Tax
- * Payment matching or Running accounts: those read incoming donations only.
- */
-
-/** A donation the accounting corporation's wallet sent. */
 export interface OutgoingDonation {
   refId: number;
   division: number;
-  /** Who received it (the journal's `second_party_id`). */
   recipientId: number;
-  /** Whole ISK, positive. */
   amount: number;
   at: string;
   reason?: string;
 }
 
-/**
- * The text a payment's reason starts with (`payoutReason`): the pay dialog writes it, and only a
- * donation carrying it is recorded as a payout on its own (#6209). Not translated: the in-game
- * reason is matched against it.
- */
 export const PAYOUT_REASON_PREFIX = 'Moon mining payout';
 
-/** Whether a donation's reason carries the payout reference, in any case. */
 export const carriesPayoutReference = (reason: string | undefined): boolean =>
   reason !== undefined && reason.toLowerCase().includes(PAYOUT_REASON_PREFIX.toLowerCase());
 
-/** How far a recorded date may sit from the journal's day and still be the same payment. */
 export { PAYOUT_LINK_WINDOW_DAYS };
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -42,7 +24,6 @@ const DATE = /^\d{4}-\d{2}-\d{2}$/;
 export const payoutId = (d: Pick<OutgoingDonation, 'division' | 'refId'>) =>
   `j${d.division}_${d.refId}`;
 
-/** The division and journal entry a `payoutId` / donation payment id names; null for any other id. */
 export function parsePaymentId(id: string): { division: number; refId: number } | null {
   const m = /^j(\d+)_(\d+)$/.exec(id);
   return m ? { division: Number(m[1]), refId: Number(m[2]) } : null;
@@ -51,16 +32,11 @@ export function parsePaymentId(id: string): { division: number; refId: number } 
 const dayIndex = (date: string) =>
   Math.floor(Date.parse(`${date.slice(0, 10)}T00:00:00Z`) / DAY_MS);
 
-/**
- * How the journal records ISK the corporation's wallet gave someone: a corporation wallet's
- * "Give ISK" is a `corporation_account_withdrawal` (first party the corporation).
- */
 const OUTGOING_REF_TYPES: ReadonlySet<string> = new Set([
   'player_donation',
   'corporation_account_withdrawal',
 ]);
 
-/** ISK the corporation's wallet donated to someone else (the amount is negative on the journal). */
 export function outgoingDonationsFromJournal(
   entries: readonly (JournalEntryLike & { second_party_id?: number })[],
   division: number,
@@ -71,7 +47,6 @@ export function outgoingDonationsFromJournal(
     if (!OUTGOING_REF_TYPES.has(e.ref_type)) continue;
     if (!(typeof e.amount === 'number' && e.amount < 0)) continue;
     if (e.first_party_id !== corporationId || e.second_party_id === undefined) continue;
-    // A move between the corporation's own divisions pays nobody.
     if (e.second_party_id === corporationId) continue;
     if (!Number.isSafeInteger(e.id) || Number.isNaN(Date.parse(e.date))) continue;
     out.push({
@@ -86,32 +61,23 @@ export function outgoingDonationsFromJournal(
   return out;
 }
 
-/** `confirmedAt`: an officer's own record was folded into this journal row (#4617). */
 type StoredPayout = FeederPayout & { id: string; confirmedAt?: number };
 
 export interface PayoutReconciliation {
-  /** Journal entries that are the payment an officer already recorded. */
   attach: { id: string; journalRef: number }[];
-  /** Donations nobody recorded: each becomes a payout. */
   create: { id: string; payout: FeederPayout }[];
 }
 
 export type Payee = { kind: 'corporation' | 'character'; id: number };
 
-/** Who a payment to a moon owner goes to: its payee, else the moon owner corporation itself. */
 export const payeeOf = (owner: { corporationId: number; payee?: Payee }): Payee =>
   owner.payee ?? { kind: 'corporation', id: owner.corporationId };
 
-/** One payee and when it took over (ms). `from: 0` is a payee set before history was kept. */
 export interface PayeeChange {
   payee: Payee;
   from: number;
 }
 
-/**
- * Who a donation sent at `at` may go to for this moon owner: the payee in force then, and the
- * moon owner corporation itself. A record with no history falls back to its current payee.
- */
 export function payeeIdsAt(
   owner: { corporationId: number; payee?: Payee; payeeHistory?: readonly PayeeChange[] },
   at: string
@@ -128,7 +94,6 @@ export function payeeIdsAt(
   return ids;
 }
 
-/** The payee history after setting `payee` at `now`; seeds it from a record that had none. */
 export function withPayeeChange(
   rec: { payee?: Payee; payeeChangedAt?: number; payeeHistory?: readonly PayeeChange[] },
   payee: Payee,
@@ -144,27 +109,16 @@ export function withPayeeChange(
   return [...history, { payee, from: now }];
 }
 
-/** One moon owner's side of the book-wide reconcile. */
 export interface OwnerOutgoing {
   corporationId: number;
   payee?: Payee;
   payeeHistory?: readonly PayeeChange[];
   payouts: readonly StoredPayout[];
-  /** First covered day: older donations are never auto-recorded. */
   since: string;
 }
 
 const dayGap = (date: string, at: string) => Math.abs(dayIndex(date) - dayIndex(at));
 
-/**
- * Attach each outgoing donation to the recorded payout with the same amount, date (within the
- * window) and recipient. A donation with no such record is recorded as a payout when its reason
- * carries the payout reference; any other (an SRP refund, say) is recorded as not a payout and
- * `unconfirmed`, for an officer to confirm either way (#6209). One pass over
- * the whole book: a journal entry counts once across every moon owner, and a donation whose
- * recipient is the payee of more than one moon owner is never auto-recorded (an officer adds it
- * by hand). Only a donation payout takes a journal donation.
- */
 export function reconcileBookOutgoing(input: {
   owners: readonly OwnerOutgoing[];
   outgoing: readonly OutgoingDonation[];
@@ -234,12 +188,6 @@ export function reconcileBookOutgoing(input: {
 
 const AUTO_RECORDED = /^j\d+_\d+$/;
 
-/**
- * "I've sent it" or a manual add after the journal already auto-recorded the same payment: the
- * journal row with the same amount within the matching window, which the officer's record then
- * confirms instead of counting it twice. Only a donation, and only a row not yet confirmed; a row
- * waiting to be confirmed (`unconfirmed`) is the payment too, and the record confirms it.
- */
 export function payoutToMerge(
   stored: readonly StoredPayout[],
   recorded: { amount: number; date: string; method: 'donation' | 'contract' | 'other' }
@@ -262,7 +210,6 @@ export function payoutToMerge(
     )[0]?.id;
 }
 
-/** A payout an officer says they sent ("I've sent it", or added by hand). A contract counts as other. */
 export function buildRecordedPayout(input: {
   amount: number;
   date: string;
@@ -284,17 +231,12 @@ export function buildRecordedPayout(input: {
   };
 }
 
-/** The balance once `sent` ISK has gone out; credit when it is more than is owed. Whole ISK, rounded down. */
 export function balanceAfter(balance: number, sent: number): BalanceDisplay {
   const left = balance - sent;
   const isk = Math.floor(Math.abs(left));
   return { kind: isk === 0 ? 'even' : left > 0 ? 'owed' : 'credit', isk };
 }
 
-/**
- * The days a payment covers: after the last payment, up to the last accrued
- * day. When nothing is newer than the last payment, every accrued day.
- */
 export function payoutPeriod(
   days: readonly { date: string }[],
   payouts: readonly Pick<FeederPayout, 'date' | 'notAPayout'>[]
@@ -311,7 +253,6 @@ export function payoutPeriod(
   return { from: (after[0] ?? dates[0]) as string, to };
 }
 
-/** The reason to paste into the in-game transfer, after `PAYOUT_REASON_PREFIX`. Never the miner rate or margin. */
 export function payoutReason(prefix: string, period: { from: string; to: string } | undefined) {
   return period ? `${prefix}, ${period.from} to ${period.to}` : prefix;
 }

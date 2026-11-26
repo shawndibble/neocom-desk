@@ -1,13 +1,3 @@
-/**
- * The Starbases widget (issue #4610) and the adapter that lends its clocks to
- * Due soon. Same contract as `models.ts`: pure, derived at render time.
- *
- * ESI gives a tower's fuel quantity but not its burn rate, so hours of fuel
- * come from the static data (`engine/corp/starbases.ts`). A tower whose type
- * has no rate, or whose bay could not be read, shows what is known and no
- * dry-run time. Fuel is read at most once an hour (the corp cache window), so
- * no figure under that is ticked down.
- */
 import { fuelExpiresMs } from './towerSources';
 import { worstSeverity, type DeadlineSeverity } from '@/engine/character/severity';
 import { STARBASE_FUEL_WARNING_HOURS } from '@/engine/corp/starbases';
@@ -38,12 +28,10 @@ interface Tower {
   row: CorpStarbaseRow;
   system: string;
   type: string;
-  /** Epoch ms the fuel runs out; null when unknowable. */
   expiresMs: number | null;
   tone: DeadlineSeverity;
 }
 
-/** A countdown that never claims more precision than the hour-old read behind it. */
 function untilText(t: Translate, remainingMs: number): string {
   if (remainingMs <= 0) return t('corp.board.dry');
   return remainingMs < CORP_CACHE_WINDOW_MS
@@ -79,7 +67,6 @@ export const corpStarbases: Builder = (feeds, { t, now, scopeAll }) => {
         ]),
       };
     })
-    // Soonest dry first; towers with no fuel clock after them, by name.
     .sort(
       (a, b) =>
         (a.expiresMs ?? Infinity) - (b.expiresMs ?? Infinity) ||
@@ -113,7 +100,6 @@ export const corpStarbases: Builder = (feeds, { t, now, scopeAll }) => {
   const reinforceText = (tower: Tower) => {
     const until = tower.row.reinforcedUntilMs;
     if (until === null) return UNKNOWN;
-    // A passed timer is over, which is not the tower being out of fuel.
     return until <= now ? t(`${W}.reinforceEnded`) : untilText(t, until - now);
   };
 

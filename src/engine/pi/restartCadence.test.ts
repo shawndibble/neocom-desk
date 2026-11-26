@@ -5,19 +5,12 @@ import { HOUR_MS } from '@/lib/age';
 
 const INSTALL_MS = Date.parse('2026-09-01T00:00:00Z');
 
-/**
- * CCP's worked reference program (the same one `extraction.test.ts` pins):
- * qty_per_cycle 6,965 on a 30-minute cycle. `expiryTimeMs` here is nominal —
- * `restartCadenceYield` builds its own counterfactual expiry per cadence off
- * `installTimeMs`, so this program's actual length never matters to the
- * result (see the "cadence, not program length" test below).
- */
 const program: ExtractorYieldProgram = {
   pinId: 1,
   installTimeMs: INSTALL_MS,
   expiryTimeMs: INSTALL_MS + 14 * 24 * HOUR_MS,
   qtyPerCycle: 6965,
-  cycleTimeMs: 1_800_000, // 30 minutes
+  cycleTimeMs: 1_800_000,
 };
 
 const DAY_H = 24;
@@ -36,15 +29,6 @@ describe('restartCadenceYield', () => {
     expect(best?.relativeToBest).toBe(1);
   });
 
-  /**
-   * Independently derived from CCP's own decay formula (not from this
-   * module): restarting daily nets ~100%, every-other-day ~79%, every three
-   * days ~66%, weekly ~42%, and every two weeks ~26% of the daily rate. A
-   * couple of points either side of these is expected — the three cosine
-   * terms on CCP's curve ripple, so the exact figure depends on where a
-   * cadence boundary lands in that ripple — but the shape (roughly halving
-   * every ~5-6 days) is the point of the table, not the last decimal.
-   */
   const EXPECTED_RATIO_PERCENT: Record<number, number> = {
     1: 100,
     2: 79,
@@ -64,9 +48,6 @@ describe('restartCadenceYield', () => {
   });
 
   it('prices the cadence, not the length of the program the pilot happened to install', () => {
-    // A program installed for 3 days and one installed for 14 days, off the
-    // same baseline, must price a weekly restart identically — the function
-    // reads only `installTimeMs`/`qtyPerCycle`/`cycleTimeMs`, never `expiryTimeMs`.
     const threeDayProgram: ExtractorYieldProgram = {
       ...program,
       expiryTimeMs: INSTALL_MS + 3 * 24 * HOUR_MS,

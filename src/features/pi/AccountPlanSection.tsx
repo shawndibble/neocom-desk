@@ -8,11 +8,6 @@ import type { PlanAdvice } from './planAdviceModel';
 import { useAccountPlan } from './useAccountPlan';
 import { usePiPriceVsMedian } from './usePiPriceVsMedian';
 
-/**
- * Plans the whole account and draws it. Its own component so the planning runs
- * only while the section is on screen: a pilot with no colonies, or on another
- * Find best view, never pays for it.
- */
 export function AccountPlanSection({ advice, pi }: { advice: PlanAdvice; pi: PiData }) {
   const settings = usePiSettings((state) => state.value);
   const haul = settings.haulBetweenPlanets === true;

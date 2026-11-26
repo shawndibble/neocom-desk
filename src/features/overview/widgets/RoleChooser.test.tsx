@@ -37,7 +37,6 @@ describe('RoleChooser corp kinds', () => {
   });
 
   it('leaves it out when the grant lacks the scope the role needs', async () => {
-    // A blocked grant still reports the role's capability; the widget could not read it.
     expect(await buildMiner('roles-without-grant', moons)).not.toContain('moonChunks');
   });
 });

@@ -44,10 +44,6 @@ describe('parseStoredCourierFilter', () => {
     expect(parseStoredCourierFilter({ ...NARROWED, maxCollateral: 50000000 })).toBeNull();
   });
 
-  /**
-   * Whole-record reject, not a per-field merge: a filter that restores every
-   * field but one is a filter the hauler never actually set.
-   */
   it('rejects the whole record when only one field is bad', () => {
     expect(parseStoredCourierFilter({ ...NARROWED, hideUncompletable: 'yes' })).toBeNull();
   });

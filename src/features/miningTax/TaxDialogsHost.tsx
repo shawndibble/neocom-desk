@@ -17,7 +17,7 @@ import type { ResolveTarget } from '@/features/miningTax/corpBook/resolve/target
 import { CorpRowDetailModal } from '@/features/miningTax/corpBook/CorpRowDetailModal';
 import { isBookRow } from '@/features/miningTax/corpBook/corpRows';
 import type { useCorpStateHint } from '@/features/miningTax/corpBook/useCorpStateText';
-import { isCorpPayeeId } from '@/features/miningTax/corpBook/corpRows';
+import { isCorpPayeeId, ownEntryRowOf } from '@/features/miningTax/corpBook/corpRows';
 import type { CorpBookView } from '@/features/miningTax/corpBook/corpBookView';
 import { minerPayCodes } from '@/features/miningTax/corpBook/minerPayCodes';
 import { allMembers, type DisplayRow, type GroupMember } from '@/features/miningTax/groupRows';
@@ -54,7 +54,12 @@ import type { PayeeRunningAccounts } from '@/features/miningTax/payeeRunningAcco
 import { buildSettleUpReason } from '@/features/miningTax/groupRows';
 import { systemLabel } from '@/features/miningTax/names';
 import { madePaymentHref } from '@/features/miningTax/madePaymentHref';
-import { minerLedgerSource } from '@/engine/corpTaxBook/minerLedgerSource';
+import { minerLedgerSource, openDayCharges } from '@/engine/corpTaxBook/minerLedgerSource';
+import {
+  recordChangesForBook,
+  recordChangesForPayee,
+  type RecordChange,
+} from '@/engine/miningTax/recordChanges';
 import { minerIdFor } from '@/engine/corpTaxBook/charges';
 import { pricesAtHubOnDate, type DatedUnitPrices } from '@/features/miningTax/pricing';
 import { RowDetailModal } from '@/features/miningTax/RowDetailModal';
@@ -112,7 +117,6 @@ const PayeeLedgerPanel = lazy(() =>
 export interface TaxDialogsHostProps {
   store: TaxDialogStore;
   actions: TaxDialogActions;
-  /** The snapshot has loaded; every dialog but the corp pay one waits for it. */
   hasData: boolean;
   typeNames: ReadonlyMap<number, string>;
   systemNames: ReadonlyMap<number, string>;
@@ -120,22 +124,16 @@ export interface TaxDialogsHostProps {
   unreachableHubs: ReadonlySet<TradeHub['id']> | undefined;
   refresh: () => void;
   loading: boolean;
-  /** A `useContinuations` write is running; with a dialog's own action it makes the dialogs `busy`. */
   continuing: boolean;
   allDisplayRows: readonly DisplayRow[];
+  entries: readonly MoonMiningTaxRow[];
   characterFiltered: readonly DisplayRow[];
   everyAssignment: readonly MiningTaxAssignmentRecord[];
-  /** Every personal Payee's Running account: what Settle up, the ledger and Paid read. */
   accounts: PayeeRunningAccounts;
-  /** Every Made Payment linked to a Payee. */
   links: readonly PayeePaymentLink[];
-  /** The corporations of the member's Corp Tax Books: a donation to one is the book's. */
   bookCorporations: ReadonlySet<number>;
-  /** The active Character: whose Miner a book's ledger opens on. */
   activeCharacterId: number | null;
-  /** Every stored Payee record; the pickers list one per recipient (`duplicateAliases`). */
   allPayees: PayeeRecord[];
-  /** Duplicate records of one Payee mapped to its primary (`payeeDuplicateAliases`). */
   duplicateAliases: ReadonlyMap<string, string>;
   payeeById: ReadonlyMap<string, PayeeRecord>;
   balances: readonly PayeeBalance[];
@@ -143,9 +141,8 @@ export interface TaxDialogsHostProps {
   paymentSources: readonly MadePaymentSources[];
   linkSuggestions: ReturnType<typeof useLinkSuggestions>;
   corpView: CorpBookView | null;
-  /** Something reached a Corp Tax Book (a declaration or a dispute, #6206): read the books again. */
+  recordChanges: readonly RecordChange[];
   reloadCorpBooks: () => void;
-  /** Opens the Resolve dialog (resolving in the app) on a problem. */
   onResolve: (target: ResolveTarget) => void;
   corpStateHint: ReturnType<typeof useCorpStateHint>;
   dismissTargets: DisplayRow[];
@@ -157,20 +154,11 @@ export interface TaxDialogsHostProps {
   settleUpRowsFor: (members: readonly GroupMember[]) => SettleUpRow[];
   pricesFor: (hubId: string | undefined, date: string) => ReadonlyMap<number, number>;
   priceSourcesFor: (hubId: string | undefined, date: string) => ReadonlyMap<number, TaxPriceSource>;
-  /** A bulk action or payment landed: row keys changed, so the table selection goes. */
   onClearSelection: () => void;
-  /** The Add-payee shortcut in the row detail; absent when there is no character to add one for. */
   onAddPayee: (() => void) | undefined;
-  /** A short confirmation for a row-menu action that has no dialog to show it in ("Copied"). */
-  /** A transient message; with `onUndo` it carries an Undo (DESIGN 6c, Transient messages). */
   onToast: (message: string, onUndo?: () => void) => void;
 }
 
-/**
- * Every Tax tab dialog, mounted at the bottom of the tab. It owns the dialog
- * state (via `useTaxDialogState`), so opening one re-renders this and not the
- * tables beside it; `TaxTab` opens them through the stable `actions`.
- */
 export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHostProps) {
   const {
     store,
@@ -184,6 +172,7 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
     loading,
     continuing,
     allDisplayRows,
+    entries,
     characterFiltered,
     everyAssignment,
     accounts,
@@ -198,6 +187,7 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
     paymentSources,
     linkSuggestions,
     corpView,
+    recordChanges,
     reloadCorpBooks,
     onResolve,
     corpStateHint,
@@ -231,9 +221,6 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
     bulkDismissOpen,
   } = useTaxDialogState(store);
 
-  // Every row action and the Link-transaction confirm run through this, so a
-  // failure reads the same as in every dialog: the modal stays open saying
-  // nothing was changed (each action is one transaction, so that is true).
   const {
     pending: acting,
     error: actionError,
@@ -245,11 +232,7 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
   }, [actions, acting]);
   const busy = continuing || acting;
 
-  // Reset whenever the target changes, not keyed on it: after a failure
-  // nothing reloads, so reopening the same row hands back the very same object.
   const [errorTarget, setErrorTarget] = useState(detailTarget);
-  // A row-menu action that failed opens its row's detail to say so; that open
-  // is a target change too, and must not wipe the message it opened for.
   const [failedMenuRow, setFailedMenuRow] = useState<DisplayRow | null>(null);
   if (errorTarget !== detailTarget) {
     setErrorTarget(detailTarget);
@@ -259,9 +242,6 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
     }
   }
 
-  // Settle up's rows, re-read from every load by Assignment id: a recheck
-  // while it is open can absorb fresh growth into an Assignment, and paying the
-  // copy taken at open would record the old amount over it.
   const liveSettleUpRows = useMemo(() => {
     if (!settleUpRows) return null;
     const current = new Map(
@@ -279,18 +259,12 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
     loading,
   });
 
-  /** Prefill for a new Assignment's Payee: the one last used in that system, by that pilot. */
   const pickablePayees = useMemo(
     () => accounts.assignable(allPayees).filter((p) => !duplicateAliases.has(p.id)),
     [allPayees, duplicateAliases, accounts]
   );
 
-  /**
-   * The picker list plus the duplicate record an existing Assignment still names: the dialog finds
-   * its Payee by id, and a duplicate is otherwise not listed.
-   */
   function payeesWithRecordsOf(payeeIds: readonly (string | undefined)[]): PayeeRecord[] {
-    // A Payee an existing Assignment names is always found, archived or a book's or not.
     const extra = payeeIds.flatMap((id) =>
       id !== undefined &&
       (duplicateAliases.has(id) || accounts.isArchived(id) || accounts.isBookOwned(id))
@@ -310,7 +284,6 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
     );
   }
 
-  /** Settle up from a row: its Payee's balance, paid by the Character who mined it. */
   function settleUpPayeeOf(dr: DisplayRow) {
     const payeeId = dr.assignment?.payeeId;
     if (!payeeId) return;
@@ -321,7 +294,6 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
       actions.openSettleUp(settleUpRowsFor(balance.members), { payerId: dr.row.characterId });
   }
 
-  /** "I don't pay tax on this entry" — dismisses the whole unassigned residual in one action, no Payee needed. */
   function dismissRow(row: MoonMiningTaxRow) {
     const { estimatedValue } = computeAssignmentValue(
       row.unassignedOreLines,
@@ -339,18 +311,6 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
     ]);
   }
 
-  /**
-   * Other rows `joinTarget` may combine with (issue #523's "join entries")
-   * when the dialog is opened from a row's detail view: same character, same
-   * solar system, not already part of a combined entry, and either Unassigned
-   * or Outstanding. Adding to an *existing* combined entry goes through the
-   * selection toolbar's Combine instead (issue #539), which checks the same
-   * rules plus the at-most-one-`groupId` constraint in `selection.ts`. When
-   * `joinTarget` already has an Assignment, a candidate Assignment must share
-   * its Payee and tax % (the decision doc's merge rule) — a candidate still
-   * unassigned always qualifies, since it simply adopts whichever side is
-   * already assigned.
-   */
   function joinCandidatesFor(primary: DisplayRow) {
     return allDisplayRows
       .filter((dr) => dr.key !== primary.key)
@@ -369,22 +329,12 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
       .map((dr) => ({ row: dr.row, assignment: dr.assignment }));
   }
 
-  // Every bulk action clears the selection: row keys are an Assignment id or a
-  // `character:date:system:unassigned` residual key, and both change the
-  // moment the action lands — a surviving selection would point at rows that
-  // no longer exist.
   function handleJoined() {
     actions.closeJoin();
     onClearSelection();
     refresh();
   }
 
-  /**
-   * Every row action ends the same way: busy while it writes, then close and
-   * reload — or, when it wrote nothing, stay open and say so. Run from the row
-   * menu (`menuRow`) no detail is open to close or to say so in, so a failure
-   * opens that row's detail to carry the message.
-   */
   async function runAndClose(
     action: () => Promise<LedgerActionResult<unknown>>,
     menuRow?: DisplayRow
@@ -394,14 +344,12 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
       refresh();
     });
     if (menuRow && !result.ok) {
-      // Stale view (already assigned): the reload already ran, so a note is all there is to say.
       if (result.reason === 'already-assigned') return onToast(t('miningTax.saveFailed'));
       setFailedMenuRow(menuRow);
       actions.openDetail(menuRow);
     }
   }
 
-  /** The Assign form's submit, from inside RowDetailModal — same refresh-and-close every other row action takes. */
   function handleAssignedFromDetail() {
     actions.openDetail(null);
     refresh();
@@ -411,7 +359,6 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
     void runAndClose(() => dismissRow(dr.row), fromMenu ? dr : undefined);
   }
 
-  /** The detail's "Open ledger": the detail closes and its Payee's ledger opens in its place. */
   function openPayeeLedger() {
     const payeeId = detailTarget?.assignment?.payeeId;
     if (!payeeId) return;
@@ -419,10 +366,6 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
     actions.openLedger({ kind: 'personal', payeeId });
   }
 
-  /**
-   * Unlinks a payment from a Payee's ledger, then says so with an Undo that links the same payment
-   * to the same Payee again (as it was: amount, day and owner).
-   */
   function unlinkPayment(key: string) {
     const was = links.find((l) => paymentLinkKey(l) === key);
     void runAndClose(async () => {
@@ -451,19 +394,16 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
     );
   }
 
-  /** "Undo" on a Dismissed row, "Unassign" on any other assigned one. */
   function unassignEntry(dr: DisplayRow, fromMenu = false) {
     const assignment = dr.assignment;
     if (!assignment) return;
     void runAndClose(() => unassign([assignment]), fromMenu ? dr : undefined);
   }
 
-  /** Taking one day out of a combined entry keeps its Assignment; only the combination goes. */
   function takeOut(member: GroupMember, menuRow?: DisplayRow) {
     void runAndClose(() => uncombine([member.assignment]), menuRow);
   }
 
-  /** "Accept new total" on a combined entry: every day that grew since it was paid. */
   function resolveGroup(dr: DisplayRow, fromMenu = false) {
     const grown = allMembers(dr).filter((m) => m.assignment.status === 'needs-review');
     void runAndClose(() => acceptNewTotal(grown), fromMenu ? dr : undefined);
@@ -479,7 +419,6 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
     void runAndClose(() => uncombine(members), fromMenu ? dr : undefined);
   }
 
-  /** "Link a payment" for a row: a payment to its Payee, which pays the oldest days. */
   function linkWalletFor(dr: DisplayRow) {
     const payeeId = dr.assignment?.payeeId;
     if (!payeeId) return;
@@ -507,8 +446,18 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
     );
   }
 
-  /** The row menu's actions: View details opens the modal, the rest do what its buttons do. */
-  function runMenuAction(action: RowMenuAction, dr: DisplayRow) {
+  function estimateOwnRow(dr: DisplayRow | null): DisplayRow | undefined {
+    if (dr?.corp?.kind !== 'row' || dr.corp.view.state !== 'estimate' || !corpView)
+      return undefined;
+    return ownEntryRowOf(entries, corpView.overlay, dr.corp.view);
+  }
+
+  function runMenuAction(action: RowMenuAction, row: DisplayRow) {
+    const editing = action.id === 'edit' || action.id === 'split';
+    const own = editing ? estimateOwnRow(row) : undefined;
+    if (editing && row.corp?.kind === 'row' && !own) return;
+    if (action.id === 'split' && own?.assignment?.groupId) return;
+    const dr = own ?? row;
     const grouped = dr.groupMembers !== undefined;
     switch (action.id) {
       case 'view':
@@ -549,13 +498,10 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
   }
   useEffect(() => actions.registerRowMenuRunner(runMenuAction));
 
-  // The personal Payees a payment may be linked to (a Corp Tax Book credits itself).
   const linkablePayees = useMemo(
     () => accounts.linkable(allPayees).filter((p) => !isCorpPayeeId(p.id)),
     [accounts, allPayees]
   );
-  // Every payment no link holds and no Corp Tax Book counts: whichever Character sent it, since a
-  // merged Payee's money can come from any alt.
   const linkCandidates = useMemo(
     () =>
       linkablePayments(madePayments, {
@@ -578,15 +524,12 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
   const characterNameOf = (id: number) =>
     trackedCharacters.find((c) => c.characterId === id)?.characterName;
 
-  // Settle up's Payee: one per dialog, its account what it pays.
   const settleUpPayeeId = settleUpRows?.[0]?.assignment.payeeId;
   const settleUpAccount = settleUpPayeeId ? accounts.of(settleUpPayeeId) : undefined;
   const settleUpPayee = settleUpPayeeId
     ? payeeById.get(accounts.primaryIdOf(settleUpPayeeId))
     : undefined;
 
-  // The Payee ledger: a personal Payee's account, or the book Miner of the active Character.
-  // A book's ledger is one Miner's: the one picked, else the active Character's, else the first.
   const ledgerBook =
     ledgerTarget?.kind === 'book'
       ? corpView?.books.find((b) => b.loaded.corporationId === ledgerTarget.corporationId)
@@ -625,16 +568,19 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
   const ledgerSource = useMemo(() => {
     if (!ledgerTarget) return null;
     if (ledgerTarget.kind === 'personal') {
-      // A Payee nothing was billed to has no account: its ledger opens empty.
-      // A Payee a book is the authority for opens its old history only (read-only, no balance).
       const account =
         (accounts.isBookOwned(ledgerTarget.payeeId)
           ? accounts.historyOf(ledgerTarget.payeeId)
           : accounts.of(ledgerTarget.payeeId)) ??
         PayeeRunningAccount.build({ payeeId: ledgerTarget.payeeId, charges: [], links: [] });
       const byId = new Map(everyAssignment.map((a) => [a.id, a]));
+      const primary = accounts.primaryIdOf(ledgerTarget.payeeId);
       return {
         account: account.account,
+        recordChanges: recordChangesForPayee(
+          recordChanges,
+          (id) => accounts.primaryIdOf(id) === primary
+        ),
         charges: account.charges.map((c): LedgerCharge => {
           const a = byId.get(c.id);
           const place = a ? systemLabel(systemNames, a.solarSystemId) : undefined;
@@ -654,14 +600,12 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
         payments: account.links
           .filter((l) => !isBareMark(l))
           .map((l): LedgerPayment => {
-            // A recorded or legacy link names no payer of its own, and no transaction.
             const payer =
               l.kind === 'recorded' || l.kind === 'legacy'
                 ? undefined
                 : characterNameOf(
                     madePayments.find((m) => m.key === paymentLinkKey(l))?.characterId ?? 0
                   );
-            // A legacy link names its old payment's transactions: its entry is the first of them.
             const href = madePaymentHref(l.refs?.[0] ?? l);
             return {
               id: paymentLinkKey(l),
@@ -679,11 +623,22 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
     if (!book) return null;
     const miner = book.summary.miners.find((m) => m.minerId === ledgerMinerId);
     if (!miner) return null;
-    return minerLedgerSource(miner, book.loaded, {
+    const source = minerLedgerSource(miner, book.loaded, {
       character: characterNameOf,
       place: (l) =>
         l.structureId === undefined ? undefined : book.loaded.structureNames?.[l.structureId],
     });
+    const open = openDayCharges(
+      allDisplayRows.flatMap((dr) => (dr.corp?.kind === 'row' ? [dr.corp.view] : [])),
+      book.loaded.corporationId,
+      miner.minerId,
+      (id) => systemLabel(systemNames, id)
+    );
+    return {
+      ...source,
+      charges: [...source.charges, ...open],
+      recordChanges: recordChangesForBook(recordChanges, book.loaded.corporationId, miner.minerId),
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- characterNameOf reads trackedCharacters
   }, [
     ledgerTarget,
@@ -694,6 +649,8 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
     ledgerBook,
     ledgerMinerId,
     trackedCharacters,
+    allDisplayRows,
+    recordChanges,
   ]);
   const ledgerTitle =
     ledgerTarget?.kind === 'personal'
@@ -703,7 +660,7 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
         : '';
 
   const corpDetail = detailTarget?.corp?.kind === 'row' ? detailTarget.corp : null;
-  // The member's own entry for a book day, when one lines up: "Fix my records" opens it to edit.
+  const estimateOwn = estimateOwnRow(detailTarget);
   const ownEntry = corpDetail
     ? allDisplayRows.find(
         (dr) =>
@@ -780,11 +737,18 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
             })
           }
           onResolve={(target) => {
-            // The detail is closed first: Resolve is its own dialog, and may send the member back here.
             actions.openDetail(null);
             onResolve(target);
           }}
           {...(ownEntry ? { onFixRecords: () => actions.openDetail(ownEntry) } : {})}
+          {...(estimateOwn
+            ? {
+                onEdit: () => actions.editFromDetail(estimateOwn),
+                ...(estimateOwn.assignment && !estimateOwn.assignment.groupId
+                  ? { onSplit: () => actions.splitFromDetail(estimateOwn) }
+                  : {}),
+              }
+            : {})}
           onOpenLedger={() => {
             actions.openDetail(null);
             actions.openLedger({
@@ -806,7 +770,6 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
                 payeeById={payeeById}
                 typeNames={typeNames}
                 onChanged={() => {
-                  // The take-over rewrote the entry this detail was opened on: close and reload, like every row action.
                   actions.openDetail(null);
                   refresh();
                 }}
@@ -840,8 +803,6 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
               dr.corp.view.corporationId === corpPayTarget &&
               dr.status === 'outstanding'
           );
-          // Each of the member's Miners' own code: money pays the Miner's oldest day whatever it
-          // carries; the code only says whose money it is.
           const codes = minerPayCodes(book, characterNameOf);
           return (
             <Suspense fallback={null}>
@@ -876,7 +837,6 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
             pricesFor={pricesFor}
             unreachableHubs={unreachableHubs}
             busy={busy}
-            // A failed link shows in its own dialog, open on top of this one.
             saveError={actionError}
             startWithUnassignConfirm={detailConfirmUnassign}
             onAssigned={handleAssignedFromDetail}
@@ -912,8 +872,6 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
             open
             onClose={() => actions.openSplit(null)}
             assignment={
-              // A needs-review row splits against what ESI reports now, so the
-              // growth (the ore the pilot usually wants to move) is on offer.
               splitTarget.assignment.status === 'needs-review'
                 ? {
                     ...splitTarget.assignment,
@@ -986,8 +944,6 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
               ],
               settleUpRows.map((r) => r.assignment.date).sort()
             )}
-            // A recorded payment, or a contract paid in kind: linked to the Payee, swapped for its
-            // wallet transaction once one shows up.
             record={(payment) =>
               linkPayment(
                 {
@@ -1002,7 +958,6 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
                 payment.payerId ?? settleUpPayee.characterId
               )
             }
-            // "I won't pay it": every owed day of this Payee becomes a dismissal.
             onDismissBalance={() =>
               dismissOwed((liveSettleUpRows ?? settleUpRows).map((r) => r.assignment))
             }
@@ -1056,7 +1011,6 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
                 ? { history: true }
                 : {
                     onUnlinkPayment: unlinkPayment,
-                    // An archived Payee is never linkable (`linkable`), so it is offered none.
                     ...(accounts.isArchived(ledgerTarget.payeeId)
                       ? {}
                       : {

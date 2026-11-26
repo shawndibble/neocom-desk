@@ -9,12 +9,6 @@ import type { CharacterFilterValue } from './characterFilterValue';
 import { useMailScope } from './mailScopePref';
 import { useCharacters } from './useCharacters';
 
-/**
- * Mail's This/All scope: the remembered device-wide choice, overridden by a
- * `scope` URL param for one view, plus the per-Character unread figures the
- * picker shows. A picker that cannot change anything (one Character) is not
- * offered and the scope stays 'current'.
- */
 export function useMailScopeSwitch() {
   const storedScope = useMailScope((state) => state.value);
   const setStoredScope = useMailScope((state) => state.setValue);
@@ -23,7 +17,6 @@ export function useMailScopeSwitch() {
   const [scopeView, setScopeView] = useUrlParams(scopeParams);
 
   const characters = useCharacters();
-  // Cached labels only, live: the menu's unread figures need no fetch of their own.
   const labelsByCharacter = useLiveQuery(
     async () => readMailLabelsForCharacters(characters.map((c) => c.characterId)),
     [characters]

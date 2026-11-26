@@ -83,7 +83,6 @@ describe('parseServerInputs', () => {
         'x'
       )?.priceAlerts
     ).toHaveLength(MAX_PRICE_ALERTS);
-    // A client from before the retirement may still send it, bad or not.
     expect(parseServerInputs({ shipLostMinimumIsk: -1 }, 'x')).toEqual({});
   });
 });
@@ -302,7 +301,6 @@ describe('buildServerEventPush', () => {
 
 describe('trimBaseline', () => {
   it('keeps only the readings of events still enabled', () => {
-    // A stored loss reading from before ship losses left the server is dropped.
     const stored = { priceAlerts: [entry(1)], shipLossIds: [1, 'x'] };
     expect(trimBaseline(stored, ['shipLost'])).toEqual({});
     expect(trimBaseline(stored, ['priceAlertTriggered'])).toEqual({ priceAlerts: [entry(1)] });

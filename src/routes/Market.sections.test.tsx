@@ -29,16 +29,10 @@ vi.mock('@/sde/loadSde', () => ({
   loadSkills: vi.fn(async () => []),
   loadTypes: vi.fn(async () => TYPES),
   loadBlueprints: vi.fn(async () => ({})),
-  // ItemContextMenu (now on every row, including Transactions/Order History
-  // per #815) checks PI plannability unconditionally on mount.
   loadPi: vi.fn(async () => ({ schematics: {}, raw: [], infrastructure: {} })),
   loadMarketWideTrees: vi.fn(async () => ({})),
 }));
 
-// Market() unconditionally loads its own catalogue on mount regardless of
-// which top-level tab is showing — these tests only exercise the
-// character-scoped tabs, so an empty catalogue is enough to keep that effect
-// from making real requests msw would otherwise reject as unhandled.
 vi.mock('@/sde/loadMarketSde', () => ({
   loadAttributeDictionary: vi.fn(async () => ({})),
   loadMarketGroups: vi.fn(async () => []),
@@ -62,8 +56,6 @@ const openOrder = {
   price: 5.5,
   volume_remain: 100,
   volume_total: 200,
-  // Issued a day ago, not on a fixed date: a fixed date drifts into "expiring
-  // soon" as the calendar moves, and the order stops being Fine.
   issued: new Date(Date.now() - 86_400_000).toISOString(),
   duration: 90,
   range: 'region',
@@ -97,7 +89,6 @@ const transactions = [
 ];
 
 const server = setupServer(
-  // The Browser tree's no-orders cue (#6200): every fixture type is listed.
   marketTypesHandler([34, 35]),
   http.get(`https://esi.evetech.net/characters/${CHAR_ID}/orders`, () =>
     HttpResponse.json([openOrder])
@@ -109,21 +100,13 @@ const server = setupServer(
     const fromId = new URL(request.url).searchParams.get('from_id');
     return HttpResponse.json(fromId === null ? transactions : []);
   }),
-  // Open Orders prices each order's station; an answer with no orders for the
-  // type reads as checked-and-healthy. Left unanswered, the order would land
-  // in "Not checked" instead (competition never read).
   http.get('https://market.fuzzwork.co.uk/aggregates/', () => HttpResponse.json({})),
-  // Fuzzwork answering with no orders at all falls through to the live ESI book,
-  // which here is empty too: still checked-and-healthy.
   http.get('https://esi.evetech.net/markets/:regionId/orders', () => HttpResponse.json([]))
 );
 
 beforeAll(async () => {
   server.listen({ onUnhandledRequest: 'error' });
-  // Compile the lazy Market chunk here, under the hook's own budget: its first
-  // import cost whichever test ran first more than `findBy`'s default wait.
   await routeChunks.loadMarket();
-  // The one App-level test below; its graph and shell chunk load here too.
   await Promise.all([import('@/app/App'), routeChunks.loadLayout()]);
 }, 30_000);
 afterAll(() => server.close());
@@ -133,7 +116,6 @@ beforeEach(async () => {
   await db.tokens.clear();
   await db.settings.clear();
   await db.esiCache.clear();
-  // The History tab now merges the wallet archive, so fills archived by an earlier test would leak in.
   await db.walletTransactionArchive.clear();
   await db.walletJournalArchive.clear();
   await db.walletArchiveCoverage.clear();
@@ -152,9 +134,6 @@ beforeEach(async () => {
 });
 
 describe('Market top-level tabs', () => {
-  // The one App-level test of the Market route: it mounts at /market inside the
-  // signed-in shell, its rail link current, and the shell carries no Orders link.
-  // Every other Market test renders the page on its own (`renderMarketRoute`).
   it('lands on the Market Browser tab by default inside the shell, with no Orders nav link anywhere', async () => {
     window.history.pushState({}, '', '/market');
     const { App } = await import('@/app/App');
@@ -164,7 +143,6 @@ describe('Market top-level tabs', () => {
       'true'
     );
     const rail = (await screen.findAllByRole('navigation'))[0];
-    // The rail lists the page's tabs under it, so the Market tab link shares the name.
     const marketLinks = await within(rail).findAllByRole('link', { name: 'Market' });
     expect(marketLinks.some((link) => link.getAttribute('aria-current') === 'page')).toBe(true);
     expect(screen.queryByRole('link', { name: 'Orders' })).not.toBeInTheDocument();
@@ -191,13 +169,10 @@ describe('Market top-level tabs', () => {
     await screen.findByRole('tab', { name: 'Market' });
 
     await user.click(screen.getByRole('tab', { name: 'Open' }));
-    // The fixture order has no problems, so it is Fine, folded under the
-    // Needs you list — Show opens All to see the row.
     await user.click(await screen.findByRole('button', { name: 'Show' }));
     expect(
       within(screen.getByRole('table', { name: 'All orders' })).getByText('Tritanium')
     ).toBeInTheDocument();
-    // The filter controls sit behind the funnel button on this tab.
     await user.click(screen.getByRole('button', { name: /^Filters/ }));
     expect(screen.getByRole('button', { name: 'Sell' })).toBeInTheDocument();
 
@@ -206,11 +181,6 @@ describe('Market top-level tabs', () => {
   });
 
   it('switching to Open Orders keeps that tab selected even with a lingering ?type= param from Browser', async () => {
-    // A prior item selection on the Browser tab leaves `type` in the URL;
-    // switching tabs must not be undone by the cross-link sync effect below.
-    // Mocked because a fresh mount briefly treats an unloaded catalogue as
-    // "not yet known invalid" (`resolveAgainstCatalogue`), so Browser's order
-    // book can fetch once before this suite's empty catalogue mocks resolve.
     server.use(
       http.get('https://esi.evetech.net/markets/:regionId/orders', () =>
         HttpResponse.json([], { headers: { 'X-Pages': '1' } })
@@ -222,7 +192,6 @@ describe('Market top-level tabs', () => {
     await screen.findByRole('tab', { name: 'Market' });
 
     await user.click(screen.getByRole('tab', { name: 'Open' }));
-    // The fixture order is healthy (Fine), so it's folded until revealed.
     await user.click(await screen.findByRole('button', { name: 'Show' }));
 
     expect(await screen.findByText('Tritanium')).toBeInTheDocument();
@@ -234,9 +203,7 @@ describe('Market top-level tabs', () => {
     const user = userEvent.setup({ delay: null });
     renderMarketRoute();
 
-    // The fixture order is healthy (Fine), so it's folded until revealed.
     await user.click(await screen.findByRole('button', { name: 'Show' }));
-    // The name is the row's own click, not a link.
     expect(screen.queryByRole('link', { name: 'Tritanium' })).not.toBeInTheDocument();
     await user.click(await screen.findByText('Tritanium'));
 
@@ -256,15 +223,11 @@ describe('Market top-level tabs', () => {
 
     await waitFor(() => expect(window.location.pathname).toBe('/market/history'));
     expect(await screen.findByText('Pyerite')).toBeInTheDocument();
-    // The query survived the move: History read `?highlight=34` (Tritanium's
-    // transaction pulses), then consumed it. Reading the URL itself raced that
-    // consume once the page rendered without App's boot in front of it.
     await waitFor(() =>
       expect(screen.getByRole('row', { name: /Tritanium/ })).toHaveClass('row-pulse')
     );
     await waitFor(() => expect(window.location.search).toBe(''));
     expect(screen.getByRole('tab', { name: 'History' })).toHaveAttribute('aria-selected', 'true');
-    // One view, so no picker between Ended orders and Transactions.
     expect(screen.queryByRole('combobox', { name: 'History view' })).not.toBeInTheDocument();
   });
 });
@@ -274,13 +237,10 @@ describe('Market Open Orders tab', () => {
     window.history.pushState({}, '', '/market/orders');
     const user = userEvent.setup({ delay: null });
     renderMarketRoute();
-    // The fixture order has no problems, so it is Fine, folded under the
-    // Needs you list — Show opens All to see the resolved item name.
     await user.click(await screen.findByRole('button', { name: 'Show' }));
     expect(
       within(screen.getByRole('table', { name: 'All orders' })).getByText('Tritanium')
     ).toBeInTheDocument();
-    // The filter controls sit behind the funnel button on this tab.
     await user.click(screen.getByRole('button', { name: /^Filters/ }));
     expect(screen.getByRole('button', { name: 'Sell' })).toBeInTheDocument();
   });
@@ -322,14 +282,7 @@ describe('Market Open Orders tab', () => {
     );
     window.history.pushState({}, '', '/market/orders');
     renderMarketRoute();
-    // The banner is now per character, since this page covers every selling
-    // character at once — title is prefixed with the character's name.
     expect(await screen.findByText('Pilot One: log in again')).toBeInTheDocument();
-    // NB: this currently fails — OpenOrdersPanel.tsx renders the reauth
-    // banner and the "no open orders cached" EmptyState unconditionally
-    // side by side (the old code was an if/else: reauth XOR empty/table).
-    // See the report for the fix this needs; not something this test file
-    // can paper over.
     expect(screen.queryByText(/^no open orders$/i)).not.toBeInTheDocument();
   });
 });
@@ -353,15 +306,11 @@ describe('Market History tab (Transactions)', () => {
     await waitFor(() => {
       expect(document.querySelector('[data-row-key="1"]')?.className).toContain('row-pulse');
     });
-    // Only the row the alert was about.
     expect(document.querySelector('[data-row-key="2"]')?.className).not.toContain('row-pulse');
-    // Some other element scrolls itself on mount (the tab bar), so assert the
-    // row was among the elements scrolled to, not that it was the first.
     await waitFor(() => {
       expect(scrollIntoView.mock.instances).toContain(document.querySelector('[data-row-key="1"]'));
     });
 
-    // Spent on arrival: a reload or a tab round-trip must not pulse again.
     await waitFor(() => {
       expect(new URLSearchParams(window.location.search).has('highlight')).toBe(false);
     });
@@ -369,15 +318,11 @@ describe('Market History tab (Transactions)', () => {
   });
 
   it('pulses nothing when the item has no sell of its own to point at', async () => {
-    // Type 35 is in the list, but only as a buy — and the alert only ever
-    // fires for a filled *sell* order.
     window.history.pushState({}, '', '/market/history?highlight=35');
     renderMarketRoute();
 
     expect(await screen.findByText('Tritanium')).toBeInTheDocument();
     expect(document.querySelector('.row-pulse')).toBeNull();
-    // Spent even so, or a link left armed would pulse a different row once the
-    // cache caught up with the fill.
     await waitFor(() => {
       expect(new URLSearchParams(window.location.search).has('highlight')).toBe(false);
     });
@@ -405,10 +350,8 @@ describe('Market History tab (Transactions)', () => {
     window.history.pushState({}, '', '/market/history');
     renderMarketRoute();
 
-    // Five identical Tritanium fills come back, one per page.
     expect((await screen.findAllByText('Tritanium')).length).toBeGreaterThan(1);
     expect(calls).toBe(5);
-    // The cap is how far back this view goes, not a fault to warn about.
     expect(screen.queryByText(/recent transactions only/i)).not.toBeInTheDocument();
   });
 
@@ -423,7 +366,6 @@ describe('Market History tab (Transactions)', () => {
     const user = userEvent.setup({ delay: null });
     renderMarketRoute();
 
-    // Initial load succeeds live — no banner at all yet.
     expect(await screen.findByText('Tritanium')).toBeInTheDocument();
     expect(screen.queryByText(/showing cached data/i)).not.toBeInTheDocument();
 

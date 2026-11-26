@@ -283,7 +283,6 @@ describe('BookSettingsDialog tabs', () => {
     afterEach(() => vi.useRealTimers());
 
     it('asks for a start date no earlier than the lock date, and will not save one before it', async () => {
-      // On 20 Dec the lock date is 1 Oct; the book's start (1 Oct) is not locked.
       const user = await open('2026-12-20');
       const start = screen.getByLabelText('Start date (EVE time)');
       expect(start).toHaveAttribute('min', '2026-10-01');
@@ -294,7 +293,6 @@ describe('BookSettingsDialog tabs', () => {
     });
 
     it('locks a start date that is itself before the lock date', async () => {
-      // On 1 Mar 2027 the lock date is 1 Dec: the book started on 1 Oct, in locked history.
       await open('2027-03-01');
       expect(screen.getByLabelText('Start date (EVE time)')).toBeDisabled();
       expect(screen.getByText(/is locked/)).toBeInTheDocument();

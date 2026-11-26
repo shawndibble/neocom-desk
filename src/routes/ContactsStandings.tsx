@@ -58,7 +58,6 @@ const INFO_KIND: Record<NpcStandingKind, NpcInfoKind> = {
   agent: 'agent',
 };
 
-/** The filter row, in the URL (ADR 0015) under `standings.` keys that Contacts' other tabs never read. */
 const FILTER_URL = defineUrlFilter<NpcStandingsFilter>({
   text: { key: 'standings.q', codec: textParam() },
   kinds: { key: 'standings.type', codec: enumSetParam(NPC_STANDING_KINDS) },
@@ -66,12 +65,6 @@ const FILTER_URL = defineUrlFilter<NpcStandingsFilter>({
   feesOnly: { key: 'standings.fees', codec: boolParam() },
 });
 
-/**
- * The Contacts page's Standings tab (issue #2859): the Character's faction,
- * corporation and agent standings. A hook rather than a component so the page can
- * keep one header and tab bar mounted across all three tabs (focus stays on
- * the tab that was just chosen); `enabled` holds the fetch until the tab opens.
- */
 export function useContactsStandings(characterId: number, enabled: boolean) {
   const { t } = useTranslation();
   const lacksScope = useCharacterLacksEndpoints(characterId, ['getCharacterStandings']);
@@ -80,9 +73,7 @@ export function useContactsStandings(characterId: number, enabled: boolean) {
     rows: NpcStandingRow[];
     failed: boolean;
     fetchedAt: Date | null;
-    /** The rows are a cached copy: ESI did not answer. */
     fromCache: boolean;
-    /** False when no list could be loaded at all — unknown, not "no standings". */
     available: boolean;
   } | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -91,10 +82,7 @@ export function useContactsStandings(characterId: number, enabled: boolean) {
     () => filterFromParamValues<NpcStandingsFilter>(filterParams, FILTER_URL.fieldToParam),
     [filterParams]
   );
-  // Rows derive from a deferred copy so a keystroke paints the box first
-  // (`useUrlFilter`'s rule); the bar keeps the immediate one.
   const rowsFilter = useDeferredValue(filter);
-  // Skills unreadable leaves every Standing empty: Base then stands in for it.
   const skillsKnown =
     !state || state.rows.length === 0 || state.rows.some((row) => row.effective !== null);
   const { columns, optionalColumns, availableIds, visibility, sortProps } =
@@ -147,8 +135,6 @@ export function useContactsStandings(characterId: number, enabled: boolean) {
     };
   }, [fetchState, enabled]);
 
-  // A refresh that outlives a character switch must not write the old
-  // character's rows over the new one's, nor clear its loading flag.
   const currentCharacterId = useRef(characterId);
   useEffect(() => {
     currentCharacterId.current = characterId;
@@ -161,8 +147,6 @@ export function useContactsStandings(characterId: number, enabled: boolean) {
     setRefreshing(true);
     void fetchState(true).then((next) => {
       if (currentCharacterId.current !== startedFor) return;
-      // A failed refresh keeps the rows already on screen rather than blanking
-      // them; so does one that reached nothing (`available` false) when rows are up.
       setState((prev) =>
         (next.failed || !next.available) &&
         prev?.characterId === startedFor &&
@@ -177,8 +161,6 @@ export function useContactsStandings(characterId: number, enabled: boolean) {
 
   const unreadable =
     state !== null && state.characterId === characterId && (state.failed || !state.available);
-  // A refresh keeps the rows on screen (the button is disabled meanwhile); only the
-  // "couldn't load" state, which has no rows to keep, shows a spinner while it retries.
   const spinning =
     !state ||
     state.characterId !== characterId ||
@@ -190,7 +172,6 @@ export function useContactsStandings(characterId: number, enabled: boolean) {
     [state?.rows, rowsFilter]
   );
   const counts = useMemo(() => countNpcStandingRows(state?.rows ?? []), [state?.rows]);
-  // Every column and the rows the filter bar leaves, in the table's sort.
   const csvColumns = useMemo(() => npcStandingsCsvColumns(t), [t]);
   const standingsExport = useTableExport({
     surface: 'npc-standings',
@@ -202,8 +183,6 @@ export function useContactsStandings(characterId: number, enabled: boolean) {
   if (lacksScope) {
     content = <GrantBanner characterId={characterId} endpoints={['getCharacterStandings']} />;
   } else if (!state || status !== 'ok') {
-    // Shown by the `DataGate` below: its spinner, or "couldn't load" with Retry —
-    // "no NPC standings" would be a guess when nothing was loaded.
     content = null;
   } else if (state.rows.length === 0) {
     content = (

@@ -1,15 +1,3 @@
-/**
- * The red strip under a page header while any of the account's corporations
- * (or their alliances) has a war declared on it, still running or about to
- * start. With one corporation at war it names the aggressor; with several it
- * counts the corporations. It draws nothing otherwise. The Overview and the Corp Board mount it;
- * pressing the strip opens the war's card in a modal.
- *
- * Not the Danger banner: that one is driven by Alerts and acknowledged away,
- * while a war is a standing condition that ends when the war does, so there is
- * nothing to acknowledge. It is a plain status, not an alert: the war is not a
- * new event on every visit.
- */
 import { LiveStatus } from '@/components/ui/LiveStatus';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -34,13 +22,11 @@ export function WarBanner({ characterId }: { characterId: number }) {
   const { wars, corporations: accountCorporations } = useWarsAgainstMe(characterId);
   const [open, setOpen] = useState(false);
   const first = wars[0];
-  // Hooks above run for every render; the name hook needs a party even with no war.
   const name = usePartyName(first?.war.aggressor ?? {});
   if (first === undefined) return null;
 
   const corporations = groupWarsByCorporation(wars).length;
   const more = wars.length - 1;
-  // The announced text leaves out `when`: it ticks, and a live region would read every tick.
   const title =
     corporations > 1
       ? t('wars.banner.corporations', { count: corporations })
@@ -60,7 +46,6 @@ export function WarBanner({ characterId }: { characterId: number }) {
     <>
       <div>
         <LiveStatus>{title}</LiveStatus>
-        {/* The whole strip is the one control (§6c "Topic drill-in": a trailing GoTo chevron). */}
         <button
           type="button"
           aria-haspopup="dialog"

@@ -1,9 +1,3 @@
-/**
- * Orders that traded per day in each compared plan's hub region, from ESI's
- * market history (its `order_count`, averaged over 30 days). Per region, never
- * per hub — ESI has no finer cut. Fetched only while the column is shown;
- * each region's history is cached until ESI's daily rollover.
- */
 import { useCallback } from 'react';
 import { averageDailyOrders } from '@/engine/industry/marketWideSanity';
 import { EsiError } from '@/esi/errors';
@@ -14,7 +8,6 @@ import { getTradeHub } from '@/market/hubs';
 import { hubOrderKey, type HubOrderTarget } from './useHubOrderCounts';
 
 export interface HubDailyOrdersState {
-  /** Orders a day by `hubOrderKey`; absent where the read failed. */
   perDay: ReadonlyMap<string, number>;
   loading: boolean;
 }
@@ -32,7 +25,6 @@ async function loadDailyOrders(key: string): Promise<HubDailyOrdersState> {
       const { points } = await loadPriceHistory(hub.regionId, Number(typeId));
       perDay.set(entry, averageDailyOrders(points, Date.now()));
     } catch (error) {
-      // A type with no market (ESI 400) traded no orders; anything else is unknown.
       if (error instanceof EsiError && error.status === 400) perDay.set(entry, 0);
     }
   });

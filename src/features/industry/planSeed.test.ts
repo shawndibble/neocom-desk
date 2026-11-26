@@ -32,14 +32,10 @@ describe('parsePlanSeed', () => {
   });
 
   it('rejects values a Build Plan could not hold', () => {
-    // Out of the game's own ME 0..10 / TE 0..20 ranges: a hand-edited URL must
-    // not write a plan the ME/TE inputs themselves would refuse.
     expect(seedOf('me=11&te=20&runs=5')).toBeNull();
     expect(seedOf('me=10&te=21&runs=5')).toBeNull();
     expect(seedOf('me=-1&te=0&runs=1')).toBeNull();
     expect(seedOf('me=0&te=-1&runs=1')).toBeNull();
-    // A blueprint original (runs -1 in ESI) is never a BPC search row, and a
-    // zero-run plan builds nothing.
     expect(seedOf('me=0&te=0&runs=0')).toBeNull();
     expect(seedOf('me=0&te=0&runs=-1')).toBeNull();
   });
@@ -100,8 +96,6 @@ describe('seedFromContractItem', () => {
   });
 
   it('falls back to no seed when ESI omits any one of the three', () => {
-    // A worse answer than the current defaults would be quoting a copy as
-    // completely unresearched just because a field was absent.
     expect(
       seedFromContractItem({ is_blueprint_copy: true, time_efficiency: 20, runs: 5 })
     ).toBeNull();
@@ -119,8 +113,6 @@ describe('seedFromContractItem', () => {
   });
 
   it('never seeds a line that is not a blueprint copy', () => {
-    // A non-blueprint line (ore, modules) is planned as itself or disabled,
-    // never seeded — even if it somehow carried these fields.
     expect(
       seedFromContractItem({
         material_efficiency: 10,
@@ -171,9 +163,6 @@ describe('seedFromOfferRow', () => {
   });
 
   it('falls back to no seed when the row omits any one of the three', () => {
-    // The publisher drops a blank ME/TE and a negative `runs` rather than
-    // zeroing them, so a BPO's unlimited runs arrives as absent — unseeded
-    // beats a fabricated run count.
     expect(seedFromOfferRow({ isBlueprintCopy: true, te: 20, runs: 5 })).toBeNull();
     expect(seedFromOfferRow({ isBlueprintCopy: true, me: 10, runs: 5 })).toBeNull();
     expect(seedFromOfferRow({ isBlueprintCopy: true, me: 10, te: 20 })).toBeNull();
@@ -185,9 +174,6 @@ describe('seedFromOfferRow', () => {
   });
 
   it('agrees with the contract-item path on the same copy', () => {
-    // Contract Search reaches one item line two ways since #933 — the row's
-    // own context menu and the detail modal's — and a pilot who used both
-    // would otherwise land on two different plans for one copy.
     expect(seedFromOfferRow({ isBlueprintCopy: true, me: 10, te: 20, runs: 5 })).toEqual(
       seedFromContractItem({
         is_blueprint_copy: true,

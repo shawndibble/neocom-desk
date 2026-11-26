@@ -7,12 +7,6 @@ import type { AttentionItem } from '@/features/miningTax/AttentionStrip';
 import type { CorpBookView } from './corpBookView';
 import { unheldCharacters } from './unheldCharacters';
 
-/**
- * The Tax tab's warning, one per corporation, when a book counts a character the pilot does not
- * hold in Neocom Desk (`unheldCharacters`), with "Not yours? Tell {corp}", which declines the
- * link for each held character grouped with them (`declineLink`). It goes once each listed
- * character is added or declined.
- */
 export function useUnheldCharacterItems(
   corpView: CorpBookView | null,
   heldIds: readonly number[],

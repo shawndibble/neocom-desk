@@ -2,16 +2,11 @@ import { formatAge } from '@/lib/age';
 import type { AbyssalEstimate } from '@/market/mutamarket';
 import type { Translate } from '@/lib/translate';
 
-/** When the estimate was made: MutaMarket's model run, else when this device fetched it. */
 function estimatedAt(estimate: AbyssalEstimate): number {
   const modelRun = estimate.valueUpdatedAt ? Date.parse(estimate.valueUpdatedAt) : Number.NaN;
   return Number.isFinite(modelRun) ? modelRun : estimate.fetchedAt;
 }
 
-/**
- * The tooltip on an abyssal module's value: what the estimate is and how old,
- * or why there is none. Undefined while the lookup is still out.
- */
 export function abyssalValueHint(
   estimate: AbyssalEstimate | undefined,
   t: Translate,

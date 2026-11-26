@@ -1,22 +1,3 @@
-/**
- * The Market page's Appraisal tab: paste a pile of items, read what it is
- * worth on both sides of a Trade Hub's order book.
- *
- * The paste box stays beside the ledger rather than collapsing once a result
- * exists — an appraisal is usually edited two or three times (a line typo, a
- * stack left out), and a list you can still see is a list you can still fix.
- * That is also where unmatched lines are reported, next to the text they
- * refer to. Below `lg` the paste card sits above the result instead of
- * beside it and would push the answer a screen down, so there (and only once
- * a result exists) it folds into a one-line "N lines · Edit list" summary;
- * the unmatched report stays visible and the list is one tap away.
- *
- * The Browser's own two-column grid holds two halves: the paste box, one
- * `Panel`, narrower on the left since it does not need the width the Market
- * Group tree does; and the result column, which stacks the primary result
- * `Panel` (its header carries the Compare Hubs toggle) beneath the summary
- * and, when open, the Compare Hubs cards, once something has been appraised.
- */
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -79,17 +60,11 @@ interface AppraisalPanelProps {
   controller: AppraisalController;
   pricePercent: number;
   onPricePercentChange: (value: number) => void;
-  /** The hub the figures are quoted at — the panel's own provenance chip, and what a Share Link is stored against. */
   hub: TradeHub;
-  /** A hub picked outside the hub menu (the Compare Hubs cards): the caller writes it. */
   onHubChange: (id: TradeHub['id']) => void;
-  /** After the hub menu itself wrote a pick (it writes the page hub, so the caller must not again). */
   onHubPicked: () => void;
-  /** The active Character's standing toward this hub's NPC station owner, for the net-of-fees chips' broker fee. */
   standing: ResolvedStandings;
-  /** Signs in to store a Share Link as this Character if no Firebase session exists yet; null disables Share. */
   characterId: number | null;
-  /** Opens the Compare Hubs panel already expanded — the Quickbar's "View in Appraisal" action (#726) lands directly on the multi-hub view rather than a collapsed one. */
   defaultCompareExpanded?: boolean;
 }
 
@@ -110,19 +85,11 @@ export function AppraisalPanel({
   const { text, result, compare, loading, failed } = controller;
   const [compareExpanded, setCompareExpanded] = useState(defaultCompareExpanded);
   const { setCompareOpen } = controller;
-  // The other four hubs' live books are fetched only once Compare Hubs is open.
   useEffect(() => setCompareOpen(compareExpanded), [compareExpanded, setCompareOpen]);
-  // Phone only: the pilot opened the folded paste card to edit the list. The
-  // result of an Appraise (or a Recent pick) from the open form folds it
-  // again, adjusted during render like the idioms below. A re-price from a
-  // changed Price % or hub also lands a new result, but must not pull the form
-  // out from under someone mid-typing, hence the explicit request flag.
   const isDesktop = useIsDesktop();
   const [editingList, setEditingList] = useState(false);
   const [foldOnResult, setFoldOnResult] = useState(false);
   const [foldedFor, setFoldedFor] = useState(result);
-  // The fold unmounts the focused Appraise button; below `lg` the Result heading
-  // takes focus instead (WCAG 2.4.3), which also announces the result.
   const [focusResultTick, setFocusResultTick] = useState(0);
   const resultHeadingRef = useRef<HTMLHeadingElement>(null);
   const focusAfterCommit = useFocusAfterCommit();
@@ -149,7 +116,6 @@ export function AppraisalPanel({
   }, [editingList]);
   const hubName = hub.systemName;
 
-  // Ages in the Recent list are read against when the panel opened.
   const [openedAt] = useState(Date.now);
   const recent = useRecentAppraisals((state) => state.value);
   const setRecent = useRecentAppraisals((state) => state.setValue);
@@ -159,18 +125,14 @@ export function AppraisalPanel({
   const setCargo = useHaulingCargo((state) => state.setValue);
   useHydratedStore(useRecentAppraisals, useAppraisalOwnedPref, useHaulingCargo);
 
-  // The refine breakdown: null closed, `typeId: null` the whole pile, else one item's.
   const [refineModal, setRefineModal] = useState<{ typeId: number | null } | null>(null);
   const refiningSetup = useRefiningSetup();
-  // The price basis the Refine figures are on, remembered across appraisals. A result that
-  // never carried the sell side (a link from before it did) cannot be priced on it, so it reads as buy.
   const storedBasis = useRefineBasis((state) => state.value);
   const setStoredBasis = useRefineBasis((state) => state.setValue);
   const basisReady = useHydratedStore(useRefineBasis);
   const refineBasis: RefineBasis =
     result !== null && basisAvailable(result.appraisal, storedBasis) ? storedBasis : 'buy';
   const mineralNames = useRefineMineralNames(result?.appraisal.items ?? NO_ITEMS);
-  // Campaign turn-ins, LP counted at this hub; never part of the Buy/Sell totals.
   const turnIns = useAppraisalTurnIns({
     rows: result?.appraisal.rows,
     hub,
@@ -195,7 +157,6 @@ export function AppraisalPanel({
         : 'market.appraisal.minusOwnedUnknownStructure',
       { id }
     );
-  // Trade Hubs are always offered; any other place that holds stock joins them, and so does a saved pick not read yet.
   const otherPlaceIds = [
     ...places.map((place) => place.id),
     ...(places.some((place) => place.id === ownedStationId) ? [] : [ownedStationId]),
@@ -244,21 +205,9 @@ export function AppraisalPanel({
   const canOpenInJanice = text.trim() !== '' && janice.status !== 'fetching';
   useAltChord('KeyJ', () => void handleOpenInJanice(), canOpenInJanice);
 
-  /*
-   * The percent field is a string while it is being typed. Committing on every
-   * keystroke would fight the typist: clearing the box to retype "90" sends an
-   * empty string, and a field that snaps back to 100 the moment you delete a
-   * digit cannot be edited at all. So the box holds whatever is typed, and the
-   * setting is only written when what is typed is a number in range.
-   */
   const [percentText, setPercentText] = useState(String(pricePercent));
   const [lastPercent, setLastPercent] = useState(pricePercent);
   if (pricePercent !== lastPercent) {
-    // Adjusted during render rather than in an effect — the same idiom
-    // `Market.tsx` uses to reset its order book when the selection changes,
-    // and for the same reason: an effect would paint the stale value first.
-    // A value the pilot is mid-way through typing does not land here, because
-    // that path only writes `pricePercent` once what is typed has parsed.
     setLastPercent(pricePercent);
     if (Number(percentText) !== pricePercent) setPercentText(String(pricePercent));
   }
@@ -281,9 +230,6 @@ export function AppraisalPanel({
   const abyssalLines = result?.abyssal ?? [];
   const accountingLevel = result?.accountingLevel ?? null;
   const brokerRelationsLevel = result?.brokerRelationsLevel ?? null;
-  // Null while skills are loading, or with no active Character — falls back
-  // to the result panel's own loading/empty states rather than ever showing
-  // a base-rate (untrained) figure.
   const net = useMemo(() => {
     if (result === null || accountingLevel === null || brokerRelationsLevel === null) return null;
     return appraisalNet(
@@ -293,8 +239,6 @@ export function AppraisalPanel({
     );
   }, [result, accountingLevel, brokerRelationsLevel, standing, pricePercent]);
   const pasteFolded = !isDesktop && rows.length > 0 && !editingList;
-  // Abyssal modules are real items with no market price: said apart from the
-  // unmatched lines, with where to price one instead.
   const abyssalNote = abyssalLines.length > 0 && (
     <PastedLinesNote
       heading={t('market.appraisal.abyssal', { count: abyssalLines.length })}
@@ -306,12 +250,9 @@ export function AppraisalPanel({
       </p>
     </PastedLinesNote>
   );
-  // Text where a count belongs: reported, with the way out. Only the current
-  // paste's result counts — a stale one must not open a picker for new text.
   const textLines =
     result?.pasteText === controller.submitted ? (result.textQuantityLines ?? []) : [];
   const quantityChoices = quantityColumnChoices(textLines);
-  // Offered once per paste: adjusted during render, like the fold above.
   const [quantityOfferedFor, setQuantityOfferedFor] = useState<string | null>(null);
   const [quantityOpen, setQuantityOpen] = useState(false);
   if (
@@ -352,7 +293,6 @@ export function AppraisalPanel({
       )}
     </PastedLinesNote>
   );
-  // About the pasted list, so it shows folded or open.
   const unmatchedNote = (unmatchedLinesNote || abyssalNote) && (
     <div className="flex flex-col gap-2">
       {unmatchedLinesNote}
@@ -421,8 +361,6 @@ export function AppraisalPanel({
 
       <div className="flex flex-col gap-4">
         {summaryReady && result !== null && totals !== undefined && (
-          // The summary groups, hold line and hub cards sit on the page ground; the
-          // table below is the only Panel (DESIGN.md §6c, boxes in boxes).
           <AppraisalSummary
             result={result}
             compare={compare}
@@ -454,7 +392,6 @@ export function AppraisalPanel({
           />
         )}
 
-        {/* The live-price bar is this card's top border: no row of its own, so the table never shifts as rows go live. */}
         <div className="relative">
           {resultReady && controller.live.checking && (
             <LivePriceBar live={controller.live} className="absolute inset-x-0 top-0 z-10" />
@@ -467,7 +404,6 @@ export function AppraisalPanel({
             meta={
               result !== null ? (
                 <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                  {/* The paste bar above already says hub and percent on a phone. */}
                   <span className="max-md:hidden">
                     <StatChip
                       label={hubName}
@@ -540,7 +476,6 @@ export function AppraisalPanel({
                     </Button>
                   </div>
                 )}
-                {/* A card a little narrower than the table's own minimum scrolls here instead of pushing past its column (#2949). */}
                 <div className="min-w-0 overflow-x-auto">
                   <DataTable
                     {...tableExport.tableProps}
@@ -551,7 +486,6 @@ export function AppraisalPanel({
                     className="pb-1"
                     rowContextMenu={rowContextMenu}
                     rowMoreActions
-                    // A phone keeps the table: Item, Buy, Sell, each header sorts.
                     responsive="table"
                   />
                 </div>
@@ -600,6 +534,7 @@ export function AppraisalPanel({
       {janice.status === 'failed' && (
         <Toast
           message={t(`market.appraisal.janiceFailed.${janice.reason}`)}
+          tone="danger"
           instance={janice}
           onClose={dismissJanice}
         />

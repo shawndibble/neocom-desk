@@ -21,9 +21,6 @@ import { putAssignments } from './storedAssignments';
 import { readTombstones, tombstoneKey } from '@/sync/localBookkeeping';
 import { MINING_TAX_ASSIGNMENTS } from '@/sync/syncedCollections';
 
-// Only `loadUnitPricesOnDate` is stubbed: `hubForPayee` is pure hub lookup,
-// and the point of these tests is *which* hub/date the real resolver hands
-// the fetch.
 const pricingMock = vi.hoisted(() => ({ loadUnitPricesOnDate: vi.fn() }));
 vi.mock('./pricing', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./pricing')>()),
@@ -31,7 +28,6 @@ vi.mock('./pricing', async (importOriginal) => ({
 }));
 
 const CHAR_A = 1;
-/** Paid as the test's stored record says: the account's reading, stood in for. */
 const byStatus = (a: MiningTaxAssignmentRecord) => a.status === 'paid';
 const TYPE_A = 45490;
 const TYPE_B = 45491;
@@ -71,8 +67,6 @@ describe('createAssignment', () => {
     expect(assignment.status).toBe('outstanding');
     expect(assignment.paidAt).toBeUndefined();
     expect(await db.miningTaxAssignments.get(assignment.id)).toEqual(assignment);
-    // No internal price lookup — the Assign dialog already resolved (and
-    // possibly corrected) the value before calling this.
     expect(pricingMock.loadUnitPricesOnDate).not.toHaveBeenCalled();
   });
 
@@ -119,7 +113,7 @@ describe('createAssignment', () => {
       payeeId: 'payee-1',
       oreLines: [{ typeId: TYPE_A, quantity: 100 }],
       taxPct: 10,
-      estimatedValue: 4200, // not what TYPE_A's price would compute to
+      estimatedValue: 4200,
       taxOwed: 420,
     });
 
@@ -184,7 +178,6 @@ describe("assigning a paid day's late ore (paid stays paid, ADR 0024)", () => {
     const created = await createAssignment({ ...lateOre, isPaid: byStatus });
 
     expect(created.collectsGrowth).toBe(true);
-    // Only the flag moves; the paid record's ore and tax stay as they were (an old mark goes).
     const stored = await db.miningTaxAssignments.get('paid');
     expect(stored?.collectsGrowth).toBeUndefined();
     expect(stored).toMatchObject({
@@ -471,9 +464,9 @@ describe('joinAssignments', () => {
     expect(a.groupId).toBe(b.groupId);
     expect(a.payeeId).toBe('payee-1');
     expect(a.taxPct).toBe(10);
-    expect(a.estimatedValue).toBe(1000); // 100 * 10
+    expect(a.estimatedValue).toBe(1000);
     expect(a.taxOwed).toBe(100);
-    expect(b.estimatedValue).toBe(200); // 50 * 4
+    expect(b.estimatedValue).toBe(200);
     expect(b.taxOwed).toBe(20);
     expect(await db.miningTaxAssignments.get(a.id)).toEqual(a);
     expect(await db.miningTaxAssignments.get(b.id)).toEqual(b);
@@ -511,10 +504,8 @@ describe('joinAssignments', () => {
 
     expect(pricesOn).toHaveBeenCalledWith('2026-09-04');
     expect(pricesOn).toHaveBeenCalledWith('2026-09-05');
-    // Same type, same quantity, two different mined dates — a shared price
-    // would give these the same value. A per-date one must not.
-    expect(a.estimatedValue).toBe(1000); // 100 * 10
-    expect(b.estimatedValue).toBe(4000); // 100 * 40
+    expect(a.estimatedValue).toBe(1000);
+    expect(b.estimatedValue).toBe(4000);
   });
 
   it('tags an already-assigned member with the shared groupId, leaving its own fields untouched', async () => {
@@ -639,7 +630,6 @@ describe('joinAssignments', () => {
 });
 
 describe('planNeedsReviewResolution', () => {
-  /** Plans and writes, the way an action does — these tests read the stored result. */
   async function planAndWrite(
     ...args: Parameters<typeof planNeedsReviewResolution>
   ): Promise<void> {
@@ -652,7 +642,7 @@ describe('planNeedsReviewResolution', () => {
     solarSystemId: 1,
     oreLines: [
       { typeId: TYPE_A, quantity: 150 },
-      { typeId: TYPE_B, quantity: 999 }, // a brand-new type, never assigned before
+      { typeId: TYPE_B, quantity: 999 },
     ],
   };
 
@@ -680,7 +670,7 @@ describe('planNeedsReviewResolution', () => {
       { typeId: TYPE_A, quantity: 150 },
       { typeId: TYPE_B, quantity: 999 },
     ]);
-    expect(updated?.estimatedValue).toBe(1500 + 999 * 4); // 150*10 + 999*4
+    expect(updated?.estimatedValue).toBe(1500 + 999 * 4);
     expect(updated?.status).toBe('outstanding');
     expect(updated?.reviewDiff).toBeUndefined();
   });
@@ -736,7 +726,7 @@ describe('planNeedsReviewResolution', () => {
 
     const updated = await db.miningTaxAssignments.get('a1');
     expect(updated?.oreLines).toEqual([{ typeId: TYPE_A, quantity: 150 }]);
-    expect(updated?.estimatedValue).toBe(1500); // 150 * 10
+    expect(updated?.estimatedValue).toBe(1500);
     expect(updated?.taxOwed).toBe(150);
   });
 
@@ -767,9 +757,6 @@ describe('planNeedsReviewResolution', () => {
 
     await planAndWrite(assignment, freshEntry, [assignment]);
 
-    // Accepting growth is a fresh invoice moment, and the invoice is still
-    // billed at the hub this Payee bills at — re-pricing at Jita would quietly
-    // restate the bill at a book the landlord never quoted.
     expect(pricingMock.loadUnitPricesOnDate).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({ id: 'hek' }),
@@ -801,8 +788,6 @@ describe('planNeedsReviewResolution', () => {
       true
     );
 
-    // A dangling payeeId (the Payee was deleted after the Assignment) resolves
-    // the same way rather than throwing partway through a re-snapshot.
     pricingMock.loadUnitPricesOnDate.mockClear();
     await planAndWrite({ ...dismissed, payeeId: 'gone' }, freshEntry, [dismissed]);
     expect(pricingMock.loadUnitPricesOnDate).toHaveBeenCalledWith(
@@ -844,7 +829,6 @@ describe('splitAssignment', () => {
     [TYPE_A, 10],
     [TYPE_B, 4],
   ]);
-  /** Both Payees billing at the same hub — the ordinary case. The two-hub case has its own test below. */
   const atOneHub = { kept: prices, moved: prices };
 
   async function seedOriginal(
@@ -861,7 +845,7 @@ describe('splitAssignment', () => {
         { typeId: TYPE_B, quantity: 50 },
       ],
       taxPct: 10,
-      estimatedValue: 9999, // a hand-edited figure, deliberately not the Jita value
+      estimatedValue: 9999,
       taxOwed: 999.9,
       status: 'outstanding',
       updatedAt: 1,
@@ -999,7 +983,6 @@ describe('splitAssignment', () => {
 
     expect(kept.collectsGrowth).toBeUndefined();
     expect(created.collectsGrowth).toBe(true);
-    // Moving a whole line drops it from the kept side entirely.
     expect(kept.oreLines).toEqual([{ typeId: TYPE_A, quantity: 100 }]);
   });
 
@@ -1109,7 +1092,6 @@ describe('splitAssignment', () => {
       { moves: [{ typeId: TYPE_A, quantity: 40 }], payeeId: 'payee-2', taxPct: 8 },
       {
         kept: prices,
-        // The second Payee bills at a thinner hub where this ore is worth half.
         moved: new Map([
           [TYPE_A, 5],
           [TYPE_B, 2],
@@ -1117,9 +1099,6 @@ describe('splitAssignment', () => {
       }
     );
 
-    // A split hands ore to a *different* Payee by construction, so the two
-    // sides can sit at two different hubs — one blended price would misstate
-    // whichever bill it did not come from.
     expect(kept.estimatedValue).toBe(60 * 10 + 50 * 4);
     expect(created.estimatedValue).toBe(40 * 5);
     expect(created.taxOwed).toBeCloseTo(40 * 5 * 0.08);
@@ -1220,7 +1199,6 @@ describe('double-assignment guard', () => {
       oreLines: [{ typeId: TYPE_A, quantity: 40 }],
       entryOreLines: [{ typeId: TYPE_A, quantity: 130 }],
     });
-    // 60 + 40 claimed of 130: the 30 residual is still assignable.
     await createAssignment({
       isPaid: byStatus,
       ...base,
@@ -1391,11 +1369,9 @@ describe('releaseOreFromAssignment', () => {
     await db.miningTaxAssignments.put(base);
     const left = [{ typeId: TYPE_A, quantity: 40 }];
     const priced = await loadReleasePrices(base, left);
-    // The write runs in the ledger's transaction, as `releaseOre` runs it.
     const out = await db.transaction('rw', db.miningTaxAssignments, db.payees, db.settings, () =>
       releaseOreFromAssignment(base, left, priced)
     );
-    // TYPE_A is 10 a unit: 40 × 10, at 10%.
     expect(out).toMatchObject({ estimatedValue: 400, taxOwed: 40 });
     expect(out?.oreLineValues).toBeUndefined();
     expect(pricingMock.loadUnitPricesOnDate).toHaveBeenCalledWith(
@@ -1416,7 +1392,6 @@ describe('releaseOreFromAssignment', () => {
         { typeId: TYPE_A, quantity: 100 },
         { typeId: TYPE_B, quantity: 100 },
       ],
-      // A pilot-edited figure: 100 × 10 + 100 × 4 = 1400 at market.
       estimatedValue: 2000,
       taxOwed: 250,
     };
@@ -1611,7 +1586,6 @@ describe('a view never reaches a write (B1)', () => {
 
   it('editing, uncombining or splitting a day its link paid writes no mark, so no link is read from it', async () => {
     await putAssignments([record({ groupId: 'g' })]);
-    // The row on screen: paid by a link, so its view says Paid.
     const view = { ...record({ groupId: 'g' }), status: 'paid' as const };
     await updateCombinedAssignments([view], { payeeId: 'p1', taxPct: 12, members: {} });
     await uncombineAssignments([{ ...view, taxPct: 12 }]);

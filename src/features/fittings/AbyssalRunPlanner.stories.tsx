@@ -15,10 +15,6 @@ const after: FittingStats = {
 const compare = () => Promise.resolve({ before, after });
 const typeName = (typeId: number) => `Filament #${typeId}`;
 
-/**
- * The Buy line prices the filament at the hub (Fuzzwork). Installed on the first
- * render, before the planner's effect asks, so no story reaches the network.
- */
 function useFilamentPriceFixture() {
   const [uninstall] = useState(() =>
     installFixtureFetch([
@@ -37,7 +33,6 @@ function useFilamentPriceFixture() {
   useEffect(() => uninstall, [uninstall]);
 }
 
-/** Sets the session weather (and tier / security) before the planner mounts. */
 function Seeded({
   weatherTypeId,
   tier = 3,
@@ -58,7 +53,6 @@ function Seeded({
   );
 }
 
-/** @summary The Abyssal stats section's body: the weather picker, then the run planner. */
 const meta = {
   title: 'fittings/AbyssalRunPlanner',
   component: AbyssalRunPlanner,
@@ -76,17 +70,14 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** @summary A weather set: picker, effect on the fit, tier and security, one verdict line, Buy. */
 export const WeatherSet: Story = {
   render: () => <Seeded weatherTypeId={47382} />,
 };
 
-/** @summary A problem only: a suspect flag is the one warning line; the rest stays plain. */
 export const WithWarning: Story = {
   render: () => <Seeded weatherTypeId={47382} tier={5} security={7} hullGroupId={25} />,
 };
 
-/** @summary Normal space: the picker and one hint; tier, verdict and Buy wait for a weather. */
 export const NormalSpace: Story = {
   render: () => <Seeded weatherTypeId={null} />,
 };

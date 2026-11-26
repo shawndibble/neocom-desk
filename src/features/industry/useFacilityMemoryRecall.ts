@@ -5,23 +5,12 @@ import type { BuildPlanChange } from './buildPlanStore';
 import { hydrateActivityFacilityDefaults } from './facilityDefaults';
 import { facilityMemoryKey, patchFromMemory, recallFacility } from './facilityMemory';
 
-/**
- * A plan that opens at a facility the pilot already described (a new plan
- * starts at the remembered location) gets that description back without a
- * pick: its rigs and tax while it still has none of its own, and the cost
- * index where ESI has none. Once per facility, and not keyed on the override
- * itself — a pilot clearing it must not have it recalled straight back.
- */
 export function useFacilityMemoryRecall(
   plan: BuildPlanRecord,
   costIndexMissing: boolean,
   latestPlan: RefObject<BuildPlanRecord>,
   latestOnChange: RefObject<(change: BuildPlanChange) => void>
 ) {
-  // Started on mount so the remembered locations are usually in hand before
-  // `toggleIncludeReactions` reads them; it still awaits them itself. Both
-  // stores are also written from the page: a location the pilot sets there
-  // becomes where their next plan starts (`rememberLocationFromEdit.ts`).
   useEffect(() => {
     void hydrateActivityFacilityDefaults();
   }, []);

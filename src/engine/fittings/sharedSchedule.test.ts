@@ -19,7 +19,6 @@ describe('splitSharedSchedule', () => {
     ];
     const groups = [[{ skillTypeID: Y, targetLevel: 1 }], [{ skillTypeID: X, targetLevel: 1 }]];
     const split = splitSharedSchedule(groups, combined, [solo[1], solo[0]]);
-    // X finishes first in the combined schedule, so it carries P.
     expect(split[1]).toEqual([step(P, 1, 10), step(P, 2, 20), step(X, 1, 5)]);
     expect(split[0]).toEqual([step(Y, 1, 7)]);
     const total = split.flat().reduce((sum, s) => sum + s.seconds, 0);

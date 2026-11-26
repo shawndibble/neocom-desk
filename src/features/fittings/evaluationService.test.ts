@@ -13,7 +13,6 @@ const fitting: Fitting = { name: 'Fit', shipTypeId: 587, modules: [], drones: []
 const pilot: PilotProfile = { skillLevels: new Map(), implantTypeIds: [], boosterTypeIds: [] };
 const stats = { ehp: 1 } as unknown as FittingStats;
 
-/** A Worker the test answers by hand. */
 class FakeWorker {
   static instances: FakeWorker[] = [];
   onmessage: ((event: MessageEvent) => void) | null = null;
@@ -118,7 +117,6 @@ describe('evaluationService with a Worker', () => {
 
     await expect(result).rejects.toThrow('aborted');
     expect(FakeWorker.instances[0].sent.at(-1)).toEqual({ kind: 'cancel', id: 1 });
-    // The late reply for a dropped job is ignored.
     FakeWorker.instances[0].reply({ id: 1, stats });
   });
 

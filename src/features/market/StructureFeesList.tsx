@@ -5,15 +5,9 @@ import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
 import { structureBrokerPct } from '@/engine/market/structureFee';
 import { useStructureFees, withoutStructureFee } from './structureFees';
 
-/**
- * Settings > Market fees: the structure broker fees the pilot has set. Renders
- * nothing until one exists (issue #2911) — the field itself lives on the Order
- * detail, so this is only where a fee is reviewed or removed.
- */
 export function StructureFeesList({
   panelHeading,
 }: {
-  /** Where focus lands when the last fee goes and this section unmounts. */
   panelHeading?: RefObject<HTMLElement | null>;
 }) {
   const { t } = useTranslation();

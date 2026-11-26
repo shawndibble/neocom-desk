@@ -101,9 +101,6 @@ describe('loadContractLocationInfo', () => {
   });
 
   it('leaves a player-structure location unresolved rather than firing an ESI request for it', async () => {
-    // No handler registered for `/universe/structures/1000000000001` on
-    // purpose — `onUnhandledRequest: 'error'` would fail the test if this
-    // function ever tried, which is exactly the property under test.
     expect(await loadContractLocationInfo(1000000000001)).toEqual({
       name: null,
       space: null,

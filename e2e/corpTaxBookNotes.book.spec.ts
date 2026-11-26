@@ -1,13 +1,3 @@
-/**
- * The words a pilot and the officers leave each other on a Corp Tax Book (decision
- * 20261120-235011): a pilot's reason for not paying a day ("Tell the corporation why"), a pilot's
- * note on "I already paid", an officer's label on a correction, and an officer's note on a
- * payment recorded by hand. Each reaches the other side where they read it, and the book's
- * Activity log.
- *
- * The pilot is the suite's signed-in Character, a Miner of their own corporation's book, and
- * also its officer (`memberSeed.ts`): one session plays both parts.
- */
 import type { Page } from '@playwright/test';
 import { expect, minerUrl, signInAsOfficer, test } from './support/taxBook/bookTest';
 import { DAY_TAX, isk } from './support/taxBook/bookSeed';
@@ -20,7 +10,6 @@ test.beforeEach(async ({ book, esi }) => {
   const notes = notesBook();
   await book.seed(notes.seed.docs());
   esi(notes.esi);
-  // A declaration also goes to the tax contact as an EVE mail, from the pilot's Character.
   esi((path, route) =>
     path === `/characters/${OFFICER.id}/mail` && route.request().method() === 'POST'
       ? 700_000_002
@@ -33,10 +22,8 @@ async function openTaxTab(page: Page) {
   await expect(page.getByRole('button', { name: `Open the ledger of ${CORP_NAME}` })).toBeVisible();
 }
 
-/** The officer's side: Needs you on the Overview (reached in-app, no reload), and its Activity log. */
 async function openNeedsYou(page: Page) {
   const moons = page.getByRole('list', { name: 'Moons' });
-  // The rail lists Moons' pages only while one is open.
   if (!(await moons.isVisible())) await page.getByRole('link', { name: /^Moons/ }).click();
   await moons.getByRole('link', { name: 'Overview' }).click();
   await expect(page.getByRole('heading', { name: /^Needs you · \d+$/ })).toBeVisible();
@@ -47,7 +34,6 @@ async function expectInActivity(page: Page, words: string) {
   await expect(page.getByRole('dialog', { name: 'Activity' })).toContainText(words);
 }
 
-/** The pilot hides a billed day as not paying and tells the corporation why. */
 async function tellWhyNotPaying(page: Page, why: string) {
   await openTaxTab(page);
   await page
@@ -65,7 +51,6 @@ async function tellWhyNotPaying(page: Page, why: string) {
   await dialog.getByRole('button', { name: 'Done' }).click();
 }
 
-/** The pilot answers the overdue late notice with "I already paid", and a note. */
 async function declarePaid(page: Page, note: string) {
   await openTaxTab(page);
   await page.getByRole('button', { name: /1 thing needs attention/ }).click();
@@ -89,7 +74,6 @@ test("a pilot's reason for not paying a day reaches the officers", async ({ page
   ).toContainText(WHY);
 });
 
-// The Activity entry words the dispute by its kind and shows the pilot's reason (useAuditWords).
 test("a pilot's reason for not paying is in the Activity log", async ({ page }) => {
   await tellWhyNotPaying(page, WHY);
   await openNeedsYou(page);
@@ -104,7 +88,6 @@ test("a pilot's note on a payment made another way reaches the officers", async 
   ).toContainText(`“${NOTE}”`);
 });
 
-// The Activity entry shows the declaration's note and amount (useAuditWords).
 test("a pilot's note on a payment made another way is in the Activity log", async ({ page }) => {
   await declarePaid(page, NOTE);
   await openNeedsYou(page);
@@ -130,8 +113,6 @@ test("an officer's label on a correction reaches the pilot's ledger", async ({ p
   await expect(page.getByRole('dialog', { name: CORP_NAME })).toContainText(label);
 });
 
-// Record a payment takes a note, and the officer's Miner page, ledger and Activity show it; so
-// does the pilot's ledger, beside the payment.
 test("an officer's note on a hand-recorded payment reaches the pilot", async ({ page }) => {
   const note = 'Handed over in person at the staging Fortizar';
   await signInAsOfficer(page, minerUrl(PILOT_MINER_ID));

@@ -73,7 +73,6 @@ describe('remembered skeleton height', () => {
   beforeEach(() => {
     localStorage.clear();
     resetRememberedHeights();
-    // Reports a settled body height as soon as a node is observed.
     vi.stubGlobal(
       'ResizeObserver',
       class {
@@ -215,7 +214,6 @@ describe('Widget states', () => {
     );
     const region = screen.getByRole('region', { name: 'Mail' });
     expect(within(region).getByText('9')).toBeInTheDocument();
-    // A Small shows four rows and says how many more there are.
     expect(within(region).getAllByText(/^Sender [0-9]$/)).toHaveLength(4);
     expect(within(region).getByText('+1 more')).toBeInTheDocument();
   });
@@ -248,7 +246,6 @@ describe('Widget states', () => {
     useActiveCharacter.setState({ activeCharacterId: 91, hydrated: true });
     renderWidget(model(), (store) =>
       store.set('mail', {
-        // Nothing was ever read (no `fetchedAt`): there is no saved mail to keep on screen.
         data: { ...mailData(0, 0), needsReauth: true, fetchedAt: null },
         error: false,
         loading: false,
@@ -492,9 +489,7 @@ describe('Widget charts', () => {
   it('keeps the headline above the chart in the Chart view, with a hidden text summary and a legend', () => {
     renderWidget(model({ kind: 'netWorth', view: 'chart', size: 'L' }), netWorthFeed);
     const region = screen.getByRole('region', { name: 'Net worth' });
-    // The "as of" day is the chart's caption now, not a line under the number.
     expect(within(region).getAllByText(/2026-10-10/).length).toBeGreaterThan(0);
-    // The legend names every layer in bar order, so colour is never the only signal.
     expect(legend(region)).toEqual(['Assets 29B', 'Sell orders 6B', 'ISK 4B']);
     const summary = region.querySelector('p.sr-only');
     expect(summary?.textContent).toContain('Net worth 39B');

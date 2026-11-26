@@ -2,7 +2,6 @@ import { diffJobReady } from './jobReady';
 
 export interface IndustryJobEntrySnapshot {
   jobId: number;
-  /** Epoch ms this job finishes (ESI's `end_date`, fixed once the job is started). */
   endMs: number;
   blueprintTypeId: number;
   productTypeId: number | null;
@@ -21,7 +20,6 @@ export interface IndustryJobNotificationFire {
   blueprintTypeId: number;
   productTypeId: number | null;
   activityId: number;
-  /** The job's `end_date` — already past when this fires, so it dates the feed row. */
   endMs: number;
 }
 

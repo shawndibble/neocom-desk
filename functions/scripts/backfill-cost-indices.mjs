@@ -1,16 +1,3 @@
-/**
- * One-off: fills the per-system cost index history (`cost-indices/<systemId>.json`)
- * from EVE Ref's industry-systems dataset, so the Build Plan's trend shows from day
- * one instead of after the daily job has run for a week. Safe to re-run: the merge
- * replaces a date's column. Needs the `bzip2` binary (EVE Ref ships .json.bz2).
- * Do not run it within an hour of 00:30 UTC: the daily job read-merge-writes the
- * same objects, and two overlapping runs can drop one side's column.
- *
- *   cd functions
- *   R2_ENDPOINT=https://<account>.r2.cloudflarestorage.com R2_BUCKET=<bucket> \
- *   R2_ACCESS_KEY_ID=... R2_SECRET_ACCESS_KEY=... \
- *   node scripts/backfill-cost-indices.mjs [days=90]
- */
 import { spawnSync } from 'node:child_process';
 import { createR2Get, createR2Put } from '../src/r2Client.ts';
 import { parseCostIndices, writeCostIndicesToR2 } from '../src/costIndicesSnapshot.ts';
@@ -35,7 +22,6 @@ async function fetchOk(url) {
   return response.ok ? response : null;
 }
 
-/** The day's last hourly file, the closest to "end of day". Null when the day is not published. */
 async function lastFileOf(date) {
   const folder = `${BASE}/${date.slice(0, 4)}/${date}/`;
   const listing = await fetchOk(folder);
@@ -44,7 +30,6 @@ async function lastFileOf(date) {
   const last = hrefs.sort().at(-1);
   if (!last) return null;
   const url = new URL(last, folder).href;
-  // A listing pointing off EVE Ref is not a file we asked for.
   return url.startsWith(BASE) ? url : null;
 }
 

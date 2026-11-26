@@ -42,10 +42,6 @@ describe('pinRole', () => {
     expect(pinRole(pin)).toBe('other');
   });
 
-  // Live ESI (2026) puts the running schematic on the pin's own top-level
-  // `schematic_id`, not inside `factory_details` — `factory_details` was
-  // observed absent even for an Industry Facility mid-cycle. Both shapes must
-  // resolve to 'factory' since which one ESI sends isn't ours to assume.
   it('identifies a factory pin from a top-level schematic_id with no factory_details', () => {
     const pin: PlanetPin = {
       pin_id: 4,
@@ -124,9 +120,6 @@ describe('extractorProgramsFromPins', () => {
   });
 
   it('still includes a pin with a valid expiry but no yield baseline, so colony health is unaffected', () => {
-    // ESI marks qty_per_cycle/cycle_time/install_time all optional. Dropping
-    // such a pin here would silently remove it from colonyStatus, letting an
-    // idle colony read as healthy.
     const pin: PlanetPin = {
       pin_id: 1,
       type_id: 100,
@@ -191,12 +184,6 @@ describe('extractorProgramsFromPins', () => {
 });
 
 describe('groupFactoryPins', () => {
-  // `factory_details: {}` (no nested `schematic_id`, despite the field being
-  // typed required) is how ESI has been observed to send a factory pin
-  // whose schematic isn't resolvable — the same "live ESI ignores its own
-  // documented shape" precedent `pinRole`'s top-level `schematic_id` fallback
-  // exists for. Cast past the type since it's declared required in the
-  // normal case.
   const factory = (id: number, schematicId?: number): PlanetPin => ({
     pin_id: id,
     type_id: 2481,
@@ -243,9 +230,6 @@ describe('groupFactoryPins', () => {
   });
 
   it('excludes a pin with extractor_details even if it also carries a stray top-level schematic_id', () => {
-    // pinRole gives extractor_details priority over schematic_id (see pinRole
-    // above) — this group must agree, or such a pin would silently vanish
-    // from both the extraction and production reads.
     const oddPin: PlanetPin = {
       pin_id: 11,
       type_id: 100,
@@ -311,8 +295,6 @@ describe('colonyPinLoad', () => {
   });
 
   it('counts a live colony’s own pins by kind, and its heads one by one', () => {
-    // Two Temperate extractors with 10 and 3 heads, one Basic and one
-    // Advanced facility, and a launchpad.
     const result = colonyPinLoad(
       [
         pin(1, 3068, { extractor_details: { heads: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(head) } }),
@@ -331,7 +313,6 @@ describe('colonyPinLoad', () => {
     });
     expect(result.extractorHeads).toBe(13);
     expect(result.unknownTypeIds).toEqual([]);
-    // 2 ECUs + 13 heads + basic + advanced + launchpad.
     expect(result.load).toEqual({
       cpu: 2 * 400 + 13 * 110 + 200 + 500 + 3_600,
       powergrid: 2 * 2_600 + 13 * 550 + 800 + 700 + 700,
@@ -339,11 +320,6 @@ describe('colonyPinLoad', () => {
   });
 
   it('does not flag the Command Center every colony has', () => {
-    // A Command Center is a real pin ESI reports and deliberately not a kind:
-    // it supplies the budget rather than drawing on it, so it has no cost row
-    // and costs the meter nothing. Reporting it as unrecognised would fire
-    // "the meter understates this colony" on 100% of colonies and bury the
-    // real signal.
     const result = colonyPinLoad([pin(1, 2254), pin(2, 2256)], pi);
     expect(result.counts).toEqual({ launchpad: 1 });
     expect(result.unknownTypeIds).toEqual([]);
@@ -367,9 +343,6 @@ describe('colonyPinLoad', () => {
   });
 
   describe('newLinkLoad', () => {
-    // Three pins on one equator on a 1,000 km planet: hops of 100 km and
-    // 150 km. A 150 km link is 15 + 0.2 x 150 = 45 tf and 10 + 0.15 x 150 =
-    // 32.5 MW.
     const equator = (pinId: number, typeId: number, longitude: number) =>
       pin(pinId, typeId, { latitude: Math.PI / 2, longitude });
     const spread = [equator(1, 2256, 0), equator(2, 2481, 0.1), equator(3, 2481, 0.25)];
@@ -379,10 +352,6 @@ describe('colonyPinLoad', () => {
     ];
 
     it('prices a link this colony has not built at its own longest hop', () => {
-      // A pin that does not exist yet has no place on the planet and so no
-      // distance to price, but it will need a link all the same. The longest
-      // hop here is the measurement that makes a headroom count a floor —
-      // `linkCost.ts`'s `newLinkLoad` carries the reasoning.
       const result = colonyPinLoad(spread, pi, chain, 1_000);
       expect(result.linkLoad?.cpu).toBeCloseTo(15 + 20 + 15 + 30, 6);
       expect(result.newLinkLoad?.cpu).toBeCloseTo(45, 6);
@@ -390,9 +359,6 @@ describe('colonyPinLoad', () => {
     });
 
     it('measures only the links it could price, not the ones ESI merely listed', () => {
-      // A link to a pin outside the pin list has no geometry, so it is not a
-      // hop this colony can be measured by — and it must not silently become
-      // one of length zero.
       const dangling = [...chain, { source_pin_id: 3, destination_pin_id: 99, link_level: 0 }];
       const result = colonyPinLoad(spread, pi, dangling, 1_000);
       expect(result.linkCount).toBe(3);
@@ -400,9 +366,6 @@ describe('colonyPinLoad', () => {
     });
 
     it('is null on a colony with no link to measure, rather than a free one', () => {
-      // Zero links is not "links are free here" — it is a colony with nothing
-      // to measure, and the caller has to say so rather than quote a pin at
-      // its unlinked price.
       const result = colonyPinLoad(spread, pi, [], 1_000);
       expect(result.linkLoad).toEqual({ cpu: 0, powergrid: 0 });
       expect(result.newLinkLoad).toBeNull();

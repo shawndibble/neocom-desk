@@ -46,7 +46,6 @@ vi.mock('@/lib/downloadCsv', async (importOriginal) =>
 
 installAssetsHarness();
 
-/** Min value lives in the funnel box (Category and Blueprints are the row's inline filters). */
 async function minValueBox(user: ReturnType<typeof userEvent.setup>): Promise<HTMLElement> {
   await user.click(screen.getByRole('button', { name: /^Filters/ }));
   return screen.getByLabelText('Minimum value');
@@ -73,7 +72,6 @@ describe('item context menu (issue #83)', () => {
     item.focus();
     fireEvent.contextMenu(item);
 
-    // Quickbar, price alert and stock target fold into the Track submenu.
     expect(screen.getByRole('menuitem', { name: 'Track' })).toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: 'Show info' })).toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: 'Add to Compare' })).toBeInTheDocument();
@@ -179,8 +177,8 @@ describe('all items view, min-value filter, and sort (issue #414)', () => {
     server.use(
       http.get('https://esi.evetech.net/markets/prices', () =>
         HttpResponse.json([
-          { type_id: 34, average_price: 5 }, // Tritanium stack: 500 x 5 = 2,500 ISK
-          { type_id: 35, average_price: 5000 }, // Pyerite stack: 10 x 5,000 = 50,000 ISK
+          { type_id: 34, average_price: 5 },
+          { type_id: 35, average_price: 5000 },
         ])
       )
     );
@@ -225,7 +223,6 @@ describe('all items view, min-value filter, and sort (issue #414)', () => {
     window.history.replaceState({}, '', '/assets?all=1&min=10000');
     renderAssetsRoute();
 
-    // Prices parked: every stack values 0, which the filter must not read as "below the minimum".
     expect(await screen.findByText('Tritanium')).toBeInTheDocument();
 
     release();
@@ -277,7 +274,6 @@ describe('all items view, min-value filter, and sort (issue #414)', () => {
       window.history.replaceState({}, '', '/assets?min=10000');
       renderAssetsRoute();
       await screen.findByText(STRUCTURE);
-      // Jita holds only the Tritanium stack, which is under the minimum.
       expect(screen.queryByText(JITA)).not.toBeInTheDocument();
 
       const rows = await exportCsv();
@@ -314,12 +310,6 @@ describe('all items view, min-value filter, and sort (issue #414)', () => {
     expect(names).toEqual(['Pyerite', 'Tritanium']);
   });
 
-  /**
-   * Silent persistence, like the location list's own sort: the flat list is
-   * the same list every visit, and re-choosing "Value" on each one is the
-   * page forgetting something the user already told it. The min-value box
-   * beside it stays per-visit on purpose — see `assetSortPreference.ts`.
-   */
   it('remembers the flat list sort across a remount', async () => {
     const user = userEvent.setup({ delay: null });
     const { unmount } = renderAssetsRoute();
@@ -330,7 +320,6 @@ describe('all items view, min-value filter, and sort (issue #414)', () => {
     await user.click(screen.getByLabelText('Sort'));
     await user.click(await screen.findByRole('option', { name: 'Value' }));
     unmount();
-    // A fresh visit: All Items rides the URL, the sort does not.
     window.history.replaceState({}, '', '/assets');
 
     renderAssetsRoute();
@@ -381,11 +370,6 @@ describe('all items view, min-value filter, and sort (issue #414)', () => {
 });
 
 describe('location sort (issue #88)', () => {
-  // Default fixture: Jita holds 500 Tritanium (type 34), the structure holds
-  // 10 Pyerite (type 35) — pricing Pyerite far above Tritanium makes the
-  // structure's estimated value the larger one while its name still sorts
-  // after Jita's, so a switch to "Value" is only visible if sorting actually
-  // changed rather than leaving the default alphabetical order in place.
   function priceStructureAboveJita() {
     server.use(
       http.get('https://esi.evetech.net/markets/prices', () =>
@@ -489,7 +473,6 @@ describe('Asset Category filter (issue #5601)', () => {
     renderAssetsRoute();
 
     const reset = await screen.findByRole('button', { name: 'Reset filters' });
-    // A filter emptied the list, not an empty hangar: the plain line, not what fills the page.
     expect(screen.getByText('Nothing stored here.')).toBeInTheDocument();
     expect(screen.queryByText('No items')).not.toBeInTheDocument();
     await user.click(reset);
@@ -499,7 +482,6 @@ describe('Asset Category filter (issue #5601)', () => {
   });
 
   it('lists the stations whose items are ticked', async () => {
-    // An empty catalogue puts every type under "Not on the market" (id -1).
     window.history.replaceState({}, '', '/assets/items?cat=-1');
     renderAssetsRoute();
 

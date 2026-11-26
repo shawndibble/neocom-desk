@@ -27,7 +27,6 @@ const status = (loading: boolean) => ({
 const pending: Builder = () => blank(null, status(true));
 const real: Builder = () => ({ ...blank(null, status(false)), summary: 'real' });
 
-/** A lazy kind whose first `failures` loads reject. */
 function probe(kind: string, failures: number) {
   let calls = 0;
   registerKindDefs({

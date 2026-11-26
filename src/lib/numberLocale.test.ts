@@ -40,7 +40,6 @@ describe('numberLocale', () => {
     expect(getDecimalMark()).toBe('.');
     expect(getGroupMark()).toMatch(/^['\u2019]$/);
     expect(isk(5_100_000)).toMatch(/^5['\u2019]100['\u2019]000\.00$/);
-    // Back to English on the same mark: the style, not the mark, picks the grouping.
     setNumberStyle('period');
     expect(isk(5_100_000)).toBe('5,100,000.00');
   });

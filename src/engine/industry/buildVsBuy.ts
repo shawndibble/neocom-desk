@@ -1,18 +1,3 @@
-/**
- * Build-vs-buy comparison: total build cost (materials at their sourced prices
- * + job fee) against buying the product outright at the hub's lowest sell.
- * Material prices come from src/engine/industry/materialResolution — owned
- * units are free, the rest is priced at an override, at `materialPrices` (the
- * hub's sell side unless the caller passes another map), or — for a material
- * named in `buildHere` — the rolled-up cost of the job that produces it,
- * recursively. Missing prices flag the result as unpriceable instead of
- * throwing; so does a built material that bottoms out unpriced.
- *
- * The product is always priced from `hubPrices`, never `materialPrices`: an
- * Acquisition Verdict asks what buying the product outright costs, and buying
- * outright pays the hub's lowest sell whatever the materials were sourced at.
- */
-
 import type { BuildResult, IndustryInputs } from '@/engine/industry/types';
 import { SKILL_IDS } from '@/engine/industry/types';
 import { splitEffectiveMaterials } from '@/engine/industry/jobSplit';
@@ -50,19 +35,12 @@ export function buildVsBuy(inputs: IndustryInputs): BuildResult {
     adjustedPrices,
     modifiers,
   };
-  // The Reaction Location (issue #698): `inputs.reactionFacility` carries no
-  // pricing of its own, so it's projected onto the same `adjustedPrices`/
-  // `modifiers` every other context on this plan already uses.
   const reactionCtx: SubBuildContext | undefined = inputs.reactionFacility && {
     ...inputs.reactionFacility,
     adjustedPrices,
     modifiers,
   };
 
-  // One shared pool across every top-level material's own resolution, not one
-  // per `.map()` iteration: two different blueprint materials can each build
-  // down into the same recursive input (e.g. two components both consuming
-  // Tritanium), and owned stock of it exists once, not once per branch.
   const ownedPool = new Map<number, number>();
   const split = splitEffectiveMaterials(blueprint, runs, me, ctx);
   const resolvedMaterials = split.materials.map((material) =>
@@ -78,10 +56,6 @@ export function buildVsBuy(inputs: IndustryInputs): BuildResult {
     })
   );
 
-  // Blueprint Acquisition (issue #838) for the plan's own top-level product —
-  // the same synthetic-row shape a nested sub-build gets from
-  // `resolveSubBuild`, but built here since the top level has no parent node
-  // to resolve it from.
   const acquisitionMaterial = inputs.blueprintAcquisition
     ? acquisitionMaterialFor(
         { me, te, ...inputs.blueprintAcquisition },
@@ -92,7 +66,6 @@ export function buildVsBuy(inputs: IndustryInputs): BuildResult {
     ? [acquisitionMaterial, ...resolvedMaterials]
     : resolvedMaterials;
 
-  // Split jobs run in parallel, so the wait is the longest (the first) one.
   const seconds = jobDurationSeconds(
     blueprint.time,
     split.jobRuns[0],
@@ -110,9 +83,6 @@ export function buildVsBuy(inputs: IndustryInputs): BuildResult {
     regionalTaxPct
   );
 
-  // The actual blocking typeIDs, however deep they sit — a built material's
-  // own `unpriced` flag only ever reflects something underneath it, so its
-  // own typeID is never the right thing to report here.
   const unpricedMaterials = unpricedLeafTypeIds(materials);
   const materialCost = materials.reduce((sum, { lineCost }) => sum + lineCost, 0);
   const totalCost = materialCost + fee.total;

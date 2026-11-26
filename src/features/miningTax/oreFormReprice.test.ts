@@ -49,7 +49,6 @@ beforeEach(async () => {
   await db.payees.clear();
 });
 
-/** Paid as each test's record says: the account's reading, stood in for. */
 const BY_STATUS = { statusOf: (a: MiningTaxAssignmentRecord) => a.status };
 
 describe('repriceForOreForm', () => {
@@ -91,7 +90,6 @@ describe('repriceForOreForm', () => {
 
   it("reads paid off the Payee's account, never the stored mark (M1)", async () => {
     formMock.compressed = false;
-    // An older client marked it paid; no link pays it: it is owed, so it re-prices.
     await db.miningTaxAssignments.put(record({ status: 'paid' }));
     await repriceForOreForm(CHAR, { statusOf: () => 'outstanding' });
     expect(await db.miningTaxAssignments.get('a1')).toMatchObject({

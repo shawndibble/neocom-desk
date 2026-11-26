@@ -15,22 +15,14 @@ import { useStructureFees, withoutStructureFee, withStructureFee } from './struc
 
 interface StructureFeeLineProps {
   structureId: number;
-  /** The order's gross value (price x remaining), for the live net preview. */
   gross: number;
   accountingLevel: number | undefined;
 }
 
-/** `2` or `2.5`, trimmed the way a pilot would type it. */
 function pctText(pct: number): string {
   return String(Math.round(pct * 100) / 100);
 }
 
-/**
- * The quiet line on a player-structure order: either "Assuming NPC station
- * fees" (amber, the fee is a default the pilot has not confirmed) or the fee
- * they set, with a button that opens the field. A popover on desktop and a
- * bottom sheet on a phone (issue #2911).
- */
 export function StructureFeeLine({ structureId, gross, accountingLevel }: StructureFeeLineProps) {
   const { t } = useTranslation();
   const isPhone = useIsPhone();

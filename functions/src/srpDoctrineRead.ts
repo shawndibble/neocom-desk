@@ -1,13 +1,9 @@
-// SRP Doctrine Fits: reading them. Kept apart from srpStore.ts so the settings
-// save and the file-claim callable can read fits without a cycle with the doctrine callables.
-
 import type { Firestore, Transaction } from 'firebase-admin/firestore';
 import { CORPS_COLLECTION, SRP_DOCTRINES, type DoctrineFit } from './srpTypes.js';
 
 export const doctrinesCollection = (db: Firestore, corporationId: number) =>
   db.collection(CORPS_COLLECTION).doc(String(corporationId)).collection(SRP_DOCTRINES);
 
-/** The corp's fits among `ids` that exist now; a deleted or foreign id is simply absent. */
 export async function readDoctrines(
   db: Firestore,
   corporationId: number,

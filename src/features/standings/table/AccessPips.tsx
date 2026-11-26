@@ -2,11 +2,6 @@ import { useTranslation } from 'react-i18next';
 import { AGENT_LEVELS, type AgentLevel } from '@/engine/standings';
 import { cx } from '@/lib/cx';
 
-/**
- * Five pips for agent levels 1-5, filled up to the highest level a standing
- * opens, then "L4". The words say it to a screen reader ("Agents up to level
- * 4"); the pips and the short form are for the eye.
- */
 export function AccessPips({ level }: { level: AgentLevel }) {
   const { t } = useTranslation();
   const label = t('contacts.standings.level', { level });

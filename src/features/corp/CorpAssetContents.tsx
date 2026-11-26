@@ -1,9 +1,3 @@
-/**
- * What one Corp assets location row holds, nested the way the in-game hangar
- * shows it: containers (and ships) open to their contents, loose stacks list
- * beside them. The by-location view's row click unfolds it under the row; a
- * container opens in place, a loose stack's name opens Show info.
- */
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Caret, RowMoreActions } from '@/components/ui';
@@ -17,7 +11,6 @@ import { formatCount } from '@/lib/formatCount';
 import { formatIsk } from '@/lib/isk';
 import type { LedgerLabels } from './assetLedgerView';
 
-/** Per-level step, as `MarketGroupTree` indents. */
 const INDENT_REM = 0.75;
 
 function NodeName({
@@ -29,7 +22,6 @@ function NodeName({
   node: LedgerContentsNode;
   labels: LedgerLabels;
   assetNames: AssetNameMap;
-  /** A loose stack's name opens its Show info (§6c: the row has no action of its own). */
   infoLink?: boolean;
 }) {
   const typeName = labels.typeName(node.typeId);
@@ -82,7 +74,6 @@ function ContentsNode({
     </span>
   );
 
-  // The same item menu as the by-item view's rows: right-click, or the ⋮ beside the row.
   const withItemMenu = (row: ReactNode) => (
     <ItemContextMenu
       typeId={node.typeId}

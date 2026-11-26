@@ -8,25 +8,16 @@ import { formatCount } from '@/lib/formatCount';
 import { materialConsumers } from './subBuildPlan';
 
 interface UsedByModalProps {
-  /** The bought material to list consumers of; `null` closes the dialog. */
   typeID: number | null;
   onClose: () => void;
-  /** The material's row quantity in the table, for the reconciling footer. */
   tableTotal: number | null;
   materials: readonly ResolvedMaterial[];
-  /** The plan's own job, which is not part of the resolved tree. */
   mainJob: { typeID: number; runs: number };
   nameFor: (typeID: number) => string;
   itemMenuFor?: ItemMenuFor;
   itemActionsFor?: (typeId: number, bordered?: boolean) => ReactElement;
 }
 
-/**
- * Which jobs consume a bought material, and how much each takes — the
- * "where does this line come from" the flat Materials table gives up
- * (`subBuildPlan`). Opened from the row menu, only in a plan that builds
- * something.
- */
 export function UsedByModal({
   typeID,
   onClose,

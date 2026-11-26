@@ -19,36 +19,6 @@ import {
 import { useIsPhone } from '@/lib/useIsPhone';
 import { CLAIMS, LOST_SHIPS, SRP_PARAMS, SRP_PHONE } from './srpMemberFixtures';
 
-/**
- * SRP, the member's side (route `/corp/srp`). Shown to a pilot with no corp
- * role and no corp scopes; their corp has SRP turned on, so the single "SRP"
- * nav item exists (hidden, never locked, when it is off). A pilot sees only
- * their own claims.
- *
- * - **Default**: File a claim (paste a killmail link, optional Fleet or FC),
- *   then "Or pick a lost ship" behind a grant prompt for the opt-in
- *   killmail scope. My claims shows all four states; a Rejected row carries
- *   its reason and Re-file (once).
- * - **Lost ships**: after the scope grant: one-tap File, Claimed rows,
- *   "Too old" past 30 days.
- * - **Blocked and errors**: a Not covered hull blocks filing with a message;
- *   inline field errors; Fleet or FC made required by the corp.
- * - **Empty**: no claims yet; and the page for a direct visit when the corp
- *   has not turned SRP on.
- * - **Re-file**: dialog with the note; a bottom sheet on a phone.
- * - **Phone** (390): different order and density. Losses first with one-tap
- *   File, paste behind a disclosure (no grant: a grant card, then paste).
- *   Dense two-line `DataTable` cards; a tap opens the detail sheet.
- *
- * Amount: fixed hull price, else killmail value x %, else Jita appraisal x %.
- * "Officer decides" shows "Officer will set the amount".
- *
- * New components in this mockup: `LostShipsList` (the pilot's losses with
- * File / Claimed / Too old / Not covered), `NotCoveredNote`. The state words
- * (Pending, Approved, Paid, Rejected) are existing `Pill` tones. Everything
- * else is `Panel`, `Fields`, `TextInput`, `Button`, `DataTable`,
- * `ReauthBanner`, `EmptyState`, `Modal`.
- */
 const meta = {
   title: 'mockups/SrpMember',
   tags: ['!manifest'],
@@ -147,35 +117,22 @@ const empty = at('empty');
 const notSetUp = at('notSetUp');
 const refile = at('refile');
 
-/** @summary 1 · Default: file a claim (paste link, scope grant prompt for the lost-ships list) and My claims in all four states, Rejected with reason and Re-file. New components: LostShipsList (prompt state). */
 export const Default: Story = {};
-/** @summary 1 · Default, phone. */
 export const DefaultPhone: Story = { ...phone };
 
-/** @summary 2 · Lost ships after the grant: one-tap File, Claimed marks, Too old past 30 days. New component: LostShipsList. */
 export const LostShips: Story = { render: lostList };
-/** @summary 2 · Lost ships, phone. */
 export const LostShipsPhone: Story = { render: lostList, ...phone };
 
-/** @summary 3 · Blocked hull (Not covered) with inline validation errors and a required Fleet or FC. New components: NotCoveredNote, LostShipsList. */
 export const BlockedAndErrors: Story = { render: blocked };
-/** @summary 3 · Blocked hull and errors, phone. */
 export const BlockedAndErrorsPhone: Story = { render: blocked, ...phone };
 
-/** @summary 4 · Empty: no claims yet. */
 export const NoClaims: Story = { render: empty };
-/** @summary 4 · No claims yet, phone. */
 export const NoClaimsPhone: Story = { render: empty, ...phone };
 
-/** @summary 4 · Corp has not turned SRP on: a direct URL visit explains it; no nav item. */
 export const NotSetUp: Story = { render: notSetUp };
-/** @summary 4 · SRP not set up, phone. */
 export const NotSetUpPhone: Story = { render: notSetUp, ...phone };
 
-/** @summary 5 · Re-file dialog for a Rejected claim, with a note. */
 export const Refile: Story = { render: refile };
-/** @summary 5 · Re-file bottom sheet, phone. */
 export const RefilePhone: Story = { render: refile, ...phone };
 
-/** @summary 6 · Phone: tapping a claim card opens a detail sheet (full reason, timeline, killmail link). */
 export const ClaimDetailPhone: Story = { render: at('detail'), ...phone };

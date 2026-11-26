@@ -15,8 +15,6 @@ beforeEach(async () => {
     ownerHash: 'oh',
     addedAt: 1,
   });
-  // Seeded rather than fetched: a cached entry makes `load()` a no-op, so the
-  // component never reaches ESI from a unit test.
   usePublicInfo.setState({
     byCharacterId: {
       [CHARACTER_ID]: { corporationName: 'Bureau of Unified Harvesting', allianceName: null },
@@ -49,7 +47,6 @@ describe('CharacterHeader', () => {
     });
     render(<CharacterHeader characterId={CHARACTER_ID} totalSp={null} unallocatedSp={null} />);
 
-    // One line, each name in its own truncating box.
     expect(
       await screen.findByText(
         (_, element) =>
@@ -62,27 +59,18 @@ describe('CharacterHeader', () => {
   });
 
   it('keeps both SP chips in place when the numbers are unavailable', async () => {
-    // The chips are the header's fixed shape: dropping them on the tabs that
-    // cannot read /skills is exactly the jumping header this component exists
-    // to stop.
     render(<CharacterHeader characterId={CHARACTER_ID} totalSp={null} unallocatedSp={null} />);
     await screen.findByRole('heading', { level: 1, name: 'Mero Otichoda' });
 
     for (const label of ['Total SP', 'Unallocated SP']) {
-      // The label's own span is the chip's first child; the chip is its parent.
       expect(screen.getByText(label).parentElement).toHaveTextContent('—');
     }
   });
 
   it('carries no controls of its own', async () => {
-    // It takes no actions slot at all: a view's data age and its Refresh
-    // describe that view's data, so they belong to its panel below the tabs.
-    // Anything rendered here would be a control that changes from tab to tab
-    // in the block every tab shares.
     render(<CharacterHeader characterId={CHARACTER_ID} totalSp={1} unallocatedSp={2} />);
     await screen.findByRole('heading', { level: 1, name: 'Mero Otichoda' });
 
-    // The alerts bell is in every page header, so it is the one button.
     expect(
       screen.getAllByRole('button').map((button) => button.getAttribute('aria-label'))
     ).toEqual(['Alerts, none waiting']);

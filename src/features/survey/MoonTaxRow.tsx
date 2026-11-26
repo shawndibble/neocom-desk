@@ -1,25 +1,3 @@
-/**
- * Moon ore is taxed by whoever owns the moon, so a Survey that shows any asks
- * who and at what rate, and hands both to the Moon Mining Tax tab. It is the
- * Moon tax row of the Additional information panel (`SurveyInfoPanel`): a rate
- * field and a name field, always shown like the location and notes, since a rate
- * means little without its payee. Focus leaving the pair saves it, as for the
- * other two. The name completes from the pilot's Payees (and fills in that
- * Payee's rate). Assign Taxes connects the Survey's moon to that Payee
- * (`useSurveyConnection`, issue #4684): the Payee is added if need be, ore
- * already mined there is assigned, and ore mined until the Survey's ETA is
- * assigned as it reaches the ledger, so the pilot never assigns it by hand.
- * Stop takes its place while connected; the Mining Tax tab is always beside it
- * (for a logged-in viewer: logged out there is no Tax tab).
- *
- * The fields start blank for each survey (only what the survey itself stored
- * comes back), so a tax is shown only when the pilot sets it.
- *
- * Shown on the owner's Survey tab only; everyone else gets the same line
- * read-only (`MoonTaxReadout`). Once the pilot is done editing, a complete
- * name and rate is also stored on the survey (`setSurveyTax`), so everyone with
- * the link sees it.
- */
 import { useEffect, useId, useRef, useState, type FocusEvent, type ReactNode } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -52,14 +30,12 @@ import {
   type ConnectionToast,
 } from './useSurveyConnection';
 
-/** The stored survey this row publishes its tax to, and what is already stored there. */
 export interface TaxSurvey {
   id: string;
   expiresAt: number;
   published: SurveyTaxShare | null;
 }
 
-/** Why Assign Taxes did nothing: no single EVE corporation or character has the name, or anything else. */
 function useFailureMessage() {
   const { t } = useTranslation();
   return (cause: unknown) =>
@@ -68,7 +44,6 @@ function useFailureMessage() {
       : t('survey.moonTax.failed');
 }
 
-/** The alert under the row, when Assign Taxes or Stop failed. */
 function FailedLine({ message }: { message: string | null }) {
   if (message === null) return null;
   return (
@@ -78,7 +53,6 @@ function FailedLine({ message }: { message: string | null }) {
   );
 }
 
-/** "Auto-assigned until …" on its own line below the row, while the Survey is connected. */
 function ConnectedNote({ connection, nowMs }: { connection: SurveyConnection; nowMs: number }) {
   const { t } = useTranslation();
   const text =
@@ -114,11 +88,6 @@ function ConnectionToastView({
   );
 }
 
-/**
- * The Survey connection behind Assign Taxes, with focus handed between Manage
- * Taxes and Stop as they swap places (DESIGN §6c focus) and a failed Stop or
- * Undo reported through `onFailed`.
- */
 function useManageTaxes(
   options: Omit<Parameters<typeof useSurveyConnection>[0], 'onFailed'>,
   onFailed: () => void
@@ -142,18 +111,12 @@ function useManageTaxes(
   };
 }
 
-/**
- * Assign Taxes (`children`) until the Survey is connected, then Stop in its
- * place; the Mining Tax tab at the far right unless `taxLink` is off. Below, what a
- * connected Survey is doing, plus its Undo toast.
- */
 function MoonConnectionSlot({
   moon,
   taxLink = true,
   children,
 }: {
   moon: ReturnType<typeof useManageTaxes>;
-  /** Off for a logged-out viewer, who has no Tax tab to open. */
   taxLink?: boolean;
   children: ReactNode;
 }) {
@@ -180,7 +143,6 @@ function MoonConnectionSlot({
   );
 }
 
-/** Stable fallback while the live query loads, so `payees` keeps one identity. */
 const NO_PAYEES: Awaited<ReturnType<typeof loadPayees>> = [];
 
 export function MoonTaxRow({
@@ -192,20 +154,13 @@ export function MoonTaxRow({
 }: {
   characterId: number;
   survey?: TaxSurvey;
-  /** The Survey as connected by Assign Taxes; without it the button only opens the Tax tab. */
   connectable?: ConnectableSurvey;
-  /**
-   * The draft, when the panel holds it, so a template can fill it. Without
-   * these the row keeps its own.
-   */
   draft?: TaxDraft;
   onDraftChange?: (draft: TaxDraft) => void;
 }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const listId = useId();
-  // Starts blank unless this survey already stored a tax: nothing carries over
-  // from the last survey, so the pilot sets it for each field they want it on.
   const [own, setOwn] = useState(() => initialTaxDraft(survey?.published));
   const saved = draft ?? own;
   const setSaved = onDraftChange ?? setOwn;
@@ -213,7 +168,6 @@ export function MoonTaxRow({
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
   const failureMessage = useFailureMessage();
-  // Focus is inside the name/rate pair: nothing is stored until it leaves.
   const [focused, setFocused] = useState(false);
   const inFlight = useRef(false);
 
@@ -225,8 +179,6 @@ export function MoonTaxRow({
     () => setFailed(t('survey.moonTax.failed'))
   );
 
-  // Stored on the survey once focus leaves the pair. Best effort: a failed write
-  // is not retried until the name or rate changes, and the local line is unaffected.
   const sent = useRef('');
   const surveyId = survey?.id;
   const surveyExpires = survey?.expiresAt;
@@ -244,8 +196,6 @@ export function MoonTaxRow({
   }, [surveyId, surveyExpires, published, focused, name, pct, characterId]);
 
   function changeName(next: string) {
-    // Picking a known Payee brings its rate along; typing a new name keeps the rate.
-    // Only when the name has just become a known Payee, so a rate typed after is kept.
     const known = findPayeeByName(payees, next);
     const fill = known !== undefined && known !== findPayeeByName(payees, saved.name);
     setSaved({ name: next, pct: fill ? String(known.defaultTaxPct) : saved.pct });
@@ -272,7 +222,6 @@ export function MoonTaxRow({
     }
   }
 
-  // Focus moving between the two fields keeps the pair focused; only leaving it stores.
   function leave(event: FocusEvent<HTMLInputElement>) {
     if (!event.currentTarget.closest('[data-tax-fields]')?.contains(event.relatedTarget)) {
       setFocused(false);
@@ -332,16 +281,6 @@ export function MoonTaxRow({
   );
 }
 
-/**
- * The read-only line, for everyone but the owner (in the app or on the public
- * page): the rate and who gets it, as the owner set them, and Assign Taxes.
- * Logged out it is disabled with "Log in to access" right under it, like Set
- * waypoint. Logged in, one click connects the Survey's moon to that Payee
- * (`useSurveyConnection`): a Payee of the viewer's by that name (any case) is
- * used as is, keeping the viewer's own default rate; without one it is added
- * at the owner's rate, with Undo. Without the Survey to connect it only opens
- * the Tax tab.
- */
 export function MoonTaxReadout({
   tax,
   connectable,
@@ -396,7 +335,6 @@ export function MoonTaxReadout({
           <Button
             id={moon.manageId}
             size="sm"
-            // Stays focusable with its reason linked, rather than the native attribute (DESIGN §6c Disabled).
             aria-disabled={loggedOut || undefined}
             aria-describedby={loggedOut ? hintId : undefined}
             loading={busy}

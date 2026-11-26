@@ -114,12 +114,10 @@ describe('Assets turn-in glyph', () => {
     participation.mockReturnValue({ status: 'idle', data: undefined, retry: vi.fn() });
     const user = userEvent.setup();
     renderStack(FAILOVER_STACK);
-    // The value stays the market value: a Turn-in Reward never joins it.
     expect(screen.getByText('18.8M')).toBeInTheDocument();
     await user.click(
       screen.getByRole('button', { name: 'Turn-in reward for Shield Failover Report' })
     );
-    // 340 × 28,000 ISK + 3 full blocks × 4,000 LP × 800 ISK/LP.
     expect(await screen.findByText('You hold 340 · ~19.1M turned in')).toBeInTheDocument();
     expect(participation).toHaveBeenCalledWith(ALT_ID);
   });

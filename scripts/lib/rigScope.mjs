@@ -1,18 +1,3 @@
-// Which Standup engineering rig covers which product (issue #6392).
-//
-// CCP's dogma ties each rig effect to one structure attribute (e.g. 2559
-// attributeBasCapCompManufactureMaterialMultiplier) but nothing ties an
-// attribute to product groups: the only statement of scope is the free-text
-// attribute `description`. So the product -> scope mapping below is hand
-// curated from those descriptions (checked against the EVE University
-// "Upwell structures" rigs list), and `verifyRigScopeAttributes` pins the
-// description text so an SDE change fails the bake loudly instead of
-// silently drifting.
-//
-// Scope ids here MUST match `PRODUCT_RIG_SCOPES` in
-// src/engine/industry/rigScope.ts (a unit test compares the two).
-
-/** Material-multiplier structure attribute -> product scope, with the pinned dogma description (whitespace-normalised). */
 export const RIG_SCOPE_ATTRIBUTES = [
   {
     attributeID: 2538,
@@ -98,7 +83,6 @@ export const RIG_SCOPE_ATTRIBUTES = [
   },
 ];
 
-/** The XL ship rig's attribute: covers every ship scope, so it has no product scope of its own. */
 export const ALL_SHIPS_ATTRIBUTE = {
   attributeID: 2592,
   description: 'bonus that affects material of all ships being manufactured, for XL rigs',
@@ -110,7 +94,6 @@ export function normaliseDescription(text) {
     .trim();
 }
 
-/** Throws when a pinned attribute is missing from `rows` ({attributeID, description}) or its description text changed. */
 export function verifyRigScopeAttributes(rows) {
   const byId = new Map(rows.map((r) => [Number(r.attributeID), r.description]));
   const problems = [];
@@ -132,7 +115,6 @@ export function verifyRigScopeAttributes(rows) {
 
 const SHIP_CATEGORY = 6;
 const SHIP_SIZE_BY_GROUP = {
-  // small hulls
   25: 'Small',
   31: 'Small',
   237: 'Small',
@@ -148,7 +130,6 @@ const SHIP_SIZE_BY_GROUP = {
   1305: 'Small',
   1527: 'Small',
   1534: 'Small',
-  // medium hulls
   26: 'Medium',
   28: 'Medium',
   358: 'Medium',
@@ -165,7 +146,6 @@ const SHIP_SIZE_BY_GROUP = {
   1201: 'Medium',
   1202: 'Medium',
   4902: 'Medium',
-  // large hulls
   27: 'Large',
   513: 'Large',
   898: 'Large',
@@ -177,15 +157,14 @@ const CAPITAL_SHIP_GROUPS = new Set([30, 485, 547, 659, 883, 1538, 4594, 5120]);
 const SUBSYSTEM_CATEGORY = 32;
 const TECH_I_META_GROUP = 1;
 
-const EQUIPMENT_CATEGORIES = new Set([7, 20, 22]); // modules + rigs, implants, deployables
-const EQUIPMENT_GROUPS = new Set([12, 340, 448, 649]); // cargo containers
+const EQUIPMENT_CATEGORIES = new Set([7, 20, 22]);
+const EQUIPMENT_GROUPS = new Set([12, 340, 448, 649]);
 const AMMO_CATEGORIES = new Set([8]);
 const DRONE_CATEGORIES = new Set([18, 87]);
-const STRUCTURE_CATEGORIES = new Set([23, 65, 66]); // starbase, Upwell structures, structure modules + rigs
-const STRUCTURE_GROUPS = new Set([536, 1136]); // structure components, fuel blocks
-const ADV_COMPONENT_GROUPS = new Set([332, 334, 716, 964]); // tools, T2 components, data interfaces, T3 components
+const STRUCTURE_CATEGORIES = new Set([23, 65, 66]);
+const STRUCTURE_GROUPS = new Set([536, 1136]);
+const ADV_COMPONENT_GROUPS = new Set([332, 334, 716, 964]);
 
-/** The product scope a manufactured product falls in, or undefined when no engineering rig covers it. `metaGroupID` is absent for Tech I. */
 export function productRigScope({ categoryID, groupID, metaGroupID }) {
   if (categoryID === SHIP_CATEGORY) {
     if (CAPITAL_SHIP_GROUPS.has(groupID)) return 'capShip';

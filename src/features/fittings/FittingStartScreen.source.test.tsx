@@ -14,8 +14,6 @@ import { FittingStartScreen } from './FittingStartScreen';
 import { clearDoctrineFitsCache } from './corpDoctrineFittings';
 import type { FittingLibrarySource } from './useFittingPicker';
 
-// The library's Source filter (issue #6217): one pick of Saved, In-game, Shared or Doctrine,
-// offered only for the sources with rows.
 vi.mock('@/app/useGrantedScopes', () => ({
   useEndpointsGranted: () => false,
   useGrantedScopes: () => undefined,
@@ -59,7 +57,6 @@ const fits = (): MemberDoctrineFit[] => [
   { id: 'b', name: 'Old Rifter', snapshot },
 ];
 
-/** The router's current query string, for the URL assertions. */
 function LocationProbe() {
   return <output data-testid="search">{useLocation().search}</output>;
 }
@@ -143,7 +140,6 @@ describe('the library Source filter', () => {
     expect(screen.queryByRole('button', { name: /^Fleet Rifter/ })).not.toBeInTheDocument();
     await userEvent.clear(screen.getByRole('searchbox', { name: 'Search fittings' }));
     await userEvent.type(screen.getByRole('searchbox', { name: 'Search fittings' }), 'kite');
-    // The pick hides the match: it is named, and undone in one click.
     expect(screen.getByText('Nothing under Doctrine matches that search.')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Show all sources' }));
     expect(screen.getByRole('button', { name: /^Kite/ })).toBeInTheDocument();
@@ -187,7 +183,6 @@ describe('the library Source filter', () => {
     await pick('Doctrine');
     expect(screen.queryByRole('button', { name: /^Kite/ })).not.toBeInTheDocument();
     await act(async () => switchTo(8));
-    // The alt's corp has no Doctrine Fits: its whole list, not an empty one.
     expect(await screen.findByRole('button', { name: /^Alt kite/ })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /^Alt brawl/ })).toBeInTheDocument();
     expect(sourceSelect()).not.toBeInTheDocument();

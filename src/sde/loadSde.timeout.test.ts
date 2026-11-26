@@ -3,7 +3,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const fetchMock = vi.fn<typeof fetch>();
 
 beforeEach(() => {
-  // Fresh module per test: the loader memoizes for the whole session.
   vi.resetModules();
   fetchMock.mockReset();
   vi.stubGlobal('fetch', fetchMock);

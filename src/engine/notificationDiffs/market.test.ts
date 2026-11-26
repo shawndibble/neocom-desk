@@ -28,7 +28,6 @@ function walletEntry(
   return { id, amount, thresholdIsk, dateMs };
 }
 
-/** The fire `walletEntry(id, amount)` produces, so the two stay in step. */
 function walletFire(id: number, amount: number, dateMs = T0 + id): WalletNotificationFire {
   return { eventId: 'walletBalanceChanged', characterId: 7, amount, journalEntryId: id, dateMs };
 }
@@ -124,8 +123,6 @@ describe('diffWalletBalanceChanged', () => {
 
   it('orders fires oldest-entry-first even though ESI returns the journal newest-first, so the delivery loop records (and the feed shows) the newest one last', () => {
     const prev = walletSnapshot([walletEntry(5)], T0);
-    // ESI's own order: id 7 (newest) before id 6 (older) before the
-    // already-seen id 5.
     const next = walletSnapshot(
       [walletEntry(7, 700), walletEntry(6, 600), walletEntry(5, 500)],
       T0 + 2000
@@ -284,10 +281,6 @@ describe('diffMarketOrderFilled', () => {
   });
 });
 
-/* -------------------------------------------------------------------------- */
-/* diffMarketOrderUndercut / buildOrderUndercutEntry (issue #1423)            */
-/* -------------------------------------------------------------------------- */
-
 function undercutEntry(
   orderId: number,
   price: number,
@@ -307,15 +300,6 @@ function undercutEntry(
   };
 }
 
-/**
- * One poll's stored snapshot, built the same way `pollDomains/`'s
- * `marketOrderUndercutDomain.toSnapshot` builds it — every entry threaded
- * through `buildOrderUndercutEntry` against the PREVIOUS poll's own stored
- * snapshot. Chaining this across several calls (poll1 -> poll2, then poll2's
- * own output as the input to poll3) is what proves the sequential shape:
- * feeding hand-authored `armed` values in would prove nothing about whether
- * the domain's own persistence actually carries them forward correctly.
- */
 function undercutPoll(
   raws: readonly Omit<OrderUndercutEntrySnapshot, 'armed'>[],
   prev: OrderUndercutSnapshot | undefined,
@@ -371,8 +355,6 @@ describe('buildOrderUndercutEntry', () => {
       entries: [{ ...undercutEntry(1, 100, 'beaten', 95), armed: false }],
       nowMs: T0,
     };
-    // Relisted at a new price (90), and still unknown this poll — the price
-    // change alone re-arms it, independent of the frozen-armed rule above.
     expect(
       buildOrderUndercutEntry(undercutEntry(1, 90, 'unknown', null), wasBeatenAndDisarmed).armed
     ).toBe(true);
@@ -415,17 +397,10 @@ describe('diffMarketOrderUndercut', () => {
     const poll3 = undercutPoll([undercutEntry(1, 100, 'clear', 105)], poll2, T0 + 2 * FIVE_MIN);
     const poll4 = undercutPoll([undercutEntry(1, 100, 'beaten', 95)], poll3, T0 + 3 * FIVE_MIN);
     expect(diffMarketOrderUndercut(7, poll1, poll2)).toHaveLength(1);
-    expect(diffMarketOrderUndercut(7, poll2, poll3)).toEqual([]); // going clear is not itself a fire
+    expect(diffMarketOrderUndercut(7, poll2, poll3)).toEqual([]);
     expect(diffMarketOrderUndercut(7, poll3, poll4)).toHaveLength(1);
   });
 
-  // The correctness trap (issue #1423): a diff comparing only two adjacent
-  // snapshots cannot tell `clear -> unknown -> beaten` apart from
-  // `beaten -> unknown -> beaten` — both look like `prev.state === 'unknown'`
-  // pairwise. These two sequential tests feed THREE real polls through
-  // `undercutPoll`'s own chaining (poll2's OWN built output becomes the input
-  // to poll3), which is what actually exercises the stored `armed` latch
-  // rather than a hand-authored one.
   it('sequential: clear -> unknown -> beaten fires — an outage never swallows a real undercut', () => {
     const poll1 = undercutPoll([undercutEntry(1, 100, 'clear', 105)], undefined, T0);
     const poll2 = undercutPoll([undercutEntry(1, 100, 'unknown', null)], poll1, T0 + FIVE_MIN);
@@ -493,10 +468,6 @@ describe('diffMarketOrderUndercut', () => {
     ]);
   });
 
-  // Not in the brief's own case list, but required by the acceptance
-  // criteria ("after a relist at a new price, a new beating alerts again") —
-  // `state` never leaves 'beaten' here, so a diff that only watched `state`
-  // transitions would wrongly stay silent.
   it('a relist at a new price re-arms and fires again, even though it never left beaten', () => {
     const poll1 = undercutPoll([undercutEntry(1, 100, 'clear', 105)], undefined, T0);
     const poll2 = undercutPoll([undercutEntry(1, 100, 'beaten', 95)], poll1, T0 + FIVE_MIN);

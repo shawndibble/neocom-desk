@@ -32,10 +32,6 @@ describe('effectiveAvoid', () => {
     expect(effectiveAvoid({ ...OFF, avoidList: [UEDAMA, TAMA] })).toEqual([UEDAMA, TAMA].sort());
   });
 
-  /*
-   * The toggle is the point of keeping the list: switching it off must route
-   * straight through those systems without the pilot losing what they entered.
-   */
   it('leaves the pilot list out while it is switched off', () => {
     expect(effectiveAvoid({ ...OFF, avoidList: [UEDAMA], avoidListEnabled: false })).toEqual([]);
   });
@@ -53,11 +49,6 @@ describe('effectiveAvoid', () => {
     expect(effectiveAvoid({ ...OFF, avoidPodKills: true, podKillsBySystem })).toEqual([PODDED]);
   });
 
-  /*
-   * An unread kill feed is not a quiet universe. It adds nothing — and the
-   * caller says the feed is missing — rather than being read as zero kills
-   * everywhere, which would look identical but claim something false.
-   */
   it('adds nothing for pod kills when the feed could not be read', () => {
     expect(effectiveAvoid({ ...OFF, avoidPodKills: true, podKillsBySystem: null })).toEqual([]);
   });

@@ -12,11 +12,6 @@ import { formatCount } from '@/lib/formatCount';
 import { dateTimeAt } from './moonsFormat';
 import { editErrorMessage, useBook } from './useBook';
 
-/**
- * A moon's ore loss, under the page's header facts (issue #5257). Flagged Fully Mined it is the
- * Residue per ore; unflagged it is residue plus ore never mined, labelled so. No chunk source:
- * no figure and no button. Marking and clearing are one click each, both audited server-side.
- */
 export function FullyMinedPanel({ id }: { id: string }) {
   const zone = useTimeZone();
   const { t } = useTranslation();
@@ -26,7 +21,6 @@ export function FullyMinedPanel({ id }: { id: string }) {
   const row = extractionDetail(view, id)?.row;
   if (!row) return null;
   const mined = minersOnMoon(view, id).flatMap((m) => m.lines);
-  // A chunk rebuilt from what was mined has nothing to lose: its loss is unknowable, not 0%.
   const loss =
     row.oreSource === 'mined' ? null : moonLoss(row.oreLines, mined, row.fullyMined !== undefined);
   const setMark = async (fullyMined: boolean) => {
@@ -69,7 +63,6 @@ export function FullyMinedPanel({ id }: { id: string }) {
   const flagged = loss.kind === 'residue';
   const head = 'py-1 font-normal ' + eyebrowClassName;
   return (
-    // A panel like the page's other sections, so it reads as one of them (not loose text).
     <Panel
       title={t(
         flagged ? 'corpTaxBook.moons.fullyMined.residue' : 'corpTaxBook.moons.fullyMined.lost'

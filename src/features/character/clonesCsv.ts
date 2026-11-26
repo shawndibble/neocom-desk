@@ -9,25 +9,18 @@ import { cloneOwnName, type CloneNicknamesValue } from './cloneNicknames';
 import { bySlot, implantBonusText } from './implantDisplay';
 import type { ImplantDetail } from './clones';
 
-/** What the card says about one clone beside its own data: where it is and how it trains. */
 export interface CloneCsvFacts {
   security?: number;
   jumps?: JumpsAwayResult;
-  /** Undefined when there is no training verdict. */
   training?: CloneRow;
   best: boolean;
 }
 
-/**
- * One exported clone: a jump clone, or the clone the Character is wearing now
- * (`clone` null, no id and no ESI location of its own).
- */
 export interface CloneCsvRow extends CloneCsvFacts {
   clone: JumpClone | null;
   implants: readonly number[];
 }
 
-/** The worn clone first, then the jump clones in the order the list shows them. */
 export function cloneCsvRows(
   worn: readonly number[] | null,
   jumpClones: readonly JumpClone[],
@@ -39,12 +32,6 @@ export function cloneCsvRows(
   ];
 }
 
-/**
- * Export columns for the clone list: the cards' facts, one clone per row. A card
- * heads a named clone with its name beside its location; the file splits them
- * so each sorts on its own. Implants come four ways: names, per slot, with
- * bonus and price, and their total market value with the count it could not price.
- */
 export function clonesCsvColumns(
   t: CsvTranslate,
   {
@@ -59,9 +46,7 @@ export function clonesCsvColumns(
     implantNames: ReadonlyMap<number, string>;
     implantDetails: ReadonlyMap<number, ImplantDetail>;
     nicknames: CloneNicknamesValue;
-    /** Undefined until the price read settles. */
     prices: ReadonlyMap<number, number | null> | undefined;
-    /** The worn clone sits in the Character's current system. */
     wornPlaceName: string | null;
   }
 ): CsvColumn<CloneCsvRow>[] {
@@ -93,7 +78,6 @@ export function clonesCsvColumns(
       value: ({ jumps }) => (jumps?.kind === 'known' ? jumps.jumps : undefined),
     },
     {
-      // Why the count is unknown, as the card's tooltip says it.
       header: t('clones.csvJumpsNote'),
       value: ({ jumps }) =>
         jumps?.kind === 'unknown' ? t(`assets.jumpsAway.unknownReason.${jumps.reason}`) : undefined,
@@ -110,7 +94,6 @@ export function clonesCsvColumns(
         ),
     },
     {
-      // Slot order, each implant with what it adds and its price: the card's implant lines.
       header: t('clones.csvImplantDetails'),
       value: (row) =>
         joined(

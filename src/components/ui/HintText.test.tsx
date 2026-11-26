@@ -2,7 +2,6 @@ import { render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { HintText } from './HintText';
 
-/** The parent's content box ends at 100; the text's right edge is `textRight`. */
 function mockClip(textRight: number) {
   vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function (this: Element) {
     const right = this.tagName === 'SPAN' ? textRight : 100;

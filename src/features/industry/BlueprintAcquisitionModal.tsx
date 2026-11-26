@@ -1,37 +1,4 @@
 import { idSetKey } from '@/lib/idSetKey';
-/**
- * The Blueprint Acquisition modal (issues #839, #1240): opened from an icon on
- * any Blueprint Acquisition row (the top-level plan or any nested sub-build),
- * it lays every way to get this blueprint side by side — Owned tiers, public
- * Contracts (copies and originals), Market sell orders, LP Store offers,
- * Invent (issue #3990) and a Manual entry — each row with a "Use this
- * blueprint" button.
- *
- * Picking writes `MaterialSourcing.acquisitionTierOverride` (+ `overridePrice`
- * except for an owned or invent row), keyed by the blueprint's own typeID, via
- * the caller's `onSourcingChange` — `acquisitionForLookup` (`recipes.ts`)
- * then honors it at every node that resolves this blueprint. What each row
- * writes, and why a picked price is one purchase of that row, lives in
- * `blueprintAcquisitionSources.ts`'s `overridePatchFor`.
- *
- * Invent's numbers come from the caller (`inventionQuoteFor`), priced as
- * automatic selection prices them — at the plan's own hub and build system,
- * not this modal's hub picker.
- *
- * Contracts and Market read one Trade Hub's region — the Build Plan's own by
- * default; Market reads the whole region (not just the hub station), unless
- * the blueprint trades in a Global Market Region. The hub picker here only
- * changes what this modal shows, never the plan. Contracts can widen to every
- * region.
- *
- * Data is self-fetched on open, the same pattern `ItemDetailModal` uses: the
- * Public Contract Offers snapshot (`loadPublicBpcContracts`, cached), the
- * hub region's Order Book view (`loadOrderBookView` — cached underneath,
- * failed kept distinct from empty), and the
- * character's LP corps' offers (`findLpOfferMatches`). Station names come
- * from the local SDE snapshot only (`loadContractLocationInfo`) — no ESI
- * call per row; a player structure stays unnamed.
- */
 import { useKeyedLoad } from '@/lib/useAsyncLoad';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { blueprintLpRate } from '@/engine/loyalty/marketLpValue';
@@ -111,9 +78,7 @@ import { useHydratedStore } from '@/lib/useHydratedStore';
 
 export type { AcquisitionOwnedCopy } from './blueprintAcquisitionSources';
 
-/** `loading` until the fetch lands; `unavailable` = nothing to read (sync off, fetch failed). */
 type Load<T> = { status: 'loading' } | { status: 'unavailable' } | { status: 'ready'; data: T };
-/** Long enough that a section served from cache never flashes the arc. */
 const LOADING_SPINNER_DELAY_MS = 200;
 
 const ALL_REGIONS = 'all';
@@ -128,50 +93,24 @@ interface BlueprintAcquisitionModalProps {
   characterId: number;
   blueprintTypeID: number;
   blueprintName: string;
-  /** Every owned copy of this blueprint — personal and (when the plan's Corp Assets toggle is on) corp-owned, already merged. */
   ownedCopies: readonly AcquisitionOwnedCopy[];
-  /** This row's own sourcing entry, for the current override/price (if any). */
   sourcing: MaterialSourcing | undefined;
   onSourcingChange: (typeID: number, patch: MaterialSourcing) => void;
-  /**
-   * Sets the plan's job runs to what a picked blueprint brings, the way the
-   * in-game Industry window fills them in (`runsForPickedRow`). Given only
-   * for the plan's own blueprint: a sub-build's runs follow from what the
-   * plan needs, not from the copy.
-   */
   onPickRuns?: (runs: number) => void;
-  /** Navigates to BPC Sourcing pre-filtered to this blueprint. */
   onSearchBpcSourcing: (blueprintTypeID: number) => void;
-  /** The Build Plan's own Trade Hub — the modal's starting hub. */
   planHubId: TradeHub['id'];
-  /**
-   * How inventing this blueprint prices for the plan (issue #3990), and the
-   * T1 blueprint it is invented from. Absent/null: nothing invents it, or its
-   * prices haven't landed — no Invent section.
-   */
   invention?: { result: InventionQuoteResult; t1BlueprintName: string } | null;
-  /** Wraps the title (the blueprint's own name) in the item context menu; omitted where the caller has none to offer. */
   itemMenuFor?: ItemMenuFor;
-  /**
-   * Visible "More actions" button beside the title (WCAG 2.1.1, issue
-   * #1498) — the title was a bare `<span>` with no focusable trigger of its
-   * own. Omitted where the caller has none to offer.
-   */
   itemActionsFor?: (typeId: number) => ReactElement;
 }
 
-/** Names for `ids`, resolved one by one as they land; a missing entry means not resolved yet. */
 function useNames(
   ids: readonly number[],
   load: (id: number) => Promise<string | null>
 ): ReadonlyMap<number, string | null> {
   const [names, setNames] = useState<ReadonlyMap<number, string | null>>(new Map());
-  // Ids already asked for: a changed id list (new hub, All regions) loads only
-  // the new ones, and an in-flight lookup is never cancelled and re-sent.
   const requested = useRef(new Set<number>());
   const mounted = useRef(true);
-  // Reset on (re)mount: StrictMode's mount → cleanup → mount would otherwise
-  // leave this false and drop every name lookup.
   useEffect(() => {
     mounted.current = true;
     return () => {
@@ -195,14 +134,7 @@ function useNames(
 
 const loadStationName = async (id: number) => (await loadContractLocationInfo(id)).name;
 
-/**
- * Runs `load` whenever `key` changes, into a `Load` state. The result is
- * stored against the key it was fetched for, so a changed key (a new hub)
- * reads as loading until its own result lands, and a stale one is dropped.
- */
 function useLoad<T>(load: () => Promise<T | null>, key: string): Load<T> {
-  // `key` encodes everything `load` reads, so the loader's identity follows
-  // the key and a re-render with a fresh closure never reloads on its own.
   const latest = useRef(load);
   useEffect(() => {
     latest.current = load;
@@ -256,8 +188,6 @@ export function BlueprintAcquisitionModal({
     const cached = await loadPublicBpcContracts();
     return cached ? { copies: cached.data.rows, originals: cached.data.originals ?? [] } : null;
   }, String(characterId));
-  // Region mode, not Trade Hub mode: every sell order in the hub's region is
-  // a real option, and the hub station's own are tagged below.
   const market = useLoad<OrderBookView>(
     async () =>
       loadOrderBookView(
@@ -275,8 +205,6 @@ export function BlueprintAcquisitionModal({
     `${characterId}:${blueprintTypeID}`
   );
 
-  // Each section: identical rows folded (contracts, market), unpickable rows
-  // dropped unless they are all there is, then capped — cheapest first throughout.
   const owned = sectionRows(ownedTierRows(ownedCopies), () => true);
   const contractGroups = useMemo(
     () =>
@@ -300,16 +228,11 @@ export function BlueprintAcquisitionModal({
     [marketView, hub.stationId]
   );
   const marketSection = sectionRows(marketGroups, (g) => g.row.pickable);
-  // Turn-ins priced as automatic selection prices them — owned ones free,
-  // the rest at this modal's hub — so a picked LP row writes the same price
-  // the plan would have chosen for it.
   const lpOffers = lp.status === 'ready' ? lp.data.map((m) => m.offer) : [];
   const turnIns = useLoad(
     () => loadLpTurnInPricer(hub, lpOffers),
     `${hub.id}:${lpOffers.map((o) => o.offer_id).join(',')}`
   );
-  // A blueprint's LP is priced at the pilot's own LP Value, else free (LP
-  // already earned) — never a store's market rate.
   const lpRows = useMemo(
     () =>
       lp.status === 'ready'
@@ -453,11 +376,6 @@ export function BlueprintAcquisitionModal({
     ].join(' · ');
   }
 
-  /**
-   * One row: its facts, any tags, and the pick button. A plain render
-   * function, not a nested component — a component defined in render would
-   * remount every row on every render.
-   */
   const selectedTag = t('industry.blueprintAcquisitionSelected');
 
   function renderRow(
@@ -484,7 +402,6 @@ export function BlueprintAcquisitionModal({
           {allTags.map((tag) => (
             <span
               key={tag}
-              // Accent is for the selected state only (DESIGN.md); static facts stay dim.
               className={`ml-1.5 inline-block text-[0.6875rem] font-semibold tracking-widest uppercase ${tag === selectedTag ? 'text-accent' : 'text-text-dim'}`}
             >
               {tag}
@@ -514,7 +431,6 @@ export function BlueprintAcquisitionModal({
   const groupCount = (group: OfferGroup<unknown>, key: string) =>
     group.count > 1 ? [t(key, { count: group.count })] : [];
 
-  /** The dim "Showing 10 of N" note, only when the cap cut rows. */
   function capNote(section: { shown: readonly unknown[]; total: number }) {
     if (section.total <= section.shown.length) return null;
     return (
@@ -711,7 +627,6 @@ export function BlueprintAcquisitionModal({
               {contractSection.shown.map((group, index) => {
                 const { row } = group;
                 return renderRow(
-                  // A contract can repeat an identical line; the index keeps keys unique.
                   `${row.contractId}:${row.runs ?? 'bpo'}:${row.me}:${row.te}:${index}`,
                   row,
                   contractSummary(row),

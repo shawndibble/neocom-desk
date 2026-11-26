@@ -25,12 +25,10 @@ const scordite: OreStack = {
 
 describe('allocateOreToNeeds', () => {
   it('uses the ore least valuable raw per mineral first and caps at the need', () => {
-    // Veldspar: 1000 ISK per batch / 200 trit = 5 ISK a mineral; Scordite: 500 / 75 = 6.7.
-    // So Veldspar goes first.
     const r = allocateOreToNeeds({ [TRIT]: 600 }, [veldspar, scordite]);
     const s = r.ores.find((o) => o.typeId === 1228)!;
     const v = r.ores.find((o) => o.typeId === 1230)!;
-    expect(v.batchesUsed).toBe(3); // 3 * 200 = 600 trit
+    expect(v.batchesUsed).toBe(3);
     expect(s.batchesUsed).toBe(0);
     expect(v.unitsNotUsed).toBe(10_000 - 300);
     expect(r.covered[TRIT]).toBe(600);

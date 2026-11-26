@@ -25,26 +25,17 @@ interface FittingEditorHeaderProps {
   hullName: string;
   compact: boolean;
   alpha: FittingAlpha;
-  /** The Alpha/Omega badge sits in the phone's tab row, so the header leaves it out. */
   alphaInTabs?: boolean;
   share: EditorShare;
   saved: ReturnType<typeof useSavedFittingRecord>;
   onLibrary: (action: LibraryAction) => void;
-  /** A Save to EVE landed, so In-game Fittings should refetch. */
   onSavedToEve: () => void;
-  /** Opens Improve. */
   onImprove: () => void;
-  /** The pilot can't fly a fitted module, so Improve opens on fixing the fit first. */
   unflyable?: boolean;
 }
 
-/** The Permission Save to EVE needs, from the registry so a regrouping can't strand a hard-coded name. */
 const SAVE_TO_EVE_GROUPS = permissionsForEndpoints(['postCharacterFitting']);
 
-/**
- * The open Fitting's header with its Save menu, plus the dialogs that menu
- * opens (Save as new, Save to EVE) and the Compare jump.
- */
 export function FittingEditorHeader({
   workspace,
   fitting,
@@ -81,8 +72,6 @@ export function FittingEditorHeader({
         onImprove={onImprove}
         unflyable={unflyable}
         onCompare={() => {
-          // Unsaved edits against a saved Fitting: Compare opens saved vs.
-          // current rather than just the one code already in the URL.
           if (hasUnsavedEdits && savedRecord && currentShareCode) {
             const params = writeCompareCodes(new URLSearchParams(), [
               savedRecord.code,

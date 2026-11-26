@@ -1,13 +1,3 @@
-/**
- * "Affected by": what changed one fitted item's attributes, and by how much —
- * the engine's own per-attribute modifier list (`calculate(fit, { sources:
- * true })`), with each source resolved from an index into the fit to the
- * type it is. Only published attributes (positive ids) a source touched are
- * listed; the patched, derived ones (negative ids) are this app's reading of
- * the others, not modifiers in the game. Pure.
- */
-
-/** A modifier source as the engine reports it (`Source` in its types). */
 export interface SourceLike {
   from:
     | { type: 'ship' }
@@ -33,15 +23,11 @@ export interface AttributeWithSources {
   sources?: SourceLike[];
 }
 
-/** What the source indices point at in the calculated fit. */
 export interface AffectedByContext {
   shipTypeId: number;
   modeTypeId?: number;
-  /** Index-parallel to the fit's items. */
   itemTypeIds: readonly number[];
-  /** The charge loaded in each item, index-parallel. */
   chargeTypeIds: readonly (number | undefined)[];
-  /** Index-parallel to the fit's incoming effects. */
   projectedTypeIds: readonly number[];
 }
 
@@ -49,15 +35,11 @@ export type AffectedSourceKind = SourceLike['from']['type'];
 
 export interface AffectedSource {
   kind: AffectedSourceKind;
-  /** The type it is — a skill, module, charge, ship…; null for the character or a buff. */
   typeId: number | null;
-  /** A command burst's buff id. */
   buffId?: number;
   operator: string;
   value: number;
-  /** The stacking penalty applied (0–1), null when not penalised. */
   penalty: number | null;
-  /** False when the source's state is too low for its effect. */
   applied: boolean;
 }
 

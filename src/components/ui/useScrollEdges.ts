@@ -2,12 +2,6 @@ import { useCallback, useEffect, useState, type RefObject } from 'react';
 import { usePrefersReducedMotion } from '@/lib/useMediaQuery';
 import { pageScrollDelta, scrollEdges, type ScrollEdges } from './tabScroll';
 
-/**
- * Which ends of a sideways scroller still have content past them, and a pager
- * for the edge chevrons (`Tabs`, the PI Map board). Recomputed on scroll and
- * on any resize of the scroller or of `contentRef` (content growing, a window
- * resize), so callers need no dependency on their items.
- */
 export function useScrollEdges(
   scrollerRef: RefObject<HTMLElement | null>,
   contentRef?: RefObject<HTMLElement | null>

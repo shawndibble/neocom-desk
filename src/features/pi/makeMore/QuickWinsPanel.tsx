@@ -111,7 +111,6 @@ export function QuickWinsPanel({
 }: {
   view: PlanView;
   ticks: Ticks;
-  /** Hub prices unreadable: the wins shown need none, so no gain is drawn, not even "No ISK figure". */
   pricesDown?: boolean;
 }) {
   const { t } = useTranslation();
@@ -167,7 +166,6 @@ export function QuickWinsPanel({
               {win.iconTypeId !== null && (
                 <TypeIcon typeId={win.iconTypeId} size={32} width={24} height={24} />
               )}
-              {/* Below md the gain sits under the sentence, so the sentence keeps the row's width. */}
               <div className="flex min-w-0 flex-1 flex-col gap-0.5 md:flex-row md:items-center md:gap-3">
                 <p
                   id={sentenceId}

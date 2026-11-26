@@ -13,11 +13,9 @@ vi.mock('@/market/prices', () => ({ getHubPrices: (...a: unknown[]) => getHubPri
 vi.mock('@/features/market/priceHistory', () => ({
   loadPriceHistory: (...a: unknown[]) => loadPriceHistory(...a),
 }));
-// Default: no daily demand object, so pass 2 takes the ESI history path.
 vi.mock('@/features/market/haulingDemand', () => ({
   loadHaulingDemand: (...a: unknown[]) => loadHaulingDemand(...a),
 }));
-// Default: no books snapshot, so pass 3 reads ESI books for a short list.
 vi.mock('@/features/market/haulingBooks', () => ({
   loadHaulingBooks: (...a: unknown[]) => loadHaulingBooks(...a),
 }));
@@ -28,7 +26,6 @@ const loadUniverseTypeOnce = vi.fn();
 vi.mock('@/features/skills/data', () => ({
   loadUniverseTypeOnce: (...a: unknown[]) => loadUniverseTypeOnce(...a),
 }));
-// Default: the baked shard lacks the type, so reads take the ESI fallback.
 vi.mock('@/sde/loadTypeInfo', () => ({ loadTypeInfo: vi.fn(async () => null) }));
 const { loadTypeInfo } = await import('@/sde/loadTypeInfo');
 const loadMarketTypes = vi.fn();
@@ -50,7 +47,6 @@ const FROM = TRADE_HUBS.find((h) => h.id === 'jita')!;
 const TO = TRADE_HUBS.find((h) => h.id === 'amarr')!;
 const TYPES = { '34': { name: 'Tritanium', volume: 0.01 } } as never;
 
-/** A catalogue entry, 1 m³ each, for every id. */
 function typesFor(ids: readonly number[]) {
   return Object.fromEntries(ids.map((id) => [String(id), { name: `T${id}`, volume: 1 }])) as never;
 }
@@ -84,7 +80,6 @@ beforeEach(() => {
       : {
           orders: [
             { price: 115, volume_remain: 5, is_buy_order: true, location_id: TO.stationId },
-            // Elsewhere in the destination region: must not count as a buyer at the hub.
             { price: 150, volume_remain: 500, is_buy_order: true, location_id: 1 },
           ],
         }
@@ -199,7 +194,6 @@ describe('runHaulingScan, selling into buy orders', () => {
       mode: 'instant',
     });
     expect(loadUniverseTypeOnce).not.toHaveBeenCalled();
-    // The market catalogue has no SDE group: the holds it may ride in stay unknown.
     expect(scan.rows[0]).toMatchObject({
       name: 'Microorganisms',
       unitVolumeM3: 0.01,
@@ -284,7 +278,6 @@ describe('runHaulingScan, selling into buy orders', () => {
 
 describe('runHaulingScan, shortlist order', () => {
   const TODAY = '2026-10-15';
-  /** Many high-ratio items that never sell (history drops them), and one bulk steady seller at a lower ratio. */
   const THIN_COUNT = 85;
   const THIN = Array.from({ length: THIN_COUNT }, (_, i) => 2000 + i);
   const BULK = 5000;
@@ -311,7 +304,6 @@ describe('runHaulingScan, shortlist order', () => {
         ids.map((id) => {
           if (id === BULK)
             return [id, atOrigin ? aggregate(100, 90, 50_000) : aggregate(120, 110, 30_000)];
-          // 3x the price, two units for sale at the origin.
           return [id, atOrigin ? aggregate(100, 90, 2) : aggregate(300, 250, 500)];
         })
       );
@@ -338,7 +330,6 @@ describe('runHaulingScan, shortlist order', () => {
       types: typesFor(typeIds),
       today: TODAY,
     });
-    // Ranked below every thin item at pass 1, it still reaches history: those items drop out there.
     expect(loadPriceHistory).toHaveBeenCalledWith(TO.regionId, BULK);
     expect(getOrderBook).toHaveBeenCalledWith(TO.regionId, BULK);
     expect(scan.rows.map((r) => r.typeId)).toContain(BULK);
@@ -346,7 +337,6 @@ describe('runHaulingScan, shortlist order', () => {
   });
 
   it('names what it examined: dropped by history or given books', async () => {
-    // Every tenth thin item has no market at the destination: dropped by pass 2.
     loadPriceHistory.mockImplementation(async (_region: number, typeId: number) => {
       if (typeId !== BULK && typeId % 10 === 0) throw new EsiError(400, 'no market');
       return { points: typeId === BULK ? BULK_HISTORY : THIN_HISTORY };
@@ -362,7 +352,6 @@ describe('runHaulingScan, shortlist order', () => {
     });
     const historyIds = loadPriceHistory.mock.calls.map(([, id]) => id as number);
     expect(new Set(scan.examinedTypeIds)).toEqual(new Set(historyIds));
-    // Every candidate was read; each is examined unless it failed history without a verdict.
     expect(historyIds.length).toBe(typeIds.length);
     expect(scan.examinedTypeIds.length).toBe(historyIds.length);
   });
@@ -410,7 +399,6 @@ describe('runHaulingScan, examined ids and a failed history read', () => {
 });
 
 describe('runHaulingScan, Max price', () => {
-  /** More dear, high-scoring items than the order-book pass takes, and one cheap one. */
   const DEAR = Array.from({ length: MAX_BOOK_CANDIDATES + 5 }, (_, i) => 7000 + i);
   const CHEAP = 8000;
 
@@ -459,7 +447,6 @@ describe('runHaulingScan, Max price', () => {
     const capped = await run(500);
     expect(capped.rows.map((r) => r.typeId)).toEqual([CHEAP]);
     expect(getOrderBook).toHaveBeenCalledTimes(2);
-    // Said, not silent: every dear item pass 1 would have kept.
     expect(capped.overMaxPrice).toBe(DEAR.length);
     expect((await run()).overMaxPrice).toBe(0);
   });
@@ -499,7 +486,6 @@ describe('runHaulingScan, the scan cache', () => {
         signal: controller.signal,
       })
     ).rejects.toThrow(/aborted/);
-    // Nothing cached: the same scan asked again reads the hubs again.
     getHubPrices.mockClear();
     await runHaulingScan({
       from: FROM,
@@ -542,9 +528,7 @@ describe('runHaulingScan, shortlist order selling into buy orders', () => {
       return new Map(
         ids.map((id) => {
           if (atOrigin) return [id, aggregate(100, 90, 100_000)];
-          // 1.05x into deep buy orders: profitable after sales tax, not after a listing's fees.
           if (id === DEEP) return [id, aggregate(500, 105, 1, 100_000)];
-          // 1.5x, one unit wanted, though plenty is listed for sale.
           return [id, aggregate(160, 150, 100_000, 1)];
         })
       );
@@ -585,7 +569,6 @@ describe('runHaulingScan, Any hub at one end', () => {
   const JITA = hubById('jita');
   const DODIXIE = hubById('dodixie');
   const RENS = hubById('rens');
-  /** Lowest sell per hub for every item: Dodixie is the cheapest origin, Rens the dearest destination. */
   const SELL: Record<string, number> = { jita: 200, amarr: 150, dodixie: 100, rens: 400, hek: 180 };
   const BUY: Record<string, number> = { jita: 180, amarr: 120, dodixie: 90, rens: 300, hek: 150 };
 
@@ -646,7 +629,6 @@ describe('runHaulingScan, Any hub at one end', () => {
     });
     expect(getHubPrices).toHaveBeenCalledTimes(COMPARED_HUBS.length);
     expect(scan.rows).toHaveLength(MAX_BOOK_CANDIDATES);
-    // Two books (origin and destination) per shortlisted item — no more.
     expect(getOrderBook).toHaveBeenCalledTimes(2 * MAX_BOOK_CANDIDATES);
     expect(scan.capped).toBe(true);
   });
@@ -678,7 +660,6 @@ describe('runHaulingScan, history pass feeding', () => {
         orderCount: 10,
       })
     );
-  /** Ids 1000.. rank by price in id order: a lower id has the bigger gap. */
   const idAt = (rank: number) => 1000 + rank;
 
   function setup(count: number, passes: (rank: number) => boolean) {
@@ -743,7 +724,6 @@ describe('runHaulingScan, history pass feeding', () => {
     });
     expect(bookedIds()).toHaveLength(MAX_BOOK_CANDIDATES);
     expect(scan.capped).toBe(true);
-    // The scan stops feeding once enough passed: not every candidate was read.
     expect(loadPriceHistory.mock.calls.length).toBeLessThan(100);
   });
 
@@ -815,7 +795,6 @@ describe('runHaulingScan, demand from the daily R2 object', () => {
     latestDay: { date: '2026-10-14', highest: price, lowest: price },
   });
 
-  /** Ids 1000.. rank by price in id order; `demand(rank)` is the aggregate the object holds, or undefined for absent. */
   function setup(
     count: number,
     demand: (rank: number) => ReturnType<typeof aggregate_> | undefined
@@ -883,7 +862,6 @@ describe('runHaulingScan, demand from the daily R2 object', () => {
   });
 
   it('books the best 40 by history score, not the first 40 by price, and says capped', async () => {
-    // A higher id sold for more, but ranks lower on the price pass.
     const { typeIds, types } = setup(100, (rank) => aggregate_(300 + rank));
     const scan = await runHaulingScan({
       from: FROM,
@@ -959,7 +937,6 @@ describe('runHaulingScan, order books from the R2 snapshot', () => {
   const typeIds = Array.from({ length: COUNT }, (_, i) => idAt(i));
 
   const level = (price: number, units = 50_000) => ({ price, units, orders: 1 });
-  /** Every type: sells at 100 at Jita, sells at 300 and buys at 280 at Amarr. */
   function snapshot(stationId: number, asOf: number) {
     const atFrom = stationId === FROM.stationId;
     return {

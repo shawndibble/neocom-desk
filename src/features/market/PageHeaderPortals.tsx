@@ -6,7 +6,6 @@ import type { PageHeaderSlots } from './pageHeaderSlots';
 interface PageHeaderPortalsProps {
   slots: PageHeaderSlots;
   meta?: ReactNode;
-  /** The tab's `CharacterFilterControl`, portalled into `PageHeader`'s `scope` slot. */
   scope?: ReactNode;
   actions?: ReactNode;
 }
@@ -15,8 +14,6 @@ export function PageHeaderPortals({ slots, meta, scope, actions }: PageHeaderPor
   return (
     <>
       {slots.meta && meta ? createPortal(meta, slots.meta) : null}
-      {/* A portal keeps the context of where it is rendered, not of its DOM
-          target, so the header's touch tier is provided again here. */}
       {slots.scope && scope
         ? createPortal(
             <PageHeaderClusterContext.Provider value={true}>

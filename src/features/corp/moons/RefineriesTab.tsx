@@ -23,11 +23,6 @@ import { tapTargetClassName } from './sectionHelpers';
 import { useBook } from './useBook';
 import { useRefineryList, type RefineryEntry } from './useRefineryList';
 
-/**
- * Every refinery the book knows (#6348): one row each, refinery name first and its moon under it,
- * for the corporation's own refineries and moon owners'. The row opens the refinery's page; an
- * archived moon owner refinery leaves the table for the folded Archived section.
- */
 export function RefineriesTab() {
   const zone = useTimeZone();
   const { t } = useTranslation();
@@ -36,7 +31,6 @@ export function RefineriesTab() {
   const list = useRefineryList();
   const nameOf = (r: Pick<RefineryEntry, 'structureId' | 'ownerId'>) =>
     r.ownerId === undefined ? names.refinery(r.structureId) : names.ownerRefinery(r.structureId);
-  // A book that reads moon owners' refineries names each one's corporation (#6097).
   const namesCorporations = list.active.some((r) => r.ownerId !== undefined);
   const states = (row: RefineryEntry) =>
     FILTER_STATES.filter((s) => row.states[s])

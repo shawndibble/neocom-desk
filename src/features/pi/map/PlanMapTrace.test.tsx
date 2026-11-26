@@ -20,7 +20,6 @@ import {
   stubPhone,
 } from '@/test/planMap';
 
-// The finder reads the SDE and the stargate graph; its own behaviour is not under test here.
 vi.mock('@/features/pi/map/PlanetFinder', () => ({
   PlanetFinder: ({ types }: { types: readonly string[] }) => (
     <div data-testid="finder">finder for {types.join(',')}</div>
@@ -29,7 +28,6 @@ vi.mock('@/features/pi/map/PlanetFinder', () => ({
 
 installPlanMapHarness();
 
-// Ownership rules: PlanMap's header, "Who owns what".
 describe('PlanMap: a product click toggles its trace; ticks stay the pilot’s', () => {
   function Search() {
     const location = useLocation();
@@ -37,7 +35,6 @@ describe('PlanMap: a product click toggles its trace; ticks stay the pilot’s',
   }
   function renderWithSearch(entry = '/planetary-industry/map') {
     return render(
-      // A page before the map: a clear that went Back twice would land there.
       <MemoryRouter initialEntries={['/planetary-industry/plan', entry]} initialIndex={1}>
         <PlanMap {...props()} />
         <Search />
@@ -55,7 +52,6 @@ describe('PlanMap: a product click toggles its trace; ticks stay the pilot’s',
     expect(productDialog()).toBeInTheDocument();
     await user.keyboard('{Escape}');
     await waitFor(() => expect(productDialog()).toBeNull());
-    // Closing the drawer is not clearing the trace.
     expect(product('Biofuels')).toHaveAttribute('aria-current', 'true');
     expect(search()).toBe('/planetary-industry/map');
     await user.click(product('Biofuels'));
@@ -86,7 +82,6 @@ describe('PlanMap: a product click toggles its trace; ticks stay the pilot’s',
     expect(product('Coolant')).toHaveAttribute('aria-current', 'true');
     await user.click(product('Coolant'));
     await waitFor(() => expect(search()).toBe('/planetary-industry/map'));
-    // Lit only for the planets its trace needed: with the trace gone, so is the tile.
     expect(maybeProduct('Coolant')).toBeNull();
     expect(screen.getByText('Trace cleared.')).toBeInTheDocument();
   });

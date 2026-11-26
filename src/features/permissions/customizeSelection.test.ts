@@ -41,12 +41,6 @@ describe('parseCustomizeSelection', () => {
     });
   });
 
-  /**
-   * #6102: a bare list was stored before every read Permission became
-   * default-on. Then the six were unticked by default, so their absence says
-   * nothing about the player — they start ticked. What the player unticked
-   * among the rest stays unticked, and nothing else is added.
-   */
   it('reads a bare list from before #6102 with the formerly opt-in Permissions ticked', () => {
     const parsed = parseCustomizeSelection(['mail', 'mailSend']);
     expect([...parsed!.groups].sort()).toEqual(

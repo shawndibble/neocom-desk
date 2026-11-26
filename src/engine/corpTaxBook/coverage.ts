@@ -1,7 +1,6 @@
 import { shiftUtcDate } from '@/engine/localDay';
 import { shiftDate } from '../miningTax/yieldRange';
 
-/** A feeder's coverage: UTC days, both ends inclusive; no `to` means still open. */
 export interface CoveragePeriod {
   from: string;
   to?: string;
@@ -11,10 +10,6 @@ export function isDayCovered(periods: readonly CoveragePeriod[], day: string): b
   return periods.some((p) => day >= p.from && (p.to === undefined || day <= p.to));
 }
 
-/**
- * Ends the open period the day before `effectiveDay`. A period that would end
- * before it began (left the day they joined) covered nothing, so it is dropped.
- */
 export function closePeriod(
   periods: readonly CoveragePeriod[],
   effectiveDay: string
@@ -26,7 +21,6 @@ export function closePeriod(
   });
 }
 
-/** A rejoin: a fresh open period on the same record. Throws if it would overlap one. */
 export function reopenPeriod(periods: readonly CoveragePeriod[], day: string): CoveragePeriod[] {
   for (const p of periods) {
     if (p.to === undefined) throw new Error('a coverage period is still open');
@@ -35,14 +29,8 @@ export function reopenPeriod(periods: readonly CoveragePeriod[], day: string): C
   return [...periods, { from: day }];
 }
 
-/** How far back a moon owner may start its coverage: EVE keeps about 30 days of ledger. */
 export const MAX_COVERAGE_BACKDATE_DAYS = 30;
 
-/**
- * The first covered day for a join or rejoin: the requested day (default today), never after
- * today or more than 30 days back, and for a rejoin never before the day after the last closed
- * period, so `reopenPeriod` cannot throw. Mirrored in `functions/`.
- */
 export function clampCoverageFrom(
   periods: readonly CoveragePeriod[],
   requested: string | undefined,
@@ -60,13 +48,6 @@ export function clampCoverageFrom(
   return day;
 }
 
-/**
- * The first covered day when a disconnected moon owner reconnects: the day after its last
- * covered day, so ore EVE still holds is counted, but never more than 30 days back (what EVE
- * keeps) and never before `joinedOn`, the day it last joined (a spell never read well leaves no
- * period, so the last one may predate a leave). Nothing ever covered: today. Mirrored in
- * `functions/`.
- */
 export function reconnectCoverageFrom(
   periods: readonly CoveragePeriod[],
   today: string,
@@ -78,7 +59,6 @@ export function reconnectCoverageFrom(
   return clampCoverageFrom(periods, asked, today);
 }
 
-/** Rows outside coverage owe nothing. */
 export function filterCovered<T extends { date: string }>(
   rows: readonly T[],
   periods: readonly CoveragePeriod[]
@@ -86,18 +66,11 @@ export function filterCovered<T extends { date: string }>(
   return rows.filter((row) => isDayCovered(periods, row.date));
 }
 
-/** A moon owner's coverage, as the book holds it on its feeder record. */
 export interface FeederCoverage {
   corporationId: number;
-  /** Absent: not known to this reader, so its rows are not tested. */
   coveragePeriods?: readonly CoveragePeriod[];
 }
 
-/**
- * Moon owner rows outside their coverage owe nothing (#4618), like mining
- * before the book's start date: kept, never billed. Only rows a known moon owner's
- * refinery recorded are tested; the book's own refineries' rows are always covered.
- */
 export function splitByCoverage<T extends { date: string; sourceCorporationId?: number }>(
   rows: readonly T[],
   bookCorporationId: number,

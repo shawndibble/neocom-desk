@@ -33,8 +33,6 @@ describe('injectorsToCover', () => {
   });
 
   it('crosses the 5M bracket mid-run', () => {
-    // 4.8M -> 500k (crosses to 5.3M) -> 400k (5.7M) -> 400k (6.1M), covering
-    // the 1M gap on the third injector with 300k left over.
     expect(injectorsToCover(1_000_000, 4_800_000)).toEqual({
       count: 3,
       deliveredSp: 1_300_000,
@@ -43,8 +41,6 @@ describe('injectorsToCover', () => {
   });
 
   it('crosses the 50M bracket mid-run', () => {
-    // 49.8M -> 400k (50.2M, now in the 300k bracket) -> 300k, covering the
-    // 500k gap on the second injector with 200k left over.
     expect(injectorsToCover(500_000, 49_800_000)).toEqual({
       count: 2,
       deliveredSp: 700_000,

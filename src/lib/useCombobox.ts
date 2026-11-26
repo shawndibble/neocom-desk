@@ -1,11 +1,6 @@
 import { useId, useState, type KeyboardEvent } from 'react';
 import { COMBOBOX_NAV_KEYS, moveHighlight, type ComboboxNavKey } from './comboboxNav';
 
-/**
- * Shared typeahead behaviour: role=combobox input, listbox, aria-activedescendant
- * highlight. Callers own option lookup, Enter/Escape, open timing and option look.
- * The index is clamped so a shrinking list never leaves activedescendant dangling.
- */
 export function useCombobox({
   count,
   open,
@@ -22,7 +17,6 @@ export function useCombobox({
   const activeIndex = open && wanted !== null && count > 0 ? Math.min(wanted, count - 1) : null;
   const optionId = (index: number) => `${base}-option-${index}`;
 
-  /** Handles Arrow/Home/End; true when it did, so the caller can open the list. */
   function handleNavKey(event: KeyboardEvent): boolean {
     if (count === 0 || !COMBOBOX_NAV_KEYS.includes(event.key)) return false;
     event.preventDefault();
@@ -30,7 +24,6 @@ export function useCombobox({
     return true;
   }
 
-  // Clamped like `activeIndex`, so Enter never reads past a list that shrank.
   const keyed = highlight === null || count === 0 ? null : Math.min(highlight, count - 1);
 
   return {
@@ -40,7 +33,6 @@ export function useCombobox({
     reset: () => setHighlight(null),
     optionId,
     handleNavKey,
-    /** Spread on the `<input>`; the caller adds its own label, value and handlers. */
     inputProps: {
       role: 'combobox' as const,
       'aria-autocomplete': 'list' as const,

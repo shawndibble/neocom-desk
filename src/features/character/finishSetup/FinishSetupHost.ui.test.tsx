@@ -34,7 +34,6 @@ vi.mock('./loadStillToApprove', () => ({
   loadStillToApprove: async () => ({ name: 'Kestrel Vane', items }),
 }));
 
-/** One page load: EVE's return is a fresh mount at a location carrying its result. */
 const land = (state?: unknown) => {
   cleanup();
   return render(

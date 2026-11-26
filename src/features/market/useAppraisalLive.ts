@@ -1,14 +1,3 @@
-/**
- * The Appraisal page's live-price layer (issue #5591), kept apart from
- * `useAppraisal`'s Fuzzwork load so the first paint stays instant: the
- * cached outcome lands first, then each row swaps to its live hub book as it
- * arrives, most valuable rows first. Nothing else in the app reads this.
- *
- * The books live in the module cache (`liveBooks.ts`, 10 minutes), so a
- * re-price from a changed percent or hub finds them already there and makes
- * no request. Compare Hubs' other four hubs are fetched only once it is
- * opened.
- */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   buildAppraisal,
@@ -30,41 +19,29 @@ const NO_OWN: ReadonlySet<number> = new Set();
 type HubJumps = ReadonlyMap<number, ReadonlyMap<number, number>>;
 const NO_JUMPS: HubJumps = new Map();
 
-/** A Refresh waiting for the base it asked for: a re-run of the same `base` is not it. */
 interface PendingForce {
   from: AppraisalOutcome | null;
 }
 
 const bookKey = (hub: TradeHub, typeId: number) => `${hub.stationId}:${typeId}`;
 
-/** How far a live run has got, for the progress text and bar. */
 export interface LiveProgress {
-  /** A run is fetching right now. */
   checking: boolean;
-  /** Books settled (live or failed) / books wanted. */
   done: number;
   total: number;
-  /** Settled books that failed: their rows stay on cached prices. */
   failed: number;
-  /** When the oldest live book was fetched; null before any landed. */
   checkedAt: number | null;
 }
 
 export interface AppraisalLive {
-  /** `base` with each row's live prices swapped in as they land. */
   result: AppraisalOutcome | null;
-  /** The five hubs' totals, live per hub once its books landed. */
   compare: HubComparisonRow[] | null;
   live: LiveProgress;
-  /** Progress of the other four hubs' books, fetched once Compare Hubs is open. */
   compareLive: LiveProgress;
-  /** Resolves with the result once every row has settled, so a copy never reads a cached row. */
   settle: () => Promise<AppraisalOutcome | null>;
-  /** The run for the next `base` refetches whatever the age: the Refresh button. */
   forceNextRun: () => void;
 }
 
-/** Most valuable rows first: the order they go live. */
 function valueOrdered(items: readonly AppraisalItem[]): number[] {
   return [...items]
     .sort(
@@ -85,7 +62,6 @@ function mergeOutcome(
   return {
     ...base,
     appraisal: buildAppraisal(items, pricePercent),
-    // Every row read a live book, so the Fuzzwork outage notes no longer apply.
     ...(allLive ? { pricesUnreachable: false, pricesStale: false } : {}),
   };
 }
@@ -126,7 +102,6 @@ async function loadOwnOrderIds(): Promise<ReadonlySet<number>> {
   try {
     return ownOrderIdSet(await loadAllCharactersOpenOrders());
   } catch {
-    // No orders scope, or the read failed: nothing counts as the pilot's own.
     return NO_OWN;
   }
 }
@@ -145,9 +120,7 @@ export function useAppraisalLive({
   compareOpen: boolean;
 }): AppraisalLive {
   const [books, setBooks] = useState<Books>(NO_BOOKS);
-  // Null until the pilot's own order ids first load: rows stay cached until then, so none briefly undercuts the pilot's own cheapest order.
   const [own, setOwn] = useState<ReadonlySet<number> | null>(null);
-  // Gate jumps from each hub's system, so a buy order's range can be told to reach the hub; a numbered range counts only once its hub's are in.
   const [hubJumps, setHubJumps] = useState<HubJumps>(NO_JUMPS);
   const [checking, setChecking] = useState(false);
   const [compareChecking, setCompareChecking] = useState(false);
@@ -156,7 +129,6 @@ export function useAppraisalLive({
   const baseRef = useRef<AppraisalOutcome | null>(base);
   const compareOpenRef = useRef(compareOpen);
   const percentRef = useRef(pricePercent);
-  // Null once the run was cancelled: a copy then waits for the run that replaced it.
   const run = useRef<Promise<AppraisalOutcome | null> | null>(null);
   const latest = useRef<AppraisalOutcome | null>(null);
 
@@ -179,7 +151,6 @@ export function useAppraisalLive({
     baseRef.current = base;
   }, [compareOpen, pricePercent, base]);
 
-  // The selected hub's books.
   useEffect(() => {
     const pending = forcePrimary.current;
     const force = pending !== null && pending.from !== base;
@@ -198,7 +169,6 @@ export function useAppraisalLive({
         if (cached) settled.set(bookKey(hub, request.typeId), cached);
       }
       const wanted = requests.filter((r) => !settled.has(bookKey(hub, r.typeId)));
-      // Seeds from the cache (nothing wanted again is no flicker) and drops a failure left from the last run.
       setBooks((previous) => {
         const next = new Map(previous);
         for (const request of requests) {
@@ -210,7 +180,6 @@ export function useAppraisalLive({
         return next;
       });
       setChecking(wanted.length > 0);
-      // Own order ids load beside the books, not before them.
       const ownPromise = loadOwnOrderIds();
       void ownPromise.then((ids) => {
         if (!cancelled) setOwn(ids);
@@ -253,11 +222,9 @@ export function useAppraisalLive({
     };
   }, [base, requests, hub]);
 
-  // The other four hubs, only while Compare Hubs is open.
   useEffect(() => {
     const pending = forceCompare.current;
     const force = compareOpen && pending !== null && pending.from !== base;
-    // Closed Compare drops a waiting force: it must not fire on a later open.
     if (force || !compareOpen) forceCompare.current = null;
     if (base === null || !compareOpen || compareRequests.length === 0) return;
     let cancelled = false;
@@ -320,7 +287,6 @@ export function useAppraisalLive({
       const lookup = lookupFrom(books, row.hub, own, hubJumps);
       const applied = applyLiveBooks(items, lookup);
       const states = new Set<PriceState | undefined>(applied.map((item) => item.priceState));
-      // Cards stay on their cached figure until every row has settled: half live and half cached would be a total of neither.
       if (states.has('cached')) return { ...row, priceState: 'cached' };
       const { buy, sell } = buildHubComparison(applied, pricePercent);
       return {
@@ -341,7 +307,6 @@ export function useAppraisalLive({
   const settle = useCallback(async (): Promise<AppraisalOutcome | null> => {
     for (let pending = run.current; pending !== null; pending = run.current) {
       const settled = await pending;
-      // A cancelled run answers null: wait for the run that replaced it.
       if (settled !== null) return settled;
     }
     return latest.current;

@@ -25,15 +25,12 @@ import { useHydratedStore } from '@/lib/useHydratedStore';
 interface Props {
   snapshot: GoalPlannerSnapshot;
   characterId: number;
-  /** Switch the picker to "Find the best thing to build". */
   onFindBest: () => void;
 }
 
-/** The sentence a screen reader hears when the plan recomputes. */
 function headlineText(view: PlanView, t: ReturnType<typeof useTranslation>['t']): string {
   const { headline } = view;
   const parts: string[] = [];
-  // Never "add 0 ISK a day": no wins says nothing, wins with no gain (saves, unpriced) give time only.
   if (view.quickWins.length > 0) {
     parts.push(
       headline.quickWinPerDay > 0
@@ -63,11 +60,6 @@ function headlineText(view: PlanView, t: ReturnType<typeof useTranslation>['t'])
   return parts.join(' ');
 }
 
-/**
- * "Make more from my planets": the recommendation model, drawn. The page
- * wires reads to `buildPlanAdvice` (`usePlanAdvice`), shapes the answer
- * (`buildPlanView`) and draws it (`makeMore/`).
- */
 export function MakeMorePlan({ snapshot, characterId, onFindBest }: Props) {
   const { t } = useTranslation();
   const location = useLocation();
@@ -91,9 +83,7 @@ export function MakeMorePlan({ snapshot, characterId, onFindBest }: Props) {
     [state, snapshot.pi, t]
   );
 
-  // A row that is gone takes its tick with it.
   useEffect(() => {
-    // With prices down the list is shorter: pruning now would drop ticks on wins that return.
     if (!view || !ticksHydrated || state.status !== 'ready') return;
     const kept = pruneTicks(ticked, tickableIds(view), coveredPlanets(view));
     if (kept.length !== ticked.length) void setTicked(kept);
@@ -108,7 +98,6 @@ export function MakeMorePlan({ snapshot, characterId, onFindBest }: Props) {
     };
   }, [ticked, setTicked]);
 
-  // `#plan-hek-vi` scrolls to that colony's card once the plan is drawn.
   const hash = location.hash;
   const scrollTarget = view && hash.startsWith('#plan-') ? hash.slice(1) : null;
   const scrollOnce = useCallback((id: string) => {
@@ -122,7 +111,6 @@ export function MakeMorePlan({ snapshot, characterId, onFindBest }: Props) {
   }, [scrollTarget, scrollOnce, location.key]);
 
   if (state.status === 'prices-failed') {
-    // A win that needs no price (restart a stopped extractor) still stands; every figure is hidden.
     return (
       <div className="space-y-4">
         <PricesUnavailable />

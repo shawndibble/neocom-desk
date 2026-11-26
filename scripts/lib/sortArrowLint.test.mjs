@@ -1,12 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { ESLint } from 'eslint';
 
-/**
- * Pins the `no-restricted-syntax` selectors that keep "↑" / "↓" text arrows
- * out of sort headers (issue #2532) — sort direction is always the
- * Icon.Sort / Icon.Ascending / Icon.Descending trio. A regex selector that
- * never fires lints clean, so this runs the real config against fixtures.
- */
 const eslint = new ESLint();
 
 async function sortArrowErrors(source, filePath = 'src/features/fixture.tsx') {

@@ -59,7 +59,6 @@ describe('walletDealings', () => {
           amount: -1,
           date: '2026-10-01T00:00:00Z',
         },
-        // CONCORD paying a bounty: an NPC corporation.
         {
           first_party_id: 1_000_125,
           second_party_id: ME,
@@ -67,7 +66,6 @@ describe('walletDealings', () => {
           amount: 9,
           date: '2026-10-01T00:00:00Z',
         },
-        // Neither side is this character.
         {
           first_party_id: PAL,
           second_party_id: CORP,

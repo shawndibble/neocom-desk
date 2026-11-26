@@ -1,7 +1,3 @@
-// The change marker (issue #5073) as the sync driver uses it: what a background
-// pass reads when nothing changed, what bumps the marker, and every way a pass
-// falls back to the full incremental read. The collection passes are stubs —
-// what they would read is theirs to test; here only whether they ran.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { db } from '@/db';
 import { syncEditableCollection } from './collectionSync';
@@ -40,7 +36,6 @@ vi.mock('./settingsSync', async (importOriginal) => ({
   syncSettings: vi.fn(async () => {}),
 }));
 
-/** The remote marker, as another device or this one would leave it. */
 const remote = vi.hoisted(() => ({ version: null as number | null }));
 vi.mock('./syncMarker', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./syncMarker')>()),
@@ -50,7 +45,7 @@ vi.mock('./syncMarker', async (importOriginal) => ({
   }),
 }));
 
-const COLLECTION_PASSES = EDITABLE_COLLECTIONS.length + 2; // + feed + settings
+const COLLECTION_PASSES = EDITABLE_COLLECTIONS.length + 2;
 
 function collectionPasses(): number {
   return (
@@ -66,11 +61,8 @@ function resetPassCounts(): void {
   vi.mocked(syncSettings).mockClear();
 }
 
-/** One background sweep pass, awaited to the end. */
 async function backgroundPass(): Promise<void> {
   const reads = vi.mocked(readRemoteMarker).mock.calls.length;
-  // Wait for this pass to settle, not just for its marker read: the marker is read mid-pass, and
-  // the status still says idle from the last pass until this one records itself.
   let started = false;
   let settled = false;
   const stop = subscribeSyncStatus((status) => {
@@ -123,7 +115,6 @@ describe('idle background pass', () => {
   it('counts as a full pass for the sweep gate', async () => {
     await triggerSync(1);
     const before = getSyncStatus(1).lastFullSyncAt;
-    // A later clock, rather than waiting for the real one to move.
     vi.spyOn(Date, 'now').mockReturnValue((before ?? 0) + 60_000);
     await backgroundPass();
     expect(getSyncStatus(1).lastFullSyncAt).toBeGreaterThan(before ?? 0);
@@ -137,7 +128,6 @@ describe('idle background pass', () => {
     await backgroundPass();
 
     expect(collectionPasses()).toBe(COLLECTION_PASSES);
-    // ...and the next idle one is cheap again.
     resetPassCounts();
     await backgroundPass();
     expect(collectionPasses()).toBe(0);
@@ -233,7 +223,6 @@ describe('bumping the marker', () => {
     await vi.advanceTimersByTimeAsync(0);
     vi.useRealTimers();
     await vi.waitFor(() => expect(remote.version).toBe(1));
-    // A narrowed pass reads no marker of its own.
     expect(readRemoteMarker).toHaveBeenCalledTimes(1);
   });
 
@@ -269,7 +258,6 @@ describe('bumping the marker', () => {
     pushOnce();
     vi.mocked(bumpRemoteMarker).mockImplementationOnce(async (_firestore, _uid, by) => {
       remote.version = (remote.version ?? 0) + by;
-      // Another tab's full pass runs between the bump and this pass's bookkeeping.
       await writeSeenSyncMarker(1, { version: remote.version, fullAt: Date.now() });
     });
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
@@ -286,7 +274,7 @@ describe('bumping the marker', () => {
     await triggerSync(1);
     pushOnce();
     await triggerSync(1);
-    remote.version = (remote.version ?? 0) + 1; // another device's push
+    remote.version = (remote.version ?? 0) + 1;
     resetPassCounts();
 
     await backgroundPass();
@@ -298,7 +286,7 @@ describe('bumping the marker', () => {
     await triggerSync(1);
     vi.mocked(syncEditableCollection).mockImplementationOnce(async (_spec, ctx) => {
       ctx.onPush?.();
-      remote.version = (remote.version ?? 0) + 1; // lands after this pass read the marker
+      remote.version = (remote.version ?? 0) + 1;
     });
     await triggerSync(1);
     resetPassCounts();

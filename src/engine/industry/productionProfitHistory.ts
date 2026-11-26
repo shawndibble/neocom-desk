@@ -1,14 +1,3 @@
-/**
- * Reduces Production Log entries into a day-bucketed, cumulative
- * realized-profit series for the Logs tab's profit-over-time chart
- * (issue #711). Cumulative running total, not a per-day figure: production
- * runs are lumpy and infrequent (unlike the wallet's near-continuous
- * balance), so a per-bucket value would mostly show gaps and spikes — the
- * running total is what answers "is this character's production trending
- * more or less profitable over time," the same question the tab's own
- * total-realized-profit hero already answers for the whole filtered range
- * (see docs/context/decisions/20260906-091110-industry-page-reads-verdict-first.md).
- */
 import { formatLocalDate } from '@/lib/localDate';
 
 export interface ProductionProfitEntry {
@@ -17,9 +6,7 @@ export interface ProductionProfitEntry {
 }
 
 export interface ProductionProfitPoint {
-  /** Local calendar day, `YYYY-MM-DD`. */
   date: string;
-  /** Cumulative realized profit through this day, inclusive. */
   profit: number;
 }
 
@@ -43,7 +30,6 @@ export function productionProfitHistory(
 
 export type ProductionProfitTrend = 'up' | 'down' | 'flat';
 
-/** First point vs. last point — the line's overall direction, for trend-coloring the chart. */
 export function productionProfitTrend(
   points: readonly ProductionProfitPoint[]
 ): ProductionProfitTrend {

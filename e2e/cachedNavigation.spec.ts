@@ -1,12 +1,3 @@
-/**
- * The reported bug, as a navigation: leaving a page and coming back must show
- * the rows it already had, not a spinner over them.
- *
- * Only an e2e spec can assert this. The retained snapshot
- * (`lib/routeSnapshotCache.ts`) exists only on a *second* mount of a view, and
- * the unit suite resets that store before every test — deliberately, so no
- * test leaks its rows into the next one.
- */
 import { test, expect } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 import { clearCachedEsiRows } from './support/login';
@@ -23,9 +14,6 @@ const CORP_NAMES = [
 ];
 
 test('coming back to a page shows its rows again, not a spinner', async ({ page }) => {
-  // Held from the moment it is set, so the return visit's live read is still
-  // in flight while the assertions run — anything on screen then can only be
-  // the retained snapshot.
   let held: Promise<void> | null = null;
   let release: () => void = () => {};
 
@@ -47,13 +35,7 @@ test('coming back to a page shows its rows again, not a spinner', async ({ page 
 
   await signInAndGoto(page);
 
-  // The Character-overview sub-nav, not the left rail: 'Overview' names a link
-  // in both.
   const subNav = page.getByRole('navigation', { name: 'Overview' });
-  // Scoped to the timeline: the character header's own corp-name subtitle and
-  // the summary's Longest stay can read the same text as a past employer's
-  // card (all legitimately "Past Corp" here), which makes an unscoped
-  // page-wide locator ambiguous.
   const historyList = page.getByRole('list', { name: 'Employment' });
 
   await subNav.getByRole('link', { name: 'Employment' }).click();
@@ -62,11 +44,6 @@ test('coming back to a page shows its rows again, not a spinner', async ({ page 
   await subNav.getByRole('link', { name: 'Overview' }).click();
   await page.waitForURL(/\/overview$/);
 
-  // Every local copy dropped, not merely expired. Expiring is not enough to
-  // tell this apart from `esi/cache.ts`'s grace path, which serves an expired
-  // row after `STALE_GRACE_MS` anyway. With the rows gone and the live read
-  // held below, what the view shows can only be what it was already holding —
-  // which before this fix was nothing, and a spinner.
   await clearCachedEsiRows(page);
   held = new Promise<void>((resolve) => {
     release = resolve;
@@ -77,6 +54,5 @@ test('coming back to a page shows its rows again, not a spinner', async ({ page 
   await expect(historyList.getByRole('link', { name: 'Past Corp' })).toBeVisible();
   await expect(page.getByRole('status', { name: 'Loading' })).toHaveCount(0);
 
-  // Released before the test ends so the held request cannot outlive it.
   release();
 });

@@ -21,18 +21,11 @@ import { STAT_FIELD_WIDTH } from './statKit';
 
 const NORMAL_SPACE = 'none';
 
-/**
- * Which Abyssal weather every number on the page is worked out in — the
- * editor's stats, Variations, the overlay and Compare (`useAbyssalWeather`) —
- * and, once one is picked, what it does at that strength.
- */
 export function AbyssalWeatherPicker({
   field = false,
   info,
 }: {
-  /** In the stats column's `StatFields` grid: the label in its column, the weather's effect beneath. */
   field?: boolean;
-  /** With `field`: beside the label, an `InfoTooltip` for the section's reference text. */
   info?: ReactNode;
 } = {}) {
   const { t } = useTranslation();

@@ -49,7 +49,7 @@ describe('loadGroupNames', () => {
   it('serves a second call from the cache without touching the network', async () => {
     server.use(group(483, 'Mining Laser'));
     await loadGroupNames([483]);
-    server.resetHandlers(); // any request now is an unhandled-request error
+    server.resetHandlers();
     expect((await loadGroupNames([483])).get(483)).toBe('Mining Laser');
   });
 

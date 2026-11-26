@@ -1,8 +1,3 @@
-/**
- * The names of the systems a Payee has been mined for, alphabetical, for the
- * row's second line. Ids with no known name are dropped rather than shown as
- * raw numbers.
- */
 export function payeeSystemNames(
   systemIds: ReadonlySet<number> | undefined,
   systemNames: ReadonlyMap<number, string> | undefined

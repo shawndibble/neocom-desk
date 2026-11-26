@@ -7,7 +7,6 @@ import {
   type LoadBlueprints,
 } from '@/features/assets/assetCopyValues';
 
-/** The slow reads every assets snapshot (personal, corp) fans out behind its rows. */
 export interface AssetReads {
   volumeByTypeId: Promise<Map<number, number>>;
   copyValueByItemId: Promise<Map<number, number>>;
@@ -18,20 +17,11 @@ interface AssetReadsInput {
   characterId: number;
   assets: readonly CopyAssetRow[];
   typeIds: readonly number[];
-  /** Each owner's own blueprint read, for a copy's ME/TE/runs. */
   loadBlueprints: LoadBlueprints;
-  /** The owner's in-game ship/container names; must swallow its own failures. */
   loadAssetNames: () => Promise<AssetNameMap>;
-  /** A superseded load: start nothing, resolve empty. */
   cancelled?: boolean;
 }
 
-/**
- * Starts volumes, blueprint copy values and in-game names together and hands
- * back the promises, so a caller can publish each as it lands or await all.
- * Prices and type categories stay with the callers: personal starts prices
- * before its assets read, and only corp shows categories.
- */
 export function startAssetReads({
   characterId,
   assets,
@@ -54,7 +44,6 @@ export function startAssetReads({
   };
 }
 
-/** Oldest `fetchedAt` across the reads, so one badge speaks for the whole view; null when none carry one. */
 export function oldestFetchedAt(
   results: readonly { cached?: Pick<CachedResult<unknown>, 'fetchedAt'> | null }[]
 ): Date | null {
@@ -64,7 +53,6 @@ export function oldestFetchedAt(
   return dates.length === 0 ? null : dates.reduce((oldest, d) => (d < oldest ? d : oldest));
 }
 
-/** True when any read fell back to its saved copy. */
 export function anyFromCache(
   results: readonly { cached?: Pick<CachedResult<unknown>, 'fromCache'> | null }[]
 ): boolean {

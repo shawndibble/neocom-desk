@@ -1,6 +1,3 @@
-// SRP callables against the Firestore emulator (issue #4848, ADR 0026). Runs
-// only under `npm run test:rules` at the repo root (which starts the emulator
-// and sets FIRESTORE_EMULATOR_HOST); a plain `npm test` skips it.
 import type { Caller } from './actorAuth.js';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { clearEmulator, emulatorDb as db, emulatorSuite } from './testSupport/emulator.js';
@@ -180,7 +177,6 @@ emulatorSuite('SRP callables (emulator)', () => {
       );
       await saveSrpSettings(deps(), who(DIRECTOR), call(DIRECTOR), patch);
       expect(await settings()).toMatchObject({ ...patch, enabled: true, updatedBy: DIRECTOR });
-      // A later patch changes only its own fields.
       await saveSrpSettings(
         deps(),
         who(DIRECTOR),
@@ -321,7 +317,7 @@ emulatorSuite('SRP callables (emulator)', () => {
           requireFleetOrFc: true,
         },
       });
-      expect(identityCalls).toBe(2); // only the Director's two live checks, never the pilot's roles
+      expect(identityCalls).toBe(2);
       await turnOffSrp(deps(), who(DIRECTOR), call(DIRECTOR));
       expect((await getSrpStatus(deps(), who(PILOT), call(PILOT))).enabled).toBe(false);
     });

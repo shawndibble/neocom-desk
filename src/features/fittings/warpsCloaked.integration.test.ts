@@ -19,7 +19,6 @@ const readJson = async <T>(path: string): Promise<T> =>
 
 import { swapChanges } from '@/engine/fittings/swapChanges';
 
-/** Jita sell, 2026-10-30. Illustrative: only the order matters. */
 const PRICES: Record<string, number> = {
   'Covert Ops Cloaking Device II': 100_000_000,
   'Prototype Cloaking Device I': 1_000_000,
@@ -96,8 +95,6 @@ describe('Warps cloaked on a cloak swap (real engine)', () => {
       stats,
       priceOf: (typeId) => PRICES[types[String(typeId)]?.name ?? ''] ?? null,
     });
-    // Cheaper's keep-your-stats guardrail turns this swap down (the Prototype cloak slows the ship
-    // more), so it sits among the closest swaps; its `lost` list is the Gives up either way.
     const option = [...(result?.tradeOffs ?? []), ...(result?.rejected ?? [])].find(
       (o) => o.candidate.toTypeId === id('Prototype Cloaking Device I')
     );

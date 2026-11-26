@@ -24,7 +24,6 @@ const bp = (item_id: number, location_id: number, location_flag = 'Hangar') => (
 
 beforeEach(() => {
   blueprints.current = { data: [bp(1, 60003760), bp(2, 9000, 'Unlocked')] };
-  // Blueprint 2 sits in container 9000, which sits in a structure.
   assets.current = {
     data: [{ item_id: 9000, location_id: 1034000000001, location_type: 'other' }],
   };

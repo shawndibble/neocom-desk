@@ -1,22 +1,3 @@
-/**
- * Settings > Notifications' Delivery layer: how alerts reach this device.
- * The master switch, the two channels it gates (Device pop-ups, Alerts list),
- * Dismiss on View, and the entry to Alerts when closed.
- *
- * Desktop is one wrapping line with the Alerts when closed summary at its
- * right end. A phone gets plain 36px rows in a fixed order, the two channels
- * indented beneath the master switch. The blocked
- * notice, the Play-app notice, the iOS install notice and the push-failure
- * retry stay with the Device pop-ups row: above the line on desktop, directly
- * under that row on a phone.
- *
- * The channels are independent rather than a fallback chain: device pop-ups
- * need a permission grant and an OS that will raise one (never iOS while the
- * app is closed, ADR 0007), while the Alerts list works everywhere and is the
- * only channel some devices will ever see, so switching one off must not
- * touch the other. Their longer explanations sit behind the info buttons (and
- * in the sr-only text the checkboxes are described by).
- */
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
@@ -56,7 +37,6 @@ interface NotificationsDeliveryProps {
   permission: NotificationPermissionState;
   refreshPermission: () => void;
   browserBlocked: boolean;
-  /** Alerts when closed is only offered once sync is set up and a Character exists. */
   alertsWhenClosedCharacters: readonly { characterId: number; name: string }[] | null;
 }
 
@@ -74,8 +54,6 @@ export function NotificationsDelivery({
   const [retrying, setRetrying] = useState(false);
   useHydratedStore(usePushFailure);
 
-  // Records the ask here too, so someone who ignored the one-time explainer and
-  // came to Settings instead is not offered it again on the next load.
   async function enableNotifications() {
     const { permission: outcome } = await enableWebPush();
     await setPromptState(promptStateAfterAsk(outcome));
@@ -83,8 +61,6 @@ export function NotificationsDelivery({
     return outcome;
   }
 
-  // Retry is the same call as Enable: permission is already granted, so it
-  // only re-registers, and the outcome files itself (cleared or re-recorded).
   async function retryPushRegistration() {
     setRetrying(true);
     try {
@@ -94,13 +70,7 @@ export function NotificationsDelivery({
     }
   }
 
-  // iOS delivers Web Push only to an installed PWA (issue #356 AC1) — the
-  // Enable button would either do nothing or grant a permission that can
-  // never deliver anything, so this state shows why instead of the button.
   const installRequired = webPushSupport() === 'requires-install';
-  // In the Play Store app Chrome delegates the grant to the Android app's own
-  // notification toggle (docs/ANDROID-TWA.md), so the blocked notice has to
-  // name that screen — browser site settings can't unblock it.
   const [inPlayStoreApp] = useState(isPlayStoreApp);
 
   const notices = (
@@ -128,7 +98,6 @@ export function NotificationsDelivery({
         <div className="flex flex-wrap items-center gap-2 rounded-xs border border-warning/60 bg-warning/10 px-3 py-2">
           <LiveNote className="min-w-0 flex-1 text-xs text-warning">
             {t(`settings.notifications.pushFailed.${pushFailure.reason}`)}{' '}
-            {/* Restamped by every failed attempt, so a Retry that fails again still changes it. */}
             {t('settings.notifications.pushFailedAt', {
               time: formatTimeOfDay(new Date(pushFailure.at)),
             })}
@@ -143,12 +112,6 @@ export function NotificationsDelivery({
           </Button>
         </div>
       )}
-      {/*
-        `permission` reads 'unsupported' here, not 'default' — a
-        non-installed iOS Safari tab has no Notification API to ask at
-        all (issue #356 AC1). Gating this on 'default' alone would hide
-        the explanation on exactly the platform it exists for.
-      */}
       {installRequired && (permission === 'default' || permission === 'unsupported') && (
         <>
           <LiveStatus>{t('settings.notifications.installRequiredNotice')}</LiveStatus>
@@ -163,12 +126,9 @@ export function NotificationsDelivery({
     </>
   );
 
-  // Ticking Device pop-ups is the ask: until the browser has been asked there
-  // is nothing to have switched on, so the box reads unticked.
   const needsGrant = permission === 'default' && !installRequired;
   async function toggleBrowserChannel() {
     if (needsGrant) {
-      // A denial leaves the box unticked; the blocked notice takes over.
       if ((await enableNotifications()) === 'granted') {
         await setDeviceNotificationPrefs(withBrowserEnabled(prefsValue, true));
       }
@@ -180,7 +140,6 @@ export function NotificationsDelivery({
   }
 
   const masterOff = !prefsValue.masterEnabled;
-  // Channel rows indent under the master switch on a phone; the line has no indent.
   const rowClassName = cx('flex items-center gap-2 text-xs text-text', tappableRowClassName);
 
   return (

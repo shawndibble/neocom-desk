@@ -1,9 +1,3 @@
-/**
- * The wallet transactions filter row: search, then Side, a date range and
- * (when the caller passes stations) a Station pick in the funnel. Shared by
- * the personal panel in Market History and the corp wallet's Transactions
- * tab, which filter the same fields of the same ESI shape.
- */
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -25,7 +19,6 @@ import {
   type WalletTransactionFilter,
 } from './walletTransactionFilter';
 
-/** Radix needs a value here, and `''` reads to it as "nothing selected". */
 const SIDE_OPTIONS: readonly TransactionSide[] = ['all', 'buy', 'sell'];
 
 const SIDE_LABEL: Record<TransactionSide, string> = {
@@ -43,14 +36,8 @@ export function TransactionsFilterBar({
 }: {
   filter: WalletTransactionFilter;
   onChange: (filter: WalletTransactionFilter) => void;
-  /** The column picker, inline between the search box and the funnel. */
   actions?: ReactNode;
-  /** Transactions the filter leaves, for the phone sheet's done button. */
   resultCount?: number;
-  /**
-   * The stations to pick from. Market History passes them for its Station
-   * filter; the corp wallet doesn't, and gets no such field.
-   */
   stationOptions?: readonly MultiSelectOption<number>[];
 }) {
   const { t } = useTranslation();

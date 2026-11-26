@@ -8,7 +8,6 @@ import {
 } from './attributeCompareMatrix';
 import type { AttributeDictionary } from './itemAttributes';
 
-/** The engine takes these already translated; the values match `market.compare.*`. */
 const LABELS = { worth: 'Worth', estimatedPrice: 'Estimated Price' };
 const DICTIONARY: AttributeDictionary = {
   9: { name: 'Structure Hitpoints', unit: 'HP', category: 'Structure' },
@@ -132,7 +131,6 @@ describe('buildCompareMatrix', () => {
     const row = buildCompareMatrix(items, DICTIONARY, LABELS, NAMES).flatMap((g) => g.rows)[1];
     expect(row.name).toBe('Used with (Launcher Group)');
     expect(row.cells.get(1)).toEqual({ value: 483, unit: null, displayValue: 'Mining Laser' });
-    // Unresolvable: unchanged from today rather than blanked.
     expect(row.cells.get(2)).toEqual({ value: 99999, unit: 'groupID' });
   });
 

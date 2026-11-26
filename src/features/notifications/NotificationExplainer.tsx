@@ -19,22 +19,6 @@ import { beginAlertsLogin } from '@/app/loginFlow';
 import { useAlertsNearby } from './alertsGrant';
 import { DialogFooter } from '@/components/ui/DialogFooter';
 
-/**
- * The one-time notification explainer (issue #171), drawn at the top of the
- * alerts panel the first time the bell is opened. Opening the bell is the
- * moment the player shows they want alerts, so nothing interrupts them before
- * it: no bottom banner, and nothing on the first screen.
- *
- * Shown once ever per device (Install Prompt precedent, GLOSSARY.md round 20):
- * Enable makes the single real `Notification.requestPermission()` call, "Not
- * now" makes none at all, and either answer suppresses it permanently — a
- * denied grant can never be re-requested from JS anyway. Settings'
- * Device pop-ups checkbox asks too, and also ends this explainer.
- *
- * Step two (ADR 0020, issue #3758): when Enable ends in a grant, the same
- * block offers Alerts when closed for the Character just signed in. It is
- * never requested inside the permission step itself.
- */
 export function NotificationExplainer() {
   const { t } = useTranslation();
   const { value, setValue } = useNotificationPromptState();
@@ -51,19 +35,11 @@ export function NotificationExplainer() {
   );
   const { value: alertsOfferSeen, setValue: setAlertsOfferSeen } = useAlertsOfferSeen();
   const nearbySupported = useAlertsNearby().supported;
-  // Set only by this explainer's own Enable, so the offer never reaches
-  // someone who saw the explainer on an earlier visit.
   const grantedHere = useGrantedHere((state) => state.granted);
 
   const hydrated = useHydratedStore(useNotificationPromptState);
   const offerHydrated = useHydratedStore(useAlertsOfferSeen);
 
-  // iOS delivers Web Push only to an installed PWA — requesting permission
-  // here would either do nothing or grant a permission that can never
-  // deliver anything, so this state skips the browser prompt and explains
-  // why instead (issue #356 AC1). Notification is undefined on a
-  // non-installed iOS Safari tab, so `permission` alone would read
-  // 'unsupported' and hide the explainer entirely without this.
   const installRequired = webPushSupport() === 'requires-install';
 
   const visible = shouldShowPermissionExplainer({
@@ -87,8 +63,6 @@ export function NotificationExplainer() {
   const dismiss = () => void setValue({ seen: true, outcome: value.outcome });
   const enable = async () => {
     const { permission: outcome } = await enableWebPush();
-    // Before the prompt state is saved: that save ends the explainer, and the
-    // offer must already be eligible so the block never unmounts in between.
     if (outcome === 'granted') {
       refresh();
       useGrantedHere.setState({ granted: true });
@@ -100,14 +74,12 @@ export function NotificationExplainer() {
     const characterId = newestCharacter?.characterId;
     if (characterId === undefined) return;
     await setAlertsOfferSeen(true);
-    // A start that fails (offline) puts the offer back rather than losing it.
     void beginAlertsLogin(characterId).catch(() => setAlertsOfferSeen(false));
   };
 
   const copy = offering
     ? {
         title: t('notifications.alertsOffer.title'),
-        // What EVE will ask for: the location too once the server takes it (ADR 0028).
         body: t(
           nearbySupported
             ? 'notifications.alertsOffer.bodyNearby'
@@ -146,7 +118,6 @@ export function NotificationExplainer() {
           {copy.dismiss}
         </Button>
         {copy.enable &&
-          // The Alerts offer starts a login (needs a connection); the plain push explainer does not.
           (offering ? <NeedsConnection>{enableButton}</NeedsConnection> : enableButton)}
       </DialogFooter>
     </div>

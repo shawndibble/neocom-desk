@@ -1,13 +1,3 @@
-/**
- * The Overview Layout and the pure reducers that edit it.
- *
- * Every reducer returns a new layout and never mutates its input; one that
- * would change nothing returns the very same object, so a caller can tell "no
- * change" by identity and skip the write (and the Undo toast). Widget ids come
- * from a caller-supplied `makeId`, so tests stay deterministic.
- *
- * No React, Dexie or fetch here: the store lives in `layoutStore.ts`.
- */
 import { DEFAULT_PLEX_PER_30_DAYS } from '@/engine/omegaCoverage';
 import { TREND_MAX_SERIES } from '@/engine/market/trendSeries';
 import { getTradeHub } from '@/market/hubs';
@@ -28,17 +18,11 @@ import { LAYER_IDS, type LayerId } from '@/engine/netWorth/series';
 import type { EmpireFaction } from '@/engine/empireFactions';
 import { CHARACTER_BOARD_ITEM_KINDS, type CharacterBoardItemKind } from '@/engine/character/board';
 
-/**
- * Whose data a widget reads: the header Character, every Character, or one corporation (the
- * Corp Board; stored as `corp:<id>`). A corporation is a scope of its own rather than a
- * Character filter, so an older build that does not know it reads the header Character.
- */
 export type CorpScope = `corp:${number}`;
 export type WidgetScope = 'header' | 'all' | CorpScope;
 
 export const corpScope = (corporationId: number): CorpScope => `corp:${corporationId}`;
 
-/** The corporation a scope names, or null for header and all. */
 export function scopeCorporation(scope: WidgetScope): number | null {
   return scope.startsWith('corp:') ? Number(scope.slice(5)) : null;
 }
@@ -53,29 +37,20 @@ export function isWidgetScope(value: unknown): value is WidgetScope {
 export type CalendarEventsChoice = 'committed' | 'all';
 export const CALENDAR_EVENTS_CHOICES: readonly CalendarEventsChoice[] = ['committed', 'all'];
 
-/** Skyhook raids: whose space it lists. Alliance is the default and is never stored. */
 export type RaidsWhere = 'alliance' | 'near';
 export const RAIDS_WHERES: readonly RaidsWhere[] = ['alliance', 'near'];
-/** Jumps from the Current System under Near me; not a WidgetRange, which counts days. */
 export const RAIDS_RADII: readonly number[] = [5, 8, 10, 15];
 export const DEFAULT_RAIDS_RADIUS = 8;
 export const isRaidsRadius = (value: unknown): value is number =>
   typeof value === 'number' && RAIDS_RADII.includes(value);
 
-/**
- * Profit: which earnings it adds up. Stored on every Profit widget; absent is
- * one saved before the setting existed, i.e. Builds (what that widget showed).
- */
 export type ProfitSource = 'builds' | 'trading' | 'both';
 export const PROFIT_SOURCES: readonly ProfitSource[] = ['builds', 'trading', 'both'];
-/** What a new Profit widget adds up. */
 export const DEFAULT_PROFIT_SOURCE: ProfitSource = 'both';
-/** What a Profit widget with no stored Source adds up: one saved before the setting showed builds. */
 export const LEGACY_PROFIT_SOURCE: ProfitSource = 'builds';
 export const isProfitSource = (value: unknown): value is ProfitSource =>
   PROFIT_SOURCES.includes(value as ProfitSource);
 
-/** Military Campaigns: whose campaign it shows. All is the default and is never stored. */
 export type CampaignFaction = 'all' | EmpireFaction;
 export const CAMPAIGN_FACTIONS: readonly CampaignFaction[] = [
   'all',
@@ -89,27 +64,21 @@ export const isCampaignFaction = (value: unknown): value is CampaignFaction =>
 
 export type WidgetRange = 7 | 30 | 90 | 365;
 export const WIDGET_RANGES: readonly WidgetRange[] = [7, 30, 90];
-/** What a price-history kind offers: ESI keeps about 13 months of market history. */
 export const LONG_WIDGET_RANGES: readonly WidgetRange[] = [7, 30, 90, 365];
 export const DEFAULT_RANGE: WidgetRange = 30;
 
-/** The windows a kind offers, or none for a kind with no time window. */
 export function rangesOf(kind: WidgetKindId): readonly WidgetRange[] {
   const def = getKind(kind);
   if (!def?.hasRange) return [];
   return def.hasLongRange ? LONG_WIDGET_RANGES : WIDGET_RANGES;
 }
 
-/** Most Trade Hubs one Market Trend widget compares. */
 export const MAX_TREND_HUBS = 3;
 
-/** The most PLEX per 30 days a plan can be set to. */
 export const MAX_PLEX_PLAN = 5000;
 
-/** Kinds a new widget opens reading every Character; each must sum across them (`scope: 'account'` in its `KindDef`). */
 export const OPENS_ON_ALL: ReadonlySet<string> = new Set(['omega']);
 
-/** Soft limit on how many widgets one Overview holds. */
 export const MAX_WIDGETS = 30;
 
 export interface Widget {
@@ -120,32 +89,17 @@ export interface Widget {
   title?: string;
   scope: WidgetScope;
   range?: WidgetRange;
-  /** Rows per page for a paged table; absent means the default. Only a table that opts in reads it. */
   rowsPerPage?: RowsPerPage;
-  /** The pilot's Omega plan: PLEX per 30 days. Absent means the default (500). Only a kind with a plan reads it. */
   plexPer30Days?: number;
-  /** Calendar only: which events it lists. Absent means accepted and tentative; stored only for 'all'. */
   calendarEvents?: CalendarEventsChoice;
-  /**
-   * Calendar only: the Clock Kinds it leaves out. Absent means every kind shows. Stored as what is
-   * hidden, so a kind added later shows on every widget the day it ships (calendarKindFilter.ts).
-   */
   hiddenKinds?: CharacterBoardItemKind[];
-  /** Skyhook raids only: 'near' lists any holder's space near the pilot. Absent means My alliance; stored only for 'near'. */
   raidsWhere?: 'near';
-  /** Skyhook raids only: jumps for Near me. Absent means the default (8). */
   raidsRadius?: number;
-  /** Net worth only: the layers the pilot switched off. Absent means all show; never every layer. */
   hiddenLayers?: LayerId[];
-  /** Profit only: which earnings it adds up. Absent means Builds (a widget saved before the setting). */
   profitSource?: ProfitSource;
-  /** Military Campaigns only: one faction's campaign. Absent means All; never stored as 'all'. */
   campaignFaction?: Exclude<CampaignFaction, 'all'>;
-  /** Market Trend only: the items it draws, newest pick last. Absent means the Quickbar's first items. */
   trendItems?: number[];
-  /** Market Trend only: the Trade Hubs it prices at. Absent means the pilot's Market hub. */
   trendHubs?: string[];
-  /** A kind with a Show setting: what it draws. Absent means the kind's first Show; stored only for another. */
   show?: WidgetShow;
   showOnPhone: boolean;
 }
@@ -158,7 +112,6 @@ export interface OverviewLayout {
 export type MakeId = () => string;
 export type MoveTarget = 'up' | 'down' | 'top' | 'bottom' | number;
 
-/** What a user action hands the Undo toast: its label key and where to go back to. */
 export interface UndoableResult {
   layout: OverviewLayout;
   undoLabel: string;
@@ -173,15 +126,10 @@ export function canAdd(layout: OverviewLayout, kind?: WidgetKindId): boolean {
 function uniqueId(layout: OverviewLayout, makeId: MakeId): string {
   const taken = new Set(layout.widgets.map((w) => w.id));
   let id = makeId();
-  // A bounded retry: a makeId that keeps colliding is a caller bug, not a loop.
   for (let i = 0; i < 1000 && taken.has(id); i++) id = makeId();
   return id;
 }
 
-/**
- * A widget with its kind's defaults, on `show` when the kind offers it; null for a
- * kind this build does not know.
- */
 export function newWidget(kind: WidgetKindId, id: string, show?: WidgetShow): Widget | null {
   const def = getKind(kind);
   if (!def) return null;
@@ -200,7 +148,6 @@ export function newWidget(kind: WidgetKindId, id: string, show?: WidgetShow): Wi
   return widget;
 }
 
-/** What the Gallery's presets set on the widget they add; the rest stays the kind's default. */
 export interface WidgetInit {
   title?: string;
   trendItems?: readonly number[];
@@ -208,11 +155,9 @@ export interface WidgetInit {
   view?: WidgetView;
   size?: WidgetSize;
   show?: WidgetShow;
-  /** Opens on All (a board's `opensOnAll`, or a default layout's seed). */
   scope?: WidgetScope;
 }
 
-/** A new widget with `init` applied over its kind's defaults; whatever the kind does not offer is left out. */
 function withInit(kind: WidgetKindId, id: string, init?: WidgetInit): Widget | null {
   const def = getKind(kind);
   const base = newWidget(kind, id, init?.show);
@@ -232,7 +177,6 @@ function withInit(kind: WidgetKindId, id: string, init?: WidgetInit): Widget | n
   return widget;
 }
 
-/** A widget a default layout or a Role brings: a kind, or a kind with settings (a Gallery preset's). */
 export type WidgetSeed = WidgetKindId | ({ kind: WidgetKindId } & WidgetInit);
 
 export const seedKind = (seed: WidgetSeed): WidgetKindId =>
@@ -281,7 +225,6 @@ export function moveWidget(layout: OverviewLayout, id: string, to: MoveTarget): 
   return { ...layout, widgets };
 }
 
-/** Replace one widget with `patch(widget)`; the same layout back if `patch` returns null. */
 function update(
   layout: OverviewLayout,
   id: string,
@@ -311,10 +254,6 @@ export function setScope(layout: OverviewLayout, id: string, scope: WidgetScope)
   return update(layout, id, (w) => (w.scope === scope ? null : { ...w, scope }));
 }
 
-/**
- * Every widget on `scope` at once (the page's scope control). `canTake` leaves out a widget
- * that cannot be on it (a kind that cannot sum, under All); unchanged widgets keep their identity.
- */
 export function setAllScopes(
   layout: OverviewLayout,
   scope: WidgetScope,
@@ -333,7 +272,6 @@ export function setRange(layout: OverviewLayout, id: string, range: WidgetRange)
   });
 }
 
-/** Stored only when it differs from the default, so a widget nobody touched stays as small as before. */
 export function setRowsPerPage(
   layout: OverviewLayout,
   id: string,
@@ -357,7 +295,6 @@ export function isPlexPlan(value: unknown): value is number {
   );
 }
 
-/** Stored only when it differs from the default, so a widget nobody touched stays as small as before. */
 export function setPlexPer30Days(layout: OverviewLayout, id: string, plex: number): OverviewLayout {
   if (!isPlexPlan(plex)) return layout;
   return update(layout, id, (w) => {
@@ -373,7 +310,6 @@ export function setPlexPer30Days(layout: OverviewLayout, id: string, plex: numbe
   });
 }
 
-/** Stored only when it differs from the default, so a widget nobody touched stays as small as before. */
 export function setCalendarEvents(
   layout: OverviewLayout,
   id: string,
@@ -392,7 +328,6 @@ export function setCalendarEvents(
   });
 }
 
-/** Stored only when it differs from the default, so a widget nobody touched stays as small as before. */
 export function setRaidsWhere(
   layout: OverviewLayout,
   id: string,
@@ -409,7 +344,6 @@ export function setRaidsWhere(
   });
 }
 
-/** Stored only when it differs from the default. The view and range stay: every Show offers the kind's views. */
 export function setShow(layout: OverviewLayout, id: string, show: WidgetShow): OverviewLayout {
   return update(layout, id, (w) => {
     const def = getKind(w.kind);
@@ -425,7 +359,6 @@ export function setShow(layout: OverviewLayout, id: string, show: WidgetShow): O
   });
 }
 
-/** Stored only when it differs from the default. */
 export function setRaidsRadius(layout: OverviewLayout, id: string, radius: number): OverviewLayout {
   if (!isRaidsRadius(radius)) return layout;
   return update(layout, id, (w) => {
@@ -441,7 +374,6 @@ export function setRaidsRadius(layout: OverviewLayout, id: string, radius: numbe
   });
 }
 
-/** Always stored: absent means Builds, not the new-widget default. */
 export function setProfitSource(
   layout: OverviewLayout,
   id: string,
@@ -456,7 +388,6 @@ export function setProfitSource(
   });
 }
 
-/** All is the default, so choosing it drops the field. */
 export function setCampaignFaction(
   layout: OverviewLayout,
   id: string,
@@ -476,7 +407,6 @@ export function setCampaignFaction(
   });
 }
 
-/** An empty (or blank) name clears the title, so the kind's own title shows again. */
 export function renameWidget(layout: OverviewLayout, id: string, title: string): OverviewLayout {
   const name = title.trim();
   return update(layout, id, (w) => {
@@ -511,7 +441,6 @@ export function snapshotLayout(layout: OverviewLayout): OverviewLayout {
   return structuredClone(layout);
 }
 
-/** Cancel: a fresh copy of the snapshot, so editing it later cannot touch the snapshot. */
 export function restoreLayout(snapshot: OverviewLayout): OverviewLayout {
   return structuredClone(snapshot);
 }
@@ -520,7 +449,6 @@ export function resetLayout(defaultLayout: OverviewLayout): OverviewLayout {
   return structuredClone(defaultLayout);
 }
 
-/** Pair a change with its Undo: null when nothing changed, so no toast is raised. */
 function undoable(
   before: OverviewLayout,
   after: OverviewLayout,
@@ -587,12 +515,6 @@ export function resetLayoutUndoable(
   };
 }
 
-/**
- * Move a widget one place earlier or later among the widgets the page draws.
- * The grid hides kinds a newer build wrote and (on a phone) widgets set to Hide
- * on phone; stepping by one index in the full list would land beside one of
- * those and look like a no-op, so this hops to the drawn neighbour's place.
- */
 export function stepWidget(
   layout: OverviewLayout,
   id: string,
@@ -608,35 +530,30 @@ export function stepWidget(
   return layout;
 }
 
-/** A drop: put `id` where `overId` sits, both named by id so the drawn subset never matters. */
 export function moveToWidget(layout: OverviewLayout, id: string, overId: string): OverviewLayout {
   const to = layout.widgets.findIndex((w) => w.id === overId);
   if (to < 0 || id === overId) return layout;
   return moveWidget(layout, id, to);
 }
 
-/** Whole positive type ids, each once, at most the most lines a widget draws; the rest is dropped. */
 export function cleanTrendItems(raw: unknown): number[] {
   if (!Array.isArray(raw)) return [];
   const ids = raw.filter((v): v is number => Number.isInteger(v) && v > 0);
   return [...new Set(ids)].slice(0, TREND_MAX_SERIES);
 }
 
-/** Known Trade Hub ids, each once, at most `MAX_TREND_HUBS`. */
 export function cleanTrendHubs(raw: unknown): string[] {
   if (!Array.isArray(raw)) return [];
   const ids = raw.filter((v): v is string => typeof v === 'string' && getTradeHub(v) !== undefined);
   return [...new Set(ids)].slice(0, MAX_TREND_HUBS);
 }
 
-/** Known layers only, once each, in the widget's own order; never all of them (a chart needs one). */
 export function cleanHiddenLayers(raw: unknown): LayerId[] {
   if (!Array.isArray(raw)) return [];
   const hidden = LAYER_IDS.filter((id) => raw.includes(id));
   return hidden.length >= LAYER_IDS.length ? [] : hidden;
 }
 
-/** Known Clock Kinds only, once each, in the board's order. Every kind may be hidden: the widget says so. */
 export function cleanHiddenKinds(raw: unknown): CharacterBoardItemKind[] {
   if (!Array.isArray(raw)) return [];
   return CHARACTER_BOARD_ITEM_KINDS.filter((kind) => raw.includes(kind));
@@ -645,7 +562,6 @@ export function cleanHiddenKinds(raw: unknown): CharacterBoardItemKind[] {
 const sameList = (a: readonly unknown[] | undefined, b: readonly unknown[]) =>
   (a ?? []).length === b.length && b.every((v, i) => a![i] === v);
 
-/** An empty list clears the setting, so the widget follows the Quickbar again. */
 export function setTrendItems(layout: OverviewLayout, id: string, items: unknown): OverviewLayout {
   const next = cleanTrendItems(items);
   return update(layout, id, (w) => {
@@ -659,7 +575,6 @@ export function setTrendItems(layout: OverviewLayout, id: string, items: unknown
   });
 }
 
-/** An empty list clears the setting, so the widget prices at the pilot's Market hub again. */
 export function setTrendHubs(layout: OverviewLayout, id: string, hubs: unknown): OverviewLayout {
   const next = cleanTrendHubs(hubs);
   return update(layout, id, (w) => {
@@ -673,7 +588,6 @@ export function setTrendHubs(layout: OverviewLayout, id: string, hubs: unknown):
   });
 }
 
-/** An empty list clears the setting, so every kind shows again. */
 export function setHiddenKinds(layout: OverviewLayout, id: string, kinds: unknown): OverviewLayout {
   const next = cleanHiddenKinds(kinds);
   return update(layout, id, (w) => {
@@ -687,7 +601,6 @@ export function setHiddenKinds(layout: OverviewLayout, id: string, kinds: unknow
   });
 }
 
-/** An empty list clears the setting, so every layer shows again. */
 export function setHiddenLayers(
   layout: OverviewLayout,
   id: string,

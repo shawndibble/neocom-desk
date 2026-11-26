@@ -1,27 +1,13 @@
-/**
- * Quiet time (issue #4566): a device's daily window with no pushes from the
- * closed app. Device-local, never synced — it describes where this phone
- * sleeps. The server enforces it (`functions/src/quietHours.ts`): iOS revokes
- * a push subscription that shows nothing, so the device cannot swallow a push.
- *
- * Pure: no fetch/DOM/Dexie. The window is read in 24h local time; the IANA
- * zone is captured each time the user saves, so the window follows the
- * pilot's clock and DST rather than UTC.
- */
 import type { NotificationPreferencesValue } from './preferencesStore';
 
 export interface QuietTimePrefs {
   enabled: boolean;
-  /** `HH:MM`, 24h. */
   start: string;
   end: string;
-  /** Attack and loss alerts are still pushed inside the window. */
   allowAttacks: boolean;
-  /** IANA zone captured when last saved. */
   timeZone: string;
 }
 
-/** What the `registerDevice` callable receives; mirrors `functions/src/quietHours.ts`'s `QuietHours`. */
 export interface QuietHoursPayload {
   start: string;
   end: string;
@@ -46,7 +32,6 @@ export function isQuietTimePrefs(raw: unknown): raw is QuietTimePrefs {
   );
 }
 
-/** The editable fields, defaulted: off, 22:00 to 07:00, attacks blocked. */
 export function quietTimeView(
   value: NotificationPreferencesValue
 ): Omit<QuietTimePrefs, 'timeZone'> {
@@ -58,7 +43,6 @@ export function quietTimeView(
   };
 }
 
-/** Applies an edit and re-captures the zone, so a saved window always carries the zone it was set in. */
 export function withQuietTime(
   value: NotificationPreferencesValue,
   patch: Partial<Omit<QuietTimePrefs, 'timeZone'>>,
@@ -67,11 +51,6 @@ export function withQuietTime(
   return { ...value, quietTime: { ...quietTimeView(value), ...patch, timeZone } };
 }
 
-/**
- * The window to upload, or `null` for none: off, a half-typed or equal
- * start and end (a window of no length). `null` is sent, not omitted, so a
- * window turned off here is cleared on the server.
- */
 export function quietHoursPayload(value: NotificationPreferencesValue): QuietHoursPayload | null {
   const quiet = value.quietTime;
   if (!quiet?.enabled) return null;

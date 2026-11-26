@@ -32,7 +32,6 @@ describe('extractExplore', () => {
     expect(extractExplore([item()], [result({ 73: 5000 })])).toEqual(NO_EXPLORE);
   });
 
-  // SDE names: 1910 is Virus Strength, 1909 is Virus Coherence (a Data Analyzer II: 30 and 60).
   it('reads the best analyzer: strength, coherence, fastest cycle', () => {
     const explore = extractExplore(
       [item(1), item(2)],
@@ -62,7 +61,6 @@ describe('extractExplore', () => {
   });
 
   it('reads strength off Virus Strength, not Virus Coherence', () => {
-    // A Data Analyzer II on a hull with no hacking bonus.
     const explore = extractExplore([item()], [result({ 1910: 30, 1909: 60, 73: 10_000 })]);
     expect(explore.hacking).toEqual({ strength: 30, coherence: 60, cycleSeconds: 10 });
   });
@@ -81,7 +79,6 @@ describe('extractExplore', () => {
       [item(1), item(2)],
       [
         result({ 1910: 40, 1909: 80, 182: HACKING }),
-        // An Integrated Analyzer needs both skills, and opens both sites.
         result({ 1910: 30, 1909: 30, 182: ARCHAEOLOGY, 183: HACKING }),
       ]
     );
@@ -101,7 +98,6 @@ describe('extractExplore', () => {
   it("reads the loaded probe's strength, the launcher's bonus and its cycle", () => {
     const explore = extractExplore(
       [item()],
-      // A Sisters launcher with Sisters probes, as the engine leaves them on an Astero.
       [result({ 604: 479, 846: 10, 51: 1500 }, 'active', { 1371: 103.98 })]
     );
     expect(explore.probe).toEqual({ strength: 103.98, launcherBonus: 10, cycleSeconds: 1.5 });

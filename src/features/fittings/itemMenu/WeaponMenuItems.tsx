@@ -16,21 +16,13 @@ import { ChargePickerMenuItems } from '../ChargePickerMenu';
 import { useFittingItemActions } from '../fittingItemActions';
 import { ChangeChargeItems, ChargeToCargoItem } from './shared';
 
-/**
- * A weapon group's actions — a stats Offense row, every module of one type
- * holding one charge: change the charge they hold (from cargo), their state,
- * and what the weapon is. Each is one edit for the whole group.
- */
 export function WeaponMenuItems({
   modules,
   shownState,
   maxState,
 }: {
-  /** The group's modules — one type, one charge. */
   modules: readonly FittingModule[];
-  /** The state they share; undefined when they differ, so the radio ticks nothing. */
   shownState?: FittingItemState;
-  /** The highest they can reach; every state until known. */
   maxState?: FittingItemState;
 }) {
   const { t } = useTranslation();
@@ -44,7 +36,6 @@ export function WeaponMenuItems({
       <MenuSub>
         <MenuSubTrigger>{t('fittings.item.changeCharge')}</MenuSubTrigger>
         <MenuSubContent className="max-h-96 min-w-64 overflow-y-auto">
-          {/* Its own component, so the engine is only asked once the submenu opens. */}
           <ChargePickerMenuItems
             actions={actions}
             module={first}

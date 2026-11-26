@@ -1,9 +1,3 @@
-/**
- * The Mercenary Dens widget (issue #4791) at every width: its table keeps the
- * columns that fit its own box, so neither the table nor the page ever
- * scrolls sideways. Four dens with long-ish cell text across two states. A
- * row opens the den's modal.
- */
 import type { Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
 import { CHARACTER_ID } from './support/fixtureData';

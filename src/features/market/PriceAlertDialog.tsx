@@ -1,13 +1,3 @@
-/**
- * The item context menu's price alert entry (issue #1427): the menu item and
- * the dialog it opens. A context menu closes on select, so the form can't live
- * in a popover anchored to it.
- *
- * Both halves own their Quickbar read (`useQuickbar` is a Dexie live query)
- * rather than `ItemContextMenu` doing it at its top level, where it would
- * mount one query per row of every table that wraps its rows in the menu. The
- * item mounts only while the menu is open; the dialog only while it is.
- */
 import { useTranslation } from 'react-i18next';
 import { DisabledMenuItem, MenuItem, Modal } from '@/components/ui';
 import { useActiveCharacter } from '@/stores/activeCharacter';
@@ -20,10 +10,6 @@ function useQuickbarItem(typeId: number) {
   return { quickbar, item: quickbar.items.find((i) => i.typeId === typeId) };
 }
 
-/**
- * Kind-agnostic `MenuItem`, so the same entry renders into the right-click
- * menu and its visible "More actions" counterpart — the two must never drift.
- */
 export function PriceAlertMenuItem({
   typeId,
   available,

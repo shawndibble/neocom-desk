@@ -1,8 +1,3 @@
-/**
- * PI Plan question in the URL (#2713, ADR 0015): the picked question rides in
- * `?q=` (replace, so Back leaves Plan), reloads and deep links restore it, and
- * a junk value reads as the default.
- */
 import type { Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
@@ -42,7 +37,6 @@ for (const [label, viewport] of VIEWPORTS) {
       { timeout: 30_000 }
     );
 
-    // Deep link to another question.
     await page.goto('./planetary-industry/plan?q=product');
     await expect(question(page, /Make a specific product/)).toHaveAttribute(
       'aria-current',
@@ -50,7 +44,6 @@ for (const [label, viewport] of VIEWPORTS) {
       { timeout: 30_000 }
     );
 
-    // Junk reads as the default.
     await page.goto('./planetary-industry/plan?q=nonsense');
     await expect(question(page, /Make more from my planets/)).toHaveAttribute(
       'aria-current',
@@ -58,7 +51,6 @@ for (const [label, viewport] of VIEWPORTS) {
       { timeout: 30_000 }
     );
 
-    // Picking replaces history: Back goes to the page before Plan, not the prior question.
     await page.goto('./planetary-industry/colonies');
     await page.goto('./planetary-industry/plan');
     await question(page, /Find the best thing to build/).click();

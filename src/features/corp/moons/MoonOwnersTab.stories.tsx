@@ -6,10 +6,6 @@ import { MOONS_TABS } from './moonsPaths';
 import { MoonOwnersTable } from './MoonOwnersTable';
 import { NAMES, NOW, ROWS, TOTALS } from './moonOwnerRowFixtures';
 
-/**
- * The page the Moon owners tab sits on: header with Invite a moon owner, the tab bar
- * and the table with its chips. Composed from the same parts as the route.
- */
 function MoonsPage() {
   const { t } = useTranslation();
   const tabs = tabBarTabs(MOONS_TABS);
@@ -39,7 +35,6 @@ function MoonsPage() {
   );
 }
 
-/** @summary The Moons page on its Moon owners tab (List A): header chips, Invite a moon owner, the table. */
 const meta = {
   title: 'corp/MoonOwnersTab',
   component: MoonsPage,
@@ -49,5 +44,4 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** @summary An accounting corporation that also reads moon owners: all five tabs. */
 export const Default: Story = {};

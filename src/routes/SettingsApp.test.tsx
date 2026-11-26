@@ -33,10 +33,6 @@ vi.mock('@/app/bootPrefetch', async () =>
   (await import('@/test/settingsMocks')).bootPrefetchMock()
 );
 
-// The Settings page's App-level wiring: links that leave Settings for Help or
-// Login through the real route table, and the shell's `?` shortcut. Everything
-// the page does on its own is tested without `App` (`renderSettingsPage`, in
-// Settings.test.tsx and SettingsNotifications.test.tsx).
 installSettingsHarness({ app: true });
 
 describe('Settings', () => {
@@ -46,10 +42,8 @@ describe('Settings', () => {
     await screen.findByRole('heading', { level: 1, name: /help & faq/i });
 
     expect(window.location.pathname).toBe('/help/shortcuts');
-    // Shortcuts first, the tab /help opens on.
     const tabs = screen.getAllByRole('tab').map((tab) => tab.textContent);
     expect(tabs).toEqual(['Shortcuts', 'FAQ', 'Support']);
-    // The off switch lives in Settings › Display, not on Help.
     expect(
       screen.queryByRole('checkbox', { name: /single-key shortcuts/i })
     ).not.toBeInTheDocument();
@@ -101,7 +95,6 @@ describe('Settings defaults', () => {
       await within(settingsNav()).findByRole('link', { name: /activity log/i })
     ).toHaveAttribute('aria-current', 'page');
 
-    // The real `?` shortcut. It navigates to Help › Shortcuts.
     await user.keyboard('{Shift>}?{/Shift}');
 
     expect(await screen.findByRole('heading', { name: /keyboard shortcuts/i })).toBeInTheDocument();
@@ -150,7 +143,6 @@ describe('Settings — This device', () => {
     await user.click(screen.getByRole('button', { name: /^log out$/i }));
     const dialog = await screen.findByRole('dialog', { name: /log out of all characters/i });
     expect(within(dialog).getByText(/removes 2 characters' logins/i)).toBeInTheDocument();
-    // Nothing happens until the dialog is confirmed.
     expect(await db.characters.count()).toBe(2);
 
     await user.click(within(dialog).getByRole('button', { name: /^log out$/i }));

@@ -1,8 +1,3 @@
-/**
- * The All characters read behind Market History (issue #3995): every
- * Character's fills and journal, plus where the local wallet archive starts
- * for the pool. Nothing is read until `enabled`.
- */
 import { useCallback, useEffect, useState } from 'react';
 import { loadAllCharactersJournals } from '@/features/character/walletJournalAll';
 import { loadWalletArchiveInfo } from '@/features/character/walletArchive';
@@ -12,11 +7,8 @@ import { useKeyedLoad } from '@/lib/useAsyncLoad';
 export interface AllCharacterFills {
   fills: CharacterFills[];
   typeNames: Map<number, string>;
-  /** Some Character's fills stopped at the page cap. */
   truncated: boolean;
-  /** The latest archive start among the pooled Characters; the shortest archive limits the pool. */
   archiveSince: number | null;
-  /** Characters left out of the pool: no wallet grant, or nothing to read. The header picker names them. */
   skipped: { characterId: number; name: string }[];
 }
 
@@ -69,7 +61,6 @@ export function useAllCharacterFills(
   return state;
 }
 
-/** Where one Character's local wallet archive starts; null while unread or empty. */
 export function useArchiveSince(characterId: number | null): number | null {
   const loader = useCallback(
     () => loadWalletArchiveInfo(characterId ?? 0).then((info) => info.since),

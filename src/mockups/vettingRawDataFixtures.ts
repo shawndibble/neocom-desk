@@ -1,9 +1,3 @@
-/**
- * Sample data for the "Vetting raw data" mockups: every row one read of the flagged review's
- * three characters (Tamsin Vell, Mira Vell, Vell Hauling) returned, generated from a fixed seed so
- * a screenshot never changes. Thousands of wallet rows on purpose: the list must not be capped.
- */
-
 import { DAY_MS, HOUR_MS } from '@/lib/age';
 
 export type SourceId = 'wallet' | 'contact' | 'mail' | 'contract' | 'skills' | 'history';
@@ -53,7 +47,6 @@ export const PILOTS: readonly Pilot[] = [
 ];
 
 export interface FlagRef {
-  /** The check id, as in the report (`vetting.checks.<id>`). */
   id: 'watchlistIsk' | 'cynoNoCapital';
   title: string;
 }
@@ -68,16 +61,12 @@ export interface Party {
 export interface RawRow {
   key: string;
   characterId: number;
-  /** ISO time; null where the source has none (contacts, skills). */
   at: string | null;
   party?: Party;
-  /** The source's own word: journal type, contract type, skill name. */
   what: string;
   amount?: number;
   standing?: number;
-  /** Mail: whether the character sent it or received it. */
   direction?: 'Sent' | 'Received';
-  /** Mail: every recipient, all of them. */
   recipients?: string[];
   status?: string;
   group?: string;
@@ -138,7 +127,6 @@ const CORPS = [
   'Ember Fleet Logistics',
 ];
 
-/** 100 invented people, deterministic. */
 const PEOPLE: Party[] = FIRST.flatMap((first, i) =>
   LAST.map((last, j) => ({
     id: 2118100000 + i * 10 + j,
@@ -359,7 +347,6 @@ export const ROWS: Record<SourceId, RawRow[]> = {
     flagged(TAMSIN, 19, CORVIN, 300_000_000, FLAG_ISK),
     flagged(TAMSIN, 4, ORRIN, -250_000_000),
     ...wallet(MIRA, 702, 23),
-    // Vell Hauling: nothing in 30 days. The source was read and is empty.
   ],
   contact: [
     ...contacts(TAMSIN, 212, 5),

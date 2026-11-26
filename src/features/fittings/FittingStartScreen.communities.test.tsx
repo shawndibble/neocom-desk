@@ -12,9 +12,6 @@ import type { SharedFitting } from '@/engine/communities/sharedFittings';
 import { FittingStartScreen } from './FittingStartScreen';
 import type { FittingLibrarySource } from './useFittingPicker';
 
-// Shared Fittings in the library (issue #3605): rows from other Members, and
-// the "Share to Community" menu item, absent / direct / submenu by how many
-// Communities the Character is in.
 vi.mock('@/app/useGrantedScopes', () => ({ useEndpointsGranted: () => false }));
 vi.mock('@/app/syncStatus', () => ({ isSyncConfigured: () => true }));
 vi.mock('./inGameFittings', () => ({ loadInGameFittings: vi.fn() }));
@@ -173,7 +170,6 @@ describe('Share to Community', () => {
     renderScreen();
     await userEvent.click(await screen.findByRole('button', { name: 'More actions for Kite' }));
     await userEvent.click(await screen.findByRole('menuitem', { name: 'Share to Pals' }));
-    // The menu runs onSelect after the click settles, so wait for it.
     await waitFor(() =>
       expect(shared.toggleShare).toHaveBeenCalledWith(
         7,
@@ -190,7 +186,6 @@ describe('Share to Community', () => {
     renderScreen();
     await userEvent.click(await screen.findByRole('button', { name: 'More actions for Kite' }));
     await userEvent.click(await screen.findByRole('menuitem', { name: 'Stop sharing in Pals' }));
-    // The menu runs onSelect after the click settles, so wait for it.
     await waitFor(() =>
       expect(shared.toggleShare).toHaveBeenCalledWith(
         7,
@@ -208,7 +203,6 @@ describe('Share to Community', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'More actions for Kite' }));
     await userEvent.click(await screen.findByRole('menuitem', { name: 'Share to Community' }));
     await userEvent.click(await screen.findByRole('menuitem', { name: 'Share to Crew' }));
-    // The menu runs onSelect after the click settles, so wait for it.
     await waitFor(() =>
       expect(shared.toggleShare).toHaveBeenCalledWith(
         7,

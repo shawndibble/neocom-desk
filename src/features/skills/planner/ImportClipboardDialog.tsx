@@ -9,22 +9,15 @@ import { importOutcome, type ClipboardImportPreview } from './clipboardImport';
 import { previewImportFile, previewImportText } from './importPreview';
 
 interface ImportClipboardDialogProps {
-  /** Add the read skills to the plan (the only commit when `onReplace` is absent). */
   onApply: (entries: PlanEntry[]) => void;
-  /** Swap the plan for the read skills. Given only when the plan has entries to lose; adds the Replace choice. */
   onReplace?: (entries: PlanEntry[]) => void;
   onClose: () => void;
-  /** Skill name for display — the EFT path's entries are raw skillTypeIDs the user has never seen. */
   nameFor: (skillTypeID: number) => string;
-  /** To tag preview rows the character has already trained to (or past) the requested level (UX-REVIEW #7). */
   trainedSkills: ReadonlyMap<number, TrainedSkill>;
-  /** Text to open on — a skill plan pasted elsewhere in the app. */
   initialText?: string;
-  /** What importing `initialText` (or a dropped file) found, when it needs a look before it is applied. */
   initialPreview?: ClipboardImportPreview;
 }
 
-/** True when the character is already trained to (or past) the entry's requested level. */
 function isAlreadyTrained(
   entry: PlanEntry,
   trainedSkills: ReadonlyMap<number, TrainedSkill>
@@ -42,13 +35,6 @@ const DOCUMENT_ERROR_KEYS: Record<PlanXmlDocumentErrorCode, string> = {
   multiPlanUnsupported: 'plans.importFileMultiPlanUnsupported',
 };
 
-/**
- * "Import plan": paste an EFT fit or skill-plan text, or choose/drop a plan
- * file (.emp/.xml) exported by another planner. Import applies at once when
- * every line parsed; when some did not, the preview (what was read, what was
- * skipped) comes up first and Apply commits it. Paste format (EFT vs. skill
- * plan) is auto-detected — see clipboardImport.ts.
- */
 export function ImportClipboardDialog({
   onApply,
   onReplace,
@@ -71,7 +57,6 @@ export function ImportClipboardDialog({
   const noEntries = preview !== null && preview.entries.length === 0;
   const noText = text.trim() === '';
 
-  /** Preview, then apply straight away unless something needs a look. */
   async function run(previewing: Promise<ClipboardImportPreview>, commit = onApply) {
     setImporting(true);
     try {
@@ -88,15 +73,12 @@ export function ImportClipboardDialog({
     void run(previewImportText(text), commit);
   }
 
-  // A file goes in as an append; the textarea's Replace button is the way to swap the plan.
   function handleFile(file: File) {
     if (importing) return;
     void run(previewImportFile(file));
   }
 
   return (
-    // `open` is literal: PlanEditor mounts this component only while the import
-    // is open, so mounting is the open signal.
     <Modal
       open
       onClose={onClose}
@@ -107,8 +89,6 @@ export function ImportClipboardDialog({
           <Button size="sm" onClick={onClose}>
             {t('plans.importCancel')}
           </Button>
-          {/* One primary: Import until something needs a look, then Apply commits what was read.
-              With a plan to lose, each commit is a pair: Append to plan, Replace plan. */}
           {needsReview ? (
             <>
               {onReplace && (
@@ -168,13 +148,11 @@ export function ImportClipboardDialog({
       <div
         className={`space-y-3 ${dragOver ? 'outline-1 outline-dashed outline-accent' : ''}`}
         onDragOver={(e) => {
-          // Only a file is ours to take; dragged text still drops into the textarea.
           if (!e.dataTransfer.types.includes('Files')) return;
           e.preventDefault();
           setDragOver(true);
         }}
         onDragLeave={(e) => {
-          // Crossing onto a child fires a leave too; only leaving the body counts.
           if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDragOver(false);
         }}
         onDrop={(e) => {

@@ -1,14 +1,3 @@
-/**
- * Device-local: the Goal Planner's standing assumptions — facts about how the
- * pilot operates, not about the goals on screen, so they live on disk rather
- * than in the URL.
- *
- * - `fallbackRatePerHour`: P0/h one ECU yields, used only where nothing the
- *   pilot runs is measured (`goalPlannerModel.ts`'s rate chain).
- * - `maxP0Types`: distinct P0s one colony may extract (one ECU each, or both
- *   ECUs on one). Two by default — one per planet turned ordinary two-ECU
- *   colonies into false shortfalls (scope decision 2026-10-04).
- */
 import { createLocalSetting } from '@/lib/useLocalSetting';
 
 export const PI_GOAL_PLANNER_KEY = 'piGoalPlanner';

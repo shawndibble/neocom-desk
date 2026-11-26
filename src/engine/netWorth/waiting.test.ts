@@ -80,7 +80,6 @@ describe('goalProgress', () => {
   });
 
   it('projects the day from the wallet gain per day over the window', () => {
-    // +300 over 10 days = 30/day; 700 left = 24 days (rounded up) after 2026-10-30.
     const rows = [row('2026-10-20', { wallet: 300 }), row('2026-10-30', { wallet: 600 })];
     const p = goalProgress({ target: 1300, rows, today: '2026-10-31' });
     expect(p.perDay).toBe(30);

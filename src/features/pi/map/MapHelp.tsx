@@ -1,4 +1,3 @@
-/** "How to use the map": the steps, the legend, and where to learn PI. */
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { cx } from '@/lib/cx';
 import { useTranslation } from 'react-i18next';

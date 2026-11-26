@@ -1,12 +1,3 @@
-/**
- * Whose Permissions Settings › Permissions is showing, and a one-tap way to
- * change it. Up to four Characters: one chip each, with its count and what it
- * is missing. More than four, or a phone: a picker whose trigger names the
- * active Character, listing those that need Permissions first (fewest granted
- * first), then the complete ones, with a search box. Picking switches the
- * active Character, so the panel below it needs no change. Absent for a single
- * Character: there is nobody to switch to.
- */
 import { useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Popover, PopoverContent, PopoverTrigger, SearchInput } from '@/components/ui';
@@ -24,7 +15,6 @@ import { useActiveCharacter } from '@/stores/activeCharacter';
 import { orderForPicker, pickerTone, type CharacterPermissionCount } from './permissionCounts';
 import { useCharacterPermissionCounts } from './useCharacterPermissionCounts';
 
-/** Beyond this many Characters the chips stop fitting one row. */
 const MAX_CHIPS = 4;
 
 function select(characterId: number) {

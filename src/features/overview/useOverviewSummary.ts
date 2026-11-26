@@ -15,14 +15,8 @@ import { chipTone, nextDeadline } from './widgets/nextDeadline';
 import { readScope, useWidgetBoard, type WidgetBoard } from './widgets/board';
 import { visibleWidgets } from './widgets/visibility';
 
-/** A kind whose view has not been built yet: no read to date. */
 const EMPTY_READ = { fetchedAt: null, fromCache: false };
 
-/**
- * Profit's reads follow its Source, so its request carries it; every other kind's key ignores the field.
- * A kind with an All read of its own (the corp widgets) follows its widget's scope: its header feed
- * is not mounted when every widget of the kind is on All, so asking for it would never settle.
- */
 function across(board: WidgetBoard, widget: Widget) {
   const scope = readScope(board, widget);
   const sums =
@@ -39,10 +33,8 @@ const requestOf = (board: WidgetBoard, widget: Widget) => ({
   profitSource: widget.profitSource,
 });
 
-/** What the header shows of the drawn widgets: the soonest clock and the stalest read. */
 export type OverviewSummary = ReturnType<typeof useOverviewSummary>;
 
-/** Read once by the board and handed to each header part, so the kinds are not resolved three times. */
 export function useOverviewSummary(widgets: readonly Widget[]) {
   const isPhone = useIsPhone();
   const board = useWidgetBoard();
@@ -73,7 +65,6 @@ export function useOverviewSummary(widgets: readonly Widget[]) {
   return {
     next,
     remaining,
-    /** A clock may still arrive: some drawn kind has not been read yet. */
     pending: views.size < requests.length || anyStillLoading(all),
     tone: chipTone(remaining),
     fetchedAt: stalest.date,

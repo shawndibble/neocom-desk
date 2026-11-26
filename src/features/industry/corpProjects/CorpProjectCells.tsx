@@ -6,7 +6,6 @@ import { formatDuration } from '@/lib/duration';
 import { formatIskCompact } from '@/lib/isk';
 import type { CorpProjectRow } from './corpProjectRows';
 
-/** Under two days left a project is about to close, so its time turns amber. */
 export const ENDING_SOON_HOURS = 48;
 
 export function EndsIn({ hours }: { hours: number | null }) {
@@ -17,7 +16,6 @@ export function EndsIn({ hours }: { hours: number | null }) {
   return hours < ENDING_SOON_HOURS ? <span className="text-warning">{text}</span> : <>{text}</>;
 }
 
-/** Where the blueprint comes from: Owned, a Community offer, the cheapest copy, or the amber assumption. */
 export function BlueprintSourceCell({ row }: { row: CorpProjectRow }) {
   const { t } = useTranslation();
   const source = row.source;
@@ -75,7 +73,6 @@ export function BlueprintSourceCell({ row }: { row: CorpProjectRow }) {
   }
 }
 
-/** Profit at the cap, or a plain word while the plan is still being priced. */
 export function ProfitCell({ row }: { row: CorpProjectRow }) {
   const { t } = useTranslation();
   if (row.profit === null) {
@@ -88,7 +85,6 @@ export function ProfitCell({ row }: { row: CorpProjectRow }) {
   return <IskDelta amount={row.profit} decimals={0} />;
 }
 
-/** The working behind a row: the sum, the Character's share of the cap, and the pool. */
 export function ProjectWorking({ row }: { row: CorpProjectRow }) {
   const { t } = useTranslation();
   const { project, remaining } = row;

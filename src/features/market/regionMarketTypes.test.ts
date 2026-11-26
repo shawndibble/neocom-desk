@@ -6,7 +6,7 @@ import { ESI_BASE_URL } from '@/esi/client';
 import { db } from '@/db';
 import { loadRegionMarketTypes, regionTypesReloadSlot } from './regionMarketTypes';
 
-const REGION_ID = 10000002; // The Forge
+const REGION_ID = 10000002;
 
 const server = mswServer();
 
@@ -74,8 +74,6 @@ describe('loadRegionMarketTypes', () => {
     );
     await loadRegionMarketTypes(REGION_ID);
 
-    // Eleven minutes on, past ESI's 600s window: a type listed since would
-    // read as "no orders" from the old copy, so nothing is claimed.
     const later = Date.now() + 11 * 60_000;
     vi.spyOn(Date, 'now').mockReturnValue(later);
     server.use(

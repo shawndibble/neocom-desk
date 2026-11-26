@@ -17,11 +17,6 @@ import { PlanConfirmation } from './PlanConfirmation';
 import type { usePlanExport } from './usePlanExport';
 import type { usePlanImport } from './usePlanImport';
 
-/**
- * Import/Export: the route's page-level actions cluster, "far top right corner" like every
- * other route (Wallet.tsx, Assets.tsx) — portaled in because the route owns that DOM slot
- * but the handlers and the data they act on (scheduled, catalog) live with the editor.
- */
 export function PlanImportExportActions({
   container,
   imports,
@@ -54,20 +49,11 @@ export function PlanImportExportActions({
   } = exporter;
   const isPhone = useIsPhone();
   const exportClipboard = (event: Event) => {
-    // Keep the menu open (skip Radix's default auto-close)
-    // until the write settles, then close it ourselves:
-    // closing first moves focus back to the trigger as part
-    // of the same transition, and writeText() called
-    // mid-transition can throw "Document is not focused"
-    // (NotAllowedError).
     event.preventDefault();
     void handleExport().finally(() => setExportMenuOpen(false));
   };
   const feedback = (
     <>
-      {/* Beside the buttons that produced them, not down in the entries
-          panel — a confirmation/error disconnected from its trigger
-          reads as belonging to something else. */}
       {copyConfirm && <PlanConfirmation message={t('plans.exportCopied')} />}
       {importConfirm && (
         <PlanConfirmation
@@ -84,8 +70,6 @@ export function PlanImportExportActions({
       {importError && <InlineError>{importError}</InlineError>}
     </>
   );
-  // On a phone the two menus would wrap under the title: one ⋮ holds both
-  // actions (DESIGN.md §6c Header controls, tier 3).
   if (isPhone) {
     return createPortal(
       <>
@@ -137,10 +121,6 @@ export function PlanImportExportActions({
         <DropdownMenuContent
           align="end"
           onCloseAutoFocus={() => {
-            // Open the dialog only once the menu has handed focus back to
-            // the trigger: the native <dialog> records the focused
-            // element to restore on close, and that must be the trigger,
-            // not a menu item that is about to unmount.
             if (openImportDialogAfterMenuRef.current) {
               openImportDialogAfterMenuRef.current = false;
               setImportOpen(true);

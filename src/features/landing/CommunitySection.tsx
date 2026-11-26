@@ -6,7 +6,6 @@ import { cx } from '@/lib/cx';
 import { DISCORD_URL } from '@/lib/links';
 import { LANDING_QUOTES, type Quote } from './landingQuotes';
 
-/** Pull-quotes in a hairline-divided row; renders nothing when there are none. */
 export function QuotesRow({ quotes }: { quotes: readonly Quote[] }) {
   if (quotes.length === 0) return null;
   return (
@@ -23,7 +22,6 @@ export function QuotesRow({ quotes }: { quotes: readonly Quote[] }) {
   );
 }
 
-/** The body of the landing page's community section: what the Discord is for, one join link, and quotes when there are any. */
 export function CommunitySection({ quotes = LANDING_QUOTES }: { quotes?: readonly Quote[] }) {
   const { t } = useTranslation();
   return (

@@ -1,24 +1,15 @@
 import { describe, it, expect, vi } from 'vitest';
 
-// The sell-order copy names the item. Resolving it for real would read the
-// bundled SDE snapshot over HTTP and fall through to ESI, neither of which is
-// served here — so the lookup is stubbed, and the unresolvable case gets its
-// own test below rather than being every test's accidental behaviour.
 vi.mock('@/features/character/typeNames', () => ({
   loadTypeNames: vi.fn(async (typeIds: readonly number[]) => {
     const names = new Map<number, string>([[34, 'Tritanium']]);
     return new Map([...names].filter(([id]) => typeIds.includes(id)));
   }),
 }));
-// `universeTypeName` (industry/colony copy) goes through `loadUniverseType`,
-// which would otherwise attempt a real SDE fetch and an ESI fall-through; the
-// failed network round trips made the first firing test slow enough to flake.
 vi.mock('@/features/skills/data', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/features/skills/data')>()),
   loadUniverseType: vi.fn(async () => null),
 }));
-// The colony domain's copy names the planet through `loadPlanetName`, a live ESI GET on a cache
-// miss. Unstubbed, the four colony cases waited on that request and timed out at 10 s on CI.
 vi.mock('@/features/pi/names', () => ({ loadPlanetName: vi.fn(async () => 'Amarr III') }));
 import type {
   IndustryJob,
@@ -54,9 +45,6 @@ import type {
 import type { PollerState } from './pollerState';
 import { occurrenceKey } from '@/engine/occurrenceKey';
 
-// The eight per-domain state types the poller used to carry as named
-// dependencies. They are now one generic shape (`PollerState<T>`); these
-// aliases keep every case below reading exactly as it did before #273.
 type SkillQueuePollerState = PollerState<SkillQueueSnapshot>;
 type IndustryJobPollerState = PollerState<IndustryJobSnapshot>;
 type ColonyPollerState = PollerState<PlanetarySnapshot>;
@@ -118,15 +106,6 @@ function calendarEvent(overrides: Partial<CalendarEventSummary> = {}): CalendarE
   };
 }
 
-/**
- * `walletDomain.load` (`pollDomains/`) now bakes the Character's threshold
- * onto each entry it returns, since `toSnapshot` is a pure passthrough for
- * this domain (the wallet-balance-threshold feature) — so this harness's fake
- * loader, which bypasses `load` entirely, must hand back entries already in
- * that shape rather than the raw ESI `WalletJournalEntry`. `thresholdIsk`
- * defaults to 0 so every case below keeps firing exactly as it did before the
- * threshold existed, unless a case opts into testing the threshold itself.
- */
 function walletJournalEntry(
   overrides: Partial<WalletJournalEntrySnapshot> = {}
 ): WalletJournalEntrySnapshot {
@@ -145,7 +124,6 @@ function eveNotification(overrides: Partial<CharacterNotification> = {}): Charac
   };
 }
 
-/** Built from ESI-shaped overrides, returned as the snapshot entry the domain's own `load` yields (issue #1713, same seam as `loadSkillQueue`). */
 function contract(overrides: Partial<Contract> = {}): ContractEntrySnapshot {
   const esi: Contract = {
     contract_id: 1,
@@ -169,18 +147,7 @@ function contract(overrides: Partial<Contract> = {}): ContractEntrySnapshot {
   };
 }
 
-/**
- * The per-domain dependencies that used to sit flat on `PollDependencies`.
- * `baseDeps` maps them onto the registry seam (`loadDomain`/`domainState`) by
- * domain id, so the cases below still name the domain they are about.
- */
 interface DomainOverrides {
-  // Already-converted snapshot entries, not raw ESI shapes (issue #1410) —
-  // the seam below (`loaders.skillQueue`) replaces the domain's own `load`
-  // outright, so it also bypasses the `currentThresholds` lookup that bakes
-  // `endingLeadMs` in for real; a case that needs one sets it directly on
-  // its fixture, the same way `loadColonyExtractors` fixtures set their own
-  // `thresholdMs`.
   loadSkillQueue?: (characterId: number) => Promise<SkillQueueEntrySnapshot[] | null>;
   prevState?: () => Promise<SkillQueuePollerState>;
   saveState?: (state: SkillQueuePollerState) => Promise<void>;
@@ -208,15 +175,9 @@ interface DomainOverrides {
   loadEveNotifications?: (characterId: number) => Promise<CharacterNotification[] | null>;
   prevEveNotificationState?: () => Promise<EveNotificationPollerState>;
   saveEveNotificationState?: (state: EveNotificationPollerState) => Promise<void>;
-  /** issue #1423 — a distinct domain from `loadMarketOrders`, so gating one off must leave the other running. */
   loadMarketOrderUndercut?: (characterId: number) => Promise<readonly unknown[] | null>;
 }
 
-/**
- * Bridges one domain's old `prev*`/`save*` pair onto `DomainPollState`. The
- * unsupplied half behaves exactly as the old defaults did: an in-memory state
- * that only the default saver writes to.
- */
 function domainState<T>(
   prev: (() => Promise<PollerState<T>>) | undefined,
   save: ((state: PollerState<T>) => Promise<void>) | undefined
@@ -275,14 +236,6 @@ function baseDeps(overrides: Partial<PollDependencies> & DomainOverrides = {}): 
     wallet: loadWalletJournal,
     marketOrders: loadMarketOrders,
     eveNotification: loadEveNotifications,
-    // Corp domains (issue #299) and spExtraction (grilling session,
-    // 2026-09-09): no dedicated overrides here — their load/diff behaviour is
-    // covered in pollDomains/index.test.ts and notificationDiffs.test.ts, so a bare
-    // "nothing to fetch" default is enough to keep the generic delivery-loop
-    // cases above from tripping over a later registry entry they know
-    // nothing about. marketOrderUndercut (issue #1423) gets its own
-    // `loadMarketOrderUndercut` override below, since a domain-off test needs
-    // to tell its stub apart from `marketOrders`' own.
     structureFuel: async () => [],
     corpIndustryJobs: async () => [],
     corpRoster: async () => [],
@@ -484,7 +437,6 @@ describe('runForegroundPoll', () => {
     });
     await runForegroundPoll(deps);
     expect(lanes).toEqual(['low']);
-    // The scope ends with the synchronous call: nothing after it is tagged.
     expect(currentEsiLane()).toBeUndefined();
   });
 
@@ -629,9 +581,6 @@ describe('runForegroundPoll', () => {
   });
 
   it("still fetches colonies when only one of the domain's two events is on (issue #310)", async () => {
-    // One snapshot answers for both planetary events, so the fetch is skipped
-    // only when every event of the domain is off — which is what makes each
-    // diff's own `gatedOn` gate load-bearing rather than redundant.
     const loadColonyExtractors = vi.fn(async () => []);
     const deps = baseDeps({
       grantedScopes: async () => new Set([SKILLQUEUE_SCOPE, PLANETS_SCOPE]),
@@ -710,11 +659,6 @@ describe('runForegroundPoll', () => {
   });
 
   it('retracts feed rows for an extractor program restarted before it could expire', async () => {
-    // The reported defect: programs restarted in game with the app closed,
-    // and a Scheduled Push (fired without a re-check, ADR 0010) claiming they
-    // expired. The restarted program takes a new expiry and therefore a new
-    // Occurrence Key, so nothing in ordinary polling ever revisits the row
-    // that push left behind.
     const OLD_EXPIRY = 2000;
     let now = 1000;
     let savedColonies: ColonyPollerState = {
@@ -753,8 +697,6 @@ describe('runForegroundPoll', () => {
     });
     now = 3000;
     await runForegroundPoll(deps);
-    // One call for the whole poll, so the badge is recomputed once — with the
-    // Characters alongside, so each can push its own retraction.
     expect(retractFromFeed).toHaveBeenCalledTimes(1);
     expect(retractFromFeed.mock.calls[0][0]).toEqual([CHAR.characterId]);
     expect(retractFromFeed.mock.calls[0][1]).toContain(
@@ -945,8 +887,6 @@ describe('runForegroundPoll', () => {
 
   it('names the event in the copy it delivers, for both calendar events', async () => {
     let now = Date.parse('2026-01-01T00:30:00Z');
-    // Built eagerly: the baseline's own `nowMs` is the previous poll's clock,
-    // and reading `now` lazily would hand the diff this poll's instead.
     const previous: CalendarPollerState = {
       [CHAR.characterId]: {
         entries: [{ calendarEventId: 1, startMs: Date.parse('2026-01-01T01:00:00Z') }],
@@ -976,10 +916,6 @@ describe('runForegroundPoll', () => {
     const starting = bodies.find((body) => body.includes('is starting'));
     const added = bodies.find((body) => body.includes('was added'));
     expect(starting).toContain('Fleet Op');
-    // The name and the start time are the two things the alert now adds. The
-    // instant renders in the viewer's own locale and clock, and carries no
-    // year (formatCalendarTimestamp), so pin that a time of day reached the
-    // sentence rather than a whole formatted string a test host would rewrite.
     expect(added).toContain('Structure Timer');
     expect(added).toMatch(/[0-9]{1,2}:[0-9]{2}/);
     for (const body of bodies) expect(body).not.toContain('{{');
@@ -1008,11 +944,6 @@ describe('runForegroundPoll', () => {
   });
 
   it('leaves the contract baseline untouched and fires nothing when the load is truncated', async () => {
-    // The truncation guard itself (loadContracts returning null on a short
-    // page set) is pollDomains/index.test.ts's job; this is the other half of
-    // AC4 — that a null load actually skips the poll end to end, the same
-    // property the skill-queue "ESI fetch fails" case above proves for its
-    // own domain.
     const initial: ContractPollerState = {
       [CHAR.characterId]: {
         entries: [{ contractId: 1, status: 'outstanding', issuerId: 1, acceptorId: 0 }],
@@ -1531,12 +1462,6 @@ describe('runForegroundPoll', () => {
     expect(loadMarketOrders).not.toHaveBeenCalled();
   });
 
-  // issue #1423: marketOrderFilled and marketOrderUndercut are two distinct
-  // domains sharing nothing but the scope and the underlying ESI endpoint
-  // (`loadOrders`, coalesced by `esi/cache.ts`'s `inFlightLoads`, not by this
-  // registry) — the realistic default (a character with orders scope granted,
-  // marketOrderFilled left on, marketOrderUndercut never turned on) must fetch
-  // one and not the other, never both or neither.
   it('makes no Fuzzwork-backed call for marketOrderUndercut while marketOrderFilled stays on for the same character', async () => {
     const loadMarketOrders = vi.fn(async () => []);
     const loadMarketOrderUndercut = vi.fn(async () => []);
@@ -1686,8 +1611,6 @@ describe('runForegroundPoll', () => {
 
     await runForegroundPoll(deps);
 
-    // Type 34 is Tritanium in the bundled SDE snapshot, so the name resolves
-    // without an ESI round trip — the same path a real poll takes first.
     const [, , copy] = notify.mock.calls[0];
     expect(copy?.title).toBe('Test Pilot — Sell order filled');
     expect(copy?.body).toBe('Someone bought 250 x Tritanium.');
@@ -1742,8 +1665,6 @@ describe('runForegroundPoll', () => {
 
     await runForegroundPoll(deps);
 
-    // An id we cannot name is no reason to hold the notification back — the
-    // same best-effort rule the EVE-notification copy follows.
     expect(notify).toHaveBeenCalledTimes(1);
     expect(notify.mock.calls[0][2]?.body).toBe('Someone bought 5 x #99999.');
   });
@@ -1773,8 +1694,6 @@ describe('runForegroundPoll', () => {
 
     await runForegroundPoll(deps);
 
-    // Neither channel: the buy side is filtered in the diff, so nothing
-    // downstream ever sees a fire to deliver.
     expect(notify).not.toHaveBeenCalled();
     expect(recordToFeed).not.toHaveBeenCalled();
   });
@@ -1838,10 +1757,6 @@ describe('runForegroundPoll', () => {
       recordToFeed,
     });
     await runForegroundPoll(deps);
-    // Two distinct occurrences (orders 1 and 2) -> two feed rows, even though
-    // they'd collapse into one browser toast — losing either row here would
-    // permanently drop that occurrence's history, since the diff that
-    // produced it is already high-water-marked and will never re-fire.
     expect(recordToFeed).toHaveBeenCalledTimes(2);
   });
 
@@ -1873,9 +1788,6 @@ describe('runForegroundPoll', () => {
       notify,
     });
     await runForegroundPoll(deps);
-    // Different Characters -> different rendered copy ("X's market order was
-    // filled." vs "Y's..."), so each stays its own delivery rather than
-    // collapsing across characters.
     expect(notify).toHaveBeenCalledTimes(2);
   });
 
@@ -1987,7 +1899,6 @@ describe('runForegroundPoll', () => {
     const deps = baseDeps({
       grantedScopes: async () => new Set([SKILLQUEUE_SCOPE, NOTIFICATIONS_SCOPE]),
       feedChannelEnabled: async () => true,
-      // The type-level opt-out, not the event-level one.
       eveTypePrefsFor: async () => ({ BillOutOfMoneyMsg: { feed: false } }),
       prevEveNotificationState: async () => ({
         [CHAR.characterId]: { entries: [], nowMs: 500 },
@@ -2000,8 +1911,6 @@ describe('runForegroundPoll', () => {
       recordToFeed,
     });
     await runForegroundPoll(deps);
-    // Browser stays off (feed-only default), feed gets only the type that
-    // wasn't opted out.
     expect(notify).not.toHaveBeenCalled();
     expect(recordToFeed).toHaveBeenCalledTimes(1);
     const [fire] = recordToFeed.mock.calls[0];
@@ -2010,7 +1919,6 @@ describe('runForegroundPoll', () => {
 });
 
 describe('runForegroundPoll delivery channels', () => {
-  /** A poll whose skill queue went empty between two polls: fires characterNotTraining once. */
   function firingDeps(
     overrides: Partial<PollDependencies> & DomainOverrides = {}
   ): PollDependencies {
@@ -2073,10 +1981,6 @@ describe('runForegroundPoll delivery channels', () => {
   });
 
   it('leaves an in-progress poll alone rather than starting a second one, so an overlapping trigger cannot double-record the same fire', async () => {
-    // firingDeps' baseline is static (not persisted between calls), so two
-    // independent runs would each fire once on their own — this only stays
-    // at one call if the second `runForegroundPoll` reuses the first's
-    // still-running promise instead of starting its own poll.
     const deps = firingDeps({ feedChannelEnabled: async () => true });
     const first = runForegroundPoll(deps);
     const second = runForegroundPoll(deps);
@@ -2093,7 +1997,6 @@ describe('runForegroundPoll delivery channels', () => {
 });
 
 describe('runForegroundPoll browser suppression against pushed occurrences (issue #360)', () => {
-  /** A poll whose skill queue went empty between two polls: fires characterNotTraining once. */
   function firingDeps(
     overrides: Partial<PollDependencies> & DomainOverrides = {}
   ): PollDependencies {
@@ -2141,10 +2044,6 @@ describe('runForegroundPoll browser suppression against pushed occurrences (issu
   });
 
   it('does not suppress a new occurrence that lands in a different day bucket than a previously-delivered one (AC4)', async () => {
-    // Same event/character, but `now` (and so the day bucket the Occurrence
-    // Key derives from) has moved on — `alreadyDelivered` reflects that by
-    // only recognizing the earlier key, proving the poller still asks per
-    // poll rather than caching a permanent "already handled" verdict.
     const earlierKey = occurrenceKey(
       {
         eventId: 'characterNotTraining',
@@ -2164,13 +2063,6 @@ describe('runForegroundPoll browser suppression against pushed occurrences (issu
   });
 
   it('still raises a browser notification for an occurrence this same poll also just recorded to the feed, when both channels are on', async () => {
-    // `recordToFeed` and `alreadyDelivered` share one backing store here, the
-    // way `liveDependencies()` wires them both against `db.notificationFeed`
-    // — this is what catches the poller checking `alreadyDelivered` *after*
-    // its own feed loop already wrote the row for this exact occurrence,
-    // which would make every occurrence with both channels on (the default
-    // for every event but `eveNotification`'s sub-types) look
-    // self-delivered and wrongly suppress its own first browser toast.
     const delivered = new Set<string>();
     const deps = firingDeps({
       feedChannelEnabled: async () => true,
@@ -2288,7 +2180,7 @@ describe('runForegroundPoll Scheduled Push upload (issue #358)', () => {
   it('uploads projection rows built from this poll’s snapshot', async () => {
     const uploadProjection = vi.fn<PollDependencies['uploadProjection']>(async () => {});
     const now = 1_000_000;
-    const startMs = now + 1000; // within the 72-hour Projection Horizon
+    const startMs = now + 1000;
     const deps = baseDeps({
       now: () => now,
       grantedScopes: async () => new Set([SKILLQUEUE_SCOPE, CALENDAR_SCOPE]),
@@ -2321,10 +2213,6 @@ describe('runForegroundPoll Scheduled Push upload (issue #358)', () => {
     expect(uploadProjection).toHaveBeenCalledTimes(1);
     const [rowsByCharacter] = uploadProjection.mock.calls[0];
     expect(rowsByCharacter.has(CHAR.characterId)).toBe(true);
-    // charB still gets *fetched* — `priceAlertTriggered` (issue #680) needs no
-    // ESI scope at all, so it is not excluded by the scope gate every other
-    // domain answers to — but it projects nothing, since price alerts are
-    // foreground-only and every scope-gated domain above stays untouched.
     expect(rowsByCharacter.get(charB.characterId) ?? []).toEqual([]);
   });
 

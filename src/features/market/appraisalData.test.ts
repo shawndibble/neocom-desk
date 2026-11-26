@@ -20,9 +20,7 @@ vi.mock('@/sde/loadMarketSde', () => ({
     { typeId: 34, name: 'Tritanium', marketGroupId: 18, volume: 0.01 },
     { typeId: 2048, name: 'Damage Control II', marketGroupId: 300, volume: 5 },
     { typeId: 999, name: 'Civilian Gatling Railgun', marketGroupId: 300, volume: 5 },
-    // Assembled 27,289 m³, packaged 2,500 — a hauler carries the packaged hull.
     { typeId: 587, name: 'Rifter', marketGroupId: 64, volume: 27_289, packagedVolume: 2_500 },
-    // No volume at all: a catalogue built before issue #2336 carried none.
     { typeId: 1230, name: 'Veldspar', marketGroupId: 402 },
   ]),
 }));
@@ -87,7 +85,6 @@ const PRICED = {
     buy: { min: '400000', max: '498500', volume: '10', orderCount: '3' },
     sell: { min: '512000', max: '600000', volume: '20', orderCount: '7' },
   },
-  // Nobody is buying this one: orderCount 0 on the buy side.
   999: {
     buy: { min: '0', max: '0', volume: '0', orderCount: '0' },
     sell: { min: '1000', max: '1200', volume: '5', orderCount: '2' },
@@ -256,7 +253,6 @@ describe('appraisePaste', () => {
   });
 
   describe('refine-then-sell (issue #672)', () => {
-    /** One portion of 100 Veldspar returns 415 Tritanium at 100% efficiency. */
     const VELDSPAR_ENTRY = { portionSize: 100, materials: [{ typeID: 34, quantity: 415 }] };
 
     it('fetches neither reprocessing data nor skills with no active Character', async () => {
@@ -287,7 +283,6 @@ describe('appraisePaste', () => {
 
       expect(mockedLoadCorrectedSkills).toHaveBeenCalledWith(1, expect.any(Number), {});
       const row = appraisal.rows[0];
-      // 10 batches x floor(415 x 10 x 0.5) Tritanium x 5.41 ISK (Tritanium's buyMax)
       expect(row.refineTotal).toBeCloseTo(Math.floor(415 * 10 * 0.5) * 5.41, 6);
       expect(row.refinePricedAll).toBe(true);
       expect(appraisal.totals.refine).toBe(row.refineTotal);
@@ -315,7 +310,6 @@ describe('appraisePaste', () => {
     });
 
     it('reports a material with no price at the hub as partially priced, not free', async () => {
-      // Tritanium (34) is not in this response at all, so it has no buy price.
       server.use(aggregates({}));
       mockedLoadReprocessing.mockResolvedValue({ '1230': VELDSPAR_ENTRY });
       mockedLoadCorrectedSkills.mockResolvedValue(skillsFixture([]));
@@ -351,19 +345,12 @@ describe('appraisePaste', () => {
 
       const { appraisal } = await appraisePaste('Veldspar\t1000', DEFAULT_TRADE_HUB, 100, 1);
 
-      // efficiency = 0.5 x 1.15 x 1.10 x 1.10 (Veldspar carries Simple Ore
-      // Processing's specialisationSkillID, so Reprocessing, Reprocessing
-      // Efficiency and the ore specialisation all apply — issue #1226).
-      // Tritanium's buyMax is 5.41.
       const efficiency = 0.5 * 1.15 * 1.1 * 1.1;
       const expected = Math.floor(415 * 10 * efficiency) * 5.41;
       expect(appraisal.rows[0].refineTotal).toBeCloseTo(expected, 6);
     });
 
     it('resolves each row against its own specialisation skill (issue #1058)', async () => {
-      // Veldspar carries the SDE's attribute-790 join to Simple Ore
-      // Processing; Damage Control II carries none, so it falls back to
-      // Scrapmetal Processing — a mixed paste resolves each independently.
       const SIMPLE_ORE_PROCESSING = 60377;
       server.use(aggregates(PRICED));
       mockedLoadReprocessing.mockResolvedValue({
@@ -384,10 +371,8 @@ describe('appraisePaste', () => {
         1
       );
 
-      // Veldspar: 0.5 x 1.10 (Simple Ore Processing V) = 0.55 -> floor(415*10*0.55) = 2282
       const veldsparRow = appraisal.rows.find((row) => row.typeId === 1230)!;
       expect(veldsparRow.refineTotal).toBeCloseTo(2282 * 5.41, 6);
-      // Damage Control II: 0.5 x 1.0 (untrained Scrapmetal) -> floor(100*0.5) = 50
       const dcuRow = appraisal.rows.find((row) => row.typeId === 2048)!;
       expect(dcuRow.refineTotal).toBeCloseTo(50 * 5.41, 6);
     });
@@ -407,14 +392,12 @@ describe('appraisePaste', () => {
 
       const { appraisal } = await appraisePaste('Damage Control II\t1', DEFAULT_TRADE_HUB, 100, 1);
 
-      // Damage Control II is scrap: only Scrapmetal Processing V applies.
-      // 0.5 x 1.10 -> floor(100*0.55) = 55
       const dcuRow = appraisal.rows[0];
       expect(dcuRow.refineTotal).toBeCloseTo(55 * 5.41, 6);
     });
 
     it("applies the active clone's refining implant to an ore row, and reports the pct (issue #1227)", async () => {
-      const RX_804 = 27174; // Zainou 'Beancounter' Reprocessing RX-804, +4%.
+      const RX_804 = 27174;
       const SIMPLE_ORE_PROCESSING = 60377;
       server.use(
         aggregates({
@@ -443,7 +426,6 @@ describe('appraisePaste', () => {
         1
       );
 
-      // 0.5 x 1.04 -> floor(415 * 10 * 0.52) Tritanium x 5.41 ISK.
       const expected = Math.floor(415 * 10 * 0.52) * 5.41;
       expect(appraisal.rows[0].refineTotal).toBeCloseTo(expected, 6);
       expect(implantBonusPct).toBe(4);
@@ -470,7 +452,6 @@ describe('appraisePaste', () => {
         1
       );
 
-      // Untrained Scrapmetal Processing, no implant: 0.5 x 1.0 -> floor(100*0.5) = 50.
       expect(appraisal.rows[0].refineTotal).toBeCloseTo(50 * 5.41, 6);
       expect(implantBonusPct).toBe(0);
       expect(refinesOreOrIce).toBe(false);
@@ -536,10 +517,8 @@ describe('appraisePaste', () => {
 
       const row = appraisal.rows[0];
       expect(row.lpCorpName).toBe('Test Corp');
-      // 3 units at 1-per-redemption needs 3 redemptions.
       expect(row.lpIskCost).toBe(600_000);
       expect(row.lpAffordable).toBe(true);
-      // The LP option (600,000) beats the market sell total (1,382,400).
       expect(appraisal.totals.cheapestBuy).toBe(600_000);
       expect(appraisal.totals.cheapestBuyViaLp).toBe(1);
     });
@@ -555,9 +534,6 @@ describe('appraisePaste', () => {
 
       await appraisePaste('Damage Control II\t3', DEFAULT_TRADE_HUB, 100, 1);
 
-      // getHubPrices is called through Fuzzwork; the widened batch is only
-      // observable via the request itself, so assert on the mocked adapter's
-      // own inputs instead of a second network round trip.
       expect(mockedFindLpOfferMatches).toHaveBeenCalledWith(1, [2048]);
     });
 
@@ -631,8 +607,6 @@ describe('compareHubs', () => {
 
     expect(hits).toBe(COMPARED_HUBS.length);
     expect(rows.map((row) => row.hub)).toEqual(COMPARED_HUBS);
-    // Same aggregate served for every hub in this fixture, so every row
-    // matches the primary appraisal's own totals at the same percentage.
     for (const row of rows) {
       expect(row.buy).toBe(1_345_950);
       expect(row.sell).toBe(1_382_400);

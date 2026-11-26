@@ -9,7 +9,6 @@ import { ImportFittingDialog, NewFromHullDialog } from './FittingStartDialogs';
 type StartScreenProps = ComponentProps<typeof FittingStartScreen>;
 
 interface FittingLibraryDialogsProps {
-  /** Which Fittings-menu dialog is open; null while none is. */
   library: LibraryAction | null;
   onClose: () => void;
   workspace: StartScreenProps['workspace'];
@@ -20,7 +19,6 @@ interface FittingLibraryDialogsProps {
   onStartHull: (hull: HullEntry) => void;
 }
 
-/** The Fittings menu's dialogs: open another Fitting, start from a hull, import. */
 export function FittingLibraryDialogs({
   library,
   onClose,
@@ -38,7 +36,6 @@ export function FittingLibraryDialogs({
         open={library === 'open'}
         onClose={onClose}
         title={t('fittings.header.libraryTitle')}
-        // Room for the preview beside the list, as on the Start page.
         placement={isPhone ? 'sheet' : 'page'}
       >
         {library === 'open' && (

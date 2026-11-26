@@ -26,14 +26,11 @@ import { useBook } from './useBook';
 const kp = (key: string) => `corpTaxBook.moons.refineryPage.${key}`;
 const NONE = <span className="text-text-dim">—</span>;
 
-/** An Extraction's row with what its moon doc says was mined in its window. */
 export interface PullRow {
   row: ExtractionRow;
-  /** The ISK value of the ore mined in the window; null when no doc says. */
   minedIsk: number | null;
 }
 
-/** The newest Extraction's chunk and where its make-up came from. Never guessed. */
 export function OrePanel({
   row,
   priceOf,
@@ -163,7 +160,6 @@ function MinedCell({ pull }: { pull: PullRow }) {
   );
 }
 
-/** Every Extraction, future and past; a row opens its Extraction page. */
 export function ExtractionsPanel({
   pulls,
   onOpen,
@@ -309,7 +305,6 @@ export function ExtractionsPanel({
   );
 }
 
-/** Every Miner who mined here, all of them, biggest first. Folds on a phone; never pages. */
 export function MinersPanel({
   miners,
   pulled,
@@ -317,7 +312,6 @@ export function MinersPanel({
   nextPop,
 }: {
   miners: readonly RefineryMiner[];
-  /** Extractions with anyone mining: the "of N" under a Miner's count. */
   pulled: number;
   nameOf: (minerId: string) => string;
   nextPop: string | undefined;

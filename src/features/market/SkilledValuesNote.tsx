@@ -3,17 +3,11 @@ import { useTranslation } from 'react-i18next';
 import { Button, LiveStatus, Spinner } from '@/components/ui';
 import type { SkilledAttributesState } from '@/features/fittings/useSkilledAttributes';
 
-/**
- * Above the attribute sections: what the arrows mean once the pilot's values
- * are in, or the one-time engine download that brings them
- * (`useSkilledAttributes`, which never starts it on its own).
- */
 export function SkilledValuesNote({
   state,
   changed,
 }: {
   state: SkilledAttributesState;
-  /** Whether any row the note sits over reads "base → skilled". */
   changed: boolean;
 }) {
   const { t } = useTranslation();

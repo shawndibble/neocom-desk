@@ -28,7 +28,6 @@ import {
 } from '@/engine/communities/shareTree';
 import { useOwnedBlueprintTypes } from './useOwnedBlueprintTypes';
 
-/** A native checkbox whose partial state is the DOM `indeterminate` flag, which has no attribute. */
 function GroupCheckbox({
   group,
   selected,
@@ -123,12 +122,6 @@ function GroupNode({
   );
 }
 
-/**
- * Which blueprints to share with a Community (issue #3599): share all or none,
- * search by name, a market-group tree whose category checkboxes show how many
- * of their blueprints are chosen, and a checkbox per blueprint to opt it out.
- * Nothing is chosen until the Member picks. Every rule is in `shareTree`.
- */
 export function SharePicker({
   owned,
   groups,
@@ -139,7 +132,6 @@ export function SharePicker({
 }: {
   owned: readonly BlueprintTypeInfo[];
   groups: readonly ShareMarketGroup[];
-  /** `blueprintGroupOfProductGroup` over every blueprint, so unlisted ones land beside their kin. */
   learned?: ReadonlyMap<number, number>;
   selected: ReadonlySet<number>;
   onChange: (next: Set<number>) => void;
@@ -194,7 +186,6 @@ export function SharePicker({
   );
 }
 
-/** The picker for one Character, loading what it owns first. */
 export function CharacterSharePicker({
   characterId,
   selected,

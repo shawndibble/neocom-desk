@@ -5,7 +5,6 @@ import { STARGATES, SYSTEM_SECURITY } from './data/stargateGraph.js';
 const text = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8');
 const pub = (name: string) => JSON.parse(text(`../../public/data/market/${name}`));
 
-// functions/ cannot import public/, so it keeps a copy (scripts/build-stargate-data.mjs).
 describe('stargateGraph copy', () => {
   it('matches public/data/market/jumps.json', () => {
     expect(STARGATES).toEqual(pub('jumps.json'));

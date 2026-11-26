@@ -21,8 +21,6 @@ describe('parseRememberedLocation', () => {
   });
 
   it('reads a record from before locations were remembered as no location at all', () => {
-    // Absent keys, not `undefined` ones: the record syncs through Firestore,
-    // which rejects `undefined` at any depth.
     const parsed = parseRememberedLocation({ facility: 'azbel' });
     expect(parsed).toEqual({});
     expect('security' in parsed).toBe(false);
@@ -39,8 +37,6 @@ describe('parseRememberedLocation', () => {
   });
 
   it('keeps the build system only as a whole pair', () => {
-    // A plan holding half the pair builds at its hub, so a remembered half
-    // would seed a plan whose label and fee disagree.
     expect(parseRememberedLocation({ buildSystemId: 30003888 })).toEqual({});
     expect(parseRememberedLocation({ buildSystemId: 'x', buildSystemName: 'Badivefi' })).toEqual(
       {}

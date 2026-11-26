@@ -23,23 +23,12 @@ interface Props {
     | 'conflictCause'
     | 'billed'
   >;
-  /** Who is asking and who answers tax questions: "Tell {corp}" also mails them, best effort. */
   mail?: MailContext;
-  /** Opens Resolve on this day: after an officer kept the bill, the member can say it again or pay. */
   onResolve?: () => void;
-  /** The Payee the member's own entry gives the ore to, by name. */
   payeeName: string;
-  /** It landed (sent or withdrawn): reload the books. */
   onSent: () => void;
 }
 
-/**
- * A Conflict day's "Tell {corp}" (#6206): the member sends the book the day, its ore and their
- * Payee, so an officer sees it in Needs you and waives that ore's tax or rejects it with a note.
- * Once sent it says so and can be withdrawn until an officer answers; an answer shows the
- * officer's reason. Ore listed beyond what the
- * book recorded is never billed, so there is nothing to dispute.
- */
 export function CorpDisputeAction({ view, payeeName, onSent, onResolve, mail }: Props) {
   const { t } = useTranslation();
   const [busy, setBusy] = useState(false);
@@ -55,8 +44,6 @@ export function CorpDisputeAction({ view, payeeName, onSent, onResolve, mail }: 
         });
         onSent();
       } catch (e) {
-        // An officer answered between the page loading and the click: read the books again, and
-        // the answer, with what to do next, is on the day.
         if (callableErrorReason(e) === 'answered') onSent();
         setFailed(callableErrorReason(e) === 'answered' ? 'rejected' : 'other');
       } finally {
@@ -115,7 +102,7 @@ export function CorpDisputeAction({ view, payeeName, onSent, onResolve, mail }: 
       </div>
     );
   const recordKey = view.recordKey;
-  if (recordKey === undefined || view.conflictCause === 'overListed') return null;
+  if (recordKey === undefined) return null;
   const send = async () => {
     setBusy(true);
     setFailed(null);
@@ -130,7 +117,6 @@ export function CorpDisputeAction({ view, payeeName, onSent, onResolve, mail }: 
           payeeName,
         })),
       });
-      // The record is in Needs you; the mail is for an officer who is not in the app.
       if (mail) await mailNotOwed(mail, view, '');
       onSent();
     } catch (e) {

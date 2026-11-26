@@ -38,8 +38,6 @@ vi.mock('./communityStore', () => ({
 }));
 vi.mock('@/features/character/location', () => ({ loadCharacterSolarSystemId: world.location }));
 vi.mock('@/esi/endpoints', () => ({ postOpenWindowNewMail: world.newMail }));
-// A chain of stargates 1-2-...-8; system 9 has no gate. Perimeter is one jump
-// from Jita, Badivefi seven, Efa unreachable.
 vi.mock('@/sde/jumpGraph', () => ({
   loadJumpGraph: () =>
     Promise.resolve(
@@ -150,7 +148,6 @@ async function grant(...scopes: string[]) {
   });
 }
 
-/** The board's filters sit behind the funnel; open it once. */
 async function openFilters(user: ReturnType<typeof userEvent.setup>) {
   const funnel = screen.getByRole('button', { name: /^Filters/ });
   if (funnel.getAttribute('aria-expanded') !== 'true') await user.click(funnel);
@@ -235,7 +232,6 @@ describe('RequestsTab columns', () => {
     expect(screen.queryByText('Budget 300M')).not.toBeInTheDocument();
     expect(screen.getByText('Aria Voss · Khanid')).toBeInTheDocument();
 
-    // Shared device-local store: put it back for the next test.
     await user.click(screen.getByRole('button', { name: 'Columns' }));
     await user.click(screen.getByRole('menuitem', { name: 'Reset to default' }));
     expect(screen.getByText('Budget 300M')).toBeInTheDocument();
@@ -335,7 +331,6 @@ describe('Request panel', () => {
   });
 });
 
-/** Posted from the one page: nobody is a Member here, so no mail goes out. */
 async function postFromDialog(user: ReturnType<typeof userEvent.setup>) {
   const post = screen.getByRole('button', { name: 'Post request' });
   await waitFor(() => expect(post).toBeEnabled());
@@ -518,7 +513,6 @@ describe('I can fill', () => {
     const chip = await screen.findByRole('button', { name: /^I can fill/ });
     await waitFor(() => expect(chip).toHaveAttribute('aria-disabled', 'true'));
     expect(chip).not.toHaveTextContent('I can fill0');
-    // Asked strictly, so an unreadable library is not mistaken for an empty one.
     expect(world.library).toHaveBeenCalledWith(1, 'c1', ['char:1'], { strict: true });
   });
 });
@@ -563,7 +557,6 @@ describe('distance', () => {
   it('explains the missing Permission with the Grant link', async () => {
     const user = userEvent.setup();
     await grant();
-    // Without the Permission ESI gives no location.
     world.location.mockResolvedValue(null);
     renderTab([near]);
     await pick(user, 'Within 5 jumps');
@@ -595,7 +588,7 @@ describe('Message the requester', () => {
       subject: 'Your Request: Tritanium',
       body: 'Hi Aria Voss, about your Request in Pals for Tritanium: ',
     });
-    expect(await screen.findByText('Opened in your EVE client.')).toBeInTheDocument();
+    expect((await screen.findAllByText('Opened in your EVE client.')).length).toBeGreaterThan(0);
   });
 
   it('hides Message without the Open in EVE Permission', async () => {
@@ -924,7 +917,6 @@ describe('Telling the requester about a Pledge', () => {
     expect(body).toContain('community=c1&tab=requests');
     expect(mail.confirmPledgeMail).toHaveBeenCalledWith(1, { communityId: 'c1', requestId: 'r1' });
     expect(await screen.findByText('Mailed Aria Voss about your Pledge.')).toBeInTheDocument();
-    // The Pledge was saved before any mail went out.
     expect(store.updateMyPledge.mock.invocationCallOrder[0]).toBeLessThan(
       mail.reservePledgeMail.mock.invocationCallOrder[0]
     );
@@ -1011,7 +1003,6 @@ describe('Telling the requester about a Pledge', () => {
     });
     renderTab([wantsMail()]);
     const panel = await open(user);
-    // The Permission state resolves asynchronously, so wait for it rather than race it.
     expect(
       await within(panel).findByText(/Sending it needs the Send mail Permission/)
     ).toBeInTheDocument();

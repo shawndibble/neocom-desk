@@ -23,9 +23,9 @@ function row(overrides: Partial<BpcContractRow>): BpcContractRow {
 describe('bpcPerRunCheck', () => {
   const subject = row({ contractId: 1 });
   const similar = [
-    row({ contractId: 2, price: 7_900_000 }), // 790,000 / run
-    row({ contractId: 3, price: 9_200_000 }), // 920,000 / run
-    row({ contractId: 4, price: 5_000_000, runs: 5, me: 9, te: 18 }), // 1,000,000 / run
+    row({ contractId: 2, price: 7_900_000 }),
+    row({ contractId: 3, price: 9_200_000 }),
+    row({ contractId: 4, price: 5_000_000, runs: 5, me: 9, te: 18 }),
   ];
 
   it('compares this copy per run with the median and cheapest of similar copies', () => {
@@ -36,7 +36,6 @@ describe('bpcPerRunCheck', () => {
       cheapestPerRun: 790_000,
       count: 3,
     });
-    // (850,000 - 920,000) / 920,000 = -7.61%
     expect(result?.diff).toBeCloseTo(-7.61, 2);
   });
 

@@ -41,7 +41,6 @@ vi.mock('@/features/character/typeNames', () => ({
   ),
 }));
 
-/** One ISK figure per type, so the per-side totals are checkable by hand. */
 vi.mock('@/market/prices', () => ({
   getHubPricesWithStatus: vi.fn(async () => ({
     unreachable: false,
@@ -216,8 +215,6 @@ describe('PublicContractDetailModal — contents', () => {
     ]);
     renderModal();
 
-    // 5 injectors at 1b, 10 extractors at 100m — whole ISK, since cents on a
-    // billion-ISK bundle are noise. Sell orders: what taking it outright costs.
     const check = await screen.findByRole('region', { name: 'Is it fair? · Jita 4-4 right now' });
     expect(await within(check).findByText('5,000,000,000 ISK')).toBeInTheDocument();
     expect(within(check).getByText('1,000,000,000 ISK')).toBeInTheDocument();
@@ -266,7 +263,7 @@ describe('PublicContractDetailModal — price check', () => {
     await within(check).findByText('5,000,000,000 ISK');
     fireEvent.click(within(check).getByRole('button', { name: 'Sell orders' }));
     expect(within(check).getByRole('button', { name: 'Buy orders' })).toBeInTheDocument();
-    expect(within(check).getAllByText('4,500,000,000 ISK')).toHaveLength(2); // asking and buy value
+    expect(within(check).getAllByText('4,500,000,000 ISK')).toHaveLength(2);
     expect(within(check).getByText('0.0%')).toHaveClass('text-isk-pos');
     expect(within(check).getByText('Level with buy orders. No saving.')).toBeInTheDocument();
   });
@@ -282,8 +279,8 @@ describe('PublicContractDetailModal — price check', () => {
     expect(rows[0]).toHaveTextContent('Your search');
     expect(rows[1]).not.toHaveTextContent('Your search');
     const check = await screen.findByRole('region', { name: /^Is it fair/ });
-    expect(await within(check).findByText('5,000,000,000 ISK')).toBeInTheDocument(); // theirs
-    expect(within(check).getByText('1,000,000,000 ISK')).toBeInTheDocument(); // the rest
+    expect(await within(check).findByText('5,000,000,000 ISK')).toBeInTheDocument();
+    expect(within(check).getByText('1,000,000,000 ISK')).toBeInTheDocument();
     expect(within(check).getByText('1 line you did not search for')).toBeInTheDocument();
   });
 
@@ -297,12 +294,11 @@ describe('PublicContractDetailModal — price check', () => {
     const rows = await itemRows();
     expect(rows[0]).not.toHaveTextContent('Your search');
     const check = await screen.findByRole('region', { name: /^Is it fair/ });
-    expect(await within(check).findAllByText('6,000,000,000 ISK')).toHaveLength(2); // ask and value
+    expect(await within(check).findAllByText('6,000,000,000 ISK')).toHaveLength(2);
     expect(within(check).queryByText('Other items')).not.toBeInTheDocument();
   });
 
   it("never prices a blueprint copy at the original's hub price, so a copy-only listing has no hub check", async () => {
-    // 40520 has a hub price (1b sell), but only the original trades; a copy never does.
     showItems([
       item({
         record_id: 1,
@@ -333,7 +329,7 @@ describe('PublicContractDetailModal — price check', () => {
     renderModal(null, { askingIsk: 50_000_000 });
 
     const check = await screen.findByRole('region', { name: /^Is it fair/ });
-    expect(await within(check).findByText('1,000,000,000 ISK')).toBeInTheDocument(); // 10 x 100m, the item only
+    expect(await within(check).findByText('1,000,000,000 ISK')).toBeInTheDocument();
     expect(within(check).getByText(/1 of 2 items priced \(1 item unpriced\)/)).toBeInTheDocument();
     expect(within(check).getByText(/Against 1 of 2 items/)).toBeInTheDocument();
   });
@@ -355,7 +351,6 @@ describe('PublicContractDetailModal — price check', () => {
     expect(await within(check).findByText('1,000,000,000 ISK')).toBeInTheDocument();
     expect(within(check).getByText('Other contracts')).toBeInTheDocument();
     expect(within(check).getByText(/about 4,300,000,000 ISK/)).toBeInTheDocument();
-    // The saving stays against the hub value: 50M against 1B.
     expect(within(check).getByText('+95.0%')).toBeInTheDocument();
   });
 
@@ -433,8 +428,6 @@ describe('PublicContractDetailModal — item actions', () => {
     renderModal();
 
     const rows = await itemRows();
-    // The row carries no `tabIndex` of its own; the Market link inside it is
-    // what a keyboard reaches, and Shift+F10 there must reach the same menu.
     fireEvent.contextMenu(within(rows[0]).getByRole('link'));
 
     expect(await screen.findByRole('menu')).toBeInTheDocument();
@@ -592,7 +585,6 @@ describe('PublicContractDetailModal — item cap (#5423)', () => {
     loadContractLocationName.mockResolvedValue('Jita IV - Moon 4 - Caldari Navy Assembly Plant');
   });
 
-  /** `count` distinct types (ids 1001..), each its own line. */
   function manyItems(count: number, isIncluded = true): PublicContractItem[] {
     return Array.from({ length: count }, (_, i) =>
       item({ record_id: i + 1, type_id: 1001 + i, is_included: isIncluded })
@@ -709,7 +701,6 @@ describe('PublicContractDetailModal — item cap (#5423)', () => {
   });
 
   it('still counts a hidden line in the price check', async () => {
-    // Line 13 (hidden behind the button) is the only priced line.
     showItems([
       ...manyItems(12).map((i) => ({ ...i, quantity: 1 })),
       item({ record_id: 99, type_id: 40519, quantity: 10 }),
@@ -717,6 +708,6 @@ describe('PublicContractDetailModal — item cap (#5423)', () => {
     renderModal(null, { askingIsk: 1_000_000_000 });
     expect(await itemRows()).toHaveLength(10);
     const check = await screen.findByRole('region', { name: /^Is it fair/ });
-    expect(await within(check).findAllByText('1,000,000,000 ISK')).toHaveLength(2); // ask and value
+    expect(await within(check).findAllByText('1,000,000,000 ISK')).toHaveLength(2);
   });
 });

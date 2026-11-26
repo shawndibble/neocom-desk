@@ -1,8 +1,3 @@
-/**
- * Plan's "Bigger chains" panel: draws `biggerChainsModel`'s view, computes no
- * figure. Its "What if I add a planet?" part, and the Map's add-planet panel,
- * draw a what-if planet's chains with `WhatIfChainCards`.
- */
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { formatCount } from '@/lib/formatCount';
 import { formatList } from '@/lib/listFormat';
@@ -70,7 +65,6 @@ function ChainSentence({
           item,
           planets: (
             <b className="font-semibold">
-              {/* A what-if planet reads last: "Gas I, Gas II and a new Lava planet". */}
               {formatList(
                 [...card.planetIds]
                   .sort((a, b) => Number(isWhatIfPlanetId(a)) - Number(isWhatIfPlanetId(b)))
@@ -173,7 +167,6 @@ function ChainCard({
   free: number;
   pi: PiData;
   assumptions: string;
-  /** The figure on its own line at every width: a narrow panel, such as the Map's. */
   stacked?: boolean;
 }) {
   const { t } = useTranslation();
@@ -229,7 +222,6 @@ function ChainCard({
   );
 }
 
-/** Planet and product names, a what-if planet included ("a new Barren planet"). */
 function useNames(advice: PlanAdvice, pi: PiData, whatIfTypes: readonly PlanetType[]): Names {
   const { t } = useTranslation();
   const byId = new Map(advice.colonies.map((colony) => [colony.planetId, colony]));
@@ -244,7 +236,6 @@ function useNames(advice: PlanAdvice, pi: PiData, whatIfTypes: readonly PlanetTy
   };
 }
 
-/** What a card's figure assumes, the what-if planet's own assumptions included. */
 function useAssumptions(advice: PlanAdvice, whatIfTypes: readonly PlanetType[]) {
   const { t } = useTranslation();
   const basis = advice.chainBasis;
@@ -267,7 +258,6 @@ function useAssumptions(advice: PlanAdvice, whatIfTypes: readonly PlanetType[]) 
         : onColonies;
 }
 
-/** The chains what-if planet types make possible together, drawn as Bigger chains cards. */
 export function WhatIfChainCards({
   types,
   cards,
@@ -275,7 +265,6 @@ export function WhatIfChainCards({
   pi,
   stacked = false,
 }: {
-  /** Sorted, as `whatIfTypesOf` gives them: the order their planet ids are given in. */
   types: readonly PlanetType[];
   cards: readonly BiggerChainCard[];
   advice: PlanAdvice;
@@ -301,17 +290,7 @@ export function WhatIfChainCards({
   );
 }
 
-/** Plan's "What if I add a planet?": every type the pilot does not run, one at a time, once the chains above are priced. */
-function WhatIfSection({
-  advice,
-  pi,
-  ready,
-}: {
-  advice: PlanAdvice;
-  pi: PiData;
-  /** The pilot's own chains are priced: the what-ifs wait for them. */
-  ready: boolean;
-}) {
+function WhatIfSection({ advice, pi, ready }: { advice: PlanAdvice; pi: PiData; ready: boolean }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState<ReadonlySet<PlanetType>>(new Set());
   const colonies = advice.chainColonies;
@@ -323,7 +302,6 @@ function WhatIfSection({
   const wanted = ready && !noSlot ? missing : NO_TYPES;
   const state = useWhatIfChains(advice, pi, wanted);
   const pending = !ready || state.pending;
-  // All at once when every type is priced: rows landing one by one would re-sort under the pointer.
   const rows = useMemo(
     () => (pending ? [] : whatIfChainsOf(advice, state.byType)),
     [pending, advice, state.byType]

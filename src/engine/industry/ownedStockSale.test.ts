@@ -29,8 +29,8 @@ describe('ownedStockSale', () => {
     const sale = ownedStockSale([line()], { 34: 1_000 }, 'instant', NO_SKILLS);
 
     expect(sale.gross).toBeCloseTo(100_000, 6);
-    expect(sale.salesTax).toBeCloseTo(7_500, 6); // 7.5% at Accounting 0
-    expect(sale.brokerFee).toBe(0); // filling someone else's order lists nothing
+    expect(sale.salesTax).toBeCloseTo(7_500, 6);
+    expect(sale.brokerFee).toBe(0);
     expect(sale.net).toBeCloseTo(92_500, 6);
     expect(sale.unpriced).toEqual([]);
   });
@@ -40,7 +40,7 @@ describe('ownedStockSale', () => {
 
     expect(sale.gross).toBeCloseTo(100_000, 6);
     expect(sale.salesTax).toBeCloseTo(7_500, 6);
-    expect(sale.brokerFee).toBeCloseTo(3_000, 6); // 3% at Broker Relations 0
+    expect(sale.brokerFee).toBeCloseTo(3_000, 6);
     expect(sale.net).toBeCloseTo(89_500, 6);
   });
 
@@ -60,8 +60,8 @@ describe('ownedStockSale', () => {
     const skills = { [SKILL_IDS.accounting]: 5, [SKILL_IDS.brokerRelations]: 5 };
     const sale = ownedStockSale([line()], { 34: 1_000 }, 'order', skills);
 
-    expect(sale.salesTax).toBeCloseTo(3_375, 6); // 3.375% at Accounting V
-    expect(sale.brokerFee).toBeCloseTo(1_500, 6); // 1.5% at Broker Relations V
+    expect(sale.salesTax).toBeCloseTo(3_375, 6);
+    expect(sale.brokerFee).toBeCloseTo(1_500, 6);
   });
 
   it('ignores materials with nothing owned, and flags owned units with no price on this side', () => {
@@ -72,7 +72,6 @@ describe('ownedStockSale', () => {
       NO_SKILLS
     );
 
-    // Nothing owned on 34, and 35 is owned but has no buy order to fill.
     expect(sale.lines).toEqual([]);
     expect(sale.gross).toBe(0);
     expect(sale.unpriced).toEqual([35]);

@@ -187,7 +187,6 @@ describe('loadPilotList', () => {
     const rows = await run(['Beta', 'Gamma', 'Delta']);
     const [beta, gamma, delta] = rows;
     expect(beta.standing).toEqual({ band: 'orange', value: -5, via: 'corporation' });
-    // Gamma is in the viewer's own corporation; Delta is a blue contact.
     expect(gamma.ownOrganization).toBe('corporation');
     expect(gamma.kills.kind).toBe('skipped');
     expect(delta.standing?.band).toBe('blue');
@@ -197,8 +196,6 @@ describe('loadPilotList', () => {
   });
 
   it('asks zKillboard about unknown and neutral pilots before red and orange contacts', async () => {
-    // Alpha is red and Beta orange (both already known to be bad); Delta has no
-    // standing. Pasted order is bad news first, but the unknown is worth waiting on.
     const contacts = new Map([
       [1, -10],
       [11, -5],
@@ -251,7 +248,6 @@ describe('loadPilotList', () => {
       if (fresh.kills.kind !== 'ready') throw new Error('expected a ready row');
       const rank = ['inactive', 'low', 'active', 'dangerous'];
       for (let n = 0; n <= busy.length; n++) {
-        // An earlier read lacks the newest kills: it holds only the oldest n of the fresh list.
         const older = busy.slice(busy.length - n);
         const stale: PilotListRow = {
           ...fresh,

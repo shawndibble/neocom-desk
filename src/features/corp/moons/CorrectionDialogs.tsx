@@ -21,12 +21,10 @@ import { dateWithYear, isk, shortDate } from './moonsFormat';
 import { useBook } from './useBook';
 import { lockDateFor } from '../../../../functions/src/corpTaxBookCheckpoint';
 
-/** The chosen date the way the rest of the book writes it: the browser's date field shows the locale's format. */
 function DateReadback({ date }: { date: string }) {
   return <span className="block text-xs text-text-dim">{dateWithYear(date)}</span>;
 }
 
-/** Per-record rate override (D31): a logged officer correction on one day. */
 export function RateOverrideDialog({
   open,
   onClose,
@@ -36,7 +34,6 @@ export function RateOverrideDialog({
   open: boolean;
   onClose: () => void;
   days: readonly DayRow[];
-  /** The day to start on, when the dialog opens from that day's row. */
   initialKey?: string;
 }) {
   const { t } = useTranslation();
@@ -96,7 +93,6 @@ export function RateOverrideDialog({
   );
 }
 
-/** A correction line (`addAdjustment`): billed on the Running account as a labelled line. */
 export function AdjustmentDialog({
   open,
   onClose,
@@ -110,12 +106,10 @@ export function AdjustmentDialog({
   miner: MinerRow;
   minerName: string;
   defaultDate: string;
-  /** Where a rolled-over balance is dated unless the officer picks another day: the book's start. */
   openingDate?: string;
 }) {
   const { t } = useTranslation();
   const { edit, view } = useBook();
-  // A correction is dated on or after the lock date (decision 20261120-235011, "a lock date").
   const lockDate = lockDateFor(view.input.now.slice(0, 10));
   const balanceText = (balance: number) =>
     balance > 0
@@ -129,7 +123,6 @@ export function AdjustmentDialog({
   const [date, setDate] = useState(defaultDate);
   const [reason, setReason] = useState('');
   const entered = Number(amount);
-  // "Set balance": the amount that moves their balance to the one typed, and which way it goes.
   const current = accountBalance(miner);
   const delta =
     kind === 'set' ? balanceAdjustment(current, side === 'owes' ? entered : -entered) : 0;
@@ -165,7 +158,6 @@ export function AdjustmentDialog({
           value={kind}
           onChange={(next) => {
             setKind(next);
-            // A rolled-over balance is an opening balance: dated at the book's start, and labelled so.
             if (next === 'set') {
               if (openingDate && date === defaultDate) setDate(openingDate);
               if (reason.trim() === '')
@@ -249,7 +241,6 @@ export function AdjustmentDialog({
   );
 }
 
-/** Edits a correction: reverses it and adds the new one, the old staying on the record (struck through). */
 export function EditCorrectionDialog({
   open,
   onClose,
@@ -324,7 +315,6 @@ export function EditCorrectionDialog({
   );
 }
 
-/** Changes how much of a Miner's one day shortfall the book forgives (a Market adjustment). */
 export function MarketAdjustmentDialog({
   open,
   onClose,
@@ -335,9 +325,7 @@ export function MarketAdjustmentDialog({
   open: boolean;
   onClose: () => void;
   minerId: string;
-  /** The mined day whose shortfall it governs. */
   date: string;
-  /** What the book forgave of it. */
   forgiven: number;
 }) {
   const { t } = useTranslation();

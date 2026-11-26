@@ -1,9 +1,3 @@
-/**
- * Whether an Alpha clone can fly the open Fitting, by skill caps: the skills
- * every fitted type needs (the requirements the skill gaps read too),
- * checked with their prerequisites against the SDE's Alpha caps. Needs no
- * Character — it is a property of the fit, not of who flies it.
- */
 import { useCallback, useEffect, useState } from 'react';
 import { fittingAlphaBlockers, type AlphaBlocker } from '@/engine/fittings/alphaClone';
 import { fittingRequirementTypeIds } from '@/engine/fittings/skillGaps';
@@ -12,7 +6,6 @@ import { loadSkillCatalog, type SkillCatalog } from '@/features/skills/skillMap'
 import { loadKnownRequirements } from './skillRequirements';
 
 export interface FittingAlpha {
-  /** Null while loading (or with nothing open); empty when an Alpha can fly it. */
   blockers: readonly AlphaBlocker[] | null;
   skillName: (skillTypeId: number) => string;
 }
@@ -33,7 +26,6 @@ export function useFittingAlpha(fitting: Fitting | null): FittingAlpha {
         ]);
         if (cancelled) return;
         setCatalog(skills);
-        // A type ESI couldn't supply might need anything: no verdict beats a false "Alpha OK".
         if (required.some((skills) => skills === null)) return;
         setResult({
           fitting,
@@ -42,9 +34,7 @@ export function useFittingAlpha(fitting: Fitting | null): FittingAlpha {
             skills.engineSkills
           ),
         });
-      } catch {
-        // No verdict rather than a wrong one; the chip stays hidden.
-      }
+      } catch {}
     })();
     return () => {
       cancelled = true;
@@ -55,6 +45,5 @@ export function useFittingAlpha(fitting: Fitting | null): FittingAlpha {
     (skillTypeId: number) => catalog?.bySkillTypeID.get(skillTypeId)?.name ?? `#${skillTypeId}`,
     [catalog]
   );
-  // Keyed to what was computed for, so a new Fitting never shows the last one's answer.
   return { blockers: result && result.fitting === fitting ? result.blockers : null, skillName };
 }

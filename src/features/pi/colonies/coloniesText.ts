@@ -5,12 +5,10 @@ import { hoursLabel } from './coloniesFormat';
 
 export interface QuickWinLine {
   verb: 'restart' | 'fix' | 'haul' | 'add';
-  /** The sentence; a `{product}` token marks where `products` go, each a product link (`Sentence`). */
   text: string;
   products: readonly { typeId: number; name: string }[];
 }
 
-/** One quick win as a sentence, with the verb a pilot would do it with. */
 export function quickWinLine(
   win: QuickWin,
   typeNames: ReadonlyMap<number, string>,
@@ -60,7 +58,6 @@ export function quickWinLine(
   }
 }
 
-/** `plan#plan-<slug>`: the card Plan gives this colony. */
 export function planColonyHref(name: string | null, planetId: number): string {
   return `/planetary-industry/plan#${planColonyAnchor(name, planetId)}`;
 }

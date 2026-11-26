@@ -50,19 +50,15 @@ import {
 import { ItemSearchPicker } from './ItemSearchPicker';
 import { DialogFooter } from '@/components/ui/DialogFooter';
 
-/** What a caller may start the dialog with: Ask to copy (issue #3813) fills in its one blueprint line. */
 export interface ComposePrefill {
   lines?: readonly RequestLine[];
 }
 
-/** Editing a Request of one's own (instead of posting a new one). */
 export interface ComposeEditing {
   request: CommunityRequest;
-  /** Members have Pledged: the lines keep their items and kinds, only quantities and specs change. */
   linesLocked: boolean;
 }
 
-/** What a pilot changed on a line since it came from the paste or the search, as typed. */
 interface LineEdit {
   quantity?: string;
   kind?: RequestLineKind;
@@ -71,11 +67,9 @@ interface LineEdit {
   te?: string;
 }
 
-/** A post that has not answered by then stops blocking the dialog (sign-in or the network may hang). */
 export const POST_TIMEOUT_MS = 75_000;
 const TIMED_OUT = Symbol('post timed out');
 
-/** An optional whole number as typed: blank is none, anything else must be in range. */
 function optionalNumber(text: string | undefined, min: number, max: number) {
   const trimmed = (text ?? '').trim();
   if (trimmed === '') return { value: undefined, valid: true };
@@ -85,7 +79,6 @@ function optionalNumber(text: string | undefined, min: number, max: number) {
 }
 
 interface ResolvedLine {
-  /** The line as it came in (paste or search): what edits and removals are filed under. */
   key: string;
   line: RequestLine;
   duplicate: boolean;
@@ -114,14 +107,6 @@ function resolveLine(base: RequestLine, edit: LineEdit | undefined): ResolvedLin
   };
 }
 
-/**
- * A new Request: an optional location and terms, lines from a pasted pile (the
- * Appraisal parser) or added by search, each line's quantity editable, and how
- * to hear about a Pledge (`RequestNotifyChoice`). The same dialog edits a
- * Request of one's own (`editing`). The pasted lines are recomputed from the
- * box on every change, so edits and removals are kept per item rather than in
- * a list the paste would overwrite.
- */
 export function ComposeRequestDialog({
   characterId,
   communityId,
@@ -135,10 +120,8 @@ export function ComposeRequestDialog({
   communityId: string;
   prefill?: ComposePrefill;
   editing?: ComposeEditing;
-  /** This Member's own Characters that are in the Community: who a buyback's contracts may go to. */
   buyers?: readonly BuyerOption[];
   onClose: () => void;
-  /** The Request is posted or saved: refetch the board. */
   onPosted: () => void;
 }) {
   const { t } = useTranslation();
@@ -159,7 +142,6 @@ export function ComposeRequestDialog({
   const [error, setError] = useState<string | null>(null);
   const [notify, setNotify] = useState<RequestNotify>(editing?.request.notify ?? DEFAULT_NOTIFY);
   const searchRef = useRef<HTMLInputElement>(null);
-  // A Request is standing or not for life: only a new one chooses, and editing keeps what it was.
   const [standingMode, setStandingMode] = useState(editing?.request.standing !== undefined);
   const [buyback, setBuyback] = useState<BuybackDraft>(() =>
     editing?.request.standing ? draftFromStanding(editing.request.standing) : emptyBuybackDraft()
@@ -181,11 +163,9 @@ export function ComposeRequestDialog({
       quantity: m.quantity,
       kind: defaultKind(m.name),
     }));
-    // Removed lines go first, so removing one never lets a dropped one back in; the cap counts what is left.
     const kept = [...pasted, ...added].filter((line) => !removed.has(lineKey(line)));
     const merged = mergeLines([], kept);
     const resolved = merged.lines.map((line) => resolveLine(line, edits[lineKey(line)]));
-    // A kind change can land two lines on one typeId:kind, which the server refuses.
     const counts = new Map<string, number>();
     for (const r of resolved) counts.set(lineKey(r.line), (counts.get(lineKey(r.line)) ?? 0) + 1);
     return {
@@ -197,8 +177,6 @@ export function ComposeRequestDialog({
   const edit = (key: string, patch: LineEdit) =>
     setEdits((current) => ({ ...current, [key]: { ...current[key], ...patch } }));
 
-  // A blueprint added again becomes the other kind (copy and original can both be asked for);
-  // anything else already listed gets one more.
   const addItem = (item: { typeId: number; name: string }) => {
     const first = defaultKind(item.name);
     const kinds: RequestLineKind[] = isBlueprintName(item.name)
@@ -305,7 +283,6 @@ export function ComposeRequestDialog({
   return (
     <Modal
       open
-      // The post is in flight: it stays until it has a result.
       onClose={busy ? () => undefined : onClose}
       title={t(
         editing
@@ -450,7 +427,6 @@ export function ComposeRequestDialog({
                       </div>
                       {blueprint && (
                         <div className="flex flex-wrap items-center gap-2 text-xs text-text-dim">
-                          {/* Native select: two options in a modal, where a phone gets the OS picker. */}
                           <NativeSelect
                             size="sm"
                             className="w-44"
@@ -522,7 +498,6 @@ export function ComposeRequestDialog({
             )}
           </>
         )}
-        {/* A standing Request takes quotes, not Pledges, so there is nothing to be told about. */}
         {!standingMode && <RequestNotifyChoice value={notify} onChange={setNotify} />}
         {error && <InlineError>{error}</InlineError>}
         <LiveStatus announceKey={announce.key}>{announce.text}</LiveStatus>

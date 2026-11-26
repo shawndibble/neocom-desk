@@ -7,8 +7,8 @@ import { answeredByMember, isoDay } from './memberFlag';
 export type PillState =
   | 'pending'
   | 'billed'
+  | 'estimate'
   | 'conflict'
-  | 'settling'
   | 'unattributed'
   | 'dismissed'
   | 'waived'
@@ -19,8 +19,8 @@ export type PillState =
 export const PILL_KEY: Record<PillState, string> = {
   pending: 'pending',
   billed: 'billed',
+  estimate: 'estimate',
   conflict: 'conflict',
-  settling: 'settling',
   unattributed: 'unattributed',
   dismissed: 'dismissed',
   waived: 'waived',
@@ -29,20 +29,12 @@ export const PILL_KEY: Record<PillState, string> = {
   notPaying: 'notPaying',
 };
 
-/**
- * A Conflict the member has already answered reads as what it now is — waiting on the corporation,
- * or answered by it — not as a warning they can do nothing more about (#6206). `rejected` is
- * deliberately absent: an officer who kept the bill has handed the day back, so it stays a
- * Conflict with the two ways out still on it.
- */
 export function flaggedPillState(view: BookRowView): 'sent' | 'oreWaived' | undefined {
-  // A billed day can be disputed too now (resolving in the app): while sent, it says so.
   if (view.state === 'billed' && view.flagged?.state === 'sent') return 'sent';
   if (view.state !== 'conflict' || !answeredByMember(view)) return undefined;
   return view.flagged?.state === 'sent' ? 'sent' : 'oreWaived';
 }
 
-/** The conflict's resolution day, as the row prints it. */
 export const resolvesOn = isoDay;
 
 export function useCorpStateLabel() {
@@ -62,15 +54,12 @@ export function useCorpStateLabel() {
   );
 }
 
-/** A Conflict's tooltip says why it clashes (`ConflictCause`). */
 const CONFLICT_HINT_KEY: Record<ConflictCause, string> = {
   otherPayee: 'conflict',
-  overListed: 'conflictOverListed',
   ownNeedsReview: 'conflictOwnNeedsReview',
   ownerCollected: 'conflictOwnerCollected',
 };
 
-/** Why the row reads as it does — a tooltip, never the only place it is said (§6c). */
 export function useCorpStateHint() {
   const { t } = useTranslation();
   return useCallback(

@@ -9,7 +9,6 @@ import { installWalletHarness, renderWalletRoute, CHAR_ID, server } from '@/test
 
 vi.mock('@/app/loginFlow', () => ({ beginEveLogin: vi.fn().mockResolvedValue(undefined) }));
 
-// Wraps the real read so a test can see what it was asked for, or make it throw.
 vi.mock('@/features/character/walletJournalAll', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/features/character/walletJournalAll')>();
   return { ...actual, loadAllCharactersJournals: vi.fn(actual.loadAllCharactersJournals) };
@@ -53,7 +52,6 @@ describe('Wallet', () => {
       );
     }
 
-    /** Wallet, assets and orders: what a net worth snapshot needs. */
     async function grantSnapshotScopes(...ids: number[]) {
       for (const id of ids) {
         await db.tokens.update(id, {
@@ -63,8 +61,6 @@ describe('Wallet', () => {
     }
 
     it('renders no character filter for an account with one Character — nothing for it to change', async () => {
-      // Deliberately no `seedSecondCharacter()`: the outer beforeEach leaves
-      // exactly one pilot in Dexie.
       renderWalletRoute();
 
       expect(await screen.findByText('EverMarks')).toBeInTheDocument();
@@ -76,7 +72,6 @@ describe('Wallet', () => {
       await seedSecondCharacter();
       renderWalletRoute();
 
-      // In the PageHeader's scope slot, not the Worth panel's title bar.
       await screen.findByText('EverMarks');
       const pageHeader = () => screen.getByRole('heading', { level: 1 }).closest('header')!;
       const panelHeader = screen.getByRole('heading', { name: 'Worth' }).closest('header')!;
@@ -84,7 +79,6 @@ describe('Wallet', () => {
       await user.click(within(pageHeader()).getByRole('button', { name: 'This character' }));
       await user.click(await screen.findByRole('menuitemradio', { name: /^All characters/ }));
 
-      // The panel below swaps to the per-character table; the picker stays put.
       await screen.findByRole('table', { name: 'Balance by character' });
       expect(
         within(pageHeader()).getByRole('button', { name: /^All characters/ })
@@ -113,7 +107,6 @@ describe('Wallet', () => {
       const table = await screen.findByRole('table', { name: 'Balance by character' });
       expect(await within(table).findByText('Pilot One')).toBeInTheDocument();
       expect(within(table).getByText('Pilot Two')).toBeInTheDocument();
-      // 4,500 + 1,500 = 6,000 — the Net worth figure, distinct from either row's own.
       expect(await screen.findByText('6,000')).toBeInTheDocument();
     });
 
@@ -130,7 +123,6 @@ describe('Wallet', () => {
       await waitFor(() => expect(window.location.search).toContain('drill=92'));
       expect(screen.queryByRole('table', { name: 'Balance by character' })).toBeNull();
 
-      // The browser Back button undoes the drill.
       window.history.back();
       expect(
         await screen.findByRole('table', { name: 'Balance by character' })
@@ -209,9 +201,6 @@ describe('Wallet', () => {
 
     it('spins in the picker while the page loads, as Mail and Contracts do', async () => {
       await seedSecondCharacter();
-      // Released at the end: a request that never settles stays in the ESI
-      // cache's module-level `inFlightLoads`, and every later test's wallet
-      // read joins it and hangs.
       let release: () => void = () => {};
       const gate = new Promise<void>((resolve) => (release = resolve));
       server.use(
@@ -243,15 +232,12 @@ describe('Wallet', () => {
         ownerHash: 'oh3',
         addedAt: 3,
       });
-      // CHAR_C deliberately gets no token at all — never granted the scope.
       renderWalletRoute();
 
       await screen.findByText('EverMarks');
       await user.click(screen.getByRole('button', { name: 'This character' }));
       await user.click(await screen.findByRole('menuitemradio', { name: /^All characters/ }));
 
-      // All three selected: Pilot Three is left out, named by the picker's
-      // accessible name (and its menu note) and flagged on its own row.
       expect(
         await screen.findByRole('button', { name: /^All characters.*Not included: Pilot Three$/ })
       ).toBeInTheDocument();
@@ -259,9 +245,6 @@ describe('Wallet', () => {
         await screen.findByRole('link', { name: 'Grant missing Permissions' })
       ).toBeInTheDocument();
 
-      // Narrow the filter back to "This character" — the notice list must
-      // follow the same filter the balance rows do (issue #607 CodeRabbit
-      // review), not just keep listing every skipped character regardless.
       await user.click(screen.getByRole('button', { name: /^All characters/ }));
       await user.click(screen.getByRole('menuitemradio', { name: 'This character' }));
 

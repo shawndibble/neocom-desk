@@ -1,8 +1,3 @@
-/**
- * One fit source (issue #2768): for every recipe the ranking offers, the "needs
- * CC level N" tag, Show me how's Command Center line and its CPU/Power meter
- * all read the same fit, the ranking's own.
- */
 import { HOUR_MS } from '@/lib/age';
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -67,7 +62,6 @@ const pin = (pinId: number, typeId: number): PlanetPin => ({
   longitude: 0.5,
 });
 
-/** A nullsec extraction colony: two ECUs on one P0, a pad, a factory and maybe a silo. */
 function extractionColony(
   product: number,
   heads: number,
@@ -106,10 +100,8 @@ function advise(opts: {
   colonies: boolean;
   ccu: number | null;
   haulDays: PiCadence['haulDays'];
-  /** Heads per ECU on the pilot's colonies. */
   heads?: number;
   storage?: boolean;
-  /** P0 per cycle on each ECU: the measured yield. */
   qty?: number;
 }): PlanAdvice {
   const qty = opts.qty ?? 6_000;
@@ -149,7 +141,6 @@ function advise(opts: {
   });
 }
 
-/** Tag, Show me how's level and the meter's budget, recipe by recipe. */
 function expectOneFitSource(advice: PlanAdvice): void {
   const { recipes } = advice.recipesWithTagged;
   expect(recipes.length).toBeGreaterThan(0);
@@ -177,7 +168,6 @@ describe('one fit source: tag, Show me how and the meter agree', () => {
   ])('a pilot with no colonies, %s', (_label, ccu) => {
     const advice = advise({ colonies: false, ccu, haulDays: 1 });
     expectOneFitSource(advice);
-    // P2 gets its Command Center line and meter too.
     expect(advice.recipesWithTagged.recipes.some((r) => r.tier === 2)).toBe(true);
   });
 
@@ -219,13 +209,11 @@ describe('one fit source: tag, Show me how and the meter agree', () => {
       const p2 = advice.recipesWithTagged.recipes.filter((r) => r.tier === 2);
       expect(p2.length).toBeGreaterThan(0);
       expect(p2.filter((r) => r.needsCcLevel !== undefined).map((r) => r.name)).toEqual([]);
-      // The heads the layout assumes are named, so the pilot can build what the meter reads.
       for (const recipe of p2) {
         const kept = recipe.layout?.headsPerExtractor ?? 0;
         expect(kept, recipe.name).toBeGreaterThanOrEqual(1);
         expect(kept, recipe.name).toBeLessThanOrEqual(heads);
       }
-      // P1 keeps the pilot's own measured head count.
       const p1 = advice.recipesWithTagged.recipes.filter((r) => r.tier === 1);
       expect(p1.every((r) => r.layout?.headsPerExtractor === heads)).toBe(true);
     }

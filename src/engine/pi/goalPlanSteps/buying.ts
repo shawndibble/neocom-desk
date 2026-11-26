@@ -1,30 +1,8 @@
-/**
- * Buying P2 and P3 for a partial chain (`PlannerPolicy.buyTiers`), as shares on
- * each goal (`Goal.buyShare`) that the other steps read through `chainRates`.
- *
- * The rule is the **lowest allowed tier that closes the gap**: a gap is bought
- * at the nearest buyable ancestor above it, never higher, and everything above
- * that is still made. A pilot who buys P1 never needs this (P1 closes every
- * gap), and one who buys nothing has no shares at all, so both leave the
- * solver exactly as it was.
- *
- * Two kinds of gap, found at two moments:
- * - a **type gap** is known before anything is solved: no colony's planet type
- *   yields the P0 under some P1. The ancestor is bought in full;
- * - a **short P1** is known only after a solve: the colonies that could yield
- *   it are full, or a scarcer input rations it. The same ancestor is bought in
- *   the share the P1 falls short of its demand, and the plan is solved again
- *   with the demand reduced.
- *
- * A goal's own type is bought outright only by `planGoals`' existing path for
- * goals it cannot make; here it is bought only as the part a short P1 leaves open.
- */
 import type { PiData } from '@/sde/types';
 import { piTier } from '../chain';
 import type { Goal, PlannerColony, PlannerPolicy } from '../goalTypes';
 import { EPSILON, schematicOf } from './shared';
 
-/** True when P1 is not bought but P2 or P3 is: the only case this step acts in. */
 export function buysHigherTiers(policy: PlannerPolicy): boolean {
   return !policy.buyTiers.includes(1) && policy.buyTiers.some((tier) => tier === 2 || tier === 3);
 }
@@ -34,11 +12,6 @@ const withShares = (g: Goal, shares: ReadonlyMap<number, number>): Goal => ({
   buyShare: shares,
 });
 
-/**
- * Buys, in full, the lowest buyable type above each P1 no colony can yield.
- * A goal that cannot be closed this way is returned unchanged for triage to
- * block (and `planGoals` to buy outright when its own tier is allowed).
- */
 export function withTypeGapPurchases(
   goals: readonly Goal[],
   colonies: readonly PlannerColony[],
@@ -81,19 +54,11 @@ export function withTypeGapPurchases(
   };
   return goals.map((g) => {
     const result = resolve(g.typeId);
-    // The goal's own type (bought outright) and a goal nothing closes are
-    // triage's to handle, with no shares.
     if (result.state !== 'ok' || result.buys.size === 0) return g;
     return withShares(g, new Map([...result.buys].map((id) => [id, 1])));
   });
 }
 
-/**
- * Buys, per goal, the share of the lowest buyable ancestor that a short P1 is
- * short of its demand. `gapShare` is that fraction per P1 holding a goal back.
- * Returns null when nothing changed (no buyable ancestor, or already bought
- * in full), which ends the re-plan loop.
- */
 export function withShortPurchases(
   goals: readonly Goal[],
   gapShare: ReadonlyMap<number, number>,

@@ -1,11 +1,3 @@
-// Community Requests (issue #3807, ADR 0021): the admin-SDK half of the post,
-// extend and close/reopen callables. Layout (see firestore.rules):
-//   communities/{id}/itemRequests/{requestId}               a Request (this file)
-//   communities/{id}/itemRequests/{requestId}/pledges/{uid} one Member's Pledges (issue #3808)
-// Callers are checked against the Member doc, the requester's display name is
-// read from it (never trusted from the client), and the open-Requests cap is
-// counted inside the same transaction as the write.
-
 import type { Caller } from './actorAuth.js';
 import { type Firestore, type Transaction } from 'firebase-admin/firestore';
 import { HttpsError } from 'firebase-functions/v2/https';
@@ -63,7 +55,6 @@ function failRequestDecision(decision: OwnerActionDecision): never {
   }
 }
 
-/** A named buyer Character must itself be a Member, so contracts go to someone the Community knows. */
 async function requireBuyerMember(
   tx: Transaction,
   db: Firestore,
@@ -79,7 +70,6 @@ async function requireBuyerMember(
   }
 }
 
-/** The stored form of a standing Request's terms; a standing Request has no expiry. */
 function standingFields(standing: NonNullable<PostRequestInput['standing']>) {
   return {
     standing: true,
@@ -91,7 +81,6 @@ function standingFields(standing: NonNullable<PostRequestInput['standing']>) {
   };
 }
 
-/** How many Requests this Member has open: not closed, not past expiry. */
 async function countOpen(
   tx: Transaction,
   db: Firestore,
@@ -112,7 +101,6 @@ async function countOpen(
   ).length;
 }
 
-/** Posts a Request. Returns its id; the client refetches the board. */
 export async function postRequest(
   db: Firestore,
   caller: Caller,
@@ -145,12 +133,6 @@ export async function postRequest(
   return { requestId: ref.id };
 }
 
-/**
- * The requester edits their own Request: location, terms and lines. It keeps
- * its id, its Pledges and its expiry; an edit is not a reason to extend it.
- * Once a Pledge exists the lines keep their slots (Pledges are keyed by line
- * index), so only their quantity and blueprint specs can change.
- */
 export async function editRequest(
   db: Firestore,
   caller: Caller,
@@ -167,7 +149,6 @@ export async function editRequest(
       ownerUid: snap.exists ? String(snap.get('ownerUid')) : null,
       callerUid: caller.uid,
       closed: snap.get('closed') === true,
-      // A standing Request's Pledges are quotes, not line slots: its buy lines stay editable.
       hasPledges: snap.get('standing') !== true && pledges !== null && !pledges.empty,
       slotsKept: sameLineSlots(
         (snap.get('lines') as { typeId: number; kind: string }[] | undefined) ?? [],
@@ -175,7 +156,6 @@ export async function editRequest(
       ),
     });
     if (decision !== 'ok') failRequestDecision(decision);
-    // An ordinary Request cannot become standing, or the reverse: they carry different fields.
     if ((snap.get('standing') === true) !== (input.standing !== undefined)) {
       throw new HttpsError(
         'failed-precondition',
@@ -197,7 +177,6 @@ export async function editRequest(
   });
 }
 
-/** The requester restarts the 30-day clock on an open Request. */
 export async function extendRequest(
   db: Firestore,
   caller: Caller,
@@ -232,11 +211,6 @@ export async function extendRequest(
   });
 }
 
-/**
- * The requester closes a Request, or reopens a closed one (a reopen restarts
- * the 30 days and counts against the open cap). A closed Request is deleted a
- * week later by the cleanup ticket.
- */
 export async function setRequestClosed(
   db: Firestore,
   caller: Caller,
@@ -274,12 +248,6 @@ export async function setRequestClosed(
   });
 }
 
-// Pledge mail: when a Member Pledges on a Request that asked for mail, the
-// Pledger's client sends the in-game mail to the requester with its own token,
-// so the 100-a-day cap, the once-per-Pledger-per-Request rule and the "sent"
-// stamp live in reserve/confirm/release, the same shape as the mail invites'.
-//   communities/{id}/itemRequests/{requestId}/pledgeMails/{pledgerUid}  the Pledger's slot
-//   characters/{uid}/requestMailQuota/{day}                              the sender's count for the day
 const PLEDGE_MAILS_COLLECTION = 'pledgeMails';
 const REQUEST_MAIL_QUOTA_COLLECTION = 'requestMailQuota';
 const pledgeMailRef = (db: Firestore, communityId: string, requestId: string, pledgerUid: string) =>
@@ -292,12 +260,9 @@ const requestMailQuotaRef = (db: Firestore, uid: string, day: string) =>
 
 export interface PledgeMailReservation {
   communityName: string;
-  /** The Pledger's name as the Member doc has it (never trusted from the client). */
   pledgerName: string;
-  /** The Request owner's name and Character: where the mail goes, from the Request itself. */
   requesterName: string;
   requesterCharacterId: number;
-  /** Request mails left today after this one. */
   remaining: number;
 }
 
@@ -331,12 +296,6 @@ function failPledgeMail(decision: Exclude<ReturnType<typeof decidePledgeMail>, '
   }
 }
 
-/**
- * Claims one of the Pledger's daily Request mails and their once-per-Request
- * slot before the client sends it. Only a Member, with a Pledge on another
- * Member's open Request that asked for mail; the recipient is the Request's
- * owner, read here. The cap is counted here, in one transaction.
- */
 export async function reservePledgeMail(
   db: Firestore,
   caller: Caller,
@@ -402,9 +361,6 @@ export async function reservePledgeMail(
       requesterCharacterId,
     };
     if (decision === 'retake' || decision === 'retake-charged') {
-      // A crashed tab left this reserved: let the Pledger try again. On the same day it costs
-      // nothing; after midnight today's count pays, and the slot moves to today so a release
-      // refunds today's count.
       const attempts = Number(mailSnap.get('attempts') ?? 1) + 1;
       if (decision === 'retake') {
         tx.update(mail, { reservedAt: now, attempts });
@@ -430,7 +386,6 @@ export async function reservePledgeMail(
   return { communityName: String(community.get('name') ?? ''), ...reserved };
 }
 
-/** The mail went out: stamp the time. */
 export async function confirmPledgeMail(
   db: Firestore,
   caller: Caller,
@@ -446,11 +401,6 @@ export async function confirmPledgeMail(
   });
 }
 
-/**
- * The send definitely failed: give back the slot and the day's count. The same
- * rules as the mail invites (`decideMailRelease`): a fresh, unconfirmed
- * reservation of this sender's, a few times a day.
- */
 export async function releasePledgeMail(
   db: Firestore,
   caller: Caller,

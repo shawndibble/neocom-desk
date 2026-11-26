@@ -1,8 +1,3 @@
-/**
- * How an Improve search scores a fit: empty guns and launchers loaded with the
- * best charge, and for Mine more every miner loaded with the picked ore's
- * best crystal, the baseline's too, so every row compares on the same load.
- */
 import type { ImproveGoal } from '@/engine/fittings/improve';
 import { assumeCharges } from '@/engine/fittings/improve';
 import {
@@ -15,15 +10,11 @@ import type { Fitting, FittingSlotKind, FittingStats } from '@/engine/fittings/t
 import type { SearchContext } from './context';
 
 export interface Scoring {
-  /** The open Fitting as every row is compared against: loaded as the rows are. */
   scoredBefore: FittingStats;
-  /** A variant's stats, loaded the same way; rejects for a miner left without the ore's crystal. */
   stats: (fitting: Fitting) => Promise<FittingStats>;
-  /** Mine more's crystal plan; null for other goals or when no miner takes the ore's crystals. */
   plan: CrystalPlan | null;
 }
 
-/** Mine more's plan for the open Fitting: the crystal key that mines the most, for every miner type. */
 function minePlan(ctx: SearchContext, own: FittingStats): Promise<CrystalPlan | null> {
   const { request, ports, signal, fitting } = ctx;
   const { catalogue } = request;
@@ -43,7 +34,6 @@ function minePlan(ctx: SearchContext, own: FittingStats): Promise<CrystalPlan | 
   );
 }
 
-/** Null when cancelled while the crystals were being tried. */
 export async function scoringFor(
   ctx: SearchContext,
   searched: ImproveGoal,
@@ -52,7 +42,6 @@ export async function scoringFor(
   const { request, ports, signal, fitting } = ctx;
   const { chargePlan } = request;
   let scoredBefore = own;
-  // Empty guns and launchers are scored loaded with the best charge, so an unarmed-looking fit isn't stripped of support.
   let load = (variant: Fitting) => assumeCharges(variant, fitting, chargePlan);
   let plan: CrystalPlan | null = null;
   if (searched === 'mining') {
@@ -68,7 +57,6 @@ export async function scoringFor(
     scoredBefore = (await ports.compare(load(fitting), signal)).after;
   const stats = async (variant: Fitting) => {
     const after = await ports.stats(load(variant), signal);
-    // A miner with no crystal of the ore would mine another ore's m³/s: left out, not compared.
     if (plan && minerWithoutCrystal(after.mining.rows, plan.crystalFor))
       throw new Error('A miner takes no crystal of this ore');
     return after;

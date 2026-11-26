@@ -10,20 +10,12 @@ import { activityI18nKey, jobProgress, type ActiveJob } from './jobs';
 import { JobEndsInCell, JobProgressCell } from './JobCells';
 import { inventionOutcome, isLoggableHistoryJob, type HistoryJobState } from './jobHistory';
 
-/**
- * A row on the table, tagged with its Character even in the single-character
- * view — so `rowKey` and the optional character column need no branch. For a
- * corp job (issue #2302) that Character is the installer, and `characterName`
- * is empty when the installer is a corpmate outside this account (only ever
- * the job an alert pointed at).
- */
 export type JobRow = ActiveJob & {
   characterId: number;
   characterName: string;
   owner: 'personal' | 'corporation';
 };
 
-/** Picks a job tone's class out of a per-site map, `undefined` for the neutral case — the one place every `cellClassName`/`rowClassName`/fill-color call site turns a tone into a string. */
 export function toneClass(
   tone: 'warning' | 'success' | undefined,
   classes: { warning: string; success: string }
@@ -42,11 +34,6 @@ interface ActiveJobColumnsDeps {
   handleLogProduction: (job: JobRow) => Promise<void>;
 }
 
-/**
- * The Active view's columns. The countdown and progress cells tick
- * themselves; the warning/done tone rebuilds the columns only when a job
- * crosses a threshold (`toneSig` in the panel).
- */
 export function activeJobColumns({
   t,
   nameForBlueprint,
@@ -63,11 +50,6 @@ export function activeJobColumns({
       header: t('industry.jobsColBlueprint'),
       className: 'font-medium',
       sortValue: (job) => nameForBlueprint(job.blueprint_type_id),
-      // The row's warning stripe. On a `<tr>` this would be a `box-shadow`,
-      // which Chromium drops under the `border-collapse: collapse` every
-      // table here inherits; a cell border paints. Held behind `sm:` — once
-      // `.dt-stacked` blocks the cell there is no row edge to stripe, and the
-      // card's tint already carries the state.
       cellClassName: (job) =>
         toneClass(jobTone(job), {
           warning: 'sm:border-l sm:border-l-warning',
@@ -80,7 +62,6 @@ export function activeJobColumns({
           </ItemInfoLink>
           {soon(job) && <Pill tone="warning">{t('industry.jobsCompletingSoon')}</Pill>}
           {done(job) && <Pill tone="success">{t('industry.jobsDone')}</Pill>}
-          {/* Only once more than one Character's jobs are on screen (`showCharacterColumn`) — same gate as `OpenOrdersPanel`'s `showCharacterStrip`. */}
           {job.owner === 'corporation' && (
             <Pill className="shrink-0">{t('industry.jobsCorpBadge')}</Pill>
           )}
@@ -108,7 +89,6 @@ export function activeJobColumns({
       render: (job) => (
         <>
           {formatCount(job.runs)}
-          {/* The card has no Runs header to say what the bare number is. */}
           <span className="sm:hidden"> {t('industry.jobsRunsUnit', { count: job.runs })}</span>
         </>
       ),
@@ -116,9 +96,7 @@ export function activeJobColumns({
     {
       id: 'progress',
       header: t('industry.jobsColProgress'),
-      // Sorts on the raw fraction, not the rounded percent the cell prints.
       sortValue: (job) => jobProgress(job, Date.now()),
-      // A thin line of its own under the meta line, % at its right end.
       stackEdge: 'below',
       render: (job) => (
         <JobProgressCell
@@ -139,7 +117,6 @@ export function activeJobColumns({
           warning: 'font-semibold text-warning',
           success: 'font-semibold text-success',
         }),
-      // The timestamp, never the printed duration: "1d 4h" sorts before "9h" as a string.
       sortFirst: 'asc',
       sortValue: (job) => Date.parse(job.end_date),
       render: (job) => <JobEndsInCell job={job} doneLabel={t('industry.jobsDone')} />,
@@ -152,7 +129,6 @@ export function activeJobColumns({
       sortValue: (job) => Date.parse(job.end_date),
       render: (job) => {
         const endDate = new Date(job.end_date);
-        // Off the phone card: the countdown in its corner already says when.
         return (
           <span data-dense-omit>
             <time dateTime={endDate.toISOString()}>{formatEveDateTime(endDate)}</time>
@@ -161,13 +137,9 @@ export function activeJobColumns({
       },
     },
     {
-      // The one trailing control: a finished job's primary next step. Rows
-      // that can't be logged (running, corp-owned) render nothing.
       id: 'logProduction',
       header: '',
       align: 'right',
-      // A text button, not the corner icon `cardActions` pins: closes the
-      // phone card's meta line at its right end, 36px tall.
       stackEdge: 'end',
       cellClassName: () => 'dt-action-row',
       render: (job) =>
@@ -192,7 +164,6 @@ interface HistoryColumnsDeps {
   handleLogProduction: (job: JobRow) => Promise<void>;
 }
 
-/** History's columns: what was delivered, when, and whether the Production Log has it. */
 export function historyColumns({
   t,
   nameForBlueprint,
@@ -243,8 +214,6 @@ export function historyColumns({
       className: 'tabular-nums',
       sortValue: (job) => job.runs,
       render: (job) => {
-        // A finished invention job's runs read as its result (issue #6166),
-        // never in a failure tone: a miss is a normal outcome.
         const outcome = inventionOutcome(job);
         if (!outcome) return formatCount(job.runs);
         return t('industry.historyInventionSucceeded', {
@@ -264,12 +233,9 @@ export function historyColumns({
       },
     },
     {
-      // An unlogged delivery's next step, or the way to the plan that holds it.
       id: 'logProduction',
       header: '',
       align: 'right',
-      // A text button, not the corner icon `cardActions` pins: its own
-      // full-width row on the phone card, 36px tall.
       cellClassName: () => 'dt-action-row',
       render: (job) => {
         if (!isLoggableHistoryJob(job)) return null;

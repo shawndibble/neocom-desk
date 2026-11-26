@@ -1,9 +1,3 @@
-/**
- * The vetting settings form as plain data: saved settings in, the strings and ticks the inputs
- * edit, the problems that block Save, and the patch `saveVettingSettingsCallable` takes. Pure.
- *
- * On or off, the watchlist and invite links are not here: each of those saves by itself.
- */
 import {
   VETTING_MINIMUM_LIMITS,
   VETTING_QUESTIONS_MAX,
@@ -18,9 +12,7 @@ import type { VettingSettingsPatch } from './vettingBackend';
 import { VETTING_MINIMUM_IDS } from './vettingView';
 
 export interface VettingQuestionDraft {
-  /** Stable while the form is open, so a row keeps its input when the list is reordered. */
   key: string;
-  /** Absent on a question added in this form: the server gives it one. */
   id?: string;
   label: string;
   required: boolean;
@@ -29,7 +21,6 @@ export interface VettingQuestionDraft {
 export interface VettingSettingsForm {
   welcome: string;
   contact: string;
-  /** As typed; blank reads as no minimum. */
   minimums: Record<VettingMinimumId, string>;
   questions: VettingQuestionDraft[];
   inviteOnly: boolean;
@@ -40,7 +31,6 @@ export interface VettingSettingsForm {
   notifyReviewers: boolean;
 }
 
-/** The sections of the settings page, in order. */
 export const VETTING_SETTINGS_SECTIONS = [
   'general',
   'applicants',
@@ -49,7 +39,6 @@ export const VETTING_SETTINGS_SECTIONS = [
 ] as const;
 export type VettingSettingsSection = (typeof VETTING_SETTINGS_SECTIONS)[number];
 
-/** The least each minimum can be, which is also "none asked". */
 export const VETTING_MINIMUM_FLOOR: Record<VettingMinimumId, number> = {
   ageDays: 0,
   skillPoints: 0,
@@ -75,10 +64,6 @@ export function formFromSettings(settings: VettingSettings): VettingSettingsForm
   };
 }
 
-/**
- * A typed minimum as the number that would be saved: blank is the floor, anything past the
- * engine's limit is the limit. Null when it is not a number at all.
- */
 export function parseMinimum(id: VettingMinimumId, raw: string): number | null {
   if (raw.trim() === '') return VETTING_MINIMUM_FLOOR[id];
   const value = unmaskCount(raw);
@@ -86,7 +71,6 @@ export function parseMinimum(id: VettingMinimumId, raw: string): number | null {
   return clamp(value, VETTING_MINIMUM_FLOOR[id], VETTING_MINIMUM_LIMITS[id]);
 }
 
-/** A typed minimum as the field shows it once left: clamped and grouped. Unreadable text is kept. */
 export function settleMinimum(id: VettingMinimumId, raw: string): string {
   const value = parseMinimum(id, raw);
   return value === null ? raw : maskNumber(value);
@@ -101,7 +85,6 @@ export function removeQuestion(form: VettingSettingsForm, key: string): VettingS
   return { ...form, questions: form.questions.filter((question) => question.key !== key) };
 }
 
-/** Moves a question one place up (`-1`) or down (`1`); the ends stay put. */
 export function moveQuestion(
   form: VettingSettingsForm,
   key: string,
@@ -130,7 +113,6 @@ export function patchQuestion(
 
 export interface VettingFormProblems {
   minimums: VettingMinimumId[];
-  /** Keys of questions with no wording. */
   questions: string[];
   count: number;
 }
@@ -152,7 +134,6 @@ const questionsOf = (form: VettingSettingsForm): QuestionPatch =>
     required: question.required,
   }));
 
-/** Only what changed. Questions, minimums, the rejection and sign-offs each go whole. */
 export function formToPatch(
   form: VettingSettingsForm,
   saved: VettingSettings
@@ -195,7 +176,6 @@ export function formIsDirty(form: VettingSettingsForm, saved: VettingSettings): 
   return Object.keys(formToPatch(form, saved)).length > 0;
 }
 
-/** Which sections hold an unsaved edit, so the section list can mark them. */
 export function dirtySections(
   form: VettingSettingsForm,
   saved: VettingSettings

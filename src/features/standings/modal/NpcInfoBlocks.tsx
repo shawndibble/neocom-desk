@@ -1,9 +1,3 @@
-/**
- * The info modal's cards for an NPC faction, corporation or agent, one per
- * view model in `npcInfoModel.ts`. They only lay text out: every choice (which
- * rows, which sentence) was made by the builder. Each card hugs its content
- * (`w-fit max-w-full`); `NpcInfoView` puts them in two columns from `md`.
- */
 import { useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -34,7 +28,6 @@ function Card({
 }: {
   title: string;
   children: ReactNode;
-  /** Take the full row instead of hugging the content (the one-line fee rows need the room). */
   fill?: boolean;
 }) {
   return (
@@ -54,7 +47,6 @@ const Note = ({ children }: { children: ReactNode }) => (
   <p className="text-[0.6875rem] text-text-dim">{children}</p>
 );
 
-/** "6 jumps", a link to Route Safety with the route set; "here" (no link) when the pilot is already there. */
 function Jumps({
   systemId,
   stationId,
@@ -73,7 +65,6 @@ function Jumps({
   );
 }
 
-/** Faction, corporation, agent: your standing with each, the number first so it reads with its name. */
 export function StandingBlock({ model }: { model: StandingModel }) {
   const { t } = useTranslation();
   const { note } = model;
@@ -127,7 +118,6 @@ export function StandingBlock({ model }: { model: StandingModel }) {
   );
 }
 
-/** The five agent levels as pips, with the standing each needs underneath. */
 export function AccessBlock({ model }: { model: AccessModel }) {
   const { t } = useTranslation();
   const { verdict } = model;
@@ -224,7 +214,6 @@ function FeeRow({ row }: { row: StationFeeRow }) {
       : row.place === null
         ? t('publicInfo.npc.stations.reprocessing')
         : t('publicInfo.npc.stations.reprocessingAt', { place: row.place });
-  // What the figures show, so a saving of floating-point dust reads as none.
   const saving = Number(format(row.savingPct));
   const amount = `${approx}${format(Math.abs(row.savingPct))}%`;
   return (
@@ -249,7 +238,6 @@ function FeeRow({ row }: { row: StationFeeRow }) {
   );
 }
 
-/** Broker fee and reprocessing tax at their stations: each on one line, never wrapped. */
 export function StationsBlock({ model }: { model: StationsModel }) {
   const { t } = useTranslation();
   return (
@@ -340,7 +328,6 @@ export function WhereBlock({ rows }: { rows: readonly WhereRow[] }) {
   );
 }
 
-/** How many agents of a level show before "Show all". */
 const AGENTS_SHOWN_PER_LEVEL = 3;
 
 function AgentRow({ row }: { row: KnownAgentRow }) {
@@ -433,7 +420,6 @@ function AgentLevelSection({ group }: { group: AgentLevelGroup }) {
   );
 }
 
-/** Every basic agent of a corporation, by level, or the corporations of a faction the pilot has a standing with. */
 export function KnownBlock({ known }: { known: KnownRows }) {
   const { t } = useTranslation();
   return (

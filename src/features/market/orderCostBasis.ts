@@ -1,16 +1,3 @@
-/**
- * What the goods behind a sell order cost, for the Market Orders page's
- * profit-so-far column — read-only over the existing Production Run /
- * Production Order Watch records (`src/db/index.ts`, issue #525). No new
- * Dexie table, no hand-entered-cost store: an order with nothing watched
- * against it simply has no cost basis today (a later ticket's problem).
- *
- * `db.productionOrderWatches` is how an order id ever finds its way back to
- * a Production Run: its id is always `${characterId}:order:${orderId}`, and
- * it names the `runId` whose `materialCost`/`jobFee`/`totalCost` were frozen
- * at logging time (`ProductionRunRecord`'s doc comment — a run holds still so
- * realized profit can be measured against what was actually paid).
- */
 import { db, type ProductionOrderWatchRecord, type ProductionRunRecord } from '@/db';
 import { hasWalletScope, loadWalletTransactions } from '@/features/character/wallet';
 import {
@@ -20,19 +7,15 @@ import {
 } from '@/engine/market/walletCostBasis';
 import type { MarketOrder, WalletTransaction } from '@/esi/endpoints';
 
-/** Cost taken from a Production Run linked to the order (the original source). */
 export interface ProductionRunBasis {
-  /** Absent on the original shape; only ever `'productionRun'` when set. */
   source?: 'productionRun';
   unitCost: number;
   runId: string;
-  /** Units the run produced, for the detail view's working. */
   runQuantity: number;
   materialCost: number;
   jobFee: number;
 }
 
-/** Cost worked out FIFO from the character's own wallet buys (issue #1422). */
 export interface WalletBasis {
   source: 'wallet';
   unitCost: number;
@@ -40,15 +23,12 @@ export interface WalletBasis {
   buyCount: number;
   oldestBuy: string;
   newestBuy: string;
-  /** The buys the cost was averaged from, newest first — the ledger names them. */
   buys: WalletBuyUsed[];
-  /** The wallet fetch hit its page cap, so older history may exist. */
   truncated: boolean;
 }
 
 export type OrderCostBasis = ProductionRunBasis | WalletBasis;
 
-/** Why an eligible order got no wallet basis. */
 export type WalletBasisGap =
   | { kind: 'partial'; coveredUnits: number; pool: number; truncated: boolean }
   | { kind: 'historyShort'; truncated: boolean };
@@ -57,13 +37,6 @@ function watchId(characterId: number, orderId: number): string {
   return `${characterId}:order:${orderId}`;
 }
 
-/**
- * Cost basis for the given order ids, from the Production Run each one is
- * watched against. Orders with no linked watch, a watch pointing at a
- * missing run, or a run with a non-positive `quantity` (which would divide
- * to `Infinity`/`NaN`) are simply absent from the map — never a zero or
- * infinite entry.
- */
 export async function loadOrderCostBases(
   characterId: number,
   orderIds: readonly number[]
@@ -104,7 +77,6 @@ export async function loadOrderCostBases(
   return result;
 }
 
-/** A character wallet fill in the shape the cost engines read. */
 export function toWalletTrade(t: WalletTransaction): WalletTrade {
   return {
     transactionId: t.transaction_id,
@@ -122,12 +94,6 @@ export interface WalletOrderCostBases {
   gaps: Map<number, WalletBasisGap>;
 }
 
-/**
- * Wallet cost basis for a character's unlinked personal sell orders. Orders
- * in `excludeOrderIds` (already costed from a Production Run) are skipped and
- * left out of the unit pool. A character without the wallet scope, or whose
- * wallet cannot be read, simply gets nothing — never an error.
- */
 export async function loadWalletOrderCostBases(
   characterId: number,
   orders: readonly MarketOrder[],

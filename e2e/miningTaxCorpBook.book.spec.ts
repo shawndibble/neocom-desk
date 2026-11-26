@@ -1,14 +1,3 @@
-/**
- * The pilot's Tax tab with two Payees (decision 20261120-235011): their corporation's Corp Tax
- * Book, whose figures are read off the book's Running account, and a personal Payee kept on the
- * device. Settle up for the book shows the Miner's one payment code and can record the payment; a
- * donation counts while in flight and stays counted once the book credits it; an alt grouped with
- * the pilot but not added is named; a transfer to the book's corporation is never offered to a
- * personal Payee.
- *
- * The book is read from the Firebase emulators (the `*.book.spec.ts` set). The pilot is the
- * suite's signed-in Character, a Miner of their own corporation's book (`memberSeed.ts`).
- */
 import type { Page } from '@playwright/test';
 import { expect, signInAsOfficer, test, type Book } from './support/taxBook/bookTest';
 import { CORP } from './support/taxBook/identities';
@@ -36,10 +25,6 @@ const ledgerButton = (page: Page, name: string) =>
   page.getByRole('button', { name: `Open the ledger of ${name}` });
 const cardOf = (page: Page, name: string) => page.getByRole('group', { name });
 
-/**
- * The book (the pilot owes three days), Rook owed two personal days, and the pilot's journal.
- * `extra` are more book docs, as the server stores them.
- */
 async function openTax(
   page: Page,
   book: Book,
@@ -47,7 +32,6 @@ async function openTax(
   p: {
     journal?: ReturnType<typeof donationSent>[];
     extra?: Parameters<Book['seed']>[0];
-    /** False: no personal Payee, so no seeding and reload (one page load fewer). */
     personal?: boolean;
   } = {}
 ) {
@@ -99,7 +83,6 @@ test("a book's credited payment pays its oldest days on the pilot's ledger", asy
   await expect(cardOf(page, CORP_NAME)).toContainText(isk(member.owed - DAY_TAX));
   await ledgerButton(page, CORP_NAME).click();
   const corp = page.getByRole('dialog', { name: CORP_NAME });
-  // The oldest day is paid: the next one is the oldest unpaid.
   await expect(corp).toContainText(new RegExp(`Days owed\\s*${member.bookDays.length - 1}`));
   await expect(corp.getByRole('row', { name: /Payment/ })).toContainText(isk(DAY_TAX));
 });
@@ -110,7 +93,6 @@ test("Settle up for the book shows the Miner's code and can record the payment",
   esi,
 }) => {
   const member = await openTax(page, book, esi);
-  // The Settle up of the book's card.
   await cardOf(page, CORP_NAME).getByRole('button', { name: 'Settle up' }).click();
   const dialog = page.getByRole('dialog', { name: `Settle up — ${CORP_NAME}` });
   await expect(dialog).toContainText(`Amount${isk(member.owed)} ISK`);
@@ -131,14 +113,11 @@ test('a donation in flight counts at once and stays counted once the book credit
   });
   await expect(cardOf(page, CORP_NAME)).toContainText(isk(member.owed - DAY_TAX));
 
-  // The book's next sync stores it: the same transfer, now credited.
   await book.seed([creditedDonation({ ...sent, characterId: PILOT.id })]);
   await page.reload();
   await expect(cardOf(page, CORP_NAME)).toContainText(isk(member.owed - DAY_TAX));
 });
 
-// The book groups the pilot with an alt this device does not hold, so the tab cannot read the
-// alt's lines: it says so, and offers to tell the corporation the alt is not theirs.
 test('a grouped alt the pilot has not added is named, and can be declined', async ({
   page,
   book,
@@ -150,7 +129,6 @@ test('a grouped alt the pilot has not added is named, and can be declined', asyn
     ],
     personal: false,
   });
-  // Read by each held Character's own lines: the alt's donation is not on this tab.
   await expect(cardOf(page, CORP_NAME)).toContainText(isk(member.owed));
   await page.getByRole('button', { name: /needs? attention/ }).click();
   const warning = page.getByText(`${CORP_NAME} counts ${PILOT_ALT.name} as yours.`, {

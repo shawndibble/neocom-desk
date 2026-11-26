@@ -34,7 +34,6 @@ vi.mock('@/sde/loadMarketSde', () => ({
   loadAttributeDictionary: vi.fn(async () => ({})),
 }));
 
-// Nothing here appraises: these tests are about the page's own navigation.
 vi.mock('@/features/market/appraisalData', () => ({
   appraisePaste: vi.fn(async () => ({
     appraisal: { rows: [], totals: { buy: 0, sell: 0, spread: 0, unpricedRows: 0 } },
@@ -50,9 +49,6 @@ vi.mock('@/features/market/appraisalData', () => ({
   clearAppraisalCatalogue: vi.fn(),
 }));
 
-// Recording the URL is exactly what an effect is for — writing the latest
-// React state out to something outside React. Doing it during render trips
-// `react-hooks/globals` / `react-hooks/immutability`, and rightly so.
 const probe = { pathname: '', search: '' };
 function LocationProbe() {
   const { pathname, search } = useLocation();
@@ -81,12 +77,6 @@ async function pickHub(name: string) {
 beforeEach(async () => {
   probe.pathname = '';
   probe.search = '';
-  // The page reads its hub from the page hubs, a Dexie-backed store like
-  // `useMarketHub`, so picking one writes it to Dexie as well as to the
-  // store. Resetting only the store leaves the row behind, and the next
-  // test's `hydrateHub()` reads it back asynchronously — landing on the hub
-  // the previous test picked, which makes picking that hub again a no-op
-  // firing no `onValueChange` at all.
   await db.settings.clear();
   resetHubStores();
   useMarketPricePercent.setState({ value: 100, hydrated: false });
@@ -97,15 +87,9 @@ describe('Market Appraisal tab navigation', () => {
     renderAt('/market/appraisal');
 
     expect(await screen.findByRole('button', { name: /Trade Hub/i })).toBeInTheDocument();
-    // Region has no meaning here: prices come from one station's aggregates.
     expect(screen.queryByRole('button', { name: /Region/i })).not.toBeInTheDocument();
   });
 
-  /**
-   * Appraisal prices at its own page hub (issue #6523), apart from the hub the
-   * Browser's URL names: a pick writes the hub, never the URL, and the tab
-   * stays put.
-   */
   it('a hub pick prices the Appraisal there and stays on the tab, leaving the URL alone', async () => {
     renderAt('/market/appraisal?type=34');
     await screen.findByRole('button', { name: /Trade Hub/i });
@@ -113,7 +97,6 @@ describe('Market Appraisal tab navigation', () => {
 
     await pickHub('Amarr VIII');
 
-    // Appraisal is on Global here, so the pick moves the Global hub.
     await waitFor(() => expect(useMarketHub.getState().value).toBe('amarr'));
     expect(probe.search).not.toContain('hub=');
     expect(probe.pathname).toBe('/market/appraisal');
@@ -123,7 +106,6 @@ describe('Market Appraisal tab navigation', () => {
   it("a link's ?hub= prices this visit's Appraisal there, never writing a hub", async () => {
     renderAt('/market/appraisal?hub=amarr');
     expect(await screen.findByRole('button', { name: /, Trade Hub$/ })).toHaveTextContent('Amarr');
-    // Once page hubs are read (adoption runs after that), nothing was written.
     await waitFor(() => expect(usePageHubs.getState().hydrated).toBe(true));
     expect(usePageHubs.getState().value).toEqual({});
     expect(useMarketHub.getState().value).toBe('jita');
@@ -136,7 +118,6 @@ describe('Market Appraisal tab navigation', () => {
     await pickHub('Closest hub');
 
     await waitFor(() => expect(useGlobalClosest.getState().value).toBe(true));
-    // No location here, so Closest falls back to Global; the stored hub is untouched.
     expect(useMarketHub.getState().value).toBe('jita');
     expect(usePageHubs.getState().value).toEqual({});
   });
@@ -152,12 +133,6 @@ describe('Market Appraisal tab navigation', () => {
     expect(useMarketHub.getState().value).toBe('jita');
   });
 
-  /**
-   * An appraised row's item link points at `/market/browser?type=…`
-   * (`engine/market/urlState.ts`'s `marketItemUrl`) — a real path change, not
-   * a query-only cross-link heuristic — so Market's own tab resolution just
-   * follows the new pathname to the Browser like any other navigation.
-   */
   it('opens an appraised item in the Browser when its name is clicked', async () => {
     const user = userEvent.setup({ delay: null });
     vi.mocked(appraisePaste).mockResolvedValueOnce({
@@ -205,7 +180,6 @@ describe('Market Appraisal tab navigation', () => {
 
     await waitFor(() => expect(probe.pathname).toBe('/market/browser'));
     expect(probe.search).toContain('type=34');
-    // The Browser's own item view, not the paste box it was clicked from.
     expect(await screen.findByRole('tab', { name: 'Order Book' })).toBeInTheDocument();
     expect(screen.queryByLabelText(/Items from inventory/)).not.toBeInTheDocument();
   });

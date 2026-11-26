@@ -17,8 +17,6 @@ import {
 } from 'firebase/firestore';
 import { characterAuth, createRulesEnv } from './testEnv';
 
-// SRP (issue #4848, ADR 0026). A mistake here lets a pilot read another corp's
-// claims, lets a demoted officer keep reading the queue, or opens a write path.
 let env: RulesTestEnvironment;
 
 const CORP = 'corps/98000001';
@@ -55,7 +53,6 @@ beforeEach(async () => {
       doc(db, `${CORP}/srpOfficers/char:5`),
       officer({ characterId: 5, ownerHash: 'h5', canEdit: false })
     );
-    // The officer of another corporation: a valid record, but under the wrong corp.
     await setDoc(doc(db, `${OTHER_CORP}/srpOfficers/char:8`), officer({ characterId: 8 }));
     await setDoc(doc(db, `${CORP}/srpClaims/111`), {
       uid: 'char:2',
@@ -104,7 +101,6 @@ describe('SRP rules', () => {
       for (const path of OFFICER_ONLY) await assertFails(getDoc(doc(db, `${CORP}/${path}`)));
       await assertFails(getDocs(collection(db, `${CORP}/srpClaims`)));
     }
-    // A record in another corporation's officers does not open this one.
     const other = characterAuth(env, 8, 'h1').firestore();
     await assertFails(getDoc(doc(other, `${CORP}/srpClaims/111`)));
   });
@@ -149,8 +145,6 @@ describe('SRP rules', () => {
     await assertFails(getDoc(doc(db, `${CORP}/srpOfficers/char:1`)));
     await assertFails(getDoc(doc(db, `${CORP}/srpDoctrines/d1`)));
     await assertFails(getDocs(collection(db, `${CORP}/srpDoctrines`)));
-    // The `corps/{id}` document itself is the Corp Tax Book's settings (issue #4858): any
-    // Character may `get` it, so SRP never stores anything in it. Other names stay closed.
     await assertFails(getDoc(doc(db, `${CORP}/unlisted/x`)));
   });
 

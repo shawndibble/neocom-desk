@@ -25,23 +25,6 @@ import { tappableRowClassName } from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
 import { NewComponent } from './NewComponent';
 
-/**
- * Proposal for #4550: Market › Appraisal gets a second source for its list,
- * "From my Fittings". Pick saved Fittings, give each a hull count, and the same
- * Appraisal table nets the combined bill against what the pilot owns.
- *
- * Only the input changes. The result table and Minus owned netting are the
- * existing Appraisal's, so they are not redrawn. The one addition on the result
- * side is a "Send to Build Group…" entry (dashed outline) in the actions menu,
- * shown only when at least one line has a blueprint.
- *
- * The card title is the source select (Paste | From my Fittings), field chrome
- * like the Recent select beside it. Recent only shows for Paste.
- *
- * New components in this mockup: `FittingsSourcePicker` (the Fittings list with
- * count steppers). Sample data.
- */
-
 interface PickedFit {
   id: string;
   hull: string;
@@ -54,7 +37,6 @@ const SAMPLE_FITS: readonly PickedFit[] = [
   { id: 'b', hull: 'Scimitar', name: 'Scimitar — shield logi', count: 4 },
 ];
 
-/** What the real Appraisal's copy menu offers today, with the count beside each. */
 const COPY_ENTRIES: readonly [string, number][] = [
   ['Sell now', 5],
   ['List at undercut', 5],
@@ -170,7 +152,6 @@ function Mockup({
             </Select>
           }
           actions={
-            // Recent holds pasted text, so it only shows for the Paste source.
             source === 'paste' ? (
               <Select value="">
                 <SelectTrigger size="sm" aria-label="Recent" className="w-32 max-w-full min-w-0">
@@ -238,7 +219,6 @@ function Mockup({
                 {buildable > 0 && (
                   <>
                     <DropdownMenuSeparator />
-                    {/* New entry: only present when at least one line has a blueprint. */}
                     <DropdownMenuItem className="outline-dashed outline-1 outline-warning">
                       Send to Build Group…
                       <span className="ml-auto pl-3 text-text-dim">{buildable}</span>
@@ -270,17 +250,12 @@ type Story = StoryObj<typeof meta>;
 
 const phone = { viewport: { value: 'mobile1', isRotated: false } };
 
-/** @summary Appraisal's input card with the "From my Fittings" source, and the result actions menu with Send to Build Group…. New component: FittingsSourcePicker. */
 export const Proposed: Story = {};
 
-/** @summary The proposal in the phone shell. */
 export const ProposedPhone: Story = { globals: phone };
 
-/** @summary No assets read for the Character: the existing grant note, with nothing netted. */
 export const NoAssets: Story = { render: () => <Mockup assetsRead={false} /> };
 
-/** @summary Nothing in the list can be built (all faction or meta modules): the Send to Build Group entry is absent from the menu. */
 export const NothingBuildable: Story = { render: () => <Mockup buildable={0} /> };
 
-/** @summary The same card on the Paste source: the title select reads "Paste" and Recent returns beside it. */
 export const PasteSource: Story = { render: () => <Mockup initialSource="paste" /> };

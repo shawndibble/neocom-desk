@@ -11,7 +11,6 @@ import {
   systemZkillUrl,
 } from './zkillboard';
 
-/** zKillboard is asked with no custom headers (no CORS preflight); the only init is the timeout's signal. */
 const NO_HEADERS = { signal: expect.any(AbortSignal) };
 
 const VICTIM = {
@@ -107,7 +106,6 @@ describe('fetchHullLosses', () => {
   });
 });
 
-// Trimmed from a real `kills/systemID/{id}/pastSeconds/3600/` body.
 const SYSTEM_KILL = {
   attackers: [
     { character_id: 1, ship_type_id: 17720, weapon_type_id: 2921, final_blow: true },
@@ -363,7 +361,6 @@ describe('systemZkillUrl', () => {
     expect(systemZkillUrl(30002813)).toBe('https://zkillboard.com/system/30002813/');
   });
 });
-/** A fetch that never answers and rejects only when its signal aborts, as a hung request does. */
 function hangingFetch() {
   return vi.fn(
     (_input: RequestInfo | URL, init?: RequestInit) =>

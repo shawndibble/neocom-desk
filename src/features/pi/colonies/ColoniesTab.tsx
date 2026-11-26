@@ -56,14 +56,10 @@ const PLAN_HREF = '/planetary-industry/plan';
 interface ColoniesTabProps {
   characterId: number;
   snapshot: Snapshot | null;
-  /** The route's first load is still running. */
   loading: boolean;
-  /** The route's load failed. */
   error: unknown;
-  /** `?colony=`: a colony to open and focus. */
   linkedColonyId: number | null;
   onClearLinkedColony: () => void;
-  /** Re-run the route's load: the Retry on the ESI-did-not-answer notice. */
   onRetry: () => void;
 }
 
@@ -71,12 +67,6 @@ function characterNames(characters: readonly RosterCharacter[]): string {
   return characters.map((character) => character.name).join(', ');
 }
 
-/**
- * A character sub-heading above its colony rows, only once more than one
- * character's colonies are on screen. `summary` and `fetchedAt` are alt-only:
- * an alt's rows are cache-only and can be days old, so its group carries its
- * own `DataAgeBadge` rather than borrowing the page header's.
- */
 function CharacterGroupHeader({
   name,
   summary,
@@ -86,7 +76,6 @@ function CharacterGroupHeader({
 }: {
   name: string;
   summary?: string;
-  /** An alt's own ISK a day: shown, but never part of the plan. */
   makesPerDay?: number | null;
   fetchedAt?: Date;
   onSwitch?: () => void;
@@ -135,7 +124,6 @@ function CharacterGroupHeader({
   );
 }
 
-/** Makes an alt the active Character in place; unlike Characters' switch, it stays on this route. */
 function SwitchToButton({ name, onSwitch }: { name: string; onSwitch: () => void }) {
   const { t } = useTranslation();
   return (
@@ -223,8 +211,6 @@ export function ColoniesTab({
   const setShowAltColonies = useShowAltColonies((state) => state.setValue);
   useHydratedStore(useShowAltColonies);
 
-  // Multi-open accordion, keyed by `${characterId}:${planetId}`: two characters
-  // can each hold a colony on the same planet.
   const [expandedKeys, setExpandedKeys] = useState<ReadonlySet<string>>(() => new Set());
   const linkedKey = linkedColonyId !== null ? `${characterId}:${linkedColonyId}` : null;
   const isExpanded = (key: string) => expandedKeys.has(key) || key === linkedKey;
@@ -238,8 +224,6 @@ export function ColoniesTab({
       }),
     []
   );
-  // Read through a ref so `toggle` stays one stable function: a memoised row
-  // would otherwise re-render on every open/close anywhere in the list.
   const latest = useRef({ isExpanded, linkedKey, onClearLinkedColony });
   useEffect(() => {
     latest.current = { isExpanded, linkedKey, onClearLinkedColony };
@@ -252,7 +236,6 @@ export function ColoniesTab({
         onClearLinkedColony: clear,
       } = latest.current;
       const open = expandedNow(key);
-      // A `?colony=` link is a way in, not a lock: closing it drops the param.
       if (key === linked && open) clear();
       setOpen(key, !open);
     },
@@ -260,12 +243,10 @@ export function ColoniesTab({
   );
   const expand = useCallback((key: string) => setOpen(key, true), [setOpen]);
 
-  // An Overview row's `?highlight=<planetId>`: scrolled to and pulsed once, own colonies only.
   const highlightedPlanetId = useHighlightParam();
   const ownListRef = useRef<HTMLDivElement>(null);
   useScrollToRowKey(ownListRef, highlightedPlanetId, data);
 
-  // Scrolled to and focused once per link, not on every refresh of the data.
   const focusedLink = useRef<string | null>(null);
   useEffect(() => {
     if (linkedColonyId === null || !data) return;
@@ -289,16 +270,12 @@ export function ColoniesTab({
   const activeCharacterName =
     data?.activeCharacterName ?? t('pi.characterLabel', { id: characterId });
 
-  // Public-lookup overlay for ids the cache-only roster reads couldn't resolve,
-  // filled in once the alt toggle turns on. A fresher live read always wins.
   const [publicPlanetNames, setPublicPlanetNames] = useState<ReadonlyMap<number, string>>(NO_NAMES);
   const [publicTypeNames, setPublicTypeNames] = useState<ReadonlyMap<number, string>>(NO_NAMES);
   const planetNames = useMemo(
     () => mergeNames(publicPlanetNames, cachedPlanetNames),
     [publicPlanetNames, cachedPlanetNames]
   );
-  // pi.json's own names win: Plan reads them, and a P0 or a schematic's output
-  // must never fall back to "Type #id" or "Unknown product" here.
   const piNames = useMemo(() => piTypeNames(pi), [pi]);
   const pinTypeNames = useMemo(
     () => mergeNames(mergeNames(publicTypeNames, cachedPinTypeNames), piNames),
@@ -309,10 +286,6 @@ export function ColoniesTab({
     [piNames, publicTypeNames, cachedProductNames]
   );
 
-  // Resolve any planet/type name the cache-only reads left unresolved through
-  // the public, globally cached lookups, and only once the toggle is on, so a
-  // page open with it off never fans out. Planet names have no bulk endpoint,
-  // so those go one GET per id, capped at `ESI_FANOUT_CONCURRENCY` in flight.
   useEffect(() => {
     if (!showAltColonies) return;
     const missingTypeIds = new Set<number>();
@@ -361,9 +334,6 @@ export function ColoniesTab({
     };
   }, [showAltColonies, roster.colonies, pinTypeNames, productNames, planetNames]);
 
-  // The shared recommendation model: quick wins and today's figure come from
-  // the same `buildPlanAdvice` Plan reads. It carries its own clock, so status
-  // and fixes agree about whether a program has expired.
   const planAdvice = useColoniesAdvice(data ? characterId : null, data?.loadedAt ?? 0);
   const advice = planAdvice.advice;
   const nowMs = planAdvice.snapshot?.nowMs ?? data?.loadedAt ?? 0;
@@ -399,12 +369,6 @@ export function ColoniesTab({
     ]
   );
 
-  // Alt colonies grouped by character, each sorted worst-first like the active
-  // Character's own. Their figures come from `buildAltAdvice` (unknown skills,
-  // priced conservatively) and are display-only: Plan and the Today figures
-  // above read the active Character's advice alone.
-  // An alt's systems may be ones the active Character has no colony in: resolve
-  // their security (a globally cached public lookup) before pricing them.
   const [altSecurity, setAltSecurity] = useState<ReadonlyMap<number, number | null>>(new Map());
   const knownSecurity = planAdvice.snapshot?.securityBySystem;
   useEffect(() => {
@@ -428,7 +392,6 @@ export function ColoniesTab({
       cancelled = true;
     };
   }, [showAltColonies, roster.colonies, knownSecurity, altSecurity]);
-  // One `buildPlanAdvice` per alt, off the main thread where there is a worker, so a roster of alts never blocks the page.
   const [altBuilt, setAltBuilt] = useState<{
     input: unknown;
     byCharacter: ReadonlyMap<number, AltCharacterAdvice>;
@@ -443,7 +406,6 @@ export function ColoniesTab({
     void (async () => {
       for (const [characterId, owned] of todo) {
         built.set(characterId, await askOneAltAdvice(input, owned, security));
-        // Without a worker the build ran on the page: give it a frame before the next alt.
         await new Promise((resolve) => setTimeout(resolve, 0));
         if (!live) return;
       }
@@ -509,7 +471,6 @@ export function ColoniesTab({
     });
   }, [roster, pi, planAdvice.snapshot, altAdvice, nowMs, expiringWindowMs, haulHours]);
 
-  // Stable per group, so a memoised alt row skips re-rendering with its siblings.
   const switchTargets = useMemo(
     () =>
       new Map(
@@ -621,7 +582,6 @@ export function ColoniesTab({
             }
             padded={false}
           >
-            {/* Header over the first real rows (own, else alts); never over the empty state. */}
             {ownRows.length > 0 && <ColonyListHeader haulHours={haulHours} />}
             {ownRows.length === 0 ? (
               <EmptyState

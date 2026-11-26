@@ -7,12 +7,6 @@ import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import { useOnline } from '@/stores/network';
 import type { BpcSearchRow } from '@/engine/contracts/bpcSearch';
 
-/**
- * The Item cell of a Community Offer row in BPC Sourcing: the blueprint name,
- * then whose it is. A Shared BPO that can be copied reads "ask <name> to
- * copy…", a button (issue #3813); a copy reads "from <name>"; a BPO that
- * cannot be asked (a reaction formula) keeps the plain "ask <name> to copy".
- */
 export function CommunityOfferCell({
   row,
   title,
@@ -38,11 +32,6 @@ export function CommunityOfferCell({
         {row.runs !== -1 ? (
           <span>{t('bpcContracts.communityFrom', { name: row.memberName })}</span>
         ) : canAsk ? (
-          // A raw button, not Button: it is a text-sized action inside the item
-          // cell (DESIGN.md §6c, the inline link look), and the row has no
-          // primary action of its own, so the name beside it stays plain. The
-          // trailing "…" says it opens a dialog needing more input.
-          // Posting a Request needs a connection: offline it explains itself.
           <Tooltip content={online ? null : t('common.needsConnection')}>
             <button
               type="button"

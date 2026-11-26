@@ -1,18 +1,6 @@
-/**
- * Time-series arithmetic for the widget charts: the daily balance a journal
- * implies, and bucketing by week or hour. Pure and independent of the clock
- * (every function is handed `now`), so each is pinned by a plain test.
- */
-
 import { DAY_MS } from '@/lib/age';
 import { shiftUtcDate } from '@/engine/localDay';
 
-/**
- * One value per UTC day over the last `days` days ending at `today`, oldest
- * first. A day with no entry carries the previous day's balance forward; days
- * before the first known balance are left out (unknown is not zero), so the
- * series can be shorter than `days`.
- */
 export function dailyBalanceSeries(
   byDay: ReadonlyMap<string, number>,
   today: string,
@@ -20,7 +8,6 @@ export function dailyBalanceSeries(
 ): { days: string[]; values: number[] } {
   const windowStart = shiftUtcDate(today, -(days - 1));
   let current: number | null = null;
-  // The newest balance held before the window opens is where the window starts.
   const earlier = [...byDay.keys()].filter((day) => day < windowStart).sort();
   const lastEarlier = earlier[earlier.length - 1];
   if (lastEarlier !== undefined) current = byDay.get(lastEarlier) ?? null;
@@ -38,7 +25,6 @@ export function dailyBalanceSeries(
   return { days: outDays, values };
 }
 
-/** The entries dated within the last `rangeDays` days of `now`. */
 export function withinRange<T extends { date: string }>(
   entries: readonly T[],
   now: number,
@@ -51,7 +37,6 @@ export function withinRange<T extends { date: string }>(
   });
 }
 
-/** How many whole days back the oldest entry reaches; 0 for none. */
 export function journalCoverageDays(entries: readonly { date: string }[], now: number): number {
   let oldest = Number.POSITIVE_INFINITY;
   for (const entry of entries) oldest = Math.min(oldest, Date.parse(entry.date));
@@ -59,10 +44,6 @@ export function journalCoverageDays(entries: readonly { date: string }[], now: n
   return Math.max(1, Math.ceil((now - oldest) / DAY_MS));
 }
 
-/**
- * Sums `valueOf` into `count` buckets of `bucketMs` that end at `now`, oldest
- * first. Anything older than the first bucket, or after `now`, is left out.
- */
 export function backwardBucketSums<T>(
   items: readonly T[],
   atOf: (item: T) => number,

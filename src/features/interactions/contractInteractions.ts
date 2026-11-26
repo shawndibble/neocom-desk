@@ -35,11 +35,10 @@ function stateOf(contract: Contract, now: number): State | null {
         ? 'expired'
         : 'outstanding';
     default:
-      return null; // cancelled / deleted: nothing happened between the two players
+      return null;
   }
 }
 
-/** The location ids a courier title names, for the caller to resolve to names. */
 export function courierLocationIds(contracts: readonly Contract[]): number[] {
   const ids = new Set<number>();
   for (const c of contracts) {
@@ -59,7 +58,6 @@ export interface ContractInteractionsInput {
   t: Translate;
 }
 
-/** One Character's contracts with `otherId`, as Interactions. Pure. */
 export function contractInteractions(input: ContractInteractionsInput): Interaction[] {
   const { characterId, otherId, contracts, locationNames, now, t } = input;
   const out: Interaction[] = [];
@@ -89,7 +87,6 @@ export function contractInteractions(input: ContractInteractionsInput): Interact
       if (c.type === 'auction' && !c.title?.trim()) title = t('interactions.contract.auctionTitle');
     }
 
-    // The issuer pays a courier's reward but is paid an exchange's or auction's price.
     const amount = contractAmount(c) ?? 0;
     const issuerGets = c.type !== 'courier';
     const signed = (viewerIssued ? 1 : -1) * (issuerGets ? 1 : -1) * amount;
@@ -107,7 +104,6 @@ export function contractInteractions(input: ContractInteractionsInput): Interact
       state: `interactions.state.${state}`,
       stateTone: STATE_TONE[state],
       characterId,
-      // All Characters, so a contract of an alt is found, not only the active Character's.
       to: `${highlightHref('/contracts/history', c.contract_id)}&history.chars=all`,
     });
   }

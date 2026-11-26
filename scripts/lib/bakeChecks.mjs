@@ -1,5 +1,3 @@
-// Post-write sanity checks; failures set process.exitCode.
-// Extracted from scripts/build-sde.mjs; see lib/bakeConstants.mjs for the shared bands.
 import { isDeepStrictEqual } from 'node:util';
 import { gatePositionProblems } from './bakeMap.mjs';
 import {
@@ -110,7 +108,6 @@ export function runSanityChecks({
   metaGroupNames,
   reprocessing,
 }) {
-  // --- sanity checks ---
   console.log('Sanity checks...');
   const skillIds = new Set(skills.map((s) => s.typeID));
   let badPrereq = 0;
@@ -197,9 +194,6 @@ export function runSanityChecks({
   }
   console.log(`  LP store corporations: ${lpCorporations.length}`);
   {
-    // Well-known stores across empire navies, independents, CONCORD and the
-    // pirate factions. A missing one means the probe (or the offers
-    // endpoint's shape) broke, not that the store went away.
     const ids = new Set(lpCorporations.map((c) => c.id));
     const missing = LP_STORE_CONTROL_CORPORATIONS.filter(([id]) => !ids.has(id));
     if (missing.length > 0) {
@@ -228,8 +222,6 @@ export function runSanityChecks({
     );
     process.exitCode = 1;
   }
-  // Every name another file carries is a name the game has: typeNames.json
-  // missing one would mark a fit using it as out of date.
   {
     const missing = namesMissingFrom(typeNames, [
       ...Object.values(typeMap).map((t) => t.name),
@@ -243,10 +235,6 @@ export function runSanityChecks({
       process.exitCode = 1;
     }
   }
-  // Mining Yield reports m3, so every mineable type must carry a volume.
-  // Checked rather than assumed: raw ore reaches types.json only through the
-  // reprocessing keys and the mineable pass above, and a change to either
-  // would otherwise turn the whole column into em dashes with no build error.
   {
     const volumeless = [...oreAndIceTypeIds, ...gasCloudTypeIds].filter(
       (id) => !(typeMap[id]?.volume > 0)
@@ -259,10 +247,6 @@ export function runSanityChecks({
     }
   }
   console.log(`  gas cloud type ids: ${gasCloudTypeIds.length}`);
-  // 50 today: 25 raw (Fullerenes + Booster Gas Clouds) and 25 compressed. The
-  // threshold sits above 25 on purpose — a restructure that left only the
-  // Compressed Gas child standing would still clear a lower bar while every
-  // raw type the ledger actually reports had silently vanished.
   if (!gasCloudsParent || gasCloudMarketGroupIds.size === 0 || gasCloudTypeIds.length < 40) {
     console.error(
       `  FAIL: gas cloud type ids came out empty or implausibly small — the "${GAS_CLOUDS_GROUP_NAME}" market group structure may have changed`
@@ -285,8 +269,6 @@ export function runSanityChecks({
     process.exitCode = 1;
   }
   console.log(`  compressed-gas type id pairs: ${Object.keys(compressedGasTypeIds).length}`);
-  // 25 raw gas types today, each with a "Compressed " twin. A lower count means
-  // a pair went missing or the naming convention changed.
   if (Object.keys(compressedGasTypeIds).length < 25) {
     console.error(
       '  FAIL: fewer than 25 compressed-gas pairs — the "Compressed " naming convention may have changed'
@@ -354,8 +336,6 @@ export function runSanityChecks({
       );
       process.exitCode = 1;
     }
-    // A known positive and a known negative (verified against the dump):
-    // Gunnery trains to V on Alpha, Capital Ships not at all.
     const GUNNERY_TYPE_ID = 3300;
     const CAPITAL_SHIPS_TYPE_ID = 20533;
     const bySkill = new Map(skills.map((s) => [s.typeID, s]));
@@ -397,9 +377,6 @@ export function runSanityChecks({
       );
       process.exitCode = 1;
     }
-    // Entries naming a skill skills.json lacks are dropped silently by the
-    // bake; a broad CCP/Fuzzwork build mismatch would hollow plans out
-    // without emptying any, so count the drops too.
     const rawEntries = skillPlanRecords
       .filter((r) => Number.isInteger(r.careerPathID))
       .reduce((n, r) => n + (r.skillRequirements?.length ?? 0), 0);
@@ -447,8 +424,6 @@ export function runSanityChecks({
       );
       process.exitCode = 1;
     }
-    // An agent whose corporation, station or division the app cannot name would
-    // show as a bare id; every one of them should resolve.
     const corporationIds = new Set(corporations.map((c) => c.id));
     const stationIds = new Set(npcStations.map((s) => s.id));
     const unresolved = agents.agents.filter(
@@ -473,9 +448,6 @@ export function runSanityChecks({
       );
       process.exitCode = 1;
     }
-    // The grade rule (engine/tierLadder.ts) stops at the first empty level, as
-    // it must for an unpublished mastery tier — so a certificate level left
-    // empty would cap every pilot below it. None is today; fail if one appears.
     const gapped = certificates.filter((c) => c.levels.some((level) => level.length === 0));
     if (gapped.length) {
       console.error(
@@ -484,8 +456,6 @@ export function runSanityChecks({
       process.exitCode = 1;
     }
     const wantedIds = new Set(certificates.map((c) => c.id));
-    // Only skills asked for at some grade: one that is level 0 at all five is
-    // dropped as "not needed", not as unknown, and mustn't count against this.
     const askedFor = (s) =>
       ['basic', 'standard', 'improved', 'advanced', 'elite'].some((g) => s[g] >= 1);
     const rawSkills = certificateRecords
@@ -550,9 +520,6 @@ export function runSanityChecks({
       );
       process.exitCode = 1;
     }
-    // A known positive, verified against a live dump: Sharpshooter (3311)
-    // grants a 5%-per-level PostPercent bonus to attribute 54 (Optimal Range)
-    // on items requiring Gunnery (3300).
     const OPTIMAL_RANGE_ATTR = 54;
     const SHARPSHOOTER_TYPE_ID = 3311;
     const GUNNERY_SKILL_TYPE_ID = 3300;
@@ -566,12 +533,6 @@ export function runSanityChecks({
       console.error('  FAIL: Sharpshooter should modify attribute 54 (Optimal Range)');
       process.exitCode = 1;
     }
-    // Every skill-gated PostPercent bonus resolves to a static per-level value
-    // on its own type (verified against a live dump — no runtime effect chain
-    // ever needs simulating); rows that didn't were dropped above rather than
-    // emitted with a missing value. A future CCP data change introducing a
-    // genuinely unresolvable case fails the build here instead of shipping a
-    // popover with no number.
     console.log(`  skill attribute modifiers unresolved: ${skillAttributeModifierUnresolved}`);
     if (skillAttributeModifierUnresolved) {
       console.error(
@@ -661,9 +622,6 @@ export function runSanityChecks({
     process.exitCode = 1;
   }
   {
-    // Every stargate connects both ways in game, so the emitted graph must be
-    // symmetric. An asymmetry means rows were dropped, and a one-way gate
-    // would silently give a route in one direction and "no route" back.
     let asymmetric = 0;
     for (const [from, tos] of Object.entries(solarSystemJumps)) {
       for (const to of tos) {
@@ -674,8 +632,6 @@ export function runSanityChecks({
       console.error(`  FAIL: ${asymmetric} one-way stargate edges in the jump graph`);
       process.exitCode = 1;
     }
-    // Jita is the busiest system in the game and has never had fewer than a
-    // handful of gates; zero here means the join silently produced nothing.
     if (!(solarSystemJumps[JITA_SYSTEM_ID]?.length > 0)) {
       console.error('  FAIL: Jita has no stargates in the jump graph');
       process.exitCode = 1;
@@ -684,16 +640,12 @@ export function runSanityChecks({
       console.error(`  FAIL: ${problem}`);
       process.exitCode = 1;
     }
-    // Every gated system must also be a system we can name and place, or a
-    // route can cross somewhere `systems.json` cannot describe.
     const systemIds = new Set(solarSystems.map((sys) => sys.id));
     const unknown = Object.keys(solarSystemJumps).filter((id) => !systemIds.has(Number(id)));
     if (unknown.length > 0) {
       console.error(`  FAIL: ${unknown.length} gated systems missing from systems.json`);
       process.exitCode = 1;
     }
-    // The converse, which is what makes membership a reliable "is this a
-    // system": every system must have a key, even a gateless one.
     if (Object.keys(solarSystemJumps).length !== solarSystems.length) {
       console.error(
         `  FAIL: jump graph holds ${Object.keys(solarSystemJumps).length} systems, systems.json has ${solarSystems.length}`
@@ -714,10 +666,6 @@ export function runSanityChecks({
     process.exitCode = 1;
   }
   {
-    // Attribute 790 is the whole join this ticket rests on (issue #1058) — a
-    // silent break (renamed CSV column, a dropped filter) would make this 0,
-    // not slightly off, so a band around the known count (338 ore/ice/moon-ore
-    // types, 2026-09-14) catches that while tolerating CCP adding types later.
     const specialised = Object.values(reprocessing).filter(
       (e) => e.specialisationSkillID != null
     ).length;
@@ -731,8 +679,6 @@ export function runSanityChecks({
       );
       process.exitCode = 1;
     }
-    // A known positive and a known negative, so a join that silently returns
-    // nothing (right count, wrong data) fails loudly too.
     const VELDSPAR_TYPE_ID = 1230;
     const SIMPLE_ORE_PROCESSING_SKILL_ID = 60377;
     const RIFTER_TYPE_ID = 587;

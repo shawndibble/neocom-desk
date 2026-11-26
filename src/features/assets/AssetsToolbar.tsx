@@ -41,11 +41,6 @@ export function AssetsToolbar({
       ),
     [selectedIds, assetsByItemId, priceByTypeId, itemValueByItemId, volumeByTypeId]
   );
-  // "N items selected · 1.2B ISK · 4,310 m³ · 3 unpriced" (issue #6165). ISK
-  // and the unpriced count wait for prices, so nothing reads unpriced while
-  // they load; m³ is the part a phone drops.
-  // ISK on screen is an `IskAmount` (exact figure one gesture away); the
-  // status line for screen readers keeps the plain shorthand.
   const selectionParts: { text: string; shown?: ReactNode; phoneHidden?: boolean }[] = [
     { text: t('assets.select.selectedCount', { count: selectedIds.size }) },
   ];
@@ -86,8 +81,6 @@ export function AssetsToolbar({
           {selectedIds.size > 0 && (
             <span className="whitespace-nowrap text-[0.6875rem] text-text-dim tabular-nums">
               {selectionParts.map((part, index) => (
-                // Plain parts are already read by the status line above; the
-                // ISK part stays in reach so its exact figure can be focused.
                 <span
                   key={index}
                   aria-hidden={part.shown ? undefined : 'true'}

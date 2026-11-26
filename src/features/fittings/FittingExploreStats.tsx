@@ -4,11 +4,6 @@ import { Facts } from './StatFacts';
 import { flagWord } from './flagWord';
 import { fixed0, fixed1 } from '@/lib/fixedFormat';
 
-/**
- * Exploration: what the fit hacks (data and relic strength, coherence, utility
- * slots), how strong its probes are, the scan arrays' cuts, and how soon a
- * cloak lets it lock again. A figure the fit has none of is left out.
- */
 export function ExploreFacts({ stats }: { stats: FittingStats }) {
   const { t } = useTranslation();
   const { explore } = stats;
@@ -28,7 +23,6 @@ export function ExploreFacts({ stats }: { stats: FittingStats }) {
         ...fact('coherence', hacking.coherence, fixed0),
         ...fact('utilitySlots', explore.utilitySlots, fixed0),
         ...fact('analyzerCycle', hacking.cycleSeconds, seconds),
-        // An empty launcher has no probe to measure; it still has its own bonus.
         ...(hasLauncher
           ? [
               {
@@ -43,7 +37,6 @@ export function ExploreFacts({ stats }: { stats: FittingStats }) {
         ...fact('scanTimeCut', scanning.duration, percent),
         ...fact('deviationCut', scanning.deviation, percent),
         ...fact('cloakRelock', explore.cloakRecalibrationSeconds, seconds),
-        // A cloak is fitted when it has a relock delay.
         ...(explore.cloakRecalibrationSeconds > 0
           ? [
               {

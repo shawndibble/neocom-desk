@@ -5,18 +5,11 @@ import { remainingSpForLevel, spBetween } from './sp';
 export interface PlanProgress {
   trainedSp: number;
   totalSp: number;
-  /** trainedSp / totalSp, or null when the plan has nothing to measure. */
   fraction: number | null;
 }
 
 const EMPTY: PlanProgress = { trainedSp: 0, totalSp: 0, fraction: null };
 
-/**
- * How much of a plan the character has already trained. The plan is expanded
- * as if from level 0 (prerequisites included) so the denominator does not
- * shrink as skills train; each level step then counts its own banked SP,
- * clamped to that level's cost.
- */
 export function planProgress(
   entries: readonly PlanEntry[],
   skills: ReadonlyMap<number, EngineSkill>,

@@ -1,23 +1,3 @@
-/**
- * "What to train": which skill most improves the open Fitting, each with its
- * whole-Fitting changes and the time to train it at the Character's
- * attributes and implants (the same schedule a Skill Plan uses —
- * prerequisites included, and listed on click). Only for the active
- * Character's real skills: under All 0 / All V or single-skill overrides a
- * "+1" would build on levels the pilot doesn't have.
- *
- * Each skill name opens the shared skill detail modal, read against the
- * target Skill Plan.
- *
- * Skills are ranked at their next level, but each row's Add button has a level menu:
- * the changes and time follow the level picked, worked out on demand. Levels
- * the pilot has are not offered; levels a Skill Plan already trains are shown
- * grayed out. "Add" puts the picked level into the picked Skill Plan
- * (a new one named after the Fitting if the Character has none): the levels
- * below it and any missing prerequisites are the plan's own derived rows,
- * scheduled ahead of it by the same normalizer the Skill Plan editor runs, so
- * Undo takes back exactly the one entry and what it pulled in goes with it.
- */
 import { useCallback, useMemo, useState } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
@@ -73,7 +53,8 @@ import { rankModuleUpgrades } from '@/engine/fittings/moduleUpgrades';
 import type { SkillPlanRecord } from '@/db';
 import { StatNote } from './StatFacts';
 import { Expanded } from '@/components/ui/icons';
-import { STAT_DETAIL, STAT_EYEBROW_TYPE, joinDetail, statRowClassName } from './statKit';
+import { STAT_DETAIL, STAT_EYEBROW_TYPE, joinDetail } from './statKit';
+import { TrainRow } from './FittingTrainRow';
 
 export interface WhatToTrainRow extends SkillGain {
   name: string;
@@ -81,13 +62,9 @@ export interface WhatToTrainRow extends SkillGain {
 
 export interface FittingWhatToTrainPanelProps {
   evaluator: SkillGainEvaluator | null;
-  /** The active Character; null shows why there's nothing to rank. */
   characterId: number | null;
-  /** Names the Skill Plan "Add to plan" creates when the Character has none yet. */
   fittingName: string;
-  /** Module names, racks and variations, for the Tech II upgrades; null while loading. */
   catalogue: FittingCatalogue | null;
-  /** Skills the Character lacks to fly the hull or use its modules: listed with the fixes. */
   missingSkills?: readonly PlanEntry[];
 }
 
@@ -105,7 +82,6 @@ export function FittingWhatToTrainPanel({
   if (characterId === null) return <StatNote>{t('fittings.whatToTrain.noCharacter')}</StatNote>;
   if (overridden) return <StatNote>{t('fittings.whatToTrain.overridesOn')}</StatNote>;
   return (
-    // Keyed so an Undo toast can't outlive a Character switch and sync the wrong pilot.
     <WhatToTrainRanking
       key={characterId}
       evaluator={evaluator}
@@ -141,16 +117,13 @@ function WhatToTrainRanking({
   const { gains, loading, failed } = useSkillGains(evaluator);
   const { catalog, trainedSkills, trainedSkillsKnown, scheduleEntriesFor } =
     useTrainingSchedule(characterId);
-  // Only once some level is seen to clear part of an overage: a fit within budget has nothing to fix.
   const overBudget = gains?.some((gain) => (gain.budgetFreed ?? 0) > 0) ?? false;
   const skillFixes = useSkillFixes(evaluator, overBudget);
-  // Each missing skill is a row of its own, timed as its share of training them all.
   const missingFixes = useMemo(
     () => missingSkills.map((entry) => ({ entries: [entry] })),
     [missingSkills]
   );
 
-  // Worked out once per result, not per sort change.
   const rows = useMemo((): WhatToTrainRow[] | null => {
     if (gains === null) return null;
     return gains.map((gain) => ({
@@ -164,7 +137,6 @@ function WhatToTrainRanking({
     [scheduleEntriesFor]
   );
   const upgrades = useModuleUpgrades(evaluator, catalogue, scheduleEntriesFor);
-  // Only the stats some suggestion moves: a mining sort on a warship would rank nothing.
   const sorts = useMemo(
     (): GainSort[] => [
       'overall',
@@ -179,7 +151,6 @@ function WhatToTrainRanking({
     () => (rows === null ? null : rankSkillGains(rows, activeSort)),
     [rows, activeSort]
   );
-  // A skill under Makes it fit isn't listed again under Improves fit.
   const improves = useMemo(() => {
     if (ranked === null) return null;
     const fixSkills = new Set(
@@ -213,21 +184,25 @@ function WhatToTrainRanking({
     plannedLevels,
     onAdd: (entries: readonly PlanEntry[]) => void addEntries(entries),
   };
-  // Missing skills don't wait on the ranking: they show while it loads, or if it fails.
   const hasFixes = missingFixes.length > 0 || (skillFixes.fixes?.length ?? 0) > 0;
   const fixBlock = hasFixes && (
     <div className="space-y-1">
       <p className={cx(STAT_EYEBROW_TYPE, 'text-warning')}>{t('fittings.skillFixes.heading')}</p>
       {missingFixes.length > 0 && (
-        <SkillFixList
-          fixes={missingFixes}
-          {...fixListProps}
-          reason={t('fittings.skillFixes.missing')}
-          together
-        />
+        <>
+          <p className={STAT_DETAIL}>{t('fittings.skillFixes.missing')}</p>
+          <SkillFixList fixes={missingFixes} {...fixListProps} together />
+        </>
       )}
       {skillFixes.fixes && skillFixes.fixes.length > 0 && (
-        <SkillFixList fixes={skillFixes.fixes} {...fixListProps} />
+        <>
+          <p
+            className={cx(STAT_DETAIL, missingFixes.length > 0 && 'mt-2 border-t border-line pt-2')}
+          >
+            {t('fittings.skillFixes.makesItFit')}
+          </p>
+          <SkillFixList fixes={skillFixes.fixes} {...fixListProps} />
+        </>
       )}
     </div>
   );
@@ -263,7 +238,6 @@ function WhatToTrainRanking({
   const rankByLabel = t('fittings.whatToTrain.rankBy');
   return (
     <div className="space-y-3">
-      {/* Two rows of one shape: a select that names itself, then what it acts on. */}
       <div className="space-y-2">
         <Select
           value={activeSort}
@@ -286,7 +260,6 @@ function WhatToTrainRanking({
             ))}
           </SelectContent>
         </Select>
-        {/* The plan the Add buttons write to, and the button that opens that same plan. */}
         <div className="flex items-center gap-2">
           {target.plans && target.plans.length > 1 ? (
             <TargetPlanPicker
@@ -310,13 +283,11 @@ function WhatToTrainRanking({
         </div>
       </div>
       {fixBlock}
-      {/* Only once no Tech II upgrade is left to suggest either: else it reads as "nothing to train". */}
       {improves.length === 0 && rankedUpgrades?.length === 0 && !hasFixes && (
         <StatNote>{t('fittings.whatToTrain.none')}</StatNote>
       )}
       {improves.length > 0 && (
-        <div className="space-y-1">
-          {/* Named only beside Makes it fit: alone, What to train's own title says it. */}
+        <div className={cx('space-y-1', hasFixes && 'mt-4 border-t border-line pt-5')}>
           {hasFixes && <p className={STAT_EYEBROW_TYPE}>{t('fittings.whatToTrain.improvesFit')}</p>}
           <ul
             aria-label={t('fittings.stats.section.whatToTrain')}
@@ -357,9 +328,7 @@ export interface WhatToTrainItemProps {
   row: WhatToTrainRow;
   rank: number;
   evaluator: SkillGainEvaluator;
-  /** The target Skill Plan; null when the Character has none yet, undefined while plans load. */
   plan: SkillPlanRecord | null | undefined;
-  /** The highest level the plan trains each skill to, prerequisite rows included. */
   plannedLevels: ReadonlyMap<number, number>;
   scheduleFor: (skillTypeId: number, level: number) => readonly ScheduledStep[] | null;
   skills: ReadonlyMap<number, EngineSkill> | undefined;
@@ -367,16 +336,10 @@ export interface WhatToTrainItemProps {
   onAdd: (row: WhatToTrainRow, level: number) => Promise<void>;
 }
 
-/** The levels `from`..`to` as "III" or "I–III". */
 function levelSpan(from: number, to: number): string {
   return from === to ? romanLevel(from) : `${romanLevel(from)}–${romanLevel(to)}`;
 }
 
-/**
- * One suggestion: the skill and what it changes on the left, the time it
- * takes at the top right; beneath, the plan it is already in, then a split
- * Add button whose menu picks the level. The changes and the time follow the level picked.
- */
 export function WhatToTrainItem({
   row,
   rank,
@@ -393,7 +356,6 @@ export function WhatToTrainItem({
   const plannedThrough = plannedLevels.get(row.skillTypeId) ?? 0;
   const options = levelOptions(row.fromLevel, plannedThrough);
   const level = pickedLevel(options, picked);
-  // Every level in a plan: what the whole skill would give, not a level to pick.
   const shownLevel = level ?? 5;
   const { gain, failed } = useSkillLevelGain(evaluator, row, shownLevel);
   const scheduled = scheduleFor(row.skillTypeId, shownLevel);
@@ -418,107 +380,103 @@ export function WhatToTrainItem({
   const canAdd = plan !== undefined && level !== null;
 
   return (
-    <li className={statRowClassName()}>
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <span className="flex items-baseline gap-2">
-            <span className="text-text-dim tabular-nums">{rank}</span>
+    <TrainRow
+      title={
+        <span className="flex items-baseline gap-2">
+          <span className="text-text-dim tabular-nums">{rank}</span>
+          <span className="min-w-0">
             <SkillLink
               typeId={row.skillTypeId}
               planEntries={plan?.entries}
-              className="min-w-0 font-semibold"
+              className="font-semibold"
             >
               {row.name}
-            </SkillLink>
-          </span>
-          <p className={STAT_DETAIL}>
-            {joinDetail([
-              row.fromLevel > 0
+            </SkillLink>{' '}
+            <span className={STAT_DETAIL}>
+              {row.fromLevel > 0
                 ? t('fittings.whatToTrain.trained', { level: romanLevel(row.fromLevel) })
-                : t('fittings.whatToTrain.notTrained'),
-              ...changes,
-            ])}
-          </p>
-        </div>
-        <div className="shrink-0 text-right tabular-nums">
-          {time === null ? (
-            <span className="text-text-dim">{t('common.loading')}</span>
-          ) : (
-            formatCountdown(time.seconds)
-          )}
-          {time?.includesPrerequisites && (
-            <div>
-              <WhatToTrainPrerequisites
-                skill={skill}
-                rows={prerequisiteRows}
-                plannedLevels={plannedLevels}
-                planEntries={plan?.entries}
-                totalSeconds={time.seconds}
-              />
-            </div>
-          )}
-        </div>
-      </div>
-      {((plan && plannedSpan !== null) || canAdd) && (
-        <div className="mt-1 flex flex-wrap items-center justify-end gap-2">
-          {plan && plannedSpan !== null && (
-            <span className="mr-auto text-[0.6875rem] text-text-dim">
-              <Trans
-                i18nKey="fittings.whatToTrain.plannedLevels"
-                values={{ levels: plannedSpan, plan: plan.name }}
-                components={{
-                  plan: <Link to={`/skills/plans/${plan.id}`} className={inlineLinkClassName} />,
-                }}
-              />
+                : t('fittings.whatToTrain.notTrained')}
             </span>
-          )}
-          {canAdd && (
-            <div className="flex">
-              <Button
-                size="sm"
-                className={options.length > 1 ? 'rounded-r-none' : undefined}
-                aria-label={t('fittings.whatToTrain.addToPlanLabel', { skill })}
-                onClick={() => void onAdd(row, level)}
-              >
-                {t('fittings.whatToTrain.addLevel', { level: romanLevel(level) })}
-              </Button>
-              {/* Another level than the next one: only when there is one to pick. */}
-              {options.length > 1 && (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <IconButton
-                      size="sm"
-                      icon={<Expanded />}
-                      label={t('fittings.whatToTrain.levelLabel', { skill: row.name })}
-                      className="-ml-px rounded-l-none"
-                    />
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuRadioGroup
-                      value={String(level)}
-                      onValueChange={(value) => setPicked(Number(value))}
-                    >
-                      {options.map((option) => (
-                        <DropdownMenuRadioItem
-                          key={option.level}
-                          value={String(option.level)}
-                          disabled={option.planned}
-                        >
-                          {option.planned
-                            ? t('fittings.whatToTrain.levelInPlan', {
-                                level: romanLevel(option.level),
-                              })
-                            : romanLevel(option.level)}
-                        </DropdownMenuRadioItem>
-                      ))}
-                    </DropdownMenuRadioGroup>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              )}
-            </div>
-          )}
-        </div>
-      )}
-    </li>
+          </span>
+        </span>
+      }
+      detail={joinDetail(changes)}
+      status={
+        plan &&
+        plannedSpan !== null && (
+          <Trans
+            i18nKey="fittings.whatToTrain.plannedLevels"
+            values={{ levels: plannedSpan, plan: plan.name }}
+            components={{
+              plan: <Link to={`/skills/plans/${plan.id}`} className={inlineLinkClassName} />,
+            }}
+          />
+        )
+      }
+      time={
+        time === null ? (
+          <span className="text-text-dim">{t('common.loading')}</span>
+        ) : (
+          formatCountdown(time.seconds)
+        )
+      }
+      prerequisites={
+        time?.includesPrerequisites && (
+          <WhatToTrainPrerequisites
+            skill={skill}
+            rows={prerequisiteRows}
+            plannedLevels={plannedLevels}
+            planEntries={plan?.entries}
+            totalSeconds={time.seconds}
+          />
+        )
+      }
+      action={
+        canAdd && (
+          <div className="flex">
+            <Button
+              size="sm"
+              className={options.length > 1 ? 'rounded-r-none' : undefined}
+              aria-label={t('fittings.whatToTrain.addToPlanLabel', { skill })}
+              onClick={() => void onAdd(row, level)}
+            >
+              {t('fittings.whatToTrain.addLevel', { level: romanLevel(level) })}
+            </Button>
+            {options.length > 1 && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <IconButton
+                    size="sm"
+                    icon={<Expanded />}
+                    label={t('fittings.whatToTrain.levelLabel', { skill: row.name })}
+                    className="-ml-px rounded-l-none"
+                  />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuRadioGroup
+                    value={String(level)}
+                    onValueChange={(value) => setPicked(Number(value))}
+                  >
+                    {options.map((option) => (
+                      <DropdownMenuRadioItem
+                        key={option.level}
+                        value={String(option.level)}
+                        disabled={option.planned}
+                      >
+                        {option.planned
+                          ? t('fittings.whatToTrain.levelInPlan', {
+                              level: romanLevel(option.level),
+                            })
+                          : romanLevel(option.level)}
+                      </DropdownMenuRadioItem>
+                    ))}
+                  </DropdownMenuRadioGroup>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+          </div>
+        )
+      }
+    />
   );
 }

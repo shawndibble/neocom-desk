@@ -1,16 +1,3 @@
-/**
- * Reads the per-weapon inputs applied DPS needs (`appliedDps.ts`) off a
- * calculation — its own table of attribute ids rather than more rows in
- * `types.ts`'s `DOGMA_ATTRIBUTE`, since these are all read per item (module,
- * its loaded charge, a drone) or off the character, never the ship.
- *
- * Ids verified 2026-09-24 by a live run of the pinned engine against a Vexor
- * Navy Issue (Neutron Blaster Cannon II + Antimatter, Warrior IIs) and a
- * Caracal (Heavy Missile Launcher II + Scourge Heavy Missile). `dps` is the
- * patched per-item derived attribute (EVEShipFit/sde-patched `ids.yaml`):
- * DPS without reload, on the turret/launcher item itself (0 unless it's
- * running) and per single drone on a drone stack.
- */
 import type { AppliedDpsInputs, AppliedWeapon, DamageSplit } from './appliedDps';
 import { weaponReloadDuty } from './tank';
 import type { WeaponRange } from './types';
@@ -18,32 +5,20 @@ import type { WeaponRange } from './types';
 export const APPLIED_DPS_ATTRIBUTE = {
   dps: -12,
   optimal: 54,
-  /** A smartbomb's blast radius (`empFieldRange`), m. */
   smartbombRange: 99,
   falloff: 158,
   tracking: 160,
   optimalSigRadius: 620,
   maxVelocity: 37,
-  /** Missile flight time, ms. */
   explosionDelay: 281,
   explosionRadius: 654,
   explosionVelocity: 653,
   damageReductionFactor: 1353,
-  /** On the character, not the ship; absent when no skills are passed. */
   droneControlRange: 458,
-  // Damage per type (plain SDE `emDamage` & co., looked up by name in the
-  // pinned `sde.dat` 2026-09-25): on a turret's or launcher's charge, and on
-  // a drone itself.
   emDamage: 114,
   explosiveDamage: 116,
   kineticDamage: 117,
   thermalDamage: 118,
-  // A fighter's standard attack, the one its `dps` above is: a live run of
-  // the pinned engine (Templar I in a Thanatos tube, 2026-09-25) gave `dps`
-  // equal to fighterAbilityAttackMissileDamagePerSecond (-55), with its
-  // damage on fighterAbilityAttackMissileDamage* (ids read by name off the
-  // pinned `sde.dat`'s dogma attributes). A few attacks carry the
-  // fighterAbilityAttackTurretDamage* ones instead.
   fighterAttackEmDamage: 2227,
   fighterAttackThermalDamage: 2228,
   fighterAttackKineticDamage: 2229,
@@ -54,7 +29,6 @@ export const APPLIED_DPS_ATTRIBUTE = {
   fighterTurretExplosiveDamage: 2174,
 } as const;
 
-/** The base drone control range with no skills trained. */
 export const DEFAULT_DRONE_CONTROL_RANGE = 20000;
 
 interface AttributeMap {
@@ -105,7 +79,6 @@ const FIGHTER_TURRET_DAMAGE = {
   explosive: APPLIED_DPS_ATTRIBUTE.fighterTurretExplosiveDamage,
 };
 
-/** The damage split by type, as shares; nothing when the item carries no damage at all. */
 function damageSplit(
   attributes: AttributeMap | undefined,
   ids: Record<keyof DamageSplit, number> = PLAIN_DAMAGE
@@ -127,12 +100,10 @@ function damageSplit(
   };
 }
 
-/** A charge's own damage split by type, as shares; null when it deals no damage. */
 export function chargeDamageSplit(charge: AttributeMap | undefined): DamageSplit | null {
   return damageSplit(charge).damage ?? null;
 }
 
-/** Metres a missile flies: its charge's speed × flight time. */
 function missileFlightRange(charge: AttributeMap): number {
   return (
     read(charge, APPLIED_DPS_ATTRIBUTE.maxVelocity) *
@@ -140,7 +111,6 @@ function missileFlightRange(charge: AttributeMap): number {
   );
 }
 
-/** A charge that flies but explodes on no radius (a breacher pod's): metres it flies, else 0. */
 function chargeFlightRange(charge: AttributeMap | undefined): number {
   return charge && !isMissile(charge) ? missileFlightRange(charge) : 0;
 }
@@ -149,11 +119,6 @@ function isMissile(charge: AttributeMap | undefined): charge is AttributeMap {
   return charge !== undefined && read(charge, APPLIED_DPS_ATTRIBUTE.explosionRadius) > 0;
 }
 
-/**
- * How far a weapon reaches: a launcher's missile flight range (no falloff),
- * or a turret's or drone's optimal and falloff — what the engine worked out
- * with the loaded ammo's modifiers. Null for anything else.
- */
 export function weaponRange(attributes: AttributeMap, charge?: AttributeMap): WeaponRange | null {
   if (isMissile(charge)) return { optimal: missileFlightRange(charge), falloff: 0 };
   if (read(attributes, APPLIED_DPS_ATTRIBUTE.tracking) > 0) {
@@ -164,15 +129,10 @@ export function weaponRange(attributes: AttributeMap, charge?: AttributeMap): We
   return reach > 0 ? { optimal: reach, falloff: 0 } : null;
 }
 
-/** A drone's speed, m/s: 0 for a sentry. */
 export function droneSpeed(attributes: AttributeMap): number {
   return read(attributes, APPLIED_DPS_ATTRIBUTE.maxVelocity);
 }
 
-/**
- * Metres an untracked weapon reaches: a smartbomb's blast, a Vorton's optimal
- * (the module's own), or a breacher charge's flight, in that order. 0 for anything else.
- */
 function areaRange(attributes: AttributeMap, charge?: AttributeMap): number {
   return (
     read(attributes, APPLIED_DPS_ATTRIBUTE.smartbombRange) ||
@@ -209,7 +169,6 @@ function moduleWeapon(result: ItemResultLike): AppliedWeapon | null {
       ...damageSplit(charge),
     };
   }
-  // A Vorton applies like a missile, off its own explosion attributes, out to its optimal.
   if (isMissile(result.attributes) && read(result.attributes, APPLIED_DPS_ATTRIBUTE.optimal) > 0) {
     return {
       kind: 'missile',
@@ -221,23 +180,14 @@ function moduleWeapon(result: ItemResultLike): AppliedWeapon | null {
       ...damageSplit(charge ?? result.attributes),
     };
   }
-  // A smartbomb or a breacher pod hits whatever is in range.
   const range = areaRange(result.attributes, charge);
   if (range > 0) {
     const own = damageSplit(charge);
     return { kind: 'area', dps, range, ...(own.damage ? own : damageSplit(result.attributes)) };
   }
-  // A launcher with nothing loaded, …: nothing to apply.
   return null;
 }
 
-/**
- * `items`/`results` must be the index-parallel `dogmaFit.items` and
- * `calculation.items`. A drone stack counts only when the Fitting launched it
- * (`item.state === 'active'`) — the engine itself reports bay drones as
- * active too. A module counts only while running (active or overloaded), a
- * fighter squadron only while launched (in a tube).
- */
 export function extractAppliedDpsInputs(
   items: readonly FitItemLike[],
   results: readonly ItemResultLike[],
@@ -261,7 +211,6 @@ export function extractAppliedDpsInputs(
       return;
     }
     if (item.slot.type === 'fighter_tube') {
-      // A tube holds a launched squadron; the bay's (`fighter_bay`) don't fight.
       if (item.state !== 'active') return;
       const perFighter = read(result.attributes, APPLIED_DPS_ATTRIBUTE.dps);
       if (perFighter <= 0) return;

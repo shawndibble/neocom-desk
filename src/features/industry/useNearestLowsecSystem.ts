@@ -4,13 +4,6 @@ import { loadCharacterSolarSystemId } from '@/features/character/location';
 import { loadJumpGraph } from '@/sde/jumpGraph';
 import { loadSolarSystemsById } from '@/sde/solarSystems';
 
-/**
- * The lowsec system nearest the Character (or `fallbackSystemId` when their
- * location is unknown), for the one-tap "move reactions" fix (issue #2908).
- * Looks nothing up while `enabled` is false, and stays `null` when the graph,
- * the system table or the location cannot be read — the fix button is then
- * simply absent.
- */
 export function useNearestLowsecSystem(
   characterId: number,
   fallbackSystemId: number | null,

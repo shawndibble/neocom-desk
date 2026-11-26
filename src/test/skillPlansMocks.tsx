@@ -3,14 +3,6 @@ export { pwaRegisterMock } from '@/test/assetsMocks';
 import type { SkillType } from '@/sde/types';
 import { IDLE_SYNC_STATUS } from '@/sync/statusFixtures';
 
-// Shared mock factories and fixtures for the SkillPlans route tests
-// (SkillPlans*.test.tsx). Kept free of app runtime imports: a `vi.mock` factory
-// imports this module while the app graph is still loading.
-
-// Real src/sync would attempt actual Firebase network calls (this repo's
-// .env carries a real dev project config). markPlanDeleted is faked down to
-// its local-delete effect only — the tombstone/remote bookkeeping is src/sync's
-// own responsibility and is covered by its own test suite.
 export const markPlanDeletedMock = vi.fn(async (_characterId: number, id: string) => {
   const { db } = await import('@/db');
   await db.skillPlans.delete(id);
@@ -33,19 +25,11 @@ export const syncMock = () => ({
   subscribeSyncStatus: (listener: (s: unknown) => void) => subscribeSyncStatusMock(listener),
 });
 
-// isSyncConfigured reads import.meta.env, which is 'test' MODE in this suite
-// and would otherwise disable the scheduleSync-after-edit wiring under test.
-// Force it on so that wiring is exercised (against the mocked src/sync above,
-// never real Firebase).
 export const syncStatusMock = (original: typeof import('@/app/syncStatus')) => ({
   ...original,
   isSyncConfigured: () => true,
 });
 
-// Small hand-made fixture, not the real SDE: a prereq chain (Small Hybrid
-// Turret needs Gunnery III) plus a second attribute pair (Spaceship Command)
-// and a same-pair-as-Gunnery skill (Small Projectile Turret) to exercise
-// prereq insertion, remap segmentation, and reorder-by-attribute-pair.
 export const FIXTURE_SKILLS: SkillType[] = [
   {
     typeID: 1,

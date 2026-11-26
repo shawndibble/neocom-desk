@@ -2,8 +2,6 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { db } from '@/db';
 import { createLocalSetting } from './useLocalSetting';
 
-// Stores are memoized by key for the life of the module, so every test that
-// wants a fresh (unhydrated) store must ask for a key nobody used before.
 let keySeq = 0;
 const freshKey = () => `test.setting.${++keySeq}`;
 
@@ -78,17 +76,8 @@ describe('createLocalSetting', () => {
   });
 
   it('shows the new value before the write settles, so a control is not gated on Dexie', async () => {
-    // The frame that matters is the one the click handler runs in: a control
-    // that only repaints once IndexedDB has confirmed the write looks dead on
-    // the press, and every test that asserts the effect of such a click is
-    // racing an IO round-trip it cannot await (which is exactly what made
-    // Calendar's view-switch tests flaky).
     const key = freshKey();
     const useSetting = createLocalSetting({ key, defaultValue: 1 });
-    // Observed through a subscriber rather than only read back: a control
-    // repaints on the notification, not on the stored value, so a set that
-    // updated state without notifying would leave the button looking just as
-    // dead while `getState()` looked fine.
     const seen: number[] = [];
     const unsubscribe = useSetting.subscribe((state) => seen.push(state.value));
 
@@ -124,9 +113,6 @@ describe('createLocalSetting', () => {
   });
 
   it('does not memoize by key, so a second call cannot inherit foreign options', async () => {
-    // Two stores for one key would drift, which is why the contract is "call
-    // once at module scope". Memoizing instead would hand the second caller a
-    // store silently wired to the first caller's parse/onApply.
     const key = freshKey();
     const a = createLocalSetting({ key, defaultValue: 1 });
     const b = createLocalSetting({ key, defaultValue: 1 });
@@ -159,7 +145,6 @@ describe('createLocalSetting', () => {
 
   it('rejects a sync.-prefixed key, which belongs to setSyncedSetting', () => {
     expect(() => createLocalSetting({ key: 'sync.density', defaultValue: 1 })).toThrow(/sync\./);
-    // 'sync.__' is planSync's internal bookkeeping — also not ours to write.
     expect(() => createLocalSetting({ key: 'sync.__settingsMeta', defaultValue: 1 })).toThrow(
       /sync\./
     );

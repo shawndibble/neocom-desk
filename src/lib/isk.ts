@@ -1,9 +1,3 @@
-/**
- * Thousands-separated ISK. `decimals` selects precision — 0 (default) for whole
- * ISK in Industry/Market, 2 for Wallet/Overview/Orders/Contracts. Values are
- * zero-clamped first, because `Intl.NumberFormat` renders negative zero as
- * "-0", which reads as a loss that isn't real.
- */
 import { formatCompactNumber } from './compactNumber';
 import { createNumberFormat, getDecimalMark, getGroupMark } from './numberLocale';
 import { parseLocalizedNumber } from '@/engine/numbers/parseLocalizedNumber';
@@ -22,13 +16,6 @@ function formatterFor(decimals: number): (value: number) => string {
   return formatter;
 }
 
-/**
- * Clamps to zero below half a unit-in-the-last-place for `decimals` (0.005 at 2,
- * 0.5 at 0). Exported so a caller that tones a value independently of
- * `formatIsk`'s text (`iskToneClass`) clamps the same noise the same way. No
- * default for `decimals`: a caller here is answering "is this really negative",
- * where a wrong precision silently changes the answer, not just the digits.
- */
 export function clampIskZero(value: number, decimals: number): number {
   const epsilon = 0.5 / 10 ** decimals;
   return Math.abs(value) < epsilon ? 0 : value;
@@ -38,75 +25,41 @@ export function formatIsk(value: number, decimals = 0): string {
   return formatterFor(decimals)(clampIskZero(value, decimals));
 }
 
-/**
- * ISK with cents only where they could matter — at or below `centsBelow`, where a
- * fraction is a real difference (a mineral priced at 4.99 vs 5.01). Above it
- * the decimals are noise nobody reads on a six- or seven-figure price.
- *
- * `centsBelow` is a parameter rather than a second near-copy of this function,
- * for the reason the module header gives: three earlier copies of these
- * helpers diverged silently. The contract screens pass 1,000 — a contract is
- * priced in whole ISK far more often than a market order is, and a trailing
- * `.00` on a billion-ISK bundle is the loudest kind of noise.
- */
 export function formatIskAuto(value: number, centsBelow = 100): string {
   return formatIsk(value, Math.abs(value) > centsBelow ? 0 : 2);
 }
 
-/** The `formatIskAuto` threshold every contract screen shares. */
 export const CONTRACT_ISK_CENTS_BELOW = 1000;
 
-/** An ISK amount as a contract screen words it: `formatIskAuto` at the shared threshold, with the unit. */
 export function formatContractIsk(value: number): string {
   return `${formatIskAuto(value, CONTRACT_ISK_CENTS_BELOW)} ISK`;
 }
 
-/**
- * Anything that would print as 10,000.00 or more. EVE limits an order price to
- * four significant figures, so from 10,000 up an order's own cents are always
- * `.00`; an average, total or margin does lose real cents there, which the
- * Market page accepts as noise at that size.
- */
 const MARKET_ISK_CENTS_BELOW = 9_999.995;
 
-/** The precision `formatMarketIsk` picks, for a caller that builds the text itself (a signed delta). */
 export function marketIskDecimals(value: number): 0 | 2 {
   return Math.abs(value) >= MARKET_ISK_CENTS_BELOW ? 0 : 2;
 }
 
-/** Market page ISK: cents below 10,000, whole ISK from there up. */
 export function formatMarketIsk(value: number): string {
   return formatIsk(value, marketIskDecimals(value));
 }
 
-/**
- * An ISK amount to the cent: a derived price (ore per unit, a split) carries a float tail nobody can use.
- * A positive amount never rounds to 0 (it reads as free); the market's own tick is 0.01.
- */
 export function roundIsk(value: number): number {
   const cents = Math.round(value * 100) / 100;
   return value > 0 ? Math.max(cents, 0.01) : cents;
 }
 
-/**
- * Grouped digits for an editable ISK field at rest — commas, and up to 2
- * decimal places only if the value actually has them (`1,234` vs `1,234.56`,
- * never a padded `1,234.00`). Distinct from `numberMask.ts`'s `maskNumber`,
- * which keeps up to 20 fraction digits for a generic quantity/price field;
- * ISK here is always cents-precision.
- */
 const iskMasker = createNumberFormat({ maximumFractionDigits: 2 });
 
 export function maskIsk(value: number): string {
   return iskMasker(value);
 }
 
-/** Abbreviated ISK (`"5.2M"`) for tight spaces — the character card, not Wallet's own precise figures. */
 export function formatIskCompact(value: number): string {
   return formatCompactNumber(clampIskZero(value, 0));
 }
 
-/** Compact ISK with an explicit sign: "+756K", "-756K", "0". Exactly one sign. */
 export function formatIskCompactSigned(value: number): string {
   const text = formatIskCompact(value);
   return text === '0' || text.startsWith('-') ? text : `+${text}`;
@@ -119,19 +72,11 @@ const ISK_SHORTHAND_MULTIPLIERS: Readonly<Record<string, number>> = {
   k: 1_000,
 };
 
-/** `10.5m`, `10,500,000`, `10.500.000` and `10500000` all parse to 10,500,000. Suffixes: b = billion, m = million, k or t = thousand. */
 const ISK_AMOUNT_PATTERN = /^([\d.,'\u2019\s\u00a0\u2009\u202f]*\d)\s*([bmtk])?$/i;
 
-/**
- * Parses a threshold-style ISK amount from free text (issue #wallet-balance-threshold):
- * thousands marks, a decimal mark (either locale), and an optional case-insensitive
- * `b`/`m`/`t` shorthand suffix, in any combination. Returns `null` for anything
- * that doesn't match rather than `NaN`, so a caller can tell "invalid" from "zero".
- */
 export function parseIskAmount(input: string): number | null {
   const match = ISK_AMOUNT_PATTERN.exec(input.trim());
   if (!match) return null;
-  // A typed amount: a lone mark before three digits follows the display format.
   const numeric = parseLocalizedNumber(
     /^[.,]/.test(match[1]) ? `0${match[1]}` : match[1],
     getDecimalMark()
@@ -142,29 +87,20 @@ export function parseIskAmount(input: string): number | null {
   return numeric * multiplier;
 }
 
-/**
- * Live mask for an ISK field being typed: the integer digits grouped with the
- * display format's separator, a decimal mark kept, and a
- * `b`/`m`/`k`/`t` suffix left as typed. Text that is not an amount comes back
- * untouched so the field's error can name it.
- */
 export function maskIskTyping(text: string): string {
   const match = /^([\d.,'\u2019\s\u00a0\u2009\u202f]*)\s*([bmtk])?$/i.exec(text.trim());
   if (!match) return text;
   const decimal = getDecimalMark();
   const body = match[1];
   const at = body.indexOf(decimal);
-  // A second decimal mark is a figure in another format (a pasted 1.234.567): left for the field's error, not mangled.
   if (at >= 0 && body.indexOf(decimal, at + 1) >= 0) return text;
   const group = getGroupMark();
   const whole = (at < 0 ? body : body.slice(0, at)).replace(/\D/g, '');
-  // No cap on fraction digits: a suffix may still follow (1.255m), and the figure is parsed whole.
   const fraction = at < 0 ? null : body.slice(at + 1).replace(/\D/g, '');
   const grouped = whole.replace(/\B(?=(\d{3})+$)/g, group);
   return `${grouped}${fraction === null ? '' : decimal + fraction}${match[2] ?? ''}`;
 }
 
-/** A blank or unparseable field is "no restriction", never `NaN` — which would silently exclude every row. */
 export function parseNumeric(value: string): number | null {
   if (value.trim() === '') return null;
   const parsed = Number(value);

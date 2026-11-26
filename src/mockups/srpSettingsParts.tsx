@@ -1,8 +1,4 @@
 /* eslint-disable react-refresh/only-export-components -- mockup parts share constants with their stories */
-/**
- * Pieces of the SRP settings mockup: the percent fields, the Hull Rules table
- * and the unsaved-changes bar, composed by `SrpSettings.stories.tsx`.
- */
 import { useId, useState, type ReactNode } from 'react';
 import {
   Button,
@@ -46,7 +42,6 @@ const RULE_LABEL: Record<RuleKind, string> = {
   officer: 'Officer decides',
 };
 
-/** A percent is valid when blank (that step of the chain is off) or from 1 to 100. */
 export function pctError(value: string): string | null {
   if (value.trim() === '') return null;
   const n = Number(value);
@@ -82,7 +77,6 @@ function percentNote(s: SrpSettingsState): string {
   return 'No percent set up';
 }
 
-/** The Hull Rules table: class rows expand to their hulls; every row has a rule select and, for a fixed price, an ISK input. */
 export function HullRulesTable({
   state,
   setRules,
@@ -204,7 +198,6 @@ export function HullRulesTable({
   );
 }
 
-/** Phone Hull Rules: collapsed class rows, one line each (name, count, rule select); a second line only for a fixed price. */
 export function HullRulesPhone({
   state,
   setRules,
@@ -319,7 +312,6 @@ export function HullRulesPhone({
   );
 }
 
-/** Add-hull search with its result list; a hull that already has a rule says so instead of offering Add. */
 export function AddHullSearch({ initial = '' }: { initial?: string }) {
   const [q, setQ] = useState(initial);
   return (
@@ -392,7 +384,6 @@ function PercentField({
   );
 }
 
-/** Bar shown (sticky to the viewport foot in the product; static here so a full-page screenshot shows it at the end) while edits are unsaved: Discard and Save; Save waits while a field is invalid. */
 export function UnsavedBar({ problems }: { problems: number }) {
   const phone = useIsPhone();
   return (
@@ -427,7 +418,6 @@ export function UnsavedBar({ problems }: { problems: number }) {
   );
 }
 
-/** First-time state: SRP off, a short explainer and one primary action. */
 export function FirstTimePanel() {
   return (
     <Panel title="Ship replacement program">
@@ -447,7 +437,6 @@ export function FirstTimePanel() {
   );
 }
 
-/** The whole settings page; `state` is the saved-then-edited form. */
 export function SrpSettingsPage({
   initial,
   dirty = false,

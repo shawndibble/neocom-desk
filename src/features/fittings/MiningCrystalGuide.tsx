@@ -16,9 +16,7 @@ import type { WeaponChargeGroup } from './useChargeChoices';
 
 interface Props {
   group: WeaponChargeGroup;
-  /** Loads the crystal into every fitted miner of the group. */
   onLoad?: (chargeTypeId: number) => void;
-  /** Wraps a loadable row in the Add panel's drag and right-click menu (Show info). */
   wrapRow?: (chargeTypeId: number, row: ReactNode) => ReactNode;
   pricesLoading: boolean;
 }
@@ -47,14 +45,6 @@ function rowLabel(t: TFunction, { choice }: CrystalChoice): string {
   ].join(', ');
 }
 
-/**
- * A mining laser group's Charge Picker: one line on how to pick (what A,
- * B and C are for sits behind its ? in a modal, out of the panel's way),
- * then one section per ore family (its ores named), each family's six
- * crystals side by side with this Fitting's yield, cycle and residue
- * (`engine/fittings/crystalChoice.ts`, `mining.ts`). The loaded crystal's
- * family starts open; the rest open on their header.
- */
 export function MiningCrystalGuide({ group, onLoad, wrapRow, pricesLoading }: Props) {
   const { t } = useTranslation();
   const sectionId = useId();
@@ -130,7 +120,6 @@ export function MiningCrystalGuide({ group, onLoad, wrapRow, pricesLoading }: Pr
 
       {families.map((family, index) => {
         const isOpen = open.has(family.family);
-        // Family names have spaces; an id (and aria-controls' list of them) can't.
         const bodyId = `${sectionId}-family-${index}`;
         const holdsLoaded = family.crystals.some((c) => group.loaded.has(c.choice.typeId));
         return (

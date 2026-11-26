@@ -1,32 +1,11 @@
-/**
- * Starbase (POS) fuel arithmetic for the Corp Board's Starbases widget
- * (issue #4610). Pure: type ids and quantities in, hours out.
- *
- * ESI gives a tower's fuel *quantity* and never its burn rate, so the rate
- * comes from CCP's static data.
- */
-
 import { HOUR_MS } from '../../../functions/src/timeConstants';
 
-/** A tower with less fuel than this many hours left is a warning (the Number's tone). */
 export const STARBASE_FUEL_WARNING_HOURS = 48;
 
-/** Fuel block types a tower burns: Nitrogen, Hydrogen, Helium and Oxygen. */
 export const FUEL_BLOCK_TYPE_IDS: ReadonlySet<number> = new Set([4051, 4246, 4247, 4312]);
 
-/** Strontium Clathrates, the reinforcement bay's contents. */
 export const STRONTIUM_TYPE_ID = 16275;
 
-/**
- * Fuel blocks per hour, by Control Tower type id.
- *
- * From CCP's SDE `controlTowerResources.jsonl` (build 2026-10-20): each tower's
- * `purpose: 1` fuel-block line with no `factionID` (the faction lines are
- * Starbase Charters, which burn separately). The varied rates within a size are
- * the faction towers' discounts. The one tower type with a 1 block/hour line
- * (4361, not a tower anyone anchors) is left out rather than trusted.
- * Regenerate when CCP adds a tower.
- */
 export const TOWER_FUEL_PER_HOUR: ReadonlyMap<number, number> = new Map([
   [12235, 40],
   [12236, 40],
@@ -72,7 +51,6 @@ export const TOWER_FUEL_PER_HOUR: ReadonlyMap<number, number> = new Map([
   [27790, 8],
 ]);
 
-/** What a tower's bay holds, from the detail call's `fuels` list. */
 export interface StarbaseBay {
   fuelBlocks: number;
   strontium: number;
@@ -90,20 +68,11 @@ export function summariseBay(
   return { fuelBlocks, strontium };
 }
 
-/**
- * Hours of fuel left at the moment the bay was read; null when the tower's
- * burn rate is not known (a tower type newer than the table).
- */
 export function fuelHoursLeft(towerTypeId: number, fuelBlocks: number): number | null {
   const rate = TOWER_FUEL_PER_HOUR.get(towerTypeId);
   return rate === undefined ? null : fuelBlocks / rate;
 }
 
-/**
- * When an online tower's fuel runs out, from the moment its bay was read; null when the tower is
- * not online, its bay was not read, or its burn rate is unknown. The one rule the Starbases
- * widget, the Calendar and the fuel alert all share.
- */
 export function towerFuelExpiresMs(
   tower: { typeId: number; state: string; bay: StarbaseBay | null },
   readAtMs: number
@@ -113,7 +82,6 @@ export function towerFuelExpiresMs(
   return hours === null ? null : readAtMs + hours * HOUR_MS;
 }
 
-/** A tower has no name of its own: its type, and its system when known (" - " would be cut as a structure's system prefix). */
 export function towerLabel(typeName: string, systemName: string | undefined): string {
   return systemName === undefined ? typeName : `${typeName} (${systemName})`;
 }

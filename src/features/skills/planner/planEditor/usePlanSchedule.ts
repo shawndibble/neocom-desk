@@ -11,7 +11,6 @@ import { DEFAULT_WHAT_IF_SELECTION, isHypotheticalLens } from '../whatIfImplants
 
 export type PlanScheduleResult = ReturnType<typeof schedulePlanWith>;
 
-/** Costs the plan once (and once more on the real implants while the What-If lens is hypothetical). */
 export function usePlanSchedule({
   plan,
   catalog,
@@ -31,30 +30,19 @@ export function usePlanSchedule({
   attributes: Attributes;
   attributeBaseline: AttributeBaseline | null;
   implants: Implants;
-  /** The Character's running typed-in accelerator, shared with the Characters table. */
   accelerator: CharacterAcceleratorRecord | null;
   cloneState: CloneState;
   whatIf: WhatIfImplantSelection;
 }) {
-  // The queue's lead (the levels ahead of the first one this plan lists)
-  // trains first, so the plan starts when it ends. One instant feeds the schedule,
-  // Optimize Remaps' Booster origin, so the savings figure and the total agree.
   const [loadedAtMs] = useState(() => Date.now());
   const queueProjection = useMemo(
     () => projectQueueEnd(trainedSkills, queueEntries, loadedAtMs, plan.entries),
     [trainedSkills, queueEntries, loadedAtMs, plan.entries]
   );
-  // The plan entry that IS the in-game queue's currently-training level, if
-  // any (#1701 follow-up) — EntryList shows its real remaining time instead
-  // of a bare, misleading "0m" for the zero own-steps that entry contributes.
   const pinnedInProgress = useMemo(
     () => pinnedInProgressEntry(plan.entries, queueProjection, loadedAtMs),
     [plan.entries, queueProjection, loadedAtMs]
   );
-  // The one inputs literal every costing below shares (the schedule, the
-  // what-if "vs current" pass, Optimize remaps / Optimize for me re-prices), so
-  // a new field cannot be wired at one site and missed at another. Implants go
-  // in raw: `schedulePlan` applies the What-If lens itself.
   const schedulablePlan = useMemo<SchedulablePlan>(
     () => ({
       entries: plan.entries,
@@ -86,20 +74,15 @@ export function usePlanSchedule({
       accelerator,
     ]
   );
-  // Costed by `schedulePlanWith`, the same costing the Calendar makes, so the
-  // two can never quote different dates for one plan.
   const schedule = useMemo(
     () => schedulePlanWith(schedulablePlan, scheduleInputs, loadedAtMs),
     [schedulablePlan, scheduleInputs, loadedAtMs]
   );
-  // The what-if chip's "vs current" figure: one more pass of the same costing
-  // against the clone's real implants, run only while the lens is hypothetical.
   const hypotheticalLens = isHypotheticalLens(whatIf);
   const currentLensSchedule = useMemo(
     () =>
       hypotheticalLens
-        ? // Override: force the default (real-implants) lens, ignoring the plan's stored What-If.
-          schedulePlanWith(schedulablePlan, scheduleInputs, loadedAtMs, {
+        ? schedulePlanWith(schedulablePlan, scheduleInputs, loadedAtMs, {
             whatIfImplants: DEFAULT_WHAT_IF_SELECTION,
           })
         : null,

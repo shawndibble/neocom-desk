@@ -26,7 +26,7 @@ const ALL_V = {
   massReactions: 5,
   advancedMassReactions: 5,
 };
-const NOW = Date.UTC(2026, 9, 15, 12, 0); // Thu 12:00
+const NOW = Date.UTC(2026, 9, 15, 12, 0);
 
 describe('planJobNodes', () => {
   it('makes one job per tree node, each waiting on the sub-jobs it consumes', () => {

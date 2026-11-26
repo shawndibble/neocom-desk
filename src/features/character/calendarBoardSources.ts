@@ -1,22 +1,3 @@
-/**
- * ESI shapes in, `engine/character/board.ts` sources out.
- *
- * The engine ranks clocks; it does not know what an ESI industry job looks
- * like, parse a date, or resolve a type name. This module does all three, and
- * is the only place that knows a market order has no expiry field at all.
- *
- * Pure itself — no fetch, no Dexie. The loaders live in
- * `calendarBoardData.ts`, the same split `features/corp/boardSources.ts` and
- * `features/corp/boardData.ts` already use.
- *
- * Every converter **drops** a row it cannot give a real instant to, rather than
- * passing a `NaN` or a `null` deadline down. A `NaN` sorts unpredictably and
- * buckets onto no day at all, so it must not reach the engine; and a character
- * clock with no instant is not a countdown —
- * a paused skill queue is a standing fault the notification system already
- * reports, not a row with nothing to sort on.
- */
-
 import { romanLevel } from '@/engine/projection';
 import { isReinforced, openOperations, type Den } from '@/engine/character/mercenaryDens';
 import type {
@@ -37,7 +18,6 @@ import { DAY_MS } from '@/lib/age';
 import type { CharacterAcceleratorRecord } from '@/db';
 import { isAcceleratorLive } from '@/engine/accelerator';
 
-/** Resolves a type id to its SDE name; supplied by the caller, which owns the catalog. */
 export type TypeNamer = (typeId: number) => string;
 
 export function toCalendarEventSources(
@@ -53,23 +33,12 @@ export function toCalendarEventSources(
       detail: '',
       deadlineMs,
       response: event.event_response,
-      // ESI documents `importance` as an integer and uses it as a flag. Any
-      // non-zero value is "important"; reading it as a scale would invent a
-      // hierarchy the API does not promise.
       important: event.importance > 0,
     });
   }
   return sources;
 }
 
-/**
- * Every queue entry that has a clock, not just the head.
- *
- * The head answers "what am I training"; the rest answer "what lands this
- * week", which is this page's question. Volume is handled by the rail's day
- * grouping and by the kind filter, which turns the whole source off for
- * someone who does not want it.
- */
 export function toSkillTrainingSources(
   queue: readonly SkillQueueEntry[],
   typeName: TypeNamer
@@ -80,7 +49,6 @@ export function toSkillTrainingSources(
     if (deadlineMs === null) continue;
     const level = romanLevel(entry.finished_level);
     sources.push({
-      // `queue_position`, not `skill_id`: one skill appears once per level.
       id: String(entry.queue_position),
       subject: `${typeName(entry.skill_id)} ${level}`,
       detail: '',
@@ -90,7 +58,6 @@ export function toSkillTrainingSources(
   return sources;
 }
 
-/** Jobs still running or finished-but-undelivered. A delivered job has no clock left. */
 const LIVE_JOB_STATUSES = new Set<IndustryJob['status']>(['active', 'ready']);
 
 export function toIndustryJobSources(
@@ -105,14 +72,7 @@ export function toIndustryJobSources(
     if (deadlineMs === null) continue;
     sources.push({
       id: String(job.job_id),
-      // The product is what the pilot is waiting for; a job with none (a copy,
-      // an invention) is only nameable by its blueprint.
       subject: typeName(job.product_type_id ?? job.blueprint_type_id),
-      // A finished job's headline already reads "ready to deliver"
-      // (`pastDeadlineLabelKey`); repeating it here would only double the same
-      // words on one row. Keyed on the deadline itself, not `job.status` — ESI
-      // can still report `active` for a moment after `end_date` passes, and
-      // that must not leave the headline and this line disagreeing.
       detail: deadlineMs <= nowMs ? '' : job.status,
       deadlineMs,
     });
@@ -120,19 +80,11 @@ export function toIndustryJobSources(
   return sources;
 }
 
-/** One colony's pins, already paired with the planet's own name by the loader. */
 export interface ColonyPins {
   planetName: string;
   pins: readonly PlanetPin[];
 }
 
-/**
- * One row per running extractor program.
- *
- * `expiry_time` is the one PI field that does not drift — it is fixed at
- * install and does not need the colony opened in-client to stay true, which is
- * exactly why it is the only one this board reads.
- */
 export function toPlanetExtractionSources(colonies: readonly ColonyPins[]): BoardClockSource[] {
   const sources: BoardClockSource[] = [];
   for (const colony of colonies) {
@@ -151,13 +103,6 @@ export function toPlanetExtractionSources(colonies: readonly ColonyPins[]): Boar
   return sources;
 }
 
-/**
- * One row per moon drill: the chunk's arrival while it is still coming, its
- * natural decay once it has landed — the same rule the corp ops board applies
- * (`engine/corp/board.ts`), so the two boards never disagree about a chunk.
- * Which of the two it is rides in `detail` (`arrival` / `decay`); the view
- * owns the wording.
- */
 export function toMoonChunkSources(
   extractions: readonly BoardExtractionSource[],
   nowMs: number
@@ -175,30 +120,17 @@ export function toMoonChunkSources(
     });
 }
 
-/**
- * A corp skyhook's theft window, read and named. The window ends are `null`
- * when ESI gave none we could parse; the stock is `null` when a reagent
- * count was not a number (unknown, never "0 at risk").
- */
 export interface SkyhookRaid {
   id: number;
-  /** The planet's name, else the system's, else `#<id>`. */
   subject: string;
   systemId: number | null;
   systemName: string | null;
   windowStartMs: number | null;
   windowEndMs: number | null;
-  /** Units of reagent a raider could take. ESI sends no silo capacity, so there is no percentage. */
   unsecuredUnits: number | null;
   securedUnits: number | null;
 }
 
-/**
- * One row per skyhook with a readable theft window that has not closed: ranked
- * by its opening while ahead and by its close while open — the corp board's own
- * rule for a `sovRaid`, via the same `raidState`. `detail` is `upcoming` or
- * `open`; the view owns the wording.
- */
 export function toSkyhookRaidSources(
   raids: readonly SkyhookRaid[],
   nowMs: number
@@ -219,14 +151,8 @@ export function toSkyhookRaidSources(
   });
 }
 
-/** What a den needs to be a clock: the engine's `Den` plus where it is. */
 export type DenClockInput = Den & { planetId: number; planetName: string | null };
 
-/**
- * One clock per open thing a den is waiting on: its reinforcement end while
- * still ahead (a lapsed timer is a stale read, not a clock), and each
- * available or started operation's expiry. `detail` says which.
- */
 export function toMercenaryDenSources(
   dens: readonly DenClockInput[],
   nowMs: number
@@ -254,13 +180,6 @@ export function toMercenaryDenSources(
   });
 }
 
-/**
- * `typeLabel` and `routeName` are supplied by the caller, which alone has
- * i18next and the location-name cache this needs — this module stays pure.
- * `typeLabel` names a contract's type (e.g. "Courier"); `routeName` names an
- * untitled courier's start → end when both ends have resolved (same resolver
- * `ContractIdentity` uses per-row, issue #1706), and `undefined` otherwise.
- */
 export function toContractExpirySources(
   contracts: readonly Contract[],
   typeLabel: (type: Contract['type']) => string,
@@ -273,9 +192,6 @@ export function toContractExpirySources(
     if (deadlineMs === null) continue;
     sources.push({
       id: String(contract.contract_id),
-      // Most contracts are untitled. An untitled courier gets its route; every
-      // other untitled contract gets its translated type label rather than the
-      // raw ESI enum (issue #1715).
       subject: contract.title || routeName(contract) || typeLabel(contract.type),
       detail: contract.type,
       deadlineMs,
@@ -284,10 +200,6 @@ export function toContractExpirySources(
   return sources;
 }
 
-/**
- * The pilot's typed-in cerebral accelerator running out (GLOSSARY.md
- * **Accelerator**). A Character has at most one; an expired one is not a clock.
- */
 export function toAcceleratorSources(
   record: Pick<CharacterAcceleratorRecord, 'characterId' | 'bonus' | 'expiresAt'> | undefined,
   nowMs: number,
@@ -304,12 +216,6 @@ export function toAcceleratorSources(
   ];
 }
 
-/**
- * ESI gives `issued` and a `duration` in whole days and never an absolute
- * expiry, so this is arithmetic rather than a field read — and getting it
- * wrong would be invisible, putting the row somewhere plausible but incorrect
- * in an otherwise sensible list. `calendarBoardSources.test.ts` pins it.
- */
 export function toOrderExpirySources(
   orders: readonly MarketOrder[],
   typeName: TypeNamer

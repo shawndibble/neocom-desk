@@ -7,12 +7,6 @@ import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { MailInvitePanel } from './MailInvitePanel';
 import { communityInviteUrl, setRequireApproval, type CommunitySummary } from './communityStore';
 
-/**
- * The admin's Invites tab: the invite link (copy, regenerate, revoke), mail
- * invites by character name, and "Approve new Members". With approval on,
- * anyone joining by the link waits on the Members tab until the admin lets
- * them in; a Character the admin mailed an invite goes straight in.
- */
 export function CommunityInvites({
   community,
   characterId,

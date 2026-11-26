@@ -1,23 +1,14 @@
-/**
- * Scroll rules for a sideways tab bar (`Tabs`, and the route sub-navs): which
- * ends still have tabs beyond them, how a vertical wheel maps onto the bar,
- * how far a chevron click travels, and how far to slide to reveal a tab. Pure
- * so they are testable without a laid-out DOM; only `revealInScroller` reads it.
- */
-
 export interface ScrollMetrics {
   scrollLeft: number;
   clientWidth: number;
   scrollWidth: number;
 }
 
-/** Which ends of the bar still have tabs hidden past them. */
 export interface ScrollEdges {
   before: boolean;
   after: boolean;
 }
 
-/** Sub-pixel scroll positions round either way; a pixel of slack stops a flickering chevron. */
 const EDGE_SLACK_PX = 1;
 
 export function scrollEdges({ scrollLeft, clientWidth, scrollWidth }: ScrollMetrics): ScrollEdges {
@@ -27,16 +18,8 @@ export function scrollEdges({ scrollLeft, clientWidth, scrollWidth }: ScrollMetr
   };
 }
 
-/** Firefox reports a mouse wheel in lines, not pixels. */
 const LINE_HEIGHT_PX = 16;
 
-/**
- * Sideways distance for a wheel event over the bar, or `null` to leave the
- * event to the browser. A vertical wheel has no other use over a tab bar, so
- * it travels the bar, but only while the bar can still move that way: at the
- * end it hands the wheel back, so the page keeps scrolling. A gesture that is
- * already sideways (a trackpad, shift+wheel) is native and left alone.
- */
 export function wheelScrollDelta(
   wheel: { deltaX: number; deltaY: number; deltaMode: number },
   edges: ScrollEdges
@@ -46,17 +29,11 @@ export function wheelScrollDelta(
   return wheel.deltaMode === 1 ? wheel.deltaY * LINE_HEIGHT_PX : wheel.deltaY;
 }
 
-/** A chevron click: most of a bar's width, so the tab at the edge stays visible as an anchor. */
 export function pageScrollDelta(direction: 'before' | 'after', clientWidth: number): number {
   const distance = Math.round(clientWidth * 0.75);
   return direction === 'after' ? distance : -distance;
 }
 
-/**
- * How far to move a bar's `scrollLeft` so an item sits fully between its
- * `start` and `end` (viewport x, already inset by the scroll padding): the
- * part cut off at whichever edge, or 0 when it already fits.
- */
 export function revealScrollDelta(
   bar: { start: number; end: number },
   item: { left: number; right: number }
@@ -66,20 +43,9 @@ export function revealScrollDelta(
   return 0;
 }
 
-/**
- * Slides a sideways scroller so `item` (a tab inside it) is fully on screen —
- * the selected `Tabs` tab, or a route sub-nav's current link on landing.
- *
- * Moves only the scroller's own `scrollLeft`, never `scrollIntoView`: that
- * scrolls every ancestor too, even with `block: 'nearest'`, so a bar below
- * the fold dragged the whole page down to it on load (the landing page's
- * feature tabs). Honours the scroller's `scroll-padding-inline` as
- * `scrollIntoView` did, so the item stops clear of the edge fade.
- */
 export function revealInScroller(scroller: HTMLElement, item: Element): void {
   const rect = scroller.getBoundingClientRect();
   const style = getComputedStyle(scroller);
-  // `auto` (no padding set) parses to NaN.
   const start = rect.left + (parseFloat(style.scrollPaddingLeft) || 0);
   const end = rect.right - (parseFloat(style.scrollPaddingRight) || 0);
   scroller.scrollLeft += revealScrollDelta({ start, end }, item.getBoundingClientRect());

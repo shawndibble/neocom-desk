@@ -18,21 +18,13 @@ import {
 import { clearJumpGraphIndex } from '@/sde/jumpGraph';
 import { clearSolarSystemIndex } from '@/sde/solarSystems';
 
-/**
- * Fixtures mirror what `build-sde.mjs` emits: every solar system gets a key,
- * a gateless one an empty array. A fixture that keys only gated systems
- * passes here and fails in production.
- */
-
 const HUB = 30000001;
 const LOW = 30000002;
 const FAR = 30000003;
 const A = 30000004;
 const B = 30000005;
 const C = 30000006;
-/** J-space: keyed like every system, but with no stargates. */
 const WORMHOLE = 31000042;
-/** Not a system the snapshot knows at all. */
 const NOT_A_SYSTEM = 39999999;
 
 const JUMPS = {
@@ -97,8 +89,6 @@ describe('findLocalRoute', () => {
 
   it('answers unknown rather than throwing when the snapshot holds a malformed entry', async () => {
     loadSolarSystemJumps.mockResolvedValue({ [HUB]: 'not-an-array', [FAR]: [HUB] });
-    // The bad entry is dropped, so HUB is not a system the graph knows —
-    // no-route, and crucially not a mid-search throw.
     await expect(findLocalRoute(HUB, FAR)).resolves.toEqual({ kind: 'no-route' });
   });
 
@@ -111,8 +101,6 @@ describe('findLocalRoute', () => {
 
   it('still routes when only the systems snapshot is unreadable, degrading to shortest', async () => {
     loadSolarSystems.mockRejectedValue(new Error('offline'));
-    // No security to bias on, so prefer-highsec must not pretend to — it
-    // takes the short lowsec hop rather than answering unknown.
     await expect(findLocalRoute(HUB, FAR, { preference: 'prefer-highsec' })).resolves.toEqual({
       kind: 'route',
       systems: [HUB, LOW, FAR],
@@ -182,15 +170,12 @@ describe('localJumpDistances', () => {
   });
 
   it('says unknown rather than an empty map when the graph cannot be read', async () => {
-    // An empty map would read as "this origin reaches nothing", which is a
-    // different claim from "we could not load the graph".
     loadSolarSystemJumps.mockRejectedValue(new Error('offline'));
     await expect(localJumpDistances(HUB)).resolves.toEqual({ kind: 'unknown' });
   });
 
   it('reads the security snapshot when the preference needs it', async () => {
     const result = await localJumpDistances(HUB, { preference: 'prefer-highsec' });
-    // The long all-highsec way round, so FAR is four jumps rather than two.
     expect(result.kind === 'known' && result.jumps.get(FAR)).toBe(4);
   });
 });

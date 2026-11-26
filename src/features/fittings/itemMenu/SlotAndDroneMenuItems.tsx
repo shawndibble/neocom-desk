@@ -6,7 +6,6 @@ import { OpenInEveItemMenuItems, ShowInfoMenuItem } from '@/features/market/Item
 import { ViewInMarketMenuItem } from '@/features/market/ViewInMarketMenuItem';
 import { useFittingItemActions } from '../fittingItemActions';
 
-/** An empty slot's actions: something recent, the copied module, a whole rack of the last one. */
 export function EmptySlotMenuItems({ rack, index }: { rack: FittingSlotKind; index: number }) {
   const { t } = useTranslation();
   const actions = useFittingItemActions();
@@ -50,7 +49,6 @@ export function EmptySlotMenuItems({ rack, index }: { rack: FittingSlotKind; ind
   );
 }
 
-/** A drone type's actions. */
 export function DroneMenuItems({
   typeId,
   inSpace,

@@ -1,9 +1,3 @@
-/**
- * Runs the Hauling Opportunities scan for a route and category, and reports
- * where it is: the panel shows a progress line while the two cheap passes and
- * the order-book pass run, then the rows. A route, category or mode change
- * abandons the scan in flight rather than letting a stale one land.
- */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { AppraisalNetFees } from '@/engine/market/appraisal';
 import { SKILL_IDS } from '@/engine/industry/types';
@@ -33,7 +27,6 @@ export function useHaulingScan(
   categoryId: number,
   mode: HaulMode,
   enabled = true,
-  /** Max price per item; null for none. */
   maxUnitPrice: number | null = null
 ): { state: HaulingScanState; refresh: () => void } {
   const [state, setState] = useState<HaulingScanState>({ status: 'loading', progress: null });
@@ -82,16 +75,9 @@ export function useHaulingScan(
 export interface HaulingFees {
   accountingLevel: number;
   brokerRelationsLevel: number;
-  /** The full fee rates for a sale at one hub — standings differ per hub owner. */
   at: HaulingFeesAt;
 }
 
-/**
- * The fee rates a sale is charged: this Character's Accounting and Broker
- * Relations levels, and — per hub — their standing toward that hub's owner.
- * Level 0 and zero standings until they load or with no Character, which is
- * the conservative side — the page says so.
- */
 export function useHaulingFees(characterId: number | null): HaulingFees {
   const standings = useTradeHubStandings(characterId);
   const loadLevels = useCallback(
@@ -102,12 +88,10 @@ export function useHaulingFees(characterId: number | null): HaulingFees {
       })),
     [characterId]
   );
-  // Stays at level 0 on a failed load: fees priced without skills read high, never low.
   const levels = useKeyedLoad(characterId === null ? null : String(characterId), loadLevels).data;
 
   const accountingLevel = characterId === null ? 0 : (levels?.accounting ?? 0);
   const brokerRelationsLevel = characterId === null ? 0 : (levels?.brokerRelations ?? 0);
-  // Memoized per hub so each hub's fees keep one identity: rows and the trip plan recompute only when a level or standing changes.
   return useMemo(() => {
     const byHub = new Map<TradeHub['id'], AppraisalNetFees>();
     const at = (hub: TradeHub): AppraisalNetFees => {

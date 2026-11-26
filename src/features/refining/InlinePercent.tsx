@@ -3,13 +3,6 @@ import { useTranslation } from 'react-i18next';
 import { EditableValue, TextInput } from '@/components/ui';
 import { formatPercent } from './formatPercent';
 
-/**
- * A percent shown as text and edited in place (DESIGN.md §6c, faint pencil):
- * a click, or a digit typed on it, swaps in a field. Enter or blur saves,
- * Escape cancels, and focus goes back to the value. The caller gets a
- * fraction (54% -> 0.54); an entry outside `[min, max]` percent, or not a
- * number, is dropped rather than saved.
- */
 export function InlinePercent({
   fraction,
   name,
@@ -18,21 +11,16 @@ export function InlinePercent({
   onCommit,
   className,
 }: {
-  /** The value shown at rest, as a fraction. */
   fraction: number;
-  /** What the value is, already translated: "Facility yield". The field is named this; the value's button reads "Edit …". */
   name: string;
-  /** Percent bounds, inclusive. */
   min: number;
   max: number;
   onCommit: (fraction: number) => void;
-  /** Extra classes for the value's button at rest (the field in edit mode is unaffected). */
   className?: string;
 }) {
   const { t } = useTranslation();
   const [draft, setDraft] = useState<string | null>(null);
   const [refocus, setRefocus] = useState(false);
-  // Set once Enter or Escape has settled the field, so the blur that follows does not save again.
   const closed = useRef(true);
   const seeded = useRef(false);
 
@@ -52,8 +40,6 @@ export function InlinePercent({
     return (
       <TextInput
         size="sm"
-        // Text with a decimal keypad, not type="number": a seeded digit needs
-        // the caret after it, and a number field can't place its caret.
         inputMode="decimal"
         autoFocus
         aria-label={name}
@@ -69,8 +55,6 @@ export function InlinePercent({
         onBlur={() => close(true, false)}
         onKeyDown={(e) => {
           if (e.key === 'Enter') {
-            // Focus moves to the value's button as the field closes; left alone, this same keystroke's
-            // default action would then press that button and open the field again.
             e.preventDefault();
             close(true, true);
           }

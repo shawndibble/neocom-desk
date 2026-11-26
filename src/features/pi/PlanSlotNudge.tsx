@@ -1,8 +1,3 @@
-/**
- * Planet-slot nudge ("you can run up to 6 planets; you're using 2") shared by
- * both Plan questions, plus the signed ISK-a-day figure it and the make-more
- * cards use.
- */
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useTranslation } from 'react-i18next';
 import { InfoTooltip, IskAmount, textActionClassName } from '@/components/ui';
@@ -14,7 +9,6 @@ import { INTERPLANETARY_CONSOLIDATION_SKILL_ID } from './planetSlots';
 import type { PlanAdvice } from './planAdviceModel';
 import { Sentence } from './sentence';
 
-/** "+95k/day": a signed ISK a day figure, green when it adds and red when it costs. */
 export function Gain({ value, className }: { value: number; className?: string }) {
   const { t } = useTranslation();
   return (
@@ -32,9 +26,7 @@ export function SlotNudge({
   compact = false,
 }: {
   slots: PlanAdvice['slots'];
-  /** Absent where the pilot is already looking at the next planet. */
   onFindBest?: () => void;
-  /** The slot line shortens to its count; the full sentence rides an info tooltip. */
   compact?: boolean;
 }) {
   const { t } = useTranslation();
@@ -62,7 +54,6 @@ export function SlotNudge({
   return (
     <div className="space-y-1.5 border-t border-line px-3 py-3 text-xs text-text">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-        {/* A status, not an action: type and colour, no box (DESIGN-RULES). */}
         <span className={eyebrowClassName}>{t('piPlan.make.slotsLocked')}</span>
         <span
           role="img"

@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { payeeLedger } from '../miningTax/payeeLedger';
 import { buildBookView, minerAccountOf, type BookViewInput } from './bookView';
-import { minerLedgerSource } from './minerLedgerSource';
+import { minerLedgerSource, openDayCharges } from './minerLedgerSource';
 import type { ObservedMiningEntry } from './types';
+import type { BookRowView } from './personal';
 
 const CORP = 98000001;
 const ORE = 45490;
@@ -23,7 +24,6 @@ const pay = (id: string, amount: number, at: string, note?: string) => ({
   ...(note ? { note } : {}),
 });
 
-/** 1,000 ISK per unit at 10%: 1,000 units owe 100,000. */
 function input(overrides: Partial<BookViewInput> = {}): BookViewInput {
   return {
     corporationId: CORP,
@@ -81,7 +81,6 @@ describe("minerLedgerSource: a Miner's account as the Payee ledger reads it", ()
       from: 'Pilot 1',
       note: 'Handed over in person',
     });
-    // Today's mining is not billable yet: beside the ledger, not in it.
     expect(l.notYetBilled).toEqual({ tax: 50_000, days: 1 });
   });
 
@@ -135,7 +134,6 @@ describe("minerLedgerSource: a Miner's account as the Payee ledger reads it", ()
     const l = ledgerOf(view);
     expect(l.rows.at(-1)!.balance).toBeCloseTo(owedLessCredit(view), 6);
     const keys = l.rows.map((r) => r.key);
-    // A correction keeps its raw id, which the row menu's edit and reverse take.
     expect(sourceOf(view).charges.map((c) => c.id)).toEqual(expect.arrayContaining(['c1', 'o1']));
     expect(keys).toContain('charge:c1:reversal');
     expect(keys).toContain('writeOff:w1');
@@ -210,7 +208,6 @@ describe("minerLedgerSource: a Miner's account as the Payee ledger reads it", ()
       at: '2026-11-01T00:00:00Z',
     };
     const writeOffs = [
-      // Already in the snapshot's balance.
       {
         id: 'old',
         minerId: 'solo:1',
@@ -231,6 +228,41 @@ describe("minerLedgerSource: a Miner's account as the Payee ledger reads it", ()
     expect(offs.map((r) => r.key)).toEqual(['writeOff:new']);
     expect(offs[0]!.kind === 'writeOff' && offs[0]!.days).toEqual([
       { date: '2026-08-10', amount: 20_000 },
+    ]);
+  });
+});
+
+describe('openDayCharges', () => {
+  const row = (over: Partial<BookRowView>): BookRowView =>
+    ({
+      id: 'r',
+      corporationId: 1,
+      date: '2026-11-25',
+      solarSystemId: 30,
+      minerId: 'm1',
+      billed: 100,
+      oreLines: [{ typeId: 7, quantity: 10 }],
+      open: true,
+      ...over,
+    }) as BookRowView;
+
+  it("lists the Miner's open rows in the book, by refinery else system", () => {
+    const charges = openDayCharges(
+      [
+        row({ id: 'a', refineryLabel: 'Palomino Prospecting' }),
+        row({ id: 'b', billed: 40 }),
+        row({ id: 'b:paid', billed: 60 }),
+        row({ id: 'billed', open: undefined }),
+        row({ id: 'other', minerId: 'm2' }),
+        row({ id: 'corp', corporationId: 2 }),
+      ],
+      1,
+      'm1',
+      () => 'Ainsan'
+    );
+    expect(charges.map((c) => [c.id, c.place, c.tax, c.open])).toEqual([
+      ['a', 'Palomino Prospecting', 100, true],
+      ['b', 'Ainsan', 100, true],
     ]);
   });
 });

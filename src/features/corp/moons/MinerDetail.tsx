@@ -85,12 +85,6 @@ const STATUS_TONE: Record<DayStatus, string> = {
 type Detail = NonNullable<ReturnType<typeof minerDetail>>;
 type Payment = Detail['payments'][number];
 
-/**
- * A Miner's page: the owed figure and its facts first, then one
- * scroll of the Ledger (payments and corrections are rows in it), Today's mining, Owed days,
- * Earlier days, Moons and Activity (mail, dismissals and the audit log behind filter chips).
- * No inner tabs; each section carries its count and pages its newest ten rows.
- */
 export function MinerDetail({ id }: { id: string }) {
   const zone = useTimeZone();
   const { t } = useTranslation();
@@ -137,7 +131,6 @@ export function MinerDetail({ id }: { id: string }) {
     };
     return audit.entries.filter((e) => isMinerAuditEntry(e.detail, subjects));
   }, [audit.entries, id, noticeIds, paymentIds, detail]);
-  // The range narrows what happened (Earlier days, Payments); what is owed now always shows whole.
   const phases = useMemo(() => {
     const all = daysByPhase(detail?.days ?? []);
     return { ...all, earlier: all.earlier.filter((d) => inRange(d.date, from)) };
@@ -167,7 +160,6 @@ export function MinerDetail({ id }: { id: string }) {
       }),
     [queue, noticeIds, detail, minerAudit]
   );
-  // The late notice (and what it asked) or payment amount an entry is about.
   const auditContext = (e: AuditEntry): ReactNode => {
     const { noticeId, [NOTICE_ID_FIELD]: legacyId, amount } = e.detail;
     const nid = noticeId ?? legacyId;
@@ -197,7 +189,6 @@ export function MinerDetail({ id }: { id: string }) {
   const { row } = detail;
   const name = names.character(row.mainCharacterId);
   const closedAt = view.input.miners.find((m) => m.id === id)?.closedAt;
-  // Tolerance shortfalls and officer write-offs (#4637) both come off what is owed.
   const toleranceTotal = detail.dayWriteOffs.reduce((s, w) => s + w.amount, 0) + detail.forgiven;
   const paidTotal = detail.payments.reduce((s, p) => s + p.credited, 0);
   const held = new Set(detail.heldDays);
@@ -206,9 +197,7 @@ export function MinerDetail({ id }: { id: string }) {
     .reduce((s, d) => s + d.tax, 0);
   const selectedDays = detail.days.filter((d) => selected.has(d.key));
   const selectedTax = selectedDays.reduce((s, d) => s + d.tax, 0);
-  // A day before the lock date is read-only (decision 20261120-235011, "a lock date").
   const locked = (date: string) => isLocked(date, view.input.now);
-  // The one divider in each day list where the lock date falls, worded as the Ledger's is.
   const lockDate = {
     date: lockDateFor(view.input.now.slice(0, 10)),
     label: dateWithYear(lockDateFor(view.input.now.slice(0, 10))),
@@ -218,7 +207,6 @@ export function MinerDetail({ id }: { id: string }) {
   const sumTax = (days: readonly DayRow[]) => days.reduce((s, d) => s + d.tax, 0);
   const moonName = (moonId: number | undefined) =>
     moonId === undefined ? undefined : names.moon(moonId);
-  /** What a dismissal waived, in words: the day, the moon or the extraction it was aimed at. */
   const dismissalWhat = (d: NonNullable<typeof detail>['dismissals'][number]) => {
     if (d.scope === 'record') {
       const day = detail.days.find((x) => x.key === d.targetId);
@@ -232,7 +220,6 @@ export function MinerDetail({ id }: { id: string }) {
   };
   const noun = (key: string) => t(`corpTaxBook.moons.sections.nouns.${key}`);
 
-  /** A late notice's issue date as a link that opens the shared notice panel (#5288). */
   const noticeLink = (n: LateNotice) => (
     <button
       type="button"
@@ -246,9 +233,6 @@ export function MinerDetail({ id }: { id: string }) {
   const noticeOf = (noticeId: string | undefined) =>
     noticeId === undefined ? undefined : detail.notices.find((x) => x.id === noticeId);
 
-  // The three day tables share one grid (select, day, moon, character, ore, rate, tax), so a
-  // reader's eye keeps its column from one section to the next: Earlier days keeps the select
-  // gutter (empty) and says each day's status under its ore instead of in a column of its own.
   const dayMoon = (d: DayRow) => moonName(d.moonId ?? moonOf.get(d.structureId));
   const dayColumns = (
     withSelect: boolean,
@@ -307,7 +291,6 @@ export function MinerDetail({ id }: { id: string }) {
       ),
       sortValue: (d) => names.refinery(d.structureId),
     },
-    // One character mined every day: a column repeating the page's own name is width for nothing.
     ...(row.characterIds.length > 1
       ? [
           {
@@ -322,14 +305,12 @@ export function MinerDetail({ id }: { id: string }) {
     {
       id: 'ore',
       header: t('corpTaxBook.moons.cols.ore'),
-      // On a card the ore is a line of its own: a long list wrapped inside the meta line leaves a dangling dot.
       stackEdge: 'below',
       render: (d) => (
         <span>
           {d.oreLines
             .map((l) => `${names.ore(l.typeId)}\u00a0×\u00a0${formatCount(l.quantity)}`)
             .join(', ')}
-          {/* A day a dispute holds says so wherever it is listed: nothing pays it until the dispute ends. */}
           {(withStatus || d.disputed) && (
             <span
               className={cx(
@@ -449,7 +430,6 @@ export function MinerDetail({ id }: { id: string }) {
     );
   };
 
-  /** One day's actions (right-click, touch-and-hold, ⋮): only a day not paid yet has them. */
   const dayMenu = (d: DayRow, tr: ReactElement) =>
     canSelect(d) ? (
       <RowActionsMenu name={shortDate(d.date)} items={dayMenuItems(d)}>
@@ -478,7 +458,6 @@ export function MinerDetail({ id }: { id: string }) {
   );
 
   const guestOpen = row.standing === 'guest' && !closedAt;
-  // The reason a disabled action is inert, printed under it: a menu item has no tooltip on touch.
   const remindItem = reminder.block ? (
     <DropdownMenuItem
       aria-disabled
@@ -515,8 +494,6 @@ export function MinerDetail({ id }: { id: string }) {
       {t('corpTaxBook.moons.miner.closeAccount')}
     </DropdownMenuItem>
   ) : null;
-  // A phone's header is one row: the primary action and a ⋮ holding the rest. Wider, the first
-  // three buttons never move and the ⋮ after them holds the corrections and Close account.
   const headerActions = canEdit ? (
     <span className="flex items-center gap-1">
       <Button onClick={() => setDialog({ kind: 'record' })}>
@@ -595,7 +572,6 @@ export function MinerDetail({ id }: { id: string }) {
         }
         facts={[
           { label: t('corpTaxBook.moons.miner.paid'), value: iskOrDash(paidTotal) },
-          // Billed − written off − settled = owed: the figures the old Payments footer printed.
           { label: t('corpTaxBook.moons.miner.billed'), value: isk(billedTotal) },
           {
             label: t('corpTaxBook.moons.miner.settled'),
@@ -610,7 +586,6 @@ export function MinerDetail({ id }: { id: string }) {
             value: row.lastPaidAt ? atDate(row.lastPaidAt, zone) : '—',
           },
           { label: t('corpTaxBook.moons.chips.pending'), value: iskOrDash(row.pending) },
-          // Nothing written off, nothing to say: the fact would be a row of zeros.
           ...(toleranceTotal === 0
             ? []
             : [
@@ -707,7 +682,6 @@ export function MinerDetail({ id }: { id: string }) {
                   selected={filter === f}
                   onToggle={() => setFilter(f)}
                   count={f === 'all' ? feed.length : feed.filter((x) => x.chip === f).length}
-                  // Nothing to filter to: an empty chip is not a choice.
                   disabled={f !== 'all' && !feed.some((x) => x.chip === f) && filter !== f}
                 />
               ))}
@@ -754,7 +728,6 @@ export function MinerDetail({ id }: { id: string }) {
                   aside={
                     canEdit &&
                     !d.reversed &&
-                    // A record's dismissal is locked with its day; a wider one never is.
                     !(
                       d.scope === 'record' &&
                       locked(detail.days.find((x) => x.key === d.targetId)?.date ?? d.at)
@@ -779,7 +752,6 @@ export function MinerDetail({ id }: { id: string }) {
                     {' '}
                     · “{d.reason}”
                     {d.reversed &&
-                      // A reversal stamped with a lock date ends the dismissal only from that day.
                       ` · ${
                         d.reversed.from
                           ? t('corpTaxBook.moons.miner.reversedFrom', {
@@ -816,7 +788,6 @@ export function MinerDetail({ id }: { id: string }) {
           reasonLabel={t('corpTaxBook.moons.dialogs.reasonShown')}
           confirmLabel={t('corpTaxBook.moons.dialogs.dismissConfirm', { amount: isk(selectedTax) })}
           run={async (reason) => {
-            // One act, so the Director-approval limit applies to the total, not each day.
             await edit({
               action: 'dismissRecords',
               targets: selectedDays.map((day) => ({ targetId: day.key, amountIsk: day.tax })),

@@ -1,10 +1,3 @@
-/**
- * Variations (GLOSSARY.md round 6): the selected item's Tech I/II/Faction/
- * Storyline/Officer variation group (src/engine/market/variations.ts),
- * falling back to its Market Group siblings when the item has no variation
- * data — e.g. plain commodities/minerals with no meta variants. Pure and
- * synchronous; the route resolves each row's own price.
- */
 import { getVariations, type VariationIndex } from '@/engine/market/variations';
 import type { OrderBookSummary } from '@/engine/market/orderBook';
 import { priceComparison, type PriceComparison } from '@/engine/market/orderBookDepth';
@@ -13,16 +6,13 @@ import type { MarketTypeEntry } from '@/sde/marketTypes';
 export interface VariationRow {
   typeId: number;
   name: string;
-  /** Abbreviated meta group name (tierLabel), or null for sibling-fallback rows, which carry no meta-group classification. */
   tier: string | null;
 }
 
 export interface VariationsResult {
-  /** Every row, uncapped — a variation group or Market Group runs to tens of rows at most. */
   rows: readonly VariationRow[];
 }
 
-/** "Tech I"/"Tech II"/"Tech III" -> "T1"/"T2"/"T3"; every other meta group name passes through unchanged. */
 export function tierLabel(metaGroupName: string): string {
   switch (metaGroupName) {
     case 'Tech I':
@@ -64,7 +54,6 @@ export function getVariationRows(
   return { rows: siblingRows(typesByGroup, selected) };
 }
 
-/** A variation's best sell against the item it varies, at the same location; null when either has none. */
 export function versusSelf(
   selfSummary: OrderBookSummary | undefined,
   prices: ReadonlyMap<number, OrderBookSummary | undefined>,

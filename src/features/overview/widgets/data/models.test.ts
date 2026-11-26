@@ -280,7 +280,6 @@ describe('structures with a control tower', () => {
           state: 'online',
           reinforcedUntilMs: null,
           unanchorsAtMs: null,
-          // 40 blocks an hour: 960 blocks is 24 hours of fuel.
           bay: { fuelBlocks: 960, strontium: 0 },
           bayReadAtMs: NOW,
         },
@@ -397,7 +396,6 @@ describe('training', () => {
         { skills: skills(queue) as never, ...accelerators(expiresAt) },
         ctx()
       );
-      // The skill ends in 4h, the accelerator in 20h: skill first.
       expect(view.table?.rows.map((row) => row.key)).toEqual(['3300:0', 'accelerator']);
       expect(view.table?.rows[1]?.cells[1]).toBe('20h 0m');
       expect(view.rows.map((row) => row.key)).toEqual(['3300:0', 'accelerator']);
@@ -550,7 +548,6 @@ describe('comingUp (the Calendar widget)', () => {
     const view = buildView('comingUp', feeds, ctx({ zone: 'UTC' }));
     expect(subjects(view)).toEqual(['Job 7', 'Job 9']);
     expect(view.table?.rows[0]?.cells[1]).toBe('calendar.detail.industryJob.ready');
-    // The headline is the next clock still ahead.
     expect(view.number.secondary?.text).toBe('Job 9');
   });
 
@@ -679,7 +676,6 @@ describe('industry', () => {
       '/industry?highlight=1',
       '/industry?highlight=2',
     ]);
-    // Only the running job is a clock still ahead.
     expect(view.deadlines.map((d) => d.at)).toEqual([NOW + 5 * HOUR_MS]);
   });
 });
@@ -1135,7 +1131,6 @@ describe('training table', () => {
       'level',
       'spPerHour',
     ]);
-    // 160,000 SP over the 4 hours between start and finish.
     expect(view.table?.rows[0]?.cells).toEqual(['Gunnery', '3h 0m', '4h 0m', '5', '40K']);
     expect(view.table?.rows[1]?.cells[4]).toBe('—');
   });
@@ -1185,7 +1180,6 @@ describe('sp table', () => {
       'skills.unallocatedSp',
       (1_450_000).toLocaleString(),
     ]);
-    // 75M extractable of the 100M threshold.
     expect(view.table?.rows[3]?.cells[1]).toEqual({ text: '75%', bar: 0.75 });
     expect(view.table?.rows[3]?.cells[2]).toContain('overview.widgets.sp.ofThreshold');
     expect(view.table?.rows[4]?.cells[1]).toMatchObject({ iskAmount: 150 * 200_000 });

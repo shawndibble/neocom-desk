@@ -14,16 +14,10 @@ import { useMoonOwnersInput } from './useMoonOwners';
 export interface OwnerRefineries {
   active: RefineryRow[];
   archived: RefineryRow[];
-  /** The covered mining lines at its refineries, valued at 100%. */
   mining: RefineryMining[];
-  /** The Extractions at its refineries. */
   extractions: ExtractionRow[];
 }
 
-/**
- * A moon owner's refineries (#6298): every one its mining or Extractions name, and every one an
- * officer archived, split into the page's list and its Archived section.
- */
 export function ownerRefineriesOf(
   corp: number,
   view: BookView,
@@ -46,7 +40,6 @@ export function ownerRefineriesOf(
       structureIds,
       extractions,
       mining,
-      // The structure lookup was refused (403 or 404); absent until the grant reads names.
       isGone: (id) => feeder?.refineryStructures?.[String(id)]?.denied === true,
       ...(feeder?.refineryArchive ? { archive: feeder.refineryArchive } : {}),
     }),

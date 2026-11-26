@@ -29,37 +29,19 @@ import { useSellHub } from './sellHub';
 import { HubField } from '@/features/market/HubMenu';
 
 interface Props {
-  /** The solar system of each of the active Character's colonies. */
   colonySystemIds: readonly number[];
-  /** The colony list could not be read: the count is unknown, not 0. */
   colonyCountUnknown?: boolean;
-  /**
-   * The Character whose current system stands in for home: set only once the
-   * colony list is read and empty, so a list still loading (or unreadable) is
-   * never taken for none. Never a hub default: no location, no home.
-   */
   locationCharacterId?: number | null;
-  /** Plan's prices and figures are projections; the other tabs show no such number. */
   estimate: boolean;
-  /** Show the EVE clock (Colonies, where timers read in EVE time). */
   eveTime?: boolean;
 }
 
-/** The current EVE (UTC) time. */
 function EveTimeChip() {
   const { t } = useTranslation();
   const now = useNow();
   return <StatChip label={t('piPlan.strip.eveTime')} value={eveClock(now)} />;
 }
 
-/**
- * The strip under the PI tabs, shared by all three: one slim row with the sell
- * market, the nearest-hub nudge, an Est. chip and an "i" popover holding where
- * the pilot's colonies are (with none, where the pilot is), how many, the way
- * to the sell market and (on Colonies) EVE time. Settings live behind the page
- * header's gear, not here. Only what there is data
- * for today: a field with no source is left out.
- */
 export function PiHeaderStrip({
   colonySystemIds,
   colonyCountUnknown,
@@ -85,9 +67,7 @@ export function PiHeaderStrip({
     colonyHome !== null
   );
   const locationId = colonyHome === null ? (located.data ?? null) : null;
-  // Where the route and the nearest-hub nudge start: the colonies, else the pilot.
   const homeId = colonyHome ?? locationId;
-  // With no colony, the chips say where the figures start: here, not home.
   const label =
     colonyHome === null && homeId !== null
       ? { home: 'location', route: 'routeFromHere', dropOff: 'dropOffHere' }
@@ -111,7 +91,6 @@ export function PiHeaderStrip({
     homeId === null || !basis.hydrated || buybackPct !== null
   );
 
-  // Until the pilot picks a hub, find the nearest one by gate route (#2705).
   const suggestLoader = useCallback(async () => {
     if (homeId === null) return null;
     const routes = await Promise.all(
@@ -179,7 +158,6 @@ export function PiHeaderStrip({
       />
     ) : null;
 
-  // One slim row: the sell market first, the facts about home behind an "i".
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-2" data-testid="pi-header-strip">
       <div className="flex items-center gap-2">
@@ -265,7 +243,6 @@ export function PiHeaderStrip({
   );
 }
 
-/** Figures for the gate route home to a hub, or null when it is unknown or there is none. */
 async function hubRouteFigures(
   homeId: number,
   hubSystemId: number,

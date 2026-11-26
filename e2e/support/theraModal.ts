@@ -1,7 +1,3 @@
-/**
- * Opens Route Safety's Thera / Turnur modal: unfolds the Route rules panel on a
- * phone, opens "More route options", then presses "Browse open wormholes".
- */
 import type { Page } from '@playwright/test';
 
 export async function openTheraModal(page: Page, { phone = false } = {}) {

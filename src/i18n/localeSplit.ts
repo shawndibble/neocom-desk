@@ -1,31 +1,5 @@
-/**
- * How the build splits `locales/en.json` so feature-page copy stops loading
- * with the shell. Pure: `localeSplitPlugin.ts` feeds it the file and the
- * sources and turns the answer into modules.
- *
- * `en.json` stays the one file anyone edits. At build time every source file
- * is scanned for the keys it names; each key in a lazy section is placed in a
- * group with the other keys named by exactly the same files, and every one of
- * those files gets a static import of its groups. The bundler then puts each
- * group wherever its importers are: beside the shell when the shell names it,
- * inside a route chunk when only that route does. A module's static imports
- * run before it does, so a key is registered before any component that names
- * it can render — no route loader has to await anything.
- *
- * Anything the scan can't prove a home for stays in the shell: every section
- * not on `LAZY_SECTIONS` (so a new section defaults eager) and every lazy key
- * no source names. The scan is deliberately generous — a false match only
- * makes a key load earlier than it had to.
- */
-
 export type LocaleTree = { [key: string]: string | LocaleTree };
 
-/**
- * Sections whose keys may leave the shell. The shell sections — login,
- * notifications, overview, nav, common, sync, boot, error, reauth and the
- * rest — are simply not listed, and neither is any section added later until
- * someone lists it here.
- */
 export const LAZY_SECTIONS: readonly string[] = [
   'industry',
   'fittings',
@@ -68,19 +42,12 @@ export const LAZY_SECTIONS: readonly string[] = [
   'vetting',
 ];
 
-/**
- * Modules, relative to `src/`, that load at boot: the entry, plus the shell
- * pieces that load right behind it even when they are split into chunks of
- * their own (the signed-in Layout and its index route). Everything they
- * statically reach names keys that belong in the shell.
- */
 export const STARTUP_ROOTS: readonly string[] = [
   'main.tsx',
   'app/Layout.tsx',
   'routes/Overview.tsx',
 ];
 
-/** Every leaf key under `sections`, dot-joined (`market.orders.buy`). */
 export function leafPaths(tree: LocaleTree, sections: readonly string[]): string[] {
   const out: string[] = [];
   const walk = (node: string | LocaleTree, path: string) => {
@@ -93,18 +60,6 @@ export function leafPaths(tree: LocaleTree, sections: readonly string[]): string
 
 const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-/**
- * The leaves in `leaves` that `code` can name. Three shapes:
- *
- * - a string starting with a key path (`'market.orders.buy'`, `i18nKey="…"`):
- *   that leaf, its plural/context variants (`_one`, `_other`, …), and every
- *   leaf under it when the path is a subtree (`returnObjects`, a prefix
- *   constant later extended with `${BASE}.title`);
- * - a template that continues the path (`` `market.orders.${side}` ``,
- *   `` `market.sort${dir}` ``): every leaf the completion could reach;
- * - a template whose section is itself a variable (`` `${ns}.reauthHint` ``):
- *   that key in every lazy section.
- */
 export function referencedLeaves(
   code: string,
   leaves: readonly string[],
@@ -112,8 +67,6 @@ export function referencedLeaves(
 ): Set<string> {
   const found = new Set<string>();
   if (sections.length === 0) return found;
-  // Longest name first and a boundary after it: with `pi` listed before
-  // `piShared`, a plain alternation would stop at `pi` inside `'piShared.x'`.
   const names = [...sections].sort((x, y) => y.length - x.length).map(escape);
   const path = new RegExp(
     `['"\`]((?:${names.join('|')})(?![\\w-])(?:\\.[\\w-]+)*)(\\.)?(\\$\\{)?`,
@@ -127,7 +80,7 @@ export function referencedLeaves(
     else bySection.set(section, [leaf]);
   }
   for (const [, key, dot, open] of code.matchAll(path)) {
-    if (!key.includes('.') && !(dot && open)) continue; // a bare section name
+    if (!key.includes('.') && !(dot && open)) continue;
     const section = key.includes('.') ? key.slice(0, key.indexOf('.')) : key;
     for (const leaf of bySection.get(section) ?? []) {
       if (dot && open) {
@@ -148,7 +101,6 @@ export function referencedLeaves(
   return found;
 }
 
-/** 32-bit FNV-1a, hex: a short id that depends only on its input. */
 function fnv1a(text: string): string {
   let hash = 0x811c9dc5;
   for (let i = 0; i < text.length; i++) {
@@ -176,7 +128,6 @@ function deleteLeaf(tree: LocaleTree, path: string): void {
   const parents: LocaleTree[] = [tree];
   for (const key of keys.slice(0, -1)) parents.push(parents[parents.length - 1][key] as LocaleTree);
   delete parents[parents.length - 1][keys[keys.length - 1]];
-  // Drop subtrees the removal emptied, so the shell carries no `{}` husks.
   for (let i = keys.length - 2; i >= 0; i--) {
     if (Object.keys(parents[i + 1]).length > 0) break;
     delete parents[i][keys[i]];
@@ -184,30 +135,16 @@ function deleteLeaf(tree: LocaleTree, path: string): void {
 }
 
 export interface LocalePlan {
-  /**
-   * Loads with the app: every non-lazy section, lazy keys nothing names, and
-   * lazy keys a startup file names.
-   */
   shell: LocaleTree;
-  /** Group id -> the keys named by exactly one set of files. */
   groups: Map<string, LocaleTree>;
-  /** Source file -> the groups it imports. Files naming no lazy key are absent. */
   importsByFile: Map<string, string[]>;
 }
 
-/**
- * `startupFiles` are the modules that load at boot anyway
- * (`staticImportClosure` from `STARTUP_ROOTS`). A key any of them names stays in the
- * shell rather than becoming a group: at startup a group would only be one
- * more tiny chunk to fetch, since its importers are spread across the
- * startup graph's many small chunks.
- */
 export function planLocaleSplit(
   en: LocaleTree,
   sources: Readonly<Record<string, string>>,
   lazySections: readonly string[] = LAZY_SECTIONS,
   startupFiles: ReadonlySet<string> = new Set(),
-  /** Stripped from file paths before hashing group ids, so ids match across checkouts. */
   srcRoot = ''
 ): LocalePlan {
   const sections = lazySections.filter((s) => typeof en[s] === 'object');
@@ -236,8 +173,6 @@ export function planLocaleSplit(
   const importsByFile = new Map<string, string[]>();
   const taken = new Set<string>();
   [...bySignature.keys()].sort().forEach((signature) => {
-    // Named for the files that import it, not its position: a key added
-    // elsewhere must not rename (and so re-hash) every later group's chunk.
     const relative = signature
       .split('\n')
       .map((file) =>
@@ -263,13 +198,6 @@ export function planLocaleSplit(
   return { shell, groups, importsByFile };
 }
 
-/**
- * Every module `entry` reaches through static value imports — what loads at
- * boot. The same regex scan as `src/app/bootImportGraph.test.ts`: `import
- * type` and dynamic `import()` are not followed. A miss either way is safe
- * here: it only moves keys between the shell and a group, and both load
- * before the component naming them renders.
- */
 export function staticImportClosure(
   sources: Readonly<Record<string, string>>,
   entries: readonly string[],

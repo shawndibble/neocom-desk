@@ -1,11 +1,3 @@
-/**
- * EVE access tokens the real Cloud Functions accept. `mockSso.ts`'s token carries a fake
- * signature, which the app never checks but `verifyEveToken` on the server does. These are
- * signed with the run's key (written by `scripts/e2e-book/emulators.mjs`, served to the Functions
- * emulator as CCP's JWKS by `ccpStub.mjs`) and name this deployment's client id, so
- * `mintFirebaseToken`, the officer check and every live role check pass as they would in
- * production.
- */
 import { createPrivateKey, sign, type JsonWebKeyInput } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { EXP_SECONDS } from '../mockSso';

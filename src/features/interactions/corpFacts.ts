@@ -1,9 +1,3 @@
-/**
- * Show Info › Interactions, Corporation scope: the loading. Everything here reads only what the
- * viewer's account can already see on the corp pages; a read the account is not allowed (no role,
- * no grant, no book) resolves to nothing, never an error. Sources and the stat chips share one
- * load per player, kept briefly so opening the tab twice does not read twice.
- */
 import { noticeSpan } from '../../../functions/src/corpTaxBookLateNotice';
 import { collection, getDocs, query, where } from 'firebase/firestore/lite';
 import { minerIdFor, type Miner } from '@/engine/corpTaxBook/charges';
@@ -23,9 +17,7 @@ import type { BookFacts } from './corpBookInteractions';
 import { classifyCorpKills, type CorpJournalRow, type CorpKill } from './corpOtherInteractions';
 import type { CorpQuery } from './sourceTypes';
 
-/** The seven corp wallet divisions. */
 const DIVISIONS = [1, 2, 3, 4, 5, 6, 7] as const;
-/** Only recent killmails are matched against the corp's roster: affiliations cost a request per 1000 ids. */
 const KILL_WINDOW_MS = 365 * DAY_MS;
 const FACTS_TTL_MS = 5 * MINUTE_MS;
 
@@ -37,10 +29,6 @@ const settled = async <T>(work: () => Promise<T>, fallback: T): Promise<T> => {
   }
 };
 
-/**
- * The Miner the player's characters bill under: the shared rule (`minerIdFor`), so of two
- * groupings that list the character the earliest wins, as everywhere else; else the solo Miner.
- */
 async function billedMinerOf(characterId: number, corporationId: number, otherId: number) {
   const solo = `solo:${otherId}`;
   try {
@@ -112,7 +100,6 @@ async function readBookFacts(
       .map((d) => ({
         date: d.date,
         tax: d.tax,
-        // A day a dispute holds owes nothing yet, but is not paid.
         settled: d.status === 'paid' || (d.status === 'owed' && d.owed === 0 && !d.disputed),
       })),
   };
@@ -120,12 +107,9 @@ async function readBookFacts(
 
 export interface CorpFacts {
   book: () => Promise<BookFacts | null>;
-  /** Corp wallet journal rows, every division the account may read. */
   journal: () => Promise<CorpJournalRow[]>;
   contracts: () => Promise<Contract[]>;
-  /** Whether the player is in the corp now; false when ESI cannot say. */
   isMember: () => Promise<boolean>;
-  /** Killmails with corp members; none for a member. */
   kills: () => Promise<CorpKill[]>;
 }
 

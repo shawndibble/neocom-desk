@@ -1,7 +1,3 @@
-/**
- * The selected offer's profit breakdown (right pane on desktop, bottom sheet on a
- * phone), plus the row-level helpers it shares with the offers table.
- */
 import { fixed1 } from '@/lib/fixedFormat';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -42,25 +38,17 @@ import { SourcingInput } from '@/features/industry/SourcingInput';
 import { parseOrKeep } from '@/features/industry/planInputParsers';
 import { useRedemptionPricing } from './useRedemptionPricing';
 
-/**
- * Item name: plain text. The row's click selects it for the detail pane, so
- * the name is not a link (DESIGN.md §6c); `OfferDetail`'s View in Market is
- * the Market link. A blueprint row is labelled with the product that button
- * opens; the BP badge beside it still marks the row as a blueprint.
- */
 function LoyaltyItemName({ row }: { row: LoyaltyOfferRow }) {
   const { typeId, itemName } = resolveLoyaltyRowItem(row);
   return <span className={entityLinkClassName()}>{typeId === null ? row.itemName : itemName}</span>;
 }
 
-/** The unit after a phone card's bold corner figure; the table's header says it on desktop. */
 export function PhoneUnit({ children }: { children: string }) {
   return (
     <span className="ml-1 text-[0.6875rem] font-normal text-text-dim sm:hidden">{children}</span>
   );
 }
 
-/** An offer's price: `2,400 LP + 2.4M`. */
 export function LoyaltyOfferCost({
   row,
   playerLp = null,
@@ -78,11 +66,6 @@ export function LoyaltyOfferCost({
   );
 }
 
-/**
- * An offers table's item cell: the name, a BP marker for a blueprint, and its LP + ISK price.
- * `showCost` is false on a phone's dense card, which prints the price on its meta line instead;
- * `lowVolumeTag` is false there too while the sells/day cell (amber) says it.
- */
 export function LoyaltyOfferItemCell({
   row,
   showCost = true,
@@ -91,17 +74,12 @@ export function LoyaltyOfferItemCell({
 }: {
   row: LoyaltyOfferRow;
   playerLp?: number | null;
-  /** False on a phone's dense card, where the cost has its own cell on the meta line. */
   showCost?: boolean;
-  /** False when the phone card's amber sells/day already carries the low-volume warning. */
   lowVolumeTag?: boolean;
 }) {
   const { t } = useTranslation();
   return (
     <span className="flex flex-col">
-      {/* Plain inline text, not a flex row: a long name wraps and the tags follow its last word
-          instead of floating beside the wrapped block. The no-break space keeps a tag from
-          starting a line of its own. */}
       <span>
         <LoyaltyItemName row={row} />
         {row.isBlueprint && (
@@ -110,7 +88,6 @@ export function LoyaltyOfferItemCell({
             <span className={tagWordClassName}>BP</span>
           </>
         )}
-        {/* A phone says it on the meta line (amber sells/day), where the name needs the room. */}
         {lowVolumeTag && isLowVolume(row) && (
           <>
             {' '}
@@ -166,8 +143,6 @@ export function OfferDetail({
 }: OfferDetailProps) {
   const { t } = useTranslation();
   const { typeId: marketTypeId, itemName: displayName } = resolveLoyaltyRowItem(row);
-  // "How many" starts at 1 each time the detail opens (the route keys this
-  // component by offer) and is never remembered.
   const [redemptions, setRedemptions] = useState(1);
   const { result: walked, loading: walking } = useRedemptionPricing({
     row,
@@ -436,13 +411,6 @@ export function OfferDetail({
       )}
       {profit.profit === null && !anyUnfilled && (
         <p className="text-xs text-warning">
-          {/* A required item with no hub price is a real, distinct cause from
-              a material or the product itself lacking one (row.build's
-              `unpricedMaterials` / a null `profit.revenue`) — naming the
-              wrong one would send the player looking for a Jita order that
-              was never missing. `requiredItemsCost` is the same null the
-              engine already used to null `profit.profit`, so this reads the
-              actual cause rather than re-deriving it. */}
           {t(
             requiredItemsCost === null
               ? 'loyaltyStore.unpriceableRequiredItem'

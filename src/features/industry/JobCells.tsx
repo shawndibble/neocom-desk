@@ -4,7 +4,6 @@ import { formatDuration } from '@/lib/duration';
 import type { IndustryJob } from '@/esi/endpoints';
 import { isJobDone, jobProgress, secondsRemaining, JOBS_TICK_MS } from './jobs';
 
-/** Progress bar that reads the shared clock itself, so its column needn't rebuild per tick. */
 export function JobProgressCell({
   job,
   label,
@@ -17,9 +16,6 @@ export function JobProgressCell({
   const now = useTicker(JOBS_TICK_MS);
   const progress = Math.round(jobProgress(job, now) * 100);
   return (
-    // Fixed track: `flex-1` in a shrink-to-fit cell has no width to
-    // fill and collapses. Nothing may right-align itself below `sm`
-    // either (docs/DESIGN.md §4a) — hence `sm:text-right`.
     <span className="flex items-center gap-2 max-sm:w-full">
       <ProgressBar
         label={label}
@@ -32,7 +28,6 @@ export function JobProgressCell({
   );
 }
 
-/** Time-left text that reads the shared clock itself. */
 export function JobEndsInCell({
   job,
   doneLabel,

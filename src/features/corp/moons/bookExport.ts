@@ -1,10 +1,3 @@
-/**
- * The Corp Tax Book as one workbook (#4946, #4959): a sheet per record type, every record the
- * officer can read, names beside ids so the file reads for a person and still joins for a script.
- * Left out on purpose: the late notice verify links (credentials, editors only), the moon owners'
- * own view (only they can read it) and the miners' coverage copy (the Moon owners sheet has it).
- * Pure: the caller reads the book and hands the sheets to `downloadWorkbook`.
- */
 import { soloCharacterId, soloMinerId } from '../../../../functions/src/corpTaxBookDonationMatch';
 import type { RunningAccountCheckpoint } from '../../../../functions/src/corpTaxBookCheckpoint';
 import type { Miner } from '@/engine/corpTaxBook/charges';
@@ -46,7 +39,6 @@ export interface BookExportInput {
   miners: readonly Miner[];
   observed: readonly ObservedRow[];
   notices: readonly LateNotice[];
-  /** Each Miner's closed-through checkpoint, as the server stored it. */
   checkpoints?: readonly RunningAccountCheckpoint[];
   payments: readonly SettlePayment[];
   adjustments: readonly Adjustment[];
@@ -55,13 +47,10 @@ export interface BookExportInput {
   declarations: readonly BookDeclaration[];
   rebills: readonly Rebill[];
   groupingAnswers: readonly GroupingAnswer[];
-  /** Characters an officer unlinked, which automatic grouping leaves alone. */
   declinedAutoGroup: readonly number[];
   extractions: readonly SyncExtraction[];
-  /** The moon owners (Feeders), each with its payouts. */
   feeders: readonly BookFeeder[];
   audit: readonly AuditEntry[];
-  /** The Automatic sync's status; null when it was never turned on or was revoked. */
   scheduledSync?: ScheduledSyncStatus | null;
 }
 
@@ -73,7 +62,6 @@ export type BookExportNames = Pick<
 type MinerName = (minerId: string | undefined) => string | null;
 
 const PREFIX = 'corpTaxBook.export';
-/** The Moon owners page's own payout labels, so the file and the page never disagree. */
 const PAYOUT_LABELS = 'corpTaxBook.moons.moonOwners.page.payouts';
 
 const sheet = <T>(t: CsvTranslate, name: string, rows: readonly T[], columns: SheetColumns<T>) =>
@@ -148,7 +136,6 @@ export function bookExportSheets(
 ): AnyXlsxSheet[] {
   const minerById = new Map(input.miners.map((m) => [m.id, m]));
   const minerIdOf = new Map(input.miners.flatMap((m) => m.characterIds.map((c) => [c, m.id])));
-  /** A grouped Miner by its main character; a `solo:<id>` one by its only character. */
   const minerName: MinerName = (minerId) => {
     if (!minerId) return null;
     const miner = minerById.get(minerId);
@@ -168,7 +155,6 @@ export function bookExportSheets(
   const noticeLines = notices.flatMap((notice) =>
     notice.lines.map((line): { notice: LateNotice; line: LateNoticeLine } => ({ notice, line }))
   );
-  /** "Ore: value" for each ore of a notice line that has one in `byType`. */
   const perOre = <V>(
     line: LateNoticeLine,
     byType: Readonly<Record<number, V>> | undefined,
@@ -246,7 +232,6 @@ export function bookExportSheets(
       ['manualReminders', (n) => n.mail.manualSent],
       ['storedMinerName', (n) => n.names?.minerName],
     ]),
-    // Every line of every late notice: the Late notices sheet only counts them.
     sheet(t, 'lateNoticeLines', noticeLines, [
       ['noticeId', (l) => l.notice.id],
       ['miner', (l) => minerName(l.notice.minerId)],
@@ -276,7 +261,6 @@ export function bookExportSheets(
       ['kind', (l) => t(`corpTaxBook.export.lineKind.${l.line.kind}`)],
       ['lineKey', (l) => l.line.key],
     ]),
-    // Each Miner's account closed through a day: what it owed and held then, for good.
     sheet(t, 'accountCheckpoints', input.checkpoints ?? [], [
       ['miner', (c) => minerName(c.minerId)],
       ['minerId', (c) => c.minerId],

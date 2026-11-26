@@ -1,8 +1,3 @@
-/**
- * Route Safety's flight-time estimate (issue #6282) for the route ship: the
- * baked gate positions and the hull's flight stats, read once, against the
- * drawn trip's rows. A pure engine (`engine/route/tripTime`) does the sums.
- */
 import { useEffect, useMemo, useState } from 'react';
 import {
   tripTime,
@@ -16,10 +11,8 @@ import { loadShipFlight } from '@/sde/loadSde';
 import { useRouteShipMass } from './routeShip';
 
 export type TripTimeState =
-  /** No route ship chosen: never a hidden default hull. */
   | { kind: 'no-ship' }
   | { kind: 'loading' }
-  /** A file is unreadable, the hull has no flight stats, or a gate is missing: no figure, never zero. */
   | { kind: 'unavailable' }
   | { kind: 'ready'; time: TripTime };
 
@@ -28,7 +21,6 @@ interface Tables {
   flight: Readonly<Record<string, readonly [number, number, number]>>;
 }
 
-/** `null` while loading, `'failed'` when a file could not be read. */
 function useTables(wanted: boolean): Tables | 'failed' | null {
   const [tables, setTables] = useState<Tables | 'failed' | null>(null);
   useEffect(() => {

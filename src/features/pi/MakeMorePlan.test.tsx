@@ -17,8 +17,6 @@ let mockState: PlanAdviceState = { status: 'loading' };
 vi.mock('./usePlanAdvice', () => ({ usePlanAdvice: () => mockState }));
 
 const CONDENSATES = 2344;
-// A chain across both fixture colonies earning far more than both together: if any of it
-// leaked into a headline, quick win or total, the figures below would move.
 vi.mock('./useBiggerChains', () => ({
   useBiggerChains: () => ({
     estimates: new Map([
@@ -42,7 +40,6 @@ vi.mock('./useBiggerChains', () => ({
     pending: false,
   }),
   NO_TYPES: [],
-  // A what-if planet's chain, as large: it must not move them either.
   useWhatIfChains: () => ({
     byType: new Map([
       [
@@ -106,7 +103,6 @@ describe('MakeMorePlan', () => {
     const { container } = renderPlan();
     const figures = container.querySelectorAll('[data-isk-figure]');
     expect(figures.length).toBeGreaterThan(1);
-    // At most one stop per panel, never one per figure.
     const stops = container.querySelectorAll('[data-isk-figure][tabindex="0"]');
     expect(stops.length).toBeGreaterThan(0);
     expect(stops.length).toBeLessThan(figures.length);
@@ -241,7 +237,6 @@ describe('MakeMorePlan', () => {
     expect(boxes).toHaveLength(2);
     expect(boxes[0]).toHaveAccessibleName(/Restart Hek VI/);
     expect(boxes[1]).toHaveAccessibleName(/launchpad is full in 16 h, before your daily haul/);
-    // A storage win's figure is a saving, a day's worth, and is not in the quick-win total.
     const storageRow = boxes[1].closest('li')!;
     expect(storageRow).toHaveTextContent(/saves ~\s*120.*\/day/);
     await user.click(boxes[0]);
@@ -250,7 +245,6 @@ describe('MakeMorePlan', () => {
   });
 
   it('forgets a tick whose quick win has gone, so a win that returns starts unticked', async () => {
-    // Another character's row (planet 9) is not this view's to drop.
     await usePlanTicks.getState().setValue(['1:restart', '1:stale', '9:other']);
     renderPlan();
     await waitFor(() => expect(usePlanTicks.getState().value).toEqual(['1:restart', '9:other']));
@@ -380,7 +374,6 @@ describe('MakeMorePlan', () => {
   it("opens a rebuild's in-game steps in its own row, with its Command Center fit", async () => {
     const user = userEvent.setup();
     renderPlan();
-    // Steps live in their rebuild row, not a panel of their own.
     expect(screen.queryByRole('heading', { name: 'What to do in-game' })).not.toBeInTheDocument();
     const toggle = screen.getByRole('button', { name: /^In-game steps for Hek VI/ });
     expect(toggle).toHaveAttribute('aria-expanded', 'false');

@@ -11,7 +11,6 @@ import {
 import { Modal } from './Modal';
 import { useOpenAfterMenu } from './useOpenAfterMenu';
 
-/** Records what held focus as the dialog's content mounted, just before `showModal()`. */
 function FocusProbe({ onMount }: { onMount?: (focused: Element | null) => void }) {
   useEffect(() => {
     onMount?.(document.activeElement);

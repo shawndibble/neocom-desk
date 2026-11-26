@@ -119,7 +119,6 @@ describe('ExtractionsTab on a phone', () => {
       screen.getByRole('menuitem', { name: 'Dismiss tax for this extraction' })
     ).toBeInTheDocument();
     unmount();
-    // Unknown ore (the visible Link button), zero tax (inert Dismiss), Notification ore: no menu.
     for (const row of rows.slice(1)) {
       expect(menuFor(row, <div>row</div>).type).toBe('div');
     }
@@ -164,7 +163,6 @@ describe('ExtractionsTab with moon owners (#6097)', () => {
     shown([{ ...ex('m', 'unknown', 0), state: 'extracting', sourceCorporationId: 98000002 }]);
     const row = screen.getByText('Corp 98000002').closest('tr');
     expect(row).toHaveTextContent('Extracting');
-    // No notification is read for a moon owner: without a linked Survey the ore is unknown.
     expect(row).toHaveTextContent('Ore unknown');
   });
 
@@ -177,7 +175,6 @@ describe('ExtractionsTab with moon owners (#6097)', () => {
       "Corp 98000002's permission doesn't include extraction notices"
     );
     fireEvent.blur(owner!);
-    // The book's own chunk keeps the general reason; Link a Survey stays on both.
     fireEvent.focus(own!);
     expect(screen.getByRole('tooltip')).toHaveTextContent('The game sent no ore details');
     expect(screen.getAllByRole('button', { name: 'Link a Survey' })).toHaveLength(2);
@@ -202,7 +199,6 @@ describe('ExtractionsTab ⋮', () => {
           <ExtractionsTab />
         </MemoryRouter>
       );
-      // Only the surveyed row with tax carries a ⋮.
       const more = screen.getAllByRole('button', { name: /More actions for/ });
       expect(more).toHaveLength(1);
       await userEvent.click(more[0]!);

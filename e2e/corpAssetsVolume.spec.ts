@@ -1,12 +1,3 @@
-/**
- * Corp Assets' Volume column shows a real m³ figure (issues #2216, #4671).
- *
- * Corp Assets is Director-only (`engine/corpRoles.ts`), so this needs a JWT
- * carrying the corp scope group plus a `/roles` override granting Director —
- * the same access-setup pattern `corpBoardNarrow.spec.ts` established, since
- * the default mock's `/roles` answers `{}` (issue #295) to keep the corp
- * grant prompt off every other spec.
- */
 import { test, expect } from './support/testBase';
 import { CHARACTER_ID, CORPORATION_ID, SCOPES } from './support/fixtureData';
 import { scopesForGroup } from '../src/esi/scopes';
@@ -50,8 +41,6 @@ test.describe('Corp Assets — item row volume', () => {
             is_singleton: false,
           },
           {
-            // No entry in the slim SDE snapshot for a market/asset-only type
-            // the fixtures never populate — stays "-" for this row only.
             item_id: 2,
             type_id: 999_999,
             quantity: 1,
@@ -62,11 +51,6 @@ test.describe('Corp Assets — item row volume', () => {
           },
         ]);
       }
-      // A Director implicitly holds every corp role, so the boot prefetch
-      // (`app/prefetch.ts`) warms every corp surface once the JWT carries the
-      // corp scope group — not just the assets/divisions this spec cares
-      // about. Answer them empty rather than letting them hit the network
-      // guard.
       if (path === `/corporation/${CORPORATION_ID}/mining/extractions`) return json([]);
       if (path === `/corporations/${CORPORATION_ID}/structures`) return json([]);
       if (path === `/corporations/${CORPORATION_ID}/industry/jobs`) return json([]);
@@ -92,13 +76,11 @@ test.describe('Corp Assets — item row volume', () => {
         page.getByRole('main').getByText('Tritanium', { exact: true }).first()
       ).toBeVisible();
 
-      // Volume starts off; the column picker adds it.
       await page.getByRole('button', { name: 'Columns' }).click();
       await page.getByRole('menuitemcheckbox', { name: 'Volume' }).click();
       await page.keyboard.press('Escape');
 
       const known = page.getByRole('row').filter({ hasText: 'Tritanium' });
-      // 500 Tritanium at 0.01 m³ each; the header names the unit.
       await expect(known.getByRole('cell', { name: '5', exact: true })).toBeVisible();
       const unknown = page.getByRole('row').filter({ hasText: 'Type #999999' });
       await expect(unknown).toBeVisible();

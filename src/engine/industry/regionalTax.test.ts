@@ -12,7 +12,7 @@ describe('regionalJobTaxPct', () => {
   });
 
   it('is 0 anywhere else, and for an unknown region', () => {
-    expect(regionalJobTaxPct(10000002)).toBe(0); // The Forge
+    expect(regionalJobTaxPct(10000002)).toBe(0);
     expect(regionalJobTaxPct(undefined)).toBe(0);
   });
 });

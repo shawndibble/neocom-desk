@@ -8,17 +8,6 @@ export type PlanStatsInputs = Omit<PlanScheduleInputs, 'cloneState'> & {
   trainedSkillsKnown: boolean;
 };
 
-/**
- * Each plan's total time and finish, costed by `schedulePlan` — the call the
- * editor and Calendar make, so every surface agrees. `undefined` until it can
- * be costed honestly: held back until ESI has answered and Clone State is
- * read, since costing against the empty stand-ins would flash catalog-only,
- * Omega-default figures. Also `undefined` when `inputs` is omitted.
- *
- * `onlyPlanIds` limits costing to those plans — a surface showing one plan
- * need not schedule them all. Compared by content, so a fresh array of the
- * same ids does not reschedule.
- */
 export function usePlanStats(
   plans: readonly SkillPlanRecord[] | undefined,
   inputs: PlanStatsInputs | undefined,
@@ -32,7 +21,6 @@ export function usePlanStats(
   useEffect(() => {
     if (enabled) void hydrateCloneStates();
   }, [enabled, hydrateCloneStates]);
-  // One instant per mount, like the editor, so the figures match its summary.
   const [loadedAtMs] = useState(() => Date.now());
   const onlyKey = onlyPlanIds?.join('\n');
   return useMemo(() => {

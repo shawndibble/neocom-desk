@@ -1,9 +1,3 @@
-/**
- * The Survey tab's alternative chart views, each replacing the whole chart
- * area: ore left by percent, and ISK left. Statically imports `recharts`, so —
- * same rule as `SurveyCharts.tsx` — this must only be reached through a dynamic
- * `import()` from `SurveyBoard.tsx`. Read-only: no scan-node remove menu.
- */
 import {
   cloneElement,
   useMemo,
@@ -83,7 +77,6 @@ function ViewFigure({
         <ResponsiveContainer>{chart}</ResponsiveContainer>
       </div>
       <figcaption className="sr-only">{label}</figcaption>
-      {/* On a wrapper: a <table> ignores sr-only's clip and still stretches the page. */}
       <div className="sr-only">{table}</div>
     </figure>
   );
@@ -214,7 +207,6 @@ export function IskChart({ summary }: { summary: SurveySummary }) {
   const { xAxis } = timeAxis(summary);
   const label = t('survey.chartIsk');
   const scanRows = rows.slice(0, summary.points.length);
-  // Inside the chart's own tooltip ISK is plain compact text (DESIGN §6c "ISK").
   const iskShort = (v: number) => t('survey.chartIskAmount', { amount: formatIskCompact(v) });
 
   const columns = useMemo<DataTableColumn<SurveySeriesRow>[]>(() => {
@@ -289,7 +281,6 @@ export function IskChart({ summary }: { summary: SurveySummary }) {
           {xAxis(false)}
           {gapBreaks(summary, true)}
           {yAxis()}
-          {/* Stacked bottom-up, so the most valuable ore (first) is drawn last, on top. */}
           {[...pricedOres].reverse().map((ore) => (
             <Area
               key={ore}
@@ -352,7 +343,6 @@ export function IskChart({ summary }: { summary: SurveySummary }) {
   );
 }
 
-/** The pace tooltip's content for one interval: most valuable ore first (the chart's top slice), idle ones left out. */
 export function PaceTipBody({
   interval,
   activeOres,
@@ -400,7 +390,6 @@ export function PaceTipBody({
   );
 }
 
-/** Props Recharts hands a ReferenceArea's custom shape. */
 interface SliceShapeProps {
   x?: number;
   y?: number;
@@ -409,7 +398,6 @@ interface SliceShapeProps {
   fill?: string;
 }
 
-/** A slice inset 1px top and bottom, so stacked slices show a 2px gap and bars keep their edges. The fill is as translucent as the ore-left and ISK-left areas. */
 function SliceShape({ x, y, width, height, fill }: SliceShapeProps) {
   if (x === undefined || y === undefined || width === undefined || height === undefined) {
     return <g />;
@@ -426,12 +414,6 @@ function SliceShape({ x, y, width, height, fill }: SliceShapeProps) {
   );
 }
 
-/**
- * The Depletion view's pace chart: one 100% bar per scan interval, from scan to scan on the shared
- * time axis, split into each mined ore's share of that interval's progress. Slices keep the
- * legend's order and colours with the first (most valuable) ore at the top, like the ore-left stack; each is inset
- * 1px top and bottom (see SliceShape), leaving a 2px gap. The caller wraps it in its figure and table; only the plot is here.
- */
 export function PaceByOreChart({
   summary,
   pace,
@@ -443,8 +425,6 @@ export function PaceByOreChart({
   const { intervals, rows, activeOres, toneIndex } = pace;
   const { xAxis } = timeAxis(summary);
 
-  // The bars themselves: each ore's slice runs from the shares of the ores below it to its own top.
-  // activeOres is most valuable first, so stack from the cheapest up to leave the priciest on top.
   const slices = useMemo(
     () =>
       intervals.flatMap((i) => {
@@ -472,7 +452,6 @@ export function PaceByOreChart({
     const index = row?.interval ?? -1;
     const interval = intervals[index];
     if (!active || interval === undefined || summary.intervals[index]?.gap) return null;
-    // The bars sit on the squeezed axis; the tip speaks in real time.
     const real = {
       ...interval,
       from: realTime(summary, interval.from),
@@ -498,7 +477,6 @@ export function PaceByOreChart({
             fontSize: '0.6875rem',
           },
         })}
-        {/* One ReferenceArea per slice: about 8 ores x intervals SVG rects, by design. */}
         {slices.map((s) => (
           <ReferenceArea
             key={s.key}

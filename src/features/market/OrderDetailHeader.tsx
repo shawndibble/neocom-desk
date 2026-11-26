@@ -16,7 +16,6 @@ import { CopyPriceButton } from './CopyablePrice';
 import { MarketItemLink } from './MarketItemLink';
 import { formatCount } from '@/lib/formatCount';
 
-/** The modal's top: who and where, the verdict (or the short call), Copy and the item's market links. */
 export function OrderDetailHeader({
   row,
   advice,
@@ -30,14 +29,9 @@ export function OrderDetailHeader({
 }) {
   const { t } = useTranslation();
   const { badge, summary, verdict } = advice;
-  // Without a verdict, a priceless "Do this" call ("Leave it alone",
-  // "Relist it") is the short headline. A priced one never is: with no floor
-  // the rival is a fact, not advice to match (decision 20260924-013535).
   const { call: fixCall } = rowFixCall(row);
   const shortCall = doThisPrice(fixCall) === null && fixCall.kind !== 'badgeAdvice';
   const offHub = isOffHubStation(row.stationName, row.locationId);
-  // A top bid is fine as a bid, but "Nothing" would contradict the turn-in block under it
-  // when turning the items in pays more than the bid.
   const actionKey =
     badge?.kind === 'topBid' && bidTurnInPays(row)
       ? 'market.orders.badge.topBidTurnInAction'
@@ -71,12 +65,6 @@ export function OrderDetailHeader({
         {badge && <OrderProblemBadge kind={badge.kind} detail={badge.detail} />}
         {verdict ? (
           <>
-            {/*
-                A real call, only ever reachable with an Order Floor. With no
-                cost basis linked there is no way to tell "undercut them" from
-                "let this one go", so the badge's generic advice is the
-                fallback below — the common case, not the exception.
-              */}
             <p className="mt-2 text-xl font-semibold text-text">
               {t(`market.orders.verdict.${verdict.kind}`, {
                 price: verdict.price === null ? '' : formatMarketIsk(verdict.price),
@@ -91,10 +79,6 @@ export function OrderDetailHeader({
           </>
         ) : shortCall ? (
           <>
-            {/*
-                No floor, so no verdict: the fix list's own short call heads
-                it, as the row says it; the badge's longer advice sits under.
-              */}
             <p className="mt-2 text-xl font-semibold text-text">
               <OrderDoThisText row={row} interactive={false} />
             </p>
@@ -117,24 +101,15 @@ export function OrderDetailHeader({
             )}
           </>
         )}
-        {/* Only a price the call recommends (`verdictFigures`). On a phone it is the sheet's footer. */}
         {!isPhone && copyPrice !== null && (
           <div className="mt-3">
             <CopyPriceButton price={copyPrice} />
           </div>
         )}
-        {/* The two ways to the item's market share a line of their own, under the one action. */}
         <div className="mt-2 flex flex-wrap gap-2">
-          {/*
-              The phone list's row is plain text, not `MarketItemLink` (a
-              link nested in the row's own tap target would be nested
-              interactive content) — this is where a phone reader reaches the
-              item's Market listing instead.
-            */}
           <MarketItemLink typeId={row.typeId} className={buttonClassName({ variant: 'ghost' })}>
             {t('orders.viewInMarket')}
           </MarketItemLink>
-          {/* Where the order is edited. An abyssal type has no market window. */}
           <MarketOnly typeId={row.typeId}>
             <OpenInEveButton
               kind="marketDetails"

@@ -62,39 +62,26 @@ import {
   type ProjectedEffects,
 } from '@/engine/fittings/types';
 
-/**
- * ADR 0016's "one seam module": the only place `@eveshipfit/dogma-engine` is
- * imported. Everything else (`src/engine/fittings/*`) works with plain
- * `Fitting`/`PilotProfile`/`FittingStats` shapes, so swapping the engine
- * later means rewriting this file, not its callers.
- */
-
 export { warmDogmaEngineAssets, type DogmaAssetProgress };
 
 let enginePromise: Promise<DogmaEngine> | null = null;
-/** Loaded with the engine, for `fittingToDogmaFit`'s mutation check; null when the data wouldn't load. */
 let readyMutaplasmids: MutaplasmidLookup | null = null;
-/** Loaded with the engine: each implant's own slot, for `fittingToDogmaFit`; null when it wouldn't load. */
 let readySlotOf: SlotOf | null = null;
-/** Loaded with the engine: the cloaks that warp cloaked, for `extractExplore`; empty when it wouldn't load. */
 let readyCovertCloaks: ReadonlySet<number> = new Set();
 
 function toDogmaFit(fitting: Fitting, profile: PilotProfile, damageProfile?: DamageProfile) {
   return fittingToDogmaFit(fitting, profile, damageProfile, readyMutaplasmids, readySlotOf);
 }
 
-/** Set once `loadDogmaEngine` has resolved; the only way to the synchronous fit checks. */
 let readyEngine: DogmaEngine | null = null;
 const readyListeners = new Set<() => void>();
 const progressListeners = new Set<(progress: DogmaAssetProgress) => void>();
 let lastProgress: DogmaAssetProgress | null = null;
 
-/** The ready engine, or null until `loadDogmaEngine` has resolved. Never starts a load. */
 export function readyDogmaEngine(): DogmaEngine | null {
   return readyEngine;
 }
 
-/** Calls `listener` once the engine becomes ready (`useDogmaEngine`'s subscription). */
 export function subscribeDogmaEngine(listener: () => void): () => void {
   readyListeners.add(listener);
   return () => {
@@ -102,22 +89,9 @@ export function subscribeDogmaEngine(listener: () => void): () => void {
   };
 }
 
-/**
- * Loads the WASM engine and its pinned SDE snapshot, lazily and once
- * (ADR 0016): fetched only the first time a caller asks, excluded from the
- * app-shell precache (`vite.config.ts`'s `globIgnores`), and cached here via
- * the Cache Storage API so a repeat visit — including offline — reuses them
- * instead of refetching. `onProgress` reports combined bytes across both
- * downloads as they stream in; a warm cache still reports 0 -> total almost
- * immediately, since a `cache.match` hit skips the network but not this
- * function's own byte counting.
- */
 export function loadDogmaEngine(
   onProgress?: (progress: DogmaAssetProgress) => void
 ): Promise<DogmaEngine> {
-  // Every caller's callback hears the one running load, however late it joins
-  // (a Retry or a start screen may have begun it before the stats asked), and
-  // the latest figure is replayed so a late joiner does not wait for the next chunk.
   if (onProgress && !readyEngine) {
     progressListeners.add(onProgress);
     if (lastProgress) onProgress(lastProgress);
@@ -166,8 +140,6 @@ export function loadDogmaEngine(
       for (const listener of readyListeners) listener();
       return dogmaEngine;
     })().catch((error: unknown) => {
-      // A failed load (offline on first visit, a bad response, …) must not
-      // wedge every later attempt behind the same rejected promise.
       enginePromise = null;
       progressListeners.clear();
       setDogmaEngineStatus('failed');
@@ -177,28 +149,13 @@ export function loadDogmaEngine(
   return enginePromise;
 }
 
-/**
- * Starts the engine download if it is not under way and swallows the outcome:
- * for a Retry, a reconnect, or a screen that just wants the data coming. The
- * status (`dogmaEngineStatus`) and whoever awaits `loadDogmaEngine` report
- * how it went. Not `warmDogmaEngineAssets`, which only fills the cache.
- */
 export function warmDogmaEngine(): void {
-  void loadDogmaEngine().catch(() => {
-    // Reported through the status.
-  });
+  void loadDogmaEngine().catch(() => {});
 }
 
-/**
- * The fit inside an Abyssal weather: the weather's beacon (see
- * `engine/fittings/abyssalWeather.ts`) as what the fit takes in. No weather
- * leaves it as it is. Here, not in the pure mapper, because only this seam
- * may call the engine — `beacon()` is the engine's own.
- */
 export function withWeather(fit: Fit, weatherTypeId?: number): Fit {
   if (weatherTypeId === undefined) return fit;
   const weather = beacon(weatherTypeId);
-  // Beside whatever the fit already takes in, not instead of it.
   const incoming = fit.incoming ?? {};
   return {
     ...fit,
@@ -210,23 +167,13 @@ export function withWeather(fit: Fit, weatherTypeId?: number): Fit {
   };
 }
 
-/** What a Fitting's stats are worked out under, beyond the pilot and the Damage Profile. */
 export interface StatsOptions {
-  /** Also work out the overheated values (the default); callers that never show heat opt out of the cost. */
   overheated?: boolean;
-  /** Every figure overheated — every module that can overheat, overloaded (the "Overheat all" switch). */
   overheatAll?: boolean;
-  /** An Abyssal weather's beacon type id. */
   weatherTypeId?: number;
-  /** What other Fittings project onto this one. */
   incoming?: ProjectedEffects;
 }
 
-/**
- * The fit taking in what other Fittings project onto it (`computeOutgoing`),
- * beside whatever it already takes in (an Abyssal weather). Nothing projected
- * leaves it as it is.
- */
 export function withIncoming(fit: Fit, projected?: ProjectedEffects): Fit {
   if (!projected || projectsNothing(projected)) return fit;
   const incoming = fit.incoming ?? {};
@@ -248,7 +195,6 @@ export function withIncoming(fit: Fit, projected?: ProjectedEffects): Fit {
   };
 }
 
-/** A Map or a plain record of attribute values, as the engine may hand either back. */
 function attributeRecord(
   values: Map<number, number> | Record<number, number> | undefined
 ): Record<number, number> {
@@ -256,11 +202,6 @@ function attributeRecord(
   return values instanceof Map ? Object.fromEntries(values) : { ...values };
 }
 
-/**
- * What a Fitting projects onto another ship — its running command bursts'
- * buffs and its running remote modules' effects — as the engine reports it,
- * worked out under `profile`.
- */
 export async function computeOutgoing(
   fitting: Fitting,
   profile: PilotProfile
@@ -269,7 +210,6 @@ export async function computeOutgoing(
   return toProjectedEffects(calculate(toDogmaFit(fitting, profile)).outgoing);
 }
 
-/** The engine's outgoing projection in our own shape. */
 export function toProjectedEffects(outgoing: Projection | undefined): ProjectedEffects {
   return {
     buffs: (outgoing?.buffs ?? []).map((buff) => ({ id: buff.id, value: buff.value })),
@@ -282,12 +222,6 @@ export function toProjectedEffects(outgoing: Projection | undefined): ProjectedE
   };
 }
 
-/**
- * `dogmaFit` with every running module that can overheat set to overload,
- * as `calculation` (the fit as it stands) reports them; null when none can.
- * Modules come first in the fit's items, so only the first `moduleCount` are
- * modules — drones and fighters after them never overheat.
- */
 function overloadHeatable(
   dogmaFit: Fit,
   moduleCount: number,
@@ -308,7 +242,6 @@ function overloadHeatable(
   };
 }
 
-/** Whether any charge in `groupIds` deals damage, per sorted group-id key; a type's charges never change. */
 const chargeDamageByGroups = new Map<string, boolean>();
 
 async function chargesDealDamage(
@@ -323,7 +256,6 @@ async function chargesDealDamage(
   try {
     types = await loadTypes();
   } catch {
-    // Unknown: count the module, as before, rather than hide a real warning.
     return true;
   }
   const groups = new Set(groupIds);
@@ -342,7 +274,6 @@ async function chargesDealDamage(
       ],
     });
     const charge = items[0]?.charge?.attributes;
-    // The engine gave no charge back: can't call it harmless, and don't cache the guess.
     if (!charge) return true;
     if (chargeDamageSplit(charge) !== null) {
       damages = true;
@@ -353,11 +284,6 @@ async function chargesDealDamage(
   return damages;
 }
 
-/**
- * The type ids of fitted, firing modules that take charges, fire only with
- * one, sit empty, and have no charge that deals damage: an empty probe
- * launcher is not an unloaded weapon.
- */
 async function modulesWithHarmlessCharges(
   fitting: Fitting,
   calculation: ReturnType<typeof calculate>
@@ -377,12 +303,6 @@ async function modulesWithHarmlessCharges(
   return harmless;
 }
 
-/**
- * The engine's violations as the rule breaks a fit reports: everything but
- * skills (the Skill Plan owns those) and resources (CPU, powergrid and
- * calibration have their own figures). An item-level break names the type
- * fitted at its index (`dogmaFit.items`); the ship-level ones carry no type.
- */
 export function ruleBreaksOf(
   dogmaFit: Fit,
   violations: readonly Violation[] | undefined
@@ -428,12 +348,6 @@ export function ruleBreaksOf(
   return breaks;
 }
 
-/**
- * Works out a Fitting's stats under a pilot's skills and implants, with EHP
- * measured against `damageProfile` (the engine's uniform default without
- * one), inside `weather` when there is one. Loads the engine first if this
- * is the first call anywhere in the session.
- */
 export async function computeFittingStats(
   fitting: Fitting,
   profile: PilotProfile,
@@ -447,7 +361,6 @@ export async function computeFittingStats(
   }: StatsOptions = {}
 ): Promise<FittingStats> {
   await loadDogmaEngine(onProgress);
-  // The overheated recalculation below spreads this fit, so it keeps the weather too.
   const dogmaFit = withIncoming(
     withWeather(toDogmaFit(fitting, profile, damageProfile), weatherTypeId),
     incoming
@@ -456,21 +369,12 @@ export async function computeFittingStats(
   const ruleBreaks = ruleBreaksOf(dogmaFit, calculation.violations);
   const harmlessCharges = await modulesWithHarmlessCharges(fitting, calculation);
 
-  // Overheated values come from the engine itself (its overload state), not
-  // a multiplier applied here: the same fit again with every active module
-  // that can overheat set to overload. Skipped when there is none, so a fit
-  // with nothing to overheat costs one calculation and shows no overheated line.
   const heatedFit =
     withOverheated || overheatAll
       ? overloadHeatable(dogmaFit, fitting.modules.length, calculation)
       : null;
   const heatedCalculation = heatedFit === null ? null : calculate(heatedFit);
 
-  // "Overheat all": every figure is the heated one, with no second number
-  // beside it — but the unheated figures ride along (`unheated`, off the
-  // calculation already made), so the page marks only what heat changed.
-  // The editor's state controls still read the unheated result — they show
-  // what the pilot set, not the what-if.
   const allOverheated = overheatAll && heatedCalculation !== null;
   const stats = (shown: Calculation, beside: Calculation | null) =>
     assembleStats({
@@ -498,12 +402,6 @@ export async function computeFittingStats(
   };
 }
 
-/**
- * "Affected by" for one fitted module (`engine/fittings/affectedBy.ts`):
- * the same calculation the stats run, with the engine asked for its sources.
- * Only ever on demand — the dialog asking — never on the stats themselves,
- * where the extra bookkeeping would be paid on every edit for nothing.
- */
 export async function explainModule(
   fitting: Fitting,
   profile: PilotProfile,
@@ -517,7 +415,6 @@ export async function explainModule(
     incoming
   );
   if (overheatAll) {
-    // As the stats do: every running module that can overheat, overloaded.
     dogmaFit = overloadHeatable(dogmaFit, fitting.modules.length, calculate(dogmaFit)) ?? dogmaFit;
   }
   const calculation = calculate(dogmaFit, { sources: true });
@@ -526,7 +423,6 @@ export async function explainModule(
   return affectedAttributes(result.attributes, affectedContextOf(dogmaFit));
 }
 
-/** What `affectedAttributes`' source indices point at in `dogmaFit`. */
 function affectedContextOf(dogmaFit: Fit): AffectedByContext {
   return {
     shipTypeId: dogmaFit.ship.type_id,
@@ -537,23 +433,12 @@ function affectedContextOf(dogmaFit: Fit): AffectedByContext {
   };
 }
 
-/** A Capsule: no hull bonus, so a module fitted to it shows only the pilot's own effects. */
 const CAPSULE_TYPE_ID = 670;
 
-/** One skilled value, and what made it (`skilledSourcesOf`). */
 export interface SkilledAttribute {
   value: number;
   sources: SkilledSource[];
 }
-
-/**
- * Item Detail's skilled values: every attribute of `target` with `profile`'s
- * skills and implants applied, by attribute id. A hull is calculated empty; a
- * module alone on a Capsule, the way the in-game Show info reads a module
- * before it is fitted (no hull bonus). Only attributes the pilot changed are
- * returned, and never the engine's own derived figures (ids ≤ 0), which Item
- * Detail has no row for.
- */
 
 export async function skilledAttributes(
   target: SkilledTarget,
@@ -588,11 +473,6 @@ export async function skilledAttributes(
       row.sources,
     ])
   );
-  /**
-   * The skills behind a hull bonus: the hull applies it, but a ship skill
-   * scales the hull's own bonus attribute (Amarr Cruiser → a Sacrilege's
-   * armor resists), so that skill is named too.
-   */
   const hullBonusSkills = (attributeId: number): AffectedSource[] =>
     (result.attributes.get(attributeId)?.sources ?? []).flatMap((source) => {
       if (
@@ -618,27 +498,18 @@ export async function skilledAttributes(
       );
     });
   const skilled = new Map<number, SkilledAttribute>();
-  // Only what something changed: an attribute the engine left at its own base
-  // can be a dogma default the item doesn't carry (a module's Mass of 1).
   for (const [id, { base, value }] of result.attributes) {
     if (id <= 0 || value === base) continue;
     const sources = skilledSourcesOf(
       [...(sourcesById.get(id) ?? []), ...hullBonusSkills(id)],
       profile
     );
-    // Changed by nothing of the pilot's (a Tactical Destroyer's default mode): not theirs to show.
     if (sources.length === 0) continue;
     skilled.set(id, { value, sources });
   }
   return skilled;
 }
 
-/**
- * Every skill that modifies anything on `fitting` under `profile` — the
- * ship, its mode, the character, each item and its charge ("What to train"'s
- * candidates, `engine/fittings/skillGains.ts`). The same fit the stats
- * work out, asked once for its sources; on demand only, like `explainModule`.
- */
 export async function fittingSkillSources(
   fitting: Fitting,
   profile: PilotProfile,
@@ -662,11 +533,8 @@ export async function fittingSkillSources(
 }
 
 export interface CandidateCheck {
-  /** Nothing about the hull rules it out — rack, hardpoints, rig size, hull restrictions. */
   fitsHull: boolean;
-  /** The pilot has every skill it needs. */
   canFly: boolean;
-  /** Fits the bare hull's CPU, powergrid and calibration (with the pilot's skills) — else it never could. */
   fitsResources: boolean;
 }
 
@@ -678,20 +546,6 @@ function rulesNaming(violations: readonly Violation[] | undefined, target: 'item
 
 const candidateCache = new WeakMap<PilotProfile, Map<string, CandidateCheck>>();
 
-/**
- * The Add panel's "fits this hull" and "can fly" chips (issue #1533): each
- * candidate is calculated alone on the bare hull with the engine's own
- * fitting rules on (`validate`). The rules that name the candidate count,
- * and so do the ship-level ones other than skills: with the candidate the
- * only item, a hardpoint shortfall (`slots`, which the engine reports
- * against the ship) can only be its doing, while a hull the pilot can't fly
- * says nothing about a module. Alone, not
- * on the open Fitting, so the answer depends only on hull + rack + pilot and
- * is memoized on exactly that; a clash with something already fitted (a
- * second one-per-ship module, hardpoints all used) shows on the Fitting
- * itself once added. Cheap (~0.3 ms a candidate), but only ever asked about
- * the results that survived the static filters in `candidates.ts`.
- */
 function checkCandidates(
   shipTypeId: number,
   rack: CandidateRack,
@@ -716,7 +570,6 @@ function checkCandidates(
   return results;
 }
 
-/** The candidate alone on the bare hull, validated: what the engine says is wrong with it. */
 function validateCandidate(
   shipTypeId: number,
   rack: CandidateRack,
@@ -735,7 +588,6 @@ function validateCandidate(
   return calculate(fit, { validate: true }).violations ?? [];
 }
 
-/** The rules that count against a candidate: its own, and the ship-level ones but skills. */
 function candidateRuleTypes(violations: readonly Violation[]): string[] {
   const shipRules = violations.filter((v) => v.target.type === 'ship' && v.rule.type !== 'skill');
   return [...rulesNaming(violations, 'item'), ...shipRules].map((v) =>
@@ -743,7 +595,6 @@ function candidateRuleTypes(violations: readonly Violation[]): string[] {
   );
 }
 
-/** One candidate alone on the bare hull, uncached — the work `checkCandidates` memoizes. */
 function checkOneCandidate(
   shipTypeId: number,
   rack: CandidateRack,
@@ -757,20 +608,6 @@ function checkOneCandidate(
 
 const NO_SKILLS: Map<number, number> = new Map();
 
-/**
- * The same answer as `checkOneCandidate`, cheaper: the engine's cost per call
- * grows with the number of skills it is handed (about 14x from none to a full
- * skill set), and most of what the check needs doesn't depend on them. Run
- * with no skills, the hull rules already answer "goes on this hull", and the
- * skill rules list every skill the item asks for, so "can fly" is read off
- * them against the pilot's own. Only an item too big for the bare hull
- * without skills needs the real run, since skills are what make room (Power
- * Grid Management, the weapon upgrades); an item that fits without them fits
- * with them. An item the hull can never take at all (`fitsHull` false) is
- * answered from this same bare, no-skill check — the Hull icon filter
- * (`FittingAddPanel`) is the only consumer that ever sees it, and a
- * structure module's exact CPU headroom is not worth a full run to report.
- */
 function checkHullCandidate(
   shipTypeId: number,
   rack: CandidateRack,
@@ -787,13 +624,6 @@ function checkHullCandidate(
   return { fitsHull: true, canFly, fitsResources: true };
 }
 
-/**
- * The skills `typeId` needs, each at the level it asks — read off the
- * engine's own fitting rules for the module alone on the bare hull with no
- * skills, where every skill rule it names is one it requires. Offline and
- * from the pinned SDE, so no ESI round trip per module. Its direct
- * requirements only: a Skill Plan's schedule adds their prerequisites.
- */
 function moduleSkillRequirements(
   shipTypeId: number,
   rack: CandidateRack,
@@ -807,7 +637,6 @@ function moduleSkillRequirements(
   );
 }
 
-/** How many slots the bare hull has in each rack — a Tech 3's are 0 until subsystems are fitted. */
 function hullSlotCounts(
   shipTypeId: number,
   skillLevels: Map<number, number>
@@ -827,21 +656,10 @@ function hullSlotCounts(
   };
 }
 
-/**
- * The racks worth asking the engine about on this hull (`racksWithSlots` of
- * its slot counts). An item in any other rack can only fail the hull's rules,
- * so the whole-catalogue check (`useHullFit`) answers it without the engine
- * and leaves it out — the browser shows nothing the check doesn't list.
- */
 function hullRacks(shipTypeId: number, skillLevels: Map<number, number>): Set<CandidateRack> {
   return racksWithSlots(hullSlotCounts(shipTypeId, skillLevels));
 }
 
-/**
- * Which of `chargeTypeIds` the module takes: loaded into it alone on the
- * hull, a charge of the wrong group or size, or too big for the module's
- * capacity, breaks a rule. A missing skill doesn't — the charge still loads.
- */
 function checkCharges(
   shipTypeId: number,
   module: { slot: FittingSlotKind; typeId: number },
@@ -872,13 +690,6 @@ function checkCharges(
   return fits;
 }
 
-/**
- * The charge groups `typeId` itself declares, from calculating it alone on
- * the hull — the same attributes `extractModuleResult` reads off a module
- * already in the Fitting, but for one that isn't fitted yet (issue #1728):
- * `addModule`'s default-charge candidates need this before the module has a
- * calculated result of its own to read `chargeGroupIds` off.
- */
 function chargeGroupIdsFor(shipTypeId: number, slot: FittingSlotKind, typeId: number): number[] {
   const fit: Fit = {
     ship: { type_id: shipTypeId },
@@ -888,7 +699,6 @@ function chargeGroupIdsFor(shipTypeId: number, slot: FittingSlotKind, typeId: nu
   return items[0] ? extractModuleResult(items[0]).chargeGroupIds : [];
 }
 
-/** m3 of charge a module holds — over a charge's volume, how many one load is. 0 when it holds none. */
 function moduleChargeCapacity(
   shipTypeId: number,
   module: { slot: FittingSlotKind; typeId: number }
@@ -897,11 +707,9 @@ function moduleChargeCapacity(
     ship: { type_id: shipTypeId },
     items: [{ type_id: module.typeId, slot: { type: module.slot, index: 0 }, state: 'online' }],
   });
-  // `capacity` is one attribute for both: a ship's cargo hold, a module's charge room.
   return items[0]?.attributes.get(DOGMA_ATTRIBUTE.cargoCapacity)?.value ?? 0;
 }
 
-/** Which of `chargeTypeIds` need a skill the pilot lacks — checked the way `checkCharges` is, keeping what it drops. */
 function chargesMissingSkills(
   shipTypeId: number,
   module: { slot: FittingSlotKind; typeId: number },
@@ -932,18 +740,12 @@ function chargesMissingSkills(
   return missing;
 }
 
-/**
- * What a charge is worked out under beyond the Fitting: the pilot the stats
- * run under, the Damage Profile, and the weather and projected effects.
- * Without one, the pilot's own profile and the engine's defaults.
- */
 export interface ChargeBasis {
   pilot: PilotProfile;
   damageProfile?: DamageProfile;
   options: Pick<StatsOptions, 'weatherTypeId' | 'incoming'>;
 }
 
-/** One charge's figures for a weapon group, from the Fitting calculated with it loaded. */
 export interface ChargeEngineStats extends Pick<
   ChargeChoice,
   'typeId' | 'dps' | 'optimal' | 'falloff' | 'damage' | 'roundsPerMinute' | 'cap' | 'mining'
@@ -951,17 +753,6 @@ export interface ChargeEngineStats extends Pick<
   techLevel: number;
 }
 
-/**
- * The Charge Picker's figures (`engine/fittings/chargeChoice.ts`): for each
- * of `chargeTypeIds`, the whole Fitting calculated once with that charge in
- * every module of `moduleTypeId` and those modules active — so the hull,
- * skills, implants and damage mods all count, as they do on the loaded
- * charge, under `basis` (the stats' own pilot, Damage Profile, weather and
- * projected effects) when given. A cap booster's charge also gets its capacitor figures, and a
- * mining crystal its yield and residue, off the
- * same calculation. One `calculate` per charge (no overheated pass): the Charges tab
- * pays this only while it is open, memoized by its caller.
- */
 function compareCharges(
   fitting: Fitting,
   profile: PilotProfile,
@@ -987,7 +778,6 @@ function compareCharges(
           : module
       ),
     };
-    // `fittingToDogmaFit` puts the modules first, so module i is items[i].
     const dogmaFit = basis
       ? withIncoming(
           withWeather(
@@ -1035,12 +825,6 @@ function compareCharges(
   });
 }
 
-/**
- * The synchronous fit checks, reachable only once the engine is loaded:
- * `loadDogmaEngine()` resolves to this, and `readyDogmaEngine()` (React:
- * `useDogmaEngine`) hands it out after that. Holding one is the proof the
- * WASM engine and its SDE are in, so no caller has to know the call order.
- */
 const dogmaEngine = {
   checkCandidates,
   checkOneCandidate,

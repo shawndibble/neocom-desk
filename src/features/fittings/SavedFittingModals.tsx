@@ -6,21 +6,18 @@ import { deleteFitting, renameFitting } from './myFittings';
 import { DialogFooter } from '@/components/ui/DialogFooter';
 
 interface SavedFittingModalProps {
-  /** The saved Fitting acted on; the dialog is open while this is set. */
   record: FittingRecord | null;
   onClose: () => void;
 }
 
 interface FittingNameModalProps {
   open: boolean;
-  /** Prefill; the text resets to it each time the dialog opens for a different key. */
   name: string;
   resetKey: string | null;
   onSubmit: (name: string) => void;
   onClose: () => void;
 }
 
-/** The rename dialog: My Fittings rows and the editor header share it. */
 export function FittingNameModal({
   open,
   name,
@@ -30,7 +27,6 @@ export function FittingNameModal({
 }: FittingNameModalProps) {
   const { t } = useTranslation();
   const reasonId = useId();
-  // Reset to the given name each time a different one opens, during render.
   const [text, setText] = useState(name);
   const [forKey, setForKey] = useState(resetKey);
   if (resetKey !== forKey) {

@@ -1,9 +1,3 @@
-/**
- * What a paste did, said in one line under the page's help text. There is no
- * paste box any more (a scan is pasted anywhere on the page), so a failed paste
- * needs somewhere to be told. `useScanFeedback` (own file) wraps a page's `add`
- * and keeps the last outcome; `ScanFeedback` renders it, empty when all is well.
- */
 import { useTranslation } from 'react-i18next';
 import { InlineError } from '@/components/ui/InlineError';
 import type { AddScanResult } from './scanResult';

@@ -1,11 +1,3 @@
-/**
- * A selected Hauling row's detail, in the trip rail or a phone sheet: the
- * most to pay, the destination's sell orders with the user's listing, Days to
- * Sell, and the math folded behind "Show the math". Sold into buy orders,
- * the buy orders it fills replace the sell orders and Days to Sell.
- * Header's `ItemMoreActions` ⋮ carries the item's actions. Sized for a ~20rem
- * rail and a 390px sheet: figures never break mid-number.
- */
 import { fixed2 } from '@/lib/fixedFormat';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useState, type ReactNode } from 'react';
@@ -33,25 +25,16 @@ import { formatCount } from '@/lib/formatCount';
 const formatVolumeM3 = createNumberFormat({ maximumFractionDigits: 3 });
 const formatDailyUnits = createNumberFormat({ maximumFractionDigits: 1 });
 
-/** Orders shown from the destination's book; the Market link has the rest. */
 const ORDER_LEVELS = 8;
 
 export interface HaulingItemDetailProps {
   row: HaulingViewRow;
-  /** The row's Trip Plan line, when it has one: what the plan brings of it. */
   line?: TripLine;
-  /** What capped the line ("22 m³ · your share of a week's sales"), from the panel. */
   loadNote?: string;
-  /**
-   * False where the surface's own title row names the item (the phone sheet):
-   * that row then carries `HaulingItemActions` too. The flags and lane stay.
-   */
   showTitle?: boolean;
-  /** Without the title row: actions right-aligned on the flags and lane line (the slide-over's ⋮). */
   laneActions?: ReactNode;
 }
 
-/** The item's ⋮, for the detail's title row or a sheet's. */
 export function HaulingItemActions({ row }: { row: HaulingViewRow }) {
   return <ItemMoreActions typeId={row.typeId} itemName={row.name} variant="ghost" size="sm" />;
 }
@@ -117,7 +100,6 @@ function Header({
       <TypeIcon typeId={row.typeId} size={64} className="size-10 shrink-0" />
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
         <div className="flex items-start gap-2">
-          {/* Plain text, not a link: Show info is a link below and in the ⋮ (DESIGN.md §6c). */}
           <h3 className="min-w-0 flex-1 text-base leading-tight font-semibold break-words">
             {row.name}
           </h3>
@@ -133,7 +115,6 @@ function Label({ children }: { children: ReactNode }) {
   return <span className={eyebrowClassName}>{children}</span>;
 }
 
-/** Full ISK on every screen, never shorthand: it is the figure typed into EVE. */
 function PayAtMost({ row }: { row: HaulingViewRow }) {
   const { t } = useTranslation();
   const limit = maxBuyPrice(row.candidate, row.fees);
@@ -155,7 +136,6 @@ function PayAtMost({ row }: { row: HaulingViewRow }) {
           </span>
         </>
       )}
-      {/* No unit worth buying: a "+0 profit each" would read as a real figure. */}
       {row.suggestedUnits > 0 && (
         <span
           className={cx(
@@ -179,11 +159,9 @@ function PayAtMost({ row }: { row: HaulingViewRow }) {
 interface OrderRow {
   price: number;
   units: number;
-  /** Listing: the user's own order. Instant: an order the load sells into. */
   marked: boolean;
 }
 
-/** A destination order book as Price / Units, the marked rows tinted. */
 function OrderTable({
   title,
   rows,
@@ -192,7 +170,6 @@ function OrderTable({
 }: {
   title: string;
   rows: OrderRow[];
-  /** Said beside a marked row's price ("your listing"); without it a marked row is only tinted. */
   markLabel?: string;
   note?: string;
 }) {
@@ -240,11 +217,6 @@ function OrderTable({
   );
 }
 
-/**
- * The cheapest orders with your listing among them, after every order at or
- * under its price (those were there first). Orders past `ORDER_LEVELS` show
- * only when your listing sits behind them.
- */
 function withYourListing(ladder: readonly LadderLevel[], price: number, units: number): OrderRow[] {
   const found = ladder.findIndex((level) => level.price > price);
   const at = found === -1 ? ladder.length : found;
@@ -253,7 +225,6 @@ function withYourListing(ladder: readonly LadderLevel[], price: number, units: n
   return rows.slice(0, Math.max(ORDER_LEVELS, at) + 1);
 }
 
-/** The dearest buy orders, marked where `units` sold in order would fill them. */
 function soldInto(ladder: readonly LadderLevel[], units: number): OrderRow[] {
   let before = 0;
   return ladder.slice(0, ORDER_LEVELS).map((level) => {
@@ -326,10 +297,6 @@ function PlanNote({
 
 type Lot = ReturnType<typeof lotEconomics>;
 
-/**
- * Per unit of the load the row's figures are worked on, so the ledger adds up
- * to the row's profit each.
- */
 function TheMath({
   row,
   line,
@@ -398,12 +365,6 @@ function TheMath({
   );
 }
 
-/**
- * Which of `estimateSale`'s cases set the Expected Sell Price: the lower of
- * the recent sale and one tick under the cheapest listing (the listing itself
- * when no tick fits under it), rounded down only when that wasn't already a
- * valid price.
- */
 function whyPriceKey(sale: ListHaulingScanRow['sale']) {
   const tick = sale.undercutPrice < sale.lowestAsk;
   const rounded = sale.price < Math.min(sale.undercutPrice, sale.recentSalePrice);
@@ -439,7 +400,6 @@ function ListingBody({
       />
       <div className="flex flex-col gap-0.5">
         <Label>{t('market.hauling.itemDetail.sellsIn')}</Label>
-        {/* Each segment keeps its trailing "·": a wrap falls between segments, never before a dot. */}
         <p className="text-sm text-text-dim">
           <span className="whitespace-nowrap">
             <b className="text-text tabular-nums">
@@ -506,7 +466,6 @@ function InstantBody({
     fees: row.fees,
     destBuyLadder: row.destBuyLadder,
   });
-  // The plan's quantity when it brings some, else what the row's figures sell.
   const orders = soldInto(row.destBuyLadder, plannedUnits(line) ?? lot.filled);
 
   return (
@@ -534,7 +493,6 @@ function InstantBody({
   );
 }
 
-/** Each end hub's Market page for the item, Route Safety for the lane, and Show info. */
 function Links({ row }: { row: HaulingViewRow }) {
   const { t } = useTranslation();
   return (
@@ -555,17 +513,14 @@ function Links({ row }: { row: HaulingViewRow }) {
   );
 }
 
-/** Real links (they open a page or the item's info), drawn as ghost buttons; `buttonClassName`'s hover keys on `:enabled`, which an `<a>` never matches. */
 const LINK_BUTTON = buttonClassName({
   variant: 'ghost',
   size: 'sm',
   className: 'hover:border-line-bright hover:bg-panel-2 active:bg-panel',
 });
 
-/** A day's highest and lowest fill this far apart are two kinds of sale — a listing bought, a dump into a buy order — not one price. */
 const SPLIT_RATIO = 0.8;
 
-/** The newest trading day's two kinds of sale, when they differ enough that its average would mislead. */
 function LastSalesSplit({ row }: { row: HaulingViewRow & ListHaulingScanRow }) {
   const { t } = useTranslation();
   const day = row.demand.latestDay;

@@ -1,10 +1,3 @@
-/**
- * Sell-order ISK split by how soon each order needs the pilot: Balance's
- * "ISK waiting" breakdown. Reads the same urgency judgement as Open Orders (`orderUrgency`),
- * from rows built by `openOrderRowsFromSnapshot`, which cannot see the deep
- * (system, region, structure) books the Orders page adds. An order nobody could check against rivals
- * is its own part, never counted as healthy.
- */
 import { orderGroupKey, type OpenOrderRow } from './openOrdersModel';
 import { orderUrgency } from './orderUrgency';
 

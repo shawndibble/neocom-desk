@@ -1,10 +1,3 @@
-/**
- * Tables and charts for the money kinds (wallet, wallet flow, net
- * worth, price watch, stock, loyalty points, mining tax). Pure, like the
- * builders that call them: figures and a translate function in, plain models
- * out. Kept in one file so the money kinds' redesign stays out of the shared
- * `models.ts`, `kindModels.ts` and `chartBuilders.ts`.
- */
 import { DAY_MS } from '@/lib/age';
 import { isPriceSpike } from '@/engine/market/priceVsMedian';
 import { formatVsMedianPct } from '@/features/market/format';
@@ -30,14 +23,6 @@ import type { Translate } from '@/lib/translate';
 
 const W = 'overview.widgets';
 
-// --- Wallet --------------------------------------------------------------------------
-
-/**
- * How far a balance moved over the days a series covers, as the Number's one
- * secondary line: the text carries the signed figure and the span, the shell
- * draws the direction glyph. More ISK is good; the tone follows that, not the
- * sign. `keyPrefix` picks the kind's own wording (`change` and `unchanged`).
- */
 export function balanceChange(
   t: Translate,
   values: readonly number[],
@@ -57,10 +42,8 @@ export function balanceChange(
 }
 
 const JOURNAL_ROWS = 6;
-/** The Wallet Journal, where `?highlight=` scrolls to an entry and flashes it. */
 const JOURNAL_PATH = '/wallet/journal';
 
-/** The newest journal entries that moved ISK: what it was, how much, how long ago, and the balance after. */
 export function journalTable(
   t: Translate,
   entries: readonly WalletJournalEntry[],
@@ -92,17 +75,12 @@ export function journalTable(
   };
 }
 
-// --- Wallet flow ---------------------------------------------------------------------
-
 export interface FlowBuckets {
-  /** A bar per day (a 7-day range) rather than per week. */
   daily: boolean;
   income: number[];
-  /** Positive magnitudes. */
   spending: number[];
 }
 
-/** Income and spending per period over the range, newest last: days up to a week, weeks beyond. */
 export function flowBuckets(
   entries: readonly WalletJournalEntry[],
   now: number,
@@ -131,11 +109,6 @@ export function flowBuckets(
   return { daily, income, spending };
 }
 
-/**
- * One bar per period: what the wallet gained net, green above the axis, red
- * below it, each with its figure. Hover reads income, spending and net apart.
- * Null when ISK never moved.
- */
 export function flowBars(
   t: Translate,
   entries: readonly WalletJournalEntry[],
@@ -172,15 +145,10 @@ export function flowBars(
   };
 }
 
-/** A column that only ever runs one way: ISK in is good, ISK out is bad; zero is plain. */
 function directionCell(text: string, value: number, tone: 'good' | 'bad'): TableCell {
   return value > 0 ? { text, tone } : text;
 }
 
-/**
- * Per ref type: net, what came in, what went out, and its share of all the ISK that moved.
- * The copy is under `walletFlow`, the retired kind's name, on purpose (now the Wallet's Flow).
- */
 export function flowTable(t: Translate, rows: readonly RefTypeBreakdownRow[]): TableModel {
   const moved = rows.reduce((sum, row) => sum + row.income + row.expense, 0);
   return {
@@ -204,12 +172,6 @@ export function flowTable(t: Translate, rows: readonly RefTypeBreakdownRow[]): T
   };
 }
 
-/**
- * The Number's one line. Against the previous window when the journal reaches
- * back far enough to hold one (twice the range): the net's rise or fall, with
- * its direction and whether it is good. Otherwise the biggest source of
- * income, so the line still says something the net does not.
- */
 export function flowSecondary(
   t: Translate,
   entries: readonly WalletJournalEntry[],
@@ -245,21 +207,12 @@ export function flowSecondary(
   };
 }
 
-// --- Net worth -----------------------------------------------------------------------
-
 export interface NetWorthSeries {
-  /** One UTC day per point, oldest first. */
   days: string[];
   layers: Record<LayerId, number[]>;
   totals: number[];
 }
 
-/**
- * The days the included Characters were all being recorded, with each layer
- * summed across them. A Character with no snapshot on a day carries its last
- * one forward; a day before every Character has a first snapshot is left out,
- * because unknown is not zero and a late-added alt would draw a jump.
- */
 export function netWorthSeries(characters: readonly NetWorthCharacter[]): NetWorthSeries {
   const out: NetWorthSeries = {
     days: [],
@@ -299,7 +252,6 @@ export function netWorthSeries(characters: readonly NetWorthCharacter[]): NetWor
   return out;
 }
 
-/** Each layer's value now (the latest snapshots), its share of the total, and how it changed over the series. */
 export function netWorthTable(
   t: Translate,
   now: LayerValues,
@@ -332,12 +284,8 @@ export function netWorthTable(
   };
 }
 
-// --- Market stock --------------------------------------------------------------------
-
-/** "Amarr VIII (Oris) - Emperor Family Academy" reads as its first part on a widget. */
 const marketName = (name: string): string => name.split(' - ')[0] ?? name;
 
-/** Worst first: most out, then most low, then by name. */
 function worstFirst(markets: readonly StockBoardMarket[]): StockBoardMarket[] {
   return [...markets].sort(
     (a, b) =>
@@ -345,7 +293,6 @@ function worstFirst(markets: readonly StockBoardMarket[]): StockBoardMarket[] {
   );
 }
 
-/** Every market, healthy ones too: how many items are out and low, what is ready to list, what restocking costs. */
 export function stockTable(t: Translate, markets: readonly StockBoardMarket[]): TableModel {
   return {
     columns: [
@@ -380,11 +327,6 @@ const STOCK_STATES = [
   { key: 'over', color: 'neutral' },
 ] as const;
 
-/**
- * One stacked bar per market, split Out / Low / OK / Over, so which side of
- * the target each market sits on is visible (a "% at target" hides it). A
- * market with no items is left out; null when none has any.
- */
 export function stockChart(
   t: Translate,
   markets: readonly StockBoardMarket[]
@@ -426,21 +368,16 @@ export function stockChart(
   };
 }
 
-// --- Price watch ---------------------------------------------------------------------
-
 interface WatchedPrice {
   typeId: number;
   name: string;
   direction: 'above' | 'below';
   targetPrice: number;
-  /** The poller's last hub price; null when it has none for this target yet. */
   price: number | null;
   crossed: boolean;
-  /** The latest price vs its 90-day median at the hub, in percent; null or absent when unknown. */
   vs90d?: number | null;
 }
 
-/** `+5%`, `-0.8%`, `0%`: a distance is read to a tenth of a percent below ten, whole above. */
 function signedPercentOf(ratio: number): string {
   const pct = ratio * 100;
   const rounded = Math.abs(pct) < 10 ? Math.round(pct * 10) / 10 : Math.round(pct);
@@ -448,10 +385,8 @@ function signedPercentOf(ratio: number): string {
   return `${rounded > 0 ? '+' : '-'}${Math.abs(rounded)}%`;
 }
 
-/** Within this fraction of its target a watched price is "close" (amber) until it crosses. */
 export const NEAR_TARGET = 0.05;
 
-/** The watch target: its direction ("≤") before the figure, the figure an `IskAmount`. */
 function targetCell(direction: string, targetPrice: number): TableCell {
   return {
     text: `${direction} ${formatIskCompact(targetPrice)}`,
@@ -460,25 +395,18 @@ function targetCell(direction: string, targetPrice: number): TableCell {
   };
 }
 
-/** Green once the target is hit, amber within `NEAR_TARGET` of it, plain beyond. */
 function gapCell(alert: WatchedPrice, ratio: number): TableCell {
   const text = signedPercentOf(ratio);
   if (alert.crossed) return { text, tone: 'good' };
   return Math.abs(ratio) <= NEAR_TARGET ? { text, tone: 'caution' } : text;
 }
 
-/** "+35%" amber from the spike threshold, "−12%" plain, blank when unknown. */
 function vs90dCell(value: number | null | undefined): TableCell {
   if (value === null || value === undefined) return '';
   const text = formatVsMedianPct(value);
   return isPriceSpike(value) ? { text, tone: 'caution' } : text;
 }
 
-/**
- * Each target against the price now: how far the price sits from it. Targets
- * that were hit first, then the nearest to being hit, those with no price yet
- * last.
- */
 export function priceWatchTable(t: Translate, alerts: readonly WatchedPrice[]): TableModel {
   const distance = (alert: WatchedPrice) =>
     alert.price === null || alert.targetPrice <= 0
@@ -515,12 +443,8 @@ export function priceWatchTable(t: Translate, alerts: readonly WatchedPrice[]): 
   };
 }
 
-// --- Loyalty points ------------------------------------------------------------------
-
-/** The LP Store (a Wallet tab); a corporation's own store is `/<corporationId>` below it. */
 export const LP_STORE_PATH = '/wallet/lp-store';
 
-/** Each corporation's points and its share of all of them (a sliver reads `<1%`, never `0%`). */
 export function lpTable(
   t: Translate,
   entries: readonly { corporationId: number; name: string | null; points: number }[]
@@ -550,9 +474,6 @@ export function lpTable(
   };
 }
 
-// --- Mining tax ----------------------------------------------------------------------
-
-/** What each payee is owed, how long the oldest of it has waited and over how many entries. */
 export function miningTaxTable(
   t: Translate,
   payees: readonly PayeeOwed[],

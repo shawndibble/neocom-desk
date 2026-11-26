@@ -1,7 +1,3 @@
-/**
- * Mails a pilot how their vetting review was decided, from the active reviewer's Character, by
- * the paced Officer mail queue. Never throws: whatever goes wrong comes back as a `MailRun`.
- */
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { VettingRejection, VettingReview } from '@/engine/vetting';

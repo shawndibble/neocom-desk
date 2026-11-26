@@ -1,10 +1,3 @@
-// Shared Pops, the Firestore side (issue #6223, ADR 0034). Publishing rebuilds a book's
-// `sharedPops/{corporationId}` doc from its Extractions and Pop Sharing settings after every sync
-// and every change that moves them; reading checks a viewer's Characters against each pop's
-// audiences live (public ESI for corporation and alliance, Member docs for Communities). Both
-// collections here are server-only: the rules deny every client, and the one way in is the
-// callables. The maths is in sharedPops.ts.
-
 import {
   FieldValue,
   type DocumentReference,
@@ -62,19 +55,14 @@ import { PROJECTIONS_COLLECTION } from './projectionStore.js';
 
 type Data = Record<string, unknown>;
 
-/** The most of the book's own refinery names one scheduled run looks up. */
 export const MAX_REFINERY_NAME_LOOKUPS = 10;
-/** A refused or missing refinery name is asked for again after this long. */
 export const REFINERY_NAME_RECHECK_MS = 7 * DAY_MS;
-/** The most extra Characters one read proves; the client sends no more than this. */
 export const MAX_VIEWER_TOKENS = 50;
-/** An editor's use is stamped again only once the stored one is this old (the window is 30 days). */
 export const EDITOR_STAMP_EVERY_MS = HOUR_MS;
 
 export interface SharedPopsDeps {
   db: Firestore;
   now: () => number;
-  /** The book corporation's alliance (public ESI); absent keeps the alliance last read. */
   corporationAlliance?: CorporationAllianceLookup;
 }
 
@@ -137,20 +125,13 @@ function extractionOf(d: DocumentSnapshot): PopExtraction | undefined {
       ? { sourceCorporationId: x.sourceCorporationId as number }
       : {}),
     ...(oreLines ? { oreLines } : {}),
-    // A pilot's own link (a start from the pop) holds until an officer links again, which clears it.
     ...(survey ? { surveyId: survey } : {}),
     ...(fullyMined ? { fullyMined } : {}),
   };
 }
 
-/** `in` queries take at most 30 values. */
 const IN_QUERY_MAX = 30;
 
-/**
- * Ore units the book's ledger rows show mined for each Extraction that has a chunk make-up and
- * has arrived: the quantity of every `observed` row stamped with its id. An Extraction with no
- * rows reads 0 (a pop with ore and nothing mined yet), one with no make-up is left out.
- */
 async function minedQtyByExtraction(
   book: DocumentReference,
   extractions: readonly PopExtraction[],
@@ -182,7 +163,6 @@ async function minedQtyByExtraction(
   return mined;
 }
 
-/** Refinery names and systems the book holds: a moon owner's label or structure, its own looked-up names. */
 function refineriesOf(
   feeders: readonly DocumentSnapshot[],
   ownNames: Data,
@@ -220,7 +200,6 @@ function refineriesOf(
   return out;
 }
 
-/** A moon owner whose moons the book handles now; the others share nothing. */
 const isHandledOwner = (f: DocumentSnapshot): boolean => {
   const status = f.get('status');
   return f.exists && (status === 'active' || status === 'pending-removal');
@@ -230,19 +209,13 @@ const ownersOf = (handled: readonly DocumentSnapshot[]) =>
     handled.map((f) => [Number(f.id), { optedOut: f.get('popSharingOptOut') !== undefined }])
   );
 
-/** The corporation's alliance a caller already read: `null` is none; `allianceId` absent, unread. */
 export interface KnownAlliance {
   allianceId?: number | null;
 }
 
-/**
- * Rebuilds the book's Shared Pops: writes the doc, or deletes it when the book publishes nothing,
- * so turning sharing off, an opt-out or a removed audience takes a pop away at once.
- */
 export async function publishSharedPops(
   deps: SharedPopsDeps,
   corporationId: number,
-  /** The corporation's alliance, already read by the caller: used as is, not re-read. */
   known: KnownAlliance = {}
 ): Promise<SharedPopsDoc | null> {
   const { db } = deps;
@@ -327,12 +300,6 @@ export async function publishSharedPops(
   return doc;
 }
 
-/**
- * `sharedPopSources/{corp}.sharingCommunityIds`: the Communities the book's settings name while
- * it shares. Unlike `sharedPops/{corp}`, which goes whenever no pop is live, this lasts between
- * extractions, so a Community's admin always sees (and can block) a corporation sharing into it.
- * Written only when it changes.
- */
 export const SHARING_COMMUNITY_IDS = 'sharingCommunityIds';
 
 async function indexSharingCommunities(
@@ -346,12 +313,6 @@ async function indexSharingCommunities(
   await ref.set({ [SHARING_COMMUNITY_IDS]: ids }, { merge: true });
 }
 
-/**
- * Drops each device's unfired Scheduled Push for a pop whose time moved (an early fracture):
- * its Occurrence Key (`sharedMoonPop:{popId}:{popAtMs}:{lead}`) names the old time, and a device
- * whose app stays closed never uploads the Projection that would replace it, so it would still
- * push at the stale time. The open app's poll tells the new time. Best effort.
- */
 async function cancelStalePopPushes(
   db: Firestore,
   moved: readonly { id: string; popAtMs: number }[]
@@ -362,7 +323,6 @@ async function cancelStalePopPushes(
       const rows = await db
         .collection(PROJECTIONS_COLLECTION)
         .where('occurrenceKey', '>=', prefix)
-        // `;` is the character after `:`, so this bounds every key under the prefix.
         .where('occurrenceKey', '<', `sharedMoonPop:${id};`)
         .get();
       const stale = rows.docs.filter(
@@ -381,12 +341,6 @@ async function cancelStalePopPushes(
   }
 }
 
-/**
- * Whether this sync republishes the book's Shared Pops (`sharedPopsRepublishDue`), with the
- * corporation's alliance it read for that, so a book that joins an alliance shows its pops there
- * now rather than at the next 6-hourly recheck. Costs the doc's read, and one public ESI read
- * while a doc is held. Null: no republish.
- */
 export async function sharedPopsRepublish(
   deps: SharedPopsDeps,
   corporationId: number,
@@ -416,7 +370,6 @@ export async function sharedPopsRepublish(
   return allianceNow === undefined ? {} : { allianceId: allianceNow };
 }
 
-/** `publishSharedPops`, best effort: a failure is logged and never fails the sync or edit behind it. */
 export async function refreshSharedPops(
   deps: SharedPopsDeps,
   corporationId: number,
@@ -429,16 +382,10 @@ export async function refreshSharedPops(
   }
 }
 
-/** The structure name reader the scheduled sync's grant carries (`SyncEsi.structure`). */
 export type StructureNameReader = (
   structureId: number
 ) => Promise<{ kind: 'ok'; name: string; solarSystemId: number } | { kind: string }>;
 
-/**
- * Looks up the names of the book's own refineries that have a live Extraction and no name yet,
- * with the scheduled sync's grant (it carries the structures scope). Only while sharing is on:
- * the names are kept for Shared Pops alone. Best effort.
- */
 export async function learnOwnRefineryNames(
   deps: SharedPopsDeps,
   corporationId: number,
@@ -483,7 +430,6 @@ export async function learnOwnRefineryNames(
   }
 }
 
-/** The `sharedPopSources` merge that stamps one officer's editing use at `at`. */
 export const editorStampFields = (
   officer: { characterId: number; ownerHash: string },
   at: number
@@ -497,7 +443,6 @@ export const editorStampFields = (
   },
 });
 
-/** Stamps an officer's use of the book with an editing role: the Community officer rule's clock. */
 export async function stampEditorUse(
   db: Firestore,
   corporationId: number,
@@ -507,7 +452,6 @@ export async function stampEditorUse(
   const ref = sharedPopSourcesRef(db, corporationId);
   const key = `char:${officer.characterId}`;
   try {
-    // One write an hour at most: every officer call lands here, on one doc per book.
     const held = editorStampsFrom({
       editors: { [key]: recordOf((await ref.get()).get('editors'))[key] },
     })[0];
@@ -518,23 +462,14 @@ export async function stampEditorUse(
       (held.failedAt === undefined || held.failedAt < held.usedAt)
     )
       return;
-  } catch {
-    // Unread: stamp anyway.
-  }
+  } catch {}
   await ref
     .set(editorStampFields(officer, at), { merge: true })
     .catch((e) => console.error('editor stamp failed', e instanceof Error ? e.message : e));
 }
 
-/** Field on the officer record: when `stampEditorUseIfSharing` last looked (epoch ms). */
 export const EDITOR_CHECKED_AT = 'editorCheckedAt';
 
-/**
- * `stampEditorUse` for `authorizeOfficer`, without a read on most calls: once an hour per
- * officer record (`EDITOR_CHECKED_AT`), and only for a book that has Pop Sharing settings: the
- * stamp only decides Community shares, and a book that never set Pop Sharing shares nothing.
- * Turning sharing on stamps the officer who does it (`applyPopSharingEdit`). Best effort.
- */
 export async function stampEditorUseIfSharing(
   db: Firestore,
   corporationId: number,
@@ -548,14 +483,12 @@ export async function stampEditorUseIfSharing(
   try {
     const settings = await corpDoc(db, corporationId).collection(META).doc(POP_SHARING_DOC).get();
     if (settings.exists) await stampEditorUse(db, corporationId, officer, at);
-    // The record may be gone (a revoked check) or never written (no book): nothing to remember.
     await officerRecord.ref.update({ [EDITOR_CHECKED_AT]: at }).catch(() => undefined);
   } catch (e) {
     console.error('editor stamp check failed', e instanceof Error ? e.message : e);
   }
 }
 
-/** Stamps a failed role check: the officer stops counting for Community shares until their next editing use. */
 export async function stampFailedRoleCheck(
   db: Firestore,
   corporationId: number,
@@ -565,15 +498,12 @@ export async function stampFailedRoleCheck(
   const ref = sharedPopSourcesRef(db, corporationId);
   try {
     const held = await ref.get();
-    // Nobody to disqualify: no stamp is written for a Character that never edited the book.
     if (!isPlainRecord(recordOf(held.get('editors'))[`char:${characterId}`])) return;
     await ref.set({ editors: { [`char:${characterId}`]: { failedAt: at } } }, { merge: true });
   } catch (e) {
     console.error('failed-check stamp failed', e instanceof Error ? e.message : e);
   }
 }
-
-// --- Reading --------------------------------------------------------------------------------
 
 export interface PopViewer {
   characterId: number;
@@ -586,10 +516,6 @@ export interface SharedPopsReadDeps {
   affiliations: AffiliationLookup;
 }
 
-/**
- * The Communities each viewer is a current Member of (ownerHash checked, as `isCurrentMember`),
- * by Character.
- */
 async function communitiesOf(
   db: Firestore,
   viewers: readonly PopViewer[]
@@ -614,11 +540,6 @@ async function communitiesOf(
   return out;
 }
 
-/**
- * The docs as each book's settings allow now (`currentSharedPops`): one batched read of every
- * book, its Pop Sharing settings and the moon owners its pops name. Publishing is best effort and
- * can race an edit, so this is what makes an opt-out or turning sharing off take pops away at once.
- */
 async function asSettingsAllowNow(
   db: Firestore,
   docs: Iterable<SharedPopsDoc>
@@ -658,11 +579,6 @@ async function asSettingsAllowNow(
   return out;
 }
 
-/**
- * Each doc with the book's alliance as it is now (`bookAllianceNow`): from a viewer in the book's
- * corporation, else from the book's officers (one batched affiliation read, cached per Character),
- * else the alliance last published. So a book that left its alliance stops showing there at once.
- */
 async function withAllianceNow(
   deps: SharedPopsReadDeps,
   docs: SharedPopsDoc[],
@@ -682,7 +598,6 @@ async function withAllianceNow(
       ];
       if (ids.length > 0) officers = [...(await deps.affiliations(ids)).values()];
     } catch (e) {
-      // Unanswered: the alliance last published stands, as before this check.
       console.error('book alliance affiliation failed', e instanceof Error ? e.message : e);
     }
   }
@@ -695,11 +610,6 @@ async function withAllianceNow(
   });
 }
 
-/**
- * Which of `communityIds` carry this book's pops now: not blocked by the Community's admin, and
- * an officer of the book (an editing use in the last 30 days, no failed role check since, still
- * in the book's corporation) is a current Member.
- */
 export async function sharingCommunities(
   deps: SharedPopsReadDeps,
   corporationId: number,
@@ -716,7 +626,6 @@ export async function sharingCommunities(
       : await deps
           .affiliations(editors.map((e) => e.characterId))
           .then((a) => editors.filter((e) => a.get(e.characterId)?.corporationId === corporationId))
-          // Unanswered: no officer is known to be in the corporation, so no Community counts.
           .catch((e: unknown) => {
             console.error('officer affiliation failed', e instanceof Error ? e.message : e);
             return [];
@@ -734,10 +643,6 @@ export async function sharingCommunities(
   return out;
 }
 
-/**
- * Every Shared Pop the viewer's Characters may read now. The server-side read seam: the
- * callable answers a pilot with it, and a notification sweep can use it for a device's Characters.
- */
 export async function sharedPopsFor(
   deps: SharedPopsReadDeps,
   viewers: readonly PopViewer[]
@@ -778,7 +683,6 @@ export async function sharedPopsFor(
     const communityIds = new Set(
       candidates.filter((c) => status.get(c)?.officer && !status.get(c)?.blocked)
     );
-    // Each Character on its own access, so the notification reaches only those in an audience.
     const characters = viewers.map((v) => {
       const a = affiliations.get(v.characterId);
       const mine = communitiesByCharacter.get(v.characterId) ?? new Set<string>();
@@ -802,10 +706,8 @@ export async function sharedPopsFor(
         syncedAt: doc.syncedAt ?? null,
         viewerCharacterIds: audienceCharacters(doc, pop, characters),
       };
-      // Who else a pop is shared with, and whose moon it is, are the book's business.
       delete view.audiences;
       delete view.ownerCorporationId;
-      // The mined figures only feed the server's own quiet test: a viewer gets the verdict.
       delete view.minedPct;
       delete view.minedQty;
       delete view.minedChangedAt;
@@ -816,9 +718,6 @@ export async function sharedPopsFor(
   return out;
 }
 
-// --- Callables ------------------------------------------------------------------------------
-
-/** `listSharedPopsCallable` input: access tokens proving the caller's other Characters. */
 export function parseListSharedPopsInput(data: unknown): { accessTokens: string[] } {
   const d = record(data ?? {});
   if (d.accessTokens === undefined) return { accessTokens: [] };
@@ -832,10 +731,6 @@ export function parseListSharedPopsInput(data: unknown): { accessTokens: string[
   return { accessTokens: d.accessTokens as string[] };
 }
 
-/**
- * The signed-in Character plus every other Character whose access token verifies. A token that
- * fails is skipped (one stale alt never hides the rest); it is never stored or logged.
- */
 export async function provenViewers(
   caller: Caller,
   accessTokens: readonly string[],
@@ -856,7 +751,6 @@ export async function provenViewers(
   return [...viewers.values()];
 }
 
-/** The Communities a book's Pop Sharing settings name (default and every Moon override). */
 export async function settingsCommunityIds(
   db: Firestore,
   corporationId: number
@@ -872,22 +766,10 @@ export async function settingsCommunityIds(
 
 export interface CommunityPopSharer {
   corporationId: number;
-  /**
-   * Whether the corporation's pops reach the Community now, block aside: its settings name the
-   * Community and an officer of the book is a Member (the officer rule). False for a blocked
-   * corporation whose settings no longer name the Community.
-   */
   sharing: boolean;
   blocked: boolean;
 }
 
-/**
- * A Community's admin: the corporations whose Pop Sharing names the Community, and the ones
- * they blocked. Listed from the settings' durable index (`sharingCommunityIds`), so a sharer
- * stays listed (and blockable) between extractions, and from the published docs for a book not
- * republished since that index existed. Each reports whether its pops actually reach the
- * Community now (the officer rule), not just whether its settings name it.
- */
 export async function listCommunityPopSharers(
   deps: SharedPopsReadDeps,
   caller: Caller,
@@ -903,7 +785,6 @@ export async function listCommunityPopSharers(
     db.collection(SHARED_POPS).where('communityIds', 'array-contains', communityId).get(),
     db.collection(COMMUNITIES_COLLECTION).doc(communityId).collection(POP_SHARING_BLOCKS).get(),
   ]);
-  // A published doc counts only for a book the index has not caught up with yet.
   const indexedNow = new Set(indexed.docs.map((d) => d.id));
   const stale = (
     await asSettingsAllowNow(
@@ -952,7 +833,6 @@ export function parseCommunityPopBlockInput(data: unknown): CommunityPopBlockInp
   return { communityId: d.communityId, corporationId: d.corporationId, blocked: d.blocked };
 }
 
-/** A Community's admin blocks (or unblocks) a corporation's Shared Pops there; it holds from the next read. */
 export async function setCommunityPopBlock(
   db: Firestore,
   caller: Caller,
@@ -966,13 +846,9 @@ export async function setCommunityPopBlock(
   return { ok: true };
 }
 
-// --- Linking a Survey started from a pop -------------------------------------------------------
-
 const POP_ID = /^([1-9][0-9]{0,15})_.{1,100}$/;
-/** A `shares` id: the app's alphabet and length (see `shortStartLink.ts`). */
 const SHARE_ID = /^[2-9a-hj-kmnp-z]{6}$/;
 
-/** `linkSharedPopSurveyCallable` input: the pop's id and the Survey (a Share Link id) started from it. */
 export function parseLinkSharedPopSurveyInput(data: unknown): { popId: string; surveyId: string } {
   const d = record(data);
   if (typeof d.popId !== 'string' || !POP_ID.test(d.popId))
@@ -982,12 +858,6 @@ export function parseLinkSharedPopSurveyInput(data: unknown): { popId: string; s
   return { popId: d.popId, surveyId: d.surveyId };
 }
 
-/**
- * Links a Survey a pilot started from a Shared Pop's start link back to that pop, so everyone who
- * sees the pop can open it. Only a viewer the pop reaches now may (`sharedPopsFor` is the one
- * audience check); the newest link wins, and an officer's own `linkSurvey` clears it. The Survey
- * must exist. Stored on the Extraction beside the officer's `surveyId`, which this never touches.
- */
 export async function linkSharedPopSurvey(
   deps: SharedPopsReadDeps,
   caller: Caller,
@@ -1000,19 +870,16 @@ export async function linkSharedPopSurvey(
   const pop = (await sharedPopsFor(deps, [viewer])).find((p) => p.id === input.popId);
   if (!pop) throw new HttpsError('permission-denied', 'That pop is not shared with you');
   const share = await deps.db.collection('shares').doc(input.surveyId).get();
-  // A lapsed Survey (its TTL delete may lag) is as good as gone.
   const expires = (share.get('expiresAt') as { toMillis?: () => number } | undefined)?.toMillis?.();
   if (!share.exists || share.get('type') !== 'survey' || (expires ?? 0) <= deps.now())
     throw new HttpsError('failed-precondition', 'That Survey does not exist');
   const extraction = corpDoc(deps.db, pop.corporationId)
     .collection(EXTRACTIONS)
     .doc(pop.extractionId);
-  // Already the pop's Survey: nothing to write or republish.
   if (pop.surveyId === input.surveyId) return { linked: true };
   try {
     await extraction.update({ popSurveyId: input.surveyId });
   } catch {
-    // The Extraction was purged after the pop was published.
     throw new HttpsError('not-found', 'That pop is gone');
   }
   await refreshSharedPops(deps, pop.corporationId);

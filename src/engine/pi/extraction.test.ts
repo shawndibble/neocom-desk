@@ -14,16 +14,9 @@ import type { ExtractorProgram, ExtractorYieldProgram } from './types';
 import { DAY_MS, HOUR_MS } from '@/lib/age';
 
 const INSTALL_MS = Date.parse('2026-09-01T00:00:00Z');
-const CYCLE_TIME_MS = 1_800_000; // ESI's cycle_time 1800 s
+const CYCLE_TIME_MS = 1_800_000;
 const CYCLES_PER_DAY = 48;
 
-/**
- * CCP's worked example: qty_per_cycle 6,965 on a 30-minute cycle, run for 14
- * days. Every expected number below is a literal produced by running CCP's
- * reference generator (https://developers.eveonline.com/docs/guides/pi/), not
- * derived from this module — a shared mistake between test and implementation
- * would otherwise agree with itself.
- */
 const program: ExtractorYieldProgram = {
   pinId: 1,
   installTimeMs: INSTALL_MS,
@@ -63,17 +56,12 @@ describe('extractorCycleYields', () => {
   });
 
   it('is not monotonically decreasing — the three cosine terms put bumps in the curve', () => {
-    // A "simplified" curve of decay alone (qty / (1 + t * 0.012)) is strictly
-    // decreasing, so a single rising step is proof the noise term survived.
     const yields = extractorCycleYields(program, TOTAL_CYCLES);
     const risingSteps = yields.filter((value, index) => index > 0 && value > yields[index - 1]);
     expect(risingSteps.length).toBeGreaterThan(0);
   });
 
   it('takes the cycle count as an argument, so program length never changes the curve itself', () => {
-    // A shorter program off the same install-time baseline reproduces the
-    // longer one's opening cycles exactly; nothing is inferred from the
-    // program's own duration beyond how many cycles to walk.
     const full = extractorCycleYields(program, TOTAL_CYCLES);
     expect(extractorCycleYields(program, CYCLES_PER_DAY)).toEqual(full.slice(0, CYCLES_PER_DAY));
   });
@@ -86,12 +74,10 @@ describe('extractorCycleYields', () => {
 
 describe('sustainedRatePerHour', () => {
   it("averages CCP's whole 14-day program into one units-per-hour figure", () => {
-    // 1,874,985 units over 336 hours.
     expect(sustainedRatePerHour(program)).toBeCloseTo(1_874_985 / 336, 0);
   });
 
   it('is two and a half times under what qty_per_cycle alone implies, which is the whole point', () => {
-    // Two 30-minute cycles an hour at the install-time baseline.
     const naiveRate = program.qtyPerCycle * 2;
     expect(naiveRate).toBe(13_930);
     expect(naiveRate / sustainedRatePerHour(program)).toBeCloseTo(2.4963, 3);
@@ -158,13 +144,6 @@ describe('fractionOfPeak', () => {
   });
 });
 
-/**
- * A trailing day of output over the program's first day, at the close of each
- * of the 14 days of CCP's worked example. Literals produced by running CCP's
- * reference generator and summing its bars into 48-cycle days — the same
- * provenance as every other expectation here, so a shared mistake between test
- * and implementation cannot agree with itself.
- */
 const DAILY_RATE_FRACTIONS = [
   1, 0.546724, 0.379254, 0.299579, 0.239838, 0.198292, 0.174904, 0.155818, 0.135307, 0.121558,
   0.11377, 0.104863, 0.095001, 0.088169,
@@ -181,17 +160,12 @@ describe('fractionOfFirstDayRate', () => {
   });
 
   it('reads a day flatter than a single cycle does, which is the whole point of it', () => {
-    // Four days in, the per-cycle read has already been under 0.15 for days
-    // (CCP's three cosine terms swing adjacent cycles hard) while a day of
-    // output is still at 0.30.
     const dayFour = INSTALL_MS + 4 * DAY_MS;
     expect(fractionOfPeak(program, dayFour)).toBeLessThan(0.15);
     expect(fractionOfFirstDayRate(program, dayFour)).toBeCloseTo(0.299579, 5);
   });
 
   it('reports a full rate through the first day, before any complete day has elapsed', () => {
-    // A window clamped back to install would read 0.256 four hours in — under
-    // any threshold worth setting, and exactly the false positive this guards.
     expect(fractionOfFirstDayRate(program, INSTALL_MS)).toBe(1);
     expect(fractionOfFirstDayRate(program, INSTALL_MS + 4 * HOUR_MS)).toBe(1);
     expect(fractionOfFirstDayRate(program, INSTALL_MS + DAY_MS - 1)).toBe(1);
@@ -216,13 +190,10 @@ describe('pastEfficientWindow', () => {
   });
 
   it('reads the trailing day, not one cycle: still inside the window four hours in', () => {
-    // The regression #316 exists for: on the per-cycle read this program was
-    // past a 0.5 window four hours in, with 6% of its output banked.
     expect(pastEfficientWindow(program, INSTALL_MS + 4 * HOUR_MS, 0.5)).toBe(false);
   });
 
   it('compares strictly against the caller’s threshold', () => {
-    // Day 3 runs at 0.379 of the first day's rate, day 4 at 0.300.
     expect(pastEfficientWindow(program, INSTALL_MS + 3 * DAY_MS, 0.35)).toBe(false);
     expect(pastEfficientWindow(program, INSTALL_MS + 4 * DAY_MS, 0.35)).toBe(true);
     expect(pastEfficientWindow(program, INSTALL_MS + 4 * DAY_MS, 0.29)).toBe(false);

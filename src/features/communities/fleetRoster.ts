@@ -1,8 +1,3 @@
-/**
- * Fleet Payout roster (issue #4779): a pasted fleet list resolved through ESI
- * to canonical names and character ids, each marked Member or not. A name ESI
- * does not know stays on the list as typed (no id, no Member link).
- */
 import { postUniverseIds } from '@/esi/endpoints/universe';
 import { uidForCharacter } from '@/sync/uid';
 

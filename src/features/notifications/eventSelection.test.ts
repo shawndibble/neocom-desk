@@ -138,7 +138,6 @@ describe('isEveTypeEnabledFor', () => {
   it('reads channels independently once set', () => {
     const map: EveTypeEnabledMap = { [TYPE_A]: { browser: true } };
     expect(isEveTypeEnabledFor(map, TYPE_A, 'browser')).toBe(true);
-    // feed still falls back to the default, not to the browser value.
     expect(isEveTypeEnabledFor(map, TYPE_A, 'feed')).toBe(true);
   });
 
@@ -221,8 +220,6 @@ describe('NOTIFICATION_FAMILIES / eveTypesByFamily', () => {
     expect([...grouped].sort()).toEqual([...EVE_ALLOWED_TYPES].sort());
   });
 
-  // Issue #4058: the whole drill cycle, so a corp moon Extraction
-  // timeline is exact (epic #4055, D14).
   it('groups the moonMining family: the whole drill cycle', () => {
     expect([...eveTypesByFamily('moonMining')].sort()).toEqual([
       'MoonminingAutomaticFracture',

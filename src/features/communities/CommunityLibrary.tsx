@@ -49,7 +49,6 @@ import { SharedBlueprintColumnPicker, SharedBlueprintTable } from './SharedBluep
 
 const FILTERS: LibraryFilter[] = ['missingCommunity', 'ownedByMe', 'missingFromMe'];
 
-/** "Shared in the Community" (each shared blueprint, the default) or one of the matrix filters. */
 type LibraryView = 'shared' | LibraryFilter;
 const VIEWS: LibraryView[] = ['shared', ...FILTERS];
 
@@ -58,11 +57,9 @@ type Loaded = {
   groups: ShareMarketGroup[];
   learned: Map<number, number>;
   libraries: MemberLibrary[];
-  /** The Members' libraries are the last ones read while online (`communityCache.ts`). */
   cached: boolean;
 };
 
-/** A Member's initial in a ring: portraits need the Character id, which a Member doc does not carry. */
 function MemberDot({ member, stale }: { member: CommunityMember; stale: boolean }) {
   return (
     <span
@@ -132,7 +129,6 @@ function LibraryGroup({
                 style={{ paddingLeft: (depth + 1) * 16 + 20 }}
               >
                 <span className="min-w-0 flex-1 truncate">{type.name}</span>
-                {/* Desktop: one cell per Member, the matrix. */}
                 <span className="hidden shrink-0 md:flex">
                   {members.map((member) => {
                     const holder = heldBy.get(member.uid);
@@ -162,7 +158,6 @@ function LibraryGroup({
                     );
                   })}
                 </span>
-                {/* Phone: an avatar stack of who holds it. */}
                 <span
                   className="flex shrink-0 items-center md:hidden"
                   role="img"
@@ -196,17 +191,6 @@ const loadSystemIds = () =>
     systems ? systemIdsByName(systems.values()) : NO_SYSTEM_IDS
   );
 
-/**
- * The Community Library (issue #3601), the Blueprints tab's Everyone view:
- * what the Members share. It opens on "Shared in the Community": each shared
- * blueprint with its Member, station or structure, jumps from here, ME / TE
- * and runs, and a ⋮ to Show info, plan a build, source it or route there. The
- * other chips turn to every blueprint in the SDE against the Members who share
- * it: "missing from the Community", "owned by me" or
- * "missing from me", in a market-group tree that counts each category. A
- * stale Member is greyed and badged, never hidden. BPC Sourcing is one link
- * away, to source a copy.
- */
 export function CommunityLibrary({
   communityId,
   characterId,
@@ -228,10 +212,7 @@ export function CommunityLibrary({
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [failed, setFailed] = useState(false);
   const reconnects = useReconnectCount();
-  // Apart from the Library's own load: only the Jumps column waits on it, and
-  // an unreadable list leaves that column at its placeholder, nothing else.
   const systemIdsLoad = useAsyncLoad(loadSystemIds);
-  // Unreadable: an empty lookup, so every Jumps cell settles on "—".
   const systemIds =
     systemIdsLoad.status === 'ready'
       ? systemIdsLoad.data
@@ -239,7 +220,6 @@ export function CommunityLibrary({
         ? NO_SYSTEM_IDS
         : null;
 
-  // Each Member with the library stamp the roster carries: a new stamp is a new library.
   const memberKey = members
     ? members
         .map((member) => `${member.uid}@${member.libraryAsOf ?? ''}`)
@@ -256,15 +236,11 @@ export function CommunityLibrary({
           return { uid, libraryAsOf: asOf ? Number(asOf) : null };
         });
         const uids = roster.map((member) => member.uid);
-        // Offline, or with every read failed, the saved libraries answer; one
-        // Member unreadable while online reads empty and the rest still show.
         const [{ libraries, cached }, groups, marketTypes, blueprints] = await Promise.all([
           loadLibrariesWithFallback(characterId, communityId, uids, () =>
             loadMemberLibrariesFor(characterId, communityId, roster)
           ),
           loadMarketGroups(),
-          // The lazy market catalogue only files blueprints under market
-          // groups: without it they list under "Other" rather than not at all.
           loadMarketTypes().catch((): MarketTypeEntry[] => []),
           loadBlueprints(),
         ]);
@@ -377,7 +353,6 @@ export function CommunityLibrary({
           </SelectContent>
         </Select>
         {view === 'shared' && copies.length > 0 && <SharedBlueprintColumnPicker />}
-        {/* Sourcing a copy leaves the Library, so it sits apart at the row's end. */}
         <span className="flex items-center gap-1 sm:ml-auto">
           <Link to={bpcSourcingCommunityHref()} className={buttonClassName({ size: 'md' })}>
             {t('communities.blueprints.browse')}

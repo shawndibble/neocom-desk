@@ -1,26 +1,3 @@
-// Corp Tax Book (issue #4061, epic #4055, ADR 0023): the pure half of the
-// callables — layout constants, role decisions and input parsing — with no
-// Firestore, so it is unit testable. The admin-SDK half is corpTaxBookStore.ts
-// and the wiring is in index.ts.
-//
-// Firestore layout (rules in firestore.rules; every write is a callable):
-//   corps/{corporationId}                settings: start date, hub, Ore Form, rates, grace,
-//                                               notice rules, divisions, lastSync
-//     officers/{uid}                            officer access record (24h) written by verifyOfficer
-//     observed/{char_type_date_structure}       Observed Mining Entry rows, upserted monotonically
-//     extractions/{structure_start}             Extractions, kept after ESI stops listing them
-//     payments/{id}                             Tax Payments (donations found in the journal, manual);
-//                                               read by its sender (`uid`)
-//     dismissals/{id}  declarations/{id}  adjustments/{id}  writeOffs/{id}  rebills/{id}
-//     lateNotices/{id}  lateNoticeLinks/{id}    Late notices and their verify tokens (decision 20261120-235011)
-//     statements/{id}  statementLinks/{id}      legacy notices, read once by the one-time copy
-//     accounts/{minerId}                        a Running account's figures and lock-date snapshot
-//     miners/{minerId}                          Miner groupings
-//     meta/paid                                 each Miner's paid-through day, only ever grown (D22)
-//     meta/uncounted                            donations into divisions the book does not read (#6207)
-//     audit/{at~rand}                           immutable audit log
-//   corpTaxBookTokens/{token}                   verify-link tokens; no client access at all
-
 import { HttpsError } from 'firebase-functions/v2/https';
 import { boundedString, docId, record } from './communities.js';
 import { oneOf } from './inputParse.js';
@@ -75,7 +52,6 @@ import {
 
 export { CLAIM_CHECK_RESULTS, DISPUTE_KINDS, TAX_CONTACT_MAX_CHARACTERS, TRANSFER_RECIPIENTS };
 
-// The book's subcollection names, declared once for both sides (corpTaxBookVersionKeys.ts).
 export {
   OBSERVED,
   EXTRACTIONS,
@@ -97,70 +73,36 @@ export {
   META,
 } from './corpTaxBookVersionKeys.js';
 
-/** The Tax Book lives under the `corps/{id}` umbrella (issue #4858, ADR 0026). */
 export const BOOKS_COLLECTION = 'corps';
 export { TOKENS_COLLECTION } from './corpTaxBookVersionKeys.js';
 
-/**
- * How long a freshly turned-on book stays out of the members' own Mining Tax
- * page (no balances, donation notes or notices), so the officers can set the
- * rates, the sync and the payment matching up before anyone is told anything.
- */
 export const MEMBER_SETUP_MS = 72 * 60 * 60 * 1000;
 export const OFFICERS = 'officers';
 export const PAID_DOC = 'paid';
-/** Doc under `meta`: the scheduled sync's public status (ADR 0025); `status: 'active'` is Automatic sync on. */
 export const SCHEDULED_SYNC_DOC = 'scheduledSync';
-/** Doc under `meta`: the donations a sync noted in divisions the book does not read (#6207). */
 export const UNCOUNTED_DOC = 'uncounted';
-/** How many "not tax" answers to uncounted donations the doc keeps, so a sync never re-notes them. */
 export const UNCOUNTED_IGNORED_MAX = 200;
 export const AUDIT = 'audit';
-/** `corps/{collector}/feeders/{feederCorp}`: a feeder's record (issue #4507). */
 export const FEEDERS = 'feeders';
-/** `corpTaxBookFeederInvites/{sha256(code)}`: invite links, function-only. */
 export const FEEDER_INVITES_COLLECTION = 'corpTaxBookFeederInvites';
-/**
- * `corpTaxBookFeederOf/{feederCorp}`: points a corporation that feeds a book at its
- * Collector, function-only. Lets "is this corporation a feeder?" be a plain read.
- */
 export const FEEDER_OF_COLLECTION = 'corpTaxBookFeederOf';
-/**
- * `corpTaxBookFeederPrevious/{feederCorp}`: `{ collectorCorporationId, leftAt }`, written when a
- * feeder leaves (the `FEEDER_OF` pointer is deleted then). Function-only; resolves the
- * Collector for the after-leaving view (issue #4512).
- */
 export const FEEDER_PREVIOUS_COLLECTION = 'corpTaxBookFeederPrevious';
-/**
- * `corpTaxBookRemovalLinks/{sha256(code)}`: the link in a removal's mail (issue #4520); only the
- * hash is stored. Function-only: a client never reads it.
- */
 export const REMOVAL_LINKS_COLLECTION = 'corpTaxBookRemovalLinks';
-/** `corps/{collector}/feederViews/{feederCorp}`: the moon owner's read model (issue #4512). */
 export const FEEDER_VIEWS = 'feederViews';
-/**
- * `corpTaxBookBilledBy/{char:id}`: which books bill a Character, `books[collectorCorp]`
- * the epoch ms of the last sync that saw them there. Written by the sync, readable by
- * that Character only, so a miner in a moon owner's corporation finds the book (#4517).
- */
 export const BILLED_BY_COLLECTION = 'corpTaxBookBilledBy';
 
-/** Roles are trusted for at most this long without a live check (D7). */
 export const ROLE_CACHE_MS = 10 * MINUTE_MS;
-/** Read access lapses this long after the last check (D7). */
 export const ACCESS_TTL_MS = DAY_MS;
 
 export const MAX_SYNC_OBSERVED = 2000;
 export const MAX_SYNC_EXTRACTIONS = 200;
 export const MAX_SYNC_DONATIONS = 500;
 export const MAX_RATES = 500;
-/** The largest Late notice (or legacy Statement) one call stores, as JSON: under Firestore's 1 MiB. */
 export const MAX_NOTICE_JSON = 900_000;
 
 const VIEW_ROLES = ['Director', 'Accountant', 'Junior_Accountant'];
 const EDIT_ROLES = ['Director', 'Accountant'];
 
-/** What a Character may do in a corporation's book, from its ESI roles (D8). */
 export interface OfficerRoles {
   isCeo: boolean;
   isDirector: boolean;
@@ -180,7 +122,6 @@ export function decideRoles(roles: readonly string[], isCeo: boolean): OfficerRo
   };
 }
 
-/** `corps/{corp}/officers/{uid}`. */
 export interface OfficerAccess extends OfficerRoles {
   characterId: number;
   characterName: string;
@@ -188,7 +129,6 @@ export interface OfficerAccess extends OfficerRoles {
   corporationId: number;
   roles: string[];
   checkedAt: number;
-  /** Rules let this officer read the book until then. */
   expiresAt: number;
 }
 
@@ -211,8 +151,6 @@ export function isCacheFresh(checkedAt: number, now: number): boolean {
   return now - checkedAt <= ROLE_CACHE_MS && checkedAt <= now + MINUTE_MS;
 }
 
-// --- Input parsing --------------------------------------------------------
-
 export function int(value: unknown, field: string, min = 1, max = Number.MAX_SAFE_INTEGER): number {
   if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < min || value > max) {
     throw new HttpsError('invalid-argument', `${field} must be a whole number ${min}-${max}`);
@@ -227,7 +165,6 @@ function num(value: unknown, field: string, min: number, max: number): number {
   return value;
 }
 
-/** A rate in percent: a finite number 0-100. */
 export function pctField(value: unknown, name: string): number {
   if (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 100) {
     throw new HttpsError('invalid-argument', `${name} must be 0-100`);
@@ -261,10 +198,8 @@ function list(value: unknown, field: string, max: number): unknown[] {
 
 const CORP_ID_MAX = 2_147_483_647;
 
-/** Every book callable names its corporation and may carry the short-lived access token. */
 export interface BookCall {
   corporationId: number;
-  /** An EVE access token (never a refresh token). Required for live checks. */
   accessToken?: string;
 }
 
@@ -275,7 +210,6 @@ export function parseBookCall(data: unknown): BookCall {
   return { corporationId: int(d.corporationId, 'corporationId', 1, CORP_ID_MAX), accessToken };
 }
 
-/** A book call about one of its moon owners. */
 export interface FeederTargetCall extends BookCall {
   feederCorporationId: number;
 }
@@ -290,7 +224,6 @@ export function parseFeederTarget(data: unknown): FeederTargetCall {
 
 export interface TurnOnInput extends BookCall {
   startDate: string;
-  /** The corp-default rate, dated at the start date. */
   startRatePct: number;
 }
 
@@ -311,7 +244,6 @@ export type StoredRate =
   | { scope: 'feeder' | 'feeder-member'; feederId: number; pct: number; effectiveFrom: string }
   | { scope: 'record'; recordKey: string; pct: number };
 
-/** The most rates one `addRates` takes. */
 const MAX_BATCH_RATES = 50;
 
 export function parseDatedRate(data: unknown): Exclude<StoredRate, { scope: 'record' }> {
@@ -331,12 +263,8 @@ export function parseDatedRate(data: unknown): Exclude<StoredRate, { scope: 'rec
   };
   if (scope === 'miner') return { scope, minerId: docId(d.minerId, 'minerId'), ...base };
   if (scope === 'moon') return { scope, moonId: int(d.moonId, 'moonId'), ...base };
-  // A refinery by structure id (#4621): a moon owner's ledger-only rows never carry a moon.
   if (scope === 'structure')
     return { scope, structureId: int(d.structureId, 'structureId'), ...base };
-  // Every refinery of one moon owner corporation: the miner rate chain's per-feeder tier.
-  // Every refinery of one moon owner corporation, for its own members only (#6210): above the
-  // Guest default they would otherwise mine its moon at.
   if (scope === 'feeder' || scope === 'feeder-member')
     return { scope, feederId: int(d.feederId, 'feederId'), ...base };
   return { scope, ...base };
@@ -358,42 +286,17 @@ export interface SettingsPatch {
   graceHours?: number;
   overdueDays?: number;
   divisions?: number[];
-  /**
-   * The stored `divisions` this patch's `divisions` was built from. When set, the edit is
-   * refused (`divisions-changed`) if the stored list has since changed, so one officer's save
-   * never silently drops another's change. Older clients omit it: their list is stored as-is.
-   */
   divisionsBase?: number[];
-  /**
-   * The division members are asked to pay into first. It must be one of the divisions the book
-   * reads once the edit lands; the book still credits a donation into any of them.
-   */
   primaryDivision?: number;
-  /**
-   * One division to add to the stored list inside the edit's transaction ("Count division"), so
-   * two officers counting different divisions at once both land. When set, `divisions` in the
-   * same patch is ignored: a client sends it only for a server that predates `addDivision`.
-   * Its `divisionNames` merge into the stored names rather than replace them, for the same reason.
-   */
   addDivision?: number;
-  /**
-   * The corp's own names for its wallet divisions, by division "1".."7" (#6161): a Director's
-   * client reads them with its ordinary corp login and pushes them, so a member's Settle up can
-   * name the Account to pick. Replaces the stored map whole; `{}` clears it.
-   */
   divisionNames?: Record<string, string>;
   chunkM3PerHour?: number;
   structureExpiryHours?: Record<string, number>;
   dismissApprovalAboveIsk?: number | null;
-  /** Who gets the EVE mail when a member asks about tax; `null` clears it (the CEO then). */
   taxContact?: TaxContact | null;
-  /** Move the book's start (Director): earlier freely, later only over unbilled days. */
   startDate?: string;
-  /** End the member setup window now (Director): `membersSeeFrom` becomes the call time. */
   showToMembers?: true;
-  /** A running account's late notices. */
   noticeRules?: NoticeRules;
-  /** A running account's per-day tolerance, in percent. */
   dayTolerancePct?: number;
 }
 
@@ -420,7 +323,6 @@ function parseNoticeRules(raw: unknown): NoticeRules {
   };
 }
 
-/** The mirror of the client's `TaxContact` (`src/engine/corpTaxBook/bookDocs.ts`). */
 export type TaxContact =
   { kind: 'mailingList'; id: number; name: string } | { kind: 'characters'; ids: number[] };
 
@@ -459,13 +361,11 @@ function parseDivisionNames(value: unknown): Record<string, string> {
   return names;
 }
 
-/** A wallet divisions list: 1-7, de-duplicated, ascending. */
 function parseDivisions(value: unknown, field: string): number[] {
   const divisions = list(value, field, 7).map((x) => int(x, 'division', 1, 7));
   return [...new Set(divisions)].sort((a, b) => a - b);
 }
 
-/** Whether two divisions lists name the same divisions, whatever their order or repeats. */
 export function sameDivisions(a: readonly number[], b: readonly number[]): boolean {
   const x = new Set(a);
   const y = new Set(b);
@@ -538,11 +438,6 @@ export function parseSettingsPatch(data: unknown): SettingsPatch {
   return patch;
 }
 
-/**
- * Why a book's start date cannot move from `oldStart` to `newStart`, else null. Never the
- * future, never before a former moon owner's leave day (`floor`); moving later is allowed
- * only while no Late notice listed a day in the gap (`noticedDates`), so billed days stay billed.
- */
 export function startDateMoveReason(
   oldStart: string,
   newStart: string,
@@ -567,11 +462,6 @@ export const rateKey = (r: StoredRate): string =>
       (r.scope === 'structure' ? `:${r.structureId}` : '') +
       (r.scope === 'feeder' || r.scope === 'feeder-member' ? `:${r.feederId}` : '');
 
-/**
- * The rates after the start date moves earlier: the corp-default rate dated at the old start is
- * re-dated to the new one. A rate already at the new date (same `rateKey`) is replaced, never
- * doubled, as `addRate` does.
- */
 export function moveStartRate(
   rates: readonly StoredRate[],
   oldStart: string,
@@ -586,7 +476,6 @@ export function moveStartRate(
 
 export type EditAction =
   | { action: 'addRate'; rate: ReturnType<typeof parseDatedRate> }
-  /** #6323: several rates in one all-or-nothing write; each is audited as its own `addRate`. */
   | { action: 'addRates'; rates: ReturnType<typeof parseDatedRate>[] }
   | { action: 'setRecordRate'; recordKey: string; pct: number; reason: string }
   | { action: 'updateSettings'; patch: SettingsPatch }
@@ -598,7 +487,6 @@ export type EditAction =
       amount: number;
       at: string;
       note?: string;
-      /** The Declaration this payment confirms, in the same write (one resolution per declaration). */
       declarationId?: string;
     }
   | { action: 'markNotTax'; paymentId: string; notTaxAmount: number; reason?: string }
@@ -606,12 +494,9 @@ export type EditAction =
       action: 'assignPayment';
       paymentId: string;
       minerId: string;
-      /** The Declaration this donation match confirms, in the same write. */
       declarationId?: string;
     }
-  /** An officer moves a payment to another Miner, or back to Unmatched with `null`. */
   | { action: 'reassignPayment'; paymentId: string; minerId: string | null }
-  /** #6207: an officer says a donation into a division the book does not read is not tax. */
   | { action: 'ignoreUncounted'; uncountedId: string }
   | {
       action: 'dismiss';
@@ -622,33 +507,25 @@ export type EditAction =
     }
   | {
       action: 'dismissRecords';
-      /** Several days at once; the approval limit is checked on their total (#4194). */
       targets: { targetId: string; amountIsk: number }[];
       reason: string;
     }
   | { action: 'reverseDismissal'; dismissalId: string; reason: string }
-  /**
-   * Links a Moon Ore Survey (a Share Link id) as a chunk's ore source, or unlinks it with null (D13).
-   * `surveyScan` keeps its first scan on the Extraction, so the make-up outlives the Survey's link.
-   */
   | {
       action: 'linkSurvey';
       extractionId: string;
       surveyId: string | null;
       surveyScan?: SurveyScanSnapshot;
     }
-  /** Flags an Extraction Fully Mined (who and when kept) or clears it (#5257). Both are audited. */
   | { action: 'setFullyMined'; extractionId: string; fullyMined: boolean }
   | { action: 'setMiner'; minerId: string; characterIds: number[]; mainCharacterId: number }
   | {
-      /** `leftOn`: the day the Character left (a sale); mining and donations before it stay put. */
       action: 'unlink';
       minerId: string;
       characterId: number;
       leftOn?: string;
     }
   | {
-      /** Folds stored Miners into one, atomically (#4194): the "Group with…" dialog's single call. */
       action: 'regroupMiner';
       minerId: string;
       characterIds: number[];
@@ -661,12 +538,9 @@ export type EditAction =
       date: string;
       amount: number;
       reason: string;
-      /** `opening`: the balance rolled over from another system. */
       kind?: 'opening';
     }
-  /** Undoes a correction: the record stays, marked reversed. Refused once a Statement billed it. */
   | { action: 'reverseAdjustment'; adjustmentId: string; reason: string }
-  /** Reverses a correction and adds its replacement in one step. */
   | {
       action: 'editAdjustment';
       adjustmentId: string;
@@ -675,7 +549,6 @@ export type EditAction =
       reason: string;
     }
   | { action: 'reverseWriteOff'; writeOffId: string; reason: string }
-  /** How much of one Miner-day's shortfall the book forgives (0 charges it all). */
   | {
       action: 'setToleranceExemption';
       minerId: string;
@@ -683,42 +556,24 @@ export type EditAction =
       forgive: number;
       reason: string;
     }
-  /** Forgives the Miner's oldest unpaid days (decision 20261120-235011): it names no notice. */
   | { action: 'writeOff'; minerId: string; amount: number; reason: string }
   | { action: 'rebill'; minerId: string; fromDate: string; reason: string }
   | {
       action: 'closeAccount';
       minerId: string;
       reason: string;
-      /** The final Late notice, issued in the same write. Absent when nothing is left to bill. */
       notice?: LateNotice;
-      /** Credit is refunded unless the guest consented or went 90 days without replying. */
       credit: CloseCredit;
-      /**
-       * A running account's credit as the officer's client works it out (#6294): money ahead of
-       * every day. The server cannot price days, so it takes this on such a book.
-       */
       runningCredit?: number;
     }
   | { action: 'issueLateNotice'; notice: LateNotice }
-  /** An officer-recorded declaration. It carries the Miner's `uids`, so its note is theirs to read. */
   | {
       action: 'declare';
       noticeId: string;
       kind: 'contract' | 'other-division' | 'wrong-corp';
       note?: string;
     }
-  /**
-   * `nextStep`: what the member should do now, shown to them word for word. The app requires it;
-   * the server accepts its absence until every deployed client sends it (production's client is
-   * older than this function).
-   */
   | { action: 'rejectDispute'; disputeId: string; reason: string; nextStep?: string }
-  /**
-   * Waives only the disputed ore (#6206): a credit Adjustment on the day, not a dismissal of the
-   * whole record. The server prices it from the Statements that billed the day; `amountIsk`, the
-   * client's figure, counts only for a day not billed yet, and then as over the Director limit.
-   */
   | {
       action: 'dismissDispute';
       disputeId: string;
@@ -731,59 +586,37 @@ export type EditAction =
       declarationId: string;
       resolution: 'confirmed' | 'rejected';
       reason?: string;
-      /** A rejection's next step for the member (see `rejectDispute`). */
       nextStep?: string;
     }
   | { action: 'recordReminder'; noticeId: string }
-  /** Pop Sharing (#6222): the switch and the Sharing default. Turning it on needs Automatic sync. */
   | { action: 'setPopSharing'; enabled?: boolean; defaults?: Partial<PopSharingSettings> }
-  /** One moon's overrides; null returns a setting to the Sharing default. */
   | { action: 'setPopSharingMoon'; moonId: number; override: PopSharingOverridePatch }
   | { action: 'recordLateNoticeMail'; noticeId: string; mailId: number; kind: LateNoticeMailKind }
-  /**
-   * A running account's figures per Miner, as the officer's client works them out (#6294), each
-   * with its snapshot for the lock date when one is due; the server sets the snapshot's `at`,
-   * `by` and readers.
-   */
   | { action: 'recordAccounts'; accounts: RecordedRunningAccount[] };
 
-/** A Late notice's first mail, or a reminder of it. */
 export type LateNoticeMailKind = 'notice' | 'reminder';
 
-/** A checkpoint as an officer's tab sends it: the server adds `at` and `by`. */
 export type RecordedCheckpoint = Omit<RunningAccountCheckpoint, 'at' | 'by'>;
 
-/** What a Miner owes on a running account, as one officer's client worked it out. */
 export interface RecordedRunningAccount {
   minerId: string;
   owed: number;
-  /** The Miner's net payments (less "not tax") the client counted: later ones come off `owed`. */
   paid: number;
   days: number;
   oldest?: string;
   paidThrough?: string;
-  /** The running days still owed, oldest first (what the verify page lists); absent from an older client. */
   unpaidDays?: OwedDay[];
-  /**
-   * The newest day the officer's client says is paid for good (D22), stored in `meta/paid`. Only
-   * ever moves forward. The server has no prices, so it can't check the day was priced at a saved
-   * close-of-day price; it trusts the client for that and checks only what it can see.
-   */
   settledThrough?: string;
-  /** Money ahead of every billed day, as the client counted it; absent from an older client. */
   credit?: number;
-  /** The account through the day before the lock date, when one is due (`checkpointRefusal`). */
   snapshot?: RecordedCheckpoint;
 }
 
 export type CloseCredit = { kind: 'refund' } | { kind: 'forfeit'; basis: ForfeitBasis };
 
-/** Dismissals, write-offs, rebills and "not tax" re-check the role live (D7). */
 export const LIVE_CHECK_ACTIONS: ReadonlySet<EditAction['action']> = new Set(
   LIVE_CHECK_ACTION_NAMES satisfies readonly EditAction['action'][]
 );
 
-/** A close that forfeits credit writes value off, so it re-checks the role live too (#4184). */
 export function needsLiveCheck(action: EditAction): boolean {
   return (
     LIVE_CHECK_ACTIONS.has(action.action) ||
@@ -791,12 +624,6 @@ export function needsLiveCheck(action: EditAction): boolean {
   );
 }
 
-/**
- * Whether a dismissal needs a Director (D6): the approval limit applies to the
- * total dismissed in one act, so a multi-day dismissal cannot slip under it
- * day by day. An omitted or zero amount counts as over the limit: a zero is a day whose
- * charge the client did not have in view, not a free dismissal.
- */
 export function dismissalNeedsDirector(
   limit: number | null | undefined,
   amounts: readonly (number | undefined)[],
@@ -811,14 +638,12 @@ export function dismissalNeedsDirector(
 }
 
 const reason = (v: unknown) => boundedString(v, 'reason', 500);
-/** Optional reason: absent or blank stores nothing. */
 const optReason = (v: unknown) =>
   v === undefined || (typeof v === 'string' && v.trim() === '') ? undefined : reason(v);
 const optNote = (v: unknown) =>
   v === undefined ? undefined : boundedString(v, 'note', PAYMENT_NOTE_MAX);
 const optNextStep = (v: unknown) =>
   v === undefined ? undefined : boundedString(v, 'nextStep', 500);
-/** A linked Survey's first scan as the book keeps it (engine `SurveyScanSnapshot`). */
 export interface SurveyScanSnapshot {
   at?: number;
   volumeM3: number;
@@ -842,7 +667,6 @@ function surveyScanOf(raw: unknown): SurveyScanSnapshot {
   };
 }
 
-/** A Late notice's id, as `noticeId` or by the old name an older client still sends. */
 const noticeIdOf = (d: Record<string, unknown>) =>
   docId(d.noticeId ?? d[NOTICE_ID_FIELD], 'noticeId');
 const money = (v: unknown, f: string) => num(v, f, 0.01, 1e13);
@@ -921,7 +745,6 @@ export function parseEditAction(data: unknown): EditAction {
         characterId: int(d.characterId, 'characterId'),
         amount: money(d.amount, 'amount'),
         at: instant(d.at, 'at'),
-        // An older tab may still name a notice: money pays the oldest day, so it is not stored.
         note: optNote(d.note),
         ...(d.declarationId !== undefined
           ? { declarationId: docId(d.declarationId, 'declarationId') }
@@ -980,7 +803,6 @@ export function parseEditAction(data: unknown): EditAction {
         action,
         extractionId: docId(d.extractionId, 'extractionId'),
         surveyId,
-        // Kept with a link only: an unlink drops it with the link.
         ...(surveyId !== null && d.surveyScan !== undefined
           ? { surveyScan: surveyScanOf(d.surveyScan) }
           : {}),
@@ -1224,10 +1046,6 @@ function popAudience(raw: unknown): PopAudience {
   };
 }
 
-/**
- * Pop Sharing settings from a client (#6222): only known settings, each validated. A null
- * `ratePct` is the book's own rate.
- */
 function popSettingsPatch(raw: unknown, allowEmpty: boolean): Partial<PopSharingSettings> {
   const p = record(raw);
   const out: Record<string, unknown> = {};
@@ -1270,11 +1088,6 @@ function popSettingsPatch(raw: unknown, allowEmpty: boolean): Partial<PopSharing
   return out as Partial<PopSharingSettings>;
 }
 
-/**
- * The names the guest verify page prints (#4066): a guest cannot look up a
- * structure's name, so the officer's client stores them on the Statement.
- * Bounded and typed here rather than stored as given.
- */
 function displayNames(raw: Record<string, unknown>) {
   const out: {
     corporationName?: string;
@@ -1344,13 +1157,6 @@ function parseNoticeLine(raw: unknown): LateNoticeLine {
   };
 }
 
-/**
- * A Late notice from an officer's tab (decision 20261120-235011). What it listed is summed here
- * from its lines, and its Reason code is the Miner's one code (`minerPaymentCode`), as the mail
- * asks for; who may read it, who issued it
- * and its mail state are the server's to set, so they start empty. A final notice is issued only
- * by closing the account (`kind` 'final'), under the Miner's final id (`finalNoticeId`).
- */
 export function parseLateNotice(
   raw: Record<string, unknown>,
   kind: LateNotice['kind'] = 'late'
@@ -1395,25 +1201,15 @@ export function parseLateNotice(
   };
 }
 
-/** Why a checkpoint from a tab is not stored. */
 export type CheckpointRefusal =
   'wrong-date' | 'exists' | CheckpointProblem | 'unknown-miner' | 'characters-changed';
 
-/**
- * Why a snapshot is not stored, undefined when it is (decision 20261120-235011, "a lock date"):
- * one per Miner per lock date, through `snapshotThroughFor(today)` (`wrong-date`), unless a stored
- * snapshot already covers that day (`exists`). It must add up (`checkpointProblems`), name a Miner
- * the book knows, and have summed that Miner's characters as they are now (`checkpointFits`).
- * A stored checkpoint for other characters, or one the strict cache recorded through days still
- * open (`isSnapshot`), is no snapshot: it is replaced.
- */
 export function checkpointRefusal(
   k: RecordedCheckpoint,
   ctx: {
     stored?: Pick<RunningAccountCheckpoint, 'through' | 'at' | 'characterIds'>;
     today: string;
     known: boolean;
-    /** The Miner's characters now. */
     characterIds: readonly number[];
   }
 ): CheckpointRefusal | undefined {
@@ -1434,7 +1230,6 @@ export function checkpointRefusal(
   return undefined;
 }
 
-/** A checkpoint from an officer's tab; `checkpointRefusal` decides whether it is stored. */
 export function parseCheckpoint(raw: unknown): RecordedCheckpoint {
   const c = record(raw);
   return {
@@ -1495,19 +1290,10 @@ export interface SyncInput extends BookCall {
     amount: number;
     at: string;
     reason?: string;
-    /** A client's hint that a known sender's Miner owed nothing, so it waits for review (#6207). */
     reviewReason?: 'no-open-balance';
   }[];
   gaps: { structureId: number; from: string; to: string }[];
-  /**
-   * #6207: donations the sync noted in divisions the book does not read; replaces the stored
-   * list. Absent when the sync did not read those divisions, which leaves the list as it was.
-   */
   uncounted?: UncountedDonation[];
-  /**
-   * Whether this sync read the book's wallet divisions for donations. Sent on a sync's first call
-   * only; absent from its overflow calls and from older clients, which leave the record as it was.
-   */
   donationsRead?: boolean;
 }
 
@@ -1582,9 +1368,6 @@ export function parseSyncInput(data: unknown, nowMs: number): SyncInput {
       amount: money(x.amount, 'amount'),
       at: instant(x.at, 'at'),
       reason: x.reason === undefined ? undefined : String(x.reason).slice(0, 200),
-      // Whose money it is, the server decides (corpTaxBookDonationMatch.ts): a client's Miner or
-      // notice is not read. #6207: a known sender's donation held for review; only on one the
-      // client matched to no Miner.
       reviewReason:
         x.reviewReason === 'no-open-balance' && x.minerId === undefined
           ? ('no-open-balance' as const)
@@ -1626,12 +1409,6 @@ export function parseSyncInput(data: unknown, nowMs: number): SyncInput {
   };
 }
 
-/**
- * The book's `donationsReadAt` after a sync: when a sync last read the wallet's donations, which
- * members' "not credited" notes wait on, so a sync that could not read it (no role, no scope)
- * never reads as one the donation missed. Stamped by a sync that read it; null while none has
- * (`stored` absent); left as it was by an older client's call or a sync's overflow call.
- */
 export function donationsReadAtPatch(
   donationsRead: boolean | undefined,
   stored: unknown,
@@ -1666,7 +1443,6 @@ export function defaultSettings(startDate: string, startRatePct: number) {
     cadence: { ...BOOK_DEFAULTS.cadence },
     startDate,
     structureExpiryHours: {} as Record<string, number>,
-    // The start-date rate skips the backdate check (`rateStartRefusal`): it is dated at the start itself (#4059 hand-off).
     rates: [{ scope: 'corp', pct: startRatePct, effectiveFrom: startDate }] as StoredRate[],
   };
 }
@@ -1681,7 +1457,6 @@ export function parseConfirmGroupingInput(data: unknown): {
   };
 }
 
-/** A verify link declines a pending character; `characterId` names which one. */
 export function parseDeclineByTokenInput(data: unknown): { token: string; characterId: number } {
   const characterId = record(data).characterId;
   if (typeof characterId !== 'number' || !Number.isSafeInteger(characterId) || characterId <= 0)
@@ -1691,28 +1466,21 @@ export function parseDeclineByTokenInput(data: unknown): { token: string; charac
 
 export type TransferRecipient = (typeof TRANSFER_RECIPIENTS)[number];
 
-/** One transfer from the member's wallet journal, sent as the proof of an "I already paid". */
 export interface ClaimTransfer {
   amount: number;
   at: string;
-  /** The member's own journal id: what an officer searches their journal on. */
   journalRef: number;
   recipient: TransferRecipient;
-  /** The character or other corporation that received it. */
   recipientId?: number;
 }
 
-/** The most transfers one "I already paid" carries. */
 export const CLAIM_TRANSFERS_MAX = 10;
 
-/** A Miner's own "I paid this another way" on one of their Late notices (#6206). */
 export interface DeclareOwnInput {
   corporationId: number;
   noticeId: string;
-  /** What they say they paid; absent when they did not say. */
   amount?: number;
   note?: string;
-  /** The transfers from their wallet journal (resolving in the app); checked before an officer sees them. */
   transfers?: ClaimTransfer[];
 }
 
@@ -1747,31 +1515,20 @@ export function parseDeclareOwnInput(data: unknown): DeclareOwnInput {
 export type ClaimCheckResult = (typeof CLAIM_CHECK_RESULTS)[number];
 export interface ClaimCheck {
   result: ClaimCheckResult;
-  /** `found`: the book's payment it matched. */
   paymentId?: string;
-  /** `division`: the wallet division it sits in, which the book does not read. */
   division?: number;
-  /** `credited`: the Miner the book already credited the payment to. */
   minerId?: string;
 }
 
-/** ESI's wallet journal window: older than this before a sync, the sync could not have read it. */
 const JOURNAL_WINDOW_MS = 30 * DAY_MS;
 
-/** A payment the book holds, as `checkClaimedTransfer` reads it. */
 export interface CheckablePayment {
   id: string;
   characterId?: number;
   amount: number;
   at: string;
-  /** The Miner it is credited to: absent while no one has it. */
   minerId?: string;
-  /** An officer marked (some of) it not tax: a payment wholly so is no one's to credit. */
   notTaxAmount?: number;
-  /**
-   * Held for an officer's review (#6207). The sender's own donation held because their Miner
-   * seemed to owe nothing (`no-open-balance`) is still theirs to prove: the book holds the ISK.
-   */
   reviewReason?: string;
 }
 
@@ -1780,17 +1537,10 @@ export interface ClaimCheckContext {
   payments: readonly CheckablePayment[];
   uncounted: readonly { characterId: number; amount: number; at: string; division: number }[];
   lastSyncAt: number | undefined;
-  /** The book's first day: it holds no wallet history before it. */
   startDate?: string;
-  /** Payments an earlier transfer of the same declaration matched: never matched twice. */
   taken?: Set<string>;
 }
 
-/**
- * A payment a claim may credit: no one holds it yet, and it is tax. One held for review because
- * its sender's Miner seemed to owe nothing counts (the claim is the sender's own: `same`), if paid
- * on or after the book's start: before it, it paid no mining the book bills.
- */
 const creditable = (p: CheckablePayment, startDate: string | undefined) =>
   p.minerId === undefined &&
   (p.reviewReason === undefined ||
@@ -1798,21 +1548,10 @@ const creditable = (p: CheckablePayment, startDate: string | undefined) =>
       (startDate === undefined || p.at.slice(0, 10) >= startDate))) &&
   (p.notTaxAmount ?? 0) < p.amount;
 
-/**
- * Checks one claimed transfer against what the book synced of the corporation's wallet, before
- * any officer sees it (resolving in the app). One exact match (sender, amount, a payment not
- * already credited to anyone) is `found`; a donation in a division it does not read is
- * `division`; two or more candidates are `ambiguous` (an officer picks); otherwise it says why
- * it cannot say — paid after the last sync (`notSynced`), or before the wallet history the book
- * holds (`tooOld`: ESI's 30 days before the last sync, or before the book's start) — and only
- * then `notFound`. A transfer to a person or another corporation is named, not searched.
- * A `found` payment joins `ctx.taken`, so a later transfer never claims it too.
- */
 export function checkClaimedTransfer(t: ClaimTransfer, ctx: ClaimCheckContext): ClaimCheck {
   if (t.recipient === 'character') return { result: 'person' };
   if (t.recipient === 'otherCorporation') return { result: 'otherCorp' };
   const at = Date.parse(t.at);
-  // The claim names no sender: any of the Miner's Characters may have sent it.
   const same = (x: { characterId?: number; amount: number; at: string }) =>
     x.characterId !== undefined &&
     ctx.senderIds.includes(x.characterId) &&
@@ -1827,7 +1566,6 @@ export function checkClaimedTransfer(t: ClaimTransfer, ctx: ClaimCheckContext): 
     return { result: 'found', paymentId: payments[0].id };
   }
   if (uncounted[0]) return { result: 'division', division: uncounted[0].division };
-  // Already placed by the book: say whose, rather than that it was never seen.
   const placed = ctx.payments.find((p) => same(p) && p.minerId !== undefined);
   if (placed) return { result: 'credited', paymentId: placed.id, minerId: placed.minerId };
   if (ctx.lastSyncAt === undefined || at > ctx.lastSyncAt) return { result: 'notSynced' };
@@ -1836,7 +1574,6 @@ export function checkClaimedTransfer(t: ClaimTransfer, ctx: ClaimCheckContext): 
   return { result: 'notFound' };
 }
 
-/** `checkClaimedTransfer` for each of a declaration's transfers, no payment matched twice. */
 export function checkClaimedTransfers(
   transfers: readonly ClaimTransfer[],
   ctx: Omit<ClaimCheckContext, 'taken'>
@@ -1845,7 +1582,6 @@ export function checkClaimedTransfers(
   return transfers.map((t) => checkClaimedTransfer(t, { ...ctx, taken }));
 }
 
-/** One ore line of a disputed Conflict day: the record, the ore, and the Payee the Miner gave it to. */
 export interface DisputeLine {
   recordKey: string;
   typeId: number;
@@ -1855,26 +1591,21 @@ export interface DisputeLine {
 
 export type DisputeKind = (typeof DISPUTE_KINDS)[number];
 
-/** A Miner's word on a day: "I gave this ore to {payee}" (#6206), or one of the other kinds. */
 export interface DisputeConflictInput {
   corporationId: number;
   date: string;
   kind: DisputeKind;
   lines: DisputeLine[];
   note?: string;
-  /** Why, in the member's own words: required for every kind but `payee`. */
   reason?: string;
-  /** A `rate` dispute: the rate, in percent, the member says applies. */
   claimedPct?: number;
 }
 
-/** The most ore lines one disputed day carries: a day's ore types across a Miner's characters. */
 export const DISPUTE_LINES_MAX = 100;
 
 export function parseDisputeConflictInput(data: unknown): DisputeConflictInput {
   const d = record(data);
   const date = dateString(d.date, 'date');
-  // Absent on a client older than kinds: the original payee dispute.
   const kind = d.kind === undefined ? 'payee' : oneOf(d.kind, 'kind', DISPUTE_KINDS);
   const raw = list(d.lines, 'lines', DISPUTE_LINES_MAX);
   if (raw.length === 0) throw new HttpsError('invalid-argument', 'lines must not be empty');
@@ -1886,7 +1617,6 @@ export function parseDisputeConflictInput(data: unknown): DisputeConflictInput {
       recordKey: key.key,
       typeId: int(l.typeId, 'typeId'),
       quantity: int(l.quantity, 'quantity'),
-      // Only a payee dispute names a Payee; the other kinds are about the book's own figures.
       payeeName:
         kind === 'payee' || l.payeeName !== undefined
           ? boundedString(l.payeeName, 'payeeName', 100)
@@ -1905,7 +1635,6 @@ export function parseDisputeConflictInput(data: unknown): DisputeConflictInput {
   };
 }
 
-/** A Miner withdraws their own unanswered dispute of a day. */
 export interface WithdrawDisputeInput {
   corporationId: number;
   date: string;
@@ -1916,7 +1645,6 @@ export function parseWithdrawDisputeInput(data: unknown): WithdrawDisputeInput {
   return { corporationId: parseBookCall(data).corporationId, date: dateString(d.date, 'date') };
 }
 
-/** The ore a book recorded, as the server's Observed Rows hold it. */
 export interface RecordedOre {
   characterId: number;
   structureId: number;
@@ -1927,12 +1655,6 @@ export interface RecordedOre {
 
 const lineId = (l: DisputeLine) => JSON.stringify([l.recordKey, l.typeId, l.quantity, l.payeeName]);
 
-/**
- * A dispute's lines after one more call (#6206): `incoming` added to what the day already holds,
- * an exact repeat dropped (as `arrayUnion` would). Every record and ore must be one the book
- * recorded, the disputed quantity of each across all its Payees no more than recorded, and the
- * day at most `DISPUTE_LINES_MAX` lines however many calls built it.
- */
 export function mergeDisputeLines(
   held: readonly DisputeLine[],
   incoming: readonly DisputeLine[],
@@ -1964,7 +1686,6 @@ export function mergeDisputeLines(
   return lines;
 }
 
-/** An ore line a Late notice listed, as it was priced (`LateNoticeLine`). */
 interface BilledLine {
   oreLines: { typeId: number; quantity: number }[];
   unitPrices: Record<string, number>;
@@ -1992,13 +1713,6 @@ function billedLineOf(raw: unknown): (BilledLine & { key: string }) | null {
   };
 }
 
-/**
- * The tax a waived dispute credits, priced on the server from the book's own records: each
- * disputed ore at the unit price and rate the Late notices listed it at, never more of it than
- * they listed (a late-ore line adds its growth). Undefined when a disputed record is on no notice
- * yet: the server holds no price for a day not listed, so it is never waived at the client's word
- * under the Director limit.
- */
 export function billedDisputeTax(
   dispute: {
     lines: readonly Pick<DisputeLine, 'recordKey' | 'typeId' | 'quantity'>[];
@@ -2033,7 +1747,6 @@ export function billedDisputeTax(
       if (take <= 0) continue;
       const price = line.unitPrices[String(typeId)];
       if (typeof price !== 'number') return undefined;
-      // A rate dispute is about the rate, not the ore: waiving it credits only the gap.
       const pct =
         dispute.kind === 'rate' && dispute.claimedPct !== undefined
           ? Math.max(0, line.taxPct - dispute.claimedPct)
@@ -2045,13 +1758,6 @@ export function billedDisputeTax(
   return tax;
 }
 
-/**
- * The ids of a Miner's open disputes an officer write-off closes (#6307). A write-off forgives
- * the oldest unpaid days first (decision 20261120-235011), read off the Miner's account as it
- * stands now (`liveRunningAccount`): the open disputes of the days it forgives in full close, a held day
- * included, while a day only partly forgiven keeps its dispute; a write-off of the whole balance
- * closes every one. With the account's days unknown, none closes.
- */
 export function disputesClosedByWriteOff(
   disputes: readonly { id?: unknown; date?: unknown; resolution?: unknown }[],
   writeOff: { amount: number },
@@ -2066,13 +1772,6 @@ export function disputesClosedByWriteOff(
     .map((d) => d.id as string);
 }
 
-/**
- * What a hand-recorded payment is, among the transfers the book already knows of from the same
- * sender (`matchesStatedTransfer`): a donation it holds (`held`: assign that one instead, never
- * count it twice), one noted in a division the book does not read (`uncounted`: the hand record
- * stands for it, so the donation is not stored again if that division is later read), or neither.
- * The nearest in time wins.
- */
 export function handRecordMatch(
   stated: { characterId: number; amount: number; at: string },
   known: {
@@ -2091,12 +1790,10 @@ export function handRecordMatch(
   return best ? { kind: best.kind, id: best.x.id } : null;
 }
 
-/** One dispute per Miner and day: `solo:7` has a colon, which a doc id avoids. */
 export function disputeIdFor(minerId: string, date: string): string {
   return `${minerId.replace(/[^A-Za-z0-9_-]/g, '_')}_${date}`;
 }
 
-/** An officer dismisses a Character's answer to a grouping from Needs you. */
 export function parseGroupingAnswerInput(data: unknown): BookCall & { characterId: number } {
   return {
     ...parseBookCall(data),
@@ -2104,11 +1801,9 @@ export function parseGroupingAnswerInput(data: unknown): BookCall & { characterI
   };
 }
 
-/** A player claims one of their own Unmatched donations (D5). */
 export function parseClaimPaymentInput(data: unknown): {
   corporationId: number;
   paymentId: string;
-  /** The player says their own donation held for review was tax (`claimPayment`). */
   inReview?: true;
 } {
   return {

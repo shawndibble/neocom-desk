@@ -11,12 +11,6 @@ describe('Tooltip', () => {
     vi.useRealTimers();
   });
 
-  /**
-   * `Modal` runs on `showModal()`, so the dialog sits in the browser's top
-   * layer, which no `z-index` can reach. A bubble portalled to `document.body`
-   * — Radix's default — renders *behind* the modal that triggered it, which is
-   * why `Tooltip` reads a container off `portalContainer.ts`.
-   */
   it('portals its bubble inside a Modal, not to the body', async () => {
     render(
       <Modal open onClose={() => {}} title="Order detail">
@@ -75,14 +69,12 @@ describe('Tooltip', () => {
         <button type="button">Trigger</button>
       </Tooltip>
     );
-    // The control was not remounted: same node, still focused.
     expect(screen.getByRole('button', { name: 'Trigger' })).toBe(trigger);
     expect(document.activeElement).toBe(trigger);
     fireEvent.pointerMove(trigger);
     expect(await screen.findByRole('tooltip')).toHaveTextContent('Now there is something to say.');
   });
 
-  // PI settings gear: its modal returned and retook focus in one tick (dev remount).
   it('ends closed when focus arrives and leaves in the same tick', () => {
     render(
       <Tooltip content="Page settings">
@@ -90,7 +82,6 @@ describe('Tooltip', () => {
       </Tooltip>
     );
     const trigger = screen.getByRole('button', { name: 'Gear' });
-    // One act, so React renders once after both: native events, as fireEvent acts on its own.
     act(() => {
       trigger.focus();
       trigger.blur();
@@ -150,8 +141,6 @@ describe('Tooltip', () => {
     );
     fireEvent.pointerMove(screen.getByRole('button', { name: 'Trigger' }));
 
-    // Only a cap, never a fixed width: Radix's popper wrapper shrink-wraps
-    // the bubble, so `w-56` was what padded "Delete" out to 14rem.
     const tooltip = await screen.findByRole('tooltip');
     expect(tooltip.className).toContain('max-w-56');
     expect(tooltip.className).not.toMatch(/(^|\s)w-\d/);
@@ -271,7 +260,6 @@ describe('Tooltip touch support', () => {
     });
     expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
 
-    // Focus still shows it.
     fireEvent.focus(trigger);
     expect(screen.getByRole('tooltip')).toHaveTextContent('One-line explanation.');
   });
@@ -411,9 +399,6 @@ describe('Tooltip touch support', () => {
     });
     expect(screen.getByRole('tooltip')).toBeInTheDocument();
 
-    // Radix's DismissableLayer defers attaching its outside-pointerdown
-    // listener by a setTimeout(0), so it never mistakes the pointerdown that
-    // opened the layer for one that should close it — flush that tick first.
     act(() => {
       vi.advanceTimersByTime(0);
     });
@@ -437,7 +422,6 @@ describe('Tooltip touch support', () => {
     fireEvent.touchEnd(trigger);
     expect(screen.getByRole('tooltip')).toBeInTheDocument();
 
-    // Reading time is the reader's — only an explicit dismissal closes it.
     act(() => {
       vi.advanceTimersByTime(60_000);
     });
@@ -532,11 +516,8 @@ describe('Tooltip tap-to-open', () => {
     fireEvent.touchEnd(trigger);
     expect(screen.getByRole('tooltip')).toBeInTheDocument();
 
-    // The real event order on a touch device: `pointerdown` lands first, and
-    // Radix dismisses the bubble on it. The second tap still has to read as
-    // "close", not re-open.
     act(() => {
-      vi.advanceTimersByTime(0); // let DismissableLayer attach its outside listener
+      vi.advanceTimersByTime(0);
     });
     fireEvent.pointerDown(trigger, { pointerType: 'touch' });
     fireEvent.touchStart(trigger);
@@ -617,9 +598,6 @@ describe('Tooltip tap-to-open', () => {
   });
 
   it('stays open through the compatibility click a real device echoes after the tap', () => {
-    // jsdom doesn't auto-synthesize a click after touchend the way a device
-    // does, so this fires one explicitly — the assertion is on our own click
-    // handler's reaction, not on jsdom modeling the touch/mouse linkage itself.
     render(
       <Tooltip content="One-line explanation." openOnTap>
         <button type="button">Trigger</button>
@@ -672,7 +650,6 @@ describe('Tooltip multi-touch', () => {
         { clientX: 200, clientY: 200 },
       ],
     });
-    // First finger lifts, second still down — not a completed tap.
     fireEvent.touchEnd(trigger, { touches: [{ clientX: 200, clientY: 200 }] });
 
     expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();

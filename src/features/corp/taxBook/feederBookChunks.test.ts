@@ -47,7 +47,6 @@ describe('Feeder pops from Corp Tax Books', () => {
     expect(out.get(30)).toMatchObject({
       chunks: [{ id: '7001', detail: 'arrival' }],
       fromBook: true,
-      // The Data Age is the book's last read of that Feeder, not this load.
       fetchedAt: new Date(NOW - 3_600_000),
     });
   });
@@ -77,7 +76,6 @@ describe('Feeder pops from Corp Tax Books', () => {
     await readFeederBooks(accounts, undefined, NOW + 60_000);
     expect(readFeederChunkParts).toHaveBeenCalledTimes(3);
     await readFeederBooks(accounts, undefined, NOW + 6 * 60_000);
-    // The refused and the readable book are asked again; the one with no book is not.
     expect(readFeederChunkParts.mock.calls.slice(3).map(([, corp]) => corp)).toEqual([20, 22]);
   });
 

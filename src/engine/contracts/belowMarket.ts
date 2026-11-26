@@ -1,65 +1,32 @@
-/**
- * Below market (issues #3989, #5427): public item-exchange contracts whose
- * contents are worth more than the asking price, one entry per contract.
- *
- * A contract's lines value in two parts that never mix. `market` is each line
- * with a hub price × that price, on the one side of the book the caller chose
- * (sell orders or buy orders), no fees. `other` is the lines the market cannot
- * price — a blueprint copy, a type with no order on that side — at the
- * cheapest *other* single-type public offer of the same thing, only when at
- * least three such offers exist. Those are asking prices, not sales, so
- * `profit` is `market − asking` and `other` joins it only when the caller opts
- * in. Abyssal lines are priced by neither.
- *
- * The asking price is the contract's, once: it is repeated on every line and
- * never split (decision 20260915-093419).
- */
 import type { PublicContractOfferRow } from '@/engine/contracts/contractOffers';
 import { buyoutOf, isUnpricedOffer, offerAskingPrice } from '@/engine/contracts/contractSearch';
 
-/** How many other offers must back a contract-priced line before it counts. */
 export const MIN_COMPARABLE_OFFERS = 3;
 
 export interface BelowMarketPricing {
-  /** Per-unit hub price on the chosen side of the book; missing, null or 0 is "no market". */
   prices: ReadonlyMap<number, number | null>;
-  /** ISK per PLEX, for PLEX asks; null leaves PLEX-asking contracts out. */
   plexPrice: number | null;
   isAbyssalType: (typeId: number) => boolean;
 }
 
 export interface BelowMarketContract {
   contractId: number;
-  /** The most valuable line: the row the Item cell names and the detail modal opens on. */
   lead: PublicContractOfferRow;
-  /** For-sale line count. */
   lines: number;
-  /** Lines with a hub price, and what they are worth there. */
   market: number;
   pricedLines: number;
-  /** Lines valued from other contracts' asks (not in `market`), and their estimate. */
   other: number;
   otherLines: number;
-  /** The weakest comparable count behind any `other` line; null when `other` is empty. */
   otherOfferCount: number | null;
   asking: number;
-  /** `market − asking`, plus `other` when the list was built with `includeOther`. */
   profit: number;
-  /** True when `other` is part of `profit`. */
   includesOther: boolean;
 }
 
 export interface BelowMarketOptions {
-  /** List and rank contracts by `market + other − asking` too. Default off. */
   includeOther?: boolean;
 }
 
-/**
- * A contract this view may list, judged on any one of its rows (every field
- * read here is contract-level): no item asks, no auction without a buyout,
- * and a real asking price — a barter, or a PLEX ask with no PLEX price yet,
- * has none.
- */
 export function isBelowMarketCandidate(
   row: PublicContractOfferRow,
   plexPrice: number | null
@@ -69,12 +36,10 @@ export function isBelowMarketCandidate(
   return !isUnpricedOffer(row, plexPrice);
 }
 
-/** Copies and abyssal lines take no market price; a copy's type price is the original's. */
 function isMarketPriceable(row: PublicContractOfferRow, isAbyssalType: (id: number) => boolean) {
   return !row.isBlueprintCopy && !isAbyssalType(row.typeId);
 }
 
-/** The types whose best buy the valuation needs: market lines of candidate contracts. */
 export function belowMarketPriceTypeIds(
   rows: readonly PublicContractOfferRow[],
   plexPrice: number | null,
@@ -89,17 +54,14 @@ export function belowMarketPriceTypeIds(
   return [...ids].sort((a, b) => a - b);
 }
 
-/** "The same thing": a copy matches blueprint and exact ME/TE; anything else matches type. */
 function comparableKey(row: PublicContractOfferRow): string {
   return row.isBlueprintCopy ? `b:${row.typeId}:${row.me ?? 0}:${row.te ?? 0}` : `t:${row.typeId}`;
 }
 
-/** Units a line is priced per: runs for a copy, items otherwise. */
 function units(row: PublicContractOfferRow): number {
   return row.isBlueprintCopy ? row.quantity * (row.runs ?? 0) : row.quantity;
 }
 
-/** The cheapest two per-unit asks (two, so the contract being valued can be skipped) and how many contracts ask. */
 interface Comparables {
   cheapest: { unit: number; contractId: number }[];
   contractIds: Set<number>;
@@ -115,11 +77,6 @@ function groupByContract(rows: readonly PublicContractOfferRow[]) {
   return byContract;
 }
 
-/**
- * One per-unit ask per single-type contract: every line the same thing, a
- * fixed price (no auctions, no PLEX, no item asks, no barters). A contract
- * that also sells the original is not single-type, since its lines differ.
- */
 function comparablesByKey(byContract: ReadonlyMap<number, readonly PublicContractOfferRow[]>) {
   const byKey = new Map<string, Comparables>();
   for (const [contractId, lines] of byContract) {
@@ -144,7 +101,6 @@ function comparablesByKey(byContract: ReadonlyMap<number, readonly PublicContrac
   return byKey;
 }
 
-/** One contract's for-sale lines, valued into the two parts. */
 interface ContractValue {
   market: number;
   pricedLines: number;
@@ -155,7 +111,6 @@ interface ContractValue {
   lead: PublicContractOfferRow;
 }
 
-/** Values one contract's lines. Pure: `comparables` is built from the whole snapshot. */
 function valueContract(
   lines: readonly PublicContractOfferRow[],
   pricing: BelowMarketPricing,
@@ -201,11 +156,6 @@ function valueContract(
   return result;
 }
 
-/**
- * Every candidate contract worth more than it asks, best profit first.
- * `rows` must be the whole snapshot: a contract's other lines and the
- * comparable offers both live outside any filtered subset.
- */
 export function belowMarketContracts(
   rows: readonly PublicContractOfferRow[],
   pricing: BelowMarketPricing,

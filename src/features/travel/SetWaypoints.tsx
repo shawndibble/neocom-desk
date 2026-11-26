@@ -1,19 +1,7 @@
 import { useCharacters } from '@/features/character/useCharacters';
-/**
- * Set waypoints in game (issue #2479): the button at the right end of Route
- * Safety's facts line, which sends the trip's Stops to a Character's EVE
- * client as autopilot waypoints.
- *
- * The client routes between waypoints by stargate with its own autopilot
- * settings, and cannot fly a wormhole or a bridge, so the waypoints stop at
- * the first such hop's entrance and the result says where to pick up
- * (`engine/route/waypoints.ts`). How each hop was flown is the trip's own
- * row tag (issue #2546): this never loads the stargate graph. A Character
- * whose grant predates the scope sees the button disabled, the reason, and a
- * Grant for that Character.
- */
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import { OutcomeNote, type Outcome } from '@/components/OutcomeNote';
 import { useNavigate } from 'react-router-dom';
 import { GrantMissingLink } from '@/app/GrantMissingLink';
 import { grantMissingPath } from '@/app/grantMissingPath';
@@ -38,6 +26,7 @@ import { useHydratedStore } from '@/lib/useHydratedStore';
 import { waypointSequence } from '@/engine/route/waypoints';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useOnline } from '@/stores/network';
+import { MESSAGE_MS } from '@/components/ui/useTimedToast';
 import { useWaypointsDismissed } from './waypointsDismissed';
 import { setWaypointsInGame } from './sendWaypoints';
 import { waypointFailureText } from './waypointFailureText';
@@ -45,17 +34,13 @@ import type { RouteSafetyLeg } from './useRouteSafety';
 
 const ENDPOINTS: readonly EsiEndpointId[] = ['postAutopilotWaypoint'];
 
-type Outcome = { tone: 'status' | 'alert'; text: ReactNode } | null;
-
 export function SetWaypoints({
   legs,
   nameOf,
   children,
 }: {
-  /** The trip's legs: a hole or bridge hop in their rows cuts the waypoints, named as such. */
   legs: readonly RouteSafetyLeg[];
   nameOf: (systemId: number) => string;
-  /** The facts line the button closes. */
   children: ReactNode;
 }) {
   const { t } = useTranslation();
@@ -72,14 +57,12 @@ export function SetWaypoints({
   const setDismissed = useWaypointsDismissed((state) => state.setValue);
   useHydratedStore(useWaypointsDismissed);
   const holders = useCharacterIdsWithScopes(requiredScopesForEndpoints(ENDPOINTS));
-  // Unknown holders hide it too: a dismissed pilot must not see the button flash on a cold load.
-  // So does a selected Character without the scope, or Dismiss would leave a dead button behind.
   const hidden =
     dismissed &&
     characters.length > 0 &&
     (holders === undefined || holders.size === 0 || lacksScope);
   const [sending, setSending] = useState(false);
-  const [outcome, setOutcome] = useState<Outcome>(null);
+  const [outcome, setOutcome] = useState<Outcome | null>(null);
 
   const blockedReason =
     characterId === null
@@ -95,7 +78,6 @@ export function SetWaypoints({
     setOutcome(null);
     try {
       const { waypoints, cutOff } = waypointSequence(legs);
-      /** The cut-off's copy under `group`, naming where it is taken and where to pick up. */
       const cutOffText = (group: 'nothing' | 'cutOff') =>
         cutOff &&
         t(`travel.waypoints.${group}.${cutOff.kind}`, {
@@ -145,7 +127,6 @@ export function SetWaypoints({
     <div className="space-y-2">
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
         {children}
-        {/* Full width under the facts on a phone, so it reads as the panel's action rather than one more fact. */}
         {!hidden && (
           <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
             {characters.length > 1 && characterId !== null && (
@@ -172,8 +153,6 @@ export function SetWaypoints({
                 </SelectContent>
               </Select>
             )}
-            {/* `aria-disabled`, not `disabled`: the blocked reason stays reachable in a tooltip. */}
-            {/* Always the Tooltip, so the button is not remounted when the reason comes and goes. */}
             <Tooltip content={lacksScope ? null : blockedReason}>{sendButton}</Tooltip>
           </div>
         )}
@@ -215,14 +194,7 @@ export function SetWaypoints({
           </div>
         </div>
       )}
-      {outcome && (
-        <p
-          role={outcome.tone}
-          className={outcome.tone === 'alert' ? 'text-danger' : 'text-text-dim'}
-        >
-          {outcome.text}
-        </p>
-      )}
+      <OutcomeNote outcome={outcome} durationMs={MESSAGE_MS} as="p" />
     </div>
   );
 }

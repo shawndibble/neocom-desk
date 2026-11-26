@@ -30,7 +30,6 @@ const skills = new Map<number, EngineSkill>([
   ],
 ]);
 
-/** Three 100s steps back to back: starts at 0, 100, 200. */
 const steps = (typeIDs: number[]): ScheduledStep[] =>
   typeIDs.map((skillTypeID, i) => ({
     skillTypeID,
@@ -47,8 +46,6 @@ describe('boostedStepIndices', () => {
   });
 
   it('ignores a skill whose attributes the Booster does not touch', () => {
-    // A Booster on intelligence/memory does nothing for a perception skill,
-    // even though that skill trains inside the window.
     const boosters: Booster[] = [{ bonus: { intelligence: 10 }, expiresAt: after(1000) }];
     expect(boostedStepIndices(steps([1, 2, 1]), skills, boosters, START)).toEqual(new Set([0, 2]));
   });
@@ -69,8 +66,6 @@ describe('boostedStepIndices', () => {
   });
 
   it('excludes a step starting exactly at expiry, matching computeSchedule', () => {
-    // computeSchedule adds the bonus while `elapsed < offset`, strictly. A step
-    // beginning at the instant of expiry gets no benefit.
     const boosters: Booster[] = [{ bonus: { intelligence: 10 }, expiresAt: after(100) }];
     expect(boostedStepIndices(steps([1, 1]), skills, boosters, START)).toEqual(new Set([0]));
   });
@@ -84,8 +79,6 @@ describe('boostedStepIndices', () => {
   });
 
   it('marks only steps that end after a Booster with a future startsAt begins', () => {
-    // Steps start at 0, 100, 200 and each run 100s. A Booster starting at 250
-    // only reaches step 2 (which ends at 300, after 250) — not steps 0 or 1.
     const boosters: Booster[] = [
       { bonus: { intelligence: 10 }, startsAt: after(250), expiresAt: after(1000) },
     ];

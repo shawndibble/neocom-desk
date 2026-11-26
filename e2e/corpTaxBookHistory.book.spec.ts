@@ -1,7 +1,3 @@
-/**
- * A Corp Tax Book with months of history on the Running account (decision 20261120-235011): the
- * officer's Miners list, a Miner's page and the Late notices tab.
- */
 import { expect, minerFact, openMiner, signInAsOfficer, test } from './support/taxBook/bookTest';
 import { historyBook } from './support/taxBook/bookScenarios';
 import { isk, shortDay } from './support/taxBook/bookSeed';
@@ -49,7 +45,6 @@ test('late notices are listed as sent', async ({ page }) => {
     `Ada Lunar2${shortDay(book.notices.adaNovember.issuedBack)}${isk(book.adaOwes.amount)}`
   );
   await expect(sent.getByRole('row', { name: /Bram Kessik/ })).toContainText(
-    // Nothing owed now: a dash.
     `Bram Kessik1${shortDay(book.notices.bram.issuedBack)}—`
   );
 });

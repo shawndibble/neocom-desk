@@ -71,7 +71,6 @@ describe('corpMembers', () => {
       'overview.widgets.corpMembers.secondary{"joined":1,"left":1}'
     );
     expect(view.table?.rows.map((r) => r.cells[0])).toEqual(['Bea', '#9']);
-    // A joined row flashes on the roster; a left member is gone from it, so that row stays plain.
     expect(view.table?.rows.map((r) => r.to)).toEqual([
       '/corp/members/roster?highlight=2',
       undefined,

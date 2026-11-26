@@ -1,21 +1,3 @@
-/**
- * Material sourcing: resolves each effective material against the player's
- * per-material overrides (units already owned, manual unit price) and the hub
- * prices, producing one cost line per material.
- *
- * Rules (issue #179):
- * - The free portion is min(ownedQuantity, quantity) — an owned quantity
- *   larger than the job needs clamps silently, it is never an error.
- * - The remainder is priced at the override price if one is set, otherwise the
- *   hub price. Owned units always contribute zero cost.
- * - A material blocks the plan's pricing only when its remainder is non-zero
- *   AND neither an override nor a hub price exists — a fully owned material is
- *   never a blocker, even with no hub listing at all.
- *
- * Nothing here throws: garbage input (negative, NaN, Infinity) is treated as
- * an absent override, so computeBuildPlan's never-throws contract holds.
- */
-
 import type {
   EffectiveMaterial,
   HubPrices,
@@ -24,20 +6,15 @@ import type {
   MaterialSourcingMap,
 } from '@/engine/industry/types';
 
-/** A usable non-negative number, or undefined. Zero is kept — it is a real price. */
 function usable(value: number | undefined): number | undefined {
   return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : undefined;
 }
 
-/** Resolve one material against its sourcing entry and the hub prices. */
 function materialCostLine(
   material: EffectiveMaterial,
   hubPrices: HubPrices,
   sourcing?: MaterialSourcing
 ): MaterialCostLine {
-  // Floored: materials are consumed in whole units everywhere else in the
-  // engine (effectiveMaterialQuantity ceils), so a fractional owned quantity
-  // must not leak a fractional remainder into the line cost.
   const owned = Math.min(Math.floor(usable(sourcing?.ownedQuantity) ?? 0), material.quantity);
   const remainingQuantity = material.quantity - owned;
   const unitPrice = usable(sourcing?.overridePrice) ?? usable(hubPrices[material.typeID]) ?? null;
@@ -51,7 +28,6 @@ function materialCostLine(
   };
 }
 
-/** Per-material cost lines for a whole job. Entries for unused materials are ignored. */
 export function materialCostLines(
   materials: readonly EffectiveMaterial[],
   hubPrices: HubPrices,
@@ -62,12 +38,6 @@ export function materialCostLines(
   );
 }
 
-/**
- * Canonical form of a sourcing map, for callers that persist one: every entry
- * holds only members that carry a real value, entries left holding nothing are
- * dropped, and an empty result collapses to `undefined` so the caller can omit
- * the field entirely rather than store an empty object.
- */
 export function normalizeMaterialSourcingMap(
   sourcing: MaterialSourcingMap | undefined
 ): MaterialSourcingMap | undefined {

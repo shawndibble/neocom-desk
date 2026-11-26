@@ -13,10 +13,8 @@ import { formatIskExact } from './chargeFormat';
 const W = 296;
 const H = 250;
 const PAD = { left: 34, right: 10, top: 24, bottom: 30 };
-/** Faction versions sit straight above their Tech I charge; a nudge keeps equal ones apart. */
 const NUDGE = 4;
 
-/** An empire navy's faction charge ("Caldari Navy", "Republic Fleet") rather than a pirate faction's. */
 function isNavy(c: ChargeChoice): boolean {
   return /\b(?:Navy|Fleet)\b/.test(c.faction ?? '');
 }
@@ -28,13 +26,6 @@ function niceStep(max: number): number {
   return 500;
 }
 
-/**
- * Range against damage: one mark per charge, told apart by shape (DESIGN.md
- * §1: by form, not a new colour) — Tech I hollow circle, navy filled circle,
- * pirate filled square, Tech II hollow triangle; accent marks only the
- * selected one. The dashed line joins the charges nothing
- * else beats at their range. A mark selects; the box under the chart loads.
- */
 export function ChargeChart({
   choices,
   distance,
@@ -58,7 +49,6 @@ export function ChargeChart({
   const x = (metres: number) => PAD.left + (metres / 1000 / maxKm) * (W - PAD.left - PAD.right);
   const y = (dps: number) => H - PAD.bottom - (dps / maxY) * (H - PAD.top - PAD.bottom);
 
-  // Within one type, spread its versions a little either side.
   const nudge = new Map<number, number>();
   const byBase = new Map<number, ChargeChoice[]>();
   for (const c of choices) byBase.set(c.baseTypeId, [...(byBase.get(c.baseTypeId) ?? []), c]);

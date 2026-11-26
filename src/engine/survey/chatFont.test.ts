@@ -1,11 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { textWidth } from './chatFont';
 
-/**
- * Fixtures are pixel measurements of EVE's chat at font size 12: a `║`, ten or
- * twenty copies of one character, and a `║`, screenshotted and measured from the
- * left `║`'s start to the right `║`'s start.
- */
 describe('textWidth', () => {
   it('measures the alphabets exactly as the chat draws them', () => {
     expect(textWidth('abcdefghijklmnopqrstuvwxyz')).toBe(170);

@@ -74,7 +74,6 @@ describe('loadCharacterStandings', () => {
       expiresAt: Date.now() + 60_000,
       scopes: ['esi-characters.read_contacts.v1'],
     });
-    // onUnhandledRequest is 'error', so any fetch here fails the test.
     expect(await loadCharacterStandings(CHAR_ID)).toEqual([]);
   });
 

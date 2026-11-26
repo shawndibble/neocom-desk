@@ -1,7 +1,3 @@
-/**
- * The plain-text lines an Improve row says about its swap: the figure the goal
- * scores, before and after, and why a rejected swap was turned down.
- */
 import type { TFunction } from 'i18next';
 import { commandOf } from '@/engine/fittings/improve';
 import { ewarOf, tackleOf } from '@/engine/fittings/improve';
@@ -23,7 +19,6 @@ export const m3sFormat = createNumberFormat({ maximumFractionDigits: 1 });
 export const m3Format = createNumberFormat({ maximumFractionDigits: 0 });
 export const twoDecimals = createNumberFormat({ maximumFractionDigits: 2 });
 
-/** The guardrail a rejected swap broke; a budget or cap says by how much. */
 export function brokeText(
   t: TFunction,
   option: RejectedOption,
@@ -39,7 +34,6 @@ export function brokeText(
   });
 }
 
-/** Mine more: the ore the row is scored with, and the m³/s it gives. */
 export function oreLine(
   t: TFunction,
   option: ImproveOption | RejectedOption,
@@ -51,14 +45,12 @@ export function oreLine(
   });
 }
 
-/** One figure a line compares: its i18n key and the two values, already formatted. */
 interface Figure {
   key: string;
   before: string;
   after: string;
 }
 
-/** The figures joined with " · ", only those that change; null when none does. */
 function changedFigures(t: TFunction, figures: readonly Figure[]): string | null {
   const changed = figures.filter((figure) => figure.before !== figure.after);
   if (changed.length === 0) return null;
@@ -67,7 +59,6 @@ function changedFigures(t: TFunction, figures: readonly Figure[]): string | null
     .join(' · ');
 }
 
-/** Carry more, the align goals, Repair more, Transfer more, Hold tighter, Stronger EWAR, Stronger fleet support: the figure the goal scores, before and after. */
 export function moveLine(
   t: TFunction,
   goal: ImproveGoal,

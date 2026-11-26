@@ -56,27 +56,17 @@ import { UnloggedDeliveriesBadge } from './UnloggedDeliveriesBadge';
 interface ProductionRunsPanelProps {
   characterId: number;
   buildPlanId: string;
-  /** Prefills the "Log Production" form; null when the plan's own result hasn't computed yet. */
   defaults: {
     quantity: number;
     materialCost: number;
     jobFee: number;
-    /** The industry job this log was opened from ("Log production" on a job); stored as the run's `sourceJobId`. */
     sourceJobId?: number;
   } | null;
   productTypeID: number | null;
-  /** The plan's blueprint: when set, the header shows how many of its delivered jobs were never logged. */
   blueprintTypeId?: number;
   productName: string;
   skills: SkillLevels;
-  /** The plan owner's standing toward the plan's Trade Hub NPC owner (issue #1238), for each run's realized-profit broker fee. Absent/0 = standings assumed 0. */
   standing?: ResolvedStandings;
-  /**
-   * Bumped by the parent each time something outside this panel asks to log
-   * a run — the hero's own "Log Production" button. A counter rather than a
-   * boolean so two requests in a row both open the form, and so the panel
-   * never has to tell the parent to reset anything.
-   */
   logRequest?: number;
 }
 
@@ -96,14 +86,6 @@ function runForm(run: Pick<ProductionRunRecord, 'quantity' | 'materialCost' | 'j
   };
 }
 
-/**
- * "Production Runs" panel (issue #525): manual build-to-sale profit tracking
- * appended below a Build Plan's Results panel. Self-contained — reads and
- * writes the three Production Log Dexie tables directly, like the sibling
- * `ActiveJobsPanel` reads its own ESI data rather than the route threading it
- * through. Owns its own `Panel` wrapper (same convention as
- * `ActiveJobsPanel`) so "Log Production" can live in the header actions.
- */
 export function ProductionRunsPanel({
   characterId,
   buildPlanId,
@@ -120,17 +102,8 @@ export function ProductionRunsPanel({
   const planColumnsShown = useColumnVisibility(useVisiblePlanRunColumns, PLAN_RUN_COLUMN_IDS);
   const runsCsvColumns = useMemo(() => productionRunsCsvColumns(t), [t]);
   const [loggingOpen, setLoggingOpen] = useState(false);
-  // Closed until asked: the table is the record, and on a plan being priced
-  // the header's one-line rollup is the read that matters. Its rows are
-  // still one click away, whatever the viewport.
   const [expanded, setExpanded] = useState(false);
   const [editingRunId, setEditingRunId] = useState<string | null>(null);
-  /**
-   * The last outside request this panel has answered. The form is open while
-   * a newer one is outstanding — derived, so an outside request needs no
-   * effect and no render-time state adjustment — and closing it settles the
-   * counter. The form's `key` below is what makes each open start fresh.
-   */
   const [dismissedLogRequest, setDismissedLogRequest] = useState(logRequest);
   const requestedOpen = logRequest > dismissedLogRequest && productTypeID !== null;
   const loggingModalOpen = loggingOpen || requestedOpen;
@@ -207,7 +180,6 @@ export function ProductionRunsPanel({
   }
 
   function requestDeleteRun(runId: string) {
-    // One modal at a time: close the edit modal before the confirm opens.
     setEditingRunId(null);
     sale.confirmDeleteRun(runId);
   }
@@ -256,8 +228,6 @@ export function ProductionRunsPanel({
         wrapMeta
         metaOwnRow
         meta={
-          // Its own full-width row under the title and controls on a phone; nothing at all when there
-          // is neither a summary nor an unlogged-delivery chip to say.
           <span className="flex flex-wrap items-center gap-x-2 gap-y-1 max-md:order-last max-md:basis-full empty:hidden">
             {rollup.count > 0 && (
               <span className="text-xs tabular-nums text-text-dim">{runsSummary}</span>
@@ -420,18 +390,11 @@ export function ProductionRunsPanel({
 
 interface ProductionRunFormProps {
   hint?: string;
-  /**
-   * Seeds the fields once, on mount — the caller re-keys the form to start it
-   * over. The raw record rather than a prepared `RunForm`: formatting it here,
-   * inside the state initializer, keeps that work out of the panel's render.
-   */
   initial: Pick<ProductionRunRecord, 'quantity' | 'materialCost' | 'jobFee'> | null;
-  /** Called only with input that passed validation; a blank field arrives as 0. */
   onSubmit: (input: ProductionRunInput) => void;
   submitLabel: string;
 }
 
-/** Shared body for the "Log Production" and edit-run modals: the three cost/quantity fields plus a live total. */
 function ProductionRunForm({ hint, initial, onSubmit, submitLabel }: ProductionRunFormProps) {
   const [form, onChange] = useState<RunForm>(() => (initial ? runForm(initial) : EMPTY_FORM));
   const { t } = useTranslation();
@@ -444,7 +407,6 @@ function ProductionRunForm({ hint, initial, onSubmit, submitLabel }: ProductionR
     jobFee: unmaskNumber(form.jobFee) ?? 0,
   };
   const { materialCost, jobFee } = input;
-  // Shown only after a refused save, then live: an error clears the moment its value is fixed.
   const errors = attempted ? validateProductionRunInput(input) : {};
 
   function submit() {

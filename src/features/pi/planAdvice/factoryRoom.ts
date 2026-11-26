@@ -9,16 +9,6 @@ import { colonyPlan } from '../colonyPlan';
 import type { BuiltColonyAdvice, PlanetAdvice } from '../systemPlanetModel';
 import type { PlannerColonyRow } from '../goalPlannerModel';
 
-/**
- * Factories a colony has the room for and the surplus P1 to feed, from the
- * network plan: the Advisor's own detector for "room for factories", reused.
- * The plan only offers a P2 no single colony already makes both inputs for
- * (that one is the rebuild scorer's question), so an opportunity usually draws
- * on another colony's surplus: `routedFrom` names those colonies so the page can
- * say what to move. A win routed from another system is dropped: a quick win
- * is doable within one system. Market sourcing is off, so nothing here is a
- * purchase. The network plan needs two measurable colonies.
- */
 export function factoryRoom(
   built: readonly (PlannerColonyRow & { advice: BuiltColonyAdvice })[],
   books: SellBooks,

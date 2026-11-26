@@ -1,8 +1,3 @@
-/**
- * The Market Browser's order-book tables as one unit: the fee context the fee
- * columns price with, the CSV exports, which columns are picked and how wide
- * the book needs to be, and the column definitions. The route only mounts them.
- */
 import { useCallback, useMemo } from 'react';
 import type { TFunction } from 'i18next';
 import { ZERO_STANDINGS } from '@/engine/market/standings';
@@ -33,7 +28,6 @@ import {
 export interface UseMarketOrderTablesArgs {
   t: TFunction;
   activeCharacterId: number | null;
-  /** The browser is in Trade Hub mode, so one station owner sets the broker fee standings. */
   hubMode: boolean;
   effectiveHubId: TradeHub['id'];
   tradeHubStandings: TradeHubStandingsMap;
@@ -41,7 +35,6 @@ export interface UseMarketOrderTablesArgs {
   solarSystemMap: ReadonlyMap<number, SolarSystemLookup>;
   myOrderIds: ReadonlySet<number>;
   jumpRangeFilter: JumpRangeFilter;
-  /** The book covers exactly one station, which the scope bar already names. */
   singleStationBook: boolean;
   loadedView: LoadedOrderBookView | null;
   sortedSell: readonly RegionOrder[];
@@ -70,8 +63,6 @@ export function useMarketOrderTables({
   const bookBestBuy = loadedView?.summary.bestBuy ?? null;
   const truncated = loadedView?.truncated ?? false;
   const feeSkills = useOrderFeeSkills(activeCharacterId);
-  // Broker fee standings come from the selected hub's station owner; a region
-  // or structure book has no single owner, so it prices with none.
   const hubStanding = hubMode
     ? tradeHubStanding(tradeHubStandings, effectiveHubId)
     : ZERO_STANDINGS;
@@ -80,12 +71,10 @@ export function useMarketOrderTables({
     [feeSkills, hubStanding]
   );
   const knownJumps = jumpRangeFilter.jumpsStatus === 'ready' ? jumpRangeFilter.jumps : null;
-  // A row's distance from the Current System, for the export: the Jumps column's own rule.
   const exportJumpsFor = useCallback(
     (systemId: number) => knownJumps?.get(systemId) ?? null,
     [knownJumps]
   );
-  // Every row, not the ROW_CAP the tables mount before "Show all"; every column, not the picker's.
   const sellCsvColumns = useMemo(
     () =>
       orderBookCsvColumns(t, {
@@ -128,8 +117,6 @@ export function useMarketOrderTables({
   });
 
   const pickedOrderColumns = useVisibleMarketOrderColumns((state) => state.value);
-  // A held-back column can't be ticked, so the picker doesn't offer it, and it
-  // doesn't count toward the width the book needs.
   const notWithheld = useCallback(
     (ids: readonly MarketOrderColumnId[]) =>
       ids.filter((id) => !isColumnWithheld(id, { hideLocation: singleStationBook, feeContext })),
@@ -139,10 +126,6 @@ export function useMarketOrderTables({
     () => notWithheld(pickedOrderColumns),
     [notWithheld, pickedOrderColumns]
   );
-  // The order book's own width picks columns or two-line cards: a phone,
-  // and a desktop whose finder column leaves the book too narrow for the
-  // columns the pilot has picked and the figures on screen, both get the
-  // card. Short of that, Location narrows first, so fewer widths need cards.
   const orderBookWidths = orderBookWidthsRem(
     unwithheldPicked,
     orderBookFigureChars([...shownSell, ...sortedBuy], bookBestSell, myOrderIds)

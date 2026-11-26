@@ -1,27 +1,10 @@
-// Pop Sharing settings (issue #6222; scope: docs/context/decisions/20261115-122511-corp-tax-book-
-// shares-moon-pop-schedules.md): a Corp Tax Book's Sharing default and per-moon Moon overrides,
-// and the one resolver every reader uses for a moon's effective settings. Pure and
-// dependency-free: the client imports it too (the Sharing tab), and the later tickets that
-// publish Shared Pops (#6223 on) resolve each moon with `effectivePopSharing`.
-//
-// Stored at `corps/{corp}/meta/popSharing` (officers read `meta`; only the
-// `editCorpTaxBookCallable` actions `setPopSharing` / `setPopSharingMoon` write it). A moon
-// owner's opt-out lives on its feeder record (`corps/{corp}/feeders/{owner}.popSharingOptOut`).
-
 import { isPlainRecord as isRecord } from './guards.js';
 
-/** `corps/{corp}/meta/{POP_SHARING_DOC}`. */
 export const POP_SHARING_DOC = 'popSharing';
 
-/** Which instant a Shared Pop shows: the chunk's arrival, or its natural decay (Auto-fracture). */
 export type PopTime = 'ready' | 'auto-fracture';
 export const POP_TIMES: readonly PopTime[] = ['ready', 'auto-fracture'];
 
-/**
- * Who sees a Shared Pop. Corp and Alliance are always the book's own corporation and its
- * alliance, never a moon owner's. A Community carries its name as the officer saw it, so the
- * Sharing tab reads without a Community lookup.
- */
 export type PopAudience =
   | { kind: 'corp' }
   | { kind: 'alliance' }
@@ -30,9 +13,7 @@ export type PopAudience =
 export interface PopSharingSettings {
   audiences: PopAudience[];
   popTime: PopTime;
-  /** The ore make-up shows on the Shared Pop (never ISK). */
   showOre: boolean;
-  /** The start link's rate; null follows the book's own rate. */
   ratePct: number | null;
   notes: string;
 }
@@ -46,24 +27,16 @@ export const POP_SHARING_KEYS: readonly PopSharingKey[] = [
   'notes',
 ];
 
-/** A Moon override: only the settings that moon changed. */
 export type PopSharingOverride = Partial<PopSharingSettings>;
 
-/**
- * A change to one moon's override: `set` overrides those settings (a `ratePct` of null is the
- * book's own rate, overriding a default that names one); `clear` returns those to the default.
- */
 export interface PopSharingOverridePatch {
   set: Partial<PopSharingSettings>;
   clear: PopSharingKey[];
 }
 
 export interface PopSharingDoc {
-  /** Off by default; turning it on needs Automatic sync. */
   enabled: boolean;
-  /** The Sharing default. */
   defaults: PopSharingSettings;
-  /** Moon overrides by moon id (string). */
   moons: Record<string, PopSharingOverride>;
 }
 
@@ -93,14 +66,9 @@ function readAudience(v: unknown): PopAudience | undefined {
   return undefined;
 }
 
-/** One audience's identity: two entries with the same key are the same audience. */
 export const audienceKey = (a: PopAudience): string =>
   a.kind === 'community' ? `community:${a.communityId}` : a.kind;
 
-/**
- * The settings a stored record holds, each read only when it is well formed. Lenient on purpose:
- * the callable (`popSettingsPatch` in corpTaxBook.ts) is the strict gate on what is written.
- */
 function readSettings(raw: unknown): PopSharingOverride {
   if (!isRecord(raw)) return {};
   const out: PopSharingOverride = {};
@@ -121,7 +89,6 @@ function readSettings(raw: unknown): PopSharingOverride {
   return out;
 }
 
-/** A stored `meta/popSharing` (or none) as settings: missing is sharing off, the built-in default. */
 export function popSharingFrom(raw: unknown): PopSharingDoc {
   const d = isRecord(raw) ? raw : {};
   const moons: Record<string, PopSharingOverride> = {};
@@ -140,20 +107,12 @@ export function popSharingFrom(raw: unknown): PopSharingDoc {
 }
 
 export interface EffectivePopSharing {
-  /** The default with this moon's overrides on top. */
   settings: PopSharingSettings;
-  /** The settings this moon overrides, in `POP_SHARING_KEYS` order. */
   overridden: PopSharingKey[];
-  /** Whether this moon's pops are published. */
   shared: boolean;
-  /** Why not: sharing is off, the moon owner opted out, or no audience is left. */
   blockedBy: 'off' | 'owner-opted-out' | 'no-audience' | null;
 }
 
-/**
- * One moon's effective settings. A moon owner's opt-out keeps the book's settings for its
- * moons (they show, inert) and shares nothing until it opts in again.
- */
 export function effectivePopSharing(
   doc: PopSharingDoc,
   moonId: number,
@@ -172,7 +131,6 @@ export function effectivePopSharing(
   return { settings, overridden, shared: blockedBy === null, blockedBy };
 }
 
-/** A moon's override after a patch; undefined when it overrides nothing any more. */
 export function applyMoonOverride(
   current: PopSharingOverride | undefined,
   patch: PopSharingOverridePatch
@@ -183,7 +141,6 @@ export function applyMoonOverride(
   return Object.keys(next).length > 0 ? (next as PopSharingOverride) : undefined;
 }
 
-/** The rate a Shared Pop's start link carries: the settings' own, else the book's. */
 export function startLinkRatePct(settings: PopSharingSettings, bookRatePct: number): number {
   return settings.ratePct ?? bookRatePct;
 }

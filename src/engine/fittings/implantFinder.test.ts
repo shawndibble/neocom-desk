@@ -229,7 +229,6 @@ describe('cheapestFixes', () => {
   });
 
   it('drops a grade beaten in its own slot on both price and headroom', () => {
-    // EE-606 here is dearer and frees less than EE-605: no fix should ever use it.
     const fixes = cheapestFixes([ee(5, 24, 20e6), ee(6, 20, 60e6)], 18.4);
     expect(fixes.map((f) => f.typeIds)).toEqual([[605]]);
   });
@@ -425,7 +424,6 @@ describe('mining and utility goals', () => {
     const goal = goalById('miningYield');
     expect(goal.kind).toBe('more');
     expect(displayValue(goal, mining(25_933))).toBe(25_933);
-    // A Highwall MX-1005 / Michi's Excavation Augmentor style bonus: +5%.
     expect(goalGain(goal, mining(20_000), mining(21_000))).toBeCloseTo(0.05);
   });
 
@@ -451,7 +449,6 @@ describe('mining and utility goals', () => {
 });
 
 describe('placeInSet', () => {
-  // Implant 10 and booster 20 both use slot 3 of their own kind.
   const slots = new Map<number, { kind: 'implant' | 'booster'; slot: number }>([
     [10, { kind: 'implant', slot: 3 }],
     [11, { kind: 'implant', slot: 3 }],

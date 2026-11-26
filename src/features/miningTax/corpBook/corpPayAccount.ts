@@ -2,11 +2,6 @@ import type { DivisionNames } from '@/engine/corpTaxBook/divisionNames';
 import { otherDivisions } from '@/engine/corpTaxBook/uncounted';
 import type { Translate } from '@/lib/translate';
 
-/**
- * The Account a member picks in EVE's Transfer ISK window for a corp book's division: the
- * corp's own name for it when a Director's visit stored one (#6161), else "Master Wallet" for
- * division 1 and the numbered division otherwise.
- */
 export function corpPayAccount(
   division: number,
   names: Readonly<DivisionNames> | undefined,
@@ -19,7 +14,6 @@ export function corpPayAccount(
     : t('miningTax.corpBook.pay.division', { division });
 }
 
-/** Every Account the book reads donations from (`corpPayAccount` each), in division order. */
 export function corpPayAccounts(
   divisions: readonly number[],
   names: Readonly<DivisionNames> | undefined,
@@ -28,7 +22,6 @@ export function corpPayAccounts(
   return divisions.map((d) => corpPayAccount(d, names, t));
 }
 
-/** Whether the book reads all of the corp's wallet divisions, so no donation can miss it. */
 export function readsEveryDivision(divisions: readonly number[]): boolean {
   return otherDivisions(divisions).length === 0;
 }

@@ -1339,7 +1339,7 @@
     },
     "skillFixes": {
       "heading": "Makes it fit",
-      "makesItFit": "Brings the Fitting under budget",
+      "makesItFit": "Brings the Fitting under CPU or powergrid budget",
       "missing": "Needed to fly the ship or use its modules",
       "inPlan": "In {{plan}}"
     },
@@ -1352,7 +1352,8 @@
       "rankBy": "Rank by",
       "improvesFit": "Improves fit",
       "withPrerequisites": "incl. prerequisites",
-      "addToPlan": "Add to plan",
+      "addToPlan": "Add",
+      "addAll": "Add all",
       "addLevel": "Add {{level}}",
       "addToPlanLabel": "Add to plan: {{skill}}",
       "newPlan": "New Skill Plan ({{name}})",
@@ -7250,6 +7251,10 @@
     "resetColumns": "Reset to default",
     "resetFilters": "Reset filters",
     "close": "Close",
+    "toastTone": {
+      "success": "Success",
+      "danger": "Error"
+    },
     "discardInputTitle": "Discard what you typed?",
     "discardInputBody": "Closing this will throw away the changes you have not saved.",
     "discardInputKeep": "Keep editing",
@@ -8308,9 +8313,9 @@
       "state": {
         "notPayingStill": "{{corp}} still bills this",
         "pending": "Pending corp record",
-        "billed": "Billed",
+        "billed": "Outstanding",
+        "estimate": "Outstanding",
         "conflict": "Conflict",
-        "settling": "Settling",
         "unattributed": "Unattributed",
         "dismissed": "Dismissed by corp",
         "waived": "Waived",
@@ -8321,9 +8326,8 @@
       "hint": {
         "pending": "{{corp}} has not closed this day in its book yet. Until it does, your own Assignment applies and nothing is owed to the corp.",
         "billed": "{{corp}}'s Corp Tax Book sets what you owe for this day.",
+        "estimate": "An estimate: {{corp}}'s book bills this day once it closes (after 00:00 UTC and its next sync), so the amount may still change. Paying now is fine: it counts toward the bill.",
         "conflict": "You gave this ore to another Payee, and {{corp}}'s book also recorded it. It is not owed yet. On {{date}} it becomes owed to {{corp}} unless you sort it out first.",
-        "settling": "{{corp}}'s refinery log hasn't caught up with your mining on {{day}} yet. This ore should appear after a later sync; nothing to do until then.",
-        "conflictOverListed": "Your entry for {{corp}} lists more of this ore than its book recorded. {{corp}} does not bill it: take the extra ore off your entry.",
         "conflictOwnNeedsReview": "Your own entry for {{corp}} needs review, so its book can't take it over. It is not owed yet. On {{date}} it becomes owed to {{corp}} unless you sort it out first.",
         "conflictOwnerCollected": "{{corp}} now collects tax for this moon, and you gave this ore to the moon's owner. It is not owed yet. On {{date}} it becomes owed to {{corp}} unless you sort it out first.",
         "unattributed": "No Corp Tax Book claims this ore. Assign it to your Payee if you owe someone.",
@@ -8354,8 +8358,10 @@
         "behind_other": "You owe {{corp}} {{amount}} ISK: {{count}} days, oldest {{date}}.",
         "openingOwes": "Opening balance from the old system: you owe {{corp}} {{amount}} ISK.",
         "openingCredit": "Opening balance from the old system: {{corp}} holds {{amount}} ISK credit for you.",
-        "settling": "{{date}} is still settling: {{corp}}'s refinery log hasn't caught up with all your mining that day (synced {{ago}}). Paying now pays only what is billed so far.",
-        "settlingHere": "{{date}} is still settling: the refinery log hasn't caught up with all your mining that day (synced {{ago}}). Paying now pays only what is billed so far.",
+        "owes": "You owe {{corp}} {{amount}} ISK.",
+        "owesWithEstimate": "You owe {{amount}} ISK. {{estimate}} ISK of it is {{date}}, billed after {{time}} UTC on {{closeDate}}.",
+        "estimate": "{{amount}} ISK of it is {{date}}, billed after {{time}} UTC on {{closeDate}}.",
+        "estimateHere": "{{amount}} ISK of it is {{date}}, billed after {{time}} UTC on {{closeDate}}.",
         "safeHere": "Safe to pay — {{date}} is closed (synced {{ago}}).",
         "safeOnceHere": "Safe to pay once the book syncs (last synced {{ago}}).",
         "neverSyncedHere": "Safe to pay once the book syncs (never synced).",
@@ -8378,7 +8384,6 @@
         "tax": "Tax",
         "explain": "Book rate {{pct}}% is the {{scope}}, effective {{from}}. Once {{date}} is Billable, the book's quantity, price and rate decide what you owe {{corp}}.",
         "raiseQuantity": "The book recorded more ore than you did, so it bills more. If the book is right, fix your records; if yours is, Resolve it and tell {{corp}}.",
-        "inYourFavourQuantity": "The book recorded less ore than you did, so it bills less — you owe the book's figure, and there is nothing to raise.",
         "raiseRate": "The book's rate is higher than the one you recorded, so it bills more. If the book is right, fix your records; if yours is, Resolve it and tell {{corp}}.",
         "inYourFavourRate": "The book's rate is lower than the one you recorded, so it bills less — you owe the book's figure, and there is nothing to raise.",
         "raiseBoth": "The book's quantity and rate both differ from your record. Fix your records if the book is right, or Resolve it if yours is."
@@ -8398,11 +8403,13 @@
         "feeder-member": "rate for the moon owner's own members",
         "record": "correction for this day"
       },
+      "refineryNotRecorded": "refinery not recorded yet",
       "detail": {
         "lockedResolve": "Think one is wrong? Resolve it with {{corp}}.",
         "bookAndYou": "{{book}} (corp) · {{you}} (you)",
         "priced": "{{hub}} buy · {{form}} ore · {{pct}}% {{scope}} from {{from}}",
         "bookTitle": "Corp Tax Book",
+        "estimateOwn": "Not billed yet. Until {{corp}} bills this day, it is your own entry: edit it, or split off ore that was another Payee's.",
         "lockedShort": "{{corp}} keeps these figures, so they can't be edited here.",
         "unlinkedDonation": "Your {{amount}} ISK donation sent {{time}} paid this day, but {{corp}} never credited it, so it's owed again. Resolve it to send {{corp}} that transfer from your wallet journal.",
         "factBilling": "Billing",
@@ -8425,21 +8432,17 @@
       "conflict": {
         "region": "Conflict",
         "titleOtherPayee": "Your entry gives this ore to another Payee",
-        "titleOverListed": "Your entry lists more ore than the book recorded",
         "titleOwnNeedsReview": "Your own entry for {{corp}} needs review",
         "titleOwnerCollected": "{{corp}} now collects tax for {{owner}}'s moon",
         "ownerCollectedAsk": "If you already paid {{owner}}, Resolve it: it tells {{corp}} where the ore went.",
         "yourEntry": "Your entry: {{payee}} · {{amount}} ISK · {{status}}",
         "yourEntryUnknown": "Your entry: gives this ore to another Payee",
-        "yourEntryOverListed": "Your entry: lists more of this ore for {{payee}} than the book recorded",
-        "settlingNote": "Not billed yet · {{corp}}'s refinery log hasn't caught up with your mining on {{day}}. This ore should appear after a later sync.",
         "entryPaid": "paid",
         "entryOwed": "owed",
         "bookEntry": "{{corp}}'s book: recorded it at {{place}}",
         "alsoContested": "Also in conflict on this day: {{list}}.",
         "alsoContestedItem": "{{corp}} ({{amount}} ISK)",
         "headerNotOwed": "Not owed yet · {{corp}}'s book bills it on its date unless an officer changes the book",
-        "headerNotBilled": "Not billed · {{corp}}'s book did not record this ore",
         "countsFrom": "From {{date}} this app also counts it as owed to {{corp}}.",
         "cardBills": "On its date",
         "fixTitle": "To fix it",
@@ -8997,7 +9000,8 @@
         "charge": "Charges",
         "payment": "Payments",
         "writeOff": "Write-offs",
-        "notice": "Late notices"
+        "notice": "Late notices",
+        "recordChange": "Automatic changes"
       },
       "kindOne": {
         "charge": "Charge",
@@ -9036,7 +9040,13 @@
         "final": "Final notice sent",
         "opening": "Balance through {{date}}",
         "reversal": "Reversal",
-        "openingBalance": "Opening balance"
+        "openingBalance": "Opening balance",
+        "recordChange": {
+          "tolerance": "Closed within tolerance",
+          "autoFix": "Fixed automatically at close",
+          "fixMyRecords": "Fixed by Fix my records",
+          "autoAssign": "Assigned automatically"
+        }
       },
       "held": "On hold while a dispute is open",
       "detail": {
@@ -9065,7 +9075,23 @@
         "markedNoPayment": "Marked paid in an older version: no wallet payment recorded.",
         "linkWalletPayment": "Link the wallet payment",
         "recordedWaits": "Recorded in Settle up. It waits for its wallet entry, and links to it once a transfer of this amount shows up.",
-        "unlinkHint": "Unlinking frees this payment: its days are owed again and it is offered under Payments to link."
+        "unlinkHint": "Unlinking frees this payment: its days are owed again and it is offered under Payments to link.",
+        "recordChange": {
+          "tolerance": "Your payment fell short of {{date}} by no more than the book’s {{pct}}% tolerance, so the day was closed and the gap written off.",
+          "toleranceExempt": "Your payment fell short of {{date}} by no more than the corporation allowed for that day, so the day was closed and the gap written off.",
+          "autoFix": "Changed automatically when {{date}} closed.",
+          "fixMyRecords": "Changed by Fix my records for {{date}}.",
+          "autoAssign": "Assigned automatically for {{date}}.",
+          "billed": "Billed",
+          "paid": "Paid",
+          "writtenOff": "Written off",
+          "limit": "Tolerance",
+          "before": "Before",
+          "after": "After",
+          "none": "Not assigned",
+          "terms": "{{pct}}%: {{tax}}",
+          "kept": "Saved when it happened. It stays here even if the day changes later."
+        }
       },
       "unlinkedToast": "Unlinked the {{amount}} ISK payment. Its days are owed again.",
       "historySubtitle": "Your own record from before the Corp Tax Book. For reference only: it changes no figure.",
@@ -9074,7 +9100,16 @@
       "filteredTitle": "No entries match these filters",
       "openFor": "Open the ledger of {{payee}}",
       "reversedTag": "reversed",
-      "minerPicker": "Whose account"
+      "minerPicker": "Whose account",
+      "summary": {
+        "tolerance": "{{date}}: billed {{billed}}, paid {{paid}}, {{writtenOff}} written off (tolerance {{tolerance}})",
+        "assignments": "{{date}}: {{changes}}",
+        "terms": "{{pct}}% {{tax}}",
+        "none": "not assigned",
+        "change": "{{before}} → {{after}}",
+        "separator": "; ",
+        "line": "{{what}}: {{summary}}"
+      }
     }
   },
   "assets": {
@@ -14164,8 +14199,6 @@
       "columnVolume": "Volume",
       "remove": "Remove {{name}}",
       "clearAll": "Clear all",
-      "expand": "Expand",
-      "restore": "Restore",
       "resize": "Resize the drawer",
       "viewLabel": "Compare view",
       "viewPrices": "Prices",
@@ -15266,7 +15299,7 @@
           "quickbar": "Your Market Quickbar.",
           "stationPins": "Stations and structures you pinned in Assets.",
           "piPicks": "Resources you picked per planet on the PI tab.",
-          "miningTax": "Moon Mining payees and assignments.",
+          "miningTax": "Moon Mining payees, assignments, payment links and the record of changes the app made to them for you.",
           "fittings": "Fittings saved to My Fittings: name and share code.",
           "netWorthSnapshots": "Your daily net worth history: wallet, asset value, PLEX and order escrow per day, as plain numbers.",
           "characterAccelerators": "Which cerebral accelerator you told us is running on each Character: its bonus and when it ends.",

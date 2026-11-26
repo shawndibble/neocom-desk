@@ -13,14 +13,6 @@ const ShipTreeTab = lazy(() =>
   }))
 );
 
-/**
- * The Ships section (scope decision `20260926-135538`): the Fittings tab and
- * the Ship Tree tab. The Fittings tab and the editor below it
- * (`/ships/fittings/edit`) render the same `<Fittings />` in the same place,
- * so opening a Fitting keeps one mounted instance, as it did when both were
- * `/fittings` (`shipsTabs.ts`). `Fittings` draws the page header and tab bar
- * itself, on its Start screen only — an open Fitting shows neither.
- */
 export function Ships() {
   const { t } = useTranslation();
   const [tab] = usePageTab(SHIPS_TABS);

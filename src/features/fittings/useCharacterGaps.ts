@@ -18,21 +18,14 @@ export type CharacterGapRow = { characterId: number; name: string } & (
   FittingGapAnswer | { state: 'pending' }
 );
 
-/** Can fly: nothing known is missing and every requirement was confirmed. */
 export const canFly = (row: CharacterGapRow): boolean =>
   row.state === 'ready' && row.gap.missingCount === 0;
 
 export interface CharacterGaps {
   rows: CharacterGapRow[];
-  /** "n of m can fly"; null until every Character has an answer. */
   headline: { canFly: number; total: number } | null;
 }
 
-/**
- * Each Character's gap to the Fitting. Closed, only the cheap can-fly yes/no is
- * worked out (shared with Fitting Compare); gaps and training times wait for
- * `enabled`. Answers outlive a Fitting edit until new ones arrive.
- */
 export function useCharacterGaps(
   fitting: Fitting,
   characters: readonly GapCharacter[],
@@ -40,7 +33,6 @@ export function useCharacterGaps(
 ): CharacterGaps {
   const reconnects = useReconnectCount();
   const [gaps, setGaps] = useState<ReadonlyMap<number, FittingGapAnswer>>(new Map());
-  // null: asked, but the requirements couldn't be determined.
   const [flies, setFlies] = useState<ReadonlyMap<number, boolean | null>>(new Map());
   useEffect(() => {
     let cancelled = false;

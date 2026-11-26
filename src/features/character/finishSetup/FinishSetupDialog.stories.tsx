@@ -16,7 +16,6 @@ const fresh = () => startFinishSetup({ characterId: 90000001, name: 'Kestrel Van
 const afterMoon = () => recordApproval(fresh(), { kind: 'moon', result: 'done' });
 const phone = { globals: { viewport: { value: 'phone390', isRotated: false } } } as const;
 
-/** @summary "Finish setting up {character}": a Character's remaining EVE approvals after a sign-in lands. */
 const meta = {
   title: 'character/FinishSetupDialog',
   component: FinishSetupDialog,
@@ -35,19 +34,14 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** @summary The offer at 1440: moon book and closed-app alerts, both ticked, Continue and Not now. */
 export const Offer1440: Story = {};
 
-/** @summary The offer at 390. */
 export const Offer390: Story = { ...phone };
 
-/** @summary Back from EVE: the moon book is done, alerts is next. */
 export const Running1440: Story = { args: { chain: afterMoon(), offering: false } };
 
-/** @summary Back from EVE at 390. */
 export const Running390: Story = { args: { chain: afterMoon(), offering: false }, ...phone };
 
-/** @summary Approved as another character: nothing approved, the same item again. */
 export const WrongCharacter: Story = {
   args: {
     chain: recordApproval(afterMoon(), {
@@ -59,7 +53,6 @@ export const WrongCharacter: Story = {
   },
 };
 
-/** @summary All done: offers the next character. */
 export const Done: Story = {
   args: {
     chain: recordApproval(afterMoon(), { kind: 'alerts', result: 'done' }),

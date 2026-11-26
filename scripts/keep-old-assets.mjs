@@ -1,24 +1,4 @@
 #!/usr/bin/env node
-// Deploy step: copy recently retired hashed assets from the live site into
-// `dist/assets/`, so a tab still on an older build can load its route chunks.
-// Why, and the retention rules: scripts/lib/assetRetention.mjs.
-//
-// Usage (after `npm run build`, before the Pages upload):
-//   node scripts/keep-old-assets.mjs https://neocomdesk.com [history.json]
-//
-// The optional history path is read first and rewritten afterwards — CI keeps
-// it in the Actions cache. The copy on the live site is only the fallback:
-// Pages' CDN serves anything up to 10 minutes stale and ignores query strings
-// and no-cache headers, and deploys land minutes apart, so it can be the
-// history from two deploys ago.
-//
-// Runs after the build on purpose: `vite-plugin-pwa` has already written the
-// precache manifest, so carried files are served but never precached — the
-// install download stays one build's size.
-//
-// Never fails the deploy. If the live site can't be read, the step warns and
-// ships the build as-is, which is exactly what deploys did before it.
-// No deps; Node 24 built-ins only.
 
 import { mkdir, readFile, readdir, stat, writeFile } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
@@ -79,8 +59,6 @@ async function download(path) {
   return body.length;
 }
 
-// One retry: a dropped file leaves the history for good, so a network blip
-// must not be what drops it.
 async function downloadWithRetry(path) {
   try {
     return await download(path);
@@ -92,9 +70,6 @@ async function downloadWithRetry(path) {
 const now = Date.now();
 const built = await builtAssets();
 
-// The history file is the record; the live `sw.js` manifest is the last
-// build's own list, which covers the first deploy (no history yet) and a
-// history the CDN still served stale.
 const historyText =
   (localHistory && (await readLocal(localHistory))) ?? (await readText(ASSET_HISTORY_FILE));
 const swText = await readText('sw.js');
@@ -125,7 +100,6 @@ await Promise.all(
   })
 );
 
-// A file the live site no longer has can't be carried now or later.
 for (const path of missing) delete plan.history.retired[path];
 const historyJson = `${JSON.stringify(plan.history)}\n`;
 await writeFile(join(DIST, ASSET_HISTORY_FILE), historyJson);

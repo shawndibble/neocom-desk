@@ -1,22 +1,13 @@
-/**
- * Pure derivations behind the Show Info Corporation tab: a corporation's
- * alliance history as dated stints, and how old it is. `now` is a parameter
- * so both stay deterministic.
- */
 import type { CorporationAllianceHistoryEntry, CorporationPublicInfo } from '@/esi/endpoints';
 
 export interface AllianceHistoryRow {
   recordId: number;
-  /** Null for a stretch spent in no alliance. */
   allianceId: number | null;
   startDate: string;
-  /** When the next stint began; null for the current one. */
   endDate: string | null;
-  /** The alliance has since closed. */
   deleted: boolean;
 }
 
-/** Most recent first — the order ESI's records are numbered in, read from the dates. */
 export function deriveAllianceHistoryRows(
   entries: readonly CorporationAllianceHistoryEntry[]
 ): AllianceHistoryRow[] {
@@ -30,7 +21,6 @@ export function deriveAllianceHistoryRows(
   }));
 }
 
-/** Whole years, then whole months past them; null without a readable founding date. */
 export function corporationAge(
   dateFounded: string | undefined,
   now: Date
@@ -46,7 +36,6 @@ export function corporationAge(
   return { years: Math.floor(months / 12), months: months % 12 };
 }
 
-/** The corporation's ISK tax as a percentage, or null when ESI sent none it can read. */
 export function corporationTaxPercent(
   info: Pick<CorporationPublicInfo, 'tax_rates'>
 ): number | null {

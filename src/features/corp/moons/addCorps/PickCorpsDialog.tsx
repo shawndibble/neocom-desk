@@ -8,11 +8,6 @@ import { CorpRow } from './CorpRow';
 
 const k = (key: string) => `corpTaxBook.moons.addCorps.pick.${key}`;
 
-/**
- * Step 1: tick the corps that own moons. Nothing is ticked unless the caller
- * says so (the New corp banner ticks its own): the app cannot see moons before
- * a sign-in.
- */
 export function PickCorpsDialog({
   corps,
   loading = false,
@@ -24,7 +19,6 @@ export function PickCorpsDialog({
   onContinue,
   onClose,
 }: {
-  /** Candidates still offered: hidden ones are already out. */
   corps: readonly AddCorpsCandidate[];
   loading?: boolean;
   error?: boolean;
@@ -37,7 +31,6 @@ export function PickCorpsDialog({
 }) {
   const { t } = useTranslation();
   const [picked, setPicked] = useState<number[]>([...initialSelected]);
-  // A corp hidden meanwhile drops out of the ticks without a reset.
   const selected = corps.filter((c) => picked.includes(c.corporationId));
   const toggle = (id: number) =>
     setPicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));

@@ -12,29 +12,17 @@ import { useTimeZone } from '@/lib/timeFormat';
 import type { RemapAvailability } from './remapAvailability';
 
 interface AttributesPaneProps {
-  /** ESI's attributes read, carrying its own age; null when it could not be read. */
   result: CachedResult<CharacterAttributes> | null;
   implantBonuses: Implants;
-  /** The attributes are still being read (not unreadable): shows a spinner, not "unknown". */
   loading?: boolean;
-  /** How the base sheet was arrived at — null until ESI has been read at all. */
   attributeBaseline?: AttributeBaseline | null;
-  /** Live remap availability, same source the plan editor costs against; null when unreadable. */
   remapInfo: RemapAvailability | null;
-  /** Makes a plan from the live skill queue with its best remaps placed; omitted hides the button. */
   onOptimizeQueue?: () => void;
-  /** The in-game queue has nothing in it: the button stays focusable and says why. */
   queueEmpty?: boolean;
-  /**
-   * The injected Accelerator's controls (`AcceleratorSection`), under Optimize
-   * queue so the pilot can set its time left without opening a plan; omitted
-   * when nothing is injected.
-   */
   accelerator?: ReactNode;
   className?: string;
 }
 
-/** The attribute chips as the Plans page shows them: here on desktop, in the phone's Accelerator sheet. */
 export function PlanAttributeChips({
   result,
   implantBonuses,
@@ -53,22 +41,6 @@ export function PlanAttributeChips({
   );
 }
 
-/**
- * The character's current attributes, filling the plan list's detail pane
- * until a plan is opened (#158 put a "select a plan" placeholder there, which
- * said only what the list beside it already said). Attributes are the input
- * every plan is costed against and the thing a remap changes, so this is
- * reference the planner wants in view, not a duplicate of the trained view.
- *
- * The editor route wants the same reference for the same reason and shows the
- * same `AttributeChips` + `DataAgeBadge` pair — but as a section inside
- * `PlanToolsPane`, not as another panel, because its sidebar already carries
- * the plan list and the tools panel. See `PlanEditor`'s `attributes` section.
- *
- * Desktop only. A phone gets `AcceleratorRow` (the chips live in its sheet)
- * and Optimize queue in the New plan menu, so "Training now" is not pushed
- * below the fold by reference and once-per-booster controls.
- */
 export function AttributesPane({
   result,
   implantBonuses,
@@ -129,8 +101,6 @@ export function AttributesPane({
         }
       >
         {chips}
-        {/* Same live remap read the plan editor costs against (#1726) — a
-            pilot checking Attributes shouldn't have to open a plan to see it. */}
         {remapInfo && (
           <p className="mt-2 text-[0.6875rem] text-text-dim">
             {`${t('plans.remapBudget', { bonus: remapInfo.bonus })} ${

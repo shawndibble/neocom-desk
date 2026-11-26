@@ -47,7 +47,6 @@ describe('buildLayoutFromRoles', () => {
       'wallet',
       'netWorth',
     ]);
-    // The Role's Wallet flow is the Wallet on its Flow, opened as the old kind was.
     expect(l.widgets[7]).toMatchObject({ show: 'flow', size: 'M', view: 'chart' });
     expect('show' in l.widgets[0]!).toBe(false);
     expect(l.version).toBe(1);
@@ -80,7 +79,6 @@ describe('buildLayoutFromRoles', () => {
         'structures'
       );
     }
-    // The rest of the Role still comes.
     expect(kindsOf(buildLayoutFromRoles(['miner'], null, ids()))).toContain('miningYield');
   });
 

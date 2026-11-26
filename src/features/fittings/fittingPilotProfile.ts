@@ -1,10 +1,3 @@
-/**
- * The active Character's own `PilotProfile` (issue #1531's shape): trained
- * skills at Effective Skill Level, plus the active clone's implants — what
- * every open Fitting's stats are worked out under, per GLOSSARY.md's
- * **Fitting** entry. The logged-out Fitting Share Code view (#1544) instead uses
- * `buildAllVProfile`; this is only for the normal, Character-present route.
- */
 import { useCallback, useEffect, useState } from 'react';
 import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
 import { loadCharacterImplants } from '@/features/skills/data';
@@ -12,12 +5,6 @@ import { buildAllVProfile, buildPilotProfile } from '@/engine/fittings/pilotProf
 import type { PilotProfile } from '@/engine/fittings/types';
 import { loadSkills } from '@/sde/loadSde';
 
-/**
- * The profile, and whether its skills are real. With no `/skills` read at all
- * (never fetched, and offline or refused now) the profile is built from an
- * empty map, which `skillsKnown: false` marks so the stats can say they assume
- * no skills instead of passing that off as the pilot's.
- */
 export async function loadActivePilotProfileState(
   characterId: number
 ): Promise<{ profile: PilotProfile; skillsKnown: boolean }> {
@@ -37,20 +24,11 @@ export async function loadActivePilotProfile(characterId: number): Promise<Pilot
 
 export interface PilotProfileState {
   profile: PilotProfile | null;
-  /** The load threw — `profile` stays `null`, so callers can tell "gave up" from "still loading". */
   failed: boolean;
-  /** False when the Character's skills could not be read at all, so `profile` assumes none. All V and a loaded Character are known. */
   skillsKnown: boolean;
-  /** Tries the load again (a passing network or SDE error shouldn't stick for the life of the page). */
   retry: () => void;
 }
 
-/**
- * The pilot a Fitting's stats and fit checks run under: the active
- * Character's own profile, or All V with no Character. Shared by the
- * single-Fitting editor and the compare page, so a load failure is reported
- * the same way on both.
- */
 export function usePilotProfile(characterId: number | null): PilotProfileState {
   const [profile, setProfile] = useState<PilotProfile | null>(null);
   const [failed, setFailed] = useState(false);

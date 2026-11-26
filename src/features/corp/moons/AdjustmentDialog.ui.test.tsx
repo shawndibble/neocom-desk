@@ -108,7 +108,6 @@ beforeEach(() => {
 });
 
 describe('AdjustmentDialog set balance', () => {
-  // 1,000,000 paid against 200,000 of billable days not yet on a Statement: a balance of -800,000.
   const credit1m = {
     payments: [
       { id: 'p', minerId: 'solo:2', amount: 1_000_000, at: '2026-09-01T00:00:00Z' } as never,
@@ -121,7 +120,6 @@ describe('AdjustmentDialog set balance', () => {
     expect(screen.getByText(/Their balance now: holds .* credit\./)).toBeInTheDocument();
     await userEvent.type(screen.getByLabelText('Amount'), '300000');
     expect(screen.getByText(/Adds a charge of .*1,?100,?000/)).toBeInTheDocument();
-    // A rolled-over balance is an opening balance: dated at the book's start and labelled so.
     expect(screen.getByLabelText(/Label on the line/)).toHaveValue(
       'Opening balance from the old system'
     );

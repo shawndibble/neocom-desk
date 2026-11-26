@@ -1,14 +1,3 @@
-/**
- * `test` for the Corp Tax Book specs (`e2e/*.book.spec.ts`, run by `playwright.book.config.ts`).
- *
- * Same shape as `testBase.ts`: a network guard first, the SSO and ESI mocks over it, and a
- * failure if anything escaped. Two differences. The Firebase emulators are reachable, because
- * the book is read and written through the real rules and callables there. And the officer
- * signs in with a token the server can verify (`eveToken.ts`), holding the corp scopes and a
- * Director's roles, so the officer check, the mint and every live role check pass for real.
- *
- * Each test starts on an empty emulator: `book.seed(docs)` writes what the test needs.
- */
 import { test as base, expect, type Page, type Route } from '@playwright/test';
 import { signInAndGoto } from '../authSeed';
 import { installEsiMock } from '../mockEsi';
@@ -21,14 +10,6 @@ import { CORP, OFFICER, OTHER_CORP, corpOf, nameOf } from './identities';
 import { installFlatPrices } from './prices';
 import { EMULATOR_HOSTS } from './runEnv';
 
-/**
- * The officer's grant: the Core Grant and only the Permissions the book's pages use (the pilot's
- * details, which name them; corp roles,
- * wallets and ledgers; the pilot's own mining and wallet; mail to send late notices). Not the
- * suite's full grant: at boot the app warms every granted endpoint, and with all of them the
- * corp role lookup the officer check waits on queued behind ~25 personal reads, pushing a book
- * page's first render to the edge of a test's 5-second wait.
- */
 export const OFFICER_SCOPES: readonly string[] = [
   ...new Set([
     ...CORE_GRANT,
@@ -39,23 +20,16 @@ export const OFFICER_SCOPES: readonly string[] = [
 ];
 
 export interface Book {
-  /** Writes the docs straight into the emulator (the server's own layout; see bookSeed.ts). */
   seed: (docs: readonly SeedDoc[]) => Promise<void>;
 }
 
-/** Per-test answers for a browser ESI path, tried before the defaults below. */
 export type EsiOverride = (path: string, route: Route) => unknown;
 
 export interface BookFixtures {
   book: Book;
-  /** Answers more browser ESI paths: return undefined to fall through. */
   esi: (answer: EsiOverride) => void;
 }
 
-/**
- * Corp ESI the officer's pages read, with nothing in it unless a test says so: the book is in
- * Firestore, and what ESI holds would only be synced into it.
- */
 function defaultCorpEsi(path: string, route: Route): unknown {
   if (path === `/characters/${OFFICER.id}/roles`) return { roles: ['Director'] };
   if (path === '/universe/names') {
@@ -100,18 +74,11 @@ function defaultCorpEsi(path: string, route: Route): unknown {
     if (path.endsWith('/divisions')) return { wallet: [{ division: 1, name: 'Master Wallet' }] };
     if (path.endsWith('/wallets')) return [{ division: 1, balance: 1_000_000_000 }];
     if (path.endsWith('/members')) return [OFFICER.id];
-    // Journals, observers, extractions, structures, member tracking: empty.
     return [];
   }
   return undefined;
 }
 
-/**
- * The network every book page runs on, for one page: the guard (only the app's server and the
- * emulators), the SSO and ESI mocks, flat prices, and no synced data of the officer's own.
- * Returns the requests that escaped, for the caller to assert empty. The `page` fixture and the
- * run's warm-up (`warmUp.ts`) both use it.
- */
 export async function installBookNetwork(page: Page, baseURL: string): Promise<string[]> {
   const escaped: string[] = [];
   const allowed = new Set([new URL(baseURL).host, ...EMULATOR_HOSTS]);
@@ -123,9 +90,6 @@ export async function installBookNetwork(page: Page, baseURL: string): Promise<s
   await installSsoMock(page, OFFICER_SCOPES);
   await installEsiMock(page);
   await installFlatPrices(page);
-  // The officer's own synced data (`characters/char:<id>/...`): none. The emulator cannot run
-  // these queries (docs/agents/testing-and-ci.md, "Known emulator noise"), and they are not
-  // what these specs are about.
   await page.route(/127\.0\.0\.1:8080\/.*\/documents\/characters\/[^/]+:runQuery/, (route) =>
     route.fulfill({
       status: 200,
@@ -133,9 +97,6 @@ export async function installBookNetwork(page: Page, baseURL: string): Promise<s
       body: JSON.stringify([{ readTime: new Date().toISOString() }]),
     })
   );
-  // Nor does it write any: the app's own sync commits only under `characters/`, and its reads of
-  // those docs find none. (Book reads are batchGets of `corps/` docs, and book writes are all
-  // callables, so neither is touched.)
   await page.route(/127\.0\.0\.1:8080\/.*\/documents:(commit|batchGet)/, (route) => {
     const body = route.request().postData() ?? '';
     if (!body.includes('/documents/characters/')) return route.fallback();
@@ -161,10 +122,6 @@ export async function installBookNetwork(page: Page, baseURL: string): Promise<s
   return escaped;
 }
 
-/**
- * The corp ESI the officer's pages read (`defaultCorpEsi`), answered before the general mock.
- * Returns how to add a test's own answers, tried first.
- */
 export async function routeBookEsi(page: Page): Promise<(answer: EsiOverride) => void> {
   const overrides: EsiOverride[] = [];
   await page.route('https://esi.evetech.net/**', async (route) => {
@@ -214,7 +171,6 @@ export const test = base.extend<BookFixtures>({
 
 export { expect };
 
-/** Signs the officer in (the server-verifiable token) and opens `path`. */
 export async function signInAsOfficer(page: Page, path: string): Promise<void> {
   const token = signedAccessToken({
     characterId: OFFICER.id,
@@ -225,23 +181,15 @@ export async function signInAsOfficer(page: Page, path: string): Promise<void> {
   await signInAndGoto(page, path, OFFICER_SCOPES, [], token);
 }
 
-/** A Miner's page: `/corp/moons/miners/<minerId>`. */
 export const minerUrl = (minerId: string): string =>
   `./corp/moons/miners/${encodeURIComponent(minerId)}`;
 
-/**
- * Opens a Miner's page signed in as the officer and waits until the account is read (its
- * "Owed" figure), the signal that the officer check, the book read and the pricing are done.
- */
 export async function openMiner(page: Page, minerId: string, name: string): Promise<void> {
   await signInAsOfficer(page, minerUrl(minerId));
-  // Two signals in their order: the book read (the ledger), then the Miner's name, which ESI
-  // resolves only after it.
   await expect(page.getByRole('table', { name: 'Ledger', exact: true })).toBeVisible();
   await expect(page.getByRole('heading', { level: 1, name })).toBeVisible();
 }
 
-/** The Miner page's figure beside a label ("Paid", "Oldest unpaid", "Last payment", ...). */
 export function minerFact(page: Page, label: string) {
   return page
     .getByRole('main')

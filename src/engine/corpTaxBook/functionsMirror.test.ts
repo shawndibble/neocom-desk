@@ -63,9 +63,6 @@ import * as removal from './removal';
 import { effectiveOwnerRate } from './ownerRate';
 import { moonOwnerMailRecipients } from './ownerRateMail';
 
-// `functions/` cannot import `src/`, so the callables enforce a mirror of these
-// engine functions (functions/src/corpTaxBookEngine.ts). This keeps the two
-// from drifting: same inputs, same outputs.
 const row = (quantity: number, cachedAt: string, over: Partial<ObservedRow> = {}): ObservedRow => ({
   structureId: 1,
   characterId: 2,
@@ -169,7 +166,6 @@ describe('functions mirror of the Corp Tax Book engine', () => {
       { ...base, lines: [line], resolution: { kind: 'dismissed', at: 'a', by: 1, reason: 'r' } },
       { ...base, lines: [] },
       { ...base },
-      // A withdrawn day's tombstone: no lines, so no reader sees a dispute, but it keeps its hold.
       {
         id: 'd',
         minerId: 'm',
@@ -194,13 +190,11 @@ describe('functions mirror of the Corp Tax Book engine', () => {
         ours.map((d) => disputeHold(d, now) !== undefined)
       );
     }
-    // The first dispute's hold window survives a re-dispute: no renewal.
     expect(mirror.disputeHolds(theirs[1], '2026-10-20T00:00:00.000Z')).toBe(false);
     expect(disputeHold(ours[1], '2026-10-20T00:00:00.000Z')).toBeUndefined();
   });
 
   describe('dismissals (#4184)', () => {
-    // Fractured 17 Oct 03:00, expires 19 Oct 03:00; a second moon ran later at the same refinery.
     const extractions: SyncExtraction[] = [
       {
         structureId: 1000,
@@ -512,7 +506,6 @@ describe('feeder view mirror', () => {
         amount: 6e6,
         first_party_id: 77,
       },
-      // A corporation wallet "Give ISK" (#4504 B1); a move between its own divisions is not.
       {
         id: 4,
         date: '2026-10-19T11:00:00Z',
@@ -560,7 +553,6 @@ describe('feeder view mirror', () => {
       outgoing,
     };
     expect(mirror.reconcileBookOutgoing(input)).toEqual(reconcileBookOutgoing(input));
-    // With the payout reference on some donations and not others (#6209).
     const referenced = {
       ...input,
       outgoing: outgoing.map((o, i) => (i === 1 ? { ...o, reason: 'Moon mining payout' } : o)),

@@ -1,42 +1,16 @@
-/**
- * Collapses a public contract's ESI item lines into the lines a reader should
- * see (issue: contract items modal).
- *
- * ESI reports one record per *stack* in the issuer's hangar, not per item
- * type, so a contract holding five Large Skill Injectors routinely comes back
- * as three lines — ×1, ×2, ×2 — which reads as three different things offered
- * rather than one pile of five. Nothing on the contract distinguishes those
- * stacks once accepted, so they are one line here.
- *
- * Blueprint copies are the exception and never merge: `material_efficiency`,
- * `time_efficiency` and `runs` describe the one copy, and the Build Plan seed
- * the modal's context menu hands off is per copy too. Two BPCs of the same
- * type are genuinely two different offers. A blueprint *original* carries none
- * of those fields, so it stacks with other originals like any other item — and
- * separately from the copies it shares a type ID with.
- *
- * Abyssal (mutated) modules never merge either: each is its own item with
- * its own rolls and its own MutaMarket estimate, so its line keeps its
- * `item_id` (pass `isAbyssalType` to tell them apart).
- */
 import type { PublicContractItem } from '@/esi/endpoints';
 import { seedFromContractItem, type BuildPlanSeed } from '@/features/industry/planSeed';
 
 export interface ContractItemLine {
-  /** The `record_id` of the first ESI line folded in — a stable React key. */
   key: number;
   typeId: number;
-  /** Summed across every ESI line folded in. */
   quantity: number;
-  /** False means the issuer *wants* this item rather than offering it. */
   isIncluded: boolean;
   isBlueprintCopy: boolean;
   materialEfficiency?: number;
   timeEfficiency?: number;
   runs?: number;
-  /** How many ESI lines this one stands for. 1 when nothing merged. */
   sourceCount: number;
-  /** An abyssal module's own item id, which its MutaMarket estimate needs. Set on no other line. */
   itemId?: number;
 }
 
@@ -79,11 +53,6 @@ export function mergeContractItemLines(
   return lines;
 }
 
-/**
- * The Build Plan seed for one line, in `seedFromContractItem`'s ESI spelling.
- * Lives here rather than in the modal so the camelCase/snake_case bridge is
- * written once, next to the type that renamed the fields.
- */
 export function planSeedForLine(line: ContractItemLine): BuildPlanSeed | null {
   return seedFromContractItem({
     is_blueprint_copy: line.isBlueprintCopy,

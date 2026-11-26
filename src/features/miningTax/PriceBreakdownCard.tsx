@@ -5,13 +5,6 @@ import { formatCount } from '@/lib/formatCount';
 import { usePriceBreakdown, type PriceBreakdownInput } from './usePriceBreakdown';
 import { OrePricedCard } from './OrePricedCard';
 
-/**
- * The ore of an assigned day with what the estimate was built from — per-ore unit
- * price, the hub and ore form (the tax % is in the modal's header line). Copying it
- * as text lives in the row detail's More menu. Unit prices are re-derived for the
- * mined date, not frozen with the bill, so any drift from the frozen total is called
- * out. A saved-snapshot price is the norm and says nothing; only another source does.
- */
 export function PriceBreakdownCard({
   quantityFor,
   ...props

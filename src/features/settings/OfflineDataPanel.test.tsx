@@ -95,7 +95,6 @@ describe('OfflineDataPanel persistent storage', () => {
     expect(await screen.findByText(/^Protected\./)).toBeInTheDocument();
     expect(mocks.requestPersistence).toHaveBeenCalledOnce();
     expect(screen.queryByRole('button', { name: 'Protect this data' })).not.toBeInTheDocument();
-    // The button is gone: focus is on the section that held it, not <body>.
     const section = screen.getByText(/^Protected\./).parentElement;
     await waitFor(() => expect(section).toHaveFocus());
   });
@@ -105,7 +104,7 @@ describe('OfflineDataPanel persistent storage', () => {
     const user = userEvent.setup();
     render(<OfflineDataPanel />);
     await user.click(await screen.findByRole('button', { name: 'Protect this data' }));
-    await waitFor(() => expect(screen.getAllByText(/The browser declined/)).toHaveLength(2)); // note + live region
+    await waitFor(() => expect(screen.getAllByText(/The browser declined/)).toHaveLength(2));
     expect(screen.getByRole('button', { name: 'Protect this data' })).toBeInTheDocument();
   });
 

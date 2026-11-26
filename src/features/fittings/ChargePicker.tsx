@@ -23,14 +23,11 @@ export { ChargePickerControls };
 interface GroupProps {
   group: WeaponChargeGroup;
   settings: ChargePickerSettings;
-  /** Loads the charge into every fitted module that takes it. */
   onLoad?: (chargeTypeId: number) => void;
-  /** Wraps a loadable row in the Add panel's drag and right-click menu. */
   wrapRow?: (chargeTypeId: number, row: ReactNode) => ReactNode;
   pricesLoading: boolean;
 }
 
-/** One weapon group's picker: the loaded line, quick picks, then the chosen view. */
 export function ChargePickerGroup({ group, settings, onLoad, wrapRow, pricesLoading }: GroupProps) {
   const { t } = useTranslation();
   const distance = pickerDistance(settings);

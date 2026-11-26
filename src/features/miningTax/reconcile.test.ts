@@ -30,7 +30,6 @@ function assignment(overrides: Partial<MiningTaxAssignmentRecord> = {}): MiningT
   };
 }
 
-/** A payment linked to `payeeId` for `amount`: its oldest days read Paid. */
 const payLinked = (payeeId: string, amount: number) =>
   db.miningTaxPaymentLinks.put({
     id: `journal:${payeeId}`,
@@ -46,8 +45,6 @@ const payLinked = (payeeId: string, amount: number) =>
 
 beforeEach(async () => {
   vi.clearAllMocks();
-  // A stand-in re-snapshot: what matters here is that reconcile writes
-  // whatever the plan returns, in its own one write.
   assignmentsMock.planNeedsReviewResolution.mockImplementation(
     async (a: MiningTaxAssignmentRecord) => ({ ...a, estimatedValue: 1500, updatedAt: 2 })
   );
@@ -96,7 +93,6 @@ describe('reconcileAssignments', () => {
     const updated = await db.miningTaxAssignments.get('a1');
     expect(updated?.status).toBe('needs-review');
     expect(updated?.reviewDiff).toEqual([{ typeId: TYPE_A, before: 100, after: 150 }]);
-    // The stored snapshot itself is untouched — only status/reviewDiff moved.
     expect(updated?.oreLines).toEqual([{ typeId: TYPE_A, quantity: 100 }]);
     expect(syncMock.scheduleSync).toHaveBeenCalledWith(CHAR_A, {
       collections: ['miningTaxAssignments'],
@@ -120,7 +116,6 @@ describe('reconcileAssignments', () => {
     expect(assignmentsMock.planNeedsReviewResolution).toHaveBeenCalledWith(outstanding, entry, [
       outstanding,
     ]);
-    // The planned re-snapshot is what lands — reconcile itself never flags it.
     const stored = await db.miningTaxAssignments.get('a1');
     expect(stored?.status).toBe('outstanding');
     expect(stored?.estimatedValue).toBe(1500);
@@ -144,8 +139,6 @@ describe('reconcileAssignments', () => {
   });
 
   it('auto-absorbs growth on an unpaid member of a combined entry too', async () => {
-    // A session that crossed midnight UTC is combined while still mining —
-    // the second day keeps growing, and an unpaid bill has nothing to protect.
     const member = assignment({ groupId: 'g1' });
     await db.miningTaxAssignments.put(member);
     const entry: MiningLedgerEntry = {
@@ -194,8 +187,6 @@ describe('reconcileAssignments', () => {
 
     await reconcileAssignments(CHAR_A, fresh);
 
-    // Status, ore and tax all stay as paid; the 100 extra units are left
-    // unowned, which the Tax tab shows as a new, separately assignable row.
     expect(await db.miningTaxAssignments.get('a1')).toEqual(paid);
     expect(assignmentsMock.planNeedsReviewResolution).not.toHaveBeenCalled();
     expect(syncMock.scheduleSync).not.toHaveBeenCalled();
@@ -258,15 +249,15 @@ describe('reconcileAssignments', () => {
   it('folds a brand-new ore type into the sole Assignment for that entry (a continuous mining session)', async () => {
     await db.miningTaxAssignments.put(
       assignment({ status: 'dismissed', payeeId: undefined, taxPct: 0, taxOwed: 0 })
-    ); // covers only TYPE_A
+    );
     const fresh: MiningLedgerEntry[] = [
       {
         characterId: CHAR_A,
         date: '2026-09-04',
         solarSystemId: 1,
         oreLines: [
-          { typeId: TYPE_A, quantity: 100 }, // unchanged
-          { typeId: TYPE_B, quantity: 40 }, // never assigned before
+          { typeId: TYPE_A, quantity: 100 },
+          { typeId: TYPE_B, quantity: 40 },
         ],
       },
     ];
@@ -279,14 +270,14 @@ describe('reconcileAssignments', () => {
   });
 
   it('does NOT fold a brand-new ore type into either Assignment when the entry is split across two', async () => {
-    await db.miningTaxAssignments.put(assignment({ id: 'a1', payeeId: 'p1' })); // covers TYPE_A
+    await db.miningTaxAssignments.put(assignment({ id: 'a1', payeeId: 'p1' }));
     await db.miningTaxAssignments.put(
       assignment({
         id: 'a2',
         payeeId: 'p2',
         oreLines: [{ typeId: TYPE_B, quantity: 20 }],
       })
-    ); // covers TYPE_B
+    );
     const TYPE_C = 45492;
     const fresh: MiningLedgerEntry[] = [
       {
@@ -296,7 +287,7 @@ describe('reconcileAssignments', () => {
         oreLines: [
           { typeId: TYPE_A, quantity: 100 },
           { typeId: TYPE_B, quantity: 20 },
-          { typeId: TYPE_C, quantity: 5 }, // belongs to neither Payee
+          { typeId: TYPE_C, quantity: 5 },
         ],
       },
     ];
@@ -333,8 +324,6 @@ describe('reconcileAssignments', () => {
       },
     ]);
 
-    // The growth is the paid side's, which is frozen, so it stays unassigned
-    // rather than being absorbed by the unpaid side.
     expect(await db.miningTaxAssignments.get('a1')).toEqual(kept);
     expect(await db.miningTaxAssignments.get('a2')).toEqual(moved);
     expect(assignmentsMock.planNeedsReviewResolution).not.toHaveBeenCalled();
@@ -358,8 +347,6 @@ describe('reconcileAssignments', () => {
 
     await reconcileAssignments(CHAR_A, [entry]);
 
-    // Two Assignments on one day: the late ore may be the other side's, so it
-    // is reviewed rather than grown silently.
     expect(assignmentsMock.planNeedsReviewResolution).not.toHaveBeenCalled();
     const flagged = await db.miningTaxAssignments.get('a2');
     expect(flagged?.status).toBe('needs-review');

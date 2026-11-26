@@ -24,17 +24,12 @@ function run(loggedAt: number, overrides: Partial<ProductionRunRecord> = {}): Pr
   };
 }
 
-// Local-time constructors, not `Date.parse('...Z')`: the filter derives each
-// run's *local* calendar day (see `productionLogFilter.ts`'s
-// `localDateString`), so a UTC-anchored fixture would give the wrong answer
-// in every timezone except UTC+0 and defeat the point of these tests.
 const AUG_10 = new Date(2026, 7, 10, 12, 0, 0).getTime();
 const AUG_20 = new Date(2026, 7, 20, 12, 0, 0).getTime();
 const AUG_30 = new Date(2026, 7, 30, 12, 0, 0).getTime();
 
 describe('filterProductionRunsByDate on the EVE clock', () => {
   it('buckets a run by its UTC day when given the UTC zone', () => {
-    // 23:30 UTC on Mar 10 is already Mar 11 in Auckland (UTC+13).
     const late = run(Date.UTC(2026, 2, 10, 23, 30));
     const onlyMar10 = { startDate: '2026-03-10', endDate: '2026-03-10' };
     const zone = process.env.TZ;

@@ -1,11 +1,3 @@
-/**
- * Per-domain copy tables (issue #1249): fire + resolved names → rendered
- * `{ title, body }`, for the live (poll) path and the Scheduled Push path, with
- * no poll harness and no lookups. Every expected string here was captured
- * from the renderers these replaced (`foregroundPoller.ts`'s
- * `notificationText`, `engine/projection.ts`'s `*Text` helpers) before the
- * move — the refactor changed no rendered copy.
- */
 import { describe, it, expect } from 'vitest';
 import type { NotificationCopy } from '@/engine/notificationWording';
 import {
@@ -556,7 +548,6 @@ describe('push copy', () => {
       },
     },
     {
-      // Unlike the poll copy, an out-of-range level prints as a number.
       name: 'skillLevelComplete, unresolved name and out-of-range level',
       render: () => skillQueueCopy.push(skill(1, 0), PILOT, {}),
       expected: { title: 'Skill training complete', body: 'Kestrel finished training #1 0.' },

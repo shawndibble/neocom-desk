@@ -6,11 +6,6 @@ import { walletTransactionsCsvColumns } from './walletTransactionsCsv';
 import { dailyGoalMessageIdOf, dailyGoalName } from './dailyGoal';
 import { exportFlag } from '@/lib/exportFlag';
 
-/**
- * CSV columns for the wallet journal: the table's columns plus the detail fields it has no room for
- * (tax, reason, context and party ids), blank rather than 0 when ESI omitted them. `characterName`,
- * `playerName` and `fills` add the Character, Player and linked-fill columns.
- */
 export function walletJournalCsvColumns(
   t: CsvTranslate,
   {
@@ -26,7 +21,6 @@ export function walletJournalCsvColumns(
     };
   } = {}
 ): CsvColumn<JournalRow>[] {
-  // The transactions export's own Item, Side, Quantity and Unit price, read off the line's linked fill.
   const fillHeaders = new Set([
     t('wallet.item'),
     t('wallet.side'),

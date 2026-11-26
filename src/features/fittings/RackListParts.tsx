@@ -24,16 +24,9 @@ interface ResourceBarProps {
   label: string;
   used: number | null;
   total: number | null;
-  /** A budget Make it fit can fix: over budget, it gets its "Fix" link. */
   resource?: FitResource;
 }
 
-/**
- * A CPU/PG/calibration/drone-bandwidth bar. `null` used/total render as a loading skeleton.
- * Over budget turns `danger` with the overage stated in words, and flashes once
- * each time the readout goes from within budget to over (a Character switch
- * that re-states it included) — the `null` gap while it recomputes doesn't count.
- */
 export function ResourceBar({ label, used, total, resource }: ResourceBarProps) {
   const { t } = useTranslation();
   const { overage, overBudget, flashKey } = useOverBudgetFlash(used, total);
@@ -84,16 +77,10 @@ export function ResourceBar({ label, used, total, resource }: ResourceBarProps) 
 export interface EditContext {
   fitting: Fitting;
   catalogue: FittingCatalogue | null;
-  /** The engine, pilot and catalogue for fit checks; null while any of them loads. */
   context: FittingContext | null;
   edit: (change: FittingChange, coalesceKey?: string) => void;
 }
 
-/**
- * A fitted item's name: a link to its Show info, when the page has Item
- * Actions (a shared-fitting preview renders no provider, and stays a span).
- * View in Market is in the row's ⋮ menu.
- */
 export function SlotName({ typeId, name }: { typeId: number; name: string }) {
   const actions = useOptionalItemActions();
   if (!actions) return <span className={SLOT_NAME_CLASS}>{name}</span>;
@@ -107,16 +94,6 @@ export function SlotName({ typeId, name }: { typeId: number; name: string }) {
 export const SLOT_NAME_CLASS =
   'line-clamp-2 min-w-0 flex-1 text-left text-sm break-words @min-[44rem]:min-w-40 @min-[44rem]:truncate @min-[44rem]:text-xs';
 
-/**
- * A fitted module's, drone's or cargo item's card. In a narrow column (a
- * phone) the name gets the first line to itself — two lines if it needs
- * them — with its menu and remove in the top-right corner as on the app's
- * other cards, and the controls below; with room, it is one line, remove
- * last. On one line the name keeps 10rem and the controls give up space
- * first; 44rem is where the widest row (a drone with its mutation badge)
- * still fits that way. With `menu`, right-click (or touch-and-hold) anywhere
- * on it opens the item's menu, and a ⋮ button opens the same.
- */
 export function SlotCard({
   identity,
   removeLabel,
@@ -131,9 +108,7 @@ export function SlotCard({
   onRemove: () => void;
   children: ReactNode;
   menu?: { name: string; items: ReactNode } | null;
-  /** From `useFittingDropTarget`: the card takes the List's drags. */
   drop?: ReturnType<typeof useFittingDropTarget>;
-  /** A pointer's drag handle for the card, and what dragging it carries. */
   grip?: { payload: FittingDragPayload; label: string };
 }) {
   const highlight = drop?.over
@@ -164,8 +139,6 @@ export function SlotCard({
           )}
           {identity}
         </div>
-        {/* The controls keep their own right-click and press-and-hold (a count
-            box's paste or text selection) rather than opening the item's menu. */}
         <div
           className="flex min-w-0 basis-full items-center gap-2 @min-[44rem]:basis-auto"
           onContextMenu={menu ? (event) => event.stopPropagation() : undefined}
@@ -195,13 +168,6 @@ export function SlotCard({
   );
 }
 
-/**
- * A drone or cargo count box. Keeps what's being typed as a local draft, so
- * the box can be emptied on the way to a new number instead of snapping back;
- * each complete number is committed as it's typed — capped at `max` when
- * given (for drones, what the bay holds), a number over it showing as the cap.
- * With `min`, a number below it stays a draft rather than being committed.
- */
 export function CountInput({
   label,
   value,
@@ -252,7 +218,6 @@ export function AddSlotButton({
   label: string;
   selected: boolean;
   onClick: () => void;
-  /** From `useFittingDropTarget`: an Add panel module, or a module moved along its rack, lands here. */
   drop?: ReturnType<typeof useFittingDropTarget>;
 }) {
   return (

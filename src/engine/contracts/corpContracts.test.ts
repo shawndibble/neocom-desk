@@ -22,7 +22,6 @@ const contract = (id: number, over: Partial<Contract> = {}): Contract => ({
   ...over,
 });
 
-/** An accepted courier as ESI sends it: still `outstanding`, with an acceptor, read once as the loader does. */
 const accepted = (id: number, over: Partial<Contract> = {}): Contract =>
   withAcceptedCourierInProgress(
     contract(id, { acceptor_id: 555, date_accepted: iso(NOW), ...over })
@@ -68,7 +67,6 @@ describe('summarizeCorpContracts', () => {
       NOW
     );
     expect(summary.expiringSoon).toBe(2);
-    // The overdue haul's deliver-by, not its offer expiry, and soonest first.
     expect(summary.rows.map((r) => r.contractId)).toEqual([3, 1, 2]);
     expect(summary.rows[0]).toMatchObject({ overdue: true, expiringSoon: true });
   });

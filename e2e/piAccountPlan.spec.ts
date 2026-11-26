@@ -1,8 +1,3 @@
-/**
- * Find best's whole-account plan against the fixture colonies: it plans in a
- * few seconds without freezing the page, follows the haul opt-in, never
- * overflows the page, and logs no console errors.
- */
 import { test, expect } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 import { mockPlannerColonies, PLAN_WINS_COLONIES } from './support/piColonies';
@@ -35,7 +30,6 @@ for (const [label, viewport] of VIEWPORTS) {
     await expect(page.getByText('Best use of all your planets')).toBeVisible();
     await expectNoPageOverflow(page);
 
-    // A frozen page cannot answer a click: the opt-in is on Make more.
     await page.goto('./planetary-industry/plan');
     const optIn = page.getByRole('checkbox', { name: /haul between my planets/i });
     await expect(optIn).toBeVisible({ timeout: 30_000 });
@@ -43,12 +37,10 @@ for (const [label, viewport] of VIEWPORTS) {
 
     await page.goto('./planetary-industry/plan?q=find-best');
     await expect(page.getByText('All planets together:')).toBeVisible({ timeout: 90_000 });
-    // Pending line gone: the whole search finished.
     await expect(page.getByText('Planning your planets…')).toHaveCount(0, { timeout: 90_000 });
     await expect(page.getByText('Hauling between planets')).toBeVisible();
     await expectNoPageOverflow(page);
 
-    // Buying a tier at the hub plans too, and says what buying adds.
     await page.getByRole('button', { name: /Planetary Industry settings/i }).click();
     await page.getByRole('button', { name: 'P1', exact: true }).click();
     await expect(page.getByText('Buying at the hub')).toBeVisible({ timeout: 90_000 });

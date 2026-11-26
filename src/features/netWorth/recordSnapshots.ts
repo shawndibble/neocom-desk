@@ -1,10 +1,3 @@
-/**
- * Writes the daily Net Worth Snapshot (issue #2865) — the impure shell around
- * `engine/netWorth/snapshot.ts`. It reads the same cached wallet, assets and
- * orders fetches the pages use, so it adds no ESI calls of its own beyond a
- * cache refresh, and writes at most one row per Character per UTC day (a same-day row that
- * predates a layer is rewritten once, in place).
- */
 import { captureException } from '@sentry/react';
 import { db } from '@/db';
 import { STALE_AFTER } from '@/esi/cache';
@@ -36,18 +29,10 @@ export const REQUIRED_SCOPES = [
   ESI_REGISTRY.getCharacterOrders.scope,
 ];
 
-/** Open-contract item reads one snapshot may add; the rest wait for the next run (they are cached once read). */
 const MAX_CONTRACT_ITEM_READS = 30;
 
-/** ESI's definite "no such contract": the contract is left out rather than holding the whole layer back. */
 const GONE_STATUSES = [404, 410];
 
-/**
- * The Character's contracts and the items of its own open item-exchange and
- * auction ones, or `null` when the layer cannot be read today: the permission
- * is missing or revoked, a read is stale or incomplete, or an item read failed
- * for a reason that may pass. The row then leaves the layer off and is re-read.
- */
 async function readContractStock(
   characterId: number,
   now: number
@@ -76,15 +61,12 @@ async function readContractStock(
 
 export type SnapshotFetch = Omit<SnapshotInputs, 'characterId' | 'now'>;
 
-/** Where the snapshot's numbers come from; swapped in tests. */
 export interface SnapshotSources {
   fetch(characterId: number): Promise<SnapshotFetch | null>;
 }
 
-/** Tail of each Character's write chain, so overlapping runs can't both pass the once-a-day check. */
 const writeChains = new Map<number, Promise<unknown>>();
 
-/** Not today's number: served from the cache after a failed call, or older than the loaders' window. */
 function isStale(cached: { fromCache: boolean; fetchedAt: Date } | null): boolean {
   if (!cached) return false;
   return cached.fromCache || Date.now() - cached.fetchedAt.getTime() > STALE_AFTER.default;
@@ -94,9 +76,7 @@ export const liveSources: SnapshotSources = {
   async fetch(characterId) {
     const token = await db.tokens.get(characterId);
     const scopes = token?.scopes ?? [];
-    // Checked up front so a missing permission never provokes a live 403.
     if (!REQUIRED_SCOPES.every((scope) => scopes.includes(scope))) return null;
-    // Optional: without the permission the layer is absent, never a zero.
     const contractStock = scopes.includes(ESI_REGISTRY.getCharacterContracts.scope)
       ? await readContractStock(characterId, Date.now()).catch(() => null)
       : null;
@@ -105,20 +85,11 @@ export const liveSources: SnapshotSources = {
       loadCharacterAssets(characterId),
       loadOrders(characterId),
     ]);
-    // A permission revoked since the grant check: the cached copy is not today's number.
     if (wallet.needsReauth || assets.needsReauth || orders.needsReauth) return null;
-    // A stale copy is not today's number, and a complete row is final for the day —
-    // it would freeze days-old figures and sync them. The live call failing flags the
-    // copy `fromCache`; a call that merely hangs (lie-fi) is answered with the expired
-    // row after the stale grace, unflagged, so its age is checked as well.
     if ([wallet, assets, orders].some((source) => isStale(source.cached))) return null;
     const hubId = await tradeHubIdFor(characterId);
     const assetList = assets.cached?.data ?? null;
-    // An abyssal module counts at its last known MutaMarket estimate, cached on
-    // this device; never a type price, never a lookup from here.
     const abyssal = await lastKnownAbyssalValues(assetList ?? []);
-    // Without the mutaplasmid data no module reads as abyssal: a day's row is
-    // final, so wait for a run that can value them rather than freeze it low.
     if (!abyssal) return null;
     const contractTypeIds = [...(contractStock?.itemsByContractId.values() ?? [])].flatMap(
       (items) => (items ?? []).map((line) => line.type_id)
@@ -130,13 +101,11 @@ export const liveSources: SnapshotSources = {
       getHubPrices(getTradeHub(hubId) ?? DEFAULT_TRADE_HUB, typeIds),
       getAveragePriceByType(),
     ]);
-    // Hub sell price where the hub trades the item, the average otherwise.
     const priceByTypeId = new Map<number, number>();
     for (const id of typeIds) {
       const price = hubPrices.get(id)?.sellMin ?? averages.get(id);
       if (price !== undefined && price !== null) priceByTypeId.set(id, price);
     }
-    // Both price sources down: a near-zero asset value would be frozen into the day.
     if (typeIds.length > 0 && priceByTypeId.size === 0) return null;
     return {
       hubId,
@@ -158,7 +127,6 @@ async function recordOne(
   now: number
 ): Promise<SnapshotOutcome> {
   const held = await db.netWorthSnapshots.get(snapshotId(characterId, utcDay(now)));
-  // A row from before a layer existed is re-read once; a complete one is final for the day.
   if (held) {
     const scopes = await loadGrantedScopes(characterId);
     const contracts = scopes.has(ESI_REGISTRY.getCharacterContracts.scope);
@@ -173,7 +141,6 @@ async function recordOne(
   return held ? 'upgraded' : 'written';
 }
 
-/** Record today's snapshot for one Character unless it already has one. Never throws: history is a bonus on top of the pages. */
 export function recordNetWorthSnapshot(
   characterId: number,
   sources: SnapshotSources = liveSources,
@@ -191,7 +158,6 @@ export function recordNetWorthSnapshot(
   return safe;
 }
 
-/** Today's snapshot for every stored Character, one after another so the price and ESI reads don't pile up. */
 export async function recordAllNetWorthSnapshots(
   sources: SnapshotSources = liveSources,
   now: number = Date.now()

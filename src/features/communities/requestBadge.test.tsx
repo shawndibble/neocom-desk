@@ -93,7 +93,6 @@ describe('Communities nav badge', () => {
       request('mine', { ownerUid: 'char:1', createdAt: NOW + 6 }),
     ]);
     await act(() => refreshRequestBadge(1, NOW + 10));
-    // Two Communities each show the new Request; nothing of mine, nothing already seen.
     expect(result.current).toBe(2);
   });
 
@@ -143,7 +142,6 @@ describe('Communities nav badge', () => {
       })
     );
     const pending = refreshRequestBadge(1, NOW + 10);
-    // Switch Character while that read is in flight.
     await vi.waitFor(() => expect(requestStore.loadRequestsSince).toHaveBeenCalledTimes(1));
     act(() => resetRequestBadge());
     release();
@@ -174,11 +172,9 @@ describe('Communities nav badge', () => {
     );
     const pending = refreshRequestBadge(1, NOW + 10);
     await vi.waitFor(() => expect(requestStore.loadRequestsSince).toHaveBeenCalledTimes(1));
-    // c1 was already read as new; the viewer opens it before the read finishes.
     const unwatch = watchRequestsViewed('c1');
     release();
     await act(() => pending);
-    // Only c2 (still unseen) counts.
     expect(result.current).toBe(1);
     unwatch();
   });

@@ -22,7 +22,6 @@ describe('stock list share code', () => {
     const odd = { ...list, name: '100% Stocked & co' };
     const code = encodeStockListShare(odd);
     expect(code).toMatch(/^[A-Za-z0-9._~%-]+$/);
-    // The Stock tab reads it back with `searchParams.get`, which decodes once.
     expect(decodeStockListShare(new URLSearchParams(`list=${code}`).get('list') ?? '')).toEqual(
       odd
     );

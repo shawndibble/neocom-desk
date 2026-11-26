@@ -10,13 +10,6 @@ import {
   type CommunityPopSharer,
 } from './communityStore';
 
-/**
- * The admin's list of corporations whose Corp Tax Book shares moon pops with this Community
- * (#6223), each with Block / Unblock. A blocked corporation's pops show to no Member here until
- * unblocked. Listed while its settings name the Community, even between extractions; one whose
- * pops show to nobody here yet (no officer of its book is a Member) is marked Not showing.
- * Shows nothing until a corporation shares, or has been blocked.
- */
 export function CommunityPopSharers({
   communityId,
   characterId,

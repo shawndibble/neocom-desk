@@ -115,7 +115,6 @@ describe('ExportBookSection', () => {
     });
     expect(readAudit).toHaveBeenCalledWith(ME, CORP, 2000);
     expect(save.mock.calls[0][0]).toMatch(/^neocom-corp-tax-book-test-\d{4}-\d{2}-\d{2}\.xlsx$/);
-    // 2 mining lines + 15 settings rows + 1 log entry.
     expect(done).toHaveTextContent(
       /^Downloaded neocom-corp-tax-book-test-.*\.xlsx · 18 sheets, 18 rows$/
     );

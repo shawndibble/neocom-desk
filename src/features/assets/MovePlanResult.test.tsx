@@ -71,7 +71,6 @@ const plan = {
   comparison: [hauledBy([cargoHaul(100), cargoHaul(50)])],
 } as MovePlan;
 
-/** Fixtures set `suggested`; with no override the active hauler is that. */
 const withActive = (p: MovePlan): MovePlan => ({ ...p, active: p.suggested });
 
 const shipPlan = {
@@ -345,7 +344,6 @@ describe('PlanResult', () => {
       .setup()
       .click(screen.getByRole('button', { name: 'Fly Praxis instead of packing it' }));
     expect(onUnpackShip).toHaveBeenCalledWith(9);
-    // 1 haul + 1 forced flight
     expect(screen.getAllByText('trips')[0].parentElement?.textContent).toBe('2trips');
   });
 
@@ -447,7 +445,6 @@ describe('PlanResult', () => {
     });
 
     it('still names the ship when nothing is hauled', () => {
-      // no hauler to suggest: the ship trips still head the plan
       const none = {
         ...shipPlan,
         totals: { ...shipPlan.totals, totalM3: 0, trips: null },
@@ -512,7 +509,6 @@ describe('PlanResult', () => {
   });
 
   describe('focus after Pack instead', () => {
-    /** Packing moves the ship from `ships` to `lines`, so the Pack button disappears. */
     function Harness({ rigs }: { rigs: number }) {
       const [packed, setPacked] = useState(false);
       const pickup = shipPlan.perCharacter[0].pickups[0];

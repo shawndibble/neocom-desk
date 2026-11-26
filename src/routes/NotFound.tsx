@@ -5,16 +5,6 @@ import { LogoMark, buttonClassName } from '@/components/ui';
 import { DISCORD_URL } from '@/lib/links';
 import { useMarkPublicRouteRendered } from '@/app/routeFocus';
 
-/**
- * The `*` route. Replaces a silent `<Navigate to="/" replace />`, which sent a
- * mistyped or dead URL to the app's front door with no indication that the
- * address had been wrong at all.
- *
- * Shares `ErrorScreen`'s full-screen shape (src/app/ErrorBoundary.tsx) because
- * they are the same kind of moment — the app has nothing to show and is
- * offering one way out. Links rather than redirects: the point is to say what
- * happened first.
- */
 export function NotFound() {
   const { t } = useTranslation();
   useMarkPublicRouteRendered();

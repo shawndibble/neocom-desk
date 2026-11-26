@@ -49,12 +49,10 @@ interface ColumnContext {
   section: SectionBuilder;
   figure: Figure;
   stats: FittingStats | null;
-  /** What each section says while the stats are not in (the error is said once, above). */
   placeholder: ReactNode;
   typeName: (typeId: number) => string;
 }
 
-/** Damage side: Offense, Applied DPS, Drones, Fighters. */
 export function damageSections({
   t,
   section,
@@ -135,7 +133,6 @@ export function damageSections({
   ];
 }
 
-/** Tank side: Defense, with the damage profile it is read against. */
 export function tankSections({
   t,
   section,
@@ -146,8 +143,6 @@ export function tankSections({
   damageProfiles,
   profileName,
 }: ColumnContext & { damageProfiles: DamageProfiles; profileName: string }): ReactNode[] {
-  // A RAH's resists move with the profile (the engine adapts it), so the
-  // armor row does too — label that, and show the RAH's own adapted resists.
   const adaptedHardeners = (stats?.modules ?? []).flatMap((module) =>
     module.adaptedResonances ? [module.adaptedResonances] : []
   );
@@ -177,7 +172,6 @@ export function tankSections({
   ];
 }
 
-/** Ship side: Capacitor, Navigation, Targeting, Fitting, Support, Mining, Fleet boosts, Price. */
 export function shipSections({
   t,
   section,
@@ -232,7 +226,6 @@ export function shipSections({
       'fitting',
       figure(
         (s) =>
-          // Calibration earns a place only when it is the one over, or the header would go red with no number to say why.
           t(
             resourceOverage(s.calibrationUsed, s.calibrationTotal) > 0
               ? 'fittings.stats.fittingMetaCalibration'
@@ -271,7 +264,6 @@ export function shipSections({
       stats.explore.modules > 0 &&
       section(
         'exploration',
-        // The figure an explorer reads first: what the analyzer hacks at, else what the probes scan at.
         figure((s) =>
           s.explore.hacking.strength > 0
             ? t('fittings.stats.exploration.strengthMeta', {

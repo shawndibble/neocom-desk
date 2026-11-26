@@ -14,12 +14,6 @@ import { isAcceleratorLive } from '@/engine/accelerator';
 import { acceleratorId } from '@/features/accelerator/characterAccelerators';
 import { acceleratorBoosters } from './planBooster';
 
-/**
- * One Character's timing inputs for "Who's closest", read from ESI's cache
- * and Dexie. The live queue is applied only as the correction `/skills`
- * needs (levels it has finished); it never delays the start. A read that
- * fails is `unavailable` with its reason, never an empty skill list.
- */
 export async function loadClosestInputs(
   characterId: number,
   nowMs: number

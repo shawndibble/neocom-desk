@@ -5,10 +5,6 @@ import type { CharacterFilterValue } from '@/features/character/characterFilterV
 import { useRememberedUrlParams } from '@/lib/useUrlState';
 import { payeeFilterParam, type PayeeFilter } from './payeeFilter';
 
-// Keys scoped `tax.*`: Mining's other tab (`OverviewTab`) has its own
-// `character`/sort params on the same route, and `usePageTab` carries the
-// query string across a tab switch — unscoped keys would leak Tax's filter
-// and sort into Overview and back.
 const TAX_URL_PARAMS = {
   'tax.character': characterFilterParam('all'),
   'tax.payee': payeeFilterParam(),
@@ -16,9 +12,7 @@ const TAX_URL_PARAMS = {
 
 export const TAX_DEFAULT_SORT = { columnId: 'date', direction: 'desc' as const };
 
-/** The Tax tab's Character and Payee filters, both held in the URL. */
 export function useTaxUrlFilters() {
-  // Remembered per device once changed; a first visit stays on All characters.
   const rememberedCharacterFilter = useRememberedCharacterFilter<typeof TAX_URL_PARAMS>(
     'miningTax',
     'tax.character',

@@ -1,25 +1,3 @@
-/**
- * Keeps a long-lived tab's synced data fresh.
- *
- * `App.tsx` syncs the active Character at boot and on every switch, and each
- * mutation site schedules its own sync. Between them nothing ever *pulls*
- * again, so a tab left open never learns that another device dismissed an
- * alert, and a Character the user is not looking through is never reconciled
- * on this device at all.
- *
- * Three constraints shape the sweep, argued in full in
- * `docs/context/decisions/20260912-125743-alert-dismissals-push-on-dismiss-a-visible-tab.md`:
- * it covers every Character, it runs on a tick *and* on `visibilitychange`
- * (neither alone catches an app switch that leaves the tab foregrounded), and
- * it is gated per Character by {@link BACKGROUND_SYNC_MIN_GAP_MS} because
- * every pass reads each synced collection. Each Character has its own
- * persisted Firebase session (`sync/syncAuth.ts`), so a sweep mints a token
- * only for a Character whose session is gone.
- *
- * The sweep queues the active Character last and everything as background
- * priority, so an edit-triggered sync overtakes the rest of the sweep
- * (`sync/planSync.ts` `SyncPriority`) instead of waiting behind every Character.
- */
 import { MINUTE_MS } from '@/lib/age';
 import { useEffect, useRef } from 'react';
 import { getSyncStatus, scheduleSync } from '@/sync';
@@ -27,43 +5,16 @@ import { isSyncConfigured } from './syncStatus';
 import { joinTabElection, type TabElectionSeat } from '@/lib/tabLeader';
 import { readLocal, writeLocal } from '@/lib/safeLocalStorage';
 
-/**
- * Smallest gap between two sweeps *of the active Character*. Five minutes is
- * well inside "fresh enough to read" and well outside "every time the mouse
- * leaves the window", which is what a `visibilitychange` gate has to survive.
- * `sync/syncScheduler.ts`'s `PARTIAL_PASS_WINDOW_MS` must not exceed it.
- */
 export const BACKGROUND_SYNC_MIN_GAP_MS = 5 * MINUTE_MS;
 
-/**
- * The same gap for every *other* Character. Nobody is looking through them,
- * and each one costs a full pass of reads, so they can wait longer.
- */
 export const BACKGROUND_SYNC_NON_ACTIVE_GAP_MS = 20 * MINUTE_MS;
 
-/**
- * How often the gate is re-checked. Not the sync cadence —
- * {@link BACKGROUND_SYNC_MIN_GAP_MS} is that. Kept well under the gap so the
- * gap, rather than the boundary between two equal periods, decides.
- */
 export const BACKGROUND_SYNC_TICK_MS = MINUTE_MS;
 
-/**
- * How long after boot the first sweep waits. Boot already syncs the active
- * Character (`App.tsx`) and the visible route is making its own reads; a sweep
- * of every Character on top — each minting a Firebase token — only competes
- * with them. A few seconds later it costs nobody anything.
- */
 export const BACKGROUND_SYNC_BOOT_DELAY_MS = 10 * 1000;
 
-/**
- * localStorage key for the last-sweep stamps, shared by every tab so that a tab
- * taking leadership over (`lib/tabLeader.ts`) does not re-sweep every
- * Character the previous leader swept a minute ago.
- */
 export const SWEEP_STAMPS_KEY = 'neocom.backgroundSync.lastSweptAt';
 
-/** Fold the other tabs' stamps into `into`, keeping the later of each. */
 function mergeSharedStamps(into: Map<number, number>): void {
   try {
     const raw: unknown = JSON.parse(readLocal(SWEEP_STAMPS_KEY) ?? '{}');
@@ -73,23 +24,13 @@ function mergeSharedStamps(into: Map<number, number>): void {
         into.set(Number(id), at);
       }
     }
-  } catch {
-    // Unreadable or blocked storage: this tab's own stamps still gate it.
-  }
+  } catch {}
 }
 
 function writeSharedStamps(stamps: ReadonlyMap<number, number>): void {
-  // Blocked or full storage: other tabs just fall back to their own stamps.
   writeLocal(SWEEP_STAMPS_KEY, JSON.stringify(Object.fromEntries(stamps)));
 }
 
-/**
- * Which of `ids` are due, given when each was last swept, in the order to
- * sweep them. Pure so the throttle is testable without a clock or a DOM event.
- *
- * The active Character has the shorter gap and always comes last. It is also
- * appended whenever any other Character is swept, due or not.
- */
 export function idsToSweep(
   ids: readonly number[],
   lastSweptAt: ReadonlyMap<number, number>,
@@ -107,34 +48,11 @@ export function idsToSweep(
   return others.length > 0 || isDue(activeCharacterId) ? [...others, activeCharacterId] : [];
 }
 
-/**
- * Sweeps shortly after mount ({@link BACKGROUND_SYNC_BOOT_DELAY_MS}), on every
- * tick, and whenever the tab is looked at again. A Character added later is
- * swept at once — only the boot sweep waits.
- *
- * A Character that finished a sync inside the gap by any other route (the
- * boot sync of the active Character, a mutation's own sync) counts as swept:
- * re-reading every collection straight after would re-mint its token for
- * nothing.
- *
- * The last-sweep stamps are a ref rather than module state so they die with
- * the component — there is exactly one mount of this in the app, and module
- * state would only leak between tests.
- *
- * The caller's list comes from `useLiveQuery`, which hands back a fresh array
- * on every render and an *empty* one before Dexie answers. Neither can be the
- * effect's dependency as-is: the identity churn would re-register the
- * listeners every render, and depending on nothing at all would mean the one
- * sweep this hook ever ran happened while the list was still empty. Hence the
- * latest-ref pattern (`market/useCompareRows.ts`) against a joined key that
- * changes exactly when the set of Characters does.
- */
 export function useBackgroundSync(
   characterIds: readonly number[],
   activeCharacterId: number | null = null
 ): void {
   const lastSweptAt = useRef(new Map<number, number>());
-  /** When the boot hold-off ends; set by the first effect run that has Characters. */
   const bootSweepAt = useRef<number | null>(null);
   const idsRef = useRef(characterIds);
   const activeRef = useRef(activeCharacterId);
@@ -145,8 +63,6 @@ export function useBackgroundSync(
   const key = characterIds.join(',');
   const active = key !== '' && isSyncConfigured();
 
-  // One tab — the Tab Leader for the sweep — sweeps every Character for all of
-  // them. Its own effect, so a change to the Character list keeps the seat.
   const seat = useRef<TabElectionSeat | null>(null);
   const onLeaderChange = useRef(() => {});
   useEffect(() => {
@@ -163,15 +79,11 @@ export function useBackgroundSync(
     if (!active) return;
 
     const sweep = () => {
-      // A hidden tab has nobody reading its alerts, and sweeping one would
-      // spend the gap that the first real look wants.
       if (document.visibilityState !== 'visible') return;
       if (!seat.current?.isLeader()) return;
       const now = Date.now();
       mergeSharedStamps(lastSweptAt.current);
       for (const characterId of idsRef.current) {
-        // A *full* pass only: one narrowed to what an edit touched pulled
-        // nothing else, so it must not hold the sweep off (issue #4896).
         const synced = getSyncStatus(characterId).lastFullSyncAt;
         if (synced !== undefined && synced > (lastSweptAt.current.get(characterId) ?? -Infinity)) {
           lastSweptAt.current.set(characterId, synced);
@@ -179,9 +91,6 @@ export function useBackgroundSync(
       }
       const due = idsToSweep(idsRef.current, lastSweptAt.current, now, activeRef.current);
       for (const characterId of due) {
-        // A sync already in flight covers this Character. Scheduling a second
-        // one behind it would re-read every collection and, since the sweep
-        // signs the session in as each Character in turn, re-mint its token.
         if (getSyncStatus(characterId).state === 'syncing') continue;
         lastSweptAt.current.set(characterId, now);
         scheduleSync(characterId, { priority: 'background' });
@@ -196,8 +105,6 @@ export function useBackgroundSync(
     else sweep();
     document.addEventListener('visibilitychange', sweep);
     const tick = window.setInterval(sweep, BACKGROUND_SYNC_TICK_MS);
-    // A tab taking leadership over sweeps at once — but not before the boot
-    // hold-off, which winning the election at boot would otherwise skip.
     onLeaderChange.current = () => {
       if (Date.now() >= (bootSweepAt.current ?? Infinity)) sweep();
     };

@@ -1,19 +1,3 @@
-/**
- * The sample reads behind the landing page's Overview demo, and the Widget
- * Views built from them.
- *
- * The data is raw: the same shapes the live feeds hold (a wallet journal, a
- * skill queue, open orders), and the Views come out of the app's
- * own `buildView`, so a demo card reads, rounds and words things exactly as
- * the real one does and follows it when a builder changes. Only Open orders
- * is assembled by hand around the real table and chart builders, because its
- * feed is a market snapshot that cannot be faked small.
- *
- * Pure: nothing here fetches, reads a store or touches Dexie. Every figure
- * hangs off `now`, so the sample always looks freshly read. The cast is
- * fictional (Aurelia Vex of Deep Space Transport); the systems, ships and
- * skills are New Eden's own.
- */
 import type { TFunction } from 'i18next';
 import { DAY_MS, HOUR_MS, MINUTE_MS } from '@/lib/age';
 import type { SkillQueueEntry, WalletJournalEntry } from '@/esi/endpoints';
@@ -38,9 +22,7 @@ import type { Translate } from '@/lib/translate';
 import type { Widget } from '@/features/overview/widgets/layout';
 import { formatIskCompact } from '@/lib/isk';
 
-/** The wallet balance the journal walks to. */
 const BALANCE = 1_842_600_000;
-/** What the journal nets: the first day's 1M is already in the series' first point, so the headline reads "+342.3M in 27 days". */
 const NET_GAIN = 343_300_000;
 const JOURNAL_DAYS = 27;
 
@@ -50,7 +32,6 @@ function cached<T>(data: T, fetchedAt: Date): CachedResult<T> {
   return { data, fetchedAt, fromCache: false, truncated: false };
 }
 
-/** About a month of wallet journal ending at `now`, walking to `BALANCE` and netting `NET_GAIN`. */
 function journal(now: number): WalletJournalEntry[] {
   type Draft = { day: number; ref: string; amount: number };
   const drafts: Draft[] = [];
@@ -67,7 +48,6 @@ function journal(now: number): WalletJournalEntry[] {
       drafts.push({ day, ref: 'market_transaction', amount: -(54e6 + 30e6 * wobble(day, 3.1)) });
     }
   }
-  // The weeks that make the flow chart diverge: a ship bought, a donation, two big contracts.
   drafts.push({ day: 13, ref: 'market_transaction', amount: -236e6 });
   drafts.push({ day: 9, ref: 'player_donation', amount: -48e6 });
   drafts.push({ day: 21, ref: 'contract_price_payment_corp', amount: 312e6 });
@@ -78,7 +58,6 @@ function journal(now: number): WalletJournalEntry[] {
   let balance = BALANCE - NET_GAIN;
   return drafts.map((draft, i) => {
     balance += draft.amount;
-    // Spread through the day, oldest first, newest well before `now`.
     const at = now - draft.day * DAY_MS - (20 - (i % 17)) * HOUR_MS * 0.5 - 20 * MINUTE_MS;
     return {
       id: 9_000 + i,
@@ -126,7 +105,6 @@ function skills(now: number): { queue: SkillQueueEntry[]; catalog: SkillCatalog 
     });
     start = finish;
   });
-  // The widget reads only the display name off a catalogue row.
   return { queue, catalog: { bySkillTypeID: names } as unknown as SkillCatalog };
 }
 
@@ -147,12 +125,6 @@ const feedsAt = (now: number): Feeds => {
   };
 };
 
-/**
- * The layout: four Small cards, then three Medium and a Full Open orders. Led by
- * the widgets that show what Neocom Desk adds beyond the game's own screens
- * (hauls, under-priced contracts, price alerts, colonies, profit); the kinds
- * with no demo feed below draw the Overview gallery's own sample (`SAMPLED_KINDS`).
- */
 export const DEMO_WIDGETS: readonly Widget[] = [
   { id: 'd-hauling', kind: 'hauling', size: 'S', view: 'number' },
   { id: 'd-below', kind: 'belowMarket', size: 'S', view: 'number' },
@@ -193,7 +165,6 @@ const ORDERS: readonly OrderSpec[] = [
 ];
 
 function openOrderRows(now: number): OpenOrderRow[] {
-  // Only what the Open orders widget reads; the rest of a row is the market page's.
   return ORDERS.map(
     ([typeName, volumeRemain, price, gapPct, beatsMe, problem, days, stationName], i) =>
       ({
@@ -212,7 +183,6 @@ function openOrderRows(now: number): OpenOrderRow[] {
   );
 }
 
-/** The landing demo links nowhere: drop the row links the real builder adds. */
 function demoTable(table: TableModel): TableModel {
   return { ...table, rows: table.rows.map((row) => ({ ...row, to: undefined })) };
 }
@@ -238,7 +208,6 @@ function ordersView(t: Translate, now: number): KindView {
   };
 }
 
-/** Kinds whose demo View is the Overview gallery's sample rather than a demo feed. */
 const SAMPLED_KINDS: ReadonlySet<string> = new Set([
   'hauling',
   'belowMarket',
@@ -247,7 +216,6 @@ const SAMPLED_KINDS: ReadonlySet<string> = new Set([
   'profit',
 ]);
 
-/** One View per demo widget, keyed by widget id, as the real feeds would have built them at `now`. */
 export function buildDemoViews(t: TFunction, now: number): ReadonlyMap<string, KindView> {
   const translate: Translate = (key, options) => String(t(key, options));
   const feeds = feedsAt(now);
@@ -268,7 +236,6 @@ export function buildDemoViews(t: TFunction, now: number): ReadonlyMap<string, K
             activeCharacterId: null,
             scopeAll: false,
             notTrainingAlert: false,
-            // The widget's own settings, resolved as the real board resolves them (Range, Show, ...).
             ...settingsContext(widget.kind, widget),
           })
     );

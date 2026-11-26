@@ -142,7 +142,6 @@ describe('downloadEverything', () => {
     const b = downloadEverything(second);
     expect(isDownloading()).toBe(true);
     await vi.waitFor(() => expect(first).toHaveBeenCalledWith(5, 74));
-    // The late joiner hears the latest figure at once.
     expect(second).toHaveBeenCalledWith(5, 74);
     finish();
     await expect(Promise.all([a, b])).resolves.toEqual(['done', 'done']);

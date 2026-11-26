@@ -66,7 +66,6 @@ const detail: MoonOwnerDetail = {
 
 const ORES: Record<number, string> = { 1: 'Zeolites', 2: 'Sylvite', 3: 'Bitumens' };
 
-/** @summary One moon owner's page: their rate beside the miner rate and margin, rate history, payments, ore mined at their refineries. */
 const meta = {
   title: 'corp/MoonOwnerPage',
   component: MoonOwnerPage,
@@ -96,10 +95,8 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** @summary Active, with a rate they asked for that the book overrode; an officer who may edit sees Pay, Set rate, Settled otherwise and Remove from this book. */
 export const Active: Story = {};
 
-/** @summary The moon owner named a player as its payee: shown read-only with Open in EVE. */
 export const PaidToAPlayer: Story = {
   args: {
     detail: { ...detail, payee: { kind: 'character', id: 77 } },
@@ -107,7 +104,6 @@ export const PaidToAPlayer: Story = {
   },
 };
 
-/** @summary The moon owner changed who gets paid (#4653): the strip with Dismiss, and Change on the "Paid to" line. */
 export const PayeeChangedByMoonOwner: Story = {
   args: {
     detail: { ...detail, payee: { kind: 'character', id: 77 } },
@@ -124,7 +120,6 @@ export const PayeeChangedByMoonOwner: Story = {
   },
 };
 
-/** @summary Their ledger cannot be read: the warning names the date. */
 export const CantReadLedger: Story = {
   args: {
     detail: {
@@ -134,7 +129,6 @@ export const CantReadLedger: Story = {
   },
 };
 
-/** @summary Compensated another way: nothing owed, the note shows. */
 export const SettledOtherwise: Story = {
   args: {
     detail: {
@@ -145,7 +139,6 @@ export const SettledOtherwise: Story = {
   },
 };
 
-/** @summary No rate set yet: nothing is due until one is. */
 export const NoRateSet: Story = {
   args: {
     detail: {
@@ -162,7 +155,6 @@ export const NoRateSet: Story = {
 
 const removalRow = { ...detail.row, status: 'removal-pending' } as const;
 
-/** @summary A removal whose notice went out: the strip says when it takes effect, with Cancel removal. */
 export const RemovalPending: Story = {
   args: {
     detail: {
@@ -180,7 +172,6 @@ export const RemovalPending: Story = {
   },
 };
 
-/** @summary A removal whose notice has not gone out: the 24 hours have not begun. */
 export const RemovalPendingNoticeUnsent: Story = {
   args: {
     detail: {
@@ -194,7 +185,6 @@ export const RemovalPendingNoticeUnsent: Story = {
   },
 };
 
-/** @summary A detected payment an officer marked "not a payout": it stays listed and can be counted again. */
 export const NotAPayout: Story = {
   args: {
     detail: {
@@ -215,7 +205,6 @@ export const NotAPayout: Story = {
   },
 };
 
-/** @summary Refineries through the label chain: one an officer labelled, one with neither name nor system, so it reads as the moon owner's name plus its id. Either side can edit a label behind the faint pencil. */
 export const RefineryLabels: Story = {
   args: {
     refineryName: (id: number) =>
@@ -223,14 +212,12 @@ export const RefineryLabels: Story = {
   },
 };
 
-/** @summary A refinery with no label and no readable structure name reads as the system a miner's own ledger placed it in (#4650), not the moon owner's name plus its id. */
 export const LearnedSystem: Story = {
   args: {
     refineryName: (id: number) => (id === 10 ? 'Efa - Ashfall Tatara' : 'Ikao'),
   },
 };
 
-/** @summary A viewer who may not edit: no Pay, Set rate, Settled otherwise or payment actions. */
 export const ReadOnly: Story = {
   args: {
     refineryEdit: undefined,

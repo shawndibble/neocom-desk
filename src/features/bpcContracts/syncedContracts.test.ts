@@ -1,8 +1,3 @@
-/**
- * `loadPublicBpcContracts`' read path from R2 (ADR 0019): which objects it
- * reads, how it narrows them, and that R2 being unreachable reads as
- * unavailable rather than falling back to Firestore (issue #4270).
- */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { db } from '@/db';
 import { resetRevalidationState, GLOBAL_CACHE_CHARACTER_ID } from '@/esi/cache';
@@ -13,7 +8,6 @@ import type { PublicContractOfferRow } from '@/engine/contracts/contractOffers';
 const getDocs = vi.hoisted(() => vi.fn());
 const getDoc = vi.hoisted(() => vi.fn());
 
-// R2 is the only store: these spies prove nothing reaches Firestore.
 vi.mock('firebase/firestore/lite', () => ({
   getDocs,
   getDoc,
@@ -33,14 +27,12 @@ function r2Index(lastSyncedAt: number) {
     types: {
       '32858': { count: 1, cheapest: 1, objects: [objectName(32858)] },
       '32859': { count: 1, cheapest: 1, objects: [objectName(32859)] },
-      // Not a blueprint: must never be downloaded.
       '34': { count: 9, cheapest: 1, objects: [objectName(34)] },
     },
     regionIds: [10000002],
   };
 }
 
-/** Serves the index and each blueprint type's object; anything else is a 404. */
 function serveR2(index: unknown, byType: Record<number, PublicContractOfferRow[]> = {}) {
   const fetchMock = vi.fn(async (url: string) => {
     if (url === INDEX_URL) return new Response(JSON.stringify(index), { status: 200 });

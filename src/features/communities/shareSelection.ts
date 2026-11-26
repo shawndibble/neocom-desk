@@ -1,11 +1,3 @@
-/**
- * A Character's choice of which blueprints to share with one Community
- * (issue #3599): the set of blueprint type ids, kept on this device in the
- * `settings` table under `communityShare:{characterId}:{communityId}`. It is
- * not a synced setting — the published copy is the Community's library
- * (pushed by `libraryPush.ts`) — and holds only type ids, never token data. No row means
- * nothing is shared.
- */
 import { db } from '@/db';
 import type { BlueprintShare, ShareChoice } from '@/engine/communities/shareMode';
 
@@ -32,7 +24,6 @@ export async function saveShareSelection(
   else await db.settings.put({ key, value: [...selected].sort((a, b) => a - b) });
 }
 
-/** Whether any of these Characters shares anything: decides if a logout asks about shared blueprints. */
 export async function hasShareSelections(characterIds: readonly number[]): Promise<boolean> {
   for (const characterId of characterIds) {
     const found = await db.settings.where('key').startsWith(`${PREFIX}${characterId}:`).count();
@@ -41,27 +32,14 @@ export async function hasShareSelections(characterIds: readonly number[]): Promi
   return false;
 }
 
-/**
- * Remembers on this device that the Character shared a Fitting (issue #3605),
- * so the logout question is asked for it too. It lives under the same
- * `communityShare:{characterId}:` prefix, so it is counted by
- * `hasShareSelections` and deleted with the Character.
- */
 export async function markFittingsShared(characterId: number): Promise<void> {
   await db.settings.put({ key: `${PREFIX}${characterId}:fittings`, value: true });
 }
 
-/**
- * Remembers on this device that the Character shared a Skill Plan, so the
- * sweep refreshes it and the logout question is asked. Same prefix as the
- * Fittings marker, so it is counted by `hasShareSelections` and deleted with
- * the Character.
- */
 export async function markPlansShared(characterId: number): Promise<void> {
   await db.settings.put({ key: `${PREFIX}${characterId}:plans`, value: true });
 }
 
-/** Run inside `removeCharacter`'s transaction: a removed Character leaves no choices behind. */
 export async function deleteShareSelections(characterId: number): Promise<void> {
   await db.settings.where('key').startsWith(`${PREFIX}${characterId}:`).delete();
 }
@@ -69,11 +47,6 @@ export async function deleteShareSelections(characterId: number): Promise<void> 
 const allKeyFor = (characterId: number, communityId: string) =>
   `${keyFor(characterId, communityId)}:all`;
 
-/**
- * The Character's full choice for a Community: share-all (its row holds the
- * blueprints stopped since) or the allowlist. A `:all` row under the same
- * prefix is counted by `hasShareSelections` and deleted with the Character.
- */
 export async function loadShareChoice(
   characterId: number,
   communityId: string
@@ -108,14 +81,6 @@ export async function saveShareChoice(
 const locationsKeyFor = (characterId: number, communityId: string) =>
   `${keyFor(characterId, communityId)}:locations`;
 
-/**
- * The Character's blueprint choice plus its standing location rules: the
- * resolved station or structure ids whose blueprints are all shared. They stay
- * on this device (only the blueprints they match are published) in a
- * `:locations` row under the same prefix, so `hasShareSelections` counts a
- * location rule on its own and the Character's removal deletes it. The row is
- * dropped when the last rule stops, so an empty one never reads as sharing.
- */
 export async function loadBlueprintShare(
   characterId: number,
   communityId: string
@@ -147,12 +112,6 @@ export async function saveBlueprintShare(
 const fittingsAllKeyFor = (characterId: number, communityId: string) =>
   `${keyFor(characterId, communityId)}:fittings-all`;
 
-/**
- * Whether "share all my Fittings" is on for a Community (issue #3605), and if
- * so the Fittings (`source-key`) the Member has stopped since. Null is off.
- * Which Fittings are actually shared is the Community's own copy; this is only
- * the standing instruction that makes later saves follow it.
- */
 export async function loadFittingsAll(
   characterId: number,
   communityId: string

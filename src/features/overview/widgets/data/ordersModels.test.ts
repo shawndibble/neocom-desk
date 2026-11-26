@@ -157,7 +157,6 @@ describe('ordersTable', () => {
   it('opts every column into sorting and sorts on the real value, not the compact text', () => {
     expect(table.columns.every((c) => c.sortable)).toBe(true);
     const sortOf = (key: string) => table.rows.find((r) => r.key === key)!.sort!;
-    // item, side, price, vs best (signed gap), expires (the instant), station
     const [item, side, price, vsBest, expires, station] = sortOf('2');
     expect(item).toBe('Nocxium');
     expect(side).toBe('overview.widgets.orders.sideSell');

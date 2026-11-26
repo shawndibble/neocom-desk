@@ -1,21 +1,3 @@
-/**
- * What Route Safety's zKillboard column reads (issue #2329): each route
- * system's player kills from the last hour, the names of the stargates and
- * stations they happened at, and every type's group for the bubble and
- * smartbomb tags.
- *
- * zKillboard answers one system or one region per request, so these are fetched
- * per region (per system when a system's region is unknown) at low concurrency
- * by the caller and cached here for five minutes each.
- * A failure (429 included) is not cached: the next look simply asks again.
- *
- * Locations: `/universe/names` cannot name a stargate or a celestial — ESI
- * rejects the whole batch — so a stargate is read from
- * `/universe/stargates/{id}`, which also says which system it leads to. That
- * is what "on your path" is matched against: an id, not a name. NPC stations
- * come from the local snapshot at no cost. Planets, moons, belts and player
- * structures stay unnamed.
- */
 import { getUniverseStargate } from '@/esi/endpoints';
 import { isNpcStationId, isStargateId } from '@/esi/locationIds';
 import type { ResolvedLocation } from '@/engine/route/recentKills';
@@ -31,13 +13,10 @@ import { MINUTE_MS } from '@/lib/age';
 
 export const RECENT_KILLS_TTL_MS = 5 * MINUTE_MS;
 
-/** Promises, so two callers asking at once share one request. */
 const killsCache = new Map<number, { at: number; result: Promise<SystemRecentKillsResult> }>();
 const regionCache = new Map<number, { at: number; result: Promise<RegionRecentKillsResult> }>();
-/** Stargates never change, so each one is read once per session. */
 const stargateCache = new Map<number, Promise<ResolvedLocation | null>>();
 
-/** Never rejects; `{ ok: false }` when zKillboard failed or rate-limited. */
 export async function loadSystemRecentKills(
   systemId: number,
   now: number = Date.now()
@@ -47,16 +26,10 @@ export async function loadSystemRecentKills(
   const entry = { at: now, result: fetchSystemRecentKills(systemId) };
   killsCache.set(systemId, entry);
   const result = await entry.result;
-  // A failure is forgotten, so the next look asks again.
   if (!result.ok && killsCache.get(systemId) === entry) killsCache.delete(systemId);
   return result;
 }
 
-/**
- * A region's last hour of player kills by system: one request covers every
- * route system in it. Never rejects; `{ ok: false }` when zKillboard failed
- * or rate-limited, and that is not cached.
- */
 export async function loadRegionRecentKills(
   regionId: number,
   now: number = Date.now()
@@ -84,7 +57,6 @@ function resolveStargate(stargateId: number): Promise<ResolvedLocation | null> {
           : null,
       () => null
     );
-    // A failed read is forgotten, so a later look can try again.
     void pending.then((location) => {
       if (location === null) stargateCache.delete(stargateId);
     });
@@ -98,7 +70,6 @@ async function resolveStation(stationId: number): Promise<ResolvedLocation | nul
   return station ? { kind: 'station', name: station.name } : null;
 }
 
-/** Never rejects: a location that cannot be named is simply absent from the map. */
 export async function resolveKillLocations(
   locationIds: readonly number[]
 ): Promise<ReadonlyMap<number, ResolvedLocation>> {
@@ -116,13 +87,11 @@ export async function resolveKillLocations(
   return resolved;
 }
 
-/** A type → group lookup from the SDE; every type unknown when it cannot be read. */
 export async function loadTypeGroups(): Promise<(typeId: number) => number | undefined> {
   const types = await loadTypes().catch(() => null);
   return (typeId) => types?.[String(typeId)]?.groupID;
 }
 
-/** For tests. */
 export function clearRouteKillCaches(): void {
   killsCache.clear();
   regionCache.clear();

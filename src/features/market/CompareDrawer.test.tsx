@@ -45,6 +45,12 @@ const mockedLoadModifiers = vi.mocked(loadCharacterModifiers);
 const mockedLoadDictionary = vi.mocked(loadAttributeDictionary);
 const mockedLoadSkills = vi.mocked(loadSkills);
 
+function drag(zone: HTMLElement, fromY: number, toY: number) {
+  fireEvent.pointerDown(zone, { clientY: fromY });
+  fireEvent.pointerMove(zone, { clientY: toY });
+  fireEvent.pointerUp(zone, { clientY: toY });
+}
+
 const REGION_ID = 10000002;
 const ITEM_A = { typeId: 34, itemName: 'Tritanium' };
 const ITEM_B = { typeId: 35, itemName: 'Pyerite' };
@@ -108,7 +114,6 @@ beforeEach(() => {
   vi.clearAllMocks();
   useCompareSet.setState({ items: [], view: 'prices', openRequest: 0 });
   narrowState.narrow = false;
-  // Jita sells Tritanium at 100 (buy 80), Amarr at 90 (buy 85); the rest have no orders.
   hubPrices.fetch.mockImplementation(async (hub: { id: string }) => {
     const quotes: Record<string, { sellMin: number; buyMax: number }> = {
       jita: { sellMin: 100, buyMax: 80 },
@@ -160,9 +165,6 @@ describe('CompareDrawer', () => {
   });
 
   it('sizes the handle off the shared touch-tier scale, not a hand-written height (issue #1086)', () => {
-    // jsdom has no layout, so this asserts the class token rather than a
-    // rendered pixel height — e2e/marketCompareNarrow.spec.ts proves the
-    // real 36px box at 390px against a live browser.
     act(() => useCompareSet.setState({ items: [ITEM_A] }));
     renderDrawer();
     const handle = screen.getByRole('button', { name: 'Compare (1)' });
@@ -177,14 +179,12 @@ describe('CompareDrawer', () => {
     await user.click(screen.getByRole('button', { name: 'Compare (2)' }));
 
     const region = await screen.findByRole('region', { name: 'Compare' });
-    // Prices render as shorthand (#947); the exact figure is the accessible name.
     await waitFor(() =>
       expect(within(region).getByText('100.00 ISK', { selector: '.sr-only' })).toBeInTheDocument()
     );
     expect(within(region).getByText('80.00 ISK', { selector: '.sr-only' })).toBeInTheDocument();
-    expect(within(region).getByText('20.00 ISK', { selector: '.sr-only' })).toBeInTheDocument(); // spread
-    expect(within(region).getByText('10')).toBeInTheDocument(); // volume
-    // Pyerite has no orders in the fixture, so its priced cells read the empty dash.
+    expect(within(region).getByText('20.00 ISK', { selector: '.sr-only' })).toBeInTheDocument();
+    expect(within(region).getByText('10')).toBeInTheDocument();
     const pyeriteRow = within(region).getByText('Pyerite').closest('tr');
     expect(pyeriteRow).not.toBeNull();
     expect(within(pyeriteRow as HTMLElement).getAllByText('—').length).toBeGreaterThan(0);
@@ -198,7 +198,6 @@ describe('CompareDrawer', () => {
     const region = await screen.findByRole('region', { name: 'Compare' });
 
     expect(within(region).getByText('Prices from Jita')).toBeInTheDocument();
-    // (100 - 80) / 80 = 25%; Pyerite has no orders.
     expect(await within(region).findByText('25.0%')).toBeInTheDocument();
     expect(within(region).getByRole('columnheader', { name: /Spread %/ })).toBeInTheDocument();
     expect(
@@ -212,7 +211,6 @@ describe('CompareDrawer', () => {
     renderDrawer(null);
     await user.click(screen.getByRole('button', { name: 'Compare (1)' }));
     const region = await screen.findByRole('region', { name: 'Compare' });
-    // A lone item opens on Trade hubs.
     await user.click(within(region).getByRole('button', { name: 'Prices' }));
     await within(region).findByText('25.0%');
 
@@ -232,7 +230,6 @@ describe('CompareDrawer', () => {
     const region = await screen.findByRole('region', { name: 'Compare' });
     await user.click(within(region).getByRole('button', { name: 'Prices' }));
 
-    // 20 spread - 3.375 tax on 100 - two 100 ISK minimum broker fees.
     expect(
       await within(region).findByText('-183.38 ISK', { selector: '.sr-only' })
     ).toBeInTheDocument();
@@ -290,36 +287,128 @@ describe('CompareDrawer', () => {
     expect(handle).toHaveFocus();
   });
 
-  it('expands to a full view and back', async () => {
+  it('offers no Expand or Restore button — the grip is the only pointer path to a height', async () => {
     const user = userEvent.setup();
     act(() => useCompareSet.setState({ items: [ITEM_A] }));
     renderDrawer();
     await user.click(screen.getByRole('button', { name: 'Compare (1)' }));
     const region = await screen.findByRole('region', { name: 'Compare' });
 
-    await user.click(screen.getByRole('button', { name: 'Expand' }));
-    expect(region.style.height).toBe('80vh');
+    expect(within(region).queryByRole('button', { name: 'Expand' })).not.toBeInTheDocument();
+    expect(within(region).queryByRole('button', { name: 'Restore' })).not.toBeInTheDocument();
+    expect(within(region).getByRole('button', { name: 'Clear all' })).toBeInTheDocument();
+  });
 
-    await user.click(screen.getByRole('button', { name: 'Restore' }));
-    expect(region.style.height).not.toBe('80vh');
+  it('clamps the drag to the viewport ceiling rather than letting it cover the handle', async () => {
+    const user = userEvent.setup();
+    act(() => useCompareSet.setState({ items: [ITEM_A] }));
+    renderDrawer();
+    await user.click(screen.getByRole('button', { name: 'Compare (1)' }));
+    const region = await screen.findByRole('region', { name: 'Compare' });
+    const grip = screen.getByRole('separator', { name: 'Resize the drawer' });
+
+    drag(grip, 400, -5000);
+
+    const ceiling = Math.round(window.innerHeight * 0.8);
+    expect(region.style.height).toBe(`${ceiling}px`);
+    expect(grip).toHaveAttribute('aria-valuemax', String(ceiling));
+    expect(grip).toHaveAttribute('aria-valuenow', String(ceiling));
+  });
+
+  it('closes when the drag carries the commit distance past the minimum height', async () => {
+    const user = userEvent.setup();
+    act(() => useCompareSet.setState({ items: [ITEM_A] }));
+    renderDrawer();
+    const handle = screen.getByRole('button', { name: 'Compare (1)' });
+    await user.click(handle);
+    const grip = await screen.findByRole('separator', { name: 'Resize the drawer' });
+
+    drag(grip, 400, 650);
+
+    expect(screen.getByRole('region', { name: 'Compare' })).toBeInTheDocument();
+
+    await waitFor(() => expect(screen.queryByRole('region')).not.toBeInTheDocument());
+    expect(handle).toHaveFocus();
+  });
+
+  it('stops shrinking at the minimum, slides toward the edge, and springs back under the commit distance', async () => {
+    const user = userEvent.setup();
+    act(() => useCompareSet.setState({ items: [ITEM_A] }));
+    renderDrawer();
+    await user.click(screen.getByRole('button', { name: 'Compare (1)' }));
+    const region = await screen.findByRole('region', { name: 'Compare' });
+    const grip = screen.getByRole('separator', { name: 'Resize the drawer' });
+
+    fireEvent.pointerDown(grip, { clientY: 400 });
+    fireEvent.pointerMove(grip, { clientY: 560 });
+    expect(region.style.height).toBe('160px');
+    expect(region.style.transform).toBe('translateY(40px)');
+    expect(region.style.transition).toBe('none');
+
+    fireEvent.pointerUp(grip, { clientY: 560 });
+
+    expect(screen.getByRole('region', { name: 'Compare' })).toBeInTheDocument();
+    expect(region.style.transform).toBe('');
+    expect(region.style.transition).toBe(
+      'transform var(--motion-slow-exit) var(--motion-ease-out)'
+    );
+  });
+
+  it('ignores a press that moves less than the activation distance (§6c)', async () => {
+    const user = userEvent.setup();
+    act(() => useCompareSet.setState({ items: [ITEM_A] }));
+    renderDrawer();
+    await user.click(screen.getByRole('button', { name: 'Compare (1)' }));
+    const region = await screen.findByRole('region', { name: 'Compare' });
+    const grip = screen.getByRole('separator', { name: 'Resize the drawer' });
+
+    drag(grip, 400, 397);
+
+    expect(region.style.height).toBe('280px');
+    expect(region.style.transform).toBe('');
+  });
+
+  it('drags from the header too, so the whole top edge of the drawer resizes it', async () => {
+    const user = userEvent.setup();
+    act(() => useCompareSet.setState({ items: [ITEM_A] }));
+    renderDrawer();
+    await user.click(screen.getByRole('button', { name: 'Compare (1)' }));
+    const region = await screen.findByRole('region', { name: 'Compare' });
+
+    drag(region.querySelector('header')!, 400, 300);
+
+    expect(region.style.height).toBe('380px');
+  });
+
+  it('resizes from the keyboard, and ArrowDown at the minimum never closes it (WCAG 2.5.7)', async () => {
+    const user = userEvent.setup();
+    act(() => useCompareSet.setState({ items: [ITEM_A] }));
+    renderDrawer();
+    await user.click(screen.getByRole('button', { name: 'Compare (1)' }));
+    const region = await screen.findByRole('region', { name: 'Compare' });
+    const grip = screen.getByRole('separator', { name: 'Resize the drawer' });
+
+    fireEvent.keyDown(grip, { key: 'ArrowUp' });
+    expect(region.style.height).toBe('304px');
+
+    fireEvent.keyDown(grip, { key: 'End' });
+    expect(region.style.height).toBe(`${Math.round(window.innerHeight * 0.8)}px`);
+
+    fireEvent.keyDown(grip, { key: 'Home' });
+    expect(region.style.height).toBe('160px');
+
+    fireEvent.keyDown(grip, { key: 'ArrowDown' });
+    expect(region.style.height).toBe('160px');
+    expect(screen.getByRole('region', { name: 'Compare' })).toBeInTheDocument();
   });
 
   it('publishes its clearance and bottom space on the root, and removes both on unmount (WCAG 2.4.11)', async () => {
-    const user = userEvent.setup();
     const rootStyle = document.documentElement.style;
     act(() => useCompareSet.setState({ items: [ITEM_A] }));
     const { unmount } = renderDrawer();
     expect(rootStyle.getPropertyValue('--compare-drawer-clearance')).not.toBe('');
-    // Normal state: the page reserves everything the bar covers.
     expect(rootStyle.getPropertyValue('--compare-drawer-space')).toBe(
       'var(--compare-drawer-clearance, 0px)'
-    );
-
-    await user.click(screen.getByRole('button', { name: 'Compare (1)' }));
-    await user.click(await screen.findByRole('button', { name: 'Expand' }));
-    // Expand covers the page: real space shrinks to the handle, not 80vh.
-    expect(rootStyle.getPropertyValue('--compare-drawer-space')).toMatch(
-      /^calc\(\d+(\.\d+)?px \+ 0\.75rem\)$/
     );
 
     unmount();
@@ -335,9 +424,7 @@ describe('CompareDrawer', () => {
     const region = await screen.findByRole('region', { name: 'Compare' });
     const handleBar = screen.getByRole('separator', { name: 'Resize the drawer' });
 
-    fireEvent.pointerDown(handleBar, { clientY: 400 });
-    fireEvent.pointerMove(window, { clientY: 300 });
-    fireEvent.pointerUp(window);
+    drag(handleBar, 400, 300);
 
     expect(region).toHaveStyle({ height: '380px' });
   });
@@ -351,7 +438,6 @@ describe('CompareDrawer', () => {
 
     await user.click(within(region).getByRole('button', { name: 'Attributes' }));
 
-    // Both items share the one attribute, so Differences only hides it at first.
     expect(await within(region).findByText('1 identical hidden')).toBeInTheDocument();
     await user.click(within(region).getByRole('checkbox', { name: 'Differences only' }));
     expect(within(region).getByText('Structure Hitpoints')).toBeInTheDocument();
@@ -359,7 +445,6 @@ describe('CompareDrawer', () => {
     expect(within(region).getByText('Estimated Price')).toBeInTheDocument();
     expect(within(region).queryByRole('button', { name: 'Export Prices' })).not.toBeInTheDocument();
 
-    // One export for the whole matrix, every category in one file.
     const spy = vi.spyOn(download, 'downloadTextFile').mockImplementation(() => {});
     fireEvent.pointerDown(within(region).getByRole('button', { name: 'Export Attributes' }), {
       button: 0,
@@ -409,7 +494,6 @@ describe('CompareDrawer', () => {
     expect(within(region).getByRole('button', { name: 'Export Trade hubs' })).toBeInTheDocument();
     expect(hubPrices.fetch).toHaveBeenCalledTimes(5);
 
-    // Leaving the view stops fetching: no further reads on a switch back.
     await user.click(within(region).getByRole('button', { name: 'Prices' }));
     expect(hubPrices.fetch).toHaveBeenCalledTimes(5);
   });
@@ -466,18 +550,19 @@ describe('CompareDrawer', () => {
     ).toBeInTheDocument();
   });
 
-  it('a later openIn call does not collapse an already-expanded drawer', async () => {
+  it('a later openIn call does not reset a height the reader has dragged', async () => {
     const user = userEvent.setup();
     act(() => useCompareSet.setState({ items: [ITEM_A] }));
     renderDrawer();
     await user.click(screen.getByRole('button', { name: 'Compare (1)' }));
     const region = await screen.findByRole('region', { name: 'Compare' });
-    await user.click(within(region).getByRole('button', { name: 'Expand' }));
-    expect(region.style.height).toBe('80vh');
+    const grip = within(region).getByRole('separator', { name: 'Resize the drawer' });
+    drag(grip, 400, 300);
+    expect(region.style.height).toBe('380px');
 
     act(() => useCompareSet.getState().openIn('attributes'));
 
-    expect(region.style.height).toBe('80vh');
+    expect(region.style.height).toBe('380px');
   });
 
   it('a handled open request does not reopen the drawer on a later remount (leaving Market and coming back)', async () => {
@@ -512,7 +597,7 @@ describe('CompareDrawer', () => {
   });
 
   describe('below md', () => {
-    it('opens as a full-screen sheet with no resize bar or Expand, Clear all in the overflow menu', async () => {
+    it('opens as a full-screen sheet with no resize grip, Clear all in the overflow menu', async () => {
       narrowState.narrow = true;
       const user = userEvent.setup();
       act(() => useCompareSet.setState({ items: [ITEM_A, ITEM_B] }));
@@ -525,7 +610,6 @@ describe('CompareDrawer', () => {
       expect(
         screen.queryByRole('separator', { name: 'Resize the drawer' })
       ).not.toBeInTheDocument();
-      expect(within(region).queryByRole('button', { name: 'Expand' })).not.toBeInTheDocument();
       expect(within(region).queryByRole('button', { name: 'Clear all' })).not.toBeInTheDocument();
       expect(within(region).getByText(/^Prices from /)).toBeInTheDocument();
 

@@ -1,27 +1,3 @@
-/**
- * What the Community alerts poll reads for one Character: the waiting list and
- * the roster of every Community it administers, and the Pledges other Members
- * made on its own open Requests (`engine/communities/communityAlert.ts` diffs
- * two reads).
- *
- * Cost is kept off everyone who never runs a Community. A Character is only
- * read once the Communities page has seen it administer one (`rememberCommunityAdmin`),
- * and only while the Firebase session is already its own: the poll never mints
- * a token. A Character it cannot read right now returns null, so the
- * poll skips rather than writing a baseline that would make the next good poll
- * look like a burst of arrivals.
- *
- * The roster is the expensive read (a document per Member), so it is refetched
- * only when the Community's Member count moves.
- *
- * Pledges are read only for a Character the Communities page has listed a
- * Community for (`rememberCommunityWatch`, the same flag the Requests badge
- * uses), and per Community only when one of its own open Requests asked for
- * the app: the Character's own Requests are queried by `ownerUid`, then the
- * Pledges of each of those (never the whole board). A
- * Pledger's name is read from the roster only when a Pledger has not been seen
- * before; without it the alert says "A Member".
- */
 import { db } from '@/db';
 import type { CommunityAlertEntry } from '@/engine/communities/communityAlert';
 import { isOpenRequest } from '@/engine/communities/requests';
@@ -31,12 +7,10 @@ import { isWatchingCommunities } from './requestBadge';
 
 const adminKey = (characterId: number) => `communityAdmin:${characterId}`;
 
-/** Called wherever the Character's Communities are loaded, so the poll knows whether to look. */
 export async function rememberCommunityAdmin(
   characterId: number,
   communities: readonly CommunitySummary[]
 ): Promise<void> {
-  // A stand-in backend (Storybook) is not this Character's real Communities.
   if (communityBackendOverride()) return;
   const admin = communities.some((community) => isCommunityAdmin(community, characterId));
   if (admin) await db.settings.put({ key: adminKey(characterId), value: true });
@@ -45,7 +19,6 @@ export async function rememberCommunityAdmin(
 
 const rosters = new Map<string, { count: number; entries: CommunityAlertEntry[] }>();
 
-/** Pledger names by Community, kept for the session: the roster is only read for a Pledger not seen yet. */
 const pledgerNames = new Map<string, Map<string, string>>();
 
 async function loadPledgeEntries(
@@ -56,10 +29,6 @@ async function loadPledgeEntries(
   requests: typeof import('./requestStore')
 ): Promise<CommunityAlertEntry[]> {
   const now = Date.now();
-  // A standing Request takes quotes, not Pledges, so it never raises a Pledge alert.
-  // Only the Character's own Requests are read (one query on ownerUid), then the
-  // Pledges on each of them: what is pledged to this Character, not every Pledge in
-  // the Community.
   const mine = (await requests.loadMyRequests(characterId, community.id)).filter(
     (request) => request.notify.app && !request.standing && isOpenRequest(request, now)
   );
@@ -80,11 +49,8 @@ async function loadPledgeEntries(
     try {
       const roster = await store.loadCommunityMembers(characterId, community.id);
       for (const member of roster) names.set(member.uid, member.characterName);
-      // Not on the roster (the Pledger left): remembered as unknown, so it is not read for again.
       for (const pledge of unseen) if (!names.has(pledge.uid)) names.set(pledge.uid, '');
-    } catch {
-      // No names this time: the alert says "A Member", and the next poll tries again.
-    }
+    } catch {}
   }
   const entries: CommunityAlertEntry[] = [];
   for (const { request, pledges } of pledgesOf) {

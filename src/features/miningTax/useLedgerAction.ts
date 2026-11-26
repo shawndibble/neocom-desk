@@ -2,15 +2,6 @@ import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { LedgerActionResult } from './ledgerActions';
 
-/**
- * How every Mining Tax dialog runs a ledger action, so a failure reads the
- * same everywhere: `pending` while it writes; on success, `onDone`; when the
- * pilot's view was stale (`already-assigned`), also `onDone`, since closing
- * and reloading shows what exists; on any other
- * failure, `error` holds the "nothing was changed" message and the dialog
- * stays open to retry. `run` also hands the result back for a caller with a
- * further step, and `setError` lets one say what that step failed at.
- */
 export function useLedgerAction() {
   const { t } = useTranslation();
   const [pending, setPending] = useState(false);

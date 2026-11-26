@@ -1,19 +1,3 @@
-/**
- * Mining yield — this app's own arithmetic over the engine's final per-item
- * attributes (ADR 0016: what the engine doesn't compute is ours, and said so).
- * The engine applies skills, the hull, upgrades and a loaded crystal to each
- * miner's `miningAmount` and cycle; this turns those into m³ a second and an
- * hour, with the expected critical successes added and the expected residue
- * (ore destroyed on top of the yield, not taken out of it) beside it. Pure.
- *
- * Attribute ids are plain SDE, looked up by name in the pinned `sde.dat` on
- * 2026-09-25 (`miningAmount`, `duration`, `miningWasteProbability` — percent —
- * `miningWastedVolumeMultiplier`, `miningCritChance` — a share — and
- * `miningCritBonusYield`), and read back off a live run: a Modulated Strip
- * Miner II with a Simple Asteroid Mining Crystal Type A II on a Hulk reads a
- * bigger amount and a higher residue chance than the same miner bare.
- */
-
 export const MINING_ATTRIBUTE = {
   miningAmount: 77,
   duration: 73,
@@ -23,23 +7,16 @@ export const MINING_ATTRIBUTE = {
   critBonus: 5969,
 } as const;
 
-/** One kind of miner in the fit — every copy of a module (and crystal), or one drone stack. */
 export interface MinerInput {
   typeId: number;
   chargeTypeId?: number;
   isDrone: boolean;
-  /** Modules of this type, or drones in the stack. */
   quantity: number;
-  /** m³ one of them mines a cycle. */
   amount: number;
   cycleSeconds: number;
-  /** Chance (0–1) a cycle leaves residue. */
   wasteChance: number;
-  /** Residue, as a multiple of the cycle's amount. */
   wasteMultiplier: number;
-  /** Chance (0–1) a cycle is a critical success. */
   critChance: number;
-  /** A critical success's extra yield, as a multiple of the cycle's amount. */
   critBonus: number;
 }
 
@@ -48,35 +25,23 @@ export interface MiningRow {
   chargeTypeId?: number;
   isDrone: boolean;
   count: number;
-  /** m³ all of them mine a cycle, crits expected in. */
   perCycle: number;
   cycleSeconds: number;
   perSecond: number;
-  /** m³ of residue a second, expected. */
   wastePerSecond: number;
 }
 
 export interface MiningStats {
   rows: MiningRow[];
-  /** m³ a second, every miner and mining drone together. */
   perSecond: number;
   perHour: number;
   wastePerSecond: number;
-  /** Residue as a share of the yield, percent. */
   wastePct: number;
 }
 
 export function miningYield(miners: readonly MinerInput[]): MiningStats {
   const rows = miners.map((miner): MiningRow => {
     const base = miner.amount * miner.quantity;
-    // A critical success's `miningCritBonusYield` (5969) is read as *extra*
-    // yield on top of the cycle's, so a crit mines 1 + bonus times the
-    // amount and a cycle averages 1 + chance × bonus. The pinned SDE names
-    // it "Critical Success Bonus Yield" (unit 127, absolute percent: 2 shows
-    // as 200%), which reads as a bonus on top rather than a total multiplier
-    // (that would be 1 + chance × (bonus − 1)). The SDE carries no longer
-    // description and the engine computes no yield of its own to check
-    // against, so this rests on the name alone — checked 2026-09-25.
     const perCycle = base * (1 + miner.critChance * miner.critBonus);
     const cycle = miner.cycleSeconds > 0 ? miner.cycleSeconds : Infinity;
     return {
@@ -101,7 +66,6 @@ export function miningYield(miners: readonly MinerInput[]): MiningStats {
   };
 }
 
-/** Seconds to fill a hold of `capacity` m³ at `perSecond`; null with no hold or no yield. */
 export function holdFillSeconds(capacity: number, perSecond: number): number | null {
   return capacity > 0 && perSecond > 0 ? capacity / perSecond : null;
 }
@@ -125,12 +89,6 @@ interface ResultLike {
 
 const MODULE_SLOTS: ReadonlySet<string> = new Set(['high', 'medium', 'low', 'rig', 'subsystem']);
 
-/**
- * The fit's miners off a calculation: running modules with a mining amount,
- * grouped by type and crystal, and launched mining drone stacks (the Fitting
- * says launched — `item.state` — as the engine reports bay drones active too).
- * `items`/`results` are the index-parallel `dogmaFit.items` and `calculation.items`.
- */
 export function extractMining(
   items: readonly ItemLike[],
   results: readonly ResultLike[]
@@ -169,25 +127,15 @@ export function extractMining(
   return [...miners.values()];
 }
 
-/** A miner group's figures with one crystal loaded in every module (the Charge Picker's crystal guide). */
 export interface CrystalFigures {
-  /** m³ the whole group mines a second, crits expected in. */
   m3PerSecond: number;
   cycleSeconds: number;
-  /** Chance (0–1) a cycle leaves residue. */
   residueChance: number;
-  /** Residue, as a multiple of the cycle's amount. */
   residueMultiplier: number;
-  /** m³ of residue a second, expected: ore the rock loses that nobody gets. */
   residueM3s: number;
-  /** Yield and residue: how fast the rock empties. */
   removedM3s: number;
 }
 
-/**
- * The miner modules at `indices` (one type, one crystal), off the same
- * calculation `extractMining` reads. Null when they mine nothing.
- */
 export function extractCrystalFigures(
   items: readonly ItemLike[],
   results: readonly ResultLike[],

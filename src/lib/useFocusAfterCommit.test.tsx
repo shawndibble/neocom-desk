@@ -107,7 +107,6 @@ describe('useFocusAfterCommit', () => {
     render(<Harness />);
     await user.click(screen.getByText('request-late'));
     expect(row('late')()).toBeNull();
-    // Show it without a focusin (a programmatic click, as an async update would be).
     await act(async () => {
       screen.getByText('show-late').click();
     });

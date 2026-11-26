@@ -19,26 +19,15 @@ import { DialogFooter } from '@/components/ui/DialogFooter';
 
 type Dialog = 'logout' | 'delete';
 
-/**
- * Settings → This device. Two actions: forget every login on this device, or
- * that plus erasing every Character's synced data and this device's app data.
- * Once no Character is left, `RequireCharacter` sends the app to /login by
- * itself, so logout never navigates and a failed purge is reported before
- * the local wipe, while this dialog can still be seen. Delete reloads after.
- */
 export function DevicePanel() {
   const { t, i18n } = useTranslation();
   const characters = useCharacters();
   const [dialog, setDialog] = useState<Dialog | null>(null);
   const [working, setWorking] = useState(false);
   const [failed, setFailed] = useState(false);
-  /** Also delete what each Character shared with its Communities (issue #3600). */
   const [removeShared, setRemoveShared] = useState(true);
-  // Characters whose remote purge could not run now; set once step one is done.
   const [unpurged, setUnpurged] = useState<number[] | null>(null);
-  // Characters with a Community that could not be left (the wipe waits on them too).
   const [leaveFailed, setLeaveFailed] = useState<number[]>([]);
-  /** Delete all data's Communities question: null until looked up. */
   const [communities, setCommunities] = useState<CharacterCommunity[] | null>(null);
   const [leaveCommunities, setLeaveCommunities] = useState(true);
   const syncConfigured = isSyncConfigured();
@@ -51,7 +40,6 @@ export function DevicePanel() {
     setCommunities(null);
     setLeaveCommunities(true);
     setDialog(next);
-    // No network unless sync is on; a lookup that fails just hides the question.
     if (next === 'delete' && syncConfigured) {
       void loadAllCommunities().then(setCommunities, () => setCommunities([]));
     }
@@ -63,7 +51,6 @@ export function DevicePanel() {
     try {
       await action();
     } catch {
-      // Stay in the dialog so the pilot can see it and try again.
       setFailed(true);
     } finally {
       setWorking(false);
@@ -79,7 +66,6 @@ export function DevicePanel() {
   const confirmDelete = () =>
     run(async () => {
       if (syncConfigured && unpurged === null) {
-        // Before the purge, while each Character can still sign in.
         const notLeft =
           leaveCommunities && communities?.length ? await leaveAllCommunities(communities) : [];
         const notPurged = await purgeAllRemoteCharacterData();
@@ -90,7 +76,6 @@ export function DevicePanel() {
         }
       }
       await deleteAllLocalData(syncConfigured);
-      // A fresh boot: no store, query or timer from before the wipe survives.
       window.location.replace('/');
     });
 
@@ -191,9 +176,6 @@ export function DevicePanel() {
       <Modal
         open={dialog === 'delete'}
         onClose={() => {
-          // Past a partial purge there is no going back: the purged Characters'
-          // remote data is gone, and an incremental sync would not re-push rows
-          // older than its cursor. Only finishing is offered.
           if (!working && !unpurged) setDialog(null);
         }}
         title={t('settings.deviceDeleteConfirmTitle')}

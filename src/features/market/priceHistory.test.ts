@@ -6,8 +6,8 @@ import { EsiError } from '@/esi/errors';
 import { db } from '@/db';
 import { loadPriceHistory } from './priceHistory';
 
-const REGION_ID = 10000002; // The Forge
-const TYPE_ID = 34; // Tritanium
+const REGION_ID = 10000002;
+const TYPE_ID = 34;
 
 const server = mswServer();
 
@@ -29,11 +29,7 @@ describe('loadPriceHistory', () => {
     );
 
     const result = await loadPriceHistory(REGION_ID, TYPE_ID);
-    // A read that just succeeded is not the saved copy.
     expect(result.fromCache).toBe(false);
-    // Every field the endpoint sends, including the day's own extremes and
-    // its order count — the chart's band and activity strip are drawn from
-    // these, and dropping them here is what used to hide them.
     expect(result.points).toEqual([
       { date: '2026-08-01', average: 5, highest: 5.5, lowest: 4.5, volume: 50, orderCount: 2 },
       { date: '2026-08-30', average: 5.5, highest: 6, lowest: 5, volume: 100, orderCount: 3 },
@@ -49,10 +45,6 @@ describe('loadPriceHistory', () => {
     expect(result.points).toEqual([]);
   });
 
-  // Sentry flagged the Mining Overview's per-type fan-out as an N+1: every
-  // visit re-fetched every ore's history although ESI only publishes it once
-  // a day. A repeat call inside the window must not touch the network — with
-  // no handler registered, `onUnhandledRequest: 'error'` proves it.
   it('serves a repeat call from the cache without a second request', async () => {
     server.use(
       http.get(
@@ -77,11 +69,6 @@ describe('loadPriceHistory', () => {
     expect(second.points.map((p) => p.average)).toEqual([5.5]);
   });
 
-  // The Mining Overview tolerates exactly this rejection per type (a
-  // non-tradable ore) and fails on anything else, so the cache must not turn
-  // it into a silent empty result — not for a caller whose concurrent load
-  // was deduplicated onto another's request, and not on a later visit that
-  // is answered from the cache.
   it('rejects every caller with a 400 for a non-tradable type, and caches that answer', async () => {
     server.use(
       http.get(

@@ -26,10 +26,6 @@ import { usePlanEditorData } from './usePlanEditorData';
 
 interface CertifiedPlanDialogProps {
   characterId: number;
-  /**
-   * The picked plan, skill names for its milestone labels, and the character's
-   * trained levels (null when ESI hasn't answered, so nothing is filtered).
-   */
   onPick: (
     plan: CertifiedPlan,
     skillNameFor: (skillTypeID: number) => string,
@@ -48,13 +44,6 @@ async function loadPlanData(): Promise<PlanData> {
   return { plans, skillNames: new Map(skills.map((s) => [s.typeID, s.name])) };
 }
 
-/**
- * "New certified plan" (issue #2392): pick one of CCP's career plans, grouped
- * by career path the way the client's Certified Plans window groups them.
- * Plans the character has fully trained are hidden, and the new plan holds
- * only the levels still untrained. Mounted only while open, like the plan
- * import dialog.
- */
 export function CertifiedPlanDialog({ characterId, onPick, onClose }: CertifiedPlanDialogProps) {
   const { t } = useTranslation();
   const tabsId = useTabsId();
@@ -70,7 +59,6 @@ export function CertifiedPlanDialog({ characterId, onPick, onClose }: CertifiedP
     groups.find((g) => g.careerPathId === careerPathId)?.careerPathId ??
     groups[0]?.careerPathId ??
     null;
-  // Fully trained plans are hidden; a tab left empty says so in its box.
   const visible = (groups.find((g) => g.careerPathId === activePathId)?.plans ?? []).filter(
     (p) => !trained || !isPlanCompleted(p, trained)
   );

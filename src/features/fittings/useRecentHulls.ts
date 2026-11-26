@@ -5,7 +5,6 @@ import { useSavedFittingRecords } from './useSavedFittingRecords';
 
 const NO_HULLS: number[] = [];
 
-/** Each hull once, by its most recent save, newest first; at most `limit`. */
 export function recentHullIds(
   saved: readonly { hullTypeId: number; updatedAt: number }[],
   limit: number
@@ -18,15 +17,10 @@ export function recentHullIds(
   return ids;
 }
 
-/**
- * The hulls of the Character's most recently saved Fittings, newest first —
- * the hull picker's "Recent hulls". Empty with none saved, or while they decode.
- */
 export function useRecentHullIds(characterId: number | null, limit = 5): number[] {
   const records = useSavedFittingRecords(characterId);
   const load = useCallback(async () => {
     if (!records) return [];
-    // Newest first, decoding only until `limit` distinct hulls are found.
     const saved: { hullTypeId: number; updatedAt: number }[] = [];
     for (const record of [...records].sort((a, b) => b.updatedAt - a.updatedAt)) {
       const decoded = await decodeFittingShare(record.code).catch(() => null);
@@ -37,6 +31,5 @@ export function useRecentHullIds(characterId: number | null, limit = 5): number[
     }
     return recentHullIds(saved, limit);
   }, [records, limit]);
-  // Another Character's list, or a stale one, never shows while this one decodes.
   return useAsyncLoad(load).data ?? NO_HULLS;
 }

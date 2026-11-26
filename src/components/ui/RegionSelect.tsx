@@ -19,35 +19,24 @@ export interface RegionSelectOption {
   readonly name: string;
 }
 
-/**
- * A pinned row above the list for a shortcut to one region the caller has to
- * work out first (the character's own region). Not an option: it stands for
- * whichever region `onSelect` answers with.
- */
 export interface RegionSelectShortcut {
   label: string;
   disabled?: boolean;
-  /** Why the shortcut is disabled, announced and drawn under the row. */
   note?: string | null;
-  /** Resolves to the region to pick, or `null`/`undefined` to leave the picker open. */
   onSelect: () => Promise<number | null | undefined> | number | null | undefined;
 }
 
 export interface RegionSelectProps {
-  /** Any order — the control sorts by name itself. */
   options: readonly RegionSelectOption[];
   value: number | null;
   onChange: (regionId: number | null) => void;
-  /** When given, an "All regions" row pinned at the top, standing for `null`. */
   allLabel?: string;
-  /** Dim text on the trigger while nothing is chosen and there is no `allLabel` row. */
   placeholder?: string;
   searchPlaceholder: string;
   noResultsLabel: string;
   'aria-label': string;
   className?: string;
   size?: ControlSize;
-  /** This filter is set away from its default: draws the accent border (DESIGN.md §6c). */
   active?: boolean;
   shortcut?: RegionSelectShortcut;
 }
@@ -57,17 +46,6 @@ interface Row {
   name: string;
 }
 
-/**
- * The one region picker. EVE has 60-odd k-space regions, too many to scan in
- * a plain `Select`, so this opens a type-to-filter list instead — always
- * alphabetical, whatever order the caller built its options in.
- *
- * Trigger looks and reads like `SelectTrigger` (`role="combobox"`, value as
- * its text). The list is the hand-built combobox shape from
- * docs/context/decisions/20260905-114550-hand-build-aria-comboboxes-rather-than-buy-radix.md:
- * focus stays in the search box, `aria-activedescendant` tracks the
- * highlight. Built on `Popover`, so it portals into a `Modal` when inside one.
- */
 export function RegionSelect({
   options,
   value,
@@ -83,7 +61,6 @@ export function RegionSelect({
   shortcut,
 }: RegionSelectProps) {
   const [open, setOpen] = useState(false);
-  // A phone keyboard would cover the list; touch users tap the field themselves.
   const coarse = useMediaQuery(COARSE_POINTER_QUERY);
   const [query, setQuery] = useState('');
   const [highlight, setHighlight] = useState<number | null>(null);
@@ -99,7 +76,6 @@ export function RegionSelect({
     return needle ? sorted.filter((o) => o.name.toLowerCase().includes(needle)) : sorted;
   }, [sorted, query]);
 
-  // The All row stays put while filtering: it is the way back out, not a match.
   const rows = useMemo<Row[]>(
     () => (allLabel === undefined ? matches : [{ id: null, name: allLabel }, ...matches]),
     [allLabel, matches]
@@ -187,7 +163,6 @@ export function RegionSelect({
             onChange={(event) => {
               const next = event.target.value;
               setQuery(next);
-              // Land on the first real match so Enter takes it straight away.
               setHighlight(next.trim() ? firstMatchIndex : null);
             }}
             onKeyDown={onKeyDown}

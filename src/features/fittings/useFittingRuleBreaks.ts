@@ -7,10 +7,6 @@ import { catalogueTypeName, type FittingCatalogue } from './useFittingCatalogue'
 
 const EMPTY = { lines: [] as string[], flagged: new Set<string>() as ReadonlySet<string> };
 
-/**
- * The open fit's rule breaks as sentences, and the modules they point at.
- * `stats` must be the ones calculated for `fitting`.
- */
 export function useFittingRuleBreaks(
   fitting: Fitting | null,
   stats: FittingStats | null | undefined,
@@ -22,7 +18,6 @@ export function useFittingRuleBreaks(
     const rules = stats?.ruleBreaks ?? [];
     if (!fitting || rules.length === 0) return EMPTY;
     const groupOf = (typeId: number) => catalogue?.types[String(typeId)]?.groupID;
-    // The catalogue holds no group names: a rule group reads as the market group of a fitted member.
     const group = (groupId: number) => {
       const member = fitting.modules.find((m) => groupOf(m.typeId) === groupId);
       const marketGroupId = catalogue?.marketTypes.find(
@@ -40,7 +35,6 @@ export function useFittingRuleBreaks(
       flagged: ruleBreakModuleKeys(fitting, rules, groupOf, kindOf),
     };
   }, [t, fitting, stats, catalogue, kindOf]);
-  // Stats are null while an edit recalculates: keep the last answer for the same hull so the block and flags don't flicker.
   const [kept, setKept] = useState({ shipTypeId: -1, result: EMPTY });
   if (stats && fitting && (kept.result !== computed || kept.shipTypeId !== fitting.shipTypeId)) {
     setKept({ shipTypeId: fitting.shipTypeId, result: computed });

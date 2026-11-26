@@ -201,7 +201,6 @@ describe('readFeederExtractions (#6097)', () => {
       ].join('\n'),
     });
     const read = await readFeederExtractions(fakeEsi({ extractions: ok([]) }).esi, FEEDER, 'tok', {
-      // One chunk still to come (cancelled, its notice lost), one already popped.
       notifications: moonNotificationsOf([
         started('2026-11-01T00:00:00Z'),
         started('2026-10-15T00:00:00Z'),

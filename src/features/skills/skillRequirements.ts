@@ -8,9 +8,7 @@ export interface PrereqRow {
   typeID: number;
   name: string;
   level: number;
-  /** Whether the character's trained level already meets `level`. */
   trained: boolean;
-  /** Whether an open plan already trains `level` or higher — as an entry or a prerequisite it schedules — independent of `trained`. */
   planned: boolean;
 }
 
@@ -18,25 +16,16 @@ export type UnlockRow = Omit<PrereqRow, 'trained' | 'planned'>;
 
 export interface SkillRequirements {
   name: string;
-  /** Markup-stripped skill description, for display above the requirements. Null when the skill has none. */
   description: string | null;
   groupName: string;
-  /** Training time multiplier. */
   rank: number;
   primaryAttr: CharacterAttribute;
   secondaryAttr: CharacterAttribute;
-  /** The fixed NPC skillbook price (SDE basePrice). Null when the SDE gives none. */
   npcPrice: number | null;
   prereqs: PrereqRow[];
   unlocks: UnlockRow[];
 }
 
-/**
- * The highest level a plan trains each skill to: its entries, plus the
- * prerequisites it schedules on the way to them (a plan with Frigate I trains
- * Spaceship Command III too). A plan that can't be scheduled counts its
- * entries alone — reporting the cycle is the Skill Plan editor's job.
- */
 export function plannedLevels(
   planEntries: readonly PlanEntry[],
   skills: ReadonlyMap<number, EngineSkill>,
@@ -51,9 +40,7 @@ export function plannedLevels(
     for (const step of normalizePlan(known, skills, trainedSkills)) {
       raise(step.skillTypeID, step.level);
     }
-  } catch {
-    // Circular prerequisites: the entries above still count.
-  }
+  } catch {}
   return levels;
 }
 
@@ -61,10 +48,6 @@ function skillName(catalog: SkillCatalog, typeID: number): string {
   return catalog.bySkillTypeID.get(typeID)?.name ?? `#${typeID}`;
 }
 
-/**
- * A skill's prerequisites (trained vs. still needed) and what it unlocks. One
- * row builder for the skill Show info and the plan's SkillPicker.
- */
 export function buildSkillRequirements(
   catalog: SkillCatalog,
   trainedSkills: ReadonlyMap<number, TrainedSkill>,

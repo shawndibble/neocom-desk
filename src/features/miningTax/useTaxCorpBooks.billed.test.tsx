@@ -18,6 +18,9 @@ vi.mock('@/features/miningTax/useMadePayments', () => ({
 vi.mock('@/features/miningTax/corpBook/useAutoClaimDonations', () => ({
   useAutoClaimDonations: () => ({ failed: [] }),
 }));
+vi.mock('@/features/miningTax/corpBook/useToleranceRecordChanges', () => ({
+  useToleranceRecordChanges: () => [],
+}));
 vi.mock('@/features/miningTax/corpBook/useBookSystems', () => ({
   useBookSystems: () => ({ names: new Map(), security: new Map() }),
 }));
@@ -61,7 +64,6 @@ const assignment = {
 describe('useTaxCorpBooks billed elsewhere', () => {
   beforeEach(() => {
     hoisted.shownBooks = [];
-    // A book that took the day whole; the stored copy has not seen it yet.
     hoisted.view = {
       overlay: {
         absorbed: new Map([['x', ['a1']]]),
@@ -90,7 +92,6 @@ describe('useTaxCorpBooks billed elsewhere', () => {
       ...hoisted.view,
       books: [{ left: false, corpName: 'Ashfall', loaded: { corporationId: 5 } }],
     } as unknown as CorpBookView;
-    // Ownership reads the loaded books, not the priced view.
     hoisted.shownBooks = [{ corporationId: 5, memberCharacterIds: [1] }];
     const data = {
       entries: [{ assignments: [assignment] }],
@@ -104,13 +105,10 @@ describe('useTaxCorpBooks billed elsewhere', () => {
     const { result } = renderHook(() => useTaxCorpBooks(data, [], null, onOwnershipStored));
     expect(result.current.accounts.isBookOwned('p1')).toBe(true);
     expect(saveBookOwned).toHaveBeenCalledWith(new Set(['p1']));
-    // No Payee has Default Systems, so nothing was held back: no second read.
-    // Wait on the store itself settling (and its follow-up), not on a duration.
     await saveBookOwned.mock.results.at(-1)?.value;
     await Promise.resolve();
     expect(onOwnershipStored).not.toHaveBeenCalled();
 
-    // With Default Systems held back until ownership was stored, the snapshot is read again.
     const withDefaults = {
       ...data,
       payeesByCharacter: new Map([

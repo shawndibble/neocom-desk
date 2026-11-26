@@ -9,32 +9,17 @@ import {
 import * as Icon from './icons';
 
 interface DisclosureProps {
-  /** Always-visible label, left of the chevron toggle. */
   label: ReactNode;
-  /**
-   * Interactive extra beside the label, e.g. an `InfoTooltip`. Sits outside
-   * the toggle button (a button can't nest one), so its clicks don't toggle.
-   */
   labelAccessory?: ReactNode;
-  /** Always-visible value, right-aligned in the toggle row. */
   trailing?: ReactNode;
   expanded: boolean;
   onToggle: () => void;
-  /** Rendered only while expanded. */
   children: ReactNode;
   className?: string;
 }
 
-/**
- * The open/closed caret shared by every disclosure surface in the app —
- * `Disclosure` itself, the Skills group headers, the Market Group tree and
- * the Fittings Charges tab's module sections, which each own too much of
- * their own frame to reuse the component but must still point the same way
- * with the same glyph.
- */
 export function Caret({ expanded, opensUp = false }: { expanded: boolean; opensUp?: boolean }) {
   const Glyph = expanded ? Icon.Expanded : Icon.Descend;
-  // `opensUp`: the content appears above its trigger, so open points up.
   return (
     <Glyph
       size={Icon.ICON_SIZE.sm}
@@ -44,11 +29,6 @@ export function Caret({ expanded, opensUp = false }: { expanded: boolean; opensU
   );
 }
 
-/**
- * The caret of a header whose whole row toggles (`Panel`'s `onHeaderToggle`):
- * the keyboard and screen-reader handle for the fold, drawn bare (no box, no
- * hover fill) at the header's left edge.
- */
 export function CaretToggle({
   expanded,
   label,
@@ -74,11 +54,6 @@ export function CaretToggle({
   );
 }
 
-/**
- * ARIA-disclosure row: a button toggling `aria-expanded` with content
- * revealed beneath it. Caller owns the expanded state so it can be driven
- * externally (e.g. "expand all").
- */
 export function Disclosure({
   label,
   labelAccessory,
@@ -102,8 +77,6 @@ export function Disclosure({
   );
 
   if (labelAccessory !== undefined) {
-    // The row itself toggles so the whole width stays a click target; the
-    // button bubbles its click (and keyboard activation) up to it.
     return (
       <div className={className}>
         <div
@@ -119,8 +92,6 @@ export function Disclosure({
             className={cx('text-left', focusRingClassName)}
           >
             {labelContent}
-            {/* The value sits outside the button for layout; keep it in the
-                button's name so the toggle still announces it. */}
             {trailing !== undefined && <span className="sr-only">{trailing}</span>}
           </button>
           <span className="flex items-center" onClick={(e) => e.stopPropagation()}>

@@ -24,7 +24,6 @@ export const skillQueueCopy: DomainCopy<NotificationFire, SkillNames> & {
         hours: Math.round((fire.thresholdMs ?? 0) / HOUR_MS),
       });
     }
-    // Live copy drops an out-of-range level; push below prints it as a number.
     const level =
       fire.level !== null && fire.level >= 1 && fire.level <= 5 ? romanLevel(fire.level) : '';
     return simple('skillLevelComplete', {
@@ -33,15 +32,7 @@ export const skillQueueCopy: DomainCopy<NotificationFire, SkillNames> & {
       level,
     });
   },
-  /**
-   * `skillQueueEnding` hedges, unlike its two skill-queue siblings above: an
-   * in-game top-up of the queue — the whole activity this warning exists to
-   * prompt — routinely falsifies the prediction before the push fires, the
-   * same reasoning `colonyCopy`/`structureFuelCopy` document in full
-   * (`engine/projection.ts`'s `projectionWording`).
-   */
   push: (fire, character, names) => {
-    // Inferred from a slowdown that already happened: nothing to predict for a Scheduled Push.
     if (fire.eventId === 'omegaLapsed') throw new Error('omegaLapsed is never projected');
     if (fire.eventId === 'characterNotTraining') {
       assertProjectionWording('characterNotTraining', 'assert');

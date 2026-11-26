@@ -43,9 +43,7 @@ describe('buildBundleObjects', () => {
     const rows = [
       row(),
       bpc(),
-      // A BPO: no copy flag, but ME/TE make the type a blueprint.
       row({ contractId: 2, typeId: 1000, me: 0, te: 0 }),
-      // Same blueprint type without ME/TE still rides with its type.
       row({ contractId: 3, typeId: 999 }),
       row({ contractId: 4, typeId: 35 }),
     ];

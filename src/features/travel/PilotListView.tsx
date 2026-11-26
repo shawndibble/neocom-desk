@@ -1,16 +1,3 @@
-/**
- * What a pasted Local list or D-Scan becomes in Pilot Lookup (issue #2863 and
- * the intel rework): a Local list is grouped by what each pilot means to the
- * Character (contacts, kills in the space they are in, kills elsewhere,
- * quiet, friendly) or by alliance and corporation (issue #5668), with kills
- * split by space and dated; a D-Scan is its
- * ships counted by class. A pilot's name opens Show Info, whose Character tab
- * has the six-month picture.
- *
- * A group says what a pilot did ("Killed in highsec, last 30 days"), and each
- * row carries a Threat badge beside the name (decision `20261008-181210`); the
- * list never calls a pilot safe or hostile.
- */
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -95,36 +82,27 @@ export function PilotListView({ paste }: { paste: PilotPaste }) {
   );
 }
 
-/** The live paste: it was taken where the pilot is, so their Current System says if it is wormhole space. */
 function LiveFleetBoard({ rows }: { rows: DscanPaste['rows'] }) {
   const { space } = useHereSpace();
   return <FleetBoard rows={rows} trackHistory wormholeSpace={space === 'wormhole'} />;
 }
 
-/** How many hulls a row names under "Flew on kills". */
 const ROW_HULLS = 2;
 
-// Widths for the Standing and kill-count columns. Each group is its own table,
-// so without them every table sizes the counts to its own content and they
-// start at a different x down the page. Pilot and Flew on stay unpinned: a
-// long name or hull list wraps instead of being clipped.
 const STANDING_COLUMN_WIDTH = 'w-40';
 const COUNT_COLUMN_WIDTH = 'w-24';
 
 function recentKills(row: PilotListRow, now: number) {
   if (row.kills.kind !== 'ready') return [];
-  // Same window as the counts: what they flew lately, not years ago.
   const since = windowStart(now);
   return row.kills.kills.filter((kill) => kill.timeMs >= since);
 }
 
-/** Most recent kills first, so the pilot who killed this morning leads the group. */
 function byRecentActivity(a: PilotListRow, b: PilotListRow): number {
   const count = (row: PilotListRow) =>
     row.kills.kind === 'ready' ? row.kills.summary.recentCount : 0;
   const last = (row: PilotListRow) =>
     row.kills.kind === 'ready' ? (row.kills.kills[0]?.timeMs ?? 0) : 0;
-  // Pilots past the zKillboard cap know nothing of their kills: below those who do.
   const unchecked = (row: PilotListRow) => Number(row.kills.kind === 'notLookedUp');
   return (
     unchecked(a) - unchecked(b) ||
@@ -155,8 +133,6 @@ function LocalList({ paste }: { paste: LocalPaste }) {
 
   useEffect(() => {
     const controller = new AbortController();
-    // One render per frame however many pilots settle in it: a 2,000-name
-    // Local re-renders every row on each update.
     let frame = 0;
     let latest: PilotListRow[] = [];
     const onRows = (next: PilotListRow[]) => {
@@ -210,8 +186,6 @@ function LocalList({ paste }: { paste: LocalPaste }) {
   const found = useMemo(() => rows.filter((row) => !row.notFound), [rows]);
   const strangers = useMemo(() => found.filter((row) => !isFriendly(row)), [found]);
   const friendly = useMemo(() => found.filter(isFriendly), [found]);
-  // Who else of their alliance or corporation is in this Local: it moves a group
-  // killer's Threat, here and in a profile opened from the list.
   const orgMates = useMemo(() => orgMatesOf(found), [found]);
   const publishOrgMates = useLocalThreatContext((state) => state.set);
   useEffect(() => {
@@ -239,12 +213,9 @@ function LocalList({ paste }: { paste: LocalPaste }) {
     if (read === null || read === 'pending' || read.shift === 0) return null;
     return read.shift < 0 ? 'down' : 'up';
   };
-  // The Kills view names only the misses among the names it lists.
   const notFound = (byOrganization ? rows : rows.slice(0, MAX_LIST_PILOTS))
     .filter((row) => row.notFound)
     .map((row) => row.name);
-  // The Kills view lists the names zKillboard was asked about; the rest are
-  // only placed by organization (issue #5668).
   const checked = rows.slice(0, MAX_LIST_PILOTS).filter((row) => !row.notFound);
   const unchecked = Math.max(0, paste.names.length - MAX_LIST_PILOTS);
   const settled = checked.filter((row) => row.kills.kind !== 'loading').length;
@@ -301,7 +272,6 @@ function LocalList({ paste }: { paste: LocalPaste }) {
       id: 'standing',
       header: t('travel.pilot.list.standing'),
       headerCellClassName: STANDING_COLUMN_WIDTH,
-      // Worst standing first: the one to watch. No contact sinks.
       sortValue: (row) => row.standing?.value,
       sortFirst: 'asc',
       render: (row) => <StandingCell row={row} />,
@@ -312,7 +282,6 @@ function LocalList({ paste }: { paste: LocalPaste }) {
       align: 'right',
       className: 'tabular-nums',
       headerCellClassName: COUNT_COLUMN_WIDTH,
-      // A pilot with no kill count (loading, unreachable, skipped) sinks.
       sortValue: (row) =>
         row.kills.kind === 'ready' ? row.kills.summary.bySpace[space].count : undefined,
       render: (row) => <SpaceCell row={row} space={space} now={now} />,
@@ -343,7 +312,6 @@ function LocalList({ paste }: { paste: LocalPaste }) {
       header: t('travel.pilot.list.asOf'),
       phoneHidden: true,
       headerCellClassName: COUNT_COLUMN_WIDTH,
-      // Only a copy from an earlier paste says anything; a fresh read leaves the cell empty.
       render: (row) => <StaleKillsBadge row={row} />,
     },
   ];
@@ -556,12 +524,10 @@ function GroupHeading({
   );
 }
 
-/** The system the list is read from: secondary, one tap to change, never waits for ESI. */
 function HereControl({ here }: { here: HereSpace }) {
   const { t } = useTranslation();
   const { current, space } = here;
   const name = useSystemName(current.systemId);
-  // The label already says it is the API's system; only a hand-picked one needs saying.
   const source = current.source === 'picked' ? t('travel.pilot.list.hereSetByYou') : null;
   return (
     <div className="flex flex-wrap items-center gap-2 text-xs text-text-dim">
@@ -647,7 +613,6 @@ function SpaceCell({ row, space, now }: { row: PilotListRow; space: KillSpace; n
     return <span className="text-text-dim">{t('travel.pilot.list.stateLoading')}</span>;
   }
   if (row.kills.kind === 'unreachable') {
-    // One request feeds all three space cells; the list-level summary says it once.
     return <span className="text-text-dim">—</span>;
   }
   if (row.kills.kind === 'notLookedUp') {
@@ -673,7 +638,6 @@ function SpaceCell({ row, space, now }: { row: PilotListRow; space: KillSpace; n
   );
 }
 
-/** The Share button's progress; `manual` is a stored link the browser wouldn't let us copy (as the Appraisal's). */
 type ShareState =
   | { status: 'idle' }
   | { status: 'saving' }
@@ -681,17 +645,11 @@ type ShareState =
   | { status: 'copied'; url: string }
   | { status: 'manual'; url: string };
 
-/**
- * "Copy Share Link" for a pasted D-Scan: a labelled action (DESIGN.md §6c)
- * that sits in the status strip beside Clear. The stored-link field it may
- * need when the clipboard refuses opens on a line of its own.
- */
 export function DscanShareControl({
   paste,
   characterId,
 }: {
   paste: DscanPaste;
-  /** Signs in to store a Share Link as this Character if no Firebase session exists yet; null disables Share. */
   characterId: number | null;
 }) {
   const { t } = useTranslation();
@@ -704,7 +662,6 @@ export function DscanShareControl({
   const snapshot = buildDscanSnapshot(paste.text);
   const tooLarge = !snapshot.ok && snapshot.reason === 'too-large';
 
-  /** Stores the scan's raw text and copies its short `/s/<id>` link; the same scan shared again gets the same link. */
   async function handleShare() {
     if (!snapshot.ok || characterId === null || share.status === 'saving') return;
     const reuseKey = dscanSnapshotReuseKey(snapshot.value);
@@ -735,9 +692,7 @@ export function DscanShareControl({
     try {
       await writeToClipboard(url);
       setShare({ status: 'copied', url });
-    } catch {
-      // Still on screen to copy by hand.
-    }
+    } catch {}
   }
 
   const tooltip = tooLarge
@@ -749,8 +704,6 @@ export function DscanShareControl({
         : share.status === 'copied'
           ? t('travel.pilot.dscan.shareCopied')
           : undefined;
-  // Icon only on a phone; the label shows beside it from `md` up (DESIGN.md §6c Header controls).
-  // The bubble says what is happening or what failed; at rest it says what the button does.
   const button = (
     <IconButton
       icon={share.status === 'copied' ? <Icon.Done /> : <Icon.Share />}

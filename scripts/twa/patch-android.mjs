@@ -1,12 +1,4 @@
 #!/usr/bin/env node
-// Add NotificationSettingsActivity to a Bubblewrap-generated Android project.
-//
-// `bubblewrap update` regenerates AndroidManifest.xml from its template, so
-// this runs after every update and before `bubblewrap build`. Safe to re-run:
-// the Java file is overwritten and the manifest entry is only added once.
-// See docs/ANDROID-TWA.md "Notification settings button".
-//
-//   node scripts/twa/patch-android.mjs [path/to/bubblewrap/project]   (default: cwd)
 
 import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
@@ -32,7 +24,6 @@ const manifest = readFileSync(manifestPath, 'utf8');
 if (manifest.includes(`android:name=".${ACTIVITY}"`)) {
   console.log(`${ACTIVITY}: already in AndroidManifest.xml`);
 } else {
-  // BROWSABLE is what lets Chrome launch it from the page's intent: URL.
   const entry = `
         <activity android:name=".${ACTIVITY}"
             android:exported="true"

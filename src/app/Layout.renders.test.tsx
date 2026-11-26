@@ -10,20 +10,6 @@ import { DEFAULT_MOBILE_TABS, useMobileTabs } from '@/lib/mobileTabs';
 import { IDLE_SYNC_STATUS } from '@/sync/statusFixtures';
 import { Layout } from './Layout';
 
-/**
- * Pages write their filters and sort into the query string as the pilot types
- * (`useUrlState` and friends), so a location change that only touches
- * `?search` is the common case, not the rare one. It must re-render the page
- * and the nav links, never the shell around them. Kept apart from
- * `Layout.test.tsx` because the render counter replaces a real child module.
- *
- * Every async read the shell makes is stubbed to a synchronous, stable value,
- * so no live query can land mid-test and bump the counter on its own: the
- * count after the first paint is final, with no timing window to wait out.
- */
-
-// A direct child of Layout's body, outside the route outlet: it re-renders
-// exactly when Layout itself does, so it doubles as Layout's render counter.
 const shellRenders = vi.hoisted(() => ({ count: 0 }));
 vi.mock('./StandingsScopeNotice', () => ({
   StandingsScopeNotice: () => {
@@ -32,7 +18,6 @@ vi.mock('./StandingsScopeNotice', () => ({
   },
 }));
 
-// Dexie-backed reads, answered synchronously with their empty value.
 vi.mock('dexie-react-hooks', () => ({
   useLiveQuery: (_query: unknown, _deps?: unknown, defaultResult?: unknown) => defaultResult,
 }));
@@ -52,7 +37,6 @@ vi.mock('@/sync', () => ({
 }));
 vi.mock('./routeWarm', () => ({ warmRoute: vi.fn() }));
 
-/** A page that writes its own query string, the way a filtered table does. */
 function FilteringPage({ name }: { name: string }) {
   const [params, setParams] = useSearchParams();
   return (
@@ -68,13 +52,11 @@ function FilteringPage({ name }: { name: string }) {
   );
 }
 
-/** Shows the return-to-origin a switch-character link carries (#1764). */
 function CharactersPage() {
   const from = (useLocation().state as { from?: string } | null)?.from;
   return <p>characters page, from: {from ?? ''}</p>;
 }
 
-/** Reads the location and renders Layout, as `SignedInShell` in App.tsx does. */
 function LocationReadingParent() {
   useLocation();
   return <Layout />;
@@ -120,7 +102,6 @@ describe('Layout render isolation from the query string', () => {
     await screen.findByText(/wallet page, filter:/);
     const before = shellRenders.count;
 
-    // A store Layout subscribes to directly: a change must reach the counter.
     act(() => {
       useMobileTabs.setState({ value: [...DEFAULT_MOBILE_TABS].reverse() });
     });

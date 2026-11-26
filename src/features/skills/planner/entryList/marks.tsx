@@ -7,7 +7,6 @@ import type { MilestoneState, MilestoneStatus } from '@/engine/skills/skillPlanM
 import { formatLocalDate } from '@/lib/localDate';
 import { useTimeZone } from '@/lib/timeFormat';
 
-/** An inline row glyph: shared by entry and prereq rows. */
 function RowMark({ label, tone, path }: { label: string; tone: string; path: string }) {
   return (
     <svg
@@ -32,7 +31,6 @@ export function BoosterMark() {
   );
 }
 
-/** A level an Alpha clone cannot train. */
 export function AlphaCapMark() {
   const { t } = useTranslation();
   return (
@@ -44,18 +42,10 @@ export function AlphaCapMark() {
   );
 }
 
-/** i18n key for a milestone's state, e.g. 'reached' -> 'plans.milestone.reached'. */
 function milestoneStateKey(state: MilestoneState): string {
   return `plans.milestone.${state}`;
 }
 
-/**
- * Plan Milestone (GLOSSARY.md): a named goal ("Fly Loki") pinned to this row's
- * skill level. Decorative only — sits beside the name so a flagged row reads
- * as one at a glance; the Add/Rename/Remove actions live in the row's own
- * the row's ⋮ menu instead, so this never has to fight the name's own
- * `truncate` for click area.
- */
 export function MilestoneMark({ status }: { status: MilestoneStatus }) {
   const { t } = useTranslation();
   const timeZone = useTimeZone();

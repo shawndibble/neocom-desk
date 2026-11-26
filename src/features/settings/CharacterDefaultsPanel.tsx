@@ -36,10 +36,6 @@ export function CharacterDefaultsPanel() {
     spExtractionThresholdHydrated &&
     spFarmHydrated;
 
-  // Only for the picker's "This character" preview and quick-select — the
-  // stored default itself keeps meaning "whichever Character I'm on" even on
-  // a device with none active right now (`CharacterFilterControl` already
-  // omits that quick-select when this is null).
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
 
   if (!ready) return <SettingsPanelLoading />;

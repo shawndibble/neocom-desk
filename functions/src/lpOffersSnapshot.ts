@@ -1,32 +1,15 @@
-/**
- * The LP Store search snapshot (issue #2873): every NPC corporation's LP Store
- * offers plus the solar systems the corporation has stations in, republished to
- * R2 (`r2DailySnapshots.ts`) for the LP Store page's item-first search.
- *
- * ESI's offers carry no home station, so the snapshot ships all of a
- * corporation's station systems and the client picks the one nearest the
- * Current System. Prices are deliberately not here: ISK/LP is computed
- * client-side from current prices.
- *
- * Fetch- and Firestore-free like `workbenchFits.ts`: the HTTP call and sleep
- * are arguments, so parsing, joining, retry and the drop rules are unit-tested.
- * `index.ts` supplies `fetch` and publishes the result.
- */
 import { ESI_ROOT } from './esiClient.js';
 import { isFiniteNumber, isPlainRecord } from './guards.js';
 import { parseRetryAfterMs } from './workbenchFits.js';
-/** Courtesy gap between corporation requests (~170 requests a day). */
 export const LP_STORE_REQUEST_GAP_MS = 200;
 const RATE_LIMIT_RETRIES = 3;
 const RETRY_AFTER_CAP_MS = 60_000;
 const DEFAULT_RETRY_MS = 5_000;
 
-/** `[offerId, typeId, quantity, iskCost, lpCost, requiredItems: [typeId, quantity][]]` */
 export type LpSnapshotOffer = [number, number, number, number, number, Array<[number, number]>];
 
 export interface LpStoreRow {
   corporationId: number;
-  /** Solar systems with a station owned by this corporation, ascending. */
   systemIds: number[];
   offers: LpSnapshotOffer[];
 }
@@ -45,7 +28,6 @@ function num(value: unknown): number | null {
   return isFiniteNumber(value) ? value : null;
 }
 
-/** ESI's offer list -> compact tuples. Anything malformed is skipped, never thrown on. */
 export function parseLpOffers(body: unknown): LpSnapshotOffer[] {
   if (!Array.isArray(body)) return [];
   const offers: LpSnapshotOffer[] = [];
@@ -79,7 +61,6 @@ export function parseLpOffers(body: unknown): LpSnapshotOffer[] {
   return offers;
 }
 
-/** The corporation's row, or null when it has no station systems or no offers to search. */
 export function buildLpStoreRow(
   corporationId: number,
   systemIds: readonly number[],
@@ -92,7 +73,6 @@ export function buildLpStoreRow(
 }
 
 export interface FetchLpStoreRowsDeps {
-  /** Corporation id -> its station systems (the baked `LP_CORP_STATION_SYSTEMS`). */
   corporations: Readonly<Record<number, readonly number[]>>;
   fetchJson: (url: string) => Promise<FetchJsonResult>;
   sleep: (ms: number) => Promise<void>;
@@ -101,7 +81,6 @@ export interface FetchLpStoreRowsDeps {
 
 export interface FetchLpStoreRowsResult {
   rows: LpStoreRow[];
-  /** Corporations whose request never succeeded: missing from `rows` by error, not because they have no store. */
   failed: number[];
 }
 
@@ -138,13 +117,11 @@ export async function fetchLpStoreRows(
       failed.push(id);
       continue;
     }
-    // 404: the corporation no longer runs a store. Not a failure.
     if (result.status === 404) continue;
     if (result.status < 200 || result.status >= 300) {
       failed.push(id);
       continue;
     }
-    // A 2xx that is not an offer list is ESI changing shape, not a store with no offers.
     if (!Array.isArray(result.body)) {
       failed.push(id);
       continue;

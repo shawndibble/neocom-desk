@@ -15,7 +15,6 @@ const input = {
   link: 'https://neocomdesk.com/corp-tax-book/remove-now/abc',
 };
 
-/** Words that would reveal money terms or the hidden payee guard. */
 const FORBIDDEN = /miner rate|margin|rate|%|\bpercent|48|payee was|changed|feeder|collector/i;
 
 describe('composeRemovalMail', () => {

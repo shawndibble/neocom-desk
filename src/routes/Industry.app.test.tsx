@@ -5,12 +5,6 @@ import { App } from '@/app/App';
 import { CHAR_ID, installIndustryHarness, seedPlan, seedRun } from '@/test/industryPage';
 import { SYNCED_BUILD_GROUPS_KEY, type BuildGroupsValue } from '@/features/industry/buildGroups';
 
-// The Industry routes' wiring through the whole `App`: each URL is reachable
-// behind the signed-in shell, and the paths `App` redirects land on their tab.
-// Every page behaviour is tested a level down, through `renderIndustryRoutes`
-// (Industry.test.tsx, Industry.plans.test.tsx, IndustryPlanPage.test.tsx,
-// IndustryGroupPage.test.tsx).
-
 vi.mock('@/features/market/priceVsMedian', async () =>
   (await import('@/test/industryMocks')).priceVsMedianMock()
 );
@@ -31,7 +25,6 @@ describe('Industry routes in App', () => {
       'aria-selected',
       'true'
     );
-    // The signed-in shell's navigation is around the page.
     expect(screen.getAllByRole('navigation').length).toBeGreaterThan(0);
   });
 

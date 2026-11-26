@@ -1,16 +1,3 @@
-/**
- * Projection rebuild (issue #1248, ADR 0010): assembles every Character's
- * whole 72-hour Projection from each domain's *saved* baseline
- * (`PollDomain.store`), applies the browser-channel filter and uploads it.
- * No ESI data fetches (only cached name lookups), so Settings can re-upload
- * after a toggle or lead-time change without a whole Foreground Poll. The
- * poll calls this too, after saving its baselines, handing them in directly.
- *
- * Every Character is in the upload, including ones with nothing to project:
- * `registerDeviceForWebPush` sends every Character on the device and the
- * backend replaces each one's stored Projection, so a missing entry already
- * meant "no rows" — listing it explicitly just says so.
- */
 import type { ProjectionRow } from '@/engine/projection';
 import { mapWithConcurrencyLimit, ESI_FANOUT_CONCURRENCY } from '@/lib/concurrency';
 import { hasEventScope, type NotificationEventId } from './events';
@@ -43,12 +30,6 @@ export type ProjectionRebuildDependencies = Pick<
 
 const PROJECTING_DOMAINS = POLL_DOMAINS.filter((domain) => domain.projection);
 
-/**
- * Whether a row for this event may be uploaded. A Scheduled Push is the
- * closed-app analog of the *browser* channel (it shows an OS notification),
- * so the feed column never counts: a feed-only event must not push once the
- * app closes. The live browser channel itself is checked by the caller.
- */
 function mayProject(
   eventId: NotificationEventId,
   scopes: ReadonlySet<string>,
@@ -57,12 +38,6 @@ function mayProject(
   return hasEventScope(eventId, scopes) && isEventEnabledFor(eventPrefs, eventId, 'browser');
 }
 
-/**
- * Each Character's browser-enabled ESI types for the upload (issue #3755,
- * ADR 0020). A Character the device cannot read notifications for, or a
- * device whose browser channel is off, uploads an empty list — an early
- * return would leave the server pushing the last list.
- */
 export async function enabledEveTypesByCharacter(
   deps: Pick<
     ProjectionRebuildDependencies,
@@ -104,17 +79,8 @@ export async function enabledEveTypesByCharacter(
   return byCharacter;
 }
 
-/**
- * Rebuilds run one at a time, in call order: each reads preferences when it
- * starts, so a later rebuild (a newer Settings change) can never have its
- * upload overtaken by an earlier one still resolving names.
- */
 let queue: Promise<unknown> = Promise.resolve();
 
-/**
- * `baselines` is the poll's in-memory state for every domain, just saved;
- * absent (Settings), each projecting domain's baseline is read from its store.
- */
 export function rebuildProjection(
   deps: ProjectionRebuildDependencies,
   baselines?: ReadonlyMap<PollDomain, PollerState<unknown>>
@@ -128,8 +94,6 @@ async function rebuildOnce(
   deps: ProjectionRebuildDependencies,
   baselines: ReadonlyMap<PollDomain, PollerState<unknown>> | undefined
 ): Promise<void> {
-  // Master off still uploads (empty rows): an early return would leave the
-  // last upload's Scheduled Pushes live on the backend.
   const [masterEnabled, browserAllowed, characters] = await Promise.all([
     deps.masterEnabled(),
     deps.browserChannelEnabled(),
@@ -157,7 +121,6 @@ async function rebuildOnce(
     for (const [domain, baseline] of domainBaselines) {
       const snapshot = baseline?.[character.characterId];
       if (snapshot === undefined) continue;
-      // Skip name resolution for a domain none of whose events could upload.
       if (!domain.eventIds.some((eventId) => mayProject(eventId, scopes, eventPrefs))) continue;
       const domainRows = await domain.projection!(
         character.characterId,

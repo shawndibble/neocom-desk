@@ -50,7 +50,6 @@ describe('AcceleratorCell', () => {
     const user = userEvent.setup();
     renderCell(undefined, 12);
     await user.click(screen.getByRole('button', { name: 'Edit accelerator for Pilot Seven' }));
-    // The bonus is a fact read from the attribute sheet: not an input.
     const days = await screen.findByLabelText('Days');
     expect(screen.queryByRole('spinbutton')).not.toBeInTheDocument();
     expect(days).toHaveAccessibleDescription(/boosters run out/);

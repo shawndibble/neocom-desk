@@ -3,10 +3,9 @@ import { renderHook, waitFor } from '@testing-library/react';
 import type { Fitting } from '@/engine/fittings/types';
 
 const REQUIREMENTS: Record<number, { skillTypeID: number; level: number }[]> = {
-  12005: [{ skillTypeID: 3332, level: 5 }], // an Ishtar: Gallente Cruiser V
-  587: [{ skillTypeID: 3329, level: 1 }], // a Rifter: Minmatar Frigate I
+  12005: [{ skillTypeID: 3332, level: 5 }],
+  587: [{ skillTypeID: 3329, level: 1 }],
 };
-// 99 stands for a type ESI couldn't supply.
 vi.mock('./skillRequirements', () => ({
   loadKnownRequirements: async (typeId: number) =>
     typeId === 99 ? null : (REQUIREMENTS[typeId] ?? []),
@@ -50,8 +49,6 @@ describe('useFittingAlpha', () => {
   });
 
   it('gives no verdict while a fitted type’s requirements are unknown, rather than a false Alpha OK', async () => {
-    // A fit an Alpha can fly, beside it: once that has its verdict, the
-    // requirements have loaded for both.
     const { result } = renderHook(() => [useFittingAlpha(UNKNOWN_MODULE), useFittingAlpha(RIFTER)]);
     await waitFor(() => expect(result.current[1]!.blockers).toEqual([]));
     expect(result.current[0]!.blockers).toBeNull();

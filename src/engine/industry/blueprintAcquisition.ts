@@ -1,115 +1,47 @@
-/**
- * Blueprint Acquisition (issue #838): which ME/TE tier a buildable node
- * should be quoted at, and what it costs to cover whatever shortfall that
- * tier leaves — replacing `findOwnedBlueprint`'s old "BPO always wins, else
- * highest-ME BPC" heuristic with a cost-minimizing one
- * (docs/context/decisions/20260911-073307).
- *
- * Decoupled from ESI/BPC Sourcing's own types, the same way
- * `engine/contracts/bpcSearch.ts`'s `OwnedBlueprintInput` stays decoupled —
- * a caller adapts `CharacterBlueprint`/`BpcContractRow` into the shapes here.
- */
 import type { AcquisitionCommunitySource, AcquisitionResolution } from '@/engine/industry/types';
 
-/** One owned copy of a blueprint. */
 export interface OwnedBlueprintCopy {
   me: number;
   te: number;
-  /** -1 = an original (BPO): unlimited runs. Positive = a copy's remaining runs. */
   runs: number;
 }
 
-/** One listing this blueprint could be bought at — a BPC Sourcing contract row's relevant fields. */
 export interface BpcOffer {
   me: number;
   te: number;
-  /** -1 = an original sold via contract: unlimited runs, one copy covers any shortfall. */
   runs: number;
-  /** Copies this one listing bundles at its combined `price` — a contract can list several at once (`engine/contracts/bpcSearch.ts`'s own `BlueprintOfferStats` doc comment). 1 for an ordinary single-copy listing. */
   quantity: number;
   price: number;
-  /**
-   * True when this offer's contract carries more than one distinct for-sale
-   * type (issue #1076) — `price` is a real ask, but for the whole contract,
-   * not this blueprint. Absent/false for an ordinary single-type listing.
-   */
   isMultiType?: boolean;
-  /** Set on a Community Offer (issue #3603): the Member who shares it. Its `price` is always 0. */
   community?: AcquisitionCommunitySource;
-  /** Set on an invention tier (issue #3990): `price` is the expected cost of one successful copy. */
   invented?: true;
 }
 
-/** `AcquisitionResolution` minus `blueprintTypeID` — this module has no typeID of its own to report, only the caller (`recipes.ts`) knows it. */
 export type BlueprintTierResult = Omit<AcquisitionResolution, 'blueprintTypeID'> & {
-  /**
-   * Runs the line's purchase brings in — Infinity for a BPO, every run of
-   * every copy for BPCs. Set only when something is actually bought;
-   * `claimBlueprintTier` credits whatever this node doesn't use back to the
-   * pool, so a later node building with the same blueprint type uses what
-   * the plan already paid for instead of buying it again.
-   */
   purchasedRuns?: number;
-  /** Set when the blueprint exists only as fixed-run copies and nothing owned or offered covers it (issue #6394). */
   copyOnly?: true;
 };
 
 export interface SelectBlueprintTierInputs {
-  /** Every copy of this blueprint type the Character owns, at any ME/TE. */
   ownedCopies: readonly OwnedBlueprintCopy[];
-  /** Runs this node needs covered. */
   neededRuns: number;
-  /** This blueprint's own material cost at a candidate ME, for `neededRuns` runs; null = unpriceable at that ME. */
   materialCostAtMe: (me: number) => number | null;
-  /**
-   * Listings for this exact blueprint type, already narrowed to the node's
-   * own Trade Hub region. Empty for a reaction node — reaction formulas
-   * cannot be copied, so BPC Sourcing is never searched for one.
-   */
   bpcOffers: readonly BpcOffer[];
-  /** The BPO's ordinary sell price at the node's hub; null if unpriced there. */
   bpoSellPrice: number | null;
-  /**
-   * Every other way to get this blueprint the app can see — contract
-   * originals, region market sell orders, LP Store redemptions, invention
-   * tiers at their expected cost — shaped as offers. They compete on total cost with the listings above; absent is
-   * the same as none.
-   */
   extraOffers?: readonly BpcOffer[];
-  /**
-   * Offers considered only when nothing above prices the blueprint at all —
-   * contracts in other regions, say. A plan quoted from a far-off listing
-   * beats one that opens with no blueprint price when something is for sale.
-   */
   lastResortOffers?: readonly BpcOffer[];
-  /**
-   * Community Offers (issue #3603): Shared Blueprints Members of the
-   * Character's Communities hold, free to take. They join the tier pool at 0
-   * ISK, so an owned BPO at the same tier still wins (owned tiers are never
-   * bought) and any priced offer at that tier loses to them. A Member's
-   * reaction formula is never passed here — the caller drops it.
-   */
   communityOffers?: readonly BpcOffer[];
-  /**
-   * The blueprint exists only as fixed-run copies (issue #6394): no original
-   * is ever assumed, so every original offer and the hub BPO price are dropped.
-   * With nothing owned or offered the result is flagged `copyOnly` at ME 0.
-   */
   copyOnly?: boolean;
-  /** ME to quote when nothing is owned and nothing can be bought — mirrors `assumedMeForUnowned`. */
   assumedMeForUnowned: number;
 }
 
 interface Candidate {
   me: number;
   te: number;
-  /** Runs already covered before buying anything; Infinity for a BPO. */
   ownedRuns: number;
-  /** How to extend this exact tier by buying more, if anything can. */
   extend: Extend | null;
 }
 
-/** What buying more at one tier brings, carried over from its `BpcOffer`. */
 interface Extend {
   capacityRuns: number;
   price: number;
@@ -117,19 +49,10 @@ interface Extend {
   invented?: true;
 }
 
-/**
- * One ME/TE tier a buildable node could be quoted at, with its total plan
- * cost (issue #839 — the picker/override modal lists every one of these,
- * not just `selectBlueprintTier`'s cheapest). `cost` is the same number
- * `candidateCost` uses to pick a winner: material cost at this tier plus
- * whatever covering the shortfall costs, or `null` when unpriceable.
- */
 export interface TierOption {
   me: number;
   te: number;
-  /** Runs already covered before buying anything; Infinity for a BPO. */
   ownedRuns: number;
-  /** How to extend this exact tier by buying more, if anything can. */
   extend: Extend | null;
   cost: number | null;
 }
@@ -140,7 +63,6 @@ function tierKey(me: number, te: number): string {
   return `${me}:${te}`;
 }
 
-/** Groups owned copies into one candidate per distinct ME/TE tier, runs summed (any -1 makes the whole tier infinite). */
 function ownedTierCandidates(copies: readonly OwnedBlueprintCopy[]): Candidate[] {
   const byTier = new Map<string, Candidate>();
   for (const copy of copies) {
@@ -161,9 +83,6 @@ function ownedTierCandidates(copies: readonly OwnedBlueprintCopy[]): Candidate[]
 
 function offerToExtend(offer: BpcOffer): Extend {
   return {
-    // A listing's combined `quantity` copies all come with the one contract
-    // at its one `price` — buying it whole nets every run all of them carry,
-    // not just one copy's worth.
     capacityRuns: offer.runs === -1 ? INFINITE_RUNS : offer.runs * offer.quantity,
     price: offer.price,
     ...(offer.community ? { community: offer.community } : {}),
@@ -171,18 +90,15 @@ function offerToExtend(offer: BpcOffer): Extend {
   };
 }
 
-/** Whole copies needed to cover `shortfall` runs at `extend`'s capacity/price — never a fractional-copy price. */
 function shortfallCost(shortfall: number, extend: Extend): number {
   return copiesToCover(shortfall, extend) * extend.price;
 }
 
-/** Whole copies it takes to cover `shortfall` runs — one for a BPO. */
 function copiesToCover(shortfall: number, extend: { capacityRuns: number }): number {
   if (extend.capacityRuns === INFINITE_RUNS) return 1;
   return Math.ceil(shortfall / extend.capacityRuns);
 }
 
-/** This candidate's total plan cost, or null when unpriceable (bad ME price, or a shortfall nothing can cover). */
 function candidateCost(
   candidate: Candidate,
   neededRuns: number,
@@ -197,19 +113,6 @@ function candidateCost(
   return materialCost + shortfallCost(shortfall, candidate.extend);
 }
 
-/**
- * BPC Sourcing is synced, untrusted data (a public contract archive) — a
- * listing with `runs: 0`/negative (anything but the -1 original sentinel) or
- * `quantity <= 0` is malformed, and `Math.ceil(shortfall / 0)` would silently
- * poison every cost this offer touches with Infinity/NaN rather than the "no
- * price" `null` every other bad-data path in this feature falls back to. A
- * multi-type offer (issue #1076) is not malformed — its price is a real ask —
- * but it is equally unusable here: `price` covers the whole contract, not
- * this blueprint, so it must not reseed a plan's ME/TE any more than a zeroed
- * `runs` should. Neither is a zero/negative price (issue #1080): a barter
- * contract's ISK side reads as 0, which must not win the cheapest-tier
- * candidate over a genuine, priced BPO.
- */
 function usableOffers(
   offers: readonly BpcOffer[],
   allowFree = false,
@@ -225,7 +128,6 @@ function usableOffers(
   );
 }
 
-/** The offer covering `shortfall` runs for the least ISK, or null when there are none. */
 function cheapestToCover(offers: readonly BpcOffer[], shortfall: number): BpcOffer | null {
   let best: BpcOffer | null = null;
   let bestCost = Infinity;
@@ -233,7 +135,6 @@ function cheapestToCover(offers: readonly BpcOffer[], shortfall: number): BpcOff
   for (const offer of offers) {
     const extend = offerToExtend(offer);
     const cost = shortfallCost(Math.max(1, shortfall), extend);
-    // A tie goes to the larger capacity: a free original outlasts a free copy for later nodes.
     if (cost < bestCost || (cost === bestCost && extend.capacityRuns > bestCapacity)) {
       bestCapacity = extend.capacityRuns;
       best = offer;
@@ -243,14 +144,11 @@ function cheapestToCover(offers: readonly BpcOffer[], shortfall: number): BpcOff
   return best;
 }
 
-/** Every ME/TE tier candidate for one buildable node, before pricing — the shared half of `tierOptions` and `selectBlueprintTier`. */
 function buildCandidates(
   inputs: SelectBlueprintTierInputs,
   offers: readonly BpcOffer[]
 ): Candidate[] {
   const candidates = ownedTierCandidates(inputs.ownedCopies);
-  // Each owned tier can only be extended by a matching-ME/TE offer — tiers
-  // never mix within one node, so a differently-tiered offer cannot top one up.
   for (const candidate of candidates) {
     if (candidate.ownedRuns === INFINITE_RUNS) continue;
     const matching = offers.filter(
@@ -260,11 +158,6 @@ function buildCandidates(
     if (best) candidate.extend = offerToExtend(best);
   }
 
-  // One purchasable candidate per tier nothing owned already stands for, at
-  // whichever offer covers the whole need cheapest there — a stack of 1-run
-  // copies loses to one original at the same tier when the runs add up.
-  // Every tier competes on total cost below, so a pricier high-ME copy still
-  // wins when the materials it saves outweigh its price.
   const ownedTiers = new Set(candidates.map((c) => tierKey(c.me, c.te)));
   const byTier = new Map<string, BpcOffer[]>();
   for (const offer of offers) {
@@ -282,18 +175,11 @@ function buildCandidates(
   return candidates;
 }
 
-/**
- * Everything purchasable in the ordinary pass: listed copies, the extra
- * sources, and the hub BPO sell price as an ME0 original. An extra offer may
- * be genuinely free — an LP redemption with no ISK side, at the default LP
- * Value of 0 — where a zero-ISK contract is a barter, not a price.
- */
 function primaryOffers(inputs: SelectBlueprintTierInputs): BpcOffer[] {
   const bpo: BpcOffer[] =
     inputs.bpoSellPrice === null || inputs.copyOnly
       ? []
       : [{ me: 0, te: 0, runs: -1, quantity: 1, price: inputs.bpoSellPrice }];
-  // Shared first: a free tie at one tier goes to the Member, never a 0 ISK LP redemption.
   const community = usableOffers(inputs.communityOffers ?? [], true, inputs.copyOnly).map(
     (offer) => ({
       ...offer,
@@ -317,12 +203,6 @@ function priced(
   }));
 }
 
-/**
- * Every ME/TE tier a buildable node could be quoted at, each priced the same
- * way `selectBlueprintTier` prices its winner (issue #839 — the
- * picker/override modal lists these so a pilot can deliberately pick a tier
- * other than the cheapest, e.g. to use up a worse owned copy first).
- */
 export function tierOptions(inputs: SelectBlueprintTierInputs): readonly TierOption[] {
   const primary = primaryOffers(inputs);
   const options = priced(inputs, primary);
@@ -331,12 +211,6 @@ export function tierOptions(inputs: SelectBlueprintTierInputs): readonly TierOpt
   return priced(inputs, [...primary, ...lastResort]);
 }
 
-/**
- * What a specific tier resolves to for a node needing `neededRuns` — the same
- * owned/shortfall logic `selectBlueprintTier` applies to its winner, exposed
- * so the picker/override modal can resolve whichever `TierOption` the pilot
- * picks, not only the cheapest.
- */
 export function resolveTierOption(option: TierOption, neededRuns: number): BlueprintTierResult {
   if (option.ownedRuns === INFINITE_RUNS) {
     return { me: option.me, te: option.te, line: null };
@@ -347,8 +221,6 @@ export function resolveTierOption(option: TierOption, neededRuns: number): Bluep
   }
   const copies = option.extend ? copiesToCover(shortfall, option.extend) : null;
   const price = option.extend ? option.extend.price : null;
-  // An owned copy that nothing can top up: the job cannot be started past the
-  // copy's own runs, so report the real limit (issue #1775).
   const coverage =
     price === null && option.ownedRuns > 0
       ? { coveredRuns: option.ownedRuns, neededRuns }
@@ -370,23 +242,8 @@ export function resolveTierOption(option: TierOption, neededRuns: number): Bluep
   };
 }
 
-/**
- * Runs remaining per ME/TE tier for one blueprint type, shared across every
- * buildable node in a build-plan resolution pass that needs that same type —
- * the same "first claim wins the stock" contract `materialResolution.ts`'s
- * `ownedPool` applies to materials, but keyed per tier since a blueprint's
- * owned copies are not fungible across ME/TE the way material units are.
- */
 export type OwnedBlueprintPool = Map<string, number>;
 
-/**
- * Seeds `pool` from `copies` the first time this blueprint type is reached
- * (an empty pool), then returns every tier's *remaining* runs — reduced by
- * whatever an earlier node already claimed via `claimBlueprintTier` — shaped
- * as `SelectBlueprintTierInputs.ownedCopies` expects. A later call with the
- * same (already-seeded) pool ignores `copies` entirely, so callers can pass
- * the same raw owned-copies list every time without re-deriving it.
- */
 export function pooledOwnedCopies(
   copies: readonly OwnedBlueprintCopy[],
   pool: OwnedBlueprintPool
@@ -402,19 +259,6 @@ export function pooledOwnedCopies(
   });
 }
 
-/**
- * Claims whatever `resolved`'s winning tier actually used out of `pool`, so
- * the next node needing this same blueprint type sees the reduced remainder
- * instead of the same stock two branches both think they can use for free.
- * A BPO tier (`INFINITE_RUNS`) is never decremented — one original covers
- * every branch that reaches it.
- *
- * Whatever `resolved` bought (`purchasedRuns`) joins the pool too, less the
- * runs this node spends: once a plan has paid for a BPO, or for a BPC with
- * runs to spare, a later node needing the same blueprint builds with it
- * rather than buying it a second time. A no-op when nothing is owned at this
- * tier and nothing was bought (an unmatched override, say).
- */
 export function claimBlueprintTier(
   pool: OwnedBlueprintPool,
   resolved: BlueprintTierResult,
@@ -432,19 +276,10 @@ export function claimBlueprintTier(
   pool.set(key, available - Math.min(neededRuns, available));
 }
 
-/**
- * Picks the cheapest overall ME/TE tier for one buildable node: every tier
- * the Character owns any runs at, plus every tier something can be bought at
- * (listed copies, contract originals, the market, the LP Store, the hub BPO
- * sell price — last-resort offers only when none of those price it) — never
- * mixing tiers within
- * one node. See docs/context/decisions/20260911-073307 for the full design.
- */
 export function selectBlueprintTier(inputs: SelectBlueprintTierInputs): BlueprintTierResult {
   const options = tierOptions(inputs);
 
   if (options.length === 0) {
-    // A copy-only blueprint has no original to assume: say so, at ME 0 (issue #6394).
     if (inputs.copyOnly) {
       return { me: 0, te: 0, line: { unitPrice: null, owned: false }, copyOnly: true };
     }

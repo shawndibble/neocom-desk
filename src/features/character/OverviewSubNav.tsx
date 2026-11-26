@@ -19,11 +19,6 @@ function subNavClass({ isActive }: { isActive: boolean }): string {
   return cx(tabItemClassName, 'gap-1.5', isActive ? tabItemActiveClassName : tabItemIdleClassName);
 }
 
-/**
- * Module-level so `useLockedRoutes`' memo — keyed on `[granted, paths]` —
- * survives a re-render. Only `/clones` is gated (routeScopes.ts); `/overview`,
- * `/employment-history` and `/srp` are UNGATED and can never appear in the result.
- */
 const TAB_PATHS = [
   '/overview',
   '/clones',
@@ -31,7 +26,6 @@ const TAB_PATHS = [
   '/srp',
 ] as const satisfies readonly AppRoutePath[];
 
-/** The Clones tab; wears the re-auth marker and tooltip when its scope is missing. */
 function ClonesTab({ locked }: { locked: boolean }) {
   const { t } = useTranslation();
   const tab = (
@@ -40,8 +34,6 @@ function ClonesTab({ locked }: { locked: boolean }) {
       {locked && <span aria-hidden="true" className="size-1.5 shrink-0 rounded-full bg-warning" />}
     </NavLink>
   );
-  // A span carries the tooltip: `NavLink`'s class is a function, which Tooltip's
-  // className merge would stringify.
   return locked ? (
     <Tooltip content={t('reauth.navLocked')}>
       <span className="inline-flex">{tab}</span>
@@ -51,30 +43,13 @@ function ClonesTab({ locked }: { locked: boolean }) {
   );
 }
 
-/**
- * Sub-navigation across the Character-overview views (SRP joins them while the corporation has SRP on). Real navigation
- * (routes), not a `Tabs` widget — same reasoning as `SkillsSubNav`, and the
- * paths stay top-level rather than nesting under `/overview`, so each view
- * keeps its own `ScopeGate` and every existing bookmark still resolves.
- *
- * `trailing` sits at the bar's right end: the view's data age, drawn on the
- * tab row rather than beside the name so it reads as the data's, not the
- * pilot's.
- */
 export function OverviewSubNav({ trailing }: { trailing?: ReactNode }) {
   const { t } = useTranslation();
   const locked = useLockedRoutes(TAB_PATHS);
-  // Hidden, never locked or dimmed, unless the pilot's corporation has SRP on (`NavSubView.visible`).
   const srpVisible = useSrpNavVisible();
   const scrollerRef = useRef<HTMLDivElement>(null);
   const { pathname } = useLocation();
 
-  // On a phone the strip outgrows its frame and opens at scroll 0, so landing
-  // on a later view cut its own tab off (or hid SRP entirely). Slide the
-  // current link into view on landing, on every route change, and on resize
-  // (the data-age badge arrives with the data and narrows the strip; the SRP
-  // tab mounts late) — but only until the reader moves the strip themselves:
-  // the ticking badge changes width, and must not snap a swipe back.
   useEffect(() => {
     const scroller = scrollerRef.current;
     if (!scroller) return;
@@ -104,12 +79,6 @@ export function OverviewSubNav({ trailing }: { trailing?: ReactNode }) {
           <NavLink to="/overview" className={subNavClass}>
             {t('nav.overview')}
           </NavLink>
-          {/*
-          The rail used to carry this marker for /clones; the tab has to keep it
-          now that the rail no longer lists the route. Informational only, and it
-          is a dot inside the link with a tooltip on a wrapper, so the link stays
-          named "Clones" — see `NavItem` in Layout.tsx for the full reasoning.
-        */}
           <ClonesTab locked={locked.has('/clones')} />
           <NavLink to="/employment-history" className={subNavClass}>
             {t('nav.employmentHistory')}
@@ -121,7 +90,6 @@ export function OverviewSubNav({ trailing }: { trailing?: ReactNode }) {
           )}
         </nav>
       </div>
-      {/* Outside the scroller, so a narrow phone scrolls the tabs and never hides this. */}
       {trailing && (
         <div className="flex shrink-0 items-center border-b border-line pr-1 pl-2">{trailing}</div>
       )}

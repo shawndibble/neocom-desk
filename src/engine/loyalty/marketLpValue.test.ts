@@ -28,7 +28,6 @@ describe('marketLpValue', () => {
   });
 
   it('ignores an offer the hub could not absorb five redemptions of', () => {
-    // 9,000 ISK/LP on 3 units for sale is one lucky order, not a rate.
     const value = marketLpValue([offer(9000, 3), offer(1500), offer(1400), offer(1300)]);
     expect(value).toBe(1400);
   });
@@ -48,7 +47,6 @@ describe('marketLpValue', () => {
   });
 
   it('counts depth in redemptions, not units', () => {
-    // 40 units for sale of an offer that hands out 10 is only 4 redemptions deep.
     expect(marketLpValue([offer(5000, 40, 10), offer(1000), offer(900), offer(800)])).toBe(900);
   });
 

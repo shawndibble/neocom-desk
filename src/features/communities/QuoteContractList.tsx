@@ -20,9 +20,7 @@ import { formatIsk } from '@/lib/isk';
 export interface LinkedContractRow {
   contractId: number;
   status: QuoteContractStatus;
-  /** The contract itself, when this side can read it: its price and its detail. */
   contract?: Contract;
-  /** Only the seller's word: this side's own copy of the contract did not confirm it. */
   unverified?: boolean;
   priceDiffers: boolean;
 }
@@ -37,12 +35,6 @@ const TONE: Record<QuoteContractStatus, PillTone> = {
 
 const NO_NAMES: ReadonlyMap<number, string> = new Map();
 
-/**
- * The contracts linked to one Quote (issue #4780): each a row with its status,
- * price and age, and a click that opens the contract's own detail. A contract
- * made at a price other than the quote's says so, so the buyer can reject it
- * knowingly. A contract this side cannot read still shows its status.
- */
 export function QuoteContractList({
   rows,
   quotedTotal,
@@ -52,7 +44,6 @@ export function QuoteContractList({
 }: {
   rows: readonly LinkedContractRow[];
   quotedTotal: number;
-  /** The Character whose ESI read these contracts: whose view the detail modal shows. */
   viewerCharacterId: number;
   label: string;
   now: number;
@@ -64,7 +55,6 @@ export function QuoteContractList({
     const receiver = contractReceiver(open, viewerCharacterId);
     return resolveNames([contractIssuer(open).id, ...(receiver ? [receiver.id] : [])]);
   }, [open, viewerCharacterId]);
-  // A failed read leaves the `#id` fallbacks, silently.
   const names = useKeyedLoad(open ? String(open.contract_id) : null, loadNames).data ?? NO_NAMES;
 
   if (rows.length === 0) return null;

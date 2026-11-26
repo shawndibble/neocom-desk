@@ -1,35 +1,3 @@
-/**
- * Route Safety's data (issue #2328): the local stargate route from a start
- * through one or more Stops (issue #2475), each system on it joined to the
- * last hour of ESI activity.
- *
- * Four outcomes besides a route, each its own message on the page:
- * - `incomplete`: From or a stop is not picked yet;
- * - `same-system`: one stop, and it is where you are — nothing to fly;
- * - `no-route`: one stop no stargate reaches — a fact about New Eden;
- * - `unknown`: the stargate snapshot could not be read — this app cannot say.
- *
- * With several stops an unreachable stop is a fact about its legs, not the
- * whole trip: the other legs still draw, and that leg carries its own
- * no-route message.
- *
- * This hook is the adapter (issue #2539): it loads the stargate graph,
- * systems, region names and activity, drops answers a newer request made
- * stale, and names its inputs (`routeSafetyKeys.ts`) so the trip is planned
- * again only when the network or a pin's answer changes — never as the holes'
- * remaining life ticks down. What the trip is made of — each leg's Ways to
- * fly, its pin, the hole and bridge jumps, the trip's facts — is
- * `engine/route/routeSafetyTrip.ts`.
- *
- * Holes (issue #2476) and Ansiblex (issue #2478) join the search as extra
- * connections; the stargate graph never holds them, so waypoints still cut at
- * a hole or a bridge.
- *
- * An Avoid preview (issue #2547) is this same trip request with one more
- * system avoided: `planWithAvoid` runs it through the same planner and
- * assembly — pins, holes, bridges and Optimize included — reading only the
- * graph and systems already loaded, and saving nothing.
- */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { candidateAvoid } from '@/engine/route/avoidRules';
 import type { RoutePreferenceKind } from '@/engine/route/jumpRoute';
@@ -72,10 +40,8 @@ export type {
   RouteSafetyWay,
 } from '@/engine/route/routeSafetyTrip';
 
-/** The trip as an Avoid preview would draw it: `unknown` when the stargate map cannot be read. */
 export type AvoidTripResult = RouteSafetyAssembly | { kind: 'unknown' };
 
-/** What an Avoid adds to the trip's avoid list (`candidateAvoid`, less the list it already has). */
 export type AvoidAddition = Omit<Parameters<typeof candidateAvoid>[0], 'effective'>;
 
 export type RouteSafetyState =
@@ -85,18 +51,8 @@ export type RouteSafetyState =
   | { kind: 'no-route' }
   | { kind: 'unknown' }
   | (Extract<RouteSafetyAssembly, { kind: 'route' }> & {
-      /** Names the trip request: equal keys plan the same trip. */
       requestKey: string;
-      /**
-       * This trip re-planned with the addition avoided — everything else as
-       * drawn. Saves nothing.
-       */
       planWithAvoid: (addition: AvoidAddition) => Promise<AvoidTripResult>;
-      /**
-       * This trip re-planned under another Route Preference, with the same
-       * activity the page shows, for the preference cards. `null` when the
-       * stargate map cannot be read or a leg has no route. Saves nothing.
-       */
       planWithPreference: (preference: RoutePreferenceKind) => Promise<PreferenceRoute | null>;
     });
 
@@ -105,15 +61,10 @@ export interface RouteSafetyRequest {
   stops: readonly number[];
   tripOptions: TripOptions;
   route: RouteQuery;
-  /** The open Thera / Turnur holes the filters allow (`useRouteHoles`). */
   holes?: readonly TheraConnection[];
-  /** Each leg's pin token (`routeSafetyLink.ts`), `''` for a leg flown as planned. */
   pins?: readonly string[];
-  /** Every open hole EVE-Scout lists, or `null` while there is no list (Hole jumps off, loading, unreachable). */
   listed?: readonly TheraConnection[] | null;
-  /** The known Ansiblex the route may cross, or `null` while Use jump bridges is off. */
   bridges?: readonly AnsiblexGate[] | null;
-  /** The hull's jump drive and the map around it, or `null` while jump legs are off (issue #3147). */
   jump?: RouteJumpSetup | null;
 }
 
@@ -130,7 +81,6 @@ const NO_PINS: readonly string[] = [];
 const NO_SYSTEMS: ReadonlyMap<number, RouteSafetySystemEntry> = new Map();
 const NO_REGION_NAMES: ReadonlyMap<number, string> = new Map();
 
-/** One planned trip with its legs' other ways: what the page and an Avoid preview both assemble. */
 async function planRouteSafetyTrip(request: {
   fromId: number;
   stops: readonly number[];
@@ -189,7 +139,6 @@ export function useRouteSafety({
   const holesKey = holeNetworkKey(holes);
   const bridgesKey = bridges === null ? '' : bridgeKey(bridges);
   const networkKey = bridgesKey === '' ? holesKey : `${holesKey}|${bridgesKey}`;
-  // Just the ends: the holes' life and the bridges' names never re-plan the trip.
   const { networkEnds, network } = useMemo(() => {
     const ends = { holes: holeEndsFromKey(holesKey), bridges: bridgeEndsFromKey(bridgesKey) };
     return { networkEnds: ends, network: routeSafetyNetwork(ends.holes, ends.bridges) };
@@ -203,10 +152,6 @@ export function useRouteSafety({
   const wantsRoute =
     fromId !== null && stops.length > 0 && !(stops.length === 1 && stops[0] === fromId);
 
-  // Re-read per route, not once per mount: inside the cache window it is a
-  // local read, and past it (ESI refreshes hourly) or after a failed feed it
-  // is the retry a page left open needs. The last answer stays on screen
-  // until the new one lands.
   useEffect(() => {
     if (!wantsRoute) return;
     let cancelled = false;
@@ -219,7 +164,6 @@ export function useRouteSafety({
   }, [wantsRoute, requestKey]);
 
   useEffect(() => {
-    // Held until the Avoided Systems are in, so the route is not drawn once without them.
     if (!wantsRoute || !hydrated) return;
     let cancelled = false;
     const stopIds = stopsKey.split(',').map(Number);
@@ -259,11 +203,8 @@ export function useRouteSafety({
     jump,
   ]);
 
-  // The same request with the avoid list swapped. No region names or
-  // activity: a preview reads jumps and security only, and asks no network.
   const planWithAvoid = useCallback(
     async (addition: AvoidAddition): Promise<AvoidTripResult> => {
-      // Only offered on a drawn route, which always has a start.
       if (fromId === null) return { kind: 'unknown' };
       const stopIds = stopsKey.split(',').map(Number);
       const planned = await planRouteSafetyTrip({

@@ -37,11 +37,6 @@ describe('humanizeEveType', () => {
 });
 
 describe('eveTypeLabelKey', () => {
-  /**
-   * The catalog is what keeps the two reinforcement types apart: their fired
-   * titles are both "Structure reinforced", so reusing those as list labels
-   * would render two separately-togglable rows identically.
-   */
   it('resolves a distinct, human-readable name for every allow-listed type', () => {
     const names = EVE_ALLOWED_TYPES.map((type) => {
       const key = eveTypeLabelKey(type);

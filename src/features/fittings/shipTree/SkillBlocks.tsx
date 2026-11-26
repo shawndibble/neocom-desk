@@ -2,7 +2,6 @@ import type { ShipTreeClassSkill } from '@/sde/types';
 
 const LEVELS = [1, 2, 3, 4, 5] as const;
 
-/** One five-block bar per displayed class skill, filled to the level trained. */
 export function SkillBlocks({
   skills,
   trainedLevel,

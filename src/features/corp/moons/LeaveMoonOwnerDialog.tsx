@@ -2,11 +2,6 @@ import { useTranslation } from 'react-i18next';
 import { formatIsk } from '@/lib/isk';
 import { DialogShell } from './BookDialogs';
 
-/**
- * Leave (or end a pending removal now): shows what the accounting corporation still
- * owes before anything is revoked. `owed` is the whole-ISK balance from the moon
- * owner's page; `null` when that page has not loaded.
- */
 export function LeaveMoonOwnerDialog({
   name,
   owed,
@@ -16,7 +11,6 @@ export function LeaveMoonOwnerDialog({
 }: {
   name: string;
   owed: number | null;
-  /** A removal is pending: the dialog ends it now instead of leaving. */
   removing: boolean;
   onClose: () => void;
   onLeave: () => Promise<void>;

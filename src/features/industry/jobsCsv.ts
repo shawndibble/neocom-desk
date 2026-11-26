@@ -9,18 +9,10 @@ const OWNER_KEY = {
 } as const;
 
 export interface JobsCsvOptions {
-  /** Job History: the End date is the delivery, and a clock-derived state means nothing. */
   delivered?: boolean;
-  /** The clock the State column reads, at export time. */
   now?: () => number;
 }
 
-/**
- * CSV columns for the jobs lists: the job's own fields (dates and numbers
- * raw, never the panel's formatted renderings), ESI's status beside the
- * clock-derived State, and the installer and owner each row is tagged with.
- * `cost` is blank when ESI sent none; a real 0 stays 0.
- */
 export function jobsCsvColumns(
   t: CsvTranslate,
   nameFor: (blueprintTypeId: number) => string,
@@ -63,7 +55,6 @@ export function jobsCsvColumns(
       ? []
       : [
           {
-            // The table's Done / Completing soon pill, derived from the clock, beside ESI's own status.
             header: t('industry.csvJobState'),
             value: (job: JobRow) => {
               const at = now();
@@ -77,7 +68,6 @@ export function jobsCsvColumns(
       value: (job) => (job.product_type_id != null ? nameFor(job.product_type_id) : null),
     },
     {
-      // The Character the job belongs to; for a corporation job, its installer.
       header: t('industry.csvCharacter'),
       value: (job) => job.characterName || null,
     },
@@ -88,11 +78,6 @@ export function jobsCsvColumns(
   ];
 }
 
-/**
- * Job History's export: the same facts as the Active list (its End date is the
- * delivery) plus whether the Production Log holds the delivery. Blank where a
- * job is not one the log can hold (not a manufacturing delivery).
- */
 export function jobHistoryCsvColumns(
   t: CsvTranslate,
   nameFor: (blueprintTypeId: number) => string,

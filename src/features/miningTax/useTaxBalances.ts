@@ -14,28 +14,17 @@ interface Args {
   personalRows: readonly DisplayRow[];
   ledgerPayees: readonly PayeeRecord[];
   allPayees: readonly PayeeRecord[];
-  /** Duplicate records of one Payee mapped to the primary (`payeeDuplicateAliases`). */
   duplicateAliases: ReadonlyMap<string, string>;
   estimatedValueOf: (dr: DisplayRow) => number;
   madePayments: Parameters<typeof useLinkSuggestions>[0]['madePayments'];
-  /** Every Made Payment linked to a Payee. */
   links: readonly PayeePaymentLink[];
-  /** The one accounts build (`useTaxCorpBooks`). */
   accounts: PayeeRunningAccounts;
-  /** The corporations of the member's Corp Tax Books: a donation to one is the book's. */
   bookCorporations: ReadonlySet<number>;
-  /** Each Corp Tax Book Payee's credit, by its id (`bookCreditsOf`). */
   bookCredits?: ReadonlyMap<string, number>;
-  /** Each Corp Tax Book Payee's owed, by its id (`bookOwesOf`). */
   bookOwes?: ReadonlyMap<string, number>;
-  /** Each Corp Tax Book Payee's owed days and oldest unpaid day, by its id (`bookDaysOf`). */
   bookDays?: ReadonlyMap<string, BookOwedDays>;
 }
 
-/**
- * What the owed cards, Settle up, the Payee ledger, the payment-link suggestions and the Payee
- * manager read: the balances off every personal Payee's Running account.
- */
 export function useTaxBalances({
   characterFiltered,
   personalRows,
@@ -51,9 +40,6 @@ export function useTaxBalances({
   bookOwes,
   bookDays,
 }: Args) {
-  // The owed cards follow the Character filter (an alt's debts are still debts) but not the Payee
-  // filter: narrowing the ledger to one Payee must not change a balance. The Overview's Mining
-  // tax card reads the same figure (`loadOwedBalances`).
   const balances = useMemo(
     () =>
       computePayeeBalances(
@@ -85,7 +71,6 @@ export function useTaxBalances({
     bookCorporations,
   });
 
-  // Every Payee's systems and owed entries, for the Payee manager's rows.
   const payeeSystems = useMemo(
     () => systemsByPayee(everyAssignment, allPayees),
     [everyAssignment, allPayees]

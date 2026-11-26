@@ -1,16 +1,3 @@
-/**
- * The pirate faction behind each NPC type a bounty paid out on, for the wallet
- * journal's bounty lines. EVE carries no faction on the type itself, and the
- * SDE snapshot carries neither NPC types nor item Groups, so: the type's
- * `group_id` from `GET /universe/types/{id}`, that Group's name through
- * `loadGroupNames`, and `pirateFactionOf` on the name.
- *
- * The typeID -> groupID step is cached in `esiCache` like `groupNames.ts`,
- * cache-first with no freshness window — an NPC doesn't change Group. Lookups
- * in flight are shared: a journal renders dozens of bounty lines at once, all
- * killing the same handful of rats, and without that each would fan out its
- * own GETs for the same ids before the first had cached anything.
- */
 import { getUniverseType } from '@/esi/endpoints';
 import { GLOBAL_CACHE_CHARACTER_ID, readCachedEntries, writeCachedMany } from '@/esi/cache';
 import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
@@ -21,10 +8,8 @@ function cacheKey(typeId: number): string {
   return `typeGroup:${typeId}`;
 }
 
-/** Each type's whole lookup, shared while it runs — see the header. */
 const inFlight = new Map<number, Promise<string | null>>();
 
-/** GroupIDs for types not yet cached; null for any ESI couldn't resolve. Never rejects. */
 async function fetchGroupIds(typeIds: number[]): Promise<Map<number, number | null>> {
   const groups = new Map<number, number | null>();
   const resolved: Array<readonly [string, number]> = [];
@@ -40,13 +25,10 @@ async function fetchGroupIds(typeIds: number[]): Promise<Map<number, number | nu
   });
   try {
     await writeCachedMany(GLOBAL_CACHE_CHARACTER_ID, resolved, fetchedAt);
-  } catch {
-    // A failed write only costs a later lookup its cache hit.
-  }
+  } catch {}
   return groups;
 }
 
-/** Type -> Group (cache, then ESI) -> Group name -> faction, for one batch of types. */
 async function resolveFactions(typeIds: number[]): Promise<Map<number, string | null>> {
   const groupIds = new Map<number, number | null>();
   const cached = await readCachedEntries<number>(GLOBAL_CACHE_CHARACTER_ID, typeIds.map(cacheKey));
@@ -70,10 +52,6 @@ async function resolveFactions(typeIds: number[]): Promise<Map<number, string | 
   return factions;
 }
 
-/**
- * Each type's pirate faction, keyed by typeID; null when it has none or
- * couldn't be resolved. Never rejects.
- */
 export async function loadNpcFactions(
   typeIds: readonly number[]
 ): Promise<Map<number, string | null>> {

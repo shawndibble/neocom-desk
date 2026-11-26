@@ -112,8 +112,6 @@ describe('PayeeRunningAccounts', () => {
     expect(accounts.paidThroughOf('p1')).toBe('2026-10-01');
   });
 
-  // An Assignment a Corp Tax Book bills whole (the corporation's own Payee's days the book took)
-  // is no charge of its Payee: neither owed nor a zero line in its ledger.
   it('leaves a day billed elsewhere in full off the account, and the money to pay the rest', () => {
     const accounts = PayeeRunningAccounts.build({
       assignments: [
@@ -144,7 +142,6 @@ describe('PayeeRunningAccounts', () => {
 
     it('has no account that counts: no debt, no credit, never offered a payment', () => {
       const accounts = build();
-      // p2's record makes the whole merged Payee the book's, whichever record a caller asks by.
       expect(accounts.isBookOwned('p1')).toBe(true);
       expect(accounts.of('p1')).toBeUndefined();
       expect([...accounts.entries()].map(([id]) => id)).toEqual(['q']);
@@ -186,13 +183,13 @@ describe('PayeeRunningAccounts', () => {
       ).toBe('needs-review');
     });
 
-    it('are never offered to a new Assignment: neither suggested, pre-filled nor listed', () => {
+    it("are offered to a new Assignment: giving one ore is how the day becomes its book's", () => {
       const payees = [payee('p1', 1, 98000001), payee('q', 1, 5)];
       expect(
         build()
           .assignable(payees)
           .map((p) => p.id)
-      ).toEqual(['q']);
+      ).toEqual(['p1', 'q']);
     });
 
     it('stay Outstanding to the safeguards, which never read a paid day as unpaid or the reverse', () => {
@@ -244,10 +241,7 @@ describe('PayeeRunningAccounts', () => {
 
     it('shows again for a backfilled or same-day entry, though it is covered by credit', () => {
       const accounts = PayeeRunningAccounts.build({
-        assignments: [
-          // Mined long ago, entered after the Payee was archived, and paid for by what was held.
-          assignment('late', 'p1', '2026-09-01', 50, { updatedAt: ARCHIVED + 1000 }),
-        ],
+        assignments: [assignment('late', 'p1', '2026-09-01', 50, { updatedAt: ARCHIVED + 1000 })],
         payees: [archivedPayee('p1', 1)],
         links: [link('p1', 500, 3)],
       });

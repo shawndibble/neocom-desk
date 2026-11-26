@@ -1,14 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { isAltChord, isApplePlatform, isModChord } from './shortcuts';
 
-/**
- * Runs `onChord` for Ctrl+`key` (Cmd on Apple), from anywhere on the page,
- * text fields included. Always swallows the browser's own answer to the chord
- * (Ctrl+S's "save page"), even when `enabled` is false — a Save that is
- * unavailable right now must not fall through to the browser's. `onChord` is
- * skipped while a modal is open, so the dialog's own chord handling is the
- * only one that answers.
- */
 export function useChord(
   key: string,
   onChord: () => void,
@@ -32,12 +24,6 @@ export function useChord(
   }, [key, shift, enabled]);
 }
 
-/**
- * Runs `onChord` for Alt+`code` (Option on Apple), e.g. `'KeyJ'`, from anywhere
- * on the page, text fields included. Swallows the key's own answer (Option+J's
- * `∆`) only while `enabled`, so a disabled chord leaves typing alone. Left alone
- * while a modal is open, so its own fields still type.
- */
 export function useAltChord(code: string, onChord: () => void, enabled = true): void {
   const latest = useRef(onChord);
   useEffect(() => {

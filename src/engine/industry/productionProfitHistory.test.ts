@@ -1,10 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { productionProfitHistory, productionProfitTrend } from './productionProfitHistory';
 
-// Local-time constructors, not `Date.parse('...Z')`: `productionProfitHistory`
-// buckets by local calendar day the same way `filterProductionRunsByDate`
-// does, so a UTC-anchored fixture would give the wrong answer in every
-// timezone except UTC+0.
 const AUG_10_MORNING = new Date(2026, 7, 10, 9, 0, 0).getTime();
 const AUG_10_EVENING = new Date(2026, 7, 10, 21, 0, 0).getTime();
 const AUG_11 = new Date(2026, 7, 11, 12, 0, 0).getTime();

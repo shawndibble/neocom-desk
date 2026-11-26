@@ -15,7 +15,6 @@ import {
 
 const t = i18n.t.bind(i18n);
 
-/** Shield Failover Report at an 800 ISK/LP LP Value. */
 const report: TurnInOffer = {
   objectiveId: 'obj-report',
   campaignId: 'camp-caldari',

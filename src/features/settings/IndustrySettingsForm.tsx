@@ -6,21 +6,7 @@ import { useAssumedTe, MIN_ASSUMED_TE, MAX_ASSUMED_TE } from '@/features/industr
 import { SettingsFormLoading } from './settingsFields';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 
-/**
- * Industry's settings: Settings → Industry, and the Industry page's settings
- * modal. Every control defaults to exactly what the app did before it was
- * settable, so an existing pilot's numbers do not move until they ask them to.
- *
- * Gates on its own stores: a control that rendered its default first would not
- * merely flicker, a press landing in that window would write the default over
- * what is on disk.
- */
-export function IndustrySettingsForm({
-  onlyAssumedMe = false,
-}: {
-  /** Opportunities prices with assumed ME alone (#2055), so its modal shows only that. */
-  onlyAssumedMe?: boolean;
-}) {
+export function IndustrySettingsForm({ onlyAssumedMe = false }: { onlyAssumedMe?: boolean }) {
   const { t } = useTranslation();
   const assumedMe = useAssumedMe((state) => state.value);
   const setAssumedMe = useAssumedMe((state) => state.setValue);
@@ -29,8 +15,6 @@ export function IndustrySettingsForm({
   const profitBasis = useProfitBasis((state) => state.value);
   const setProfitBasis = useProfitBasis((state) => state.setValue);
 
-  // Each on its own line, never `a() && b()`: `&&` short-circuits, which would
-  // make every hook after the first false one a conditional call.
   const assumedMeHydrated = useHydratedStore(useAssumedMe);
   const assumedTeHydrated = useHydratedStore(useAssumedTe);
   const profitBasisHydrated = useHydratedStore(useProfitBasis);
@@ -64,11 +48,6 @@ export function IndustrySettingsForm({
 
         {!onlyAssumedMe && (
           <>
-            {/*
-            Beside its ME twin rather than merged with it: the two answer
-            different questions (material cost, job time), and TE's range is
-            0..20 where ME's is 0..10 (issue #634).
-          */}
             <Field
               label={t('settings.assumedTeLabel')}
               htmlFor="settings-assumed-te"
@@ -90,7 +69,6 @@ export function IndustrySettingsForm({
               />
             </Field>
 
-            {/* The list and the plan page both read this, so a plan's profit agrees on both. */}
             <Field label={t('settings.profitBasisLabel')} note={t('settings.profitBasisHint')}>
               <SegmentedControl
                 label={t('settings.profitBasisLabel')}

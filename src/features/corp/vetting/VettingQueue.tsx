@@ -21,7 +21,6 @@ import { requestMailCooldown } from './vettingRequestMail';
 import { reviewKindLabel } from './vettingText';
 import { needsYours, reviewResult } from './vettingView';
 
-/** A review's result in words (`reviewResult`): flags, nothing found, incomplete, or where it stands. */
 export function VettingResultPill({ review }: { review: VettingReviewSummary }) {
   const { t } = useTranslation();
   const { result, tone } = reviewResult(review);
@@ -35,16 +34,9 @@ export function VettingResultPill({ review }: { review: VettingReviewSummary }) 
 }
 
 interface VettingQueueProps {
-  /** Which list: reviews waiting on a sign-off or the pilot, or the ones that are over. */
   tab: 'open' | 'decided';
   rows: readonly VettingReviewSummary[];
-  /** Opens a review's report. */
   onOpen: (review: VettingReviewSummary) => void;
-  /**
-   * A request's row menu: mail the member the link, or copy it. Absent (a reviewer who cannot
-   * act on requests): a waiting row has no menu.
-   */
-  /** The signed-in reviewer: only the officer who asked may mail, so others get no menu. */
   reviewerId?: number;
   onRequestMail?: (review: VettingReviewSummary) => void;
   onCopyRequestLink?: (review: VettingReviewSummary) => void;
@@ -52,10 +44,6 @@ interface VettingQueueProps {
 
 const firstName = (name: string) => name.split(' ')[0] ?? name;
 
-/**
- * One row per pilot: who, what for, the result in words, sign-offs with "Yours needed". A row
- * click opens the report; there is no Accept or Reject here, because a decision needs it read.
- */
 export function VettingQueue({
   tab,
   rows,
@@ -89,8 +77,6 @@ export function VettingQueue({
       {
         id: 'kind',
         header: t('vetting.queue.columns.for'),
-        // Where an application came from, under what it is for. A phone's dense card runs its
-        // cells into one line, so nothing here may be a block there.
         render: (row) =>
           row.invite === undefined ? (
             reviewKindLabel(row, t)
@@ -108,10 +94,8 @@ export function VettingQueue({
         id: 'characters',
         header: t('vetting.queue.columns.characters'),
         align: 'right',
-        // Dropped from md to xl so the queue fits its panel at 1024 (#6643).
         className: 'tabular-nums max-xl:md:hidden',
         headerClassName: 'max-xl:md:hidden',
-        // A bare count means nothing in a card's meta line; the report lists them.
         phoneHidden: true,
         render: (row) =>
           row.characters > 0 ? row.characters : <span className="text-text-faint">-</span>,
@@ -134,7 +118,6 @@ export function VettingQueue({
           id: 'signoffs',
           header: t('vetting.queue.columns.signOffs'),
           className: 'whitespace-nowrap tabular-nums',
-          // A phone's dense card runs its cells into one line, so nothing here may be a block.
           render: (row) => (
             <span className={phone ? undefined : 'block'}>
               {t(phone ? 'vetting.queue.signedPhone' : 'vetting.queue.signed', {
@@ -208,7 +191,6 @@ export function VettingQueue({
   }, [t, tab, now, timeZone, phone]);
 
   const rowMenu = (row: VettingReviewSummary, tr: React.ReactElement) => {
-    // Copy link alone is one action: a non-asker's row has no menu (the row click opens it).
     if (
       row.state !== 'requested' ||
       !onRequestMail ||

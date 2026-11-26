@@ -26,36 +26,15 @@ import { formatCountdown } from '@/lib/duration';
 import { canAnimate } from './motion';
 import { DEMO_NAME, NEXT_EVENT, READ_AGES } from './demo/demoCast';
 
-/**
- * The signed-out landing page's working mock of the Overview. The frame and
- * header here (portrait, name, Next chip, Customize, the alerts bell and the
- * tab row with its "Data updated" control) are drawn at once; the Widget grid
- * is the app's own `Widget` and `WidgetMenu` over sample data
- * (`demo/DemoBoard.tsx`), loaded as a chunk of its own because the widget
- * stack is far too large for the landing page's first load.
- *
- * Nothing here navigates or changes data: a Widget's title looks like the
- * real link but is plain text (every destination is a route a signed-out
- * visitor cannot reach), the menus and the popover only open and close, and
- * the alerts bell lists sample alerts.
- *
- * Every label is a key the real Overview renders (`overview.*`, `nav.*`), so a
- * retired key fails `Login.test.tsx` instead of printing a literal key at a
- * visitor.
- */
-
 const DemoBoard = lazy(() => guarded(() => import('./demo/DemoBoard')));
 
-/** Only the top of the board shows, fading out below: the full set scrolls off the page. */
 const BOARD_CLIP =
   'max-h-[46rem] overflow-hidden [mask-image:linear-gradient(to_bottom,#000_calc(100%-8rem),transparent)] sm:max-h-[43rem]';
 
-/** Holds the board's clipped height until its chunk arrives, so nothing below shifts. */
 function BoardPlaceholder() {
   return <div aria-hidden="true" className="h-[46rem] sm:h-[43rem]" />;
 }
 
-/** The sample alerts behind the bell: key under `login.demo.alerts`, how bad, how long ago. */
 const ALERTS: { key: string; severity: DeadlineSeverity; minutes: number }[] = [
   { key: 'undercut', severity: 'critical', minutes: 4 },
   { key: 'jobReady', severity: 'warning', minutes: 18 },
@@ -64,17 +43,9 @@ const ALERTS: { key: string; severity: DeadlineSeverity; minutes: number }[] = [
   { key: 'mail', severity: 'clear', minutes: 310 },
 ];
 
-/** How long the demo must be on screen before the newest sample alert arrives. */
 const ARRIVAL_DELAY_MS = 3000;
-/** Largest drift of the frame while scrolling, in px. */
 const FLOAT_MAX_PX = 12;
 
-/**
- * Drives the bell's one-time auto-play. `static`: motion is off or unavailable,
- * so every alert is already there. `pending`: the newest alert is withheld until
- * the demo has been in view for a while (timer pauses when it scrolls away or
- * the tab is hidden). `arrived`: done, never repeats.
- */
 function useAlertArrival(frameRef: RefObject<HTMLElement | null>) {
   const [phase, setPhase] = useState<'static' | 'pending' | 'arrived'>(() =>
     canAnimate() ? 'pending' : 'static'
@@ -105,10 +76,6 @@ function useAlertArrival(frameRef: RefObject<HTMLElement | null>) {
   return phase;
 }
 
-/**
- * True once the board's chunk may start loading: the browser is idle after the
- * page has loaded, so the hero paints first.
- */
 function useBoardReady() {
   const [ready, setReady] = useState(false);
   useEffect(() => {
@@ -135,7 +102,6 @@ function useBoardReady() {
   return ready;
 }
 
-/** Sets `--lp-float` (0 to -12px) on the frame as the page scrolls; rAF-throttled, off on touch. */
 function useFloat(frameRef: RefObject<HTMLElement | null>) {
   useEffect(() => {
     const el = frameRef.current;
@@ -160,14 +126,12 @@ function useFloat(frameRef: RefObject<HTMLElement | null>) {
 
 export function OverviewDemo() {
   const { t } = useTranslation();
-  // Wall-clock read for the illustrative "Data updated" age; lazy so it runs once.
   const [now] = useState(() => Date.now());
   const [alertsOpen, setAlertsOpen] = useState(false);
   const frameRef = useRef<HTMLDivElement>(null);
   const phase = useAlertArrival(frameRef);
   useFloat(frameRef);
   const boardReady = useBoardReady();
-  // Newest first: while `pending`, the head of the list has not arrived yet.
   const alerts = phase === 'pending' ? ALERTS.slice(1) : ALERTS;
   const breakdown = READ_AGES.map(({ kind, minutes }) => ({
     kind,
@@ -277,7 +241,6 @@ export function OverviewDemo() {
         </Popover>
       </div>
 
-      {/* The tab row, as `OverviewSubNav` draws it: the data age sits at its right end. */}
       <div className="mt-4 flex items-stretch">
         <div className={cx(tabScrollerClassName, 'min-w-0 flex-1')}>
           <div className={tabListClassName}>

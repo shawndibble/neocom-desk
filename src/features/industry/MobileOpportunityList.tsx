@@ -1,26 +1,3 @@
-/**
- * Phone rendering of the Build Opportunities list (mobile UX pass): a
- * genuinely different information hierarchy from the desktop table, not a
- * CSS-only reflow of it — a glanceable list rather than a column-for-column
- * comparison. Each card leads with its selection checkbox, then the product
- * with a promoted "hero" metric (whichever field the pilot is sorting by)
- * parked at the right of its row, and every other field folded into one
- * quiet secondary line. Every row action
- * (Plan, price history, the market) lives in one borderless ⋯ menu.
- *
- * Identical copies — same owner, print, location, ME/TE and runs — fold into
- * one card with a count (`identicalBlueprints.ts`); they price identically,
- * so a second card would only repeat the first.
- *
- * Sorting: `DataTable`'s own sortable column headers are accessibility-hidden
- * once it stacks below `sm` (`.dt-stacked thead`, `src/styles/index.css`), so
- * this list keeps its own sort toolbar, reusing `sortRows`/`nextDataTableSort`
- * so both this list and the desktop table sort and toggle direction by the
- * identical rule.
- *
- * Comparing: once two or more cards are ticked, a bar pinned above the bottom
- * tab bar carries the Compare action — the panel header has no room for it.
- */
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { selectedRowClassName } from '@/components/ui/controlStyles';
 import type { ReactNode } from 'react';
@@ -64,12 +41,9 @@ interface MobileOpportunityListProps {
   selectedIds: ReadonlySet<string>;
   onToggleSelected: (id: string) => void;
   onClearSelected: () => void;
-  /** Seeds the ticked cards' rows into Build Plan Compare. */
   onCompare: (rows: readonly OpportunityRow[]) => void;
-  /** Resolves true once it has opened the new plan (see `StartPlanButton`). */
   onStartPlan: (entry: BlueprintCatalogEntry, seed?: OpportunityPlanSeed) => Promise<boolean>;
   onViewHistory: (typeId: number, itemName: string, regionId: number) => void;
-  /** Account-wide skill gate for a row's product (issue #1231). */
   skillGateFor: (productTypeID: number) => SkillGateVerdict | undefined;
   nameForSkill: (typeID: number) => string;
   nameForCharacter: (characterId: number) => string;
@@ -79,17 +53,10 @@ type SortFieldId =
   'iskPerHour' | 'unitMargin' | 'margin' | 'vs90d' | 'stockCovers' | 'stillToBuy' | 'duration';
 
 interface HeroValue {
-  /** Null: blank — left out as a secondary readout, "Unknown" as the hero. */
   node: ReactNode | null;
   toneClassName?: string;
 }
 
-/**
- * One entry per sortable field. `label` doubles as this list's own sort menu
- * text and the secondary line's field label — both already-translated
- * strings the desktop table's columns use, so nothing new needed translating
- * beyond the sort menu's own chrome.
- */
 function sortFields(t: ReturnType<typeof useTranslation>['t']): Record<
   SortFieldId,
   {
@@ -175,7 +142,6 @@ function sortFields(t: ReturnType<typeof useTranslation>['t']): Record<
   };
 }
 
-/** Figures blanked on a reaction row that can't run where it would build (issue #5990). */
 const PROFIT_FIELDS: ReadonlySet<SortFieldId> = new Set(['iskPerHour', 'unitMargin', 'margin']);
 
 const SORT_FIELD_ORDER: readonly SortFieldId[] = [
@@ -221,10 +187,6 @@ export function MobileOpportunityList({
 
   const sortedRows = sortRows(rows, { sortValue: fields[activeFieldId].sortValue }, sort.direction);
   const groups = groupIdentical(sortedRows, identicalRowKey);
-  // A folded card's checkbox stands for its first row only, so selection is
-  // read off the visible cards: neither a hidden copy ticked earlier (say on
-  // desktop, before a resize) nor an id a Character filter change dropped
-  // from `rows` can count toward Compare.
   const selectedRows = groups
     .map((group) => group.first)
     .filter((row) => selectedIds.has(row.candidate.id));
@@ -261,7 +223,6 @@ export function MobileOpportunityList({
             <li
               key={row.candidate.id}
               aria-current={selected ? 'true' : undefined}
-              // A tap on the card is Start plan's action; its controls are exempt.
               onClick={(event) => {
                 if (isCardOwnClick(event)) startPlanFromRow(row);
               }}
@@ -282,7 +243,6 @@ export function MobileOpportunityList({
               </label>
 
               <div className="flex min-w-0 flex-col gap-1 py-3">
-                {/* The hero rides the name row's right edge like a price tag, matching the owned-blueprint cards. */}
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5">
                     <button
@@ -333,7 +293,6 @@ export function MobileOpportunityList({
 
                 <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[0.6875rem] text-text-dim tabular-nums">
                   <OpportunityBlueprintChip candidate={row.candidate} />
-                  {/* The hero says it when a profit figure leads; otherwise say it here. */}
                   {row.reactionLocation && !blanked(activeFieldId) && (
                     <span>{t('industry.opportunitiesSetReactionLocation')}</span>
                   )}

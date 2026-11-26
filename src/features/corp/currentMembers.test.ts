@@ -39,7 +39,6 @@ describe('loadCurrentMemberIds (#4194)', () => {
 
   it('does not call a character with no answer a leaver', async () => {
     resolveAffiliations.mockResolvedValue(new Map([[1, aff(1, 99)]]));
-    // 2 had no answer: it is neither a member nor known to have left.
     const members = await loadCurrentMemberIds([1, 2], 98);
     expect(members).toBeDefined();
     expect(members!.has(2)).toBe(true);

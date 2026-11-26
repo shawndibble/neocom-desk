@@ -19,12 +19,6 @@ import { useReportMineCount } from './useTabSharing';
 type State =
   { status: 'loading' } | { status: 'failed' } | { status: 'ready'; plans: SharedPlan[] };
 
-/**
- * The Skill plans tab's Everyone view: every plan the Community's Members
- * share, with Copy to my plans. A copy is an ordinary plan of the pilot's own
- * (it does not follow the original), and Copy opens it, as Skills › Plans'
- * "From a Community plan" does.
- */
 export function CommunitySharedPlans({
   characterId,
   communityId,
@@ -33,9 +27,7 @@ export function CommunitySharedPlans({
 }: {
   characterId: number;
   communityId: string;
-  /** For the sharer's name; null while the roster loads. */
   members: readonly CommunityMember[] | null;
-  /** How many of the listed plans are this Character's, once loaded (the tab's sharing line). */
   onMineCount?: (count: number) => void;
 }) {
   const { t } = useTranslation();
@@ -79,7 +71,6 @@ export function CommunitySharedPlans({
   }, [state, members, myUid, t]);
 
   async function copy(shared: { name: string; entries: PlanEntry[] }) {
-    // A second click while the first is still adding must not make a second plan.
     if (copying.current) return;
     copying.current = true;
     setCopyFailed(false);
@@ -87,7 +78,6 @@ export function CommunitySharedPlans({
       const plan = { ...newPlan(characterId, shared.name), entries: shared.entries };
       await db.skillPlans.add(plan);
       if (isSyncConfigured()) scheduleSync(characterId, { collections: ['plans'] });
-      // Opening the new plan is the confirmation.
       navigate(`/skills/plans/${plan.id}`);
     } catch {
       setCopyFailed(true);

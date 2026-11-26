@@ -111,7 +111,7 @@ describe('summarizeProductionRun', () => {
     expect(summary.status).toBe('new');
     expect(summary.quantitySold).toBe(0);
     expect(summary.remaining).toBe(10);
-    expect(summary.openInventoryValue).toBe(550_000); // 10 units @ 55,000/unit
+    expect(summary.openInventoryValue).toBe(550_000);
   });
 
   it('is "open" once partially sold, with open inventory valued at cost basis for the rest', () => {
@@ -133,7 +133,7 @@ describe('summarizeProductionRun', () => {
     const summary = summarizeProductionRun(
       run(),
       [saleLink({ quantity: 3 })],
-      [orderWatch({ initialVolumeRemain: 5, lastKnownVolumeRemain: 2 })], // filled 3
+      [orderWatch({ initialVolumeRemain: 5, lastKnownVolumeRemain: 2 })],
       {}
     );
     expect(summary.quantitySold).toBe(6);
@@ -160,7 +160,6 @@ describe('summarizeProductionRun', () => {
         [SKILL_IDS.accounting]: 5,
       }
     );
-    // salesTaxPct(5) = 3.375%, so tax on 1,000,000 = 33,750
     expect(summary.profit.salesTax).toBeCloseTo(33_750, 5);
   });
 

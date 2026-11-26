@@ -9,12 +9,6 @@ import { refusal } from './feederErrorText';
 import { parseSurveyRef } from './surveyRef';
 import { useBook } from './useBook';
 
-/**
- * Link a Moon Ore Survey as a chunk's ore source (D13) when no moon drill
- * notification gave one. The Survey is read first, so a link that opens nothing
- * is refused here instead of silently leaving the ore unknown, and its first
- * scan is kept with the link.
- */
 export function LinkSurveyDialog({
   open,
   onClose,
@@ -39,7 +33,6 @@ export function LinkSurveyDialog({
       run={async () => {
         const survey = await loadSurvey(id!);
         if (!survey.ok) throw refusal('survey-not-found');
-        // Its first scan is kept with the link, so the make-up outlives the Survey's 7-day link.
         const surveyScan = keptSurveyScan(survey, await loadMoonOreTypeIdByName());
         await edit({
           action: 'linkSurvey',

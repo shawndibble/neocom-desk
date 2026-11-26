@@ -10,31 +10,10 @@ import {
   type LocaleTree,
 } from './localeSplit.ts';
 
-/**
- * Build-time split of `locales/en.json` (see `localeSplit.ts` for the rule).
- *
- * - `src/i18n/index.ts`'s `import en from './locales/en.json'` resolves to the
- *   shell half instead of the file.
- * - Every other source file that names a lazy key gets a static
- *   `import "virtual:neocom-locale/gN"` per group it needs, prepended on its
- *   first line; each group module registers its keys through
- *   `lazyResources.ts` as it is evaluated.
- *
- * Build only, like `phosphorWeightsPlugin`: dev and Vitest keep loading the
- * whole file through the untouched import, so nothing about editing en.json
- * or testing against it changes. Other importers of en.json (the service
- * worker's `pushHandler.ts`, tests) are not redirected either.
- */
-
 const GROUP_PREFIX = 'virtual:neocom-locale/';
 const RESOLVED_PREFIX = '\0neocom-locale/';
 const SHELL_ID = `${RESOLVED_PREFIX}locale-shell`;
 
-/**
- * The group imports for one source file, prepended on its first line so every
- * later line keeps its number — the transform returns no sourcemap, which
- * tells the bundler positions did not move.
- */
 export function prependGroupImports(code: string, groupIds: readonly string[]): string {
   return groupIds.map((id) => `import ${JSON.stringify(GROUP_PREFIX + id)};`).join('') + code;
 }
@@ -79,8 +58,6 @@ export function localeSplitPlugin(): Plugin {
       this.addWatchFile(en);
       const srcDir = normalizePath(join(root, 'src'));
       const sources = sourceFiles(srcDir);
-      // `src/i18n/` only describes keys (in doc comments); nothing there
-      // renders one. It still takes part in the startup graph walk.
       const scanned = Object.fromEntries(
         Object.entries(sources).filter(([file]) => !file.startsWith(`${srcDir}/i18n/`))
       );
@@ -125,8 +102,6 @@ export function localeSplitPlugin(): Plugin {
       },
     },
     generateBundle(_options, bundle) {
-      // One line in the build log, so the split's effect on startup can be
-      // read from CI without a local build.
       const chunks = Object.values(bundle).filter((o) => o.type === 'chunk');
       const byName = new Map(chunks.map((c) => [c.fileName, c]));
       const startup = new Set<string>();
@@ -153,7 +128,7 @@ export function localeSplitPlugin(): Plugin {
           if (id === SHELL_ID) shellChunk = chunk.fileName;
         }
       }
-      const kb = (n: number) => `${(n / 1024).toFixed(1)} kB`; // fixed format: build log
+      const kb = (n: number) => `${(n / 1024).toFixed(1)} kB`;
       console.log(
         `[neocom-locale-split] shell in ${shellChunk}; locale at startup ${kb(atStartup)} of ${kb(total)}; ` +
           `startup chunks ${[...startup].sort().join(', ')}`

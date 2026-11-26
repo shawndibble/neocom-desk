@@ -14,8 +14,6 @@ import { FittingStartScreen } from './FittingStartScreen';
 import { clearDoctrineFitsCache } from './corpDoctrineFittings';
 import type { FittingLibrarySource } from './useFittingPicker';
 
-// The corp's Doctrine Fits in the library (issue #6202): read-only rows tagged Doctrine, opened
-// like a Community's Fitting; none for a Character outside the corp.
 vi.mock('@/app/useGrantedScopes', () => ({
   useEndpointsGranted: () => false,
   useGrantedScopes: () => undefined,

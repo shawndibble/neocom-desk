@@ -24,7 +24,6 @@ interface Filters {
 
 const NONE = <span className="text-text-dim">—</span>;
 
-/** Moon first: the name is the row's handle, the station under it. */
 const moonColumn = (withStation: boolean, phone: boolean): DataTableColumn<MoonRow> => ({
   id: 'moon',
   header: 'Moon',
@@ -115,7 +114,6 @@ function columns(phone: boolean): DataTableColumn<MoonRow>[] {
     },
   ];
   if (phone) {
-    // A card is a tap target already; owner, last pop and pop count live on the moon's page.
     const dropped = new Set(['owner', 'last', 'pops']);
     return cols.filter((c) => !dropped.has(c.id));
   }
@@ -123,10 +121,6 @@ function columns(phone: boolean): DataTableColumn<MoonRow>[] {
   return cols;
 }
 
-/**
- * The all-moons list. Variant A: one flat sortable table, the station under
- * each name. Variant B: the same rows folded under their refinery.
- */
 export function MoonsList({ archivedShown = false }: { archivedShown?: boolean }) {
   const phone = useIsPhone();
   const [filters, setFilters] = useState<Filters>({ owner: 'all', archived: archivedShown });

@@ -35,14 +35,8 @@ async function readJson<T>(path: string): Promise<T> {
 }
 
 const SHIELD_HARDENER = 77;
-/** Hacking and scanning rigs: the Memetic, Emission, Gravity and Signal rigs. */
 const SCANNING_RIGS = 1233;
 
-/**
- * The PvE Drake from issue #5548. A hand review turned it into: Damage Control
- * and three Ballistic Controls in the lows, three extenders, two hardeners and
- * an afterburner in the mids, three Core Defense Field Extender rigs.
- */
 const LOWS = [
   'Shield Power Relay II',
   'Shield Power Relay II',
@@ -61,7 +55,6 @@ const RIG = 'Medium Core Defense Field Purger II';
 
 type TypeMap = Record<string, { name: string; groupID: number }>;
 
-/** The real engine, the pinned SDE and an All-V pilot: what every case below shares. */
 async function loadWorld() {
   const engine = await loadRealDogmaEngine();
   const [types, rackOf, marketTypes, variations, skills] = await Promise.all([
@@ -136,9 +129,7 @@ const fitModule = (
   slot: FittingSlotKind,
   slotIndex: number,
   name: string
-): FittingModule =>
-  // Every loader marks modules active and the engine lowers a passive one (`eftLoader`).
-  ({ slot, slotIndex, typeId: id(name), state: 'active' }) as FittingModule;
+): FittingModule => ({ slot, slotIndex, typeId: id(name), state: 'active' }) as FittingModule;
 
 function drakeFit(id: (name: string) => number): Fitting {
   const module = (slot: FittingSlotKind, slotIndex: number, name: string) => ({
@@ -161,13 +152,11 @@ function drakeFit(id: (name: string) => number): Fitting {
   } as unknown as Fitting;
 }
 
-/** The Drake's PvE commonality from the Workbench fixture (`hullCommonality.realData.test.ts`): 14 fits, 6 afterburner, 5 MWD. */
 const DRAKE_PVE: JobCommonality = {
   fits: 14,
   groupShare: new Map(),
   propulsion: { afterburner: 6 / 14, mwd: 5 / 14, mjd: 0 },
 };
-/** The Dominix's: 14 PvE fits, 10 with a micro jump drive, 5 afterburner, 3 MWD. */
 const DOMINIX_PVE: JobCommonality = {
   fits: 14,
   groupShare: new Map(),
@@ -267,7 +256,6 @@ describe('Improve makeover on a PvE Drake (real WASM + real pinned SDE)', () => 
   });
 });
 
-/** The relic and data Astero from the #5548 review, in the order its EFT lists them. */
 const ASTERO = {
   low: [
     "'Stoic' Core Equalizer I",
@@ -285,13 +273,11 @@ const ASTERO = {
   rig: ['Small Inverted Signal Field Projector I', 'Small Low Friction Nozzle Joints II'],
 };
 const TANK = ['Small Armor Repairer II', 'Damage Control II'];
-/** The explorer's kit by group: cloak, probe launcher, two analyzers, a propulsion module (a swap within a group is fine). */
 const EXPLORER_GROUPS = new Map([
   [330, 1],
   [481, 1],
   [538, 2],
   [46, 1],
-  // The 'Stoic' Core Equalizer: a warp core stabilizer, what gets it away when pointed.
   [315, 1],
 ]);
 
@@ -318,7 +304,6 @@ describe('Improve makeover on an Explore Astero (real WASM + real pinned SDE)', 
     safe = (await world.search(astero, { job: 'explore', space: 'safe' }, 'explore')).result;
   }, 90_000);
 
-  /** The fit the search ends on; the open fit when it finds no Makeover. */
   const namesOf = (found: MakeoverSearch | null) =>
     (found?.makeover?.fitting ?? astero).modules.map((m) => types[String(m.typeId)].name);
 
@@ -360,7 +345,6 @@ describe('Improve makeover on an Explore Astero (real WASM + real pinned SDE)', 
   it('Safe does not guard the tank modules (any drop shows as lost)', () => {
     const lost = safe?.makeover?.lost ?? [];
     const dropped = TANK.some((name) => !namesOf(safe).includes(name));
-    // A dropped tank module must be reported; keeping it is also allowed.
     expect(!dropped || lost.length > 0).toBe(true);
   });
 });
@@ -402,7 +386,6 @@ describe('Explore score on the Astero rigs (real WASM + real pinned SDE)', () =>
   });
 });
 
-/** A sentry Dominix with no propulsion: the #5548 review's drone boat without its micro jump drive. */
 const DOMINIX = {
   low: [
     'Large Armor Repairer II',

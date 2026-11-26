@@ -4,7 +4,6 @@ import type { WarParty as WarPartyData } from '@/engine/wars';
 import { partyEntity } from './partyEntity';
 import { usePartyName } from './usePartyName';
 
-/** A war party's logo and name, the name opening its Show Info (§6c "Entities"). */
 export function WarParty({ party }: { party: Pick<WarPartyData, 'corporationId' | 'allianceId'> }) {
   const entity = partyEntity(party);
   const name = usePartyName(party);

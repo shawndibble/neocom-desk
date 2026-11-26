@@ -1,9 +1,3 @@
-/**
- * Turn a raw plan file (`.emp` = gzip, or plain `.xml`) into the plain,
- * engine-safe `PlanXmlDocument` intermediate object skillPlanXml consumes.
- * This is the only module that touches DOMParser/gzip — a `Document` never
- * crosses into src/engine, only this module's plain output does.
- */
 import type { PlanXmlDocument, PlanXmlEntryInput } from '@/engine/import/skillPlanXml';
 
 export type PlanXmlDocumentErrorCode =
@@ -24,30 +18,20 @@ export type PlanXmlDocumentResult =
 
 const GZIP_MAGIC_0 = 0x1f;
 const GZIP_MAGIC_1 = 0x8b;
-// A plan is tiny XML even with thousands of entries; these caps only exist
-// to reject a malicious/corrupt file cheaply, not to accommodate real plans.
 const MAX_COMPRESSED_BYTES = 2 * 1024 * 1024;
 const MAX_DECOMPRESSED_BYTES = 10 * 1024 * 1024;
 
-/** Legitimate exports never carry a DOCTYPE — rejecting it removes XXE/entity-expansion as a concern before DOMParser ever sees the text. */
 function containsDoctype(text: string): boolean {
   return /<!DOCTYPE/i.test(text);
 }
 
 async function decompressGzipCapped(bytes: Uint8Array): Promise<string> {
-  // Built directly from the bytes rather than via Blob.stream(): jsdom's Blob
-  // (the test environment's DOM implementation) has no .stream() method,
-  // unlike a real browser's — ReadableStream itself is a platform global both
-  // provide, so this path works identically in tests and in the browser.
   const source = new ReadableStream<Uint8Array>({
     start(controller) {
       controller.enqueue(bytes);
       controller.close();
     },
   });
-  // lib.dom types DecompressionStream's writable as WritableStream<BufferSource>,
-  // which pipeThrough's generic can't unify with our ReadableStream<Uint8Array>
-  // even though Uint8Array is a valid BufferSource at runtime — cast the pair.
   const stream = source.pipeThrough(
     new DecompressionStream('gzip') as ReadableWritablePair<Uint8Array, Uint8Array>
   );
@@ -86,9 +70,6 @@ function readEntries(planEl: Element): PlanXmlEntryInput[] {
     entries.push({
       skillName,
       level: Number(levelAttr),
-      // A malformed attribute (Number(...) -> NaN) is treated as absent
-      // rather than propagated — same "unknown gracefully becomes optional"
-      // stance as an entry missing the attribute entirely.
       ...(skillID !== undefined && Number.isFinite(skillID) ? { skillID } : {}),
       ...(priority !== undefined && Number.isFinite(priority) ? { priority } : {}),
     });
@@ -96,12 +77,6 @@ function readEntries(planEl: Element): PlanXmlEntryInput[] {
   return entries;
 }
 
-/**
- * Parse a raw plan file's bytes. `file` may be gzip (`.emp`) or plain
- * (`.xml`) — detected by content (gzip magic bytes), not filename, since a
- * user might rename either. Never throws: every failure mode returns
- * `{ ok: false, error }` for the caller to translate into a UI message.
- */
 export async function parsePlanXmlFile(file: File): Promise<PlanXmlDocumentResult> {
   if (file.size > MAX_COMPRESSED_BYTES) {
     return { ok: false, error: { code: 'tooLarge' } };
@@ -111,9 +86,6 @@ export async function parsePlanXmlFile(file: File): Promise<PlanXmlDocumentResul
   try {
     bytes = new Uint8Array(await file.arrayBuffer());
   } catch {
-    // A File handle can reject on read (removed/renamed/permission-denied
-    // mid-pick) — this is the one step in the pipeline that touches disk
-    // I/O rather than pure bytes-in-memory, so it's the one guarded here.
     return { ok: false, error: { code: 'readFailed' } };
   }
   const isGzip = bytes[0] === GZIP_MAGIC_0 && bytes[1] === GZIP_MAGIC_1;

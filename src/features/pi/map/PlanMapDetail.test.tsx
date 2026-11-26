@@ -17,7 +17,6 @@ import {
   reportWidth,
 } from '@/test/planMap';
 
-// The finder reads the SDE and the stargate graph; its own behaviour is not under test here.
 vi.mock('@/features/pi/map/PlanetFinder', () => ({
   PlanetFinder: ({ types }: { types: readonly string[] }) => (
     <div data-testid="finder">finder for {types.join(',')}</div>
@@ -38,7 +37,6 @@ describe('PlanMap: the detail drawer', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
     await waitFor(() => expect(tile).toHaveFocus());
 
-    // Biofuels is still traced, so a click on it would clear it: open another.
     const other = product('Proteins');
     await user.click(other);
     await user.click(screen.getByRole('button', { name: 'Close' }));
@@ -53,32 +51,23 @@ describe('PlanMap: the detail drawer', () => {
     const dialog = screen.getByRole('dialog', { name: 'Where to put a new Lava colony' });
     expect(within(dialog).getByText('Add a Lava planet')).toBeInTheDocument();
     expect(within(dialog).getByText(/Unlocks \d+ products/)).toBeInTheDocument();
-    // Assistive tech gets the product names, not only the count.
     expect(within(dialog).getByText(/^Unlocked products: .*Plasmoids.*\.$/)).toBeInTheDocument();
     expect(within(dialog).getByText(/Best one-planet recipe:/)).toBeInTheDocument();
     expect(
       within(dialog).getByText("You're using 1 of 4 planets: room for 3 more.")
     ).toBeInTheDocument();
     expect(within(dialog).getByTestId('finder')).toHaveTextContent('finder for lava');
-    // Pressed while it is open, and the highlight stays after the drawer closes.
     expect(planet('Lava')).toHaveAttribute('aria-pressed', 'true');
     await user.keyboard('{Escape}');
     expect(screen.queryByRole('dialog')).toBeNull();
     expect(screen.getByText('What if I add a Lava planet?')).toBeInTheDocument();
   });
 
-  // Felsic Magma is a Lava product; the pilot has no Lava colony. It shows on
-  // the map once Lava is a what-if, and tracing it keeps that tick. Kept as
-  // short tests: each map click re-renders the whole map (~0.5s).
   async function traceFelsicMagmaWithLavaWhatIf() {
     const user = userEvent.setup({ delay: null });
     renderMap();
     await user.click(planet('Lava'));
     await user.keyboard('{Escape}');
-    // Escape hands focus back to the Lava planet on the next animation frame.
-    // Let that frame run (frames fire in request order): on a loaded runner it
-    // could otherwise land after the click below and pull focus out of the
-    // product drawer it opens.
     await act(() => new Promise<void>((resolve) => requestAnimationFrame(() => resolve())));
     expect(planet('Lava')).toHaveFocus();
     await user.click(product('Felsic Magma'));
@@ -89,7 +78,6 @@ describe('PlanMap: the detail drawer', () => {
     await traceFelsicMagmaWithLavaWhatIf();
     const dialog = screen.getByRole('dialog', { name: /^(How to make|Where to get) / });
     expect(planet('Lava')).toHaveAttribute('aria-pressed', 'true');
-    // The drawer takes focus as it opens, in the same act as the click.
     expect(dialog).toContainElement(document.activeElement as HTMLElement);
   });
 
@@ -109,7 +97,6 @@ describe('PlanMap: the detail drawer', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
     await user.click(planet('Lava'));
     await user.hover(planet('Lava'));
-    // No what-if preview: the trace already shows the chain, pink wires would bury it.
     expect(screen.queryByText('What if I add a Lava planet?')).toBeNull();
     await user.click(planet('Lava'));
     expect(
@@ -210,7 +197,6 @@ describe("PlanMap: docked or drawer, by the map panel's own width", () => {
     expect(within(aside).getByText('Proteins', { selector: 'div' })).toBeInTheDocument();
     expect(within(aside).getByRole('link', { name: 'View in Market' })).toBeInTheDocument();
 
-    // And back, without a stale panel.
     reportWidth(1200);
     expect(layout).toHaveAttribute('data-detail-mode', 'drawer');
     expect(screen.queryByRole('complementary')).toBeNull();

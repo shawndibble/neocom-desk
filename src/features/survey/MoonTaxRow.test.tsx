@@ -19,7 +19,6 @@ vi.mock('@/features/miningTax/surveyConnections', async (importOriginal) => ({
   autoAssignFromSurveys,
 }));
 
-// Every name is one EVE corporation unless a test says otherwise: a Payee is always someone in game.
 const { lookupPayeeName } = vi.hoisted(() => ({ lookupPayeeName: vi.fn() }));
 vi.mock('@/features/miningTax/payeeLookup', () => ({ lookupPayeeName }));
 
@@ -165,7 +164,6 @@ describe('MoonTaxRow', () => {
     const rate = screen.getByLabelText('Tax rate, percent');
     fireEvent.focus(name);
     fireEvent.change(name, { target: { value: 'Moon Corp' } });
-    // Focus moving to the rate field is still inside the pair.
     fireEvent.blur(name, { relatedTarget: rate });
     fireEvent.focus(rate);
     fireEvent.change(rate, { target: { value: '8' } });

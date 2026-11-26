@@ -2,11 +2,6 @@ import { describe, expect, it } from 'vitest';
 import { jumpCountsForRoutes } from './jumpCounts';
 import type { JumpGraph } from './jumpRoute';
 
-/**
- *   HUB ─ LOW ─ FAR            two jumps, LOW is lowsec
- *   HUB ─ A ─ B ─ C ─ FAR      four jumps, all highsec
- *   ISLAND                     a system with no stargates
- */
 const HUB = 30000001;
 const LOW = 30000002;
 const FAR = 30000003;
@@ -48,8 +43,6 @@ describe('jumpCountsForRoutes', () => {
   });
 
   it('has no distance for a haul with an unplaced end', () => {
-    // A player structure resolves to no system, so neither end of the trip is
-    // measurable — distinct from a route that exists but is long.
     const counts = jumpCountsForRoutes(GRAPH, [
       { originSystemId: null, destinationSystemId: FAR },
       { originSystemId: HUB, destinationSystemId: null },
@@ -79,8 +72,6 @@ describe('jumpCountsForRoutes', () => {
   });
 
   it('agrees with itself whether an origin is asked once or many times', () => {
-    // The grouping below switches strategy on how many destinations an origin
-    // has; both paths must give the same answer.
     const alone = jumpCountsForRoutes(GRAPH, [{ originSystemId: HUB, destinationSystemId: FAR }], {
       preference: 'prefer-highsec',
       securityOf,

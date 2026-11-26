@@ -84,7 +84,6 @@ describe('the report points at the data', () => {
     await userEvent.click(panel.getByText('Skills').closest('tr')!);
     expect(await screen.findByTestId('where')).toHaveTextContent(dataPage('skills'));
     expect(await screen.findByRole('tab', { name: /Skills/, selected: true })).toBeInTheDocument();
-    // The review the report opened is not opened again for the data.
     expect(fixture.calls.filter((call) => call.method === 'open')).toHaveLength(1);
   });
 
@@ -150,7 +149,6 @@ describe('the data page', () => {
     expect(
       await screen.findByText('All 4,652 rows read. Scroll for the rest.')
     ).toBeInTheDocument();
-    // One stored chunk per call: the whole journal arrived across several pages.
     expect(rawCalls()).toHaveLength(Math.ceil(RAW_BUSY_WALLET_ROWS / RAW_CHUNK));
     expect(rawCalls().map((call) => call.args[4])).toEqual([
       undefined,
@@ -165,7 +163,6 @@ describe('the data page', () => {
     await screen.findByText('All 12 rows read. Scroll for the rest.');
     await userEvent.click(screen.getByRole('tab', { name: /Skills/ }));
     await screen.findByText('All 31 rows read. Scroll for the rest.');
-    // One chunk per character, once: the second visit to Skills read nothing.
     expect(rawCalls().filter((call) => call.args[3] === 'skills')).toHaveLength(3);
   });
 
@@ -176,7 +173,6 @@ describe('the data page', () => {
     await userEvent.click(within(group).getByRole('button', { name: 'Tamsin Vell' }));
     expect(await screen.findByText('All 11 rows read. Scroll for the rest.')).toBeInTheDocument();
     expect(screen.getByTestId('where')).toHaveTextContent('character=2118000001');
-    // A single character's table has no Character column.
     expect(screen.queryByRole('columnheader', { name: 'Character' })).toBeNull();
 
     await userEvent.type(screen.getByRole('searchbox', { name: 'Search Skills' }), 'cynosural');
@@ -257,7 +253,6 @@ describe('the data page', () => {
     const rawRows = fixture.rawRows;
     fixture.rawRows = async (...args) => {
       const page = await rawRows(...args);
-      // The server stops early: no cursor after the first page.
       return { ...page, next: null };
     };
     setVettingBackendOverride(fixture);

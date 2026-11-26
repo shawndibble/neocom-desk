@@ -1,9 +1,3 @@
-/**
- * Fleet Payouts client (issue #4779): reads go through Firestore under the
- * membership rules (lite build, no listeners: callers refetch after a change);
- * creating, marking paid and removing go through the callables, which hold the
- * caps and the boss-only checks.
- */
 import { collection, getDocs, limit, orderBy, query, where } from 'firebase/firestore/lite';
 import type { FleetPayout, FleetPayoutDraft, FleetShare } from '@/engine/communities/fleetPayouts';
 import { getSyncFirestore } from '@/sync/firebaseApp';
@@ -47,12 +41,10 @@ function readShare(id: string, d: Record<string, unknown>): FleetShare | null {
   };
 }
 
-/** Most Fleet Payouts one read takes, newest first. */
 export const FLEET_PAYOUTS_CAP = 500;
 
 const byIndex = (a: FleetShare, b: FleetShare) => Number(a.id) - Number(b.id);
 
-/** Every Fleet Payout in a Community, newest first. A document that does not read as one is skipped. */
 export async function loadFleetPayouts(
   characterId: number,
   communityId: string
@@ -77,7 +69,6 @@ export async function loadFleetPayouts(
   );
 }
 
-/** The boss's read: the whole Share list, in list order. */
 export async function loadFleetShares(
   characterId: number,
   communityId: string,
@@ -104,7 +95,6 @@ export async function loadFleetShares(
     .sort(byIndex);
 }
 
-/** A listed Member's own Share. A query on `memberUid`, since the rules deny a non-owner the whole list. */
 export async function loadMyFleetShare(
   characterId: number,
   communityId: string,
@@ -153,7 +143,6 @@ export function createFleetPayout(
   );
 }
 
-/** The boss marks one Share paid, or takes it back (checked server side). */
 export async function setFleetShareDone(
   characterId: number,
   communityId: string,
@@ -169,7 +158,6 @@ export async function setFleetShareDone(
   });
 }
 
-/** The boss, or the Community admin, removes a Payout with its Shares (checked server side). */
 export async function removeFleetPayout(
   characterId: number,
   communityId: string,

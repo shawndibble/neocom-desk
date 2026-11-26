@@ -141,7 +141,6 @@ describe('OwnedBlueprintsPanel', () => {
     expect(screen.getByText('Fullerides Reaction Formula')).toBeInTheDocument();
     expect(screen.getByText('Merlin Blueprint')).toBeInTheDocument();
     expect(await screen.findByText('Jita IV - Moon 4')).toBeInTheDocument();
-    // Walked up through the cached container to its station.
     expect(await screen.findByText('Amarr VIII')).toBeInTheDocument();
     expect(screen.getByText('In container')).toBeInTheDocument();
   });
@@ -193,11 +192,9 @@ describe('OwnedBlueprintsPanel', () => {
     const user = userEvent.setup();
     const onStartPlan = renderPanel();
     const buttons = screen.getAllByRole('button', { name: 'Plan' });
-    // Merlin isn't in the catalog, so it has nothing to plan.
     expect(buttons).toHaveLength(2);
     const rifterRow = screen.getByText('Rifter Blueprint').closest('tr')!;
     await user.click(within(rifterRow).getByRole('button', { name: 'Plan' }));
-    // The row's ranked pricing rides along, so the plan opens at its ISK/hour.
     expect(onStartPlan).toHaveBeenCalledWith(RIFTER, RANKED[0]);
   });
 

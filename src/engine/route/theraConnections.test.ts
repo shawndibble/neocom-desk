@@ -32,7 +32,6 @@ function connection(overrides: Partial<TheraConnection> = {}): TheraConnection {
 
 const SYSTEMS = new Map([
   [30002676, { security: 0.62 }],
-  // Shows as 0.5 in game, so highsec, whatever the feed's class letters say.
   [30003807, { security: 0.46 }],
   [30004629, { security: -0.3 }],
   [31000629, { security: -0.99 }],

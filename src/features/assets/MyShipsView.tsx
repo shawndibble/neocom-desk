@@ -51,37 +51,27 @@ import type { JumpBasis } from '@/features/route/jumpBasis';
 import { textParam, type UrlSort } from '@/lib/urlState';
 import { useUrlParam, useUrlSort } from '@/lib/useUrlState';
 
-/** SDE category 6. */
 const SHIP_CATEGORY_ID = 6;
 
 interface ShipData {
   rows: ShipRow[];
   typeNames: ReadonlyMap<number, string>;
-  /** In-game names the players gave their ships, by item id (issue #5652). */
   gameNames: AssetNameMap;
-  /** SDE group (the ship class) by type id. */
   groupIdByType: ReadonlyMap<number, number>;
   characterNames: ReadonlyMap<number, string>;
-  /** Type names of the owned assets a ship sits in, by item id (for the trail). */
   holderNames: ReadonlyMap<number, string>;
-  /** What sits directly in each ship (slots, bays, cargo), by ship item id: the fitting the menu opens. */
   contentsByShip: ReadonlyMap<number, ShipAssetItem[]>;
-  /** Chosen Characters whose assets could not be read: their ships are missing, not absent. */
   skipped: readonly SkippedCharacterAssets[];
-  /** How many Characters' assets were read; zero with some skipped means nothing loaded at all. */
   loadedCount: number;
-  /** When the oldest saved-copy list was read (ms); null when every list came from ESI. */
   cachedAt: number | null;
 }
 
 type ShipsState = { status: 'loading' } | { status: 'ready'; data: ShipData } | { status: 'error' };
 
-/** SDE-backed ship lookup plus every chosen Character's ships. Cache-or-live, like the page's own cross-character read. */
 async function loadShipData(characterIds: readonly number[]): Promise<ShipData> {
   const [{ entries, skipped, cachedAt }, types, groupCategories] = await Promise.all([
     loadOtherCharactersAssetsDetailed(characterIds),
     loadTypes(),
-    // Without it no type reads as a ship: an empty list beats a wrong one.
     loadGroupCategories().catch(() => ({}) as Record<string, number>),
   ]);
   const isShip = (typeId: number) => {
@@ -92,7 +82,6 @@ async function loadShipData(characterIds: readonly number[]): Promise<ShipData> 
     entry.assets.map((asset) => ({ ...asset, characterId: entry.characterId }))
   );
   const rows = findShips(owned, isShip);
-  // Best-effort and per Character; the read swallows its own failures.
   const gameNames: Record<number, string> = {};
   await mapWithConcurrencyLimit(entries, ESI_FANOUT_CONCURRENCY, async (entry) => {
     Object.assign(gameNames, await loadCharacterAssetNames(entry.characterId, entry.assets));
@@ -132,10 +121,8 @@ async function loadShipData(characterIds: readonly number[]): Promise<ShipData> 
   };
 }
 
-/** Flags worth naming; a container's own flag (Unlocked) adds nothing, so it reads as the holder name alone. */
 const NAMED_HOLD_FLAGS = new Set(['ShipHangar', 'FleetHangar', 'Cargo']);
 
-/** The holders of a ship, outermost first: "Orca (Ship Maintenance Bay) › Cargo Container". Empty for a free-standing ship. */
 function holderTrailText(
   row: ShipRow,
   holderNames: ReadonlyMap<number, string>,
@@ -154,13 +141,11 @@ function holderTrailText(
   return parts.join(' › ');
 }
 
-/** What holds a ship inside another asset: "inside Orca (Ship Maintenance Bay) › Cargo Container". Empty for a free-standing ship. */
 function holderTrail(row: ShipRow, holderNames: ReadonlyMap<number, string>, t: TFunction): string {
   const text = holderTrailText(row, holderNames, t);
   return text === '' ? '' : t('assets.myShips.inside', { holder: text });
 }
 
-/** The kind a ship's location resolves under: a station, a system, else a structure (`other`, or the parent of an item ESI never returned as an asset). */
 function placeRefOf(row: ShipRow) {
   return {
     locationId: row.locationId,
@@ -172,10 +157,6 @@ function placeRefOf(row: ShipRow) {
   };
 }
 
-/**
- * Names, security and jumps for every distinct place the ships sit in. Best
- * effort: each lands as it resolves and the list never waits on them.
- */
 function usePlaces(rows: readonly ShipRow[], activeCharacterId: number | null, route: JumpBasis) {
   const loadOrigin = useCallback(
     () => loadCharacterSolarSystemId(activeCharacterId ?? 0).catch(() => null),
@@ -198,19 +179,14 @@ function usePlaces(rows: readonly ShipRow[], activeCharacterId: number | null, r
 }
 
 interface MyShipsViewProps {
-  /** The Character filter, already resolved to the Characters whose ships to list. */
   characterIds: readonly number[];
   activeCharacterId: number | null;
-  /** Set while the filter reads "This character" and there are more Characters to show. */
   onShowAllCharacters?: () => void;
-  /** Where a ship's location opens in the Assets browser. */
   hrefFor: (locationId: number) => string;
   route: JumpBasis;
-  /** Reports the Characters this tab's read skipped, for the header picker's `missingNames`. */
   onSkippedChange?: (names: readonly string[] | undefined) => void;
 }
 
-/** Phone: a card (ship line, place line, then one meta line: character, Sec, Jumps). `sm` up: the table grid. The Character column only exists when more than one Character's ships are listed. */
 const ROW_GRID_BASE = 'flex flex-wrap items-center gap-x-3 gap-y-1 sm:grid sm:gap-y-0.5';
 const ROW_GRID_WITH_CHARACTER =
   'sm:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,1.8fr)_2.5rem_10rem_2rem]';
@@ -221,16 +197,10 @@ type SortColumn = 'ship' | 'character' | 'location' | 'security' | 'jumps';
 
 const SORT_COLUMNS: readonly SortColumn[] = ['ship', 'character', 'location', 'security', 'jumps'];
 
-/** Nearest first. Defaults stay out of the URL (ADR 0015). */
 const DEFAULT_SORT: UrlSort = { columnId: 'jumps', direction: 'asc' };
 
 const QUERY_PARAM = textParam();
 
-/**
- * Search and sort live in the URL (ADR 0015), under `ships.*`: `usePageTab`
- * carries the query string across a tab switch, and the Items tab's own `q`
- * and sort would otherwise leak into this list and back.
- */
 const QUERY_KEY = 'ships.q';
 const SORT_KEY = 'ships.sort';
 
@@ -244,7 +214,6 @@ interface SortKeys {
 
 const NO_CLASSES: ReadonlyMap<number, string> = new Map();
 
-/** Ship classes (SDE groups) by group id; lands after the list, which never waits on it. */
 function useShipClasses(groupIds: readonly number[]): ReadonlyMap<number, string> {
   const idsKey = idSetKey(groupIds);
   const loadClasses = useCallback(
@@ -265,15 +234,10 @@ interface ShipRowViewProps {
   security: number | null | undefined;
   jumps: JumpsAwayResult | undefined;
   shipClass: string | undefined;
-  /** Where the ship's location opens in the Assets browser. */
   locationHref: string;
   preference: RoutePreferenceKind;
 }
 
-/**
- * One ship. Click opens Show info; the ⋮ button and a right-click or hold
- * reach the same menu: Show info, Show fitting, Plan route, Open location assets.
- */
 function ShipRowView({
   row,
   data,
@@ -418,10 +382,6 @@ function ShipRowView({
   );
 }
 
-/**
- * My ships (issue #2853): every ship the chosen Characters own, nearest
- * first. The Assets page's Ships tab (`/assets/ships`).
- */
 export function MyShipsView({
   characterIds,
   activeCharacterId,
@@ -436,7 +396,6 @@ export function MyShipsView({
     () => loadShipData(idsKey === '' ? [] : idsKey.split(',').map(Number)),
     [idsKey]
   );
-  // A manual retry re-keys the load so an all-skipped result blanks to the spinner, as before.
   const [retryTick, setRetryTick] = useState(0);
   const ships = useKeyedLoad(`${idsKey}#${retryTick}`, loadShips);
   const state = useMemo<ShipsState>(
@@ -449,7 +408,6 @@ export function MyShipsView({
 
   const allSkipped =
     state.status === 'ready' && state.data.skipped.length > 0 && state.data.loadedCount === 0;
-  // Who the read left out is the header picker's to say (its dot and "Not included" note).
   useReportSkipped(
     state.status === 'ready' ? state.data.skipped.map((c) => c.name) : undefined,
     onSkippedChange
@@ -473,7 +431,6 @@ export function MyShipsView({
     [urlSort.columnId, urlSort.direction]
   );
   const [query, setQuery] = useUrlParam(QUERY_KEY, QUERY_PARAM);
-  // Keys that don't depend on the resolving places: built once per rows, not per places tick.
   const staticKeys = useMemo(() => {
     if (state.status !== 'ready') return [];
     const { data } = state;
@@ -519,7 +476,6 @@ export function MyShipsView({
     items.sort((x, y) => {
       const va = x.d[sort.column] === '' ? null : x.d[sort.column];
       const vb = y.d[sort.column] === '' ? null : y.d[sort.column];
-      // Unresolved values sort last in either direction.
       if (va === null || vb === null) return va === vb ? 0 : va === null ? 1 : -1;
       const cmp =
         typeof va === 'number' && typeof vb === 'number'
@@ -553,12 +509,10 @@ export function MyShipsView({
   }, [state, places, shipClasses, t]);
   const shipsExport = useTableExport({
     surface: 'my-ships',
-    // Not a DataTable: `sorted` already carries the search and the sort.
     source: 'rows',
     rows: sorted,
     columns: shipsCsvColumnList,
   });
-  // One Character's ships need no Character column.
   const showCharacter = characterIds.length > 1;
   const columns = (
     showCharacter
@@ -604,7 +558,6 @@ export function MyShipsView({
                 ? 'failed'
                 : 'ok'
           }
-          // Every chosen Character skipped (or the read threw): "No ships found" would be a guess.
           title={state.status === 'error' ? t('assets.myShips.error') : t('common.couldntLoad')}
           hint={allSkipped ? t('assets.skippedAllHint') : undefined}
           onRetry={() => setRetryTick((n) => n + 1)}

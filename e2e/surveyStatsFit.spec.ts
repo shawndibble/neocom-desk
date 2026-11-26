@@ -1,19 +1,8 @@
-/**
- * The Survey's stat tiles on the public share page (`/s/<id>`): no tile value
- * clips or ellipsizes, at the widths where the page's ~720px board used to
- * squeeze five viewport-keyed columns to ~110px each (#3280). The tile grid
- * follows the board's own width, so a tile drops to another row instead.
- *
- * Playwright rather than jsdom: the check is real layout (`scrollWidth` vs
- * `clientWidth`). No login; Firestore's reads are mocked, as in
- * `appraisalSharedNarrow.spec.ts`.
- */
 import type { Page } from '@playwright/test';
 import { test, expect, PHONE } from './support/testBase';
 
 const SHARE_ID = 'e2eSurvy1';
 
-/** Two scans of one field ten minutes apart, so Pace, Done and Time left all have a value. */
 const SCANS = [
   { at: -600_000, text: 'Veldspar\t1,000,000\t200,000 m3\t900,000.00 ISK\t23 km' },
   { at: 0, text: 'Veldspar\t794,000\t158,800 m3\t720,000.00 ISK\t23 km' },
@@ -104,7 +93,6 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 1024, height: 768
         };
       })
     );
-    // One row, or rows of 3 (6 = 3 + 3; 5 = 3 + 2): never 4 + 2 or 5 + 1.
     const rows = await tiles.evaluateAll((nodes) => {
       const counts = new Map<number, number>();
       for (const node of nodes) {

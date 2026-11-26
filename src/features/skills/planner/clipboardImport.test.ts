@@ -83,11 +83,11 @@ describe('previewClipboardImport: EFT fit', () => {
       typeByName,
       loadType: loadTypeFixture({
         [RIFTER_TYPE_ID]: [
-          { attribute_id: 182, value: 3329 }, // Minmatar Frigate
+          { attribute_id: 182, value: 3329 },
           { attribute_id: 277, value: 1 },
         ],
         [MODULE_TYPE_ID]: [
-          { attribute_id: 182, value: 3336 }, // Gunnery
+          { attribute_id: 182, value: 3336 },
           { attribute_id: 277, value: 3 },
         ],
       }),
@@ -109,19 +109,16 @@ describe('previewClipboardImport: EFT fit', () => {
   });
 
   it('takes the hull from a bare [Ship] header, which used to be dropped', async () => {
-    // Behaviour change (issue #630): `[Rifter]` used to fail the header
-    // outright, so the Skill Planner planned the modules and silently left out
-    // everything the hull itself needs.
     const deps: ClipboardImportDeps = {
       skillByName: new Map(),
       typeByName,
       loadType: loadTypeFixture({
         [RIFTER_TYPE_ID]: [
-          { attribute_id: 182, value: 3329 }, // Minmatar Frigate
+          { attribute_id: 182, value: 3329 },
           { attribute_id: 277, value: 1 },
         ],
         [MODULE_TYPE_ID]: [
-          { attribute_id: 182, value: 3336 }, // Gunnery
+          { attribute_id: 182, value: 3336 },
           { attribute_id: 277, value: 3 },
         ],
       }),
@@ -181,7 +178,7 @@ describe('previewClipboardImport: EFT fit', () => {
     const deps: ClipboardImportDeps = {
       skillByName: new Map(),
       typeByName,
-      loadType: async () => null, // nothing cached for either type
+      loadType: async () => null,
     };
 
     const preview = await previewClipboardImport('[Rifter, My Fit]\nGyrostabilizer II', deps);
@@ -199,9 +196,6 @@ describe('previewClipboardImport: EFT fit', () => {
       typeByName: new Map(),
       loadType: async () => null,
     };
-    // Starts with "[" (so it routes to EFT mode) but names no ship. A bare
-    // "[Rifter]" used to stand in for a broken header here; it parses fine now
-    // (issue #630), so this needs a header that is genuinely unreadable.
     const preview = await previewClipboardImport('[, Max Hacker]\nGyrostabilizer II', deps);
     expect(preview.errors).toEqual([
       {

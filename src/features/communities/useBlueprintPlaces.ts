@@ -10,31 +10,17 @@ import { KEY as BLUEPRINTS_KEY } from '@/features/industry/data';
 import { lookupSolarSystem } from '@/sde/solarSystems';
 import { loadPlacedBlueprints } from './blueprintPlacement';
 
-/** A station or structure's name and system; either is null when it cannot be read. */
 export interface PlaceLabel {
   name: string | null;
   systemName: string | null;
 }
 
-/**
- * The Character's blueprint copies with their places, or why there are none:
- * `unavailable` when the blueprints or assets aren't cached, which is also
- * when a publish sends nothing, so locations cannot be shared yet.
- */
 export type BlueprintCopies =
   { status: 'loading' } | { status: 'unavailable' } | { status: 'ready'; copies: BlueprintCopy[] };
 
 const LOADING: BlueprintCopies = { status: 'loading' };
 
-/**
- * Every blueprint copy a Character owns with its resolved station or
- * structure, through the same resolver the publish uses
- * (`loadPlacedBlueprints`). Reloads when the blueprint or asset cache is
- * refreshed, so counts and "via" labels follow blueprints that move; the last
- * answer stays on screen meanwhile.
- */
 export function useBlueprintCopies(characterId: number): BlueprintCopies {
-  // A refresh of either cache row rewrites its meta's `fetchedAt`.
   const stamp = useLiveQuery(async () => {
     const [blueprints, assets] = await Promise.all([
       db.esiCacheMeta.get([characterId, BLUEPRINTS_KEY]),
@@ -55,22 +41,14 @@ export function useBlueprintCopies(characterId: number): BlueprintCopies {
           })),
         };
       }
-    } catch {
-      // Unavailable: sharing by type still works.
-    }
+    } catch {}
     return value;
-    // stamp only re-runs the load: the last answer stays up meanwhile
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [characterId, stamp]);
   const loaded = useKeyedLoad(String(characterId), load);
   return loaded.status === 'ready' ? loaded.data : LOADING;
 }
 
-/**
- * Names the given places as they resolve, each asked for once, so one slow
- * structure never holds back the rest (as `OwnedBlueprintsPanel` does). A
- * place missing from the map is still loading.
- */
 export function usePlaceLabels(
   characterId: number,
   placeIds: readonly number[]
@@ -85,8 +63,6 @@ export function usePlaceLabels(
   });
   const key = useMemo(() => idSetKey(placeIds), [placeIds]);
 
-  // Requests outlive a change of `placeIds` (opening the dialog asks for more
-  // places): only a change of Character or unmounting drops their answers.
   const current = useRef<number | null>(characterId);
   useEffect(() => {
     current.current = characterId;

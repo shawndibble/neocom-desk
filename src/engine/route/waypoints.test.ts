@@ -1,12 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { waypointSequence, type HopKind, type WaypointLeg } from './waypoints';
 
-/**
- *   A ─ B ─ C        X ─ Y ─ Z
- *
- * Two gate islands. C → X is no stargate: the hop between them is tagged a
- * hole or a bridge, as the trip assembly tags a row (issue #2546).
- */
 const A = 30000001;
 const B = 30000002;
 const C = 30000003;
@@ -14,7 +8,6 @@ const X = 31000001;
 const Y = 31000002;
 const Z = 31000003;
 
-/** A leg flown by gate, except the steps `hops` names: `[from, to, kind]`. */
 function leg(systems: number[], hops: [number, number, HopKind][] = []): WaypointLeg {
   return {
     to: systems[systems.length - 1],

@@ -1,39 +1,3 @@
-/**
- * The whole-account plan: what every colony should do so the pilot's planets,
- * together, earn the most ISK a day.
- *
- * The Goal Planner answers "make this product". This answers the question the
- * pilot actually has: "what is the best use of all my planets?". It is a split
- * of the colonies into groups, never one solver call:
- *
- * - a **group** is one chain over some of the colonies (a capacity search,
- *   `estimateChain`), or one colony on its own best pick;
- * - a colony no group wants stays on its own best pick;
- * - the total is the sum of the groups.
- *
- * Three stages, each built on the last, so the plan can say what each choice
- * the pilot made is worth:
- *
- * 1. **Apart**: every colony on its own best pick (`soloPerDay`), nothing
- *    bought. This is the one-planet answer.
- * 2. **Buying**: when the pilot will buy some tiers at the hub, each colony may
- *    instead run any candidate product alone from bought inputs. The best of
- *    that and stage 1.
- * 3. **Hauling**: when the pilot hauls between planets, greedy rounds. For each
- *    candidate product, plan the chain over the colonies still free; its gain
- *    is what the colonies it uses earn under it, less what they earn at the end
- *    of stage 2 (never their Baseline, never the unused colonies the solver
- *    also credits). Take the biggest positive gain, lock its colonies, repeat.
- *
- * A chain with no positive gain is never taken, so every figure the plan shows
- * is at least what the colonies make apart.
- *
- * Greedy, not exact: it does not prove the best split, and two splits within
- * the solver's tolerance are the same plan. It is a generator so a caller can
- * run it in slices between frames; each `yield` is one solver search finished.
- *
- * Pure: colonies, policy, prices, jumps and `PiData` are parameters.
- */
 import { sum as sumAll } from '../math';
 import type { PiData } from '@/sde/types';
 import { estimateChain } from './chainEstimate';
@@ -45,72 +9,45 @@ import { salesCapPerDay, thinSales, type ThinSales } from './salesCap';
 
 export interface AccountPlanInput {
   colonies: readonly PlannerColony[];
-  /** `buyTiers` is what the pilot will buy at the hub. */
   policy: PlannerPolicy;
   books: PriceBooks;
   jumps?: JumpsFn;
-  /** Products worth trying. The caller narrows these: each costs a solver search. */
   candidates: readonly number[];
-  /** Plan chains across colonies (the pilot hauls between planets). */
   haul: boolean;
-  /**
-   * What each colony earns a day on its own best pick today. Defaults to its
-   * Baseline (its best P1 sale); a caller with a better one-planet figure
-   * (after quick wins and rebuild) passes it.
-   */
   soloPerDay?: ReadonlyMap<number, number | null>;
-  /**
-   * Units a day the hub's region trades, per product. A product's sales count
-   * at no more than the fixed share of it; absent (unknown) is uncapped.
-   */
   hubTradesPerDay?: ReadonlyMap<number, number>;
   pi: PiData;
 }
 
-/** One haul between two of a group's colonies. */
 export interface AccountLeg {
   from: number;
   to: number;
-  /** Gate jumps, null when not known. */
   jumps: number | null;
 }
 
 export interface AccountGroup {
-  /** The product the group makes; null for a colony left on its own best pick. */
   typeId: number | null;
-  /** Colonies the group uses, ascending. */
   planetIds: number[];
-  /** What the group earns a day, after customs and sales tax. */
   iskPerDay: number;
-  /** What the same colonies earn apart. */
   apartPerDay: number;
-  /** `iskPerDay − apartPerDay`. Zero for a colony left alone. */
   gainPerDay: number;
   unitsPerDay: number;
-  /** The colony the factories sit on; null for a colony left alone. */
   hostId: number | null;
   m3PerWeek: number;
   legs: AccountLeg[];
-  /** The group buys some of its inputs at the hub. */
   buys: boolean;
-  /** Set when the product's output is over the share the hub absorbs; `iskPerDay` counts the share only. */
   thin: ThinSales | null;
 }
 
 export interface AccountPlan {
   groups: AccountGroup[];
   totalPerDay: number;
-  /** Stage 1: every colony on its own best pick. */
   apartTotalPerDay: number;
-  /** What buying at the hub adds on top of stage 1; 0 when nothing is bought. */
   buyGainPerDay: number;
-  /** What hauling between planets adds on top of stage 2; 0 when the pilot does not haul. */
   haulGainPerDay: number;
-  /** Colonies with no one-planet figure: counted as zero, never guessed. */
   unknownPlanetIds: number[];
 }
 
-/** One solver search finished, so a caller can yield the thread. */
 export interface AccountProgress {
   stage: 'buying' | 'hauling';
   typeId: number;
@@ -128,7 +65,6 @@ interface Chain {
   thin: ThinSales | null;
 }
 
-/** The chain over `colonies`, and only the colonies it uses; null with no plan or no price. */
 function chainOnColonies(
   typeId: number,
   colonies: readonly PlannerColony[],
@@ -227,14 +163,12 @@ export function* planAccount(
   const ctx = { policy, books, jumps, pi, hubTradesPerDay };
   const buying = policy.buyTiers.length > 0;
 
-  // Stage 1: each colony on its own best pick.
   const baseline = baselineTotal(colonies, pi, policy, books, jumps);
   const ownFigure = (c: PlannerColony): number | null => {
     const given = input.soloPerDay?.get(c.planetId);
     if (given !== undefined) return given;
     const own = baseline.perColony.get(c.planetId);
     if (own?.status === 'ok') return own.iskPerHour * HOURS_PER_DAY;
-    // Nothing fits earns nothing, which is a figure; an unpriced P1 is not.
     return own?.status === 'nothing-fits' ? 0 : null;
   };
   const unknown: number[] = [];
@@ -245,11 +179,8 @@ export function* planAccount(
     else apart.set(c.planetId, figure);
   }
   const apartTotal = totalOf(apart);
-  // A colony with no own figure has nothing to compare a chain against: it is
-  // left out of the search, never counted as earning zero and so "gaining" all it makes.
   const known = colonies.filter((c) => apart.has(c.planetId));
 
-  // Stage 2: one colony alone, buying inputs. The best of that and apart.
   const solo = new Map<number, Chain>();
   const soloFigure = new Map(apart);
   if (buying) {
@@ -266,7 +197,6 @@ export function* planAccount(
   }
   const afterBuying = totalOf(soloFigure);
 
-  // Stage 3: chains across colonies, biggest gain first.
   const taken: Chain[] = [];
   const locked = new Set<number>();
   if (input.haul) {

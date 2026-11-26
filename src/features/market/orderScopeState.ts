@@ -1,9 +1,3 @@
-/**
- * The pure reads behind the Order Detail modal's scope table and sections:
- * what each scope (station / system / region) says about my order, the
- * sell-through estimate, my rank at my own station, and the scope table's CSV
- * rows. No JSX — `OrderDetailModal.tsx` renders them.
- */
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import type { useTranslation } from 'react-i18next';
 import type { JumpsAwayResult } from '@/engine/clone/jumpsAway';
@@ -21,7 +15,6 @@ export type ScopeState =
   | { kind: 'clear' }
   | { kind: 'rival'; rival: UndercutRival };
 
-/** The tightest scope carrying a rival, for the "Who is cheaper" disclosure's trailing read — or `'clear'`/`'notChecked'` when none of the three do. */
 export function tightestRivalScope(
   station: ScopeState,
   system: ScopeState,
@@ -34,19 +27,11 @@ export function tightestRivalScope(
   ] as const) {
     if (state.kind === 'rival') return { scope, price: state.rival.price };
   }
-  // `unavailable` (a player structure's market that can't be read at all)
-  // is not proof of "clear" either — only a real `clear` read earns that.
   return [station, system, region].some((s) => s.kind === 'notChecked' || s.kind === 'unavailable')
     ? 'notChecked'
     : 'clear';
 }
 
-/**
- * `'known'` — the NPC-station lookup loaded and resolved this location.
- * `'structure'` — it loaded but this location isn't in it (a player
- * structure). `'unknown'` — the lookup itself hasn't loaded, so nothing
- * about this location can be claimed either way.
- */
 export type LocationState = 'known' | 'structure' | 'unknown';
 
 export function stationScopeState(
@@ -77,18 +62,6 @@ export function stationScopeState(
   return { kind: 'clear' };
 }
 
-/**
- * The 'station' column for a player structure (issue #538): sourced from
- * `row.deepUndercut.byScope.station`, which `openOrdersModel.ts` only
- * populates once THIS structure's own book was actually fetched — never from
- * `deepScopeState`, whose `deep.truncated` read is the REGION fetch's flag
- * and would misattribute a structure-book truncation to the wrong fetch.
- *
- * 'unavailable' is the default and the failure mode alike: never fetched,
- * the `structureMarkets` scope isn't granted, or this character isn't on the
- * structure's ACL all leave `byScope.station` absent, and all read the same
- * — there is no way, or reason, to tell them apart on the row.
- */
 export function structureStationScopeState(
   row: OpenOrderRow,
   structureMarket: StructureCompetition | null
@@ -97,8 +70,6 @@ export function structureStationScopeState(
   if (!('station' in byScope)) return { kind: 'unavailable' };
   const rival = byScope.station;
   if (rival) return { kind: 'rival', rival };
-  // A clean read from a TRUNCATED structure book is only proof of absence for
-  // the pages it actually saw — same reasoning as `deepScopeState` below.
   if (structureMarket?.truncated) return { kind: 'notChecked' };
   return { kind: 'clear' };
 }
@@ -116,9 +87,6 @@ export function deepScopeState(
   if (!(scope in byScope)) return { kind: 'notChecked' };
   const rival = byScope[scope];
   if (rival) return { kind: 'rival', rival };
-  // A rival was found here despite truncation, that finding stands. But a
-  // CLEAN read from a truncated book is only proof of absence for the pages
-  // it actually saw — honest is "not checked", not "clear".
   if (deep.truncated) return { kind: 'notChecked' };
   return { kind: 'clear' };
 }
@@ -129,14 +97,12 @@ export function scopeLabelText(scope: UndercutScope, t: Translate): string {
   return t(`market.orders.badge.undercut${scope[0].toUpperCase()}${scope.slice(1)}`);
 }
 
-/** Distance as words, the way `JumpsAwayText` renders it. */
 export function jumpsText(jumps: JumpsAwayResult, t: Translate): string {
   return jumps.kind === 'known'
     ? t('assets.jumpsAway.value', { count: jumps.jumps })
     : t('assets.jumpsAway.unknown');
 }
 
-/** One scope line of the grid as exported (`scopeOrdersCsv.ts`), mirroring `ScopeRow`. */
 export function scopeCsvRow(
   scope: UndercutScope,
   state: ScopeState,
@@ -161,7 +127,6 @@ export function scopeCsvRow(
     return { ...base, seller, distance: null };
   }
   const { rival } = state;
-  // The station tier is an aggregate price with no order count (filled with 0): blank, as on screen.
   const countsKnown = rival.ordersBeatingMe > 0;
   return {
     ...base,
@@ -175,26 +140,6 @@ export function scopeCsvRow(
   };
 }
 
-/**
- * "Sells out in": `sellThrough` fed with this order's remaining volume, the
- * region's recent average daily units (last 30 days of price history — the
- * same window `sellsOutNoSales`'s wording promises), and the player's share
- * of the units listed at their price or better.
- *
- * No usable history at all (never fetched, fetch failed, or ESI genuinely
- * has none) reads as `'noHistory'` — never a fabricated rate.
- *
- * `myShare` comes from the deep competitors already in hand: same side
- * (a buy order only queues behind other buy orders), priced at-or-better
- * than mine, my own remaining volume as a fraction of that whole pool. When
- * the deep book has not been fetched yet there is no honest way to place
- * myself in that queue, so this passes `1` (assume nothing ahead) rather
- * than inventing a number — the only other input, region volume, still
- * carries the interesting signal in that case. A TRUNCATED deep book is
- * used as-is here too: it under-counts the queue ahead of me (rather than
- * over-counting it), so `myShare` — and therefore the days-to-clear estimate
- * — reads as a lower bound in that case, never a false alarm.
- */
 export function computeSellThrough(
   row: OpenOrderRow,
   deep: RegionCompetition | null,
@@ -229,14 +174,6 @@ export function computeSellThrough(
   });
 }
 
-/**
- * Where my price sits among the sell orders at my own station.
- *
- * Only from a COMPLETE region book: a truncated fetch under-counts the
- * orders at my station, so both the rank and the total would be a lower
- * bound dressed up as a fact. The station tier cannot answer this at all —
- * an aggregate carries a price and no order count.
- */
 export function stationRank(
   row: OpenOrderRow,
   deep: RegionCompetition | null
@@ -249,22 +186,9 @@ export function stationRank(
   const better = atMyStation.filter((c) =>
     row.isBuyOrder ? c.price > row.price : c.price < row.price
   ).length;
-  // `atMyStation` already includes my own order (`loadRegionCompetition` does
-  // not filter it out), so it is the total, not the total minus me.
   return { rank: better + 1, total: atMyStation.length };
 }
 
-/**
- * One cell of the scope table. Every row is a FRAGMENT of these, not its own
- * grid: three separate grids each size their `auto` columns to their own
- * content, so the price and gap columns landed in a different place on every
- * row. One grid owns the track sizes for the whole table, and the rows only
- * contribute cells.
- *
- * That rules out a row background or a row border — a fragment has no box —
- * so the top rule and the "my order" tint are painted per cell instead.
- */
 export const CELL = 'border-t border-line px-2 py-1.5';
 
-/** A scope table column header. */
 export const COLUMN_HEADER = `px-2 pt-2 ${eyebrowClassName}`;

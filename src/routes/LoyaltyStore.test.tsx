@@ -17,7 +17,6 @@ vi.mock('@/features/loyalty/useLoyaltyStoreOffers', () => ({
   useLoyaltyStoreOffers: (corporationId: number) => useLoyaltyStoreOffers(corporationId),
 }));
 
-// The landing's views have their own tests (`lpLanding.test.ts`); here it is an empty, ready page.
 vi.mock('@/features/loyalty/useLpStoreLanding', () => ({
   useLpStoreLanding: () => ({
     status: 'ready',
@@ -43,18 +42,12 @@ const { useMarketHub } = await import('@/features/market/hub');
 const { usePriceBasis } = await import('@/features/loyalty/priceBasis');
 const { useLpBasis } = await import('@/features/loyalty/lpBasis');
 
-/**
- * Narrow, so the filters render inside the sheet. jsdom's stub never matches
- * (`vitest.setup.ts`), which `useIsNarrow` reads as a pointer viewport.
- */
 function useNarrowViewport(): void {
   stubViewport(NARROW_QUERY);
 }
 
 const OTHER_HUB = TRADE_HUBS.find((hub) => hub.id !== 'jita')!;
 
-/** Opposite of `useNarrowViewport`: jsdom's stub never matches, so this is
- * what forces the desktop two-column layout in a test. */
 function useDesktopViewport(): void {
   stubViewport(DESKTOP_QUERY);
 }
@@ -85,9 +78,6 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-// Writing the latest router location out to something outside React, the
-// same pattern Market.appraisal.test.tsx uses — reading it during render
-// itself would trip `react-hooks/immutability`.
 const probe = { pathname: '', search: '' };
 function LocationProbe() {
   const { pathname, search } = useLocation();
@@ -117,12 +107,10 @@ function renderStore(search = '') {
   );
 }
 
-/** The store's funnel, not the landing's behind the modal. */
 function storeFiltersButton() {
   return within(screen.getByRole('dialog')).getByRole('button', { name: /^Filters/ });
 }
 
-/** Every filter now sits behind the funnel (FilterBar, issue #1282). */
 function openFilters() {
   fireEvent.click(storeFiltersButton());
 }
@@ -200,7 +188,6 @@ describe('LoyaltyStore LP Value cog', () => {
         name: /LP Store settings/i,
       })
     );
-    // The settings modal opens over the store modal: it is the last in the tree.
     const dialog = screen.getAllByRole('dialog').at(-1)!;
     expect(
       await within(dialog).findByRole('textbox', { name: /Your LP value/ })
@@ -276,7 +263,6 @@ describe('LoyaltyStore filters', () => {
     expect(screen.getByRole('button', { name: /^Affordable/i })).toBeInTheDocument();
   });
 
-  /** The hub is a persisted preference; the phone sheet writes it as it is picked. */
   it('writes the persisted trade hub as it is picked in the sheet', async () => {
     useNarrowViewport();
     const user = userEvent.setup();
@@ -293,7 +279,6 @@ describe('LoyaltyStore filters', () => {
     const user = userEvent.setup();
     renderStore();
 
-    // "Affordable only" is on by default, so turning it off is one active filter.
     await user.click(storeFiltersButton());
     await user.click(screen.getByRole('button', { name: /^Affordable/i }));
     await user.keyboard('{Escape}');
@@ -305,10 +290,6 @@ describe('LoyaltyStore filters', () => {
     );
   });
 
-  /**
-   * The three filters live in the URL now (issue #1302), so a reload or a
-   * pasted link reopens the same filtered view.
-   */
   it('leaves the query string empty on a plain visit — every filter still on its default', () => {
     renderStore();
     expect(probe.search).toBe('');
@@ -527,8 +508,6 @@ describe('LoyaltyStore selected offer (issue #1490)', () => {
       'aria-current',
       'true'
     );
-    // The desktop split panel repaints in place with no dialog to announce
-    // it — a live region says so, the way the mobile sheet does implicitly.
     expect(screen.getByText(`Showing ${ITEM_ROW.itemName}`)).toBeInTheDocument();
   });
 });
@@ -655,8 +634,6 @@ describe('LoyaltyStore item context menu (issue #716)', () => {
     if (!row) throw new Error('expected a blueprint row');
     fireEvent.contextMenu(row);
 
-    // The resolved product's blueprint status (from the already-loaded
-    // catalog) is available immediately — no "checking…" transient.
     expect(screen.getByRole('menuitem', { name: 'Build Plan' })).toBeInTheDocument();
 
     await user.click(screen.getByRole('menuitem', { name: 'View in Market' }));
@@ -776,10 +753,6 @@ describe('LoyaltyStore required items breakdown (issue #1068)', () => {
     expect(
       screen.getByRole('link', { name: 'Shadow Serpentis Gold Tag' }).closest('dt')
     ).toHaveTextContent('1 × Shadow Serpentis Gold Tag');
-    // The Required items total must equal what profit already subtracted —
-    // this reads it straight off `row.requiredItemsCost`, the same number
-    // fed into `loyaltyOfferProfit`, so there's nothing here to recompute or
-    // let drift.
     expect(screen.getByText('5,800,000')).toBeInTheDocument();
   });
 
@@ -818,7 +791,6 @@ describe('LoyaltyStore required items breakdown (issue #1068)', () => {
   it('shows the same Required items lines in the mobile sheet and the desktop detail — one component', async () => {
     mockRows([REQUIRED_ITEMS_ROW]);
 
-    // Mobile: opens in the sheet.
     const mobileUser = userEvent.setup();
     const mobile = renderStore();
     await mobileUser.click(screen.getByText('Vexor Navy Issue Blueprint').closest('tr')!);
@@ -827,7 +799,6 @@ describe('LoyaltyStore required items breakdown (issue #1068)', () => {
     ).toHaveTextContent('8 × Serpentis Palladium Tag');
     mobile.unmount();
 
-    // Desktop: renders inline, no sheet.
     useDesktopViewport();
     const desktopUser = userEvent.setup();
     renderStore();
@@ -1172,7 +1143,6 @@ describe('LoyaltyStore switching stores through the search', () => {
     const settings = screen.getAllByRole('dialog').at(-1)!;
     await user.click(within(settings).getByRole('button', { name: /Market hub/ }));
     await user.click(await screen.findByRole('button', { name: OTHER_HUB.stationLabel }));
-    // On Global, so the gear's pick moves the Global hub the filter row reads.
     await waitFor(() => expect(useMarketHub.getState().value).toBe(OTHER_HUB.id));
     expect(screen.getByTestId('lp-basis-readout')).toHaveTextContent(OTHER_HUB.systemName);
   });
@@ -1203,7 +1173,6 @@ describe('LoyaltyStore switching stores through the search', () => {
     expect(screen.getAllByText('2 / 2 offers').length).toBeGreaterThan(0);
 
     await user.type(screen.getByPlaceholderText('Search offers…'), 'Scourge');
-    // The visible count is `md:` only; the status region carries it at every width.
     await waitFor(() =>
       expect(screen.getAllByRole('status').some((el) => el.textContent === '1 / 2 offers')).toBe(
         true

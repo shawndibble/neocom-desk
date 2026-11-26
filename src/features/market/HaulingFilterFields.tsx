@@ -18,7 +18,6 @@ import { HAULING_CATEGORY_OPTIONS } from './haulingCategories';
 import { HAUL_MODES, type HaulMode } from './haulingData';
 import { ANY_HUB, type HaulingHubChoice } from './haulingHubs';
 
-/** A hub picker. Uncaptioned: the → button between From and To (which swaps them) says which is which; the name is its `aria-label`. */
 export function HubField({
   label,
   value,
@@ -46,16 +45,8 @@ export function HubField({
   );
 }
 
-/** A typed ISK cap not yet committed: none, a whole figure (null = no limit), or a fraction that can't commit. */
 type HeldIsk = 'none' | 'partial' | { amount: number | null };
 
-/**
- * An ISK cap in the filters — Max price per item, Max spend. Blank is no
- * limit. Only a whole, positive figure commits: the URL holds whole ISK.
- * It commits on blur or Enter, not per keystroke, in the box and the sheet
- * alike: `250m` passes through 2 ISK, which would hide every row and drop the
- * selection.
- */
 export function IskCapField({
   label,
   hint,
@@ -69,18 +60,11 @@ export function IskCapField({
 }) {
   const { t } = useTranslation();
   const hintId = useId();
-  // Inline the field has no caption, so its placeholder names it; in the sheet the caption does.
   const inSheet = useFilterSurface() === 'sheet';
-  // `IskInput`'s own last parse, unrounded, handed back as its `value`: a
-  // rounded figure (`2.01m` = 2009999.99… → 2010000) would read as an outside
-  // change and reset the typed text. The URL lands in a transition, so `value` lags.
   const [typedText, setTypedText] = useState<string | null>(null);
-  // What the typed text says, not yet committed: a whole figure (or null, no
-  // limit) waiting for blur/Enter, or a fraction that can't commit.
   const [held, setHeld] = useState<HeldIsk>('none');
   const [lastSent, setLastSent] = useState<number | null>(value);
   const [prevValue, setPrevValue] = useState(value);
-  // A value this field did not send (Reset, a link) replaces what was typed.
   if (prevValue !== value) {
     setPrevValue(value);
     if (value !== lastSent) {
@@ -95,7 +79,6 @@ export function IskCapField({
     setLastSent(next);
     onChange(next);
   }
-  /** Blur/Enter: commit a held figure; a fraction reverts to the committed value. */
   function settle() {
     if (held === 'partial') {
       setTypedText(null);
@@ -115,7 +98,6 @@ export function IskCapField({
           setTypedText(text);
           const amount = Number(text);
           const whole = text === '' ? null : Math.round(amount);
-          // Shorthand's float noise rounds away; a real fraction (`1.5`, on its way to `1.5b`) waits.
           const usable =
             whole === null ||
             (Math.abs(amount - whole) < 0.001 && Number.isSafeInteger(whole) && whole > 0);
@@ -136,14 +118,8 @@ export function IskCapField({
   );
 }
 
-/**
- * In the route row Category and Sell by give way before the row wraps: they
- * break the line at a smaller basis and grow back to their full width, so the
- * filter funnel stays on the route's line beside the trip rail.
- */
 const ROUTE_ROW_SELECT = 'grow basis-36';
 
-/** The market category to scan — in the route row on a wide screen, in the filter sheet on a narrow one. */
 export function CategorySelect({
   value,
   onChange,
@@ -176,7 +152,6 @@ export function CategorySelect({
   );
 }
 
-/** How the load is sold at the destination — placed like `CategorySelect`. */
 export function ModeSelect({
   value,
   onChange,
@@ -207,13 +182,6 @@ export function ModeSelect({
   );
 }
 
-/**
- * The quantity to bring, typed by hand. Keeps what is being typed in its own
- * state so the box can be emptied and retyped: the planned quantity it would
- * otherwise echo back is clamped and re-sized on every keystroke. Emptying it
- * or typing 0 unticks the row. `title` says what capped the suggestion (the
- * row's detail says it too, for touch).
- */
 export function BringInput({
   card,
   label,
@@ -221,7 +189,6 @@ export function BringInput({
   value,
   onCommit,
 }: {
-  /** On the dense card rather than in a table row. */
   card: boolean;
   label: string;
   title?: string;
@@ -234,10 +201,6 @@ export function BringInput({
       size="sm"
       inputMode="numeric"
       aria-label={label}
-      // Shorter and narrower on the card: its height sets the meta line's,
-      // and a 360px card still fits it beside that line. 28px is under the
-      // touch tier's 36px on purpose (DESIGN.md §3); `max-md:` because the
-      // `sm` field is already 28px from `md` up.
       className={cx('text-right tabular-nums', card ? 'w-16 max-md:h-7' : 'w-20')}
       value={draft ?? value}
       onChange={(event) => {

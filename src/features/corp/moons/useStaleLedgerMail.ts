@@ -1,12 +1,3 @@
-/**
- * The "we can't read your ledger" mail (#6210): when an editor of the book opens it and a moon
- * owner's ledger cannot be read, their client asks the server for this stale spell's one mail
- * (the first officer to ask gets it; nobody else does, unless that officer's queue has not sent
- * it within a few hours, when the claim lapses to the next to ask) and queues it to both sides, the moon
- * owner's CEO and payee and the book's other officers, through the Officer mail queue. It
- * says by when to reconnect before EVE drops the oldest unread mining; once that is past, no mail.
- * Without the mail permission nothing is asked, so another officer's client can still send it.
- */
 import { useEffect, useRef } from 'react';
 import { useGrantedScopes } from '@/app/useGrantedScopes';
 import { oreLostOn, staleLedgerClock } from '@/engine/corpTaxBook/feederHealth';
@@ -21,7 +12,6 @@ export function useStaleLedgerMail(rows: readonly MoonOwnerRow[]): void {
   const { canEdit, characterId, corporationId, names } = useBook();
   const grantedScopes = useGrantedScopes();
   const accountingName = useCorporationName();
-  // One ask per stale spell per page visit; the server stops a second officer.
   const asked = useRef(new Set<string>());
 
   useEffect(() => {

@@ -1,10 +1,3 @@
-/**
- * The Trading profit figures above Market History's table (issue #3995): the
- * margin of the sales shown, the broker fees paid over the same dates, and
- * whether the local wallet archive reaches back that far.
- *
- * Pure: the caller loads the journal and the archive coverage.
- */
 import { sumBrokerFees, sumMargins, type MarginTotal } from '@/engine/market/tradingProfit';
 import type { MarginGap, RealizedMargin } from '@/engine/market/realizedMargin';
 import type { WalletTransaction } from '@/esi/endpoints';
@@ -12,9 +5,7 @@ import type { WalletTransactionFilter } from '@/features/character/walletTransac
 
 export interface TradingSummary extends MarginTotal {
   brokerFees: number;
-  /** The archive starts after the range does: the figures cover only this far back. Epoch ms. */
   archiveSince: number | null;
-  /** The sales shown that have no margin (a gap), and the ISK they brought in. */
   uncosted: { sales: number; revenue: number };
 }
 
@@ -24,7 +15,6 @@ interface FeeLine {
   date: string;
 }
 
-/** The dates the filter shows, as UTC ms: its start/end days, else the fills' own first day and open-ended. */
 export function tradingWindow(
   filter: Pick<WalletTransactionFilter, 'startDate' | 'endDate'>,
   fills: readonly Pick<WalletTransaction, 'date'>[]
@@ -46,10 +36,6 @@ export function tradingWindow(
 
 const NO_GAPS: ReadonlyMap<number, MarginGap> = new Map();
 
-/**
- * `archiveSinceMs` is where the local wallet archive starts (null when it has
- * no history); it is reported only when it falls inside the range.
- */
 export function summarizeTrading(
   shown: readonly WalletTransaction[],
   margins: ReadonlyMap<number, RealizedMargin>,

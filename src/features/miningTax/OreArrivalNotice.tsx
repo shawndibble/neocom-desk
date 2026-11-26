@@ -7,20 +7,11 @@ import { useHydratedStore } from '@/lib/useHydratedStore';
 import { MINUTE_MS } from '@/lib/age';
 
 interface OreArrivalNoticeProps {
-  /** The entries ticked for this settlement. */
   entries: readonly SettledEntryRef[];
-  /** The pull Settle up started is still running. */
   checking: boolean;
-  /** When that pull started; `null` when Settle up started none. */
   pullStartedAt: number | null;
 }
 
-/**
- * Settle up's one line about ore that may still be on its way (scope decision
- * 20261004 "settle up waits for ore still arriving"): a yellow "wait" for up to
- * 50 minutes after a ticked entry grew, small print while one could still grow,
- * nothing once none can. Skimmable on purpose — a longer note gets ignored.
- */
 export function OreArrivalNotice({ entries, checking, pullStartedAt }: OreArrivalNoticeProps) {
   const { t } = useTranslation();
   const now = useTicker(MINUTE_MS);
@@ -43,8 +34,6 @@ export function OreArrivalNotice({ entries, checking, pullStartedAt }: OreArriva
     text = t('miningTax.settleUp.arrival.unchecked');
   else text = t('miningTax.settleUp.arrival.quiet');
 
-  // One element whatever it says, so a screen reader's live region survives
-  // the switch between the warning and the small print.
   return (
     <p
       role="status"

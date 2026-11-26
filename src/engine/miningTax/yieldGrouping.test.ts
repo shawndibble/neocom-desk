@@ -2,10 +2,10 @@ import { describe, it, expect } from 'vitest';
 import { groupMiningYield } from './yieldGrouping';
 import type { MiningLedgerRow } from './types';
 
-const VELDSPAR = 1230; // ordinary asteroid ore
-const ICE = 16262; // ordinary ice
-const MOON_ORE = 45490; // Zeolites — moon ore is still ore, so it counts here too
-const UNCLASSIFIED = 99999; // on no allowlist the caller passes in at all
+const VELDSPAR = 1230;
+const ICE = 16262;
+const MOON_ORE = 45490;
+const UNCLASSIFIED = 99999;
 
 const ALLOWLIST = new Set([VELDSPAR, ICE, MOON_ORE]);
 

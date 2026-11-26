@@ -1,13 +1,3 @@
-/**
- * Popular fits bound to zKillboard, ESI and the slot map (issue #2327): a
- * hull's recent losses, each victim read inline or — for zKillboard's
- * hash-only shape — from ESI's killmail endpoint, grouped by
- * `engine/fittings/popularFits.ts`. A good result is held in memory per hull
- * for ten minutes, so clicking back to a hull doesn't refetch 40 killmails,
- * and a load already under way is shared — the EVE Workbench tab's "Seen on
- * zKillboard" badges (#2486) ask for the same hull's losses as the zKillboard
- * tab, and must never fetch them a second time.
- */
 import { useCallback } from 'react';
 import { useAsyncLoad } from '@/lib/useAsyncLoad';
 import { groupPopularFits, type HullLoss, type PopularFit } from '@/engine/fittings/popularFits';
@@ -19,20 +9,17 @@ import { MINUTE_MS } from '@/lib/age';
 
 const CACHE_TTL_MS = 10 * MINUTE_MS;
 
-/** `ok: false` when zKillboard or ESI couldn't supply the losses. */
 export type PopularFitsResult =
   { ok: true; fits: PopularFit[] } | { ok: false; reason: ZkillFailureReason };
 
 const cache = new Map<number, { at: number; result: PopularFitsResult }>();
 const pending = new Map<number, Promise<PopularFitsResult>>();
 
-/** For tests: forget every cached hull. */
 export function resetPopularFitsCache(): void {
   cache.clear();
   pending.clear();
 }
 
-/** The losses, or why zKillboard couldn't supply them; null when ESI couldn't read any. */
 async function resolveLosses(
   shipTypeId: number
 ): Promise<HullLoss[] | { reason: ZkillFailureReason } | null> {
@@ -53,15 +40,11 @@ async function resolveLosses(
         value: loss.value,
         victim: killmail.victim,
       });
-    } catch {
-      // One killmail ESI couldn't read leaves the rest of the group intact.
-    }
+    } catch {}
   });
-  // Every loss failing on ESI is a failed load, not "nobody flies this".
   return fetched.losses.length > 0 && resolved.length === 0 ? null : resolved;
 }
 
-/** The hull's Popular fits. Never throws. */
 export async function loadPopularFits(
   shipTypeId: number,
   now: number = Date.now()
@@ -93,11 +76,6 @@ async function fetchPopularFits(shipTypeId: number, now: number): Promise<Popula
   }
 }
 
-/**
- * The hull's Popular fits, read through `load` (`loadPopularFits`, or a test's
- * stand-in; pass it stable); `null` while loading. A switch of hull drops the
- * old hull's answer.
- */
 export function usePopularFits(
   shipTypeId: number,
   load: (shipTypeId: number) => Promise<PopularFitsResult>

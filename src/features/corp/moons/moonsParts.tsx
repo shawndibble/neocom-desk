@@ -22,7 +22,6 @@ const STATE_TONE: Record<ExtractionState, string> = {
   cancelled: 'text-text-dim',
 };
 
-/** An Extraction's state as a word (D14): readable without its colour. */
 export function StateWord({ state }: { state: ExtractionState }) {
   const { t } = useTranslation();
   return (
@@ -63,11 +62,6 @@ export function OverdueWord({ days, paused }: { days: number | null; paused?: bo
   );
 }
 
-/**
- * Ore make-up of a chunk, or D13's fallback. `onLink` adds the "Link a Survey" action to the
- * unknown case, whose tooltip names the cause when the book knows it (a moon owner's grant that
- * reads no Extraction notices).
- */
 export function OreLine({
   row,
   onLink,
@@ -114,7 +108,6 @@ export function OreLine({
   );
 }
 
-/** D13: mined vs left after fracture. */
 export function MinedBar({ pct, label }: { pct: number | null; label: string }) {
   const { t } = useTranslation();
   if (pct === null) return <span className="text-text-dim">—</span>;
@@ -128,12 +121,8 @@ export function MinedBar({ pct, label }: { pct: number | null; label: string }) 
   );
 }
 
-/** A labelled way up from a drill-down page (§6c: never a bare CaretLeft). */
 export function Crumb({ to, label }: { to: string; label: string }) {
   const navigate = useNavigate();
-  // Arrived by an in-app click (a router key, not the first load): Back is the page it came from,
-  // whichever that was, so it reads "Back". Modified clicks and a first load keep the link's own
-  // destination and label.
   const cameFromApp = useLocation().key !== 'default';
   const { t } = useTranslation();
   return (
@@ -153,10 +142,6 @@ export function Crumb({ to, label }: { to: string; label: string }) {
   );
 }
 
-/**
- * A late notice's due date; once past, the days late, in danger. `now` is the book's clock.
- * While a declaration pauses the Overdue clock (`pausedUntil`), no due date or lateness shows.
- */
 export function DueWord({
   dueAt,
   now,

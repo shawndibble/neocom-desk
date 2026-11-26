@@ -13,7 +13,6 @@ describe('OpenOrdersList — turn-in glyph (#6708)', () => {
       turnInEach: 60_000,
     });
     const sell = openOrderRow({ orderId: 2, typeName: 'Tritanium', turnInEach: 60_000 });
-    // A bid the turn-in does not beat gets no cue.
     const highBid = openOrderRow({
       orderId: 3,
       typeName: 'Stereo-Collapse Signal',

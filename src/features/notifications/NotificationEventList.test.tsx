@@ -15,8 +15,6 @@ import {
   type NotificationPreferencesValue,
 } from './preferences';
 
-// Preference writes schedule a sync, which lazy-loads Firebase; that import can
-// land after the test environment is torn down and fail the whole shard.
 vi.mock('@/sync', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/sync')>()),
   setSyncedSetting: vi.fn(async () => {}),
@@ -58,7 +56,6 @@ function Harness(props: {
   eveTypes?: ReadonlySet<string>;
   path?: string;
 }) {
-  // Re-read the store each render so a click's write is visible, like the panel does.
   const value = useNotificationPreferences((state) => state.value);
   return (
     <MemoryRouter initialEntries={[props.path ?? '/settings/notifications']}>
@@ -113,7 +110,6 @@ describe('NotificationEventList on desktop', () => {
     expect(await screen.findByText('1 differs')).toBeInTheDocument();
     const chip = screen.getByText('Beta Pilot').closest('li')!;
     expect(chip.className).toMatch(/border-warning/);
-    // The odd one is named by words and position too, not by colour alone.
     expect(within(chip).getByText('D')).toBeInTheDocument();
   });
 
@@ -146,7 +142,6 @@ describe('NotificationEventList on desktop', () => {
         }}
       />
     );
-    // Only two can use it: the chip says so rather than claiming all three.
     expect(screen.getByText('2 of 3 can use this')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Skill level complete' }));
     expect(
@@ -249,7 +244,6 @@ describe('NotificationEventList on desktop', () => {
     expect(screen.getByRole('button', { name: 'Structure Under Attack' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Structure Destroyed' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'War Declared' })).not.toBeInTheDocument();
-    // A family with no matching type leaves its heading out too.
     expect(screen.queryByRole('region', { name: 'War' })).not.toBeInTheDocument();
   });
 
@@ -332,8 +326,6 @@ describe('NotificationEventList on desktop', () => {
   it('says the Corporation permission once on the corp group, not on every corp row', () => {
     render(
       <Harness
-        // The Corporation group's events (a corp-named event pushed by the backend, like
-        // corpTaxBookSyncStopped, files under World and needs no Permission).
         ids={groupNotificationEvents(NOTIFICATION_EVENT_IDS).corp}
         over={{
           scopesByCharacterId: new Map([
@@ -375,7 +367,6 @@ describe('NotificationEventList on desktop', () => {
         over={{ forceExpanded: true, visibleCharacterIds: new Set([2]) }}
       />
     );
-    // One character matches, so the disclosure counts one, not three.
     await user.click(
       await screen.findByRole('button', { name: /Warn-ahead time \(1 character\)/ })
     );
@@ -383,7 +374,6 @@ describe('NotificationEventList on desktop', () => {
   });
 
   it('toggles when the D or A beside a checkbox is clicked, not only the 16px box', async () => {
-    // The letters look like the box's label; a click on one that did nothing read as a click that did not register.
     const user = userEvent.setup();
     render(<Harness ids={['skillLevelComplete']} />);
     await user.click(screen.getByRole('button', { name: 'Skill level complete' }));
@@ -427,7 +417,6 @@ describe('NotificationEventList Topics', () => {
     render(<Harness ids={['skillQueueEnding']} />);
     expect(screen.getByText('Warn ahead')).toBeInTheDocument();
     expect(screen.getByText('Characters')).toBeInTheDocument();
-    // Warn-ahead sits on the event's own row, not in a separate list.
     expect(screen.getByRole('button', { name: /Warn-ahead times \(3 characters\)/ })).toBeVisible();
   });
 

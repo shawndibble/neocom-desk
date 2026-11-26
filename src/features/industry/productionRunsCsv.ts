@@ -7,12 +7,6 @@ const STATUS_KEY: Record<ProductionRunStatus, string> = {
   closed: 'industry.productionRunStatusClosed',
 };
 
-/*
- * The per-column pieces `ProductionRunsPanel` and `ProductionLogPanel` share,
- * mirroring `productionRunColumns.tsx`: each table assembles its own order.
- * `loggedAt` is epoch ms, exported as a UTC ISO timestamp so it lands as a
- * real date; every ISK figure is raw, at full precision.
- */
 function loggedAt<Row extends ProductionRunSummary>(t: CsvTranslate): CsvColumn<Row> {
   return {
     header: t('industry.productionRunColumnLogged'),
@@ -38,7 +32,6 @@ function status<Row extends ProductionRunSummary>(t: CsvTranslate): CsvColumn<Ro
   return { header: t('industry.productionRunColumnStatus'), value: (r) => t(STATUS_KEY[r.status]) };
 }
 
-/** One Build Plan's Production Runs table. */
 export function productionRunsCsvColumns(t: CsvTranslate): CsvColumn<ProductionRunSummary>[] {
   return [
     loggedAt(t),
@@ -52,7 +45,6 @@ export function productionRunsCsvColumns(t: CsvTranslate): CsvColumn<ProductionR
   ];
 }
 
-/** The Production Log's "All production runs" table. */
 export function productionLogRunsCsvColumns(
   t: CsvTranslate
 ): CsvColumn<ProductionRunSummary & { itemName: string }>[] {
@@ -68,7 +60,6 @@ export function productionLogRunsCsvColumns(
   ];
 }
 
-/** The Production Log's "By item" row, structurally — the panel's own row type carries more. */
 export interface ProductionLogItemCsvRow {
   itemName: string;
   runsLogged: number;
@@ -80,10 +71,6 @@ export interface ProductionLogItemCsvRow {
   unsoldCost: number;
 }
 
-/**
- * The Production Log's "By item" table. Both margins are blank where the
- * table shows "—" (nothing sold); the average margin is a raw percent.
- */
 export function productionLogItemsCsvColumns(
   t: CsvTranslate
 ): CsvColumn<ProductionLogItemCsvRow>[] {

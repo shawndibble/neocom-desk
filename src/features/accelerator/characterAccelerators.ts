@@ -1,12 +1,3 @@
-/**
- * A Character's typed-in cerebral accelerator (GLOSSARY.md **Accelerator**),
- * stored in Dexie (`characterAccelerators`) and synced. One row per Character;
- * a plan and the Characters table both read and write it here, so the two can
- * never disagree.
- *
- * Deleting goes through a tombstone so the removal syncs instead of the next
- * pull resurrecting the row.
- */
 import { db, type CharacterAcceleratorRecord } from '@/db';
 import { scheduleSync } from '@/sync';
 import { appendTombstones, tombstoneKey } from '@/sync/localBookkeeping';
@@ -19,12 +10,6 @@ export function acceleratorId(characterId: number): string {
   return String(characterId);
 }
 
-/**
- * The Character's injected accelerator as the Accelerator controls see it:
- * the typed-in record while it still runs, and the bonus read off the
- * attribute sheet (EVE gives its size, never its expiry). Both null means
- * nothing is injected.
- */
 export function injectedAccelerator(
   stored: CharacterAcceleratorRecord | null | undefined,
   baseline: AttributeBaseline | null | undefined,
@@ -36,7 +21,6 @@ export function injectedAccelerator(
   };
 }
 
-/** Saves the accelerator running on `characterId`, replacing any earlier one. */
 export async function setCharacterAccelerator(
   characterId: number,
   bonus: number,
@@ -61,7 +45,6 @@ async function removeRecord(characterId: number): Promise<void> {
   ]);
 }
 
-/** `removeRecord` in one transaction, so a crash cannot leave the row gone and the removal unsynced. */
 function removeRecordAtomically(
   characterId: number,
   onlyIf?: (row: CharacterAcceleratorRecord) => boolean
@@ -74,21 +57,18 @@ function removeRecordAtomically(
   });
 }
 
-/** Forgets the typed-in accelerator, so detection from the attribute sheet applies again. */
 export async function clearCharacterAccelerator(characterId: number): Promise<void> {
   if (await removeRecordAtomically(characterId)) {
     scheduleSync(characterId, { collections: ['characterAccelerators'] });
   }
 }
 
-/** Deletes every accelerator that has run out, returning the Characters it touched. */
 export async function purgeExpiredAccelerators(nowMs: number = Date.now()): Promise<number[]> {
   const expired = (await db.characterAccelerators.toArray()).filter(
     (record) => !isAcceleratorLive(record, nowMs)
   );
   const purged: number[] = [];
   for (const record of expired) {
-    // Re-checked inside the transaction: the pilot may have just saved a new expiry.
     const removed = await removeRecordAtomically(
       record.characterId,
       (row) => !isAcceleratorLive(row, nowMs)

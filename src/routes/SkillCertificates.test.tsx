@@ -33,7 +33,6 @@ const CERTS: Certificate[] = [
     groupName: 'Navigation',
     levels: ladder(20),
   },
-  // Untrained, in Armor's group: grade order puts it above Armor Tanking, name order below.
   {
     id: 3,
     name: 'Zeal Basics',
@@ -80,7 +79,6 @@ vi.mock('@/features/skills/certificates/useCertificatesData', () => ({
   useCertificatesData: () => ({
     load: { status: 'ready', certificates: CERTS },
     catalog: CATALOG,
-    // Armor Tanking at Elite; Navigation at Standard.
     trainedSkills: new Map([
       [10, { level: 5, sp: 0 }],
       [20, { level: 2, sp: 0 }],

@@ -42,8 +42,6 @@ describe('useAssumedMe', () => {
     ['a string', '5'],
     ['null', null],
   ])('falls back to the default for %s', async (_label, stored) => {
-    // Out-of-range reaches the engine's own range check and throws, so a
-    // damaged row must not be clamped into a value the pilot never picked.
     await db.settings.put({ key: ASSUMED_ME_SETTING_KEY, value: stored });
     expect(await hydrated()).toBe(DEFAULT_ASSUMED_ME);
   });

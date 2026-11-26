@@ -16,13 +16,6 @@ import type { RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import { loadPi } from '@/sde/loadSde';
 import type { PiData } from '@/sde/types';
 
-/**
- * The Colonies tab's reads: the active Character's colonies live, every other
- * Character's from Dexie, and the names both need. One loader, so the route's
- * header (data age, refresh) and the tab read the same snapshot.
- */
-
-/** `cached` wins on a shared id — it's always the fresher read (see call sites); `overlay` only fills what it left unresolved. */
 export function mergeNames(
   overlay: ReadonlyMap<number, string>,
   cached: ReadonlyMap<number, string>
@@ -40,25 +33,19 @@ export const EMPTY_ROSTER: PiRosterSnapshot = {
 
 export interface ActiveColonies {
   planetsResult: CachedResult<CharacterPlanet[]> | null;
-  /** 403 (scope never granted) means "log in again", not "offline". */
   planetsNeedsReauth: boolean;
-  /** ESI did not answer and nothing is cached: an error, not "no colonies". */
   planetsFetchFailed: boolean;
   details: Map<number, StatusResult<CharacterPlanetDetail>>;
   planetNames: Map<number, string>;
   pinTypeNames: Map<number, string>;
   productNames: Map<number, string>;
   schematicNames: Map<number, string>;
-  /** Captured in the loader, not at render: Date.now() is impure and React forbids it in render/useMemo. */
   loadedAt: number;
 }
 
 export interface Snapshot extends ActiveColonies {
-  /** Null when the active Character record itself isn't cached (shouldn't happen post-login, but the type is honest about it). */
   activeCharacterName: string | null;
-  /** Every OTHER Character's colonies, read cache-only — see `features/pi/roster.ts`. */
   roster: PiRosterSnapshot;
-  /** For each row's "Storage full in" figure. Null on a failed load — that figure is optional, so it must not take the rest of the tab down. */
   pi: PiData | null;
 }
 
@@ -140,28 +127,6 @@ async function loadActiveColonies(
   };
 }
 
-/**
- * The active Character's colonies live, then every other Character's
- * colonies from Dexie, for the alt-colonies toggle.
- *
- * The cache-only story is the whole reason page open costs exactly the ESI
- * traffic it cost before this toggle existed: `loadPiRosterSnapshot` never
- * fetches, so resolving *its* colonies' pin/product/schematic/planet names
- * must stay cache-only too (`readCached*`, never `load*`) — otherwise a
- * character with several alts would turn every page open into a name-lookup
- * fan-out for colonies nobody asked to see yet. Roster names are spread
- * first and the active Character's live-resolved ones last, so a same-id
- * collision (there won't usually be one — this is static game data) resolves
- * to the fresher live read.
- *
- * That cache-only rule is specifically about *this function* running
- * unconditionally on every page open — it says nothing about the
- * alt-colonies toggle itself. A separate `useEffect` further down in this
- * component *does* call `loadPlanetName`/`loadTypeNames` for names still
- * missing after the read above, batched and gated on the toggle being on, so
- * that a pilot who actually opens the alt view gets resolved names instead
- * of raw ids without paying the fan-out cost on every visit.
- */
 export async function loadPiSnapshot(
   characterId: number,
   signal: RouteSnapshotSignal
@@ -170,9 +135,6 @@ export async function loadPiSnapshot(
     loadActiveColonies(characterId, signal),
     db.characters.get(characterId),
     loadPiRosterSnapshot(characterId),
-    // Cached after first load, so this is free beyond what the Advisor tab
-    // already pays. Caught, not awaited bare: an optional figure must not
-    // take the rest of the tab's real colony data down with it.
     loadPi().catch(() => null),
   ]);
   const activeCharacterName = activeCharacterRecord?.name ?? null;

@@ -25,7 +25,6 @@ vi.mock('./startLinkNames', () => ({
   nameIds: async (_fields: unknown, info: unknown) => info,
 }));
 vi.mock('./submitterName', () => ({ submitterName: async () => null }));
-// The real picker searches the whole SDE; its own tests cover that.
 vi.mock('./SurveyLocationPicker', () => ({
   SurveyLocationPicker: ({
     value,
@@ -57,7 +56,6 @@ function renderScreen(search: string) {
   );
 }
 
-// The paste listener always sees the latest form, so a paste right after a name lands uses it.
 const pasteScan = () => {
   fireEvent.paste(document.body, { clipboardData: { getData: () => SCAN } });
 };
@@ -155,7 +153,6 @@ describe('SurveyStartScreen', () => {
       id: 98000001,
     });
     renderScreen('');
-    // Paste in the same task as the commit that shows the name, before React's passive effects run.
     const observer = new MutationObserver(() => {
       if (screen.queryByText('Found: Bob Corporation (corporation)') === null) return;
       observer.disconnect();
@@ -183,7 +180,6 @@ describe('SurveyStartScreen', () => {
   it('names a place given by ID alone', async () => {
     resolvePlaceId.mockResolvedValue({ ok: true, name: 'Efa' });
     renderScreen('?placeId=30001');
-    // The ID boxes stay folded away until asked for.
     expect(screen.queryByLabelText('Place ID')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Add IDs instead' }));
     expect(await screen.findByText('Found: Efa')).toBeTruthy();
@@ -228,7 +224,6 @@ describe('SurveyStartScreen', () => {
   it('starts nothing for a paste that is not a scan', async () => {
     renderScreen('');
     fireEvent.paste(document.body, { clipboardData: { getData: () => 'hello' } });
-    // The listener decides in the event itself: text that is no scan starts nothing.
     expect(startSurvey).not.toHaveBeenCalled();
   });
 });

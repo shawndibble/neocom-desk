@@ -1,8 +1,3 @@
-/**
- * Test-only fixtures for the Map: a real `pi.json`, deterministic prices and a
- * small colony set, built the way `planAdviceModel.test.ts` builds its own, so
- * a test can run the real `buildPlanAdvice` without fetching anything.
- */
 import { HOUR_MS } from '@/lib/age';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -79,7 +74,6 @@ function planet(
   };
 }
 
-/** A lean temperate colony (3,000 a cycle): refining beats selling the ore, so Plan has a rebuild. */
 const leanDetail: CharacterPlanetDetail = {
   pins: [ecuPin(1, 2073, 3_000), ecuPin(2, 2073, 3_000), pad(3, 2256), pad(4, 2469)],
   links: [
@@ -101,10 +95,6 @@ export function snapshot(colonies: 'lean' | 'none' = 'lean'): PlannerSnapshot {
   };
 }
 
-/**
- * Bacteria (the P1 made from this colony's Microorganisms) priced under the ore
- * itself, so refining in place is no quick win and the rebuild is what Plan offers.
- */
 const LEAN_PRICES = {
   prices: { ...PRICES.prices, 2393: 50 },
   buyPrices: { ...PRICES.buyPrices, 2393: 45 },

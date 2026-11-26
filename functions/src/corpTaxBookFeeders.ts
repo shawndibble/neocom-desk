@@ -1,16 +1,3 @@
-// Collector books (issue #4507, spec #4504): the feeder record, its invite links
-// and the callables behind them. No sync and no UI yet. Layout:
-//
-//   corps/{collector}/feeders/{feederCorp}  the feeder record (officer-readable, function-written)
-//   corpTaxBookFeederInvites/{sha256(code)}        an invite link; only the hash is stored (function-only)
-//   corpTaxBookFeederOf/{feederCorp}               feeder → Collector pointer (function-only)
-//   corpTaxBookFeederPrevious/{feederCorp}         set when a feeder leaves, so its after-leaving view still resolves (function-only)
-//
-// A corporation feeds one book or runs its own, never both. The feeder's
-// mining-only grant (kind 'feeder' in corpTaxBookSyncGrants) arrives with the
-// feeder sync ticket. Failures carry stable `reason` codes the UI maps later;
-// no player-facing text lives here.
-
 import { utcDay } from './timeConstants.js';
 import { createHash } from 'node:crypto';
 import { HttpsError } from 'firebase-functions/v2/https';
@@ -51,155 +38,81 @@ import {
 
 export type FeederStatus = 'active' | 'pending-removal' | 'removed' | 'left' | 'disconnected';
 
-/** `corps/{collector}/feeders/{feederCorp}`. */
 export interface FeederRecord {
   corporationId: number;
   status: FeederStatus;
-  /** The Character who made the invite link. */
   invitedBy: number;
   joinedAt: number;
   leftAt?: number;
-  /** The Character holding the feeder's mining grant; set by the grant ticket. */
   grantHolder?: number;
   lastSyncResult?: { at: number; outcome: 'synced' | 'skipped' | 'stale'; reason?: string };
-  /** Last ledger read that landed (ms); a feeder's days are Billable only after one past their grace. */
   lastReadWellAt?: number;
-  /** When ESI first refused the ledger in the current spell (ms); absent when the ledger reads fine. */
   staleSince?: number;
-  /** Why the read that began the current stale spell was refused (`lastSyncResult.reason` of that read); later refusals do not overwrite it. */
   staleReason?: string;
-  /** When it disconnected after 30 days stale (ms). */
   disconnectedAt?: number;
-  /** The `staleSince` whose "we can't read your ledger" mail an officer's client claimed (#6210). */
   staleMailedFor?: number;
-  /** When that claim was made (ms): unsent after `STALE_MAIL_CLAIM_MS`, another officer may claim it. */
   staleMailClaimedAt?: number;
-  /** The `staleSince` whose mail the claiming officer's queue sent: the claim is final. */
   staleMailSentFor?: number;
-  /** One payee: a corporation or a player. */
   payee?: { kind: 'corporation' | 'character'; id: number };
   payeeChangedAt?: number;
-  /** Who set the payee last (#4653): either side may; absent on a payee set before it was kept. */
   payeeSetBy?: PayeeSetBy;
-  /**
-   * The moon owner turned Pop Sharing off for all its moons (#6222): who and when. Absent is the
-   * default, sharing allowed. The book's settings for its moons are kept and come back on opt-in.
-   */
   popSharingOptOut?: { by: number; at: number };
-  /** A removal the accounting corporation started (#4520); present while status is `pending-removal`. */
   removal?: Removal;
-  /** The id (hash) of the removal mail's link; the link's code is only ever in the mail. */
   removalLinkId?: string;
   mode: 'normal' | 'settled-otherwise';
-  /**
-   * The CEO's own corporation, joined without an invite link ("Add my other corps"): settled
-   * otherwise from its first day, no owner rate, no payouts. Absent on every other record.
-   */
   sameOwner?: boolean;
-  /** What the moon owner has been paid: payouts not marked "not a payout" (#5242). Absent until a payout write totals it. */
   payoutTotals?: { count: number; amount: number };
   note?: string;
-  /** The Character (the signed-in player) who handed over the mining grant; the holder may be their alt. */
   grantedBy?: number;
-  /** The rate the feeder asked for at grant time (0-100); the Collector's agreed rate wins when set. */
   requestedRatePct?: number;
-  /** The rate the Collector set; absent until one is. */
   agreedRatePct?: number;
-  /** The owner rate the invite offered, if it carried one. */
   offeredOwnerRatePct?: number;
   coveragePeriods: CoveragePeriod[];
-  /**
-   * The owner rate history (#4512). Absent on records written before it existed: the
-   * feeder view then derives entries from `requestedRatePct` / `agreedRatePct`.
-   */
   ownerRateHistory?: OwnerRateEntry[];
-  /** Dated mode switches (#4510); absent means derive from `mode`. */
   modeChanges?: FeederModeChange[];
-  /** When the corporation's officers dismissed the after-leaving view (ms). */
   viewDismissedAt?: number;
-  /**
-   * Free-text refinery labels by structure id (#4640): either side's officers set one, the last
-   * edit replaces it. Kept here, not in the view, so they carry on across a rejoin.
-   */
   refineryLabels?: Record<string, RefineryLabelDoc>;
-  /**
-   * Refineries an officer archived, by structure id (#6298): the page lists them apart. Hides only;
-   * every row, Extraction and label stays. Mining on a later day brings one back (the client reads
-   * it so), and a restore deletes the entry. Absent on every record from before.
-   */
   refineryArchive?: Record<string, RefineryArchiveDoc>;
-  /**
-   * Each refinery's system by structure id (#4650), learned from a miner's own ledger: a moon
-   * owner's rows rarely carry one. The first learned stays.
-   */
   refinerySystems?: Record<string, number>;
-  /**
-   * Each refinery's name and system by structure id (#4654), read by the sync with the moon
-   * owner's own token. Its system wins over a learned one. Re-read about weekly.
-   */
   refineryStructures?: Record<string, RefineryStructureDoc>;
-  /** The current grant carries the structure scope (#4654); absent on grants from before. */
   readsStructureNames?: boolean;
-  /**
-   * The current grant carries the notifications scope, so the sync reads each chunk's ore from the
-   * holder's Extraction started notifications. Mirrored from the grant by the sync; absent until a
-   * read since it existed (unknown, not lacking).
-   */
   readsNotifications?: boolean;
-  /**
-   * ESI refused the moon owner's Extractions (#6097): the grant holder lacks Station_Manager.
-   * Not asked again until a week has passed. Absent while they read fine or were never refused.
-   */
   extractionsRefusedAt?: number;
 }
 
-/** One refinery's structure lookup on a moon owner's record. */
 export interface RefineryStructureDoc {
   name?: string;
   solarSystemId?: number;
-  /** When it was looked up (ms). */
   checkedAt: number;
-  /** ESI said 403 (no docking access) or 404: not retried until a week has passed. */
   denied?: boolean;
 }
 
-/** One archived refinery on a moon owner's record. */
 export interface RefineryArchiveDoc {
-  /** When it was archived (ms). */
   at: number;
-  /** The officer's Character id. */
   by: number;
-  /** What the page offered it for, or `manual` when it offered nothing. */
   reason: 'gone' | 'idle' | 'manual';
 }
 
-/** The side and officer that set a moon owner's payee, and when (ms). */
 export interface PayeeSetBy {
   side: 'accounting' | 'moon-owner';
   characterId: number;
   at: number;
 }
 
-/** One refinery's label on a moon owner's record. */
 export interface RefineryLabelDoc {
   label: string;
-  /** ISO instant of the edit. */
   setAt: string;
   setBy: number;
   side: 'accounting' | 'moon-owner';
 }
 
-/** `corpTaxBookFeederInvites/{hash}`. */
 export interface FeederInviteDoc {
   collectorCorporationId: number;
   createdBy: number;
   createdAt: number;
   offeredOwnerRatePct?: number;
-  /** First covered day (UTC, `YYYY-MM-DD`) the join asks for; the accept clamps it. Absent: today. */
   coverageFrom?: string;
-  /** The joined corporation is the same owner's: it joins settled otherwise. */
   sameOwner?: boolean;
-  /** Minted by the add-my-corp call and never shown: exempt from the open-invite cap. */
   selfInvite?: boolean;
   revokedAt?: number;
   acceptedBy?: number;
@@ -207,7 +120,6 @@ export interface FeederInviteDoc {
   acceptedByCorporationId?: number;
 }
 
-/** Open (neither revoked nor accepted) invite links one book may hold. */
 export const MAX_OPEN_FEEDER_INVITES = 20;
 
 export const hashInviteCode = (code: string) => createHash('sha256').update(code).digest('hex');
@@ -215,10 +127,7 @@ export const hashInviteCode = (code: string) => createHash('sha256').update(code
 export const inviteRef = (db: BookDeps['db'], id: string) =>
   db.collection(FEEDER_INVITES_COLLECTION).doc(id);
 
-// --- Input -----------------------------------------------------------------
-
 export interface CreateFeederInviteInput extends BookCall {
-  /** The owner rate the link offers the feeder; absent means none offered. */
   offeredOwnerRatePct?: number;
 }
 
@@ -247,8 +156,6 @@ export interface AcceptFeederInviteInput {
   code: string;
   accessToken: string;
 }
-
-// --- Create and revoke -----------------------------------------------------
 
 export async function requireActiveBook(deps: BookDeps, corporationId: number): Promise<void> {
   const book = await bookRef(deps.db, corporationId).get();
@@ -315,7 +222,6 @@ export async function revokeFeederInvite(
   await deps.db.runTransaction(async (tx) => {
     const snap = await tx.get(ref);
     const invite = snap.data() as FeederInviteDoc | undefined;
-    // Another book's link reads as not found: a caller learns nothing about it.
     if (!invite || invite.collectorCorporationId !== input.corporationId) {
       fail('not-found', 'No such invite link', 'invite-invalid');
     }
@@ -334,11 +240,8 @@ export async function revokeFeederInvite(
   return { revoked: true };
 }
 
-// --- Preview ---------------------------------------------------------------
-
 export interface FeederInvitePreview {
   collectorCorporationId: number;
-  /** The book's own name setting; absent when never set (the client resolves the public name). */
   collectorName: string | null;
   offeredOwnerRatePct: number | null;
 }
@@ -347,11 +250,6 @@ export function parsePreviewFeederInviteInput(data: unknown): { code: string } {
   return { code: boundedString(record(data).code, 'code', 64) };
 }
 
-/**
- * What the consent screen shows before the grant: who the link is from and the rate it
- * offers. Holding the code is the standing; a revoked, used or unknown link, or one whose
- * book is closed, all read the same.
- */
 export async function previewFeederInvite(
   deps: BookDeps,
   caller: Caller,
@@ -375,21 +273,12 @@ export async function previewFeederInvite(
   };
 }
 
-// --- Accept ----------------------------------------------------------------
-
 export interface AcceptFeederInviteResult {
   collectorCorporationId: number;
   feederCorporationId: number;
-  /** True when this reopened a record that had left, been removed or disconnected. */
   rejoined: boolean;
 }
 
-/**
- * Accept an invite link as a member of the corporation that will feed. The caller
- * needs the edit role in their own corporation (read live from ESI). The record is
- * active at once; the first coverage period starts today (UTC), and a rejoin
- * reopens the same record with a new period.
- */
 export async function acceptFeederInvite(
   deps: BookDeps,
   caller: Caller,
@@ -407,7 +296,6 @@ export async function acceptFeederInvite(
     name: claims.name,
     feederCorp: identity.corporationId,
   });
-  // A join or rejoin opens coverage; the miners' copy follows (#4622).
   await refreshMemberCoverage(
     deps.db,
     accepted.collectorCorporationId,
@@ -420,16 +308,12 @@ export async function acceptFeederInvite(
   };
 }
 
-/** What the mining-only grant path needs to put back if the first ledger read is refused. */
 export interface AcceptUndo {
-  /** The feeder record before the accept; absent when the accept created it. */
   priorRecord?: FeederRecord;
-  /** The pointer before the accept: only a disconnected moon owner taken back has one. */
   priorPointer?: { collectorCorporationId: number; since: number };
   inviteId: string;
 }
 
-/** Per-feed sync state that never carries into a new coverage period. */
 const FEED_STATE: readonly (keyof FeederRecord)[] = [
   'leftAt',
   'staleSince',
@@ -439,17 +323,13 @@ const FEED_STATE: readonly (keyof FeederRecord)[] = [
   'staleMailSentFor',
   'disconnectedAt',
   'lastSyncResult',
-  // A rejoin's holder may read Extractions the old one could not (#6117).
   'extractionsRefusedAt',
   'viewDismissedAt',
-  // The offered rate belongs to the link, not to the record's history.
   'offeredOwnerRatePct',
-  // A holder's standing belongs to the feed it granted; a rejoin names its own.
   'grantHolder',
   'grantedBy',
 ];
 
-/** The agreed rate an accepted link's offer stands for, dated the join day. */
 function offeredRate(base: FeederRecord, invite: FeederInviteDoc, now: number) {
   const pct = invite.offeredOwnerRatePct;
   if (pct === undefined) return {};
@@ -465,20 +345,10 @@ export interface AcceptCoreInput {
   characterId: number;
   name: string;
   feederCorp: number;
-  /** Extra fields stamped on the new or reopened record (the grant path's holder). */
   recordExtra?: Partial<FeederRecord>;
-  /**
-   * Take back a disconnected moon owner of this book. Only the grant path sets it: a
-   * take-back without a fresh grant would only go stale and disconnect again.
-   */
   allowTakeBack?: boolean;
 }
 
-/**
- * The accept transaction, after the caller's standing is settled: the roles-scope
- * path checks the edit role first, the mining-only grant path leaves that to the
- * ledger read (decision 20261020-141656).
- */
 export async function acceptInviteCore(
   deps: BookDeps,
   input: AcceptCoreInput
@@ -511,7 +381,6 @@ export async function acceptInviteCore(
     const pointer = (await tx.get(pointerRef)).data() as AcceptUndo['priorPointer'];
     const recordRef = feederRef(deps.db, collector, feederCorp);
     const held = (await tx.get(recordRef)).data() as FeederRecord | undefined;
-    // A disconnected moon owner keeps its pointer; this book's fresh link takes it back.
     const takenBack =
       input.allowTakeBack === true &&
       pointer?.collectorCorporationId === collector &&
@@ -519,11 +388,7 @@ export async function acceptInviteCore(
     if (pointer && !takenBack)
       fail('failed-precondition', 'This corporation already feeds a book', 'already-feeder');
 
-    // The first covered day: the invite's ask within 30 days back, never before the book began
-    // and (on a rejoin) never inside an earlier period.
     const startDate: unknown = collectorBook.get('startDate');
-    // Taking back a disconnected moon owner with no asked day is a reconnect: it reaches back to
-    // the day after its last covered one, so ore EVE still holds is not lost.
     let from =
       takenBack && invite.coverageFrom === undefined
         ? reconnectCoverageFrom(
@@ -554,7 +419,6 @@ export async function acceptInviteCore(
         ...extra,
       });
     } else {
-      // The pointer is gone only once the record has left or been removed, or kept while disconnected.
       if (held.status !== 'left' && held.status !== 'removed' && !takenBack) {
         fail('failed-precondition', 'This corporation already feeds this book', 'feeder-active');
       }

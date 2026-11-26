@@ -1,10 +1,3 @@
-/**
- * The hulls and hull classes a Hull Rule can name, from the SDE the app already
- * ships: every type in the Ship category (`types.json` + `groupCategories.json`, as
- * `fittings/hullNames.ts` does), and its ship group as the class (HullRuleScope 'class' keys on
- * a ship group id, ADR 0026). Group names are not in the SDE snapshot: `useHullCatalog` reads them
- * through `loadGroupNames`. Pure here: no fetch.
- */
 import { SHIP_CATEGORY_ID } from '@/sde/categories';
 import type { TypeMap } from '@/sde/types';
 
@@ -44,14 +37,12 @@ export function buildHullCatalog(
   };
 }
 
-/** Every hull whose name contains the query; blank gives none. Not capped: the list scrolls. */
 export function searchHulls(catalog: HullCatalog, query: string): Hull[] {
   const q = query.trim().toLowerCase();
   if (q === '') return [];
   return catalog.hulls.filter((h) => h.name.toLowerCase().includes(q));
 }
 
-/** Every ship class whose name contains the query; blank gives none. */
 export function searchClasses(
   catalog: HullCatalog,
   className: (classId: number) => string,

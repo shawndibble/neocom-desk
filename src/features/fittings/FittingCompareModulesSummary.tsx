@@ -1,4 +1,3 @@
-/** "Modules that differ": one row per module type not shared identically across every compared Fitting. */
 import { useTranslation } from 'react-i18next';
 import { typeNameOr } from '@/lib/typeNameOr';
 import { TypeIcon } from '@/components/ui';
@@ -12,7 +11,6 @@ import { useModuleDiffNames } from './useModuleDiffNames';
 
 export interface FittingCompareModulesSummaryProps {
   entries: readonly ModuleDiffEntry[];
-  /** The stats table's own columns (`statsIndex` = position in `entry.counts`; null: stats failed, shown as a dash), so the phone window matches. */
   columns: readonly FittingCompareColumn[];
 }
 

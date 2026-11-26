@@ -1,31 +1,13 @@
-/**
- * Pure rules for the Active Jobs "History" view (issue #2866): which ESI jobs
- * are history, how fetched jobs fold into the stored history, and which
- * delivered jobs the Production Log already covers. No fetch/DOM/Dexie here.
- */
 import type { IndustryJob } from '@/esi/endpoints';
 
-/** A job that is history: collected, output in the hangar. */
 export function isDeliveredJob(job: Pick<IndustryJob, 'status'>): boolean {
   return job.status === 'delivered';
 }
 
-/**
- * A job that still belongs on the Active list: running, paused, or finished
- * but not yet collected (`ready`). Delivered, cancelled and reverted jobs are
- * what `include_completed=true` adds; every cache reader (slots, alerts,
- * board) expects them absent, so the loader strips them.
- */
 export function isOpenJob(job: Pick<IndustryJob, 'status'>): boolean {
   return job.status === 'active' || job.status === 'paused' || job.status === 'ready';
 }
 
-/**
- * Folds a fetch into the stored history. Delivered jobs are kept even once ESI
- * stops returning them; a fetched copy replaces the stored one by `job_id`. A
- * stored job a later fetch reports as anything but delivered (reverted) is
- * dropped. Newest `end_date` first.
- */
 export function mergeJobHistory(
   stored: readonly IndustryJob[],
   fetched: readonly IndustryJob[]
@@ -38,14 +20,12 @@ export function mergeJobHistory(
   return [...byId.values()].sort((a, b) => Date.parse(b.end_date) - Date.parse(a.end_date));
 }
 
-/** The slice of a Production Run the matching reads. */
 export interface LoggedRunRef {
   id: string;
   characterId: number;
   buildPlanId: string;
   productTypeID: number;
   loggedAt: number;
-  /** Set when the run was logged from this job's "Log production" action. */
   sourceJobId?: number;
 }
 
@@ -56,14 +36,6 @@ export type HistoryJob = Pick<IndustryJob, 'job_id' | 'end_date' | 'product_type
   characterId: number;
 };
 
-/**
- * Logged vs unlogged per job id. A run that names its job (`sourceJobId`) is
- * an exact match and claims it first. For runs logged by hand there is no link,
- * so the rest fall back to same Character + product type + logged after the
- * job ended, oldest job taking the earliest eligible run. Units are not
- * compared: a job records runs, not units, and the log form lets the pilot
- * edit the quantity anyway. Each run covers at most one job.
- */
 export function classifyHistoryJobs(
   jobs: readonly HistoryJob[],
   runs: readonly LoggedRunRef[]
@@ -110,17 +82,10 @@ export function classifyHistoryJobs(
   return states;
 }
 
-/** Activity ids the Production Log can record: manufacturing and reactions. */
 const LOGGABLE_ACTIVITIES = new Set([1, 11]);
 
-/** ESI `activity_id` for invention. */
 const INVENTION_ACTIVITY = 8;
 
-/**
- * A delivered invention job's result: how many of its runs produced a copy
- * (issue #6166). Null for any other activity, and when ESI left
- * `successful_runs` out, so a missing count never reads as "0 succeeded".
- */
 export function inventionOutcome(
   job: Pick<IndustryJob, 'activity_id' | 'runs' | 'successful_runs'>
 ): { succeeded: number; runs: number } | null {
@@ -129,18 +94,12 @@ export function inventionOutcome(
   return { succeeded: job.successful_runs, runs: job.runs };
 }
 
-/** Whether a delivered job is something the Production Log could hold at all. */
 export function isLoggableHistoryJob(
   job: Pick<IndustryJob, 'activity_id' | 'product_type_id'>
 ): boolean {
   return LOGGABLE_ACTIVITIES.has(job.activity_id) && job.product_type_id !== undefined;
 }
 
-/**
- * Delivered, loggable jobs with no run — the "N delivered, not logged" figure.
- * `blueprintTypeId` narrows it to one Build Plan's blueprint. A dismissed job
- * (`dismissedJobIds`) is left out; one that was logged counts as logged either way.
- */
 export function countUnloggedDeliveries(
   jobs: readonly (Pick<IndustryJob, 'job_id' | 'activity_id' | 'product_type_id'> & {
     blueprint_type_id: number;

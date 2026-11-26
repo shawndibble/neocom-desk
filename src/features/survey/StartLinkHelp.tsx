@@ -1,8 +1,3 @@
-/**
- * The foot of the start page: how to write a Survey start link by hand, for a
- * pilot who wants one in a site, a calendar invite or a chat. Its first line is
- * that link, built from the Additional information beside it and copyable.
- */
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, CollapsiblePanel } from '@/components/ui';
@@ -18,19 +13,13 @@ const FIND = ['findPlace', 'findStructure', 'findPayee', 'findLoggedIn'] as cons
 
 const EXAMPLE_PATH = '/survey?place=Efa&payee=Bob%20Corp&rate=10&notes=Fleet%20at%2019%3A00';
 
-/**
- * `path` is the start link built from the Additional information beside it
- * (`startLinkPath`); with nothing filled in there, a made-up example shows instead.
- */
 export function StartLinkHelp({ path = START_LINK_PATH }: { path?: string }) {
   const { t } = useTranslation();
   const made = path !== START_LINK_PATH;
   const [expanded, setExpanded] = useState(false);
   const { copied, flash } = useCopyFeedback<'copied' | 'failed'>(2000);
-  // The short link made for one path; any change to the details drops it.
   const [short, setShort] = useState<{ path: string; url: string } | null>(null);
   const [shortState, setShortState] = useState<'idle' | 'busy' | 'failed'>('idle');
-  // Seconds to wait when the service said to slow down.
   const [wait, setWait] = useState<number | null>(null);
   const shortUrl = made && short?.path === path ? short.url : null;
   const url = shortUrl ?? appUrl(made ? path : EXAMPLE_PATH);

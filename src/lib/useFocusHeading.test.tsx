@@ -38,7 +38,6 @@ describe('useFocusHeading', () => {
     rerender(<Harness level="Jita" />);
     expect(screen.getByRole('heading')).not.toHaveFocus();
 
-    // Focus it manually, then confirm an unrelated re-render doesn't re-steal it.
     screen.getByRole('heading').focus();
     rerender(<Harness level="Jita" />);
     expect(screen.getByRole('heading')).toHaveFocus();
@@ -62,16 +61,11 @@ describe('useFocusHeading', () => {
 
   it('does not retroactively focus once re-enabled if the key did not change while disabled (e.g. a viewport resize)', () => {
     const { rerender } = render(<Harness level="Jita" enabled={false} />);
-    // Same key as before, only `enabled` flips — as when a narrow layout's
-    // `isDesktop` toggles true->false on a resize with no new selection.
     rerender(<Harness level="Jita" enabled={true} />);
     expect(screen.getByRole('heading')).not.toHaveFocus();
   });
 
   it('does not retroactively focus on re-enable even if the key changed while disabled', () => {
-    // `prevKey` tracks every render regardless of `enabled`, so it has
-    // already caught up to "Structure #1" by the time `enabled` flips back
-    // on — there is no unseen change left to fire for.
     const { rerender } = render(<Harness level="Jita" enabled={false} />);
     rerender(<Harness level="Structure #1" enabled={false} />);
     rerender(<Harness level="Structure #1" enabled={true} />);

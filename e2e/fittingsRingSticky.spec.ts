@@ -1,7 +1,3 @@
-/**
- * Open Fitting Ring column (issue #1929): at lg and up the Ring column stays in view
- * while the tall stats column is scrolled. Structure only — no stat figure is awaited.
- */
 import type { Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
@@ -36,7 +32,7 @@ test.describe('Open Fitting Ring column stays in view', () => {
       await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
       const box = await column.boundingBox();
       expect(box).not.toBeNull();
-      expect(box!.y).toBeGreaterThan(-2); // sub-pixel slack: it sits at the grid's end
+      expect(box!.y).toBeGreaterThan(-2);
       expect(box!.y).toBeLessThan(height);
       expect(
         await page.evaluate(

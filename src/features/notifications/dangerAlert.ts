@@ -1,16 +1,3 @@
-/**
- * What the global alerts bell, panel and Danger banner decide, with no UI in
- * it: which entries are danger, what the bell badge says, what "Mark all read"
- * may touch, and which chip a notification type sits under.
- *
- * Danger is `entrySeverity(...) === 'critical'` (`alertGroups.ts`) — the one
- * judgement of consequence the app already makes, reused rather than restated.
- * Acknowledging a danger Alert is dismissing its feed entries, so there is no
- * "acknowledged" state here: an undismissed danger entry is an unacknowledged
- * one.
- *
- * Pure: no fetch/DOM/Dexie, no clock.
- */
 import type { NotificationFeedRecord } from '@/db';
 import { alertGroupKey, entrySeverity, type AlertTypeGroup } from './alertGroups';
 import { notificationUrlFor } from './notificationOptions';
@@ -24,7 +11,6 @@ export function isDangerEntry(
 const live = (entries: readonly NotificationFeedRecord[]) =>
   entries.filter((entry) => entry.dismissedAt === undefined);
 
-/** The entry the Danger banner shows: newest undismissed danger entry, or null. */
 export function selectDangerBanner(
   entries: readonly NotificationFeedRecord[]
 ): NotificationFeedRecord | null {
@@ -37,7 +23,6 @@ export function selectDangerBanner(
 
 export interface BellBadge {
   count: number;
-  /** An unacknowledged danger Alert exists: the badge turns red. */
   danger: boolean;
 }
 
@@ -46,7 +31,6 @@ export function bellBadge(entries: readonly NotificationFeedRecord[]): BellBadge
   return { count: waiting.length, danger: waiting.some(isDangerEntry) };
 }
 
-/** "Mark all read" dismisses everything except danger, which only Acknowledge clears. */
 export function markAllReadTargets(
   entries: readonly NotificationFeedRecord[]
 ): NotificationFeedRecord[] {
@@ -102,7 +86,6 @@ const EVENT_CHIP: Readonly<Record<string, TopicChip>> = {
 
 const STRUCTURE_TYPE_PREFIXES = ['Structure', 'Orbital', 'Moonmining', 'InfrastructureHub'];
 
-/** The topic chip a group key (`alertGroupKey`) files under, or null when only All lists it. */
 export function typeChipOfGroupKey(key: string): TopicChip | null {
   if (key.startsWith('eveType:')) {
     const type = key.slice('eveType:'.length);
@@ -120,11 +103,6 @@ export function filterByChip<G extends Pick<AlertTypeGroup, 'key' | 'severity'>>
   return groups.filter((group) => typeChipOfGroupKey(group.key) === chip);
 }
 
-/**
- * The chips worth showing: a chip only earns its place when it narrows the list,
- * so those matching nothing, or every type, are left out, and with none left
- * (one type, or all alike) there is nothing to filter and no chips at all.
- */
 export function usefulChips(
   groups: readonly Pick<AlertTypeGroup, 'key' | 'severity'>[]
 ): AlertChip[] {
@@ -136,17 +114,10 @@ export function usefulChips(
   return narrowing.length === 0 ? [] : ['all', ...narrowing];
 }
 
-/** Price alerts are the one type where "not now, ask again later" is honest. */
 export function isSnoozable(group: Pick<AlertTypeGroup, 'key'>): boolean {
   return group.key === alertGroupKey({ eventId: 'priceAlertTriggered' });
 }
 
-/**
- * Where View goes for a group. An event uses its notification route; an EVE
- * notification has no page of its own, so structure types go to the corp page
- * and the rest stay on the Overview. Never `/alerts`, which now just opens
- * the panel this was clicked in.
- */
 export function alertViewPath(groupKey: string): string {
   if (groupKey.startsWith('eveType:')) {
     return typeChipOfGroupKey(groupKey) === 'structures' ? '/corp' : '/overview';

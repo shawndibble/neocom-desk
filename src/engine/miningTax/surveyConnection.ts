@@ -1,57 +1,28 @@
-/**
- * A Survey connection (issue #4684): "Assign Taxes" on a moon Survey ties
- * that moon's mining to the Survey's Payee and rate, so the pilot never
- * assigns it by hand. While the Survey is being mined — from its first scan's
- * UTC date until its ETA, plus a grace period for the ledger's lag — every
- * unassigned ore line of the Survey's moon ore types, in the Survey's system,
- * is assigned to that Payee at that rate as it reaches the Mining Ledger.
- *
- * Only one connection runs at a time (scope decision "one Auto Assignment at
- * a time"): Assign Taxes on another Survey replaces it. The ledger has days,
- * systems and ore types, never moons, so this never guesses: an entry holding
- * ore no live connection covers (another moon's ore) is left for the pilot to
- * assign. Lists synced before that rule can still hold two; ore both claim
- * while both are being mined stays unassigned too.
- *
- * Pure: the caller loads entries and Assignments and writes what this plans.
- */
 import { HOUR_MS } from '@/lib/age';
 import { isDefaultAssigned, isUnpaidDefault } from './defaultSystems';
 import { growthCollector, type CoveringAssignment } from './ownership';
 import type { MiningLedgerEntry, OreLine } from './types';
 import { utcDay } from '@/engine/localDay';
 
-/** How long past its ETA a connection still claims ore: ESI's mining ledger runs a few minutes behind the game, sometimes more. */
 export const LEDGER_GRACE_MS = HOUR_MS;
 
 export interface SurveyConnection {
   surveyId: string;
-  /** The Character whose mining is connected — the one who clicked. */
   characterId: number;
   payeeId: string;
-  /** The Payee's name when connected, for the Survey's "Assigning to …" line. */
   payeeName: string;
-  /** The Survey's rate, which every Assignment it makes is billed at. */
   taxPct: number;
-  /** The Survey Location's solar system; null until the Survey has one that resolves. */
   systemId: number | null;
-  /** The structure named in the Survey Location ("Mav's Watering Hole" from "Ainsan - Mav's Watering Hole"); the "Moon / structure" label each Assignment gets. */
   structureLabel?: string;
-  /** The moon ore types the Survey's scans show. */
   typeIds: number[];
-  /** UTC `YYYY-MM-DD` of the Survey's first scan. */
   fromDate: string;
-  /** Epoch ms the Survey is expected to be mined out (its ETA). */
   untilMs: number;
-  /** The Survey link's own expiry, epoch ms. */
   expiresAt: number;
   connectedAt: number;
 }
 
-/** How long a connection assigns when the Survey has one scan, so no pace and no ETA: the next 12 hours. */
 export const NO_ETA_WINDOW_MS = 12 * HOUR_MS;
 
-/** The summary fields a connection's window is read from (`SurveySummary`, engine/survey/series.ts). */
 export interface ConnectionWindowInput {
   firstAt: number;
   etaAt: number | null;
@@ -61,12 +32,6 @@ export interface ConnectionWindowInput {
   expiresAt: number;
 }
 
-/**
- * From the first scan's UTC date until the field runs out: the ETA while it is
- * being mined, the time it was found empty once finished, and 12 hours from
- * `connectedAt` while there is no ETA yet (one scan, no pace). Never past the
- * expiry.
- */
 export function connectionWindow(
   input: ConnectionWindowInput,
   connectedAt: number
@@ -80,11 +45,6 @@ export function connectionWindow(
   return { fromDate: utcDay(input.firstAt), untilMs: Math.min(end, input.expiresAt) };
 }
 
-/**
- * The structure in a Survey Location's name: EVE names a station or structure
- * "System - Structure", so what follows the first " - ". None for a bare
- * system or a blank name.
- */
 export function structureFromLocation(name: string | undefined): string | undefined {
   const at = name?.indexOf(' - ') ?? -1;
   if (name === undefined || at < 0) return undefined;
@@ -98,12 +58,6 @@ export function isConnectionLive(connection: SurveyConnection, nowMs: number): b
 const sameConnection = (a: SurveyConnection, b: SurveyConnection) =>
   a.surveyId === b.surveyId && a.characterId === b.characterId;
 
-/**
- * Saves `next` over the same Survey's connection for the same Character,
- * dropping any no longer live. Adds nothing when that connection is gone:
- * a Survey left open after a Stop, or after another Survey replaced it,
- * must not bring it back.
- */
 export function updateSurveyConnection(
   list: readonly SurveyConnection[],
   next: SurveyConnection,
@@ -134,23 +88,19 @@ function isConnection(value: unknown): value is SurveyConnection {
   );
 }
 
-/** The synced setting's value, malformed entries dropped; null when it is no list at all. */
 export function parseSurveyConnections(raw: unknown): SurveyConnection[] | null {
   return Array.isArray(raw) ? raw.filter(isConnection) : null;
 }
 
-/** A stored Assignment, as far as planning reads it. */
 export interface PlannedCovering extends CoveringAssignment {
   characterId: number;
   date: string;
   solarSystemId: number;
   payeeId?: string;
   taxPct: number;
-  /** `false` on an Assignment a Default System made and no one has changed (`defaultSystems.ts`). */
   override?: boolean;
 }
 
-/** Ore types a Default Systems Assignment gives up to a connection, so the caller can release them before assigning. */
 export interface Takeover {
   assignmentId: string;
   typeIds: number[];
@@ -162,11 +112,8 @@ export interface AutoAssignSlice {
   date: string;
   solarSystemId: number;
   oreLines: OreLine[];
-  /** The connection's structure, for the Assignment's "Moon / structure" label. */
   label?: string;
-  /** The entry's whole ore, for the double-assignment guard. */
   entryOreLines: readonly OreLine[];
-  /** Unpaid Default Systems Assignments holding some of this slice's ore: release those types first. */
   takeovers: Takeover[];
 }
 
@@ -180,7 +127,6 @@ function covers(c: SurveyConnection, e: MiningLedgerEntry, nowMs: number): boole
   );
 }
 
-/** The one connection that owns a type: the only claimant, or the only one still being mined. */
 function ownerOf(
   claimants: readonly SurveyConnection[],
   nowMs: number
@@ -190,15 +136,6 @@ function ownerOf(
   return mining.length === 1 ? mining[0] : undefined;
 }
 
-/**
- * The ore each live connection should assign now: per entry, what no stored
- * Assignment holds (entry quantity less every covering snapshot), grouped by
- * the connection whose ore types it is. Nothing for an entry when any of that
- * ore has no single owner, or the entry's growth collector is a dismissal (the
- * pilot said no tax here). A connection whose Payee and rate already collect
- * the entry's growth, unpaid, is left to that Assignment: it absorbs the ore
- * on its own (`reconcile.ts`), so a second row would only split one bill.
- */
 export function planSurveyAutoAssign(
   entries: readonly MiningLedgerEntry[],
   assignments: readonly PlannedCovering[],
@@ -221,8 +158,6 @@ export function planSurveyAutoAssign(
     const collector = growthCollector(covering);
     if (collector?.status === 'dismissed') continue;
 
-    // Ore a Default System assigned and no one has changed counts as unassigned to a
-    // connection claiming its type (the default is the last resort); a paid one is the pilot's.
     const claimed = new Set(live.flatMap((c) => c.typeIds));
     const takeable = isUnpaidDefault;
     const held = new Map<number, number>();

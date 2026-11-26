@@ -1,8 +1,9 @@
 import type { PayeeLedgerRow } from '@/engine/miningTax/payeeLedger';
+import type { AssignmentTerms, RecordChange } from '@/engine/miningTax/recordChanges';
+import { formatIsk } from '@/lib/isk';
 import type { CsvColumn } from '@/lib/csv';
 import type { Translate } from '@/lib/translate';
 
-/** What a row is, in a few words: the table's What column and the export's. */
 export function ledgerWhat(row: PayeeLedgerRow, t: Translate): string {
   switch (row.kind) {
     case 'charge':
@@ -32,16 +33,50 @@ export function ledgerWhat(row: PayeeLedgerRow, t: Translate): string {
         : t(`miningTax.ledger.what.${row.cause}`);
     case 'notice':
       return t(`miningTax.ledger.what.${row.notice.kind}`);
+    case 'recordChange':
+      return t(`miningTax.ledger.what.recordChange.${row.change.reason}`);
     case 'opening':
       return t('miningTax.ledger.what.opening', { date: row.date });
   }
 }
 
-/** The export's columns: an old history's rows carry no balance, so its file has none either. */
+export function recordChangeSummary(change: RecordChange, t: Translate): string {
+  const isk = (value: number) => `${formatIsk(value)} ISK`;
+  if (change.reason === 'tolerance')
+    return t('miningTax.ledger.summary.tolerance', {
+      date: change.date,
+      billed: isk(change.closeOut.billed),
+      paid: isk(change.closeOut.paid),
+      writtenOff: isk(change.closeOut.writtenOff),
+      tolerance: isk(change.closeOut.tolerance),
+    });
+  const terms = (x: AssignmentTerms | null) =>
+    x
+      ? t('miningTax.ledger.summary.terms', { pct: x.taxPct, tax: isk(x.taxOwed) })
+      : t('miningTax.ledger.summary.none');
+  return t('miningTax.ledger.summary.assignments', {
+    date: change.date,
+    changes: change.assignments
+      .map((a) =>
+        t('miningTax.ledger.summary.change', { before: terms(a.before), after: terms(a.after) })
+      )
+      .join(t('miningTax.ledger.summary.separator')),
+  });
+}
+
 export function ledgerCsvColumns(t: Translate, history?: boolean): CsvColumn<PayeeLedgerRow>[] {
   const columns: CsvColumn<PayeeLedgerRow>[] = [
     { header: t('miningTax.ledger.column.date'), value: (r) => r.date },
-    { header: t('miningTax.ledger.column.what'), value: (r) => ledgerWhat(r, t) },
+    {
+      header: t('miningTax.ledger.column.what'),
+      value: (r) =>
+        r.kind === 'recordChange'
+          ? t('miningTax.ledger.summary.line', {
+              what: ledgerWhat(r, t),
+              summary: recordChangeSummary(r.change, t),
+            })
+          : ledgerWhat(r, t),
+    },
     { header: t('miningTax.ledger.column.charged'), value: (r) => r.charged || null },
     { header: t('miningTax.ledger.column.credited'), value: (r) => r.paid || null },
   ];

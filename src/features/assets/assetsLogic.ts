@@ -31,15 +31,8 @@ export function locationLabel(
       : t('assets.inSpaceLabel', { id: locationId });
   }
   if (locationType === 'item') {
-    // A missing parent is often actually a structure id ESI never returned as
-    // its own asset row (a personal-hangar division inside a player-owned
-    // structure, for instance) — `loadAssetsSnapshot` best-effort resolves
-    // these via the structures endpoint, so a hit here beats every fallback
-    // below.
     const resolvedName = locationNames.get(locationId);
     if (resolvedName) return resolvedName;
-    // The parent is another asset (container or ship) in this same list; label
-    // the group with ITS resolved type name instead of a raw item id.
     const parent = assetsByItemId.get(locationId);
     if (parent) {
       const parentName = typeNames.get(parent.type_id);
@@ -47,16 +40,9 @@ export function locationLabel(
     }
     return t('assets.containerLabel');
   }
-  // Exhaustiveness fallback: every current location_type is handled above.
   return t('assets.structureLabel', { id: locationId });
 }
 
-/**
- * What an asset sits in, outermost first: the owned containers and ships between
- * it and its station, structure or solar system, and that root place. A parent
- * ESI never returned as an asset (a structure the list has no row for) ends the
- * walk with the root left as an `item` location; a loop ends it with `cyclic` set.
- */
 export function assetHolderChain(
   asset: CharacterAsset,
   assetsByItemId: ReadonlyMap<number, CharacterAsset>
@@ -64,7 +50,6 @@ export function assetHolderChain(
   chain: CharacterAsset[];
   rootLocationId: number;
   rootLocationType: CharacterAsset['location_type'];
-  /** The walk met a holder it had already passed: the root is not a real place. */
   cyclic: boolean;
 } {
   const chain: CharacterAsset[] = [];
@@ -93,11 +78,6 @@ export function assetHolderChain(
   };
 }
 
-/**
- * Name-substring search over a flat asset list, shared by the CSV export path
- * and the on-screen results path. Matches the type name or, for a ship or
- * container the player named, its in-game name (issue #5652).
- */
 export function matchAssets(
   assets: readonly CharacterAsset[],
   typeNames: ReadonlyMap<number, string>,
@@ -115,13 +95,11 @@ export function matchAssets(
   return matches;
 }
 
-/** An `AssetMatch` with its estimated value precomputed once, rather than re-derived by every sort comparison. */
 export interface ValuedAssetMatch {
   match: AssetMatch;
   value: number;
 }
 
-/** Orders the search/all-items flat list: name ascending, value and quantity highest-first. */
 export function compareValuedAssetMatches(
   a: ValuedAssetMatch,
   b: ValuedAssetMatch,
@@ -142,10 +120,6 @@ function nameForNode(node: AssetTreeNode, typeNames: ReadonlyMap<number, string>
   return typeNames.get(node.asset.type_id) ?? `Type #${node.asset.type_id}`;
 }
 
-/**
- * Bays stay in their fixed Cargo Hold / Drone Bay / Fitting order; every other sibling
- * list sorts by resolved display name, matching the flat list this tree replaces.
- */
 function sortNodes(
   nodes: readonly AssetTreeNode[],
   typeNames: ReadonlyMap<number, string>
@@ -161,7 +135,6 @@ function sortNodes(
   return [...bays, ...rest];
 }
 
-/** Pinned stations (either scope) sort ahead of unpinned ones; each group orders by `sortField` (issue #88). */
 export function sortStations(
   stations: readonly AssetTreeStation[],
   labelFor: (station: AssetTreeStation) => string,
@@ -181,7 +154,6 @@ export function sortStations(
     );
 }
 
-/** An asset group's `location_type` as the kind a Place resolves under. */
 export function placeKindForStation(
   locationType: AssetTreeStation['locationType']
 ): 'station' | 'solar_system' | 'structure' | undefined {

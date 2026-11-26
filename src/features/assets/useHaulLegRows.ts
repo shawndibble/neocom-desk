@@ -6,15 +6,8 @@ import { findLocalRoute } from '@/features/route/localRoute';
 import { loadSystemActivity } from '@/features/route/routeSafetyData';
 import { loadSolarSystemsById } from '@/sde/solarSystems';
 
-/** A Leg's systems in flying order, read for the strip; `none` when no gate route can be drawn. */
 export type LegRows = { status: 'ready'; rows: RouteSafetyRow[] } | { status: 'none' };
 
-/**
- * The systems each Leg flies through, re-derived under the saved Jump Basis
- * (the haul snapshot keeps jump counts only), with the last hour's kills.
- * Both activity feeds are one cached call each for all of New Eden, so a
- * haul of any size costs the same two requests. Absent until read.
- */
 export function useHaulLegRows(legs: readonly HaulLeg[]): ReadonlyMap<number, LegRows> {
   const [rows, setRows] = useState<ReadonlyMap<number, LegRows>>(new Map());
   useEffect(() => {

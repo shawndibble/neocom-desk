@@ -23,11 +23,6 @@ import {
   type CategoryPick,
 } from './assetCategoryFilter';
 
-/**
- * The two-level Asset Category picker (issue #5601), shared by Assets and Corp
- * Assets: search, Select all / Select none, a heading per Asset Category with
- * its direct child market groups beneath it.
- */
 export function AssetCategoryPicker({
   index,
   visibleIndex = index,
@@ -35,13 +30,10 @@ export function AssetCategoryPicker({
   onChange,
   active,
 }: {
-  /** The full index: toggles run against it so an `'all'` pick stays "everything". */
   index: AssetCategoryIndex;
-  /** What the list shows (e.g. only categories with assets); defaults to `index`. */
   visibleIndex?: AssetCategoryIndex;
   pick: CategoryPick;
   onChange: (pick: CategoryPick) => void;
-  /** Draws the accent border while the pick narrows the list. */
   active?: boolean;
 }) {
   const { t } = useTranslation();
@@ -51,7 +43,6 @@ export function AssetCategoryPicker({
     for (const heading of visibleIndex.headings) map.set(heading.name, heading);
     return map;
   }, [visibleIndex]);
-  // A heading holding one row of its own name ("Not on the market") is just that row.
   const groups = useMemo<readonly MultiSelectGroup<number>[]>(
     () =>
       visibleIndex.headings.map((heading) => ({
@@ -111,7 +102,6 @@ export function AssetCategoryPicker({
   );
 }
 
-/** Any / Originals / Copies; shown only while a Blueprints & Reactions option is ticked. */
 export function BlueprintKindSelect({
   value,
   onChange,

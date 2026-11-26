@@ -30,7 +30,6 @@ function phone(matches: boolean) {
   stubViewport((media) => matches && media === PHONE_QUERY);
 }
 
-/** The real header scrolled 50px above the viewport, 400px of rows left. */
 function headerScrolledAway() {
   HTMLElement.prototype.getBoundingClientRect = function () {
     const rect = (top: number, height: number) =>
@@ -62,7 +61,6 @@ describe('DataTable sticky header on a phone', () => {
     const copy = screen.getByTestId('dt-sticky-header');
     expect(copy).toHaveAttribute('aria-hidden', 'true');
     expect(copy).toHaveTextContent('Item');
-    // Not in the tab order, so only the real header is reachable by keyboard.
     expect(copy.querySelector('button')).toHaveAttribute('tabindex', '-1');
   });
 

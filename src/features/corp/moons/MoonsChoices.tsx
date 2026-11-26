@@ -4,13 +4,6 @@ import { parseInviteInput } from '../taxBook/feederClient';
 
 export type SetupChoice = 'own' | 'consent' | 'collect';
 
-/**
- * The three choices on the Moons page of a corporation with no book. Running its own
- * book is the common path, so it leads: a full-width row with the one primary button.
- * Letting an accounting corporation handle it (a pasted invite link or code) and
- * collecting tax for other corporations sit beneath it, side by side, with ghost
- * buttons. Presentational: `MoonsSetup` owns the steps.
- */
 export function MoonsChoices({
   canOwn,
   left,
@@ -19,9 +12,7 @@ export function MoonsChoices({
   onPaste,
   onChoose,
 }: {
-  /** Directors may turn a book on; the paste-an-invite choice is for any officer. */
   canOwn: boolean;
-  /** The corporation just left an accounting corporation. */
   left?: boolean;
   error?: string | null;
   paste: string;
@@ -71,7 +62,6 @@ export function MoonsChoices({
                 </span>
                 <TextInput value={paste} onChange={(e) => onPaste(e.target.value)} />
               </label>
-              {/* With the book choices off, this is the one way forward, so it leads. */}
               <Tooltip
                 content={
                   parseInviteInput(paste) === null

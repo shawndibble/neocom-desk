@@ -23,34 +23,16 @@ interface ColumnPickerMenuProps<Id extends string, Row> {
   visible: readonly Id[];
   columnsById: Record<Id, DataTableColumn<Row>>;
   onToggle: (id: Id) => void;
-  /** Accessible name and tooltip text for the trigger — the picker itself is icon-only. */
   buttonLabel: string;
   menuTitle: string;
-  /**
-   * "Reset to default" action below a separator (issue #1282, Mining
-   * Overview's first consumer to need one — Characters' and BPC Search's
-   * pickers have no equivalent). Omitted entirely when `onReset` isn't given.
-   */
   onReset?: () => void;
   resetLabel?: string;
-  /** Trigger size; defaults to `IconButton`'s own default so existing callers are unchanged. */
   size?: ComponentProps<typeof IconButton>['size'];
-  /** Checkable picks that aren't columns (a heading figure), below a separator after the columns. */
   extraItems?: readonly { id: string; label: string; checked: boolean; onToggle: () => void }[];
 }
 
 const COLUMN_PICKER_HINT = 'columnPickerHint';
 
-/**
- * Which columns show in a table view — a menu, not a form: every toggle is
- * already reversible in one tap. Labels come straight from `columnsById`'s
- * own already-translated `header`, not a second id->i18n-key table that could
- * drift from it.
- *
- * Extracted from `Characters.tsx`'s original table-view column picker
- * (issue #796) so a second table (BPC Search) can toggle its own columns
- * through the same mechanism rather than a hand-rolled second one.
- */
 export function ColumnPickerMenu<Id extends string, Row>({
   available,
   visible,
@@ -65,10 +47,7 @@ export function ColumnPickerMenu<Id extends string, Row>({
 }: ColumnPickerMenuProps<Id, Row>) {
   const { t } = useTranslation();
   const visibleSet = new Set(visible);
-  // Only once a pilot is logged in: never on /login, where no Character exists yet.
   const loggedIn = useCharacterCount() > 0;
-  // The hint says some columns are off by default — pointless (and it would
-  // burn the one-time slot) on a table already showing every column.
   const hasHiddenColumns = available.some((id) => !visibleSet.has(id));
   const [hintShown, dismissHint] = useOneTimeHint(COLUMN_PICKER_HINT, loggedIn && hasHiddenColumns);
 
@@ -88,10 +67,8 @@ export function ColumnPickerMenu<Id extends string, Row>({
           align="end"
           aria-label={buttonLabel}
           className="flex max-w-60 flex-col items-start gap-2 p-2 text-xs"
-          // A hint never takes focus from where the pilot is working.
           onOpenAutoFocus={(event) => event.preventDefault()}
           onCloseAutoFocus={(event) => event.preventDefault()}
-          // Focus moving elsewhere is not an answer; a press outside or Escape is.
           onFocusOutside={(event) => event.preventDefault()}
         >
           <p>{t('common.columnPickerHint')}</p>
@@ -106,8 +83,6 @@ export function ColumnPickerMenu<Id extends string, Row>({
           <DropdownMenuCheckboxItem
             key={id}
             checked={visibleSet.has(id)}
-            // A picker that closes on the first check makes picking several
-            // columns take one round trip per column.
             onSelect={(event) => event.preventDefault()}
             onCheckedChange={() => onToggle(id)}
           >

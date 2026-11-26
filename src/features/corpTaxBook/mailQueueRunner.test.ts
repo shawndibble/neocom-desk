@@ -106,12 +106,10 @@ describe('stepQueue', () => {
         attempts: 0,
       });
     }
-    // Still held: the next step only waits, and sends nothing.
     h.advance(10_000);
     const again = await stepQueue(h.deps);
     expect(again.delayMs).toBe(39_000);
     expect(send).toHaveBeenCalledTimes(1);
-    // Hold over: the same mail goes out.
     h.advance(40_000);
     send.mockResolvedValueOnce(9);
     await stepQueue(h.deps);

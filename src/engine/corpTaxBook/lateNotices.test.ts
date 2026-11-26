@@ -19,7 +19,6 @@ function entry(characterId: number, date: string, quantity: number): ObservedMin
   };
 }
 
-/** 1,000 ISK per unit at 10%: 1,000 units owe 100,000. Every day here owes 10M (100,000 units). */
 function input(overrides: Partial<BookViewInput> = {}): BookViewInput {
   return {
     corporationId: CORP,
@@ -66,7 +65,6 @@ const rules = (over: Partial<NoticeRules> = {}): NoticeRules => ({
   ...over,
 });
 
-/** Issues every notice the plan holds, as the run does. */
 const issue = (base: BookViewInput, now = base.now): LateNotice[] =>
   planNotices(buildBookView({ ...base, now }), rules(), now).map(({ notice }) => notice);
 
@@ -85,7 +83,6 @@ describe('planNotices (#6294)', () => {
       pricing: { hubId: 'jita', oreForm: 'compressed' },
       mail: { sent: 0, manualSent: 0, remindersStopped: false },
     });
-    // The server sets a notice's code itself, as this, and refuses any other. One code per Miner: the one the mail asks for, whichever notice it is.
     expect(plan.notice.code).toBe(minerPaymentCode(plan.notice.minerId));
     expect(plan.notice.lines.map((l) => [l.date, l.tax])).toEqual([
       ['2026-09-01', 10_000_000],
@@ -98,7 +95,6 @@ describe('planNotices (#6294)', () => {
     const view = buildBookView(input());
     expect(planNotices(view, rules({ after: { kind: 'behind', days: 18 } }))).toEqual([]);
     expect(planNotices(view, rules({ minimum: 30_000_001 }))).toEqual([]);
-    // Paid the first day: now the oldest unpaid day is 16 days old.
     const paid = buildBookView(input({ payments: [pay(10_000_000)] }));
     expect(planNotices(paid, rules({ after: { kind: 'behind', days: 17 } }))).toEqual([]);
     expect(planNotices(paid, rules({ after: { kind: 'behind', days: 16 } }))).toHaveLength(1);
@@ -159,7 +155,6 @@ describe('planNotices (#6294)', () => {
         },
       ],
     });
-    // Out of the cooldown, but this month's notice went already.
     expect(planNotices(buildBookView({ ...sent, now: '2026-10-14T14:00:00Z' }), monthly)).toEqual(
       []
     );
@@ -203,7 +198,6 @@ describe('a late notice on the running account (#6294)', () => {
         memberIds: new Set(),
       })
     );
-    // A guest is never a leaver; this Miner mined for the corp, so with no members it has left.
     expect(left.needsYou).toContainEqual(
       expect.objectContaining({ kind: 'leaver', noticeId: n.id })
     );
@@ -243,7 +237,6 @@ describe('a late notice on the running account (#6294)', () => {
     ]);
     const sum = owedDays(view, 'solo:1').reduce((s, d) => s + d.owed, 0);
     expect(sum).toBe(view.miners[0]!.owed);
-    // A notice of every one of those days carries nothing from earlier notices.
     expect(draftNotice(view, 'solo:1')!.carried).toBe(0);
   });
 

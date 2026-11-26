@@ -45,13 +45,10 @@ describe('MobileMoreSheet history', () => {
     await user.click(screen.getByRole('link', { name: 'Settings' }));
     expect(screen.getByTestId('where')).toHaveTextContent('/settings');
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-    // The sheet's own entry was replaced, not left behind.
     expect(window.history.state).not.toHaveProperty('__neocomOverlay');
 
-    // A single Back reaches the page the sheet was opened over.
     window.history.back();
     await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent('/overview'));
-    // Landed on the original entry, not a dead one the overlay left behind.
     expect(window.history.state).not.toHaveProperty('__neocomOverlay');
   });
 

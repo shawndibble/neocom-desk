@@ -15,7 +15,6 @@ function model(count: number, over: Partial<TableModel> = {}): TableModel {
       { key: 'price', label: 'Price', align: 'end', sortable: true },
       { key: 'note', label: 'Note' },
     ],
-    // Row n costs n * 10; row 3 has no price.
     rows: Array.from({ length: count }, (_, i) => ({
       key: `r${i + 1}`,
       cells: [`Item ${i + 1}`, i === 2 ? '—' : `${(i + 1) * 10}`, 'x'],
@@ -200,7 +199,6 @@ describe('TableBody paging', () => {
     await user.keyboard('{Enter}');
     expect(bodyRows()).toHaveLength(12);
     expect(bodyRows()[3]).toHaveFocus();
-    // Tab onward reaches the toggle, which now says how to put the rows back.
     await user.tab();
     expect(screen.getByRole('button', { name: 'Show fewer' })).toHaveFocus();
     await user.keyboard('{Enter}');

@@ -24,7 +24,6 @@ const NET: AppraisalNetTotals = {
   brokerFeePct: 3,
 };
 
-/** @summary The Appraisal's Buy, Split and Sell cards: every figure in full, one copy area above each divider and one below. */
 const meta = {
   title: 'market/AppraisalHeaderStats',
   component: AppraisalHeaderStats,
@@ -51,10 +50,8 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** @summary A ten-digit pile with the Character's fees known: two copy areas a card. */
 export const Default: Story = {};
 
-/** @summary The widest case: 13-digit totals and a negative spread. Three across with the total sized to the width; one card per row on a phone. */
 export const ThirteenDigits: Story = {
   args: {
     totals: totals({
@@ -67,12 +64,10 @@ export const ThirteenDigits: Story = {
   },
 };
 
-/** @summary Skills still loading: Buy and Sell have no second figure, so only the top area copies. */
 export const NoNetFigures: Story = {
   args: { net: null },
 };
 
-/** @summary Items worth more turned in than sold now: the Turn in total sits beside Refine in the facts row, its figure opens `TurnInBreakdown`. */
 export const WithTurnIn: Story = {
   args: {
     showRefine: true,

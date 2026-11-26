@@ -1,13 +1,3 @@
-/**
- * A solar system picker that is the search box itself, for a page whose next
- * step is naming a system: Route Safety's destination, before any route
- * exists. The same local snapshot and ranking as `SolarSystemPicker`, with the
- * results listed under the field rather than in a popover behind a button.
- *
- * With `places`, stations and known structures join the systems in one list
- * (issue #4964), each result marked as a system, station or structure. Picking
- * a station answers with its system and the station beside it.
- */
 import { useMemo, useState, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, LiveStatus, SearchInput } from '@/components/ui';
@@ -34,20 +24,16 @@ export function SolarSystemSearchField({
   className,
   places = false,
 }: {
-  /** `station` is set when a station or structure was picked: `systemId` is its system. */
   onChange: (systemId: number, station?: PickedStation) => void;
   ariaLabel: string;
-  /** Systems left out of the results, such as the trip's start. */
   exclude?: ReadonlySet<number>;
   autoFocus?: boolean;
   className?: string;
-  /** Also search stations and known structures, not only systems. */
   places?: boolean;
 }) {
   const { t } = useTranslation();
   const [query, setQuery] = useState('');
   const { systems, failed: systemsFailed, retry: retrySystems } = useSolarSystemList(true);
-  // Retry's notice unmounts when the read restarts: focus waits on the field wrapper.
   const [wrapRef, , holdRetryFocus] = useRetryFocus(
     systemsFailed ? 'failed' : systems === null ? 'busy' : 'ok',
     'systems'

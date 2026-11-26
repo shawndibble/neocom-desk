@@ -34,7 +34,6 @@ export interface LoyaltyOfferFilterValue {
   blueprintsOnly: boolean;
 }
 
-/** The LP store page's filter row: search, the hub/basis/affordable/blueprint draft, and the column picker. */
 export function LoyaltyOfferFilterBar({
   value,
   onChange,
@@ -55,8 +54,6 @@ export function LoyaltyOfferFilterBar({
   const { t } = useTranslation();
   const affordableLabel = t('loyaltyStore.affordableFilter');
   const blueprintsLabel = t('loyaltyStore.blueprintsFilter');
-  // The hub and the two bases are what the numbers are priced at, not filters:
-  // they never hide a row, so they never show as a pill.
   const active: ActiveFilter<LoyaltyOfferFilterValue>[] = [];
   if (value.affordableOnly)
     active.push({ label: affordableLabel, clear: (next) => ({ ...next, affordableOnly: false }) });
@@ -90,8 +87,6 @@ export function LoyaltyOfferFilterBar({
     >
       {(draft, setDraft) => (
         <>
-          {/* Radix, to match the revenue-basis select beside it: side by side,
-    two selects that open into different-looking lists read as a seam. */}
           <FilterField label={t('loyaltyStore.hubLabel')}>
             <TradeHubSelect
               value={draft.hubId}

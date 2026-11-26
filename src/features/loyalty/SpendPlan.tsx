@@ -1,7 +1,3 @@
-/**
- * LP Store "Spend my LP" (issue #6199): the button beside the offers table and
- * the plan it opens above the table. Presentational: `useSpendPlan` loads.
- */
 import { useMemo } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import {
@@ -33,10 +29,6 @@ import type { Translate } from '@/lib/translate';
 
 const noteClassName = 'text-[0.6875rem] text-text-dim';
 
-/**
- * The plan's action: enabled only with a known, non-zero LP balance and at
- * least one offer in view with a Sell now price (never runs on load).
- */
 export function SpendLpButton({
   playerLp,
   lpAccess = null,
@@ -45,12 +37,7 @@ export function SpendLpButton({
   onClick,
 }: {
   playerLp: number | null;
-  /**
-   * Why the balance can never load, when that is known: no Character signed in,
-   * or one whose grant lacks the loyalty scope. Null while it may still load.
-   */
   lpAccess?: 'signedOut' | 'noScope' | null;
-  /** Whether any offer in the current view has a Sell now ISK/LP to rank by. */
   rankable: boolean;
   loading: boolean;
   onClick: () => void;
@@ -94,7 +81,6 @@ const FLOOR_KEYS = {
   best: 'loyaltyStore.spendPlan.stopFloorBest',
 } as const satisfies Record<SpendFloor['source'], string>;
 
-/** Turn-ins to buy as "5× Name", in the row's required-item order. */
 function turnInsToBuy(r: PlanRow): string[] {
   return r.turnIns
     .filter((line) => line.bought > 0)
@@ -104,14 +90,9 @@ function turnInsToBuy(r: PlanRow): string[] {
     });
 }
 
-/**
- * Where a row's owned turn-ins sit: the largest holding's location, then how
- * many other places hold some. Null when nothing owned was used.
- */
 function ownedNote(r: PlanRow, view: SpendPlanView, t: Translate): string | null {
   const owned = r.turnIns.reduce((sum, line) => sum + line.owned, 0);
   if (owned <= 0) return null;
-  // Units per place across every owned turn-in type, so the first named is the row's largest holding.
   const unitsByLabel = new Map<string, number>();
   for (const line of r.turnIns) {
     if (line.owned <= 0) continue;
@@ -297,7 +278,6 @@ function PlanBody({
   );
 }
 
-/** The plan, above the offers table, once the button has been pressed. */
 export function SpendPlanPanel({
   plan,
   playerLp,

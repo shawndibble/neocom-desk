@@ -1,9 +1,3 @@
-/**
- * "What to train"'s Tech II section: each fitted Tech I module the pilot is a
- * few skills short of upgrading (`useModuleUpgrades`), with what the swap and
- * those skills together do to the Fitting, the time to train them (their
- * prerequisites listed on click) and "Add to plan" for the skills it needs.
- */
 import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui';
@@ -17,21 +11,19 @@ import type { SkillPlanRecord } from '@/db';
 import { gainChangeLabels } from './whatToTrainChanges';
 import { WhatToTrainPrerequisites } from './FittingWhatToTrainPrerequisites';
 import type { ModuleUpgradeRow } from './useModuleUpgrades';
-import { STAT_DETAIL, joinDetail, statRowClassName } from './statKit';
+import { STAT_DETAIL, joinDetail } from './statKit';
+import { TrainRow } from './FittingTrainRow';
 
 export interface ModuleUpgradeListProps {
-  /** Ranked; null while working out. */
   rows: readonly ModuleUpgradeRow[] | null;
   typeName: (typeId: number) => string;
   skills: ReadonlyMap<number, EngineSkill> | undefined;
   trainedSkills: ReadonlyMap<number, TrainedSkill>;
-  /** The target Skill Plan; null when the Character has none yet, undefined while plans load. */
   plan: SkillPlanRecord | null | undefined;
   plannedLevels: ReadonlyMap<number, number>;
   onAdd: (entries: readonly PlanEntry[]) => Promise<void>;
 }
 
-/** Nothing at all once worked out and empty: most fits have no Tech II a pilot is short of. */
 export function ModuleUpgradeList({ rows, ...item }: ModuleUpgradeListProps) {
   const { t } = useTranslation();
   const headingId = useId();
@@ -74,7 +66,6 @@ export function ModuleUpgradeItem({
     row.scheduled,
     row.required.map((entry) => entry.skillTypeID)
   );
-  // The changes below are the swap with these trained, so the row says so.
   const needs = t('fittings.whatToTrain.upgrades.withTrained', {
     skills: row.required
       .map(
@@ -89,29 +80,23 @@ export function ModuleUpgradeItem({
     : [];
 
   return (
-    <li className={statRowClassName()}>
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <span className="font-semibold">{swap}</span>
-          <p className={STAT_DETAIL}>{joinDetail([needs, ...changes])}</p>
-        </div>
-        <div className="shrink-0 text-right tabular-nums">
-          {formatCountdown(time.seconds)}
-          {time.includesPrerequisites && (
-            <div>
-              <WhatToTrainPrerequisites
-                skill={toName}
-                rows={prerequisiteRows}
-                plannedLevels={plannedLevels}
-                planEntries={plan?.entries}
-                totalSeconds={time.seconds}
-              />
-            </div>
-          )}
-        </div>
-      </div>
-      {plan !== undefined && (
-        <div className="mt-1 flex justify-end">
+    <TrainRow
+      title={<span className="font-semibold">{swap}</span>}
+      detail={joinDetail([needs, ...changes])}
+      time={formatCountdown(time.seconds)}
+      prerequisites={
+        time.includesPrerequisites && (
+          <WhatToTrainPrerequisites
+            skill={toName}
+            rows={prerequisiteRows}
+            plannedLevels={plannedLevels}
+            planEntries={plan?.entries}
+            totalSeconds={time.seconds}
+          />
+        )
+      }
+      action={
+        plan !== undefined && (
           <Button
             size="sm"
             aria-label={t('fittings.whatToTrain.upgrades.addToPlanLabel', { module: toName })}
@@ -119,8 +104,8 @@ export function ModuleUpgradeItem({
           >
             {t('fittings.whatToTrain.addToPlan')}
           </Button>
-        </div>
-      )}
-    </li>
+        )
+      }
+    />
   );
 }

@@ -22,7 +22,6 @@ describe('swapLimitsOf', () => {
 });
 
 describe('candidateFilter', () => {
-  // Types 1 and 2 are groups 10 and 60 (a unique module); 3 is group 11.
   const groupOf = (typeId: number) => ({ 1: 10, 2: 60, 3: 11 })[typeId];
   const filter = candidateFilter([mod('low', 0, 2), mod('low', 1, 1)], groupOf, {
     goal: 'overall',
@@ -50,7 +49,6 @@ describe('candidateFilter', () => {
 });
 
 describe('candidateFilter, propulsion kinds', () => {
-  // 1 a hardener (group 77); 20 an afterburner and 21 an MWD (group 46); 22 a micro jump drive (group 1189).
   const groupOf = (typeId: number) => ({ 1: 77, 20: 46, 21: 46, 22: 1189 })[typeId];
   const nameOf = (typeId: number) =>
     ({ 20: '10MN Afterburner II', 21: '50MN Microwarpdrive II', 22: 'Large Micro Jump Drive' })[
@@ -69,7 +67,6 @@ describe('candidateFilter, propulsion kinds', () => {
     const optOut = filterFor(jobSettingOf('pve', 'dangerous', true));
     expect(optOut.kindBlocks(21, 1)).toBe(true);
     expect(optOut.kindBlocks(22, null)).toBe(true);
-    // A fitted propulsion module may still become another one.
     expect(optOut.kindBlocks(21, 20)).toBe(false);
   });
 
@@ -80,7 +77,6 @@ describe('candidateFilter, propulsion kinds', () => {
 });
 
 describe('candidateFilter, analyzer kinds', () => {
-  // 30 a Data, 31 a Relic and 32 an Integrated Analyzer, all group 538.
   const groupOf = (typeId: number) => ({ 30: 538, 31: 538, 32: 538 })[typeId];
   const nameOf = (typeId: number) =>
     ({ 30: 'Data Analyzer II', 31: 'Relic Analyzer II', 32: 'Zeugma Integrated Analyzer' })[typeId];

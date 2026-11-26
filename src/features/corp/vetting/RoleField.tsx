@@ -6,11 +6,9 @@ import { roleSuggestions } from './reviewRoster';
 interface RoleFieldProps {
   value: string;
   onChange: (value: string) => void;
-  /** The corporation's own titles, offered first. */
   corpTitles: readonly string[];
 }
 
-/** Free text with suggestion chips under it: the corp's titles, then common EVE roles. Typing narrows them. */
 export function RoleField({ value, onChange, corpTitles }: RoleFieldProps) {
   const { t } = useTranslation();
   const { titles, roles } = roleSuggestions(value, corpTitles);

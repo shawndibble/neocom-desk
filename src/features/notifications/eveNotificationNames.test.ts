@@ -15,11 +15,6 @@ vi.mock('@/features/character/names', () => ({
 
 const { resolveEveNotificationNames } = await import('./eveNotificationNames');
 
-/**
- * Resolution is memoized per notification id, so every test that expects a
- * fresh lookup needs its own id — the same discipline the real feed gets for
- * free from ESI's monotonic ids.
- */
 let nextNotificationId = 1;
 
 function fire(overrides: Partial<EveNotificationFire> = {}): EveNotificationFire {
@@ -185,11 +180,6 @@ describe('resolveEveNotificationNames — only looks up what a body will use', (
   });
 });
 
-/**
- * Issue #300's "name resolution must not block the notification" — the rule
- * that a caught rejection alone does not satisfy, because a lookup that simply
- * never settles delays the alert just as effectively as one that throws.
- */
 describe('resolveEveNotificationNames — a slow lookup cannot hold the notification back', () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -231,8 +221,6 @@ describe('resolveEveNotificationNames — the second render of a fire costs no s
       type: 'CorpAppNewMsg',
       text: 'applicationText: hi\ncharID: 1011\ncorpID: 2001\n',
     });
-    // `renderNotification` renders twice per fire: once for the browser
-    // notification, once for the Notification Feed entry.
     const [browser, feed] = await Promise.all([
       resolveEveNotificationNames(applicant),
       resolveEveNotificationNames(applicant),

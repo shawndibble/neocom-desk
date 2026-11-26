@@ -1,11 +1,3 @@
-/**
- * The Threat verdict as a small colour-coded badge, drawn beside a pilot's
- * name on the profile and in every Local list row. The word is always there:
- * colour alone never carries it. There is no green level, because the verdict
- * reads kills only and so can never say a pilot is harmless
- * (decision `20261008-181210`). `pending` stands in while the one thing a
- * row is still waiting for, the danger ratio, decides between two levels.
- */
 import { useTranslation } from 'react-i18next';
 import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
@@ -28,9 +20,7 @@ export function ThreatBadge({
 }: {
   level: ThreatLevel | 'pending';
   className?: string;
-  /** Fills a Dangerous badge solid, for a list row where it has to read at a glance. */
   solid?: boolean;
-  /** The level was moved one step by where you are or who is in Local: a small arrow says so. */
   adjusted?: 'down' | 'up' | null;
 }) {
   const { t } = useTranslation();
@@ -52,7 +42,6 @@ export function ThreatBadge({
         </>
       ) : (
         <>
-          {/* One short word on screen; the full wording for a screen reader. */}
           <span className="sr-only">
             {t('travel.pilot.threat.label')}: {t(`travel.pilot.threat.levelFull.${level}`)}
           </span>

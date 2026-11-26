@@ -1,11 +1,3 @@
-/**
- * The mail editor's schema: only what EVE markup can say. Individual Tiptap
- * extensions, not StarterKit, so headings, lists, code and images simply do
- * not exist and cannot arrive by paste.
- *
- * Wire safety is not entrusted to this schema: `docToMarkup` re-parses
- * whatever the editor holds through `eveMarkup.ts` before anything is sent.
- */
 import { Mark, mergeAttributes, type Extensions } from '@tiptap/core';
 import Bold from '@tiptap/extension-bold';
 import Document from '@tiptap/extension-document';
@@ -27,7 +19,6 @@ import { BASE_SIZE_PX } from '../MailBodyView';
 
 const COLOR_ATTR = /^#[0-9a-f]{8}$/;
 
-/** Text colour as `#aarrggbb`; shown against the dark mail surface. */
 export const EveColor = Mark.create({
   name: 'eveColor',
   addAttributes() {
@@ -49,7 +40,6 @@ export const EveColor = Mark.create({
   renderHTML: ({ HTMLAttributes }) => ['span', mergeAttributes(HTMLAttributes), 0],
 });
 
-/** Text size in px (6–64), drawn relative to the game's 12px default like the reader. */
 export const EveSize = Mark.create({
   name: 'eveSize',
   addAttributes() {
@@ -74,7 +64,6 @@ export const EveSize = Mark.create({
   renderHTML: ({ HTMLAttributes }) => ['span', mergeAttributes(HTMLAttributes), 0],
 });
 
-// `**x**` and `*x*` typed in a mail stay literal: no markdown shortcuts.
 const PlainBold = Bold.extend({
   addInputRules: () => [],
   addPasteRules: () => [],
@@ -84,7 +73,6 @@ const PlainItalic = Italic.extend({
   addPasteRules: () => [],
 });
 
-// A table cell holds plain text only.
 const plainCell = { content: 'text*', marks: '' } as const;
 
 export function mailEditorExtensions(): Extensions {
@@ -101,7 +89,6 @@ export function mailEditorExtensions(): Extensions {
       autolink: false,
       linkOnPaste: false,
       defaultProtocol: 'https',
-      // Every kind the reader knows survives a Forward; the link dialog only offers http(s).
       isAllowedUri: (url) => classifyMarkupLink(url) !== null,
       HTMLAttributes: { rel: null, target: null, class: 'underline' },
     }),

@@ -7,8 +7,6 @@ const META_GROUP_NAMES = {
   4: 'Faction',
 };
 
-// 178 = Tech I root, 179 = Tech II variant, 196 = Faction variant, of one family.
-// 200 = an unrelated Tech I root with no variants at all.
 const TYPES: VariationTypeMap = {
   178: { parentTypeId: null, metaGroupId: 1 },
   179: { parentTypeId: 178, metaGroupId: 2 },

@@ -1,22 +1,10 @@
-/**
- * Pure "what did this row actually mine" logic for the Mining Yield
- * Overview's optional Ore breakdown / Units columns (issue #1282) — split out
- * the same way `volume.ts` split from `volumeDisplay.tsx`, so it stays
- * unit-testable without React Testing Library.
- */
 import type { OreLine } from '@/engine/miningTax/types';
 import { joined } from '@/lib/exportSheets';
 
-/** Total units mined across every ore line in a row, regardless of type. */
 export function sumUnits(oreLines: readonly OreLine[]): number {
   return oreLines.reduce((total, line) => total + line.quantity, 0);
 }
 
-/**
- * "Bitumens, Zeolites +2" — the two largest lines by quantity, named, with
- * the rest counted rather than dropped. A single line names itself with no
- * "+0"; no lines at all reads as the table's usual em dash.
- */
 export function oreBreakdownSummary(
   oreLines: readonly OreLine[],
   typeNames: ReadonlyMap<number, string>
@@ -29,7 +17,6 @@ export function oreBreakdownSummary(
   return remaining > 0 ? `${shown.join(', ')} +${remaining}` : shown.join(', ');
 }
 
-/** Every ore as "Name × units", most units first, for an export cell; null with no lines. */
 export function oreLinesText(
   oreLines: readonly OreLine[],
   nameOf: (typeId: number) => string

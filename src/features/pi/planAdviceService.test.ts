@@ -4,7 +4,6 @@ import { buildPlanAdvice } from './planAdviceModel';
 import { answerPlanAdvice, emptyPlanAdviceState } from './planAdvice.worker';
 import type { PlanAdviceRequest } from './planAdviceWire';
 
-/** A Worker that answers on a later tick with the real worker logic, structured-cloning each way. */
 class FakeWorker {
   static instances: FakeWorker[] = [];
   static failPost = false;
@@ -132,7 +131,6 @@ describe('askPlanAdvice', () => {
       const [worker] = FakeWorker.instances;
       expect(worker.received.map((r) => r.kind)).toEqual(['pi', 'advice', 'cancel']);
       expect(peekPlanAdvice(input)).toBeNull();
-      // The same input can be asked again afterwards.
       expect(await askPlanAdvice(input)).toEqual(buildPlanAdvice(input));
     });
 

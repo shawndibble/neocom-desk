@@ -28,7 +28,6 @@ const row = (
   iskPerDay: number
 ): RecipeRow => ({ typeId, name, tier, planetType, iskPerDay, m3PerDay: 1 });
 
-// Silicon P1 on lava/barren, Coolant P2 on lava, Proteins P1 on oceanic, Water P1 on barren.
 const ROWS: RecipeRow[] = [
   row(SILICON, 'Silicon', 1, 'lava', 100),
   row(SILICON, 'Silicon', 1, 'barren', 90),
@@ -51,7 +50,6 @@ const input = (over: Partial<FindBestInput> = {}): FindBestInput => ({
 
 describe('buildFindBestView', () => {
   it('ranks what the pilot can make today above what needs a planet they lack', () => {
-    // Oceanic Proteins (200) is the top ISK pick, but the pilot only runs lava.
     const view = buildFindBestView(input({ colonyTypes: ['lava'] }));
     const names = view.cards.map((card) => card.recipe.name);
     expect(names).toEqual(['Coolant', 'Silicon', 'Proteins', 'Water']);
@@ -102,7 +100,7 @@ describe('buildFindBestView', () => {
     const view = buildFindBestView(input({ colonyTypes: ['barren'] }));
     expect(view.toggles.map((t) => t.type)).toEqual(['barren']);
     const lava = view.chips.find((c) => c.type === 'lava');
-    expect(lava).toMatchObject({ on: false, unlocks: 1 }); // Coolant; Silicon is hosted on barren
+    expect(lava).toMatchObject({ on: false, unlocks: 1 });
     expect(view.chips.find((c) => c.type === 'oceanic')?.unlocks).toBe(1);
     expect(view.chips.map((c) => c.type)).not.toContain('barren');
     const silicon = view.cards.find((c) => c.recipe.name === 'Silicon');
@@ -211,8 +209,8 @@ describe('buildAllProducts', () => {
   });
 
   it('gives a raw its best sell figure on a planet type it has, and never a comparison', () => {
-    const MICRO = 2073; // barren, ice, oceanic, temperate
-    const BASE_METALS = 2267; // no ice
+    const MICRO = 2073;
+    const BASE_METALS = 2267;
     const tiers = buildAllProducts(
       {
         ...base,
@@ -228,7 +226,6 @@ describe('buildAllProducts', () => {
     const raw = (id: number) => tiers[0].items.find((i) => i.typeId === id);
     expect(raw(MICRO)).toMatchObject({ perDay: 40_000, noPrice: false, comparison: null });
     expect(raw(BASE_METALS)).toMatchObject({ perDay: null, noPrice: false });
-    // Raw column keeps name order whatever the figures.
     const names = tiers[0].items.map((i) => i.name);
     expect(names).toEqual([...names].sort((a, b) => a.localeCompare(b)));
   });

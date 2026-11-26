@@ -103,7 +103,6 @@ describe('IskInput invalid text', () => {
   });
 
   const userWithFakeClock = () => userEvent.setup({ delay: null });
-  /** Moves past the error pause. */
   const pause = () => act(() => vi.advanceTimersByTime(800));
 
   it('never errors while "1.5b" is typed, even at "1."', async () => {

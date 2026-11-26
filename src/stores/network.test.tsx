@@ -11,7 +11,6 @@ function go(value: boolean): void {
   window.dispatchEvent(new Event(value ? 'online' : 'offline'));
 }
 
-/** Unsubscribes collected by a test, run after it so a failure cannot leak a listener. */
 const cleanups: Array<() => void> = [];
 function track(off: () => void): () => void {
   cleanups.push(off);
@@ -20,7 +19,6 @@ function track(off: () => void): () => void {
 
 afterEach(() => {
   for (const off of cleanups.splice(0)) off();
-  // Drops the own property, leaving the environment's prototype getter.
   Reflect.deleteProperty(navigator, 'onLine');
   vi.restoreAllMocks();
 });

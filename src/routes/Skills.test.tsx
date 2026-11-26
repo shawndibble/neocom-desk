@@ -47,7 +47,6 @@ const FIXTURE_SKILLS: SkillType[] = [
     prereqs: [{ skillTypeID: 1, level: 3 }],
   },
   {
-    // In the SDE but not in the character's skills: a skill whose book is still to buy.
     typeID: 3,
     name: 'Sharpshooter',
     description: '',
@@ -67,7 +66,6 @@ vi.mock('@/sde/loadSde', () => ({
   loadMarketWideTrees: vi.fn(async () => ({})),
 }));
 
-// The baked typeInfo shard lacks every type here, so reads take the ESI fallback.
 vi.mock('@/sde/loadTypeInfo', () => ({ loadTypeInfo: vi.fn(async () => null) }));
 
 const CHAR_ID = 91;
@@ -107,7 +105,7 @@ const server = mswServer(
       description: 'A basic <b>ocular filter</b> implant.',
       group_id: 300,
       published: true,
-      dogma_attributes: [{ attribute_id: 178, value: 3.0 }], // +3 perception
+      dogma_attributes: [{ attribute_id: 178, value: 3.0 }],
     })
   )
 );
@@ -130,8 +128,6 @@ beforeEach(async () => {
     scopes: ['esi-skills.read_skills.v1', 'esi-skills.read_skillqueue.v1'],
   });
   await db.settings.put({ key: ACTIVE_CHARACTER_KEY, value: CHAR_ID });
-  // The trained view's own route: /skills is the section index and redirects
-  // to the plan list, which is where the Skills section now opens.
   window.history.pushState({}, '', '/skills/trained');
 });
 
@@ -141,9 +137,8 @@ describe('Skills', () => {
 
     expect(await screen.findByText('Gunnery')).toBeInTheDocument();
     expect(await screen.findByText('Spaceship Command')).toBeInTheDocument();
-    expect(screen.getByText('264,000')).toBeInTheDocument(); // total SP
-    expect(screen.getByText('1,500')).toBeInTheDocument(); // unallocated SP
-    // Groups start collapsed — expand both before asserting row content.
+    expect(screen.getByText('264,000')).toBeInTheDocument();
+    expect(screen.getByText('1,500')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /Gunnery/ }));
     fireEvent.click(screen.getByRole('button', { name: /Spaceship Command/ }));
     expect(screen.getByText('256,000 SP')).toBeInTheDocument();
@@ -154,15 +149,11 @@ describe('Skills', () => {
     fireEvent.focus(frigateTrigger);
     expect(screen.getByRole('tooltip')).toHaveTextContent('Pilots a Frigate-class starship.');
 
-    // ESI perception 22 already includes the +3 implant: base 19 + 3 = 22.
-    // The chip shows the total; the terms are what its hover reveals.
     expect(await screen.findByText('22')).toBeInTheDocument();
     expect(
       screen.getByText('19 base + 3 implant = 22', { selector: '.sr-only' })
     ).toBeInTheDocument();
-    // Unbonused attributes show the base value plainly.
-    expect(screen.getByText('20')).toBeInTheDocument(); // intelligence, no bonus
-    // Implants count toward attributes but are not listed on this page.
+    expect(screen.getByText('20')).toBeInTheDocument();
     expect(screen.queryByText('Ocular Filter - Basic')).not.toBeInTheDocument();
   });
 
@@ -179,8 +170,6 @@ describe('Skills', () => {
   });
 
   it('opens the drawer on the selection a retired Compare link carried', async () => {
-    // App-level wiring: the retired path is `App`'s `LegacyPathRedirect`, so
-    // this one boots the whole app (imported here, so no other test loads it).
     const { App } = await import('@/app/App');
     window.history.pushState({}, '', `/skills/compare?ids=${CHAR_ID}`);
     render(<App />);
@@ -190,11 +179,6 @@ describe('Skills', () => {
   });
 
   it('marks a skill already in a Skill Plan on its level bar, regardless of which plan it is in', async () => {
-    // Frigate (typeID 2) is trained to III; a plan targets V. The row's
-    // context menu can add to *any* of the character's plans (no single
-    // "target plan" here — see SkillPlanAdd), so the mark reflects
-    // every plan, not just one (issue: the bar gave no indication a skill
-    // was already queued anywhere).
     await db.skillPlans.put({
       id: 'plan-1',
       characterId: CHAR_ID,
@@ -215,9 +199,6 @@ describe('Skills', () => {
   });
 
   it('recovers an implant attribute bonus from a transient type lookup failure', async () => {
-    // loadUniverseType is one live call per implant with no batch to fall
-    // back to: without its retry, one transient failure drops the implant's
-    // perception bonus from the attribute chip.
     let typeRequests = 0;
     server.use(
       http.get('https://esi.evetech.net/universe/types/9899', () => {
@@ -242,11 +223,6 @@ describe('Skills', () => {
   });
 
   it('detects a cerebral accelerator and shows it as a third term, separate from implants', async () => {
-    // A legal base spread (20/20/20/20/19, sums to 99) with a uniform +4
-    // booster on every attribute, plus the fixture's own +3 perception
-    // implant on top of that. Once the implant comes off, what's left is
-    // inflated by exactly +4 everywhere — the signature deriveAttributeBaseline
-    // reads as an accelerator.
     server.use(
       http.get(`https://esi.evetech.net/characters/${CHAR_ID}/attributes`, () =>
         HttpResponse.json({
@@ -261,21 +237,15 @@ describe('Skills', () => {
 
     renderSkillsRoutes();
 
-    // Perception: base 20 + implant 3 + booster 4 = effective 27. The chip
-    // shows the total; the terms are the label the hover reveals.
     expect(
       await screen.findByText('20 base + 3 implant + 4 booster = 27', { selector: '.sr-only' })
     ).toBeInTheDocument();
-    // Intelligence, memory, willpower: no implant, so the booster is named on
-    // its own — applied uniformly.
     expect(screen.getAllByText('20 base + 4 booster = 24', { selector: '.sr-only' })).toHaveLength(
       3
     );
   });
 
   it('shows the level from a finished queue entry that /skills has not caught up to', async () => {
-    // ESI: "/skills is not updated until the character logs in ... entries
-    // that are in the past need to be applied on top of this list."
     server.use(
       http.get(`https://esi.evetech.net/characters/${CHAR_ID}/skillqueue`, () =>
         HttpResponse.json([
@@ -296,12 +266,9 @@ describe('Skills', () => {
     fireEvent.click(await screen.findByRole('button', { name: /Spaceship Command/ }));
     expect(screen.getByRole('img', { name: 'Level 4 of 5' })).toBeInTheDocument();
     expect(screen.getByText('45,255 SP')).toBeInTheDocument();
-    // The stale /skills reading is gone, not shown alongside.
     expect(screen.queryByRole('img', { name: 'Level 3 of 5' })).not.toBeInTheDocument();
     expect(screen.queryByText('8,000 SP')).not.toBeInTheDocument();
-    // The total moves with the row. Leaving ESI's total_sp alone would show
-    // 45,255 SP on a skill inside a 264,000 SP total that still counts 8,000.
-    expect(screen.getByText('301,255')).toBeInTheDocument(); // 264,000 + 37,255
+    expect(screen.getByText('301,255')).toBeInTheDocument();
     expect(screen.queryByText('264,000')).not.toBeInTheDocument();
   });
 
@@ -330,8 +297,6 @@ describe('Skills', () => {
     renderSkillsRoutes();
 
     fireEvent.click(await screen.findByRole('button', { name: 'Expand all' }));
-    // Level IV is the one training; V is queued behind it and must not show.
-    // One chip on the row, one on its group's header.
     expect(await screen.findAllByText(/^Training → IV · 4d 0h$/)).toHaveLength(2);
     expect(screen.queryByText(/Training → V/)).not.toBeInTheDocument();
   });
@@ -383,15 +348,11 @@ describe('Skills', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: /Spaceship Command/ }));
     expect(screen.getByRole('img', { name: 'Level 4 of 5' })).toBeInTheDocument();
-    // The last known SP stands, and so does the total. Neither is guessed up.
     expect(screen.getByText('8,000 SP')).toBeInTheDocument();
     expect(screen.getByText('264,000')).toBeInTheDocument();
   });
 
   it('shows Unknown SP for a skill only the queue knows about', async () => {
-    // /skills omits the skill entirely and the entry carries no level_end_sp,
-    // so the level is known and the SP is not. A literal 0 would read as
-    // broken rather than as unknown.
     server.use(
       http.get(`https://esi.evetech.net/characters/${CHAR_ID}/skillqueue`, () =>
         HttpResponse.json([
@@ -412,7 +373,7 @@ describe('Skills', () => {
     fireEvent.click(unknownGroupButton.closest('button')!);
     expect(await screen.findByText('#1337')).toBeInTheDocument();
     const row = screen.getByText('#1337').closest('li')!;
-    expect(within(row).getByText('—')).toBeInTheDocument(); // common.unknown
+    expect(within(row).getByText('—')).toBeInTheDocument();
     expect(within(row).queryByText('0 SP')).not.toBeInTheDocument();
   });
 
@@ -435,7 +396,6 @@ describe('Skills', () => {
     renderSkillsRoutes();
 
     fireEvent.click(await screen.findByRole('button', { name: /Spaceship Command/ }));
-    // Trained level comes from /skills alone — no queue correction attempted.
     expect(screen.getByRole('img', { name: 'Level 3 of 5' })).toBeInTheDocument();
     expect(screen.getByText('8,000 SP')).toBeInTheDocument();
     expect(queueRequests).toBe(0);
@@ -506,11 +466,6 @@ describe('Skills', () => {
   });
 
   it('exports what the list shows in the re-login state, the saved skills', async () => {
-    // The invariant: export hands over exactly what the route renders.
-    // loadWithCacheStatus still reads the cache on an auth failure ("needsReauth
-    // never short-circuits the cache read"), and the route now shows that saved
-    // copy under a small note, so the export carries it too. The full banner (and
-    // an empty export) is only for a lapsed grant with nothing saved.
     await db.esiCache.put({
       characterId: CHAR_ID,
       key: 'skills',
@@ -525,8 +480,6 @@ describe('Skills', () => {
 
     renderSkillsRoutes();
 
-    // The route's own note, not Layout's global auth notice — the latter
-    // fires on emitEsiAuthFailure, before the snapshot settles.
     expect(await screen.findByText('Showing saved data.')).toBeInTheDocument();
 
     const copied: string[] = [];
@@ -542,7 +495,6 @@ describe('Skills', () => {
       (await screen.findByRole('menuitem', { name: 'Copy for Google Sheets / Excel' })).focus();
       await user.keyboard('{Enter}');
       await waitFor(() => expect(copied).toHaveLength(1));
-      // The header row and the saved skills.
       expect(copied[0].trim().split('\n').length).toBeGreaterThan(1);
     } finally {
       configureClipboard(null);
@@ -552,13 +504,11 @@ describe('Skills', () => {
   it('shows trained of total on each tile, counting skills the character has not trained', async () => {
     renderSkillsRoutes();
 
-    // Gunnery has Small Hybrid Turret (trained) and Sharpshooter (not in ESI's skills).
     const gunnery = await screen.findByRole('button', { name: /^Gunnery/ });
     expect(within(gunnery).getByText('1 / 2')).toBeInTheDocument();
     expect(
       within(screen.getByRole('button', { name: /^Spaceship Command/ })).getByText('1 / 1')
     ).toBeInTheDocument();
-    // The summary strip carries the overall count.
     expect(screen.getByText('2 / 3')).toBeInTheDocument();
   });
 
@@ -570,7 +520,6 @@ describe('Skills', () => {
     expect(within(row).getByText('Need book')).toBeInTheDocument();
     expect(within(row).getByRole('img', { name: 'Level 0 of 5' })).toBeInTheDocument();
     expect(within(row).queryByText(/SP$/)).not.toBeInTheDocument();
-    // A trained skill never shows the marker.
     expect(
       within(screen.getByRole('button', { name: 'Small Hybrid Turret' })).queryByText('Need book')
     ).not.toBeInTheDocument();
@@ -618,7 +567,6 @@ describe('Skills', () => {
     expect(
       within(row).getByRole('img', { name: 'Level 3 of 5, planned to 5' })
     ).toBeInTheDocument();
-    // The summary strip counts the skill once, not once per queued level.
     expect(screen.getByText('In queue')).toBeInTheDocument();
   });
 
@@ -630,12 +578,10 @@ describe('Skills', () => {
       target: { value: 'sharpshooter' },
     });
     expect(await screen.findByText('Need book')).toBeInTheDocument();
-    // The tile reports its matches instead of trained / total.
     expect(
       within(screen.getByRole('button', { name: /^Gunnery/ })).getByText('1 match')
     ).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^Spaceship Command/ })).not.toBeInTheDocument();
-    // Still in the tab order while searching: aria-disabled, not disabled.
     const tile = screen.getByRole('button', { name: /^Gunnery/ });
     expect(tile).toHaveAttribute('aria-disabled', 'true');
     expect(tile).toBeEnabled();
@@ -693,7 +639,6 @@ describe('Skills', () => {
     const dialog = await screen.findByRole('dialog');
     const prereqsHeading = await within(dialog).findByText('Prerequisites');
     const prereqsSection = prereqsHeading.closest('section')!;
-    // Frigate needs Small Hybrid Turret III; the character has it trained to V.
     expect(within(prereqsSection).getByText('Small Hybrid Turret')).toBeInTheDocument();
     expect(within(prereqsSection).getByText('Trained · Level 3')).toBeInTheDocument();
   });
@@ -709,7 +654,6 @@ describe('Skills', () => {
     const unlocksHeading = await within(dialog).findByText('Unlocks');
     const unlocksSection = unlocksHeading.closest('section')!;
     expect(within(unlocksSection).getByText('Frigate')).toBeInTheDocument();
-    // The level row names the level; this character has trained it.
     expect(within(unlocksSection).getByRole('button', { name: /^Level 3/ })).toBeInTheDocument();
   });
 
@@ -772,24 +716,19 @@ describe('Skills', () => {
     renderSkillsRoutes();
 
     await screen.findByText('Gunnery');
-    // Manually expand Gunnery so we can confirm its state survives a search.
     fireEvent.click(screen.getByRole('button', { name: /^Gunnery/ }));
     expect(screen.getByText('Small Hybrid Turret')).toBeInTheDocument();
 
     const search = screen.getByPlaceholderText('Search skills…');
     fireEvent.change(search, { target: { value: 'fr' } });
-    // Under the 3-character threshold: no filtering, Gunnery still expanded, Spaceship Command still collapsed.
     expect(screen.getByText('Small Hybrid Turret')).toBeInTheDocument();
     expect(screen.queryByText('Frigate')).not.toBeInTheDocument();
 
     fireEvent.change(search, { target: { value: 'frigate' } });
-    // Spaceship Command auto-expands to show the match; Gunnery has no match and disappears entirely.
     expect(await screen.findByText('Frigate')).toBeInTheDocument();
     expect(screen.queryByText('Gunnery')).not.toBeInTheDocument();
 
     fireEvent.change(search, { target: { value: '' } });
-    // Clearing restores prior state: Gunnery (manually expanded) is back and still expanded,
-    // Spaceship Command (only auto-expanded by the search) is collapsed again.
     expect(await screen.findByText('Gunnery')).toBeInTheDocument();
     expect(screen.getByText('Small Hybrid Turret')).toBeInTheDocument();
     expect(screen.queryByText('Frigate')).not.toBeInTheDocument();

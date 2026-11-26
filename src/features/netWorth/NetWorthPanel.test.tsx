@@ -13,7 +13,6 @@ import { REQUIRED_SCOPES } from './recordSnapshots';
 vi.mock('@/features/character/wallet', () => ({
   loadWalletJournal: vi.fn(async () => null),
 }));
-// Recharts draws nothing useful in jsdom; the chart's maths are tested in the engine.
 vi.mock('./NetWorthChart', () => ({ default: () => <div data-testid="chart" /> }));
 
 const A = { characterId: 1, name: 'Ava' };
@@ -32,7 +31,6 @@ const snap = (characterId: number, wallet: number): NetWorthSnapshotRow => ({
   updatedAt: 1,
 });
 
-/** The Net worth figure in the stat row (the table's column header is a `th`, not a `p`). */
 function netWorthFigure() {
   return screen.getByText('Net worth', { selector: 'p' }).nextElementSibling as HTMLElement;
 }
@@ -80,12 +78,10 @@ beforeEach(async () => {
 });
 
 describe('NetWorthPanel, several Characters', () => {
-  // Who is left out also rides in the page header's Character picker (`useNetWorthMissingNames`).
   it('totals only Characters with every permission, and flags who is left out on their row', async () => {
     await seed({ covered: [1, 2] });
     renderPanel();
 
-    // (100 + 1000 + 200 + 30 + 4) + (500 + 1000 + 200 + 30 + 4) = 3068
     await vi.waitFor(() => expect(netWorthFigure()).toHaveTextContent(/^2,668$/));
     const table = screen.getByRole('table', { name: 'Balance by character' });
     expect(
@@ -171,7 +167,6 @@ describe('NetWorthPanel, several Characters', () => {
     for (const name of ['Assets', 'Order escrow', 'Sell orders', 'ISK']) {
       await user.click(await screen.findByRole('option', { name }));
     }
-    // ISK was the last one standing, so the click on it changed nothing.
     expect(screen.getByRole('option', { name: 'ISK' })).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByRole('button', { name: 'Layers: 1 of 4' })).toBeInTheDocument();
   });
@@ -184,7 +179,6 @@ describe('NetWorthPanel, several Characters', () => {
     await user.click(screen.getByRole('checkbox', { name: 'Show Bo on the chart' }));
     await vi.waitFor(() => expect(netWorthFigure()).toHaveTextContent(/^1,134$/));
     expect(screen.getByRole('checkbox', { name: 'Show Ava on the chart' })).toBeDisabled();
-    // The checkbox is not a drill.
     expect(onDrill).not.toHaveBeenCalled();
   });
 
@@ -218,7 +212,6 @@ describe('NetWorthPanel, one Character', () => {
 
     const heading = await screen.findByRole('heading', { name: 'Worth' });
     expect(screen.queryByRole('table', { name: 'Net worth by layer' })).toBeNull();
-    // The page picker still reads "All characters": the title bar names the drilled one.
     expect(within(heading.closest('header')!).getByText('Ava only')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: /All characters/ }));
@@ -261,7 +254,6 @@ describe('NetWorthPanel, layers with no value', () => {
 
   async function seedBare() {
     await seed({ covered: [1, 2] });
-    // Ava holds nothing optional; Bo has escrow.
     await db.netWorthSnapshots.bulkPut([bare(1), { ...bare(2), escrow: 30 }]);
   }
 

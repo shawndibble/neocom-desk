@@ -23,10 +23,6 @@ const ROW_TONE: Record<SignOffRow['kind'], PillTone> = {
   barred: 'neutral',
 };
 
-/**
- * Who has to decide and where each stands. Another reviewer's decision stays hidden until the
- * caller records their own; whoever asked for the review cannot sign it off.
- */
 function VettingSignOffs({ review, reviewerId }: { review: VettingReview; reviewerId: number }) {
   const { t } = useTranslation();
   const timeZone = useTimeZone();
@@ -73,28 +69,12 @@ function VettingSignOffs({ review, reviewerId }: { review: VettingReview; review
 
 interface VettingDecisionProps {
   review: VettingReview;
-  /** The signed-in reviewer, to tell "you asked for this" from being barred for another reason. */
   reviewerId: number;
-  /**
-   * What the corp set about telling the pilot. Null when it could not be read: the reason is
-   * then treated as shown to the pilot, and no mail is offered. Whether the pilot reads a note
-   * is settled when it is written (the server stamps the sign-off), so the hint speaks of this
-   * note alone.
-   */
   settings: Pick<VettingSettings, 'rejection' | 'mailDecision'> | null;
-  /** Records the caller's sign-off; rejects with the server's refusal. */
   onDecide: (decision: 'yes' | 'no', note: string) => Promise<void>;
-  /** Queues the in-game mail that tells the pilot; never rejects. Absent: no mail is offered. */
   onMail?: () => Promise<MailRun>;
 }
 
-/**
- * The decision rail: the sign-off list, a note kept with the caller's decision, and the two
- * buttons. Yes acts at once; No opens a confirm that needs the note, since the pilot's officers
- * read it as the reason (and the pilot too, where the corp shows it at that moment). A decided
- * review offers each reviewer who signed it the in-game mail that tells the pilot, when the corp
- * wants one: on any visit, since the Officer mail queue only remembers what this device queued.
- */
 export function VettingDecision({
   review,
   reviewerId,
@@ -138,7 +118,6 @@ export function VettingDecision({
       setMailing(false);
     }
   };
-  // Nobody queued, nobody failed: this device had already queued the review's mail.
   const alreadyQueued =
     mail !== null && !mail.missingScope && mail.queued.length === 0 && mail.failed.length === 0;
   const mailLine =

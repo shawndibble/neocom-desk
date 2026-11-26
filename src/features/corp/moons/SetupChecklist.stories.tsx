@@ -9,7 +9,6 @@ type Context = typeof BOOK_CONTEXT;
 
 function Checklist({ context, overview }: { context: Context; overview?: boolean }) {
   return (
-    // The route's settings host, stood in for, so a Settings step shows its button.
     <BookProvider value={{ ...context, openSettings: () => {} }}>
       <div className="mx-auto max-w-page px-4 py-4">
         {overview ? <OverviewTab /> : <SetupChecklist />}
@@ -18,7 +17,6 @@ function Checklist({ context, overview }: { context: Context; overview?: boolean
   );
 }
 
-/** A book just turned on: one refinery this Character cannot dock at. */
 const FRESH: Context = {
   ...BOOK_CONTEXT,
   names: {
@@ -30,10 +28,6 @@ const FRESH: Context = {
   },
 };
 
-/**
- * "Set up the book" on the Overview: each step is read off the book, and a step
- * to do carries the one button that goes where it is done. Dismissed per viewer.
- */
 const meta = {
   title: 'corp/SetupChecklist',
   component: Checklist,
@@ -44,11 +38,8 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** @summary Partly done: rate and names done; Automatic sync to turn on. */
 export const PartlyDone: Story = {};
 
-/** @summary Just turned on: Automatic sync and an unreadable refinery to do. */
 export const JustTurnedOn: Story = { args: { context: FRESH } };
 
-/** @summary On the Overview, above the totals (the full sample book, so Needs you stays consistent). */
 export const OnOverview: Story = { args: { overview: true } };

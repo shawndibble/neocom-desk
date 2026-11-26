@@ -1,9 +1,3 @@
-/**
- * The mail an SRP officer's client sends a pilot when a claim is approved or rejected. Best effort, sent from the officer's own Character with their own token
- * after the callable succeeded: a failed mail never undoes or blocks the decision, the in-app
- * state is the record. It rides the paced Officer mail queue, not a direct send. The builder
- * and the summary are pure.
- */
 import type { TFunction } from 'i18next';
 import { clipToCodePoints, MAX_MAIL_SUBJECT } from '@/engine/communities/requestMail';
 import { formatIsk } from '@/lib/isk';
@@ -13,13 +7,10 @@ import { mailSummary, queueOfficerMail, type MailRun } from '@/features/corpTaxB
 
 export type SrpMailKind = 'approved' | 'rejected';
 
-/** One decided claim, as the pilot reads it. */
 export interface SrpMailClaim {
   killmailId: number;
   hull: string;
-  /** Whole ISK; approved mails only. */
   amount?: number;
-  /** Rejected mails only. */
   reason?: string;
 }
 
@@ -63,7 +54,6 @@ export function buildSrpResultMail(
   };
 }
 
-/** Group decided claims by pilot, so a pilot with several gets one mail. A claim with no pilot id is skipped. */
 export function groupByPilot(
   items: readonly {
     characterId: number | null;
@@ -85,10 +75,6 @@ export function groupByPilot(
   return [...byId.values()];
 }
 
-/**
- * One mail per pilot, put on the Officer mail queue (one place that paces every Officer mail,
- * so a dozen pilots do not trip EVE's spam limit). Never throws.
- */
 export async function queueSrpResultMails(
   t: TFunction,
   input: {
@@ -96,7 +82,6 @@ export async function queueSrpResultMails(
     corpName: string;
     pilots: readonly SrpMailPilot[];
     senderCharacterId: number;
-    /** The officer's corporation; null while unknown (the mail does not need it). */
     corporationId: number | null;
   }
 ): Promise<MailRun> {
@@ -110,7 +95,6 @@ export async function queueSrpResultMails(
     knownNames: new Map(pilots.map((p) => [p.characterId, p.characterName])),
     enqueue: (recipients) =>
       enqueueSrpResultMails({
-        // The queue row only scopes by corporation; the mail needs none, so an unresolved one is 0.
         corporationId: input.corporationId ?? 0,
         senderCharacterId: input.senderCharacterId,
         kind: input.kind,
@@ -130,14 +114,12 @@ export async function queueSrpResultMails(
       }),
   });
   if (out.status === 'queued') {
-    // Only the mails really queued: a repeat of one decision queues none.
     return { ...run, queued: pilots.slice(0, out.queued).map((p) => p.characterName) };
   }
   if (out.status === 'no-scope') return { ...run, missingScope: true };
   return { ...run, failed: pilots.map((p) => p.characterName) };
 }
 
-/** `head` then the mail summary, as one toast line. */
 export function withMailSummary(t: TFunction, head: string, run: MailRun): string {
   const tail = mailSummary(t, run);
   return tail === '' ? head : `${head}${/[.!?]$/.test(head) ? '' : '.'} ${tail}`;

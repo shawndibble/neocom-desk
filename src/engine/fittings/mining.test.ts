@@ -166,7 +166,6 @@ describe('extractCrystalFigures', () => {
   });
 
   it("gives a miner group's yield, cycle and residue with a crystal in every one", () => {
-    // Two strip miners with Simple C II, a drone that must not count.
     const fit = [
       strip(60284, 26.2, 37102, 93, 29),
       {
@@ -187,7 +186,6 @@ describe('extractCrystalFigures', () => {
     expect(figures?.residueChance).toBeCloseTo(0.93, 9);
     expect(figures?.residueMultiplier).toBe(29);
     expect(figures?.residueM3s).toBeCloseTo(residue, 9);
-    // What leaves the rock: the yield and the residue.
     expect(figures?.removedM3s).toBeCloseTo(perSecond + residue, 9);
   });
 

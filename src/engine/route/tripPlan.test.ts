@@ -2,15 +2,6 @@ import { describe, expect, it } from 'vitest';
 import type { JumpGraph } from './jumpRoute';
 import { MAX_STOPS, optimizeStopOrder, planTrip, type RouteCostMatrix } from './tripPlan';
 
-/**
- * A line of systems, so every distance is obvious:
- *
- *   A ─ B ─ C ─ D ─ E        ISLAND (no stargates)
- *
- * and a highsec detour round D, so the preferences disagree:
- *
- *   C ─ LOW ─ E              LOW is lowsec; C ─ D ─ E is highsec
- */
 const A = 30000001;
 const B = 30000002;
 const C = 30000003;
@@ -27,7 +18,6 @@ const LINE: JumpGraph = new Map([
   [ISLAND, []],
 ]);
 
-/** A matrix straight from costs; jumps mirror the costs. */
 function matrix(costs: (number | null)[][]): RouteCostMatrix {
   return costs.map((row) => row.map((cost) => (cost === null ? null : { cost, jumps: cost })));
 }
@@ -45,7 +35,6 @@ describe('optimizeStopOrder', () => {
   });
 
   it('finds the cheapest order', () => {
-    // From 0: 1 is far, 2 is near, 3 is between them.
     const costs = matrix([
       [0, 9, 1, 5],
       [9, 0, 8, 4],
@@ -91,9 +80,7 @@ describe('optimizeStopOrder', () => {
       [6, 6, 0, 3],
       [30, 3, 3, 0],
     ]);
-    // Home from stop 3 is dear, so returning alone flies it in the middle...
     expect(optimizeStopOrder(costs, { returnToStart: true })).toEqual([2, 3, 1]);
-    // ...but kept last, only the middle moves.
     expect(optimizeStopOrder(costs, { returnToStart: true, keepLastStopLast: true })).toEqual([
       2, 1, 3,
     ]);
@@ -214,8 +201,6 @@ describe('planTrip', () => {
 });
 
 describe('stop order through extra connections', () => {
-  // START ─ A ─ B ─ C ─ D ─ E by gate, and a hole pair START ⤳ HUB ⤳ E. By
-  // gate D comes before E; through the holes E is two jumps away, so E first.
   const START = 32000001;
   const A = 32000002;
   const B = 32000003;

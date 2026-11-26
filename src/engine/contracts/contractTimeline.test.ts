@@ -19,7 +19,6 @@ function contract(overrides: Partial<Contract>): Contract {
   };
 }
 
-/** Before every contract's expiry below, so none has lapsed unless a test says so. */
 const NOW = Date.UTC(2026, 9, 20);
 
 describe('contractTimeline', () => {
@@ -68,7 +67,6 @@ describe('contractTimeline', () => {
   });
 
   it('leaves out an accepted step that ESI gave no stamp for once the contract is completed', () => {
-    // Completed means it was accepted; "Accepted: Waiting" beside it would be wrong.
     const steps = contractTimeline(
       contract({ status: 'finished_contractor', date_completed: '2026-08-26T01:46:00Z' }),
       NOW
@@ -86,7 +84,6 @@ describe('contractTimeline', () => {
           ['issued', true],
           [status, true],
         ]);
-        // ESI gives no date for any of these, so none is shown.
         expect(steps[1]!.atMs).toBeNull();
       }
     );

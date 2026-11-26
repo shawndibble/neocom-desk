@@ -8,12 +8,6 @@ import { isTabRouteDefaulted, tabPath } from '@/lib/pageTabs';
 import { PilotLookupPanel } from '@/features/travel/PilotLookupPanel';
 import { RouteSafetyTab } from '@/features/travel/RouteSafetyTab';
 
-/**
- * Travel (issue #2328): intel for getting somewhere — Route Safety (with Thera/Turnur
- * connections (#2330) as a modal on it) and Pilot Lookup (#2331), back under Travel (scope decision
- * `20261009-163837-pinned-rail-alerts-bell-pilot-lookup-back-under`).
- * Signed-in like every other route; logged-out access is a possible follow-up.
- */
 export function Travel() {
   const { t } = useTranslation();
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
@@ -22,10 +16,6 @@ export function Travel() {
   const tabsId = useTabsId();
   const location = useLocation();
 
-  // A shared `/travel?pilot=<id>` from before Pilot Lookup was a tab names no
-  // tab, so `TabRoute` defaults it to Route Safety; the pilot it names belongs
-  // on the Pilot Lookup tab. Only that defaulted landing moves: an explicit
-  // Route Safety link must stay put.
   if (isTabRouteDefaulted(location.state) && new URLSearchParams(location.search).has('pilot')) {
     return (
       <Navigate replace to={{ pathname: tabPath(TRAVEL_TABS, 'pilot'), search: location.search }} />

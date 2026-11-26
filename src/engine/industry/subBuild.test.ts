@@ -14,11 +14,6 @@ const CTX = {
   modifiers: NO_CHARACTER_MODIFIERS,
 };
 
-/**
- * Shaped on the real Auto-Integrity Preservation Seal: one input, three units
- * of output per run — the case the whole feature exists for, since "need 150"
- * is 50 runs rather than 150.
- */
 function recipe(overrides: Partial<IndustryBlueprint> = {}): IndustryBlueprint {
   return {
     name: 'Seal Blueprint',
@@ -29,7 +24,6 @@ function recipe(overrides: Partial<IndustryBlueprint> = {}): IndustryBlueprint {
   };
 }
 
-/** A parent material line, built through the engine so it cannot drift from the real shape. */
 function parent(typeID: number, quantity: number, owned = 0): MaterialCostLine {
   return materialCostLines(
     [{ typeID, baseQuantity: quantity, quantity }],
@@ -73,14 +67,12 @@ describe('planSubBuild', () => {
   it('reports the overshoot when the output does not divide the requirement evenly', () => {
     const sub = planSubBuild(parent(57478, 76), recipe(), 0, CTX);
 
-    // 26 runs is the first count that covers 76, and it makes 78.
     expect(sub?.runs).toBe(26);
     expect(sub?.unitsMade).toBe(78);
     expect(sub?.spare).toBe(2);
   });
 
   it('sizes the job to what is still needed, not the whole requirement', () => {
-    // 150 needed, 60 already in hand: the sub-job only has to cover 90.
     const sub = planSubBuild(parent(57478, 150, 60), recipe(), 0, CTX);
 
     expect(sub?.needed).toBe(90);
@@ -89,8 +81,6 @@ describe('planSubBuild', () => {
   });
 
   it('rounds materials once for the whole job, the way EVE does, not once per run', () => {
-    // 7 runs x 3 base at ME 10 = 18.9 -> 19. Rounding per run would ceil 2.7
-    // to 3 and bill 21.
     const sub = planSubBuild(
       parent(57478, 21),
       recipe({ materials: [{ typeID: 57457, quantity: 3 }] }),
@@ -114,7 +104,6 @@ describe('planSubBuild', () => {
       adjustedPrices: { 57457: 100 },
     });
 
-    // EIV is ME0: 10 units x 100 ISK x 1 run. ME never reduces the fee.
     expect(sub?.jobFee.eiv).toBe(1000);
     expect(sub?.jobFee.total).toBeGreaterThan(0);
   });
@@ -122,10 +111,9 @@ describe('planSubBuild', () => {
   it('applies the context manufacturing-time implant bonus to the sub-job seconds (issue #1229)', () => {
     const sub = planSubBuild(parent(57478, 3), recipe(), 0, {
       ...CTX,
-      modifiers: characterModifiers({ skills: {}, implantTypeIds: [27171] }), // BX-804
+      modifiers: characterModifiers({ skills: {}, implantTypeIds: [27171] }),
     });
 
-    // 1800 * 1 run * 0.96 (BX-804)
     expect(sub?.seconds).toBeCloseTo(1728, 6);
   });
 

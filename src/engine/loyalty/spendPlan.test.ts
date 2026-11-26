@@ -15,7 +15,6 @@ function sell(price: number, volume: number): HubOrder {
 function bid(price: number, volumeRemain: number): ReachableBuyOrder {
   return { price, volumeRemain, range: 'station', locationId: STATION, systemId: 1 };
 }
-/** Net of sales tax at Accounting 0, the fee authority's own rate. */
 const net = (revenue: number): number => revenue - salesTax(revenue, 0);
 
 function offer(over: Partial<SpendCandidate> & { offerId: number }): SpendCandidate {
@@ -57,7 +56,6 @@ describe('planLpSpend', () => {
   });
 
   it('two offers selling the same output never sell more than its buy book takes', () => {
-    // 3 units bid at 100k, then 1k. Both offers hand over 1 unit of SHIP.
     const plan = planLpSpend(
       input({
         candidates: [offer({ offerId: 1 }), offer({ offerId: 2, lpCost: 110 })],
@@ -66,15 +64,12 @@ describe('planLpSpend', () => {
       })
     );
     const sold = plan.rows.reduce((sum, row) => sum + row.redemptions, 0);
-    // Once the 100k bids are gone the next unit earns ~9 ISK/LP: under 70% of the best.
     expect(sold).toBe(3);
     expect(plan.totals.revenue).toBe(300_000);
     expect(plan.stop).toMatchObject({ reason: 'belowFloor', floor: { source: 'best' } });
   });
 
   it('two offers needing the same required item never price the same sell-book units', () => {
-    // 2 tags at 1,000, then 50,000. Each offer takes one tag. SHIP's book takes one
-    // unit, so the second step moves to offer 2, which must pay for the second tag.
     const plan = planLpSpend(
       input({
         candidates: [
@@ -94,7 +89,6 @@ describe('planLpSpend', () => {
       [1, 1],
       [2, 2],
     ]);
-    // Three tags bought: two at 1,000, the third at 50,000.
     expect(plan.totals.turnInsCost).toBe(2 * 1_000 + 50_000);
     const bought = plan.rows.flatMap((r) => r.turnIns).reduce((s, t) => s + t.bought, 0);
     expect(bought).toBe(3);
@@ -145,7 +139,6 @@ describe('planLpSpend', () => {
   });
 
   it('never takes a step under a typed LP Value', () => {
-    // 100k net ~ 925 ISK/LP for 2 units, then 50k ~ 462.
     const plan = planLpSpend(
       input({
         buyBooks: new Map([[SHIP, [bid(100_000, 2), bid(50_000, 100)]]]),
@@ -173,7 +166,6 @@ describe('planLpSpend', () => {
   });
 
   it('falls back to 70% of the best step with no rate', () => {
-    // 80k is 80% of 100k: kept. 60k is 60%: stopped.
     const plan = planLpSpend(
       input({ buyBooks: new Map([[SHIP, [bid(100_000, 1), bid(80_000, 1), bid(60_000, 100)]]]) })
     );
@@ -196,7 +188,6 @@ describe('planLpSpend', () => {
   });
 
   it('skips a step the wallet cannot cover and takes the next affordable one', () => {
-    // Offer 1 earns more per LP but costs 50k ISK a redemption; the wallet holds 40k.
     const plan = planLpSpend(
       input({
         candidates: [

@@ -1,26 +1,3 @@
-/**
- * Route Safety's trip, assembled (issue #2539): a planned trip, each leg's
- * other ways and pins, and the hour of activity, turned into what the page
- * draws — each leg's rows and Ways to fly, and the whole trip's facts.
- *
- * Pure, and in two steps because they change at different rates:
- * - `planLegAlternatives` searches the stargate graph for each leg's ways and
- *   its pinned route. It is the costly step, run once per planned trip.
- * - `assembleRouteSafety` reads those routes against the live hole, bridge
- *   and activity lists. It is cheap, and re-run as activity arrives.
- *
- * The rules a way's list follows live here: one entry per distinct route (a
- * pinned hole never hiding its hub's own way), the planner's pick added when
- * no way flies it, the way in use first, why a pin is not flown, and a pinned
- * hole the filters skip still read as a hole jump.
- *
- * Holes (issue #2476) and Ansiblex (issue #2478) are extra connections for
- * the search only: the stargate graph never holds them. Each row says how it
- * was entered — gate, hole or bridge (issue #2546) — decided here once, so
- * the strip, the table, the facts and the waypoints never re-derive it.
- * Where a gate and a hole or bridge join the same two systems the gate is
- * the jump shown: the pilot can always fly the gate.
- */
 import { bridgeBetween, bridgeConnections, type AnsiblexGate } from './ansiblex';
 import { lightYearDistance, type SystemPosition } from './jumpDrive';
 import { jumpWayFacts, type JumpDriveOptions, type JumpHop, type JumpWayFacts } from './jumpLegs';
@@ -51,104 +28,71 @@ import {
 import type { TheraConnection } from './theraConnections';
 import type { TripLeg, TripPlan } from './tripPlan';
 
-/** How a route entered a system from the one before it. */
 export type RouteStep =
   | { kind: 'gate' }
   | { kind: 'hole'; hole: TheraConnection }
   | { kind: 'bridge'; gate: AnsiblexGate }
   | { kind: 'jump'; distanceLy: number };
 
-/** A Route Safety row, tagged with how its system was entered. */
 export interface RouteSafetyTripRow extends RouteSafetyRow {
-  /** `null` for the system a leg or the trip starts in. */
   entry: RouteStep | null;
 }
 
-/** A hole jump along one way to fly a leg. */
 export interface RouteSafetyWayHole {
   from: number;
   to: number;
   hole: TheraConnection;
 }
 
-/** A bridge jump along one way to fly a leg. */
 export interface RouteSafetyWayBridge {
   from: number;
   to: number;
   gate: AnsiblexGate;
 }
 
-/**
- * One way to fly a leg, with its facts. `pin` is the token clicking the way's
- * box writes — `null` for the planner's own pick, which un-pins the leg.
- */
 export interface RouteSafetyWay {
   kind: 'planner' | 'gates' | 'thera' | 'turnur' | 'hole' | 'ansiblex' | 'jump';
   pin: string | null;
-  /** `null` when this way does not reach the leg's far end. */
   summary: RouteSafetySummary | null;
   holes: RouteSafetyWayHole[];
   bridges: RouteSafetyWayBridge[];
-  /** Fuel, light years and fatigue of the jump drive legs; `null` when the way has none. */
   jump: JumpWayFacts | null;
   inUse: boolean;
 }
 
-/** Why a leg's pin is not what it is flown by. */
 export type LegPinNote = 'closed' | 'no-hole' | 'no-route' | 'no-list' | 'no-bridge';
 
-/** One Leg of the trip: its rows and facts, or `null` for both when no stargate route flies it. */
 export interface RouteSafetyLeg {
   from: number;
   to: number;
   rows: RouteSafetyTripRow[] | null;
   summary: RouteSafetySummary | null;
-  /** The ways to fly it, the one in use first; gates only is always among them. */
   ways: RouteSafetyWay[];
-  /** The leg's pin token, `''` when it is flown as planned. */
   pin: string;
-  /** Set when the leg is pinned but flown by the planner's pick instead, and why. */
   pinNote: LegPinNote | null;
 }
 
-/** The whole trip as one route: what the facts line and strip cover. */
 export interface RouteSafetyTrip {
   rows: RouteSafetyTripRow[];
-  /** Where along `rows` each leg ends. */
   stopIndexes: number[];
   summary: RouteSafetySummary;
-  /** How many of the trip's jumps go through a wormhole. */
   holeJumps: number;
-  /** How many go over an Ansiblex; the rest are by gate. */
   bridgeJumps: number;
-  /** How many go by jump drive. */
   driveJumps: number;
-  /** The trip's jump drive legs, or `null` when it has none. */
   jump: JumpWayFacts | null;
 }
 
-/** A trip as the planner left it: the stargate graph it was planned on, and the search, holes and all. */
 export interface PlannedTrip {
   plan: TripPlan;
   graph: JumpGraph;
   options: FindJumpRouteOptions;
 }
 
-/** A leg's other ways, and its pinned route when it has a pin to fly. */
 export interface LegAlternatives {
   ways: LegWay[];
-  /** `null` with no pin, and while a hole or hub pin waits on the hole list. */
   pinned: PinnedLegRoute<PinnableHole> | null;
 }
 
-/**
- * The trip with each leg the planner sent through Thera or Turnur in more
- * jumps than the gates flown without the holes instead. A biased preference
- * can cost a long hole route below a short gate one, since the hub is free;
- * a longer hole route is never offered as a way, so it is never the pick.
- * An optimized order's jumps are recounted on the new routes. The same trip
- * back when no leg changes.
- */
 export function gatesOverLongerHoles<T extends PlannedTrip>(trip: T): T {
   const { plan, graph, options } = trip;
   let changed = false;
@@ -168,10 +112,6 @@ export function gatesOverLongerHoles<T extends PlannedTrip>(trip: T): T {
   return { ...trip, plan: { ...plan, legs, reordered } };
 }
 
-/**
- * The search's view of the qualifying holes and the known bridges. The
- * bridges join the holes' connections; only holes make a system free.
- */
 export function routeSafetyNetwork(
   holes: readonly HoleEnds[],
   bridges: readonly AnsiblexGate[]
@@ -183,16 +123,6 @@ export function routeSafetyNetwork(
   };
 }
 
-/**
- * Each leg's Ways to fly and pinned route, and every system any of them (or
- * the planner's pick) crosses — what the region names are looked up for.
- *
- * `network` is what the trip was planned with: the qualifying holes and the
- * known bridges, their ends are enough. `pins.listed` holds the open holes
- * a hole pin may name — EVE-Scout's list, or just the pinned holes it still
- * holds — or is `null` while there is no list: a hole or hub pin then waits,
- * unflown.
- */
 export function planLegAlternatives(
   trip: PlannedTrip,
   network: { holes: readonly HoleEnds[]; bridges: readonly AnsiblexGate[] },
@@ -224,36 +154,24 @@ export function planLegAlternatives(
   return { legs, systemIds: [...crossed] };
 }
 
-/** The hour of ESI activity. Each feed is `null` when it could not be read. */
 export interface RouteSafetyActivity {
   kills: ReadonlyMap<number, SystemKills> | null;
   jumps: ReadonlyMap<number, number> | null;
-  /** The older of the two feeds' ages, or `null` when neither arrived. */
   fetchedAt: Date | null;
 }
 
-/** What `assembleRouteSafety` reads: the planned trip, and the live lists and data around it. */
 export interface RouteSafetyTripInput {
   planned: Pick<PlannedTrip, 'plan' | 'graph'>;
-  /** From `planLegAlternatives`, one per leg. */
   alternatives: readonly LegAlternatives[];
-  /** One Stop was asked for: no route is then the whole answer. */
   singleStop: boolean;
-  /** Each leg's pin token, `''` for a leg flown as planned. */
   pins: readonly string[];
-  /** The holes the filters allow. */
   holes: readonly TheraConnection[];
-  /** Every open hole EVE-Scout lists, or `null` while there is no list. */
   listed: readonly TheraConnection[] | null;
-  /** The known Ansiblex, or `null` while Use jump bridges is off. */
   bridges: readonly AnsiblexGate[] | null;
   systems: ReadonlyMap<number, RouteSafetySystemEntry>;
   regionNames: ReadonlyMap<number, string>;
-  /** `null` while the feeds load. */
   activity: RouteSafetyActivity | null;
-  /** Systems under a lawless insurgency now; leave out while there is no fresh list. */
   lawless?: ReadonlySet<number>;
-  /** The hull's drive and every system's position, when jump legs are on. */
   jump?: {
     positions: ReadonlyMap<number, SystemPosition>;
     drive: Pick<JumpDriveOptions, 'fuelPerLy' | 'distanceFactor'>;
@@ -265,22 +183,16 @@ export type RouteSafetyAssembly =
   | {
       kind: 'route';
       legs: RouteSafetyLeg[];
-      /** `null` when a leg has no route: there is no whole trip to sum. */
       trip: RouteSafetyTrip | null;
-      /** Set when optimizing changed the stop order. */
       reordered: TripPlan['reordered'];
-      /** A stop no stargate route reaches: optimizing is off until it is removed. */
       unreachable: boolean;
-      /** `null` while the activity feeds load, and when neither could be read. */
       fetchedAt: Date | null;
       activityLoading: boolean;
-      /** A feed could not be read: its figures show as unknown, never zero. */
       activityUnavailable: boolean;
     };
 
 const GATE_STEP: RouteStep = { kind: 'gate' };
 
-/** How many of a route's rows were entered through a hole, and how many over a bridge. */
 export function stepJumps(rows: readonly Pick<RouteSafetyTripRow, 'entry'>[]): {
   holeJumps: number;
   bridgeJumps: number;
@@ -297,7 +209,6 @@ export function stepJumps(rows: readonly Pick<RouteSafetyTripRow, 'entry'>[]): {
   return { holeJumps, bridgeJumps, driveJumps };
 }
 
-/** The jump hops and gate hops a run of tagged rows holds, in order. */
 function hopsOf(rows: readonly Pick<RouteSafetyTripRow, 'entry' | 'systemId'>[]): JumpHop[] {
   return rows.flatMap((row, at): JumpHop[] => {
     if (at === 0 || !row.entry) return [];
@@ -310,12 +221,6 @@ function hopsOf(rows: readonly Pick<RouteSafetyTripRow, 'entry' | 'systemId'>[])
   });
 }
 
-/**
- * How each step of a route was flown. A step a stargate joins is a gate jump,
- * whatever else joins it. A step nothing known joins reads as a gate too:
- * the adapter reads a trip only against the holes and bridges it was planned
- * with, so no route holds one.
- */
 function stepReader(
   graph: JumpGraph,
   holes: readonly TheraConnection[],
@@ -340,11 +245,9 @@ function sameRoute(a: readonly number[] | null, b: readonly number[] | null): bo
   return a !== null && b !== null && a.length === b.length && a.every((id, i) => id === b[i]);
 }
 
-/** The Route Safety trip: each leg's rows and ways, and the whole trip's facts. */
 export function assembleRouteSafety(input: RouteSafetyTripInput): RouteSafetyAssembly {
   const { planned, alternatives, pins, holes, listed, bridges, activity } = input;
   const { plan, graph } = planned;
-  // A pinned hole the filters skip is still a hole jump on the leg it is flown on.
   const listedById = new Map(listed?.map((hole) => [hole.id, hole]));
   const qualifyingIds = new Set(holes.map((hole) => hole.id));
   const pinnedHoles = alternatives.flatMap(({ pinned }) => {
@@ -358,7 +261,6 @@ export function assembleRouteSafety(input: RouteSafetyTripInput): RouteSafetyAss
     bridges ?? [],
     input.jump?.positions ?? null
   );
-  // One stop is the page as it always was: no route is the whole answer.
   if (
     input.singleStop &&
     plan.legs[0]?.route.kind !== 'route' &&
@@ -382,7 +284,6 @@ export function assembleRouteSafety(input: RouteSafetyTripInput): RouteSafetyAss
   };
   const summaryOf = (systems: readonly number[]) =>
     summarizeRouteSafety(buildRouteSafetyRows(systems, inputs));
-  /** A way's hole and bridge jumps, each step read once. */
   const jumpsOn = (systems: readonly number[]) => {
     const holeJumps: RouteSafetyWayHole[] = [];
     const bridgeJumps: RouteSafetyWayBridge[] = [];
@@ -413,7 +314,6 @@ export function assembleRouteSafety(input: RouteSafetyTripInput): RouteSafetyAss
       pinNote = pinned.kind;
     }
 
-    // The pinned hole or hub, gates only, each hub: one entry per distinct route.
     const candidates: {
       kind: RouteSafetyWay['kind'];
       pin: string | null;
@@ -422,7 +322,6 @@ export function assembleRouteSafety(input: RouteSafetyTripInput): RouteSafetyAss
     if (pinned?.kind === 'route' && pin?.kind === 'hole') {
       candidates.push({ kind: 'hole', pin: token, systems: pinned.systems });
     }
-    // A hub pin is flown even when its way is longer than the gates and so not listed.
     if (pinned?.kind === 'route' && pin?.kind === 'hub') {
       candidates.push({ kind: pin.hub, pin: token, systems: pinned.systems });
     }
@@ -433,7 +332,6 @@ export function assembleRouteSafety(input: RouteSafetyTripInput): RouteSafetyAss
         systems: way.route.kind === 'route' ? way.route.systems : null,
       });
     }
-    // The pinned hole never hides a hub's own way: both stay listed.
     const distinct = candidates.filter(
       (candidate, at) =>
         candidate.systems === null ||

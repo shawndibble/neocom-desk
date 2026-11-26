@@ -63,7 +63,6 @@ describe('buildVsBuy', () => {
   it('computes the full hand-checked scenario', () => {
     const r = buildVsBuy(baseInputs);
 
-    // modifier 0.9 * 0.99 * 0.98 = 0.87318, per-job over 10 runs
     expect(r.materials).toEqual([
       {
         typeID: 34,
@@ -86,26 +85,23 @@ describe('buildVsBuy', () => {
         unpriced: false,
       },
     ]);
-    expect(r.materialCost).toBeCloseTo(8732 * 5 + 297 * 120, 6); // 79_300
+    expect(r.materialCost).toBeCloseTo(8732 * 5 + 297 * 120, 6);
 
-    // 3600*10 * 0.8 (TE) * 0.8 (Ind V) * 0.88 (Adv IV) * 0.85 (Raitaru) * 0.8 (T1 rig)
     expect(r.seconds).toBeCloseTo(13_787.136, 6);
 
-    // EIV = 10 * (1000*4 + 34*100) = 74_000
     expect(r.jobFee.eiv).toBe(74_000);
-    expect(r.jobFee.grossCost).toBeCloseTo(74_000 * 0.05 * 0.97, 6); // 3_589
+    expect(r.jobFee.grossCost).toBeCloseTo(74_000 * 0.05 * 0.97, 6);
     expect(r.jobFee.sccSurcharge).toBeCloseTo(2_960, 6);
     expect(r.jobFee.facilityTax).toBeCloseTo(740, 6);
     expect(r.jobFee.total).toBeCloseTo(7_289, 6);
 
     expect(r.totalCost).toBeCloseTo(86_589, 6);
 
-    // 10 units at 100k
     expect(r.buyCost).toBe(1_000_000);
     expect(r.revenue).toBe(1_000_000);
     expect(r.salesTax).toBeCloseTo(1_000_000 * 0.03375, 6);
     expect(r.brokerFee).toBeCloseTo(1_000_000 * 0.015, 6);
-    expect(r.netRevenue).toBeCloseTo(1_000_000 - 33_750 - 15_000, 6); // 951_250
+    expect(r.netRevenue).toBeCloseTo(1_000_000 - 33_750 - 15_000, 6);
 
     const profit = 1_000_000 - 33_750 - 15_000 - 86_589;
     expect(r.profit).toBeCloseTo(profit, 6);
@@ -117,8 +113,6 @@ describe('buildVsBuy', () => {
     expect(r.grossMargin).toBeCloseTo((grossProfit / 1_000_000) * 100, 6);
     expect(r.grossIskPerHour).toBeCloseTo(grossProfit / (13_787.136 / 3600), 4);
 
-    // totalCost 86_589 over 10 units, Accounting V (3.375%) + Broker Relations V (1.5%)
-    // revenue = 86_589 / (1 - 0.04875) = 91_026.5480...; price = revenue / 10
     expect(r.breakEvenPrice).toBeCloseTo(86_589 / (1 - 0.04875) / 10, 6);
 
     expect(r.unpriceable).toBe(false);
@@ -131,13 +125,11 @@ describe('buildVsBuy', () => {
       ...baseInputs,
       modifiers: { ...baseInputs.modifiers, manufacturingTimeImplantPct: 4 },
     });
-    // 13_787.136 (baseline) * 0.96 (BX-804)
     expect(r.seconds).toBeCloseTo(13_235.65056, 6);
   });
 
   it('recommends buy when building costs more than the hub sell price', () => {
     const r = buildVsBuy({ ...baseInputs, hubPrices: { ...baseInputs.hubPrices, 999: 8_000 } });
-    // buyCost 80_000 < totalCost 86_589
     expect(r.recommendation).toBe('buy');
   });
 
@@ -151,7 +143,6 @@ describe('buildVsBuy', () => {
     const r = buildVsBuy({ ...baseInputs, hubPrices: { 34: 5, 999: 100_000 } });
     expect(r.unpriceable).toBe(true);
     expect(r.unpricedMaterials).toEqual([35]);
-    // priced portion still reported; verdict withheld
     expect(r.materialCost).toBeCloseTo(8732 * 5, 6);
     expect(r.profit).toBeNull();
     expect(r.marginPct).toBeNull();
@@ -160,12 +151,10 @@ describe('buildVsBuy', () => {
     expect(r.grossMargin).toBeNull();
     expect(r.grossIskPerHour).toBeNull();
     expect(r.recommendation).toBe('unknown');
-    // break-even price only needs totalCost + quantity + skills, unaffected by unpriced materials
     expect(r.breakEvenPrice).not.toBeNull();
   });
 
   it('prices a fully owned material at zero and stops it blocking the plan', () => {
-    // No hub listing for 35 at all — owning every unit must still price the plan.
     const r = buildVsBuy({
       ...baseInputs,
       hubPrices: { 34: 5, 999: 100_000 },
@@ -174,8 +163,6 @@ describe('buildVsBuy', () => {
     expect(r.unpriceable).toBe(false);
     expect(r.unpricedMaterials).toEqual([]);
     expect(r.materialCost).toBeCloseTo(8732 * 5, 6);
-    // Job fee is EIV-based (ME0 quantities x adjusted prices) — owning material
-    // does not make the job cheaper to install.
     expect(r.jobFee.total).toBeCloseTo(7_289, 6);
     expect(r.totalCost).toBeCloseTo(8732 * 5 + 7_289, 6);
     expect(r.recommendation).toBe('build');
@@ -244,9 +231,7 @@ describe('buildVsBuy', () => {
     expect(r.grossMargin).toBeNull();
     expect(r.grossIskPerHour).toBeNull();
     expect(r.recommendation).toBe('unknown');
-    // break-even price depends only on totalCost + quantity + skills, not the product's hub price
     expect(r.breakEvenPrice).not.toBeNull();
-    // build-side numbers still available
     expect(r.totalCost).toBeCloseTo(86_589, 6);
   });
 
@@ -284,7 +269,6 @@ describe('buildVsBuy', () => {
       },
     ]);
     expect(r.seconds).toBe(3600);
-    // EIV 7_400: gross 370, scc 296, tax 0.25% = 18.5 -> 684.5
     expect(r.jobFee.total).toBeCloseTo(684.5, 6);
   });
   describe('materialPrices', () => {
@@ -294,16 +278,12 @@ describe('buildVsBuy', () => {
         runs: 1,
         me: 0,
         te: 0,
-        // Buy-order side: cheaper materials, same product.
         materialPrices: { 34: 4, 35: 90 },
       });
 
-      // Quantities are the facility-adjusted ones; only the unit prices move.
       const [tritanium, pyerite] = r.materials;
       expect(r.materials.map((m) => m.unitPrice)).toEqual([4, 90]);
       expect(r.materialCost).toBeCloseTo(tritanium.quantity * 4 + pyerite.quantity * 90, 6);
-      // Acquisition Verdict still compares against buying the product
-      // outright, which pays the hub's lowest sell.
       expect(r.revenue).toBeCloseTo(100_000, 6);
       expect(r.unpriceable).toBe(false);
     });
@@ -326,7 +306,6 @@ describe('buildVsBuy', () => {
         runs: 1,
         me: 0,
         te: 0,
-        // 35 has no buy order at the hub.
         materialPrices: { 34: 4 },
       });
 
@@ -341,7 +320,7 @@ describe('buildVsBuy', () => {
     const pyeriteBlueprint: IndustryBlueprint = {
       name: 'Pyerite Reprocessing (stand-in blueprint)',
       time: 60,
-      materials: [{ typeID: 36, quantity: 1 }], // some other mineral
+      materials: [{ typeID: 36, quantity: 1 }],
       products: [{ typeID: 35, quantity: 1 }],
     };
     const recipeFor =
@@ -372,8 +351,6 @@ describe('buildVsBuy', () => {
       const pyerite = r.materials.find((m) => m.typeID === 35);
       expect(pyerite?.subBuild).toBeDefined();
       expect(pyerite?.unitPrice).toBeNull();
-      // The build choice actually moves materialCost/totalCost/profit — not a
-      // parallel number left beside an unchanged Results panel.
       expect(r.materialCost).not.toBeCloseTo(baseline.materialCost, 0);
       expect(r.totalCost).not.toBeCloseTo(baseline.totalCost, 0);
       expect(r.profit).not.toBeNull();
@@ -408,12 +385,9 @@ describe('buildVsBuy', () => {
         recipeFor: recipeFor({
           35: { method: 'manufacturing', blueprint: pyeriteBlueprint, me: 0 },
         }),
-        materialPrices: { 34: baseInputs.hubPrices[34] }, // 36 (Pyerite's own input) has no price anywhere
+        materialPrices: { 34: baseInputs.hubPrices[34] },
       });
       expect(r.unpriceable).toBe(true);
-      // The real culprit (36, Pyerite's own unpriced input), not Pyerite's own
-      // typeID standing in for it — a plan asking "what's blocking this"
-      // needs the actual leaf, however deep it sits.
       expect(r.unpricedMaterials).toEqual([36]);
       expect(r.profit).toBeNull();
     });
@@ -460,8 +434,6 @@ describe('buildVsBuy', () => {
 
       const pyerite = withReactionFacility.materials.find((m) => m.typeID === 35);
       expect(pyerite?.subBuild).toBeDefined();
-      // A configured Reaction Location must move the sub-job's own fee away
-      // from what the plan's own Raitaru/index-0.05 context would have given.
       expect(withReactionFacility.materialCost).not.toBeCloseTo(
         withoutReactionFacility.materialCost,
         0

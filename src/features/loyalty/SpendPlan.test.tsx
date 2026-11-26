@@ -126,7 +126,6 @@ describe('SpendPlanPanel', () => {
     });
     renderPlan({
       ...owned,
-      // Two types: the second type's holding is the row's largest, so it is named first.
       ownedPlacements: new Map([
         [34, [placement(60003760, 4), placement(60008494, 1)]],
         [35, [placement(60008494, 10)]],

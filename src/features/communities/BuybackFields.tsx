@@ -14,17 +14,11 @@ import { COMPARED_HUBS } from '@/market/hubs';
 import { addType, removeType, toggleGroup, type BuybackDraft } from './buybackDraft';
 import { ItemSearchPicker } from './ItemSearchPicker';
 
-/** A Character of the requester that may take the contracts: it is a Member of this Community. */
 export interface BuyerOption {
   characterId: number;
   name: string;
 }
 
-/**
- * The buyback half of the compose form (issue #4780): the rate and what it is
- * a percent of, the Trade Hub, who the contracts go to, and what the corp
- * buys, as ticked groups ("All ore") and single items.
- */
 export function BuybackFields({
   draft,
   onChange,
@@ -36,7 +30,6 @@ export function BuybackFields({
   onChange: (next: BuybackDraft) => void;
   catalogue: AppraisalCatalogue | null;
   buyers: readonly BuyerOption[];
-  /** The Character posting: what "contracts go to" means when none is named. */
   ownCharacterId: number;
 }) {
   const { t } = useTranslation();

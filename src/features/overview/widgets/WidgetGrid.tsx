@@ -1,15 +1,3 @@
-/**
- * A widget board's grid: flex-wrap rows of widgets in layout order.
- *
- * No gap-filling, on purpose: reading order is screen order is the order the
- * pilot arranged, so Move up and Move down do what they say. A row's leftover
- * width is shared by `flex-grow`, so there are no holes.
- *
- * While customizing, each widget gets a size control, earlier / later / remove
- * buttons and (on a pointer-sized screen) a drag handle. The buttons are the
- * keyboard and touch route; dragging is a convenience over the same
- * `moveTo` action. A phone customizes in a list instead (`PhoneCustomizeList`).
- */
 import {
   DndContext,
   KeyboardSensor,
@@ -51,9 +39,7 @@ import { WidgetMenu } from './WidgetMenu';
 interface WidgetGridProps {
   widgets: readonly WidgetModel[];
   editing?: boolean;
-  /** The empty board's Add widget; absent where there is no Gallery to open. */
   onAdd?: () => void;
-  /** The empty board's Start from a role. */
   onRoles?: () => void;
 }
 
@@ -131,11 +117,9 @@ interface CellProps {
   first: boolean;
   last: boolean;
   isPhone: boolean;
-  /** Set only inside the sortable context. */
   sortable?: boolean;
 }
 
-/** One widget in its flex cell: scroll-and-flash on add, and the edit chrome. */
 function Cell({ widget, title, editing, first, last, isPhone, sortable = false }: CellProps) {
   const { t } = useTranslation();
   const edit = useOverviewEdit();
@@ -239,14 +223,11 @@ export function WidgetGrid({ widgets, editing = false, onAdd, onRoles }: WidgetG
   const board = useWidgetBoard();
   const shown = visibleWidgets(widgets, isPhone, board.canDraw);
   const sensors = useSensors(
-    // A 4px travel before a drag starts, so a tap on the grip is not a drag.
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
   const [dragging, setDragging] = useState(false);
 
-  // Known widgets this Character may not see (every one's corp capability gone) read as an empty
-  // board: "nothing to show" would blame the phone or a newer build for what is a role.
   const known = widgets.filter((w) => getKind(w.kind) !== undefined);
   const hiddenByBoard = known.length > 0 && !known.some((w) => board.canDraw(getKind(w.kind)!));
   if (widgets.length === 0 || hiddenByBoard) {

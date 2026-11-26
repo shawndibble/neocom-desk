@@ -11,14 +11,6 @@ import {
 import { SIGNED_IN_SHELL_HINT_KEY } from './signedInShellHint';
 import { PLAY_STORE_FLAG_KEY, PLAY_STORE_PACKAGE } from '@/lib/playStoreApp';
 
-/**
- * The landing-shell scripts in `index.html` run before any bundle: the gate in
- * `<head>` decides and starts the hero's ship, the boot script in `<body>`
- * clones the hero in. They carry their own copies of the signed-in hint key,
- * the Play Store flag and package, the `<html>` attributes and the ship's
- * URL. This runs them as shipped, so those copies cannot drift from the
- * modules that own them.
- */
 function inlineScript(id: string): string {
   const match = new RegExp(`<script id="${id}">([\\s\\S]*?)<\\/script>`).exec(indexHtml);
   if (match === null) throw new Error(`index.html has no #${id} script`);
@@ -26,7 +18,6 @@ function inlineScript(id: string): string {
 }
 
 function runBootScripts(): void {
-  // Indirect eval: each runs at global scope, as a classic <script> does.
   (0, eval)(inlineScript('landing-shell-gate'));
   (0, eval)(inlineScript('landing-shell-boot'));
 }

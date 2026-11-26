@@ -75,7 +75,6 @@ vi.mock('./corpBook/useCorpBookView', () => ({
     booksKnown: hoisted.booksKnown,
     view: hoisted.view,
     reload: vi.fn(),
-    // No book the member has left: the left-the-corp notice has nothing to say here.
     shownBooks: [],
     corpNameOf: (id: number) => `Corp ${id}`,
     hiddenLeft: [],
@@ -158,7 +157,7 @@ describe('TaxTab with a Corp Tax Book', () => {
     expect(screen.getAllByRole('status').length).toBeGreaterThan(0);
   });
 
-  it('shows the corp Payee balance, a Billed row and the Safe to pay note', async () => {
+  it('shows the corp Payee balance, an Outstanding row and the Safe to pay note', async () => {
     hoisted.view = buildCorpBookView(
       {
         rows: snapshot.entries,
@@ -175,15 +174,12 @@ describe('TaxTab with a Corp Tax Book', () => {
     const user = userEvent.setup();
     renderTab();
     expect(screen.getAllByText('Brass Meridian Logistics').length).toBeGreaterThan(0);
-    expect(screen.getByText('Billed')).toBeInTheDocument();
-    // The 13 Oct ore is free and no book observed it at all: still the member's to assign (D12).
+    expect(screen.getByText('Outstanding')).toBeInTheDocument();
     expect(screen.queryByText('Unattributed')).not.toBeInTheDocument();
     expect(screen.getAllByText('Unassigned').length).toBeGreaterThan(0);
     expect(screen.getByText(/Safe to pay — 17 Oct is closed/)).toBeInTheDocument();
-    // The corp's balance has Settle up but no "Link payment": the book credits donations itself.
     expect(screen.queryByRole('button', { name: /link payment/i })).not.toBeInTheDocument();
 
-    // The pill is a tooltip control; the row opens from its date cell.
     await user.click(screen.getAllByText('2026-10-17')[0]);
     const detail = await screen.findByRole('dialog');
     expect(within(detail).getByText(/Disputed/)).toBeInTheDocument();
@@ -191,7 +187,6 @@ describe('TaxTab with a Corp Tax Book', () => {
   });
 });
 
-/** A book that reads every wallet division, so an uncredited donation can only mean a late sync. */
 const everyDivisionBook: LoadedCorpBook = { ...book, divisions: [1, 2, 3, 4, 5, 6, 7] };
 
 const donation = (refId: number, date: string, amount: number) => ({
@@ -206,7 +201,6 @@ const donation = (refId: number, date: string, amount: number) => ({
   label: 'Player Donation',
 });
 
-/** A day the member allocated at one rate, so `disputeOf` has a rate of theirs to compare. */
 const assigned = (quantity: number, payeeId: string, taxPct: number): MoonMiningTaxRow => ({
   characterId: ME,
   characterName: 'Kestrel Vane',
@@ -234,7 +228,6 @@ const assigned = (quantity: number, payeeId: string, taxPct: number): MoonMining
   unassignedOreLines: [],
 });
 
-/** The corporation as one of the member's own Payees, so its ore is not "another Payee's". */
 const corpPayee: PayeeRecord = {
   id: 'corp1',
   characterId: ME,
@@ -268,30 +261,23 @@ function viewWith(
 describe('uncredited donations in the attention strip', () => {
   it('gives one book one item, however many of its donations are uncredited', async () => {
     hoisted.view = viewWith(everyDivisionBook, [
-      // Both are older than UNCREDITED_AFTER_HOURS before the book's last sync (18 Oct 12:00).
       donation(1, '2026-10-11T22:38:00.000Z', 26_952_549),
       donation(2, '2026-10-13T01:21:00.000Z', 1_824_664),
     ]);
     const user = userEvent.setup();
     renderTab();
 
-    // Two donations, one corporation, one row in the strip — not the same advisory twice. (The
-    // strip may also list the day's own figure dispute; that is another problem.)
     await user.click(screen.getByText('Show'));
     expect(screen.getAllByText(/hasn't credited/)).toHaveLength(1);
     expect(
       screen.getByText(/Brass Meridian Logistics hasn't credited 2 of your donations/)
     ).toBeInTheDocument();
-    // And it has a way out, not advice: one Resolve.
     expect(screen.getAllByRole('button', { name: 'Resolve' }).length).toBeGreaterThan(0);
 
-    // Each donation still names itself, so the member can give an officer the exact transfers.
     const items = screen.getAllByRole('listitem');
     expect(items.map((li) => li.textContent).join(' | ')).toMatch(/26,952,549 ISK, sent/);
     expect(items.map((li) => li.textContent).join(' | ')).toMatch(/1,824,664 ISK, sent/);
 
-    // The app matched the donation to the corp from the member's own journal (inFlightDonations):
-    // it must not send them off to re-check what it already knows.
     expect(screen.queryByText(/check in your wallet journal/i)).not.toBeInTheDocument();
   });
 
@@ -319,15 +305,12 @@ describe('donations the book holds for review without counting them (#6207)', ()
     ...(reason ? { reason } : {}),
   });
 
-  // Neither in flight (the book has them) nor credited: nothing else on the tab says where the
-  // ISK went, so the member sees them, with every one listed and a Resolve.
   it('names them once per book, each with its amount and what the member wrote', async () => {
     hoisted.view = viewWith({
       ...book,
       inReview: [
         held(26226487580, '2026-10-02T22:38:44.000Z', 26_952_549, 'Moon tax 10-01/10-02'),
         held(26271892482, '2026-10-14T18:28:44.000Z', 10_976_509),
-        // Paid before the book bills from: it paid no mining the book bills.
         held(26177051185, '2026-09-21T17:38:23.000Z', 11_340_032),
       ],
     });
@@ -369,7 +352,6 @@ describe('a bill an officer kept', () => {
     },
   };
 
-  // The officer's next step, word for word, with Resolve again and a one-click Not paying.
   it('reads the next step on the attention strip with Resolve and Not paying', async () => {
     hoisted.view = viewWith({ ...book, disputes: [rejected] });
     const user = userEvent.setup();
@@ -385,7 +367,6 @@ describe('a bill an officer kept', () => {
     expect(screen.getAllByRole('button', { name: 'Not paying' }).length).toBeGreaterThan(0);
   });
 
-  // "If they say f-it the tool shouldn't annoy them" - but a later answer is a new problem.
   it('hides the answer the member said no to, and shows a later one again', async () => {
     const day = '2026-10-17';
     const answered = (at: string) => ({
@@ -404,7 +385,6 @@ describe('a bill an officer kept', () => {
         <TaxTab tabBar={null} tabsId="t" />
       </MemoryRouter>
     );
-    // Whatever else is on the strip, the answer the member said no to is not.
     const show = screen.queryByText('Show');
     if (show) await userEvent.setup().click(show);
     expect(screen.queryByText(/kept the bill on 2026-10-17/)).toBeNull();
@@ -417,11 +397,6 @@ describe('a bill an officer kept', () => {
   });
 });
 
-/**
- * Open a 17 Oct row's detail and then Compare with the book. One day can carry several rows —
- * the member's surplus keeps a personal row where the book observed less, and a contested day
- * splits into a billed row and a conflict row — so the caller says which one to open.
- */
 const openCompare = async (inRow = 'Brass Meridian Logistics') => {
   const user = userEvent.setup();
   renderTab();
@@ -437,28 +412,29 @@ const openCompare = async (inRow = 'Brass Meridian Logistics') => {
 
 describe('Compare with the book: which way the difference runs', () => {
   it('gives the member both ways out when the book bills more than their record', async () => {
-    // The book observed 43,050; the member recorded 41,200.
     hoisted.view = viewWith(book);
     const compare = await openCompare();
     expect(compare.getByText(/The book recorded more ore than you did/)).toBeInTheDocument();
-    // No dead end: the two ways out are right beside the sentence.
     expect(compare.getByText(/If the book is right, fix your records/)).toBeInTheDocument();
     expect(compare.getByRole('button', { name: 'Resolve' })).toBeInTheDocument();
   });
 
-  it('says there is nothing to raise when the book bills less', async () => {
+  it('raises nothing when the book bills less: its records stand, so there is no dispute', async () => {
     hoisted.view = viewWith({
       ...book,
       observed: [{ ...book.observed[0], oreLines: [{ typeId: ZEO, quantity: 39_000 }] }],
     });
-    const compare = await openCompare();
-    expect(compare.getByText(/The book recorded less ore than you did/)).toBeInTheDocument();
-    expect(compare.getByText(/there is nothing to raise/)).toBeInTheDocument();
-    expect(compare.queryByText(/Ask a .* officer to correct the book/)).not.toBeInTheDocument();
+    const user = userEvent.setup();
+    renderTab();
+    const date = screen
+      .getAllByText('2026-10-17')
+      .find((el) => el.closest('tr')?.textContent?.includes('Brass Meridian Logistics'));
+    await user.click(date ?? screen.getAllByText('2026-10-17')[0]);
+    await screen.findByRole('dialog');
+    expect(screen.queryByText(/^Disputed/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /compare with the book/i })).toBeNull();
   });
 
-  // The member allocated the day at one rate, so `disputeOf` sets `personalPct` and the
-  // quantities agree: the rate is the whole of the difference.
   it('reads the rate when that is what differs, not the ore', async () => {
     hoisted.view = viewWith({ ...book }, [], {
       rows: [assigned(43_050, corpPayee.id, 10)],
@@ -468,7 +444,6 @@ describe('Compare with the book: which way the difference runs', () => {
     expect(
       compare.getByText(/The book's rate is higher than the one you recorded/)
     ).toBeInTheDocument();
-    // No dead end: the two ways out are right beside the sentence.
     expect(compare.getByText(/If the book is right, fix your records/)).toBeInTheDocument();
     expect(compare.getByRole('button', { name: 'Resolve' })).toBeInTheDocument();
   });
@@ -486,8 +461,6 @@ describe('Compare with the book: which way the difference runs', () => {
     expect(compare.getByText(/there is nothing to raise/)).toBeInTheDocument();
   });
 
-  // A conflict row is "Not owed yet" (`taxOwed` is null) and an officer decides it, so none of
-  // these sentences may tell the member what they owe or that there is nothing to raise.
   it('claims nothing about what is owed on a row that is not owed yet', async () => {
     hoisted.view = viewWith({ ...book }, [], {
       rows: [assigned(41_200, personalPayee.id, 10)],

@@ -48,7 +48,6 @@ function colony(planetId: number, planetType: PlanetType, rates: number[]): Plan
   };
 }
 
-// Coolant (P2) from one Gas planet: Ionic Solutions and Aqueous Liquids.
 const GAS = [colony(1, 'gas', [IONIC_SOLUTIONS, AQUEOUS_LIQUIDS])];
 
 describe('estimateChain', () => {
@@ -57,7 +56,6 @@ describe('estimateChain', () => {
     const result = estimateChain({ typeId: COOLANT, colonies: GAS, policy: POLICY, books }, pi);
     if (result.status !== 'estimated') throw new Error(`expected estimated, got ${result.status}`);
     expect(result.unitsPerDay).toBeGreaterThan(0);
-    // Every goal is reached in full at that rate…
     const at = planBest(
       {
         goals: [{ typeId: COOLANT, unitsPerDay: result.unitsPerDay }],
@@ -68,7 +66,6 @@ describe('estimateChain', () => {
       pi
     );
     expect(reachesInFull(at.plan)).toBe(true);
-    // …and a tenth more is not: the colonies are the limit, not the search.
     const above = planBest(
       {
         goals: [{ typeId: COOLANT, unitsPerDay: result.unitsPerDay * 1.1 }],
@@ -79,7 +76,6 @@ describe('estimateChain', () => {
       pi
     );
     expect(reachesInFull(above.plan)).toBe(false);
-    // The figure is the plan's absolute net a day, never a lift over a Baseline.
     expect(at.economics.status).toBe('costed');
     if (at.economics.status !== 'costed') return;
     expect(result.iskPerDay).toBeCloseTo(at.economics.netPerHour * 24, 0);
@@ -88,7 +84,6 @@ describe('estimateChain', () => {
   });
 
   it('hands a jumps function to the planner, so every leg between colonies carries its distance', () => {
-    // Condensates (P3) from two Gas colonies: one ships its P1 to the other.
     const GAS_RAWS = [IONIC_SOLUTIONS, AQUEOUS_LIQUIDS, 2311, 2310];
     const colonies = [colony(1, 'gas', GAS_RAWS), colony(2, 'gas', GAS_RAWS)];
     const result = estimateChain(
@@ -121,7 +116,6 @@ describe('estimateChain', () => {
   });
 
   it('refuses when the colonies cannot make it at any rate', () => {
-    // A Barren planet yields neither of Coolant's raws.
     const result = estimateChain(
       { typeId: COOLANT, colonies: [colony(1, 'barren', [])], policy: POLICY, books: priced() },
       pi
@@ -130,8 +124,6 @@ describe('estimateChain', () => {
   });
 
   it('never buys its way to a figure, whatever the policy says', () => {
-    // With P1 bought at the hub a lone Barren could "make" Coolant: a trade
-    // spread, not a planet chain.
     const result = estimateChain(
       {
         typeId: COOLANT,

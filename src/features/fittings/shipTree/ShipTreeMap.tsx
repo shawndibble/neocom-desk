@@ -1,10 +1,3 @@
-/**
- * The Ship Tree as the game draws it (desktop default): one faction's tree
- * in a pan/zoom world — drag to pan, wheel or pinch to zoom around the
- * pointer/fingers, Fit for the whole tree. Geometry is `layoutShipTree`'s;
- * this only draws it. Hovering a hull shows the in-game hover card; clicking
- * one opens the Ship Info window (the caller's).
- */
 import { useObservedMeasure } from '@/lib/useObservedMeasure';
 import { useGesture } from '@use-gesture/react';
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
@@ -39,10 +32,8 @@ import type { ShipTreeSource } from './useShipTreeData';
 
 const BUTTON_STEP = 1.2;
 
-/** The faction panel's 14.5rem plus its 0.75rem inset and a gap. */
 const FACTION_PANEL_SPACE = 256;
 const MIN_FIT_WIDTH = 480;
-/** Long enough to cross the gap from a tile to its hover card. */
 const HOVER_CLOSE_DELAY_MS = 150;
 
 export function ShipTreeMap({
@@ -57,14 +48,11 @@ export function ShipTreeMap({
 }: {
   source: ShipTreeSource;
   tree: FactionTree;
-  /** The hull to mark: the open one, else the last one opened. */
   selectedTypeID: number | null;
-  /** Whether the Ship Info window is open over the map. */
   windowOpen: boolean;
   onFaction: (factionID: number) => void;
   onOpenShip: (ship: ShipTreeShip) => void;
   viewSwitch: ReactNode;
-  /** The in-canvas faction panel; a phone's map is too small and keeps the bar above. */
   showFactionGrid: boolean;
 }) {
   const { t } = useTranslation();
@@ -73,18 +61,12 @@ export function ShipTreeMap({
   const [showNames, setShowNames] = useState(false);
   const [hover, setHover] = useState<{ ship: ShipTreeShip; rect: DOMRect } | null>(null);
   const [viewport, setViewport] = useState<Size>({ width: 0, height: 0 });
-  // Px of the map's right edge the open Ship Info slide-out covers (0 on a phone's bottom sheet).
   const [coveredRight, setCoveredRight] = useState(0);
   const rightInset = windowOpen && showFactionGrid ? coveredRight : 0;
-  // Fit beside the faction panel when the canvas is wide enough to spare it.
   const fitInset =
     showFactionGrid && viewport.width - FACTION_PANEL_SPACE >= MIN_FIT_WIDTH
       ? FACTION_PANEL_SPACE
       : 0;
-  // A camera the reader moved, for the faction they moved it on; any other
-  // faction starts at 100% (or centred on the hull search picked there).
-  // The text-size setting scales the whole map; a change re-centres it, like a
-  // faction switch, rather than rescaling a pan made at the old scale.
   const scale = useFontScale((state) => state.value);
   const [moved, setMoved] = useState<{ factionID: number; scale: number; cam: Camera } | null>(
     null
@@ -129,10 +111,6 @@ export function ShipTreeMap({
   const zoomBy = (factor: number) =>
     moveTo(zoomAround(cam, factor, viewport.width / 2, viewport.height / 2, scale));
 
-  // Drag pans, wheel and pinch zoom around the pointer/fingers — one gesture
-  // layer for mouse, trackpad and touch (incl. two-finger pinch on a
-  // touchscreen). Bound straight to the viewport node so wheel/touch can
-  // preventDefault (React's synthetic handlers are passive).
   useGesture(
     {
       onDragStart: ({ event, cancel }) => {
@@ -177,7 +155,6 @@ export function ShipTreeMap({
     }
   );
 
-  // Stable, so a pan or a hover re-renders only the transform, not the world.
   const switchFaction = useCallback(
     (id: number) => {
       setHover(null);
@@ -192,8 +169,6 @@ export function ShipTreeMap({
     },
     [onOpenShip]
   );
-  // Leaving the tile closes the card after a beat, so the pointer can cross
-  // the gap onto the card (WCAG 1.4.13 "hoverable"); the card cancels it.
   const closeTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const cancelClose = useCallback(() => clearTimeout(closeTimer.current), []);
   const hoverShip = useCallback((ship: ShipTreeShip | null, el?: HTMLElement) => {
@@ -214,14 +189,12 @@ export function ShipTreeMap({
       onFaction(ship.factionID);
     } else {
       const node = nodeById.get(ship.treeGroupID);
-      // The window opens right after this, so centre for it already.
       if (node)
         moveTo(focusCamera(node, viewport, cam.z, scale, showFactionGrid ? coveredRight : 0));
     }
     onOpenShip(ship);
   }
 
-  // Escape dismisses the hover card without moving focus or stopping the key.
   const hovering = hover !== null;
   useEffect(() => {
     if (!hovering) return;
@@ -293,7 +266,6 @@ export function ShipTreeMap({
         role="region"
         aria-label={t('ships.tree.mapLabel', { faction: factionNameOf(data.factions, factionID) })}
         data-testid="ship-tree-map"
-        // fixed format: DOM attribute
         data-zoom={cam.z.toFixed(2)}
         className="isis-viewport relative h-[calc(100dvh-17rem)] min-h-[28rem] cursor-grab touch-none overflow-hidden rounded-xs border border-line active:cursor-grabbing"
         style={{
@@ -352,11 +324,6 @@ export function ShipTreeMap({
   );
 }
 
-/**
- * Everything inside the scaled world: lines, pirate emblems and classes.
- * Memoised on stable props, so panning and zooming (the transform around
- * it) and the hover card never re-render the tiles.
- */
 const MapWorld = memo(function MapWorld({
   layout,
   tree,
@@ -384,8 +351,6 @@ const MapWorld = memo(function MapWorld({
 }) {
   const { t } = useTranslation();
   const lit = useCallback((e: ShipTreeEdge) => tree.unlocked(e.childId), [tree]);
-  // Only the class holding the selected hull gets it, so a new selection
-  // re-renders two classes, not all of them.
   const selectedClassId = useMemo(() => {
     for (const [classId, ships] of tree.hulls) {
       if (ships.some((s) => s.typeID === selectedTypeID)) return classId;

@@ -59,7 +59,6 @@ describe('accountCandidates', () => {
   const colonies = (
     ['barren', 'gas', 'ice', 'lava', 'oceanic', 'plasma', 'storm', 'temperate'] as const
   ).map(planet);
-  // Buying makes every host-able product a candidate, so the pool is every priced P4.
   const p4 = Object.keys(pi.schematics)
     .map(Number)
     .filter((id) => piTier(id, pi) === 4);

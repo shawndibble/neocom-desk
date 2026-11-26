@@ -1,15 +1,3 @@
-/**
- * What a pilot has told the app about one facility: its rigs, the tax its
- * owner charges and — for a J-Space structure ESI has no cost index for — the
- * index they read in the industry window. Filed per facility (the station or
- * structure, else its system) so setting it once serves every plan that builds
- * there, instead of once per plan.
- *
- * Local only, in the `settings` table under an unsynced key: it is a cache of
- * the pilot's own answers, and a miss costs one retype. Recalled when a plan
- * picks the facility (`BuildPlanDetail`), never pushed onto a plan that has
- * already been set.
- */
 import { db, type BuildPlanRecord } from '@/db';
 import {
   FACILITY_PRESETS,
@@ -23,24 +11,17 @@ const SETTING_KEY = 'industry.facilityMemory';
 export interface FacilityMemory {
   rigFit?: RigFit;
   facilityTaxPct?: number;
-  /** In-game percent, as typed — see `costIndexOverride.ts`. */
   costIndexPct?: number;
 }
 
 type Place = Pick<BuildPlanRecord, 'buildLocationId' | 'buildSystemId'>;
 
-/** Where a facility is filed: the picked station or structure, else its system. */
 export function facilityMemoryKey(place: Place): string | null {
   if (place.buildLocationId !== undefined) return `loc:${place.buildLocationId}`;
   if (place.buildSystemId !== undefined) return `sys:${place.buildSystemId}`;
   return null;
 }
 
-/**
- * Writes run one after another: each is a read-modify-write of one row, and two
- * in flight would drop each other's fields (or let a recall read a row a clear
- * has not yet written).
- */
 let writes: Promise<unknown> = Promise.resolve();
 function enqueue<T>(job: () => Promise<T>): Promise<T> {
   const run = writes.then(job, job);
@@ -53,7 +34,6 @@ export function memoryFromPlan(
     Partial<Pick<BuildPlanRecord, 'costIndexOverridePct'>>
 ): FacilityMemory {
   const memory: FacilityMemory = {};
-  // An NPC station has no rig slots and a tax CCP fixes, so neither belongs to it.
   if (FACILITY_PRESETS[plan.facility].structure) {
     memory.rigFit = resolveRigFit(plan);
     if (plan.facilityTaxPct !== undefined) memory.facilityTaxPct = plan.facilityTaxPct;

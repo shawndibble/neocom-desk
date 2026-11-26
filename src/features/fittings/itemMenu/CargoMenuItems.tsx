@@ -5,7 +5,6 @@ import { ViewInMarketMenuItem } from '@/features/market/ViewInMarketMenuItem';
 import { useFittingItemActions } from '../fittingItemActions';
 import { ChargeLoadItems } from './shared';
 
-/** A cargo item's actions. */
 export function CargoMenuItems({ typeId }: { typeId: number }) {
   const { t } = useTranslation();
   const actions = useFittingItemActions();

@@ -1,8 +1,3 @@
-/**
- * A Tactical Destroyer's mode — Defense, Propulsion or Sharpshooter — picked
- * beside the Fitting's other conditions. Part of the Fitting (it rides the
- * Fitting Share Code), so a change is an edit. Renders nothing for a hull without modes.
- */
 import { useTranslation } from 'react-i18next';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui';
 import {
@@ -14,11 +9,6 @@ import type { Fitting } from '@/engine/fittings/types';
 import { StatField } from './StatFacts';
 import { STAT_FIELD_WIDTH } from './statKit';
 
-/**
- * The Fitting in `mode`. The hull's default leaves no `mode` at all — it's
- * what a Fitting without one flies in anyway, and a link without it stays in
- * the format every older build reads.
- */
 function withMode(fitting: Fitting, mode: number): Fitting {
   if (mode !== defaultTacticalMode(fitting.shipTypeId)) return { ...fitting, mode };
   const { mode: _default, ...rest } = fitting;
@@ -31,7 +21,6 @@ export function TacticalModePicker({
   onChange,
 }: {
   fitting: Fitting;
-  /** The editor's `edit()`: applies a change to the open Fitting. */
   onChange: (change: (fitting: Fitting) => Fitting) => void;
 }) {
   const { t } = useTranslation();

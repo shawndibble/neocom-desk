@@ -1,24 +1,13 @@
-/**
- * Appraisal result header with big-haul totals printed in full: the other
- * Appraisal specs only price short numbers, so overflow and overlap in the
- * header went unseen.
- *
- * Asserts invariants, not pixels (CI fonts differ): the three groups don't
- * overlap, no group's content overflows its box, the page doesn't scroll
- * sideways, and the row menu button is inside the viewport.
- */
 import type { Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 import { expectNoPageOverflow } from './support/overflow';
 
 const VELDSPAR = 1230;
-/** 12,500,000 units at 0.1 m³ is 1,250,000 m³; at ~5,377 ISK each, a sell of 67,214,000,000 ISK. */
 const PASTE = 'Veldspar\t12,500,000';
 
 const JITA_STATION = 60_003_760;
 
-/** The live book (#5591) the page prices from first: the same Jita prices as Fuzzwork's, one order each side. */
 async function mockLiveBook(page: Page): Promise<void> {
   await page.route(/^https:\/\/esi\.evetech\.net\/(?:[^/]+\/)?markets\/\d+\/orders/, (route) =>
     route.fulfill({
@@ -71,7 +60,6 @@ for (const width of [1024, 1100, 1280, 1440]) {
       .getByRole('button', { name: /^Copy Sell total, 6\d,\d{3},\d{3},\d{3} ISK$/ })
       .first();
     await expect(sell).toBeVisible();
-    // The full digits are printed, never the shorthand.
     await expect(page.getByRole('region', { name: 'Sell' }).first()).toContainText(
       /6\d,\d{3},\d{3},\d{3}/
     );
@@ -93,7 +81,6 @@ for (const width of [1024, 1100, 1280, 1440]) {
       });
       const table = document.querySelector('table[aria-label="Appraisal"]')!;
       const kebab = table.querySelector('td.dt-actions button')!.getBoundingClientRect();
-      // The table's own scroll container: the kebab must be inside it without scrolling.
       let scroller: Element | null = table.parentElement;
       while (scroller && scroller.scrollWidth <= scroller.clientWidth && scroller !== document.body)
         scroller = scroller.parentElement;
@@ -115,7 +102,6 @@ for (const width of [1024, 1100, 1280, 1440]) {
       };
     });
 
-    // Side by side from `lg` up: the paste box and the results share a row.
     expect(geometry.pasteRight, 'results sit to the right of the paste box').toBeLessThanOrEqual(
       geometry.tableLeft + 1
     );
@@ -151,17 +137,14 @@ for (const width of [390, 1024, 1280, 1440]) {
     await signInAndGoto(page);
     await mockHubPrices(page);
     await page.goto('./market/appraisal?hub=jita');
-    // No history yet: no select at all.
     await expect(page.getByRole('combobox', { name: 'Load a recent list' })).toHaveCount(0);
     await page.getByLabel(/items from inventory/i).fill(PASTE);
     await page.getByRole('button', { name: 'Appraise', exact: true }).click();
     await expect(page.getByRole('table', { name: 'Appraisal' })).toBeVisible({ timeout: 15_000 });
 
-    // Below lg the paste card folds into its summary once a result exists (#3135).
     if (width < 1024) await page.getByRole('button', { name: /Edit list/ }).click();
     const select = page.getByRole('combobox', { name: 'Load a recent list' });
     await expect(select).toBeVisible();
-    // The title never truncates, wherever the select sits (#5761).
     const title = page.getByRole('heading', { name: 'Paste', exact: true });
     await expect(title).toHaveText('Paste');
     const clipped = await title.evaluate((el) => el.scrollWidth - el.clientWidth);
@@ -180,11 +163,9 @@ for (const width of [390, 1024, 1280, 1440]) {
       };
     });
     if (width < 768) {
-      // Phone lane: unchanged, the select stays in the header row.
       expect(g.inHeader).toBe(true);
       expect(g.select.bottom).toBeLessThanOrEqual(g.header.bottom + 1);
     } else {
-      // md and up: the select sits in the body, above the textarea.
       expect(g.inHeader).toBe(false);
       expect(g.select.bottom).toBeLessThanOrEqual(g.text.top);
     }

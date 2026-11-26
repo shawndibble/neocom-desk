@@ -4,12 +4,6 @@ import { usePageTab } from '@/lib/usePageTab';
 import { SRP_TABS } from './srpTabs';
 import { SRP_VIEWS } from './srpViews';
 
-/**
- * `/corp/srp`'s body: the page header and the officer views `srpViews.ts`
- * lists for this pilot. One view renders bare; two or more get a tab bar (`SRP_TABS`, a path
- * segment). A tab the pilot has no view for (a stale link, or Queue where SRP is off) falls back
- * to the first they have.
- */
 export function SrpPage({
   canManageSrp,
   srpOn,
@@ -46,8 +40,6 @@ export function SrpPage({
           }))}
         />
       )}
-      {/* One wrapper either way: a second view appearing (SRP turned on) must
-          not remount the first. */}
       <div {...panel}>
         <View />
       </div>

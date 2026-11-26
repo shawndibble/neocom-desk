@@ -9,7 +9,6 @@ import { AcceleratorRow } from './AcceleratorRow';
 const NOW = Date.UTC(2026, 10, 14, 12);
 
 function renderRow(props: Partial<Parameters<typeof AcceleratorRow>[0]> = {}) {
-  // The sheet's market link is a router link.
   return render(
     <MemoryRouter>
       <AcceleratorRow

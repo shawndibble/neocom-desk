@@ -81,7 +81,6 @@ const context = {
   characterId: 7,
 };
 
-/** A blueprint original on sale at `price`, the way `loadBlueprintPurchaseOffers` reports one. */
 function offerAt(price: number): BlueprintOffersLookup {
   return (blueprintTypeID: number): readonly BpcOffer[] =>
     blueprintTypeID === BLUEPRINT ? [{ me: 0, te: 0, runs: -1, quantity: 1, price }] : [];
@@ -99,7 +98,6 @@ beforeEach(() => {
   vi.mocked(loadActivityFacilityDefaults).mockResolvedValue(DEFAULT_ACTIVITY_FACILITY_DEFAULTS);
   vi.mocked(loadBpcContractRows).mockResolvedValue([]);
   vi.mocked(loadLatestBuildPlan).mockResolvedValue(null);
-  // The blueprint is on sale by default, so a candidate prices.
   vi.mocked(loadBlueprintPurchaseOffers).mockResolvedValue(offerAt(400_000));
   vi.mocked(loadMarketSnapshot).mockResolvedValue({
     hubPrices: { [PRODUCT]: 1_000_000, [TRITANIUM]: 5 },
@@ -112,12 +110,10 @@ beforeEach(() => {
 
 describe('priceCandidatesAsPlans', () => {
   it('prices the blueprint itself: a bought original comes off profit and lifts build cost', async () => {
-    // The pilot holds it, so a plan prices it free.
     const [free] = await priceCandidatesAsPlans([candidate()], {
       ...context,
       research: { owned: [OWNED_ORIGINAL], assumedMe: 0, assumedTe: 0 },
     });
-    // Not held: the 400K original on sale is the plan's blueprint price.
     const [bought] = await priceCandidatesAsPlans([candidate()], context);
 
     expect(free).toBeDefined();
@@ -174,7 +170,6 @@ describe('priceCandidatesAsPlans', () => {
       hubId: 'jita',
     } as unknown as Awaited<ReturnType<typeof loadLatestBuildPlan>>);
     const [buy] = await priceCandidatesAsPlans([candidate()], context);
-    // 100 Tritanium at 300 plus an untrained 3% placement fee (#6167), against 500.
     expect(buy!.profit - sell!.profit).toBeCloseTo(100 * (500 - 300 * 1.03));
   });
 

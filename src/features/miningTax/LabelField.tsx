@@ -6,11 +6,9 @@ import { TextInput } from '@/components/ui';
 interface LabelFieldProps {
   value: string;
   onChange: (value: string) => void;
-  /** Labels already used for this Payee and system, offered as autocomplete. */
   suggestions?: readonly string[];
 }
 
-/** The optional free-text "Moon / structure" input on an Assignment. */
 export function LabelField({ value, onChange, suggestions = [] }: LabelFieldProps) {
   const { t } = useTranslation();
   const listId = useId();

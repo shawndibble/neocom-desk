@@ -54,12 +54,6 @@ describe('Disclosure', () => {
   });
 
   it('carries the touch-tier height floor, reverting to the compact size at md (issue #1071)', () => {
-    // jsdom applies no real CSS, so this can't measure a pixel height the
-    // way `e2e/skillsTrainedNarrow.spec.ts` does for the trained-skills
-    // page's own hand-rolled header — this asserts the class tokens
-    // themselves, on every one of this shared primitive's consumers
-    // (BuildLocationPicker, ResultsSummary, AppraisalPanel, PlanToolsPane,
-    // CollapsiblePanel), not just the one page with a dedicated e2e spec.
     render(
       <Disclosure label="Job fee" expanded={false} onToggle={vi.fn()}>
         <div>EIV detail</div>
@@ -86,7 +80,6 @@ describe('Disclosure', () => {
     );
 
     const toggle = screen.getByRole('button', { name: /^job fee/i });
-    // The value stays in the toggle's name even though it renders outside it.
     expect(toggle).toHaveAccessibleName('Job fee65');
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
     expect(toggle).not.toContainElement(screen.getByRole('button', { name: /about job fee/i }));

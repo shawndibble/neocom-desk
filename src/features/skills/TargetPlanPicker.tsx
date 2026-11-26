@@ -4,15 +4,11 @@ import type { TargetPlan } from './useTargetPlan';
 
 export interface TargetPlanPickerProps {
   target: TargetPlan;
-  /** Just the select, for a caller that labels it itself (the fitting stats column). */
   bare?: boolean;
-  /** The select's width when `bare`. */
   className?: string;
-  /** When `bare`: a dim label drawn inside the select, before its value. */
   prefix?: string;
 }
 
-/** Renders nothing under 2 plans — nothing to choose (0: the Add button itself offers to create one; 1: auto-picked). */
 export function TargetPlanPicker({
   target,
   bare = false,

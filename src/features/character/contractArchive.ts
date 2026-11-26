@@ -1,10 +1,3 @@
-/**
- * Local contract archive. ESI returns a finished contract for only 30 days; every live
- * fetch of the Character's own contracts upserts its headers here and rows whose last date
- * is over 365 days old are pruned. Item lines are kept only for a contract the pilot opened
- * (never re-fetched for old ones). Device-local, not synced, not in the encrypted backup,
- * and not touched by "clear cache" — same footing as the wallet archive.
- */
 import { captureException } from '@sentry/react';
 import { db } from '@/db';
 import type { Contract, ContractItem } from '@/esi/endpoints';
@@ -12,7 +5,6 @@ import type { CachedResult } from '@/esi/cache';
 import { archiveCutoffIso } from '@/engine/wallet/archiveCoverage';
 import { DAY_MS } from '@/lib/age';
 
-/** The newest of a contract's dates: the clock the one-year prune runs on. */
 export function contractArchiveDate(contract: Contract): string {
   return [
     contract.date_issued,
@@ -22,15 +14,12 @@ export function contractArchiveDate(contract: Contract): string {
   ].reduce<string>((newest, date) => (date && date > newest ? date : newest), '');
 }
 
-/** How long ESI returns a finished contract. */
 const ESI_CONTRACT_DAYS = 30;
 
-/** The contract's last date is past what ESI still sends, so its items are gone from ESI. */
 export function pastEsiWindow(contract: Contract, nowMs: number = Date.now()): boolean {
   return Date.parse(contractArchiveDate(contract)) < nowMs - ESI_CONTRACT_DAYS * DAY_MS;
 }
 
-/** Drops rows past a year, with the item lines filed under them. */
 async function prune(characterId: number, nowMs: number): Promise<void> {
   const stale = await db.contractArchive
     .where('[characterId+archiveDate]')
@@ -41,10 +30,6 @@ async function prune(characterId: number, nowMs: number): Promise<void> {
   await db.contractItemArchive.bulkDelete(stale);
 }
 
-/**
- * Upserts a live fetch and prunes past a year. Never throws. A saved copy is skipped: it
- * holds rows an earlier live fetch already archived.
- */
 export async function archiveContracts(
   characterId: number,
   result: CachedResult<Contract[]> | null,
@@ -67,14 +52,12 @@ export async function archiveContracts(
   }
 }
 
-/** Keeps the item lines of a contract the pilot opened. Never throws. */
 export async function archiveContractItems(
   characterId: number,
   contractId: number,
   items: readonly ContractItem[]
 ): Promise<void> {
   try {
-    // Only for a contract the archive holds: a row with no header would never be pruned.
     await db.transaction('rw', db.contractArchive, db.contractItemArchive, async () => {
       if ((await db.contractArchive.get([characterId, contractId])) === undefined) return;
       await db.contractItemArchive.put({
@@ -88,7 +71,6 @@ export async function archiveContractItems(
   }
 }
 
-/** The item lines kept for a contract, or null when none were. */
 export async function archivedContractItems(
   characterId: number,
   contractId: number
@@ -101,10 +83,6 @@ export async function archivedContractItems(
   }
 }
 
-/**
- * The live result with archived contracts folded in (live wins on a shared id); a result
- * built from the archive alone when nothing live came back.
- */
 export async function contractsWithArchive(
   characterId: number,
   live: CachedResult<Contract[]> | null
@@ -131,12 +109,10 @@ export async function contractsWithArchive(
     };
   }
   if (archived.length === 0) return null;
-  // Stamped with the newest thing seen, not now: Data Age must not claim a fresh fetch.
   const newest = Math.max(0, ...archived.map((c) => Date.parse(contractArchiveDate(c))));
   return { data: archived, fetchedAt: new Date(newest), fromCache: true, truncated: false };
 }
 
-/** Drops a Character's archive. Call inside a Dexie transaction that includes these tables. */
 export async function clearContractArchive(characterId: number): Promise<void> {
   await db.contractArchive.where('characterId').equals(characterId).delete();
   await db.contractItemArchive.where('characterId').equals(characterId).delete();

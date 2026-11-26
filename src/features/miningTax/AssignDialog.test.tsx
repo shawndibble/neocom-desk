@@ -21,22 +21,12 @@ const SYSTEM = 30000142;
 const ZEOLITES = 45490;
 const VELDSPAR = 1230;
 
-/**
- * The whole point of the feature: the same ore is worth different money at
- * different hubs, so a test that used one price everywhere could not tell a
- * per-Payee lookup from the old single map.
- */
 const PRICES: Record<string, ReadonlyMap<number, number>> = {
   jita: new Map([[ZEOLITES, 1000]]),
   hek: new Map([[ZEOLITES, 400]]),
 };
 const pricesFor = (hubId: string | undefined) => PRICES[hubId ?? 'jita'] ?? PRICES.jita;
 
-/**
- * Deliberately a claim about the Payee, not about the number above it: once
- * the pilot types their own figure, a "valued at X" reading would contradict
- * the field it sits under.
- */
 const HEK_HINT = "This Payee's ore is priced at Hek buy orders.";
 
 const row: MoonMiningTaxRow = {
@@ -58,8 +48,6 @@ function payee(overrides: Partial<PayeeRecord> = {}): PayeeRecord {
     characterId: CHAR,
     name: 'Hek landlord',
     defaultTaxPct: 10,
-    // Auto-matched by `AssignDialog` on open (its Default Payee for the entry's system), so the
-    // money path is exercised without driving the Radix Select.
     defaultSystems: [{ systemId: SYSTEM, from: '2026-01-01' }],
     hubId: 'hek',
     updatedAt: 1,
@@ -159,8 +147,6 @@ describe('AssignDialog — the money path', () => {
 
     await userEvent.click(screen.getByRole('button', { name: /^Assign( to |$)/ }));
 
-    // 100 units at Hek's 400, not at Jita's 1000: the bill is the landlord's,
-    // so it is priced at the book the landlord bills against.
     expect(mockedCreate).toHaveBeenCalledWith(
       expect.objectContaining({ estimatedValue: 40_000, taxOwed: 4_000, payeeId: 'p-hek' })
     );
@@ -209,7 +195,6 @@ describe('AssignDialog — the money path', () => {
     });
     renderDialog([payee(), jitaPayee]);
 
-    // Opens auto-matched on the Hek Payee (the Default Payee of the entry's system).
     expect(screen.getByText(HEK_HINT)).toBeInTheDocument();
     const estimated = screen.getByLabelText('Estimated value');
     expect(estimated).toHaveValue('40,000');

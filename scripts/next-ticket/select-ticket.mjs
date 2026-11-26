@@ -1,23 +1,4 @@
 #!/usr/bin/env node
-// Pick and claim the next unblocked ready-for-agent issue. Replaces the
-// hand-rolled lock/list/blocked-by-check/claim sequence in next-ticket.md
-// step 2 with a single call.
-//
-// Usage: node scripts/next-ticket/select-ticket.mjs [issue-number-override]
-//
-// Only picks up issues whose GitHub author is the authenticated `gh` user
-// (Shawn). This guards against a repo collaborator opening an issue under
-// their own account, labelling it `ready-for-agent`, and this loop
-// autonomously implementing and auto-merging it — every ticket it acts on
-// must actually be one Shawn (or his own automation, which authenticates as
-// him) filed.
-//
-// Prints one line of JSON to stdout:
-//   {"status":"claimed","number":83,"title":"...","slug":"item-tooltip-context-menu"}
-//   {"status":"no-ticket"}
-//   {"status":"lock-timeout"}
-//   {"status":"override-unavailable","reason":"not-found|not-own-ticket|assigned-or-in-progress|blocked"}
-// All progress chatter goes to stderr.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -48,7 +29,7 @@ function acquireLock() {
       if (ageSec > 90) {
         log(`stale lock (${ageSec}s old), reclaiming`);
         fs.rmSync(lockDir, { recursive: true, force: true });
-        continue; // retry right away — reclaiming does not use up an attempt
+        continue;
       }
       log(`lock held, waiting (attempt ${attempt}/12)`);
       sleepSync(10_000);
@@ -60,7 +41,7 @@ function acquireLock() {
 
 function releaseLock() {
   try {
-    fs.rmSync(lockDir, { recursive: true, force: true }); // holds an owner file, so rmdir would throw
+    fs.rmSync(lockDir, { recursive: true, force: true });
   } catch {}
 }
 
@@ -79,10 +60,9 @@ function isUnblocked(issue) {
   for (const n of refs) {
     let state;
     try {
-      // `gh issue view` returns empty output in the agent shell; the API is reliable.
       state = String(ghJson(['api', `repos/{owner}/{repo}/issues/${n}`]).state).toUpperCase();
     } catch {
-      return false; // can't confirm closed — treat as still blocked
+      return false;
     }
     if (state !== 'CLOSED') return false;
   }
@@ -94,7 +74,6 @@ if (!acquireLock()) {
   process.exit(0);
 }
 
-/** Pick (and, unless a dry run, claim) under the lock. Never exits the process: the caller releases the lock. */
 function selectUnderLock() {
   const currentUser = ghJson(['api', 'user']).login;
   const issues = ghJson([

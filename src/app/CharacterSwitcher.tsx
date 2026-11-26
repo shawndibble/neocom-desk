@@ -1,11 +1,3 @@
-/**
- * The Character switcher beside the rail's (and the More sheet's) Character
- * link: every Character with how many Permissions it has granted, one press to
- * switch, and "x of N Permissions" link on each, which switches to it and
- * opens Settings › Permissions. The link itself still goes to the Characters
- * page; this sits next to it, so a pilot with several Characters changes the
- * active one without leaving the page. Absent with a single Character.
- */
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -29,7 +21,6 @@ export function CharacterSwitcher({
   onNavigate,
 }: {
   className?: string;
-  /** Called when the Permissions link or Manage characters leaves the page, so a sheet the switcher sits in can close. */
   onNavigate?: () => void;
 }) {
   const { t } = useTranslation();
@@ -105,7 +96,6 @@ export function CharacterSwitcher({
                     {t('nav.permissionsCount', { granted: row.granted, total: row.total })}
                   </button>
                 </span>
-                {/* Above the row's full-size switch button, like the Permissions link. */}
                 <NeedsLoginAction
                   characterId={row.characterId}
                   name={row.name}

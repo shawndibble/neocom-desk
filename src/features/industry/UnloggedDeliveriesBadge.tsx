@@ -3,12 +3,6 @@ import { useTranslation } from 'react-i18next';
 import { industryTabHref } from './industryTabs';
 import { useUnloggedDeliveryCount } from './useJobHistory';
 
-/**
- * Build Plan page: how many delivered jobs of this plan's blueprint the
- * Production Log never got (issue #2866), linking to Active Jobs' History so
- * the gap is visible from the plan whose profit it understates. Renders
- * nothing at zero.
- */
 export function UnloggedDeliveriesBadge({
   characterId,
   blueprintTypeId,

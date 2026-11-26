@@ -1,10 +1,3 @@
-// Community events pushed the moment the backend writes them (issue #5121).
-// Pure: the Firestore triggers in index.ts read the documents and hand them
-// here; this decides whether the write is an alert and builds the fire the
-// Foreground Poller would have built for it (`src/engine/communities/
-// communityAlert.ts`), so the Occurrence Key matches and the open app does not
-// file a second row.
-
 import { characterIdOfUid, isOpenRequest } from './communityRequests.js';
 import type {
   CommunityJoinRequestFire,
@@ -12,7 +5,6 @@ import type {
   CommunityRequestPledgedFire,
 } from './serverEvents.js';
 
-/** How the member doc says it was made; set by `decideJoinRequest`'s admit. */
 export const ADMITTED_FROM_REQUEST = 'request';
 
 export interface CommunityDoc {
@@ -30,7 +22,6 @@ function adminOf(community: CommunityDoc | null): { characterId: number; uid: st
   return characterId === null ? null : { characterId, uid: community.adminUid };
 }
 
-/** A Character asked to join (a `requests/{uid}` doc was created): the admin is told. */
 export function joinRequestFire(input: {
   communityId: string;
   community: CommunityDoc | null;
@@ -51,12 +42,6 @@ export function joinRequestFire(input: {
   };
 }
 
-/**
- * A Member doc was created. Not for the admin founding the Community, and not
- * for a Member the admin just let in from the waiting list: the join request
- * already told them, and they did it themselves (the Foreground Poller's
- * "already waiting" rule).
- */
 export function memberJoinedFire(input: {
   communityId: string;
   community: CommunityDoc | null;
@@ -87,11 +72,6 @@ export interface ItemRequestDoc {
   lines?: unknown;
 }
 
-/**
- * A Pledge doc was created: the requester is told, under the client's rules
- * (`loadPledgeEntries`): only on their own open, non-standing Request that
- * asked for the app, never for their own Pledge.
- */
 export function requestPledgedFire(input: {
   communityId: string;
   communityName: string;
@@ -99,7 +79,6 @@ export function requestPledgedFire(input: {
   request: ItemRequestDoc | null;
   pledgerUid: string;
   pledgerName: string;
-  /** The Pledge's `updatedAt`, ms: the client keys the occurrence by it. */
   pledgedAt: number;
   now: number;
 }): CommunityRequestPledgedFire | null {

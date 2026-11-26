@@ -115,7 +115,6 @@ describe('decisionMailInput', () => {
         note: '',
         reasonShown: true,
       },
-      // Written while the corp kept reasons to itself: never the pilot's to read.
       {
         characterId: 9,
         name: 'Oda Lind',
@@ -125,7 +124,6 @@ describe('decisionMailInput', () => {
         note: 'Kept quiet.',
         reasonShown: false,
       },
-      // Written before sign-offs were stamped.
       { characterId: 10, name: 'Per Aske', you: false, at: 1, decision: 'no', note: 'Unstamped.' },
     ],
     ...over,

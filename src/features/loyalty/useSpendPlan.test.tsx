@@ -40,7 +40,6 @@ function offerRow(id: number, iskPerLp: number | null, over: Partial<LoyaltyOffe
 
 afterEach(() => loadLiveBooks.mockReset());
 
-/** Each row's instant ISK/LP as the table shows it. */
 const instantOf = (rows: readonly LoyaltyOfferRow[]) =>
   new Map(rows.map((row) => [row.offer.offer_id, row.profit.iskPerLp]));
 
@@ -59,7 +58,6 @@ describe('spendCandidates', () => {
   });
 
   it('ranks on the instant basis, not the table’s listing basis', () => {
-    // Offer 1 lists best but sells now worst; offer 2 is the reverse.
     const rows = [offerRow(1, 3_000), offerRow(2, 2_000), offerRow(3, 2_500)];
     const instant = new Map<number, number | null>([
       [1, 500],

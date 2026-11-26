@@ -1,4 +1,3 @@
-/** Cells the officer queue's columns and claim detail share. */
 import type { ReactElement, ReactNode } from 'react';
 import { Button, Checkbox, IskInput, Tooltip } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
@@ -21,7 +20,6 @@ const STATE_TONE = {
   rejected: 'danger',
 } as const;
 
-/** A decide button with its reason in a tooltip while it is inert for this officer. */
 export function DecideTip({
   reason,
   children,
@@ -32,12 +30,10 @@ export function DecideTip({
   return reason === undefined ? children : <Tooltip content={reason}>{children}</Tooltip>;
 }
 
-/** A claim's state as a pill. */
 export function ClaimStatePill({ claim, ctx }: { claim: SrpClaim; ctx: ClaimColumnsContext }) {
   return <Pill tone={STATE_TONE[claim.state]}>{ctx.t(`srp.officer.states.${claim.state}`)}</Pill>;
 }
 
-/** The queue's flag for a claim whose fit matched no Doctrine Fit; the detail has the diff. */
 export function OffDoctrineFlag({ claim, ctx }: { claim: SrpClaim; ctx: ClaimColumnsContext }) {
   if (claim.doctrineCheck?.status !== 'off-doctrine') return null;
   return <Pill tone="warning">{ctx.t('srp.doctrine.queueFlag')}</Pill>;
@@ -84,7 +80,6 @@ export function SelectBox({
   );
 }
 
-/** The field a claim with no worked-out amount shows in place of a figure. */
 export function TypeAmountField({
   claim,
   ctx,
@@ -105,7 +100,6 @@ export function TypeAmountField({
   );
 }
 
-/** The figure and, under it, how it was reached (or that an officer changed it). */
 export function AmountCell({ claim, ctx }: { claim: SrpClaim; ctx: ClaimColumnsContext }) {
   const { t } = ctx;
   return (
@@ -185,7 +179,6 @@ export function ApproveReject({
   );
 }
 
-/** A copy button for the bare amount, so the officer can paste it into the in-game wallet. */
 export function CopyAmount({
   claim,
   ctx,
@@ -223,7 +216,6 @@ export function CopyAmount({
   );
 }
 
-/** Two equal 36px buttons side by side. */
 export function ButtonPair({ children }: { children: ReactNode }) {
   return (
     <span className="grid grid-cols-2 gap-2 [&>button]:w-full [&>button]:px-2 [&>button]:whitespace-nowrap">

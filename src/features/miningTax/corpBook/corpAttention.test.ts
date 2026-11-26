@@ -10,6 +10,7 @@ const summary = (over: Partial<BookSummary> = {}): BookSummary => ({
   corpName: 'Brass Meridian',
   startDate: '2026-10-01',
   credit: 0,
+  estimate: 0,
   account: { paidThrough: null, owes: null },
   miners: [],
   notices: [],
@@ -106,7 +107,6 @@ describe('corpBookAttention', () => {
         withHeld([
           held('j5_2', '2026-11-14T18:28:44.000Z', 1, 10_976_509),
           held('j5_1', '2026-11-02T22:38:44.000Z'),
-          // Paid before the book bills from: it paid no mining the book bills.
           held('j5_0', '2026-10-21T17:38:23.000Z'),
           held('j5_9', '2026-11-03T00:00:00.000Z', 2),
         ]),
@@ -127,8 +127,6 @@ describe('corpBookAttention', () => {
       ).toEqual([]);
     });
 
-    // Counted at once, each to its own Miner: never tied to one Late notice a waiting
-    // declaration could block.
     it('names no Late notice, even when the donor Miner has one unpaid', () => {
       const out = corpBookAttention(
         withHeld(

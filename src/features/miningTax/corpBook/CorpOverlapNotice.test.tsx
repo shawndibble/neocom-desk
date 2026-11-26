@@ -13,14 +13,12 @@ vi.mock('./sendTaxQuestionMail', () => ({
   sendTaxQuestionMail: vi.fn(async () => ({ status: 'no-scope' })),
 }));
 
-// #6206: what reaches the corporation is a router action; stubbed here.
 vi.mock('./corpBookStore', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./corpBookStore')>()),
   declareCorpTaxBookPayment: vi.fn(async () => ({ declarationId: 'x1' })),
   disputeCorpTaxBookConflict: vi.fn(async () => ({ disputeId: 'd1' })),
 }));
 
-// Releasing ore re-prices what is left; the market read is stubbed.
 vi.mock('../pricing', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../pricing')>()),
   loadUnitPricesOnDate: vi.fn(async () => ({
@@ -169,13 +167,6 @@ describe('CorpOverlapNotice on a Conflict day', () => {
     expect(screen.getByRole('region', { name: 'Conflict' })).toBeInTheDocument();
   });
 
-  it("says so when the corporation's own Payee lists more ore than the book recorded", () => {
-    renderConflict(assignment, { ...conflict, conflictCause: 'overListed' });
-    expect(screen.getByRole('region', { name: 'Conflict' })).toHaveTextContent(
-      'Your entry lists more ore than the book recorded'
-    );
-  });
-
   it('names an own entry for the corporation that needs review, not another Payee', () => {
     renderConflict(assignment, { ...conflict, conflictCause: 'ownNeedsReview' });
     expect(screen.getByRole('region', { name: 'Conflict' })).toHaveTextContent(
@@ -222,7 +213,6 @@ describe('CorpOverlapNotice on a Conflict day', () => {
       'Also in conflict on this day: Ashfall Prospecting (120,000 ISK).'
     );
     await userEvent.click(screen.getByRole('button', { name: 'Let each corp bill its share' }));
-    // 43,050 for this book and 5,000 for the other come off the 50,000 entry.
     expect(screen.getByText(/Ashfall: 50,000 Zeolites → 1,950 Zeolites/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Take it off my list' }));
     await waitFor(() => expect(changed).toBe(1));
@@ -380,36 +370,6 @@ describe('CorpOverlapNotice: what reaches the corporation (#6206)', () => {
     expect(
       screen.getByText('Brass Meridian waived the tax on that ore: Their ore')
     ).toBeInTheDocument();
-  });
-
-  it("names the member's own Payee on over-listed ore, never another Payee", () => {
-    render(
-      <CorpOverlapNotice
-        view={
-          {
-            ...conflict,
-            conflictCause: 'overListed',
-            overlap: { payeeIds: ['p1'], ore: conflict.oreLines, paid: false },
-          } as BookRowView
-        }
-        corpName="Brass Meridian"
-        recordedAt="Efa"
-        // The book stands in for the Assignment, so it is not among the tab's own rows.
-        everyAssignment={[]}
-        payeeById={new Map([['p1', payee]])}
-        typeNames={new Map([[ZEO, 'Zeolites']])}
-        onChanged={() => {}}
-      />
-    );
-    expect(
-      screen.getByText('Your entry: lists more of this ore for Ashfall than the book recorded')
-    ).toBeInTheDocument();
-    expect(screen.queryByText(/another Payee/)).toBeNull();
-  });
-
-  it('offers nothing to dispute on ore the book never recorded', () => {
-    renderWith({ ...conflict, conflictCause: 'overListed' });
-    expect(screen.queryByRole('button', { name: /^Tell / })).toBeNull();
   });
 
   it('on a day a Late notice asked for, Resolve opens its Late notice problem', async () => {

@@ -34,29 +34,16 @@ import { LedgerActionError } from './LedgerActionError';
 interface LinkPaymentDialogProps {
   open: boolean;
   onClose: () => void;
-  /**
-   * The Payee the dialog is for (a merged Payee's primary id), opened from its card, its row or
-   * Settle up: its suggestions only, and a payment picked by hand goes to it. Absent, the dialog
-   * covers every Payee (the "Payments to link" card): suggestions grouped by Payee, and a Payee
-   * to pick for a payment chosen by hand.
-   */
   scopeId?: string;
-  /** The personal Payees a payment may be linked to. */
   payees: readonly LinkablePayee[];
-  /** Unlinked payments with a Payee named, the surest first (`suggestLinks`). */
   suggestions: readonly LinkSuggestion[];
-  /** Every Made Payment no link holds and no Corp Tax Book counts: the manual list. */
   candidates: readonly MadePayment[];
-  /** Each personal Payee's account, by any of its record ids: what a payment would pay. */
   accountOf: (payeeId: string) => PayeeRunningAccount | undefined;
-  /** The Characters whose payments are offered, for a missing Permission's Grant note. */
   characters: readonly { characterId: number; characterName: string }[];
-  /** How each tracked Character's payment reads went; a skipped one gets a Grant note. */
   paymentSources?: readonly MadePaymentSources[];
   onLinked: () => void;
 }
 
-/** One payment's row, in either list: the amount and day, who it went to, and how sure we are. */
 function PaymentRow({
   payment,
   confidence,
@@ -64,7 +51,6 @@ function PaymentRow({
   onPick,
 }: {
   payment: MadePayment;
-  /** The suggestion's line ("Sent to Rook Belter"); absent on a payment picked by hand. */
   confidence?: string;
   on: boolean;
   onPick: () => void;
@@ -101,19 +87,6 @@ function PaymentRow({
   );
 }
 
-/**
- * "I already paid this" (issues #540, #6290): the one place a payment the pilot already sent is
- * linked to a Payee. Suggested matches come first (decision 20261120-235011, "linking money under
- * one payment model": the recipient is the learned entity, then the name, and an amount alone never
- * suggests a transfer a Corp Tax Book holds), then every other unlinked payment from the wallet,
- * searchable. Opened for a Payee, it offers that Payee's own and links a hand pick to it; opened
- * for all of them, the suggestions are grouped by Payee and a hand pick asks which Payee.
- *
- * Confirming links the payment, where it pays the Payee's oldest unpaid days (shown off its account)
- * and what is over is credit; nothing is ticked. A payment in kind asks what its cargo was worth.
- * Every link here is the pilot's own (`manual`). It also teaches the Payee who the recipient was,
- * unless unticked, so the next payment to them is known by its entity.
- */
 export function LinkPaymentDialog({
   open,
   onClose,
@@ -137,13 +110,11 @@ export function LinkPaymentDialog({
     })
     .filter((gap) => gap.endpoints.length > 0);
 
-  // The matches on top: a Payee's own when the dialog is for one.
   const matches = useMemo(
     () => (scope ? suggestions.filter((s) => s.payee.id === scope.id) : suggestions),
     [suggestions, scope]
   );
   const matchedKeys = useMemo(() => new Set(matches.map((s) => s.payment.key)), [matches]);
-  // Everything else by hand: what a suggestion already offers is not listed twice.
   const manual = useMemo(
     () => candidates.filter((p) => !matchedKeys.has(p.key)),
     [candidates, matchedKeys]
@@ -158,7 +129,6 @@ export function LinkPaymentDialog({
     return [...byPayee.values()];
   }, [matches]);
 
-  // The first match, or a lone payment of exactly what is owed: the obvious pick, on first render only.
   const [initialPick] = useState(() => {
     if (matches[0]) return matches[0].payment.key;
     const owed = scope?.owed ?? 0;
@@ -174,7 +144,6 @@ export function LinkPaymentDialog({
   const [valueParses, setValueParses] = useState(true);
   const [remember, setRemember] = useState(true);
   const { pending: saving, error: saveError, setError: setSaveError, run } = useLedgerAction();
-  // Set once the link is saved, so a retry after a later failure can't save it twice.
   const [linked, setLinked] = useState(false);
 
   const filtered = useMemo(() => {
@@ -189,13 +158,8 @@ export function LinkPaymentDialog({
 
   const match = matches.find((s) => s.payment.key === selectedKey) ?? null;
   const selected = match?.payment ?? candidates.find((p) => p.key === selectedKey) ?? null;
-  // Who it goes to: the Payee a match names, the Payee the dialog is for, else the one picked.
   const target = match?.payee ?? scope ?? payees.find((p) => p.id === chosenPayeeId) ?? null;
   const account = target ? accountOf(target.id) : undefined;
-  /**
-   * The ISK that moved, or the pilot's figure for cargo handed over: required, never assumed to be
-   * the whole balance (a cargo is rarely worth exactly that).
-   */
   const amount =
     selected === null
       ? null
@@ -230,12 +194,9 @@ export function LinkPaymentDialog({
     if (!result.ok) return;
     setLinked(true);
     try {
-      // Learned only on confirmation: the pilot agreeing who was paid is what makes it trustworthy.
       if (remember && selected.counterpartyId !== undefined)
         await rememberPayeeEntity(record, selected.counterpartyId);
     } catch {
-      // The payment is linked; only learning who the Payee is failed. Say so and stay open: the
-      // reload drops this payment from the lists, which would unmount the message unread.
       setSaveError(t('miningTax.linkWallet.rememberFailed', { payee: target.name }));
       return;
     }
@@ -344,7 +305,6 @@ export function LinkPaymentDialog({
           </section>
         )}
 
-        {/* A payment picked by hand, with no Payee the dialog is for: which Payee it paid. */}
         {selected && !target && (
           <div className="space-y-1">
             <p id={pickPayeeId} className={eyebrowClassName}>

@@ -1,10 +1,3 @@
-/**
- * What the Corp assets widget reads off the corp asset ledger (issue #4671):
- * stack counts and estimated value for the states a Director must act on, and
- * the usable stock per item type so the widget can count types below target
- * without holding every stack. Pure; the loader runs it once per read, the
- * builder re-counts "below target" against the live targets.
- */
 import {
   buildItemLedger,
   countLedgerByState,
@@ -14,20 +7,15 @@ import {
 } from '@/engine/corp/assetLedger';
 
 export interface StateTotal {
-  /** Asset stacks (one per item row), the same count the page's tab badge shows. */
   stacks: number;
-  /** Estimated value in ISK, from the page's price and copy-value inputs; null when no prices could be read. */
   value: number | null;
 }
 
 export interface CorpAssetsSummary {
   assetSafety: StateTotal;
   impounded: StateTotal;
-  /** The widget shows the count only. */
   deliveries: Pick<StateTotal, 'stacks'>;
-  /** Every stack the corporation has, whatever its state: tells "no assets" from "all clear". */
   totalStacks: number;
-  /** Usable stock (Offices + Corp deliveries, originals only) by type id; types with none are absent. */
   usableByType: ReadonlyMap<number, number>;
 }
 
@@ -54,7 +42,6 @@ export function summariseCorpAssets(
   options: SummariseOptions
 ): CorpAssetsSummary {
   const counts = countLedgerByState(items);
-  // Asking for a target of 1 on every type reuses the ledger's own owned-count rule.
   const everyType = new Map([...new Set(items.map((i) => i.input.typeId))].map((id) => [id, 1]));
   const usableByType = new Map<number, number>();
   for (const [typeId, status] of evaluateStockTargets(everyType, items)) {
@@ -69,7 +56,6 @@ export function summariseCorpAssets(
   };
 }
 
-/** Types whose target is not met: short, or none owned. Same rule as the page's Below target chip. */
 export function countShortTypes(
   targets: ReadonlyMap<number, number>,
   usableByType: ReadonlyMap<number, number>

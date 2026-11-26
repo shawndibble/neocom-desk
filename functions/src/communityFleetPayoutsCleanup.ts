@@ -1,9 +1,3 @@
-// Community Fleet Payouts cleanup (issue #4779): the scheduled sweep that
-// deletes Fleet Payouts a week after they expired, with their Shares. Leaving,
-// removal and the stale-account purge delete a Member's own Fleet Payouts
-// (communitiesStore.deleteMemberShares). Timing is the pure
-// `decideFleetPayoutSweep` in communityFleetPayouts.ts.
-
 import type { Firestore } from 'firebase-admin/firestore';
 import { COMMUNITIES_COLLECTION } from './communities.js';
 import {
@@ -13,26 +7,15 @@ import {
 } from './communityFleetPayouts.js';
 import { indexedPages, isTopLevelChild, pages } from './indexedSweep.js';
 
-/** Fleet Payouts read per query page. */
 export const SWEEP_PAGE_SIZE = 100;
-/** Fleet Payouts deleted per run across all Communities; a larger backlog continues on the next tick. */
 export const SWEEP_MAX_DELETES = 500;
 
 export interface SweepResult {
   deleted: number;
-  /** Fleet Payouts whose delete failed: left in place, retried next run. */
   failed: number;
-  /** The delete cap was reached with more waiting. */
   truncated: boolean;
 }
 
-/**
- * Deletes every Fleet Payout expired a week ago, with its Shares. One
- * collection-group query across all Communities (the per-Community scan until
- * its index is deployed; see indexedSweep.ts). Each candidate is read again
- * right before its delete, so one extended meanwhile survives. Bounded per run,
- * idempotent, and one failing delete does not stop the rest.
- */
 export async function sweepFleetPayouts(
   db: Firestore,
   now: number,

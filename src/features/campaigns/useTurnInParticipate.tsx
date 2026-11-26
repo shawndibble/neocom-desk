@@ -1,4 +1,3 @@
-// Its own module so `TurnInDetail.tsx` exports components only.
 import { useTranslation } from 'react-i18next';
 import { GrantCellMark } from '@/app/GrantCellMark';
 import { usePermissionMark } from '@/app/usePermissionMark';
@@ -6,17 +5,11 @@ import { useActiveCharacter } from '@/stores/activeCharacter';
 import { participateLine, pileParticipate } from './turnInContent';
 import { useParticipation } from './useTurnIns';
 
-/** The Character a turn-in is about: a row's own, or the active one when omitted. */
 export function useTurnInCharacter(characterId: number | null | undefined): number | null {
   const active = useActiveCharacter((s) => (s.hydrated ? s.activeCharacterId : null));
   return characterId === undefined ? active : characterId;
 }
 
-/**
- * One Character's Participate answers for the turn-in views: the line for an
- * objective (`lineFor`), the pile's (`pile`), the Character's name, and the
- * Military Campaigns `GrantCellMark` that goes by the caveat.
- */
 export function useTurnInParticipate(characterId: number | null, characterName?: string) {
   const { t } = useTranslation();
   const participation = useParticipation(characterId);

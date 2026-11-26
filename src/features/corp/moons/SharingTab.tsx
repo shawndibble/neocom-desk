@@ -1,10 +1,3 @@
-/**
- * Moon settings' Sharing tab (issue #6222; moved off the Moons page by #6304): the book's Pop Sharing switch and Sharing
- * default on top, every moon the book handles below (its own refineries and its moon
- * owners'), each row opening its overrides. A refinery with no Extraction yet is listed apart:
- * its moon is not known until one syncs (#6240). Book editors change the settings; read-only
- * officers see them.
- */
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
 import { useKeyedLoad } from '@/lib/useAsyncLoad';
 import { useTranslation } from 'react-i18next';
@@ -45,7 +38,6 @@ import type { PopSharingCommunityStatus } from '../taxBook/popSharingClient';
 
 const k = 'corpTaxBook.moons.sharing';
 
-/** Which chosen Communities carry the pops (#6223): a Community with no officer shares nothing. */
 const CommunityStatus = createContext<Record<string, PopSharingCommunityStatus>>({});
 
 function Audiences({ settings }: { settings: PopSharingSettings }) {
@@ -75,7 +67,6 @@ function Audiences({ settings }: { settings: PopSharingSettings }) {
   );
 }
 
-/** The refineries no Extraction places at a moon yet: listed, not configurable (#6240). */
 function UnplacedRefineries({ refineries }: { refineries: readonly UnplacedRefinery[] }) {
   const { t } = useTranslation();
   const { names } = useBook();
@@ -146,7 +137,6 @@ export function SharingTab({ onOpenSyncSettings }: { onOpenSyncSettings: () => v
   const { view, data, settings, names, canEdit, edit, characterId, corporationId } = useBook();
   const { load, reload } = usePopSharing(characterId, corporationId);
   const communityStatus = usePopSharingCommunities(characterId, corporationId, load);
-  // A moon's share mark elsewhere (the Extractions tab) links to its row here.
   const highlightedMoonId = useHighlightParam();
   const [editing, setEditing] = useState<'default' | SharingMoonRow | null>(null);
   const [switching, setSwitching] = useState(false);
@@ -162,7 +152,6 @@ export function SharingTab({ onOpenSyncSettings }: { onOpenSyncSettings: () => v
   const communities =
     useKeyedLoad(String(characterId), loadCommunities, !canEdit).data ?? NO_COMMUNITIES;
 
-  // Alliance reaches nobody while the book's corporation is in none (#6223 publishes it unshared).
   const loadNoAlliance = useCallback(
     () =>
       getCorporationPublicInfo(corporationId).then((r) =>
@@ -170,10 +159,8 @@ export function SharingTab({ onOpenSyncSettings }: { onOpenSyncSettings: () => v
       ),
     [corporationId]
   );
-  // Unread: Alliance stays on offer; the server still publishes it to nobody.
   const noAlliance = useKeyedLoad(String(corporationId), loadNoAlliance).data ?? false;
 
-  // The book's own rate, at a moon when one is open (a moon, refinery or moon owner rate wins).
   const bookRateAt = useCallback(
     (row?: SharingMoonRow) =>
       resolveRate(settings.rates, {

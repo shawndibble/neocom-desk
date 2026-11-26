@@ -3,8 +3,6 @@ import { planetSlots } from './planetSlots';
 
 describe('planetSlots', () => {
   it('gives one planet per trained level, plus the one every capsuleer starts with', () => {
-    // Reported bug: the app asserted six planets flat. A pilot at
-    // Interplanetary Consolidation IV can run five.
     expect(planetSlots(4)).toEqual({ slots: 5, assumed: false });
   });
 
@@ -17,9 +15,6 @@ describe('planetSlots', () => {
   });
 
   it('keeps a confident zero distinct from no skill data', () => {
-    // Same distinction `customsRateSource` and `maxColonyBudget` draw: an
-    // untrained pilot is a fact, a pilot whose `/skills` never loaded is not.
-    // Both get one slot; only the first may be shown as fact.
     expect(planetSlots(null)).toEqual({ slots: 1, assumed: true });
   });
 

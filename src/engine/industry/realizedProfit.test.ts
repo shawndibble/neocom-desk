@@ -18,7 +18,6 @@ describe('realizedProfit', () => {
       brokerRelationsLevel: 5,
     });
 
-    // salesTaxPct(5) = 7.5 * (1 - 0.11*5) = 3.375%
     expect(r.totalCost).toBe(550_000);
     expect(r.salesTax).toBeCloseTo(33_750, 5);
     expect(r.brokerFee).toBe(0);
@@ -38,7 +37,6 @@ describe('realizedProfit', () => {
       brokerRelationsLevel: 0,
     });
 
-    // brokerFeePct(0) = 3%
     expect(r.brokerFee).toBeCloseTo(12_000, 5);
   });
 
@@ -74,7 +72,6 @@ describe('realizedProfit', () => {
 
 describe('soldUnitsMargin', () => {
   it('reads a partial sale above unit cost as a positive margin, with the rest as unsold cost', () => {
-    // 10 units cost 1,000,000 (100k each); 4 sold for 600,000 net.
     const m = soldUnitsMargin({
       totalCost: 1_000_000,
       quantity: 10,

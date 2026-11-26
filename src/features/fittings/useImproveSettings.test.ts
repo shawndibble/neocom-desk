@@ -31,7 +31,6 @@ describe('Improve Job and space', () => {
     await useImproveSpace.getState().setValue('safe');
     expect((await db.settings.get('fittingsImproveJob'))?.value).toBe('explore');
     expect((await db.settings.get('fittingsImproveSpace'))?.value).toBe('safe');
-    // a reload: the stores start from nothing and read the rows back
     useImproveJob.setState({ value: 'pve', hydrated: false });
     useImproveSpace.setState({ value: 'dangerous', hydrated: false });
     await useImproveJob.getState().hydrate();

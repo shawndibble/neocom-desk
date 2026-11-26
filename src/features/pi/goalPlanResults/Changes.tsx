@@ -1,4 +1,3 @@
-/** What to set up: one directive per colony the plan changes. */
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import { Panel } from '@/components/ui';
@@ -45,7 +44,6 @@ function StepDetail({
 }: {
   step: ColonyStep;
   names: PlanNames;
-  /** Not needed: what switching to its best P1 would add a day, when known. */
   switchGainPerDay: number | null;
 }) {
   const { t } = useTranslation();
@@ -77,7 +75,6 @@ function StepDetail({
     }
   }
   for (const ship of step.ships) {
-    // A colony left as it is already sells at the hub: only a new leg is a step.
     if (step.kind === 'as-is' && !ship.isNew) continue;
     const text = t('piPlan.stepShip', { item: '{item}', to: endName(ship.to, names) });
     lines.push({
@@ -99,7 +96,6 @@ function StepDetail({
   return (
     <ul className="col-span-full space-y-0.5 pl-1 text-[0.6875rem] text-text-dim">
       {lines.map((line, i) => (
-        // Positional: the lines are rebuilt whole each render, never reordered.
         <li key={i} className={line.tone === 'tip' ? 'italic' : undefined}>
           <ProductSentence text={line.text} products={line.products} pi={pi} />
         </li>

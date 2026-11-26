@@ -1,5 +1,3 @@
-/** Sample SRP claims for the officer mockups. Today is 23 Oct 2026, 14:00 EVE. Not shared with other mockups. */
-
 export type SrpState = 'Pending' | 'Approved' | 'Paid' | 'Rejected';
 
 export type SrpBasis =
@@ -17,10 +15,8 @@ export interface SrpClaim {
   lostAt: string;
   filedAt: string;
   note?: string;
-  /** What the server worked out; null = officer types it. */
   computed: number | null;
   basis: SrpBasis;
-  /** Amount in force after an override, else the computed one. */
   amount: number | null;
   overrideReason?: string;
   overrideBy?: string;

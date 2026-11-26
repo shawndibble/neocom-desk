@@ -1,8 +1,3 @@
-/**
- * The wormhole "My ship fits" segmented control takes its natural width in
- * Settings › Travel but still fills Route Safety's narrow rules rail
- * (issue #3252).
- */
 import { test, expect } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 
@@ -22,9 +17,6 @@ for (const size of SIZES) {
     const panel = control.locator('xpath=ancestor::section[1]');
     const controlBox = (await control.boundingBox())!;
     const panelBox = (await panel.boundingBox())!;
-    // The panel is half the content area beside Avoided systems, so a share of
-    // its width can't tell natural from stretched: the natural width is ~185px
-    // and a stretched control would fill the panel's inner width (226px at 1024).
     expect(controlBox.width).toBeLessThan(200);
     expect(controlBox.width).toBeLessThan(panelBox.width * 0.8);
   });

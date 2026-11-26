@@ -15,13 +15,9 @@ vi.mock('./fittingPilotProfile', () => ({
 
 let inFlight = 0;
 let maxInFlight = 0;
-// 99998 starts unreadable and becomes readable (a reconnect); its result is cached once read.
 let reconnectTypeReadable = false;
-// 99999 stands for a type neither the cache nor ESI could supply.
 const UNREADABLE_TYPE_ID = 99999;
-// The baked typeInfo shard lacks every type here, so reads take the ESI fallback.
 vi.mock('@/sde/loadTypeInfo', () => ({ loadTypeInfo: vi.fn(async () => null) }));
-// typeId 587 (the hull) requires skillTypeID 3300 at level 5; everything else needs nothing.
 vi.mock('@/features/skills/data', () => ({
   loadUniverseType: async (typeId: number) => {
     inFlight += 1;
@@ -114,8 +110,6 @@ describe('useFittingSkillGaps', () => {
 
   it('caps how many fitted types it looks up requirements for at once (N+1 fan-out)', async () => {
     maxInFlight = 0;
-    // More distinct types than the fan-out's concurrency cap, so an
-    // unbounded `Promise.all` would fire them all at once.
     const many: Fitting = {
       ...RIFTER,
       modules: Array.from({ length: ESI_FANOUT_CONCURRENCY + 5 }, (_, index) => ({

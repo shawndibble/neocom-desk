@@ -78,7 +78,6 @@ describe('VettingPage queue', () => {
 
     expect(within(await rowOf('Pell Okonru')).getByText('Nothing found')).toBeInTheDocument();
     expect(within(await rowOf('Dara Quill')).getByText('Incomplete')).toBeInTheDocument();
-    // Waiting on the pilot: nothing for the caller to sign yet; who asked, and where the mail stands.
     const ren = within(await rowOf('Ren Halvard'));
     expect(ren.getByText('Waiting for Ren')).toBeInTheDocument();
     expect(ren.getByText(/Asked 2d ago by /)).toBeInTheDocument();
@@ -87,7 +86,6 @@ describe('VettingPage queue', () => {
 
     expect(screen.getByText('5 open')).toBeInTheDocument();
     expect(screen.getByText('need your sign-off')).toBeInTheDocument();
-    // Reading the queue opens no report: an open is logged where the pilot sees it.
     expect(fixture.calls.map((call) => call.method)).toEqual(['overview']);
   });
 
@@ -101,9 +99,7 @@ describe('VettingPage queue', () => {
     expect(screen.getByText('ISK with the watchlist')).toBeInTheDocument();
     expect(screen.getByText('Serious')).toBeInTheDocument();
     expect(screen.getByText(/1,200,000,000 ISK in 3 wallet rows/)).toBeInTheDocument();
-    // The ISK flag says how far back the wallet goes.
     expect(screen.getByText(/from Wallet journal, about the last 30 days$/)).toBeInTheDocument();
-    // The first flag's rows are open, each party an entity link.
     expect(screen.getAllByRole('link', { name: 'Corvin Hale' }).length).toBeGreaterThan(0);
     expect(screen.getByText('Could not check')).toBeInTheDocument();
     expect(screen.getByText('Mira Vell did not share Mail.')).toBeInTheDocument();
@@ -250,7 +246,6 @@ describe('VettingPage queue', () => {
     );
     await userEvent.type(dialog.getByLabelText('Role they are up for'), 'Accountant');
     await userEvent.click(ask);
-    // The review exists; the member is offered the mail, never sent one unasked.
     expect(await dialog.findByText('Waiting for Sio')).toBeInTheDocument();
     expect(dialog.getByRole('button', { name: 'Send mail to Sio' })).toBeInTheDocument();
     await userEvent.click(dialog.getByRole('button', { name: 'Done' }));
@@ -411,7 +406,6 @@ describe('VettingPage settings', () => {
       notifyReviewers: false,
     });
     expect(screen.queryByText('Unsaved changes')).toBeNull();
-    // By invite now: the header makes an invite link instead of copying the bare one.
     expect(screen.getByRole('button', { name: 'New invite link' })).toBeInTheDocument();
   });
 
@@ -422,25 +416,20 @@ describe('VettingPage settings', () => {
     const count = screen.getAllByRole('button', { name: /^Remove question/ }).length;
     expect(count).toBeGreaterThanOrEqual(2);
 
-    // Inert at the ends, but not `disabled`: Tab still reaches it.
     const up = screen.getByRole('button', { name: 'Move question 1 up' });
     expect(up).toHaveAttribute('aria-disabled', 'true');
     expect(up).not.toBeDisabled();
-    // Moving the second question up leaves its button at the top: focus stays on it.
     await userEvent.click(screen.getByRole('button', { name: 'Move question 2 up' }));
     await waitFor(() =>
       expect(screen.getByRole('button', { name: 'Move question 1 up' })).toHaveFocus()
     );
 
-    // Not the last: the question that takes its place.
     await userEvent.click(remove(1));
     await waitFor(() => expect(remove(1)).toHaveFocus());
-    // The last: the one before it.
     for (let left = count - 1; left > 1; left -= 1) {
       await userEvent.click(remove(left));
       await waitFor(() => expect(remove(left - 1)).toHaveFocus());
     }
-    // None left: Add question.
     await userEvent.click(remove(1));
     await waitFor(() =>
       expect(screen.getByRole('button', { name: 'Add a question' })).toHaveFocus()
@@ -485,7 +474,6 @@ describe('VettingPage settings', () => {
     );
 
     await userEvent.click(screen.getByRole('button', { name: 'Add a question' }));
-    // A question with no wording blocks Save until it is written or removed.
     expect(screen.getByText('Write the question, or remove it.')).toBeInTheDocument();
     await userEvent.type(screen.getByLabelText('Question 4'), 'Voice?');
     await userEvent.click(screen.getByRole('checkbox', { name: 'Question 4 is required' }));
@@ -567,7 +555,6 @@ describe('VettingPage invites', () => {
     expect(forum.getByText('Ilse Marrow')).toBeInTheDocument();
     expect(forum.getByText('4')).toBeInTheDocument();
 
-    // One visible action per row; Revoke is in the row's menu.
     expect(forum.getByRole('button', { name: 'Copy link for Forum post' })).toBeInTheDocument();
     expect(forum.queryByRole('button', { name: /Revoke/ })).toBeNull();
     await userEvent.click(forum.getByRole('button', { name: 'More actions for Forum post' }));
@@ -579,7 +566,6 @@ describe('VettingPage invites', () => {
     await waitFor(() => expect(dialog.queryByText('Forum post')).toBeNull());
     expect(fixture.calls.find((call) => call.method === 'revokeInvite')?.args[2]).toBe('inv-forum');
     expect(dialog.getByText('Pell Okonru')).toBeInTheDocument();
-    // The row and its menu button are gone: focus lands on a link that is left.
     await waitFor(() =>
       expect(dialog.getByRole('button', { name: 'Copy link for Pell Okonru' })).toHaveFocus()
     );

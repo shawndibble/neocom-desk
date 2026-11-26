@@ -9,22 +9,12 @@ function stateRecord(state: unknown): Record<string, unknown> {
     : {};
 }
 
-/**
- * Wraps a tabbed page's route element (`App.tsx`, ADR 0015): the bare page
- * path, or a segment naming no tab, is replaced by the default tab's path —
- * a replace, not a push, so Back does not bounce off the redirect. Query
- * string and hash are kept, so a one-shot parameter (`?highlight=`) still
- * reaches the page it was meant for. A page that moved its
- * URLs passes `legacy`, asked first about such a path. A page with an index state (`PageTabs.index`)
- * keeps the bare path below its breakpoint instead.
- */
 export function TabRoute({
   page,
   legacy,
   children,
 }: {
   page: PageTabs;
-  /** The page's pre-tabs URLs: where a path naming no tab used to live, if it did. */
   legacy?: (pathname: string, search: string) => { pathname: string; search: string } | null;
   children: ReactNode;
 }) {

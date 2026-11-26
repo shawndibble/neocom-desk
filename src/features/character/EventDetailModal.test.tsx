@@ -63,10 +63,6 @@ describe('EventDetailModal', () => {
     render(<EventDetailModal characterId={CHAR_ID} event={EVENT} onClose={() => {}} />);
     expect(screen.getByRole('dialog', { name: 'Fleet Op' })).toBeInTheDocument();
     expect(screen.getByRole('status', { name: 'Loading' })).toBeInTheDocument();
-    // Ends only once the request is parked in the handler. Ended earlier, the
-    // fetch went out after the test-end abort, untracked, and hung on this
-    // handler until the 30s request timeout; every later test's load deduped
-    // onto it (same `91:calendar:1` key) and timed out on CI.
     await vi.waitFor(() => expect(requested).toBe(true));
   });
 
@@ -200,7 +196,6 @@ describe('EventDetailModal', () => {
       expect(await screen.findByText('Bring your ship')).toBeInTheDocument();
       expect(screen.queryByRole('button', { name: 'Grant in EVE' })).not.toBeInTheDocument();
       expect(screen.queryByRole('button', { name: 'Log in' })).not.toBeInTheDocument();
-      // The saved copy says so, rather than passing as current.
       expect(screen.getByText('Showing cached data')).toBeInTheDocument();
     });
   });
@@ -349,9 +344,6 @@ describe('EventDetailModal', () => {
         'aria-pressed',
         'false'
       );
-      // Once a response is picked, the button it picked already carries the
-      // status — a second "Tentative" badge next to it would double the same
-      // fact, so it renders only for "no answer yet" (below).
       expect(screen.queryByText('Tentative', { selector: 'p' })).not.toBeInTheDocument();
     });
 

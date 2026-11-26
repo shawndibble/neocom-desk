@@ -1,18 +1,3 @@
-/**
- * `/corp/moons` — the Corp Tax Book (issue #4063, epic #4055, D21): Overview,
- * Extractions, Miners, Late notices and Moon owners as path-segment tabs (ADR 0015), the moon and Miner
- * pages below their tabs, settings (Rates, Billing, Extractions, Sharing, Access) behind the header's gear and the audit log
- * behind Activity.
- *
- * Visible to a Character whose roles can view the book (D8: Director,
- * Accountant, Junior_Accountant); syncing it is the refinery ledger's
- * (`miningLedgerAccess`, Accountant), so a viewer without that role reads what
- * an Accountant synced and sees no Sync action. An Accountant who has not
- * granted the mining scope yet is asked for it here, the first screen that
- * needs it (#4058). The book itself
- * is read through the officer rules, so the Character is verified first
- * (`useCorpBook`), and a corporation with no book shows the Director's turn-on.
- */
 import { useAuditWords } from '@/features/corp/moons/useAuditWords';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { canViewCorpTaxBook } from '@/engine/corpRoles';
@@ -97,7 +82,6 @@ function ActivityPanel({ open, onClose }: { open: boolean; onClose: () => void }
       ) : audit.failed ? (
         <LoadFailedState title={t('corpTaxBook.moons.activity.loadFailed')} onRetry={audit.retry} />
       ) : (
-        // A Miner link opens their page: close over it rather than cover it.
         <AuditFeed entries={audit.entries} subject={subject} words={words} onOpen={onClose} />
       )}
     </SlideOver>
@@ -107,29 +91,23 @@ function ActivityPanel({ open, onClose }: { open: boolean; onClose: () => void }
 function ReadyBook({ sync }: { sync: ReturnType<typeof useCorpTaxBook> }) {
   const { t } = useTranslation();
   const { pathname, search } = useLocation();
-  // With no moon owners the empty state carries the invite button itself.
   const { rows: moonOwnerRows } = useMoonOwners();
   const hasMoonOwners = moonOwnerRows.length > 0;
   const addCorps = useAddMyCorps(moonOwnerRows);
   const moonOwnersSync = useMoonOwnersSyncNow(moonOwnerRows);
-  // A moon owner's ledger that can't be read is mailed to both sides once per spell (#6210).
   useStaleLedgerMail(moonOwnerRows);
   useMoonsAttentionPublisher();
   useMoonOwnerDebugDump(moonOwnerRows);
   const syncing = sync.run.phase === 'syncing' || moonOwnersSync.busy;
   const [tab, selectTab] = usePageTab(MOONS_TABS);
   const tabsId = useTabsId();
-  // Back from EVE's page after the Automatic sync opt-in: show the settings it was pressed in.
   const { state: routerState } = useLocation();
-  // Open (on a tab) or closed; back from the opt-in it opens where it was pressed.
   const [settingsDialog, setSettingsDialog] = useState<{ tab?: SettingsTab } | null>(() =>
     (routerState as { corpSyncGrant?: unknown } | null)?.corpSyncGrant !== undefined ? {} : null
   );
   const book = useBook();
   const { view, canEdit, characterId, corporationId, names } = book;
-  // The Overview's setup checklist opens this same dialog, so there is one settings host.
   const openSettings = useCallback((tab?: SettingsTab) => setSettingsDialog({ tab }), []);
-  // `?settings=<tab>` (a share mark's link, the retired Sharing tab's URL) opens it once.
   const [searchParams, setSearchParams] = useSearchParams();
   const settingsParam = searchParams.get(SETTINGS_PARAM);
   const [seenParam, setSeenParam] = useState<string | null>(null);
@@ -143,8 +121,6 @@ function ReadyBook({ sync }: { sync: ReturnType<typeof useCorpTaxBook> }) {
       (prev) => {
         const params = new URLSearchParams(prev);
         params.delete(SETTINGS_PARAM);
-        // The Sharing tab latched `?highlight=` on mount; both updaters read the same stale
-        // params, so this one must drop it too or its write would bring it back.
         if (settingsParam === 'sharing') params.delete(HIGHLIGHT_PARAM);
         return params;
       },
@@ -205,7 +181,6 @@ function ReadyBook({ sync }: { sync: ReturnType<typeof useCorpTaxBook> }) {
                     <IconButton
                       icon={syncing ? <Spinner /> : <Icon.Refresh />}
                       label={t('corpTaxBook.moons.syncNow')}
-                      // The book's own ledger and every moon owner's, side by side (#6117).
                       onClick={() => void Promise.all([sync.sync(), moonOwnersSync.run()])}
                       busy={syncing}
                     />
@@ -290,7 +265,11 @@ function ReadyBook({ sync }: { sync: ReturnType<typeof useCorpTaxBook> }) {
           />
         )}
         {saved && (
-          <Toast message={t('corpTaxBook.moons.settings.saved')} onClose={() => setSaved(false)} />
+          <Toast
+            message={t('corpTaxBook.moons.settings.saved')}
+            tone="success"
+            onClose={() => setSaved(false)}
+          />
         )}
         {inviteOpen && (
           <InviteMoonOwnerDialog
@@ -307,10 +286,6 @@ function ReadyBook({ sync }: { sync: ReturnType<typeof useCorpTaxBook> }) {
   );
 }
 
-/**
- * The header stays while loading; the body is a skeleton. No tabs: which ones the
- * viewer has (Extractions only in a book with moons) is unknown until the book is.
- */
 function MoonsLoading() {
   const { t } = useTranslation();
   const bar = 'block animate-pulse rounded-xs bg-line motion-reduce:animate-none';
@@ -347,15 +322,12 @@ function CorpMoonsView({ needsScope }: { needsScope: boolean }) {
     structureId: open?.kind === 'refinery' ? open.structureId : undefined,
   });
   const { state } = book;
-  // The rail and the page title list Moons' tabs only when the page will show them: a book
-  // mode is chosen and this Character may read the book (a moon owner's own corp is denied).
   const unavailable = state.status === 'off' || state.status === 'denied';
   const decided = unavailable || state.status === 'ready';
   useEffect(() => {
     if (decided) setMoonsTabsHidden(unavailable);
     return () => setMoonsTabsHidden(false);
   }, [decided, unavailable]);
-  // No book, or no access to it: the Moons nav dot has nothing to point at (#6208).
   useEffect(() => {
     if (!unavailable || book.characterId === null || book.corporationId === null) return;
     void publishMoonsAttention(book.characterId, book.corporationId, null).catch((err) =>
@@ -415,7 +387,6 @@ function CorpMoonsView({ needsScope }: { needsScope: boolean }) {
   }
   if (state.status !== 'ready' || book.characterId === null || book.corporationId === null)
     return null;
-  // Only a corporation with a book syncs it: a moon owner never needs the mining scope here.
   if (needsScope) {
     return (
       <div className="mx-auto max-w-page space-y-4">
@@ -457,7 +428,6 @@ export function CorpMoons() {
   const access = useCorpAccess();
   const { ledger } = useCorpTaxBook({ autoSync: false });
   const viewer = access.state === 'ready' && canViewCorpTaxBook(access.roles);
-  // The page below renders no tab bar for these, so the rail lists none either.
   const noAccess =
     access.state !== 'unknown' &&
     (access.state !== 'ready' ||

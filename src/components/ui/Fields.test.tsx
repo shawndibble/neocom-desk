@@ -74,7 +74,6 @@ describe('FieldsHeading', () => {
       'Pricing',
       'Statements',
     ]);
-    // One grid: both groups' rows are its children, so they share the label column.
     expect(container.querySelectorAll(':scope > div > *')).toHaveLength(4);
   });
 });

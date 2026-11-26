@@ -28,13 +28,6 @@ import { NARROW_QUERY } from '@/lib/useIsNarrow';
 import { exportRows } from '@/lib/downloadCsv';
 import { stubViewport } from '@/test/viewport';
 
-// A pinned "today": mid-month, mid-morning, so the hour offsets below and the
-// five-day-out fixture never cross midnight or a month end, whenever the suite
-// runs. Only `Date` is faked, and it keeps ticking (an RSVP must land before the
-// reload that overrides it), so every timer stays real. Hoisted, so `TODAY`
-// below and any clock a module reads at import see it; set again before each
-// test, since the shared teardown (`restoreRealTimers`) puts the real clock
-// back after every test.
 const { pinClock } = vi.hoisted(() => {
   const pinClock = () =>
     vi.useFakeTimers({
@@ -49,13 +42,11 @@ beforeEach(() => {
   pinClock();
 });
 
-// The export test reads the rows handed to the export rather than a file.
 vi.mock('@/lib/downloadCsv', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/lib/downloadCsv')>()),
   exportRows: vi.fn(async () => {}),
 }));
 
-// The Shared Pops callable (#6223): no Firebase here; each test says what it returns.
 const sharedPops = vi.hoisted(() => ({ list: [] as unknown[] }));
 vi.mock('@/sync/sharedPops', () => ({
   fetchSharedPops: async () => sharedPops.list,
@@ -79,7 +70,6 @@ vi.mock('@/sde/loadSde', () => ({
 const CHAR_ID = 91;
 const ESI = `https://esi.evetech.net/characters/${CHAR_ID}`;
 
-/** "Today", pinned before the page's modules load (see the `vi.hoisted` above). */
 const TODAY = new Date();
 const inHours = (hours: number) =>
   new Date(TODAY.getFullYear(), TODAY.getMonth(), TODAY.getDate(), TODAY.getHours() + hours);
@@ -112,12 +102,6 @@ const jobs = [
   },
 ];
 
-/**
- * Every source the page reads, all empty. A test that cares about one source
- * overrides just that handler with `server.use` — msw resolves with the FIRST
- * match, so an override must stand alone rather than follow a re-spread of
- * these.
- */
 function baseHandlers() {
   return [
     http.get(`${ESI}/calendar`, () => HttpResponse.json(events)),
@@ -141,8 +125,6 @@ function baseHandlers() {
     http.get(`${ESI}/contracts`, () => HttpResponse.json([])),
     http.get(`${ESI}/orders`, () => HttpResponse.json([])),
     http.post('https://esi.evetech.net/universe/names', () => HttpResponse.json([])),
-    // The shell's corp nav asks for these on every route; unrelated to the
-    // page, but `onUnhandledRequest: 'error'` counts them.
     http.get(`${ESI}/roles`, () => HttpResponse.json({ roles: [] })),
     http.get(`${ESI}/corporationhistory`, () => HttpResponse.json([])),
   ];
@@ -150,21 +132,10 @@ function baseHandlers() {
 
 const server = mswServer(...baseHandlers());
 
-/**
- * `vitest.setup.ts` stubs `matchMedia` to never match, and `useIsNarrow` is
- * phrased as a max-width so that reads as "wide" — so every test here renders
- * the Calendar Map unless it calls this, which flips the page to its Day
- * Ticker branch. Same shape as `FilterBar.test.tsx`.
- */
 function useNarrowViewport(): void {
   stubViewport(NARROW_QUERY);
 }
 
-/**
- * Every day cell's accessible name that reports a load, from whichever of the
- * two surfaces rendered — the Calendar Map and the Day Ticker deliberately
- * publish the same group name, so this reads either one.
- */
 function dayCells(): HTMLElement[] {
   return within(screen.getByRole('group', { name: /calendar map/i })).getAllByRole('button');
 }
@@ -175,7 +146,6 @@ function dayLabelsWithLoad(): string[] {
     .filter((label) => label.includes('due:'));
 }
 
-/** The Day Ticker's fixed span — `TICKER_DAYS` in the route, a fortnight. */
 const TICKER_DAYS = 14;
 
 beforeEach(async () => {
@@ -205,7 +175,6 @@ beforeEach(async () => {
 const CORP_ID = 98000001;
 const CORP = 'https://esi.evetech.net/corporation';
 
-/** A Character holding the corp scopes and answering the reads the moon-chunk gate makes. */
 async function grantCorpScopes(roles: string[]) {
   await db.tokens.update(CHAR_ID, {
     scopes: [
@@ -238,7 +207,6 @@ const ALT_ID = 92;
 const ALT_CORP_ID = 98000002;
 const ALT_ESI = `https://esi.evetech.net/characters/${ALT_ID}`;
 
-/** A second Character, a director of a holding corporation the active one is not in. */
 async function addHoldingCorpDirector() {
   await db.characters.put({ characterId: ALT_ID, name: 'Alt Two', ownerHash: 'oh2', addedAt: 2 });
   await db.tokens.put({
@@ -273,12 +241,8 @@ async function addHoldingCorpDirector() {
   );
 }
 
-/** The Calendar page on its own route, with no App boot or signed-in shell. */
 const renderCalendarRoute = () => renderPageRoute('/calendar', <Calendar />);
 
-// The one App-level test below: its graph and shell chunk load here, under the
-// hook's own budget, not inside the test's findBy. Every other test renders the
-// page on its own (`renderCalendarRoute`).
 beforeAll(async () => {
   await Promise.all([import('@/app/App'), routeChunks.loadLayout(), routeChunks.loadCalendar()]);
 }, 30_000);
@@ -304,7 +268,6 @@ describe('Calendar corporation events', () => {
     await screen.findAllByText('Perimeter - Holding Astrahus');
 
     await user.click(screen.getByRole('button', { name: /filter event types/i }));
-    // By keyboard: a pointer leaving the submenu trigger closes it under jsdom.
     (await screen.findByRole('menuitem', { name: /corporation events/i })).focus();
     await user.keyboard('{Enter}');
     await screen.findByRole('menuitemradio', { name: /hide corporation events/i });
@@ -328,7 +291,6 @@ describe('Calendar corporation events', () => {
 
 const SHARING_CORP_ID = 98000005;
 
-/** A Shared Pop of refinery 1001, the one `grantCorpScopes` also reads from ESI. */
 function sharePop() {
   sharedPops.list = [
     {
@@ -366,9 +328,7 @@ describe('Calendar Shared Pops', () => {
     renderCalendarRoute();
 
     const rail = await screen.findByRole('list', { name: /coming up/i });
-    // One row: the belt expiry waits until the moon is ready.
     expect(await within(rail).findAllByText('Efa - Shared Tatara')).toHaveLength(1);
-    // The moon is in the detail, not on the row.
     expect(within(rail).queryByText('Efa I - Moon 1')).toBeNull();
     expect(within(rail).getByText(/Shared moon pops · ready/)).toBeInTheDocument();
     expect(within(rail).queryByText(/belt expires/)).toBeNull();
@@ -418,7 +378,6 @@ describe('Calendar Shared Pops', () => {
 
   it("moves the map to the pop's day from ?pop=<id>, scoping the rail to it", async () => {
     sharePop();
-    // Seven weeks out: past any month grid that opens on today, so the map has to move.
     Object.assign(sharedPops.list[0] as object, {
       popAt: inHours(49 * 24).toISOString(),
       expiresAt: inHours(49 * 24 + 48).toISOString(),
@@ -427,7 +386,6 @@ describe('Calendar Shared Pops', () => {
     renderCalendarRoute();
 
     await screen.findByRole('dialog', { name: 'Efa - Shared Tatara' });
-    // A day off the opening grid can only be pressed once the map moved to it.
     expect(await screen.findByRole('button', { pressed: true })).toBeInTheDocument();
     const rail = screen.getByRole('list', { name: /coming up/i });
     expect(within(rail).getByText('Efa - Shared Tatara')).toBeInTheDocument();
@@ -472,8 +430,6 @@ describe('Calendar', () => {
     expect(extractionRequests).not.toHaveBeenCalled();
   });
 
-  // The one App-level test of the Calendar route: it mounts at /calendar inside
-  // the signed-in shell, its rail link current.
   it('shows the calendar map and the coming-up rail together, at /calendar inside the shell', async () => {
     const { App } = await import('@/app/App');
     render(<App />);
@@ -505,12 +461,9 @@ describe('Calendar', () => {
   it('falls back to today rather than crashing on a garbage anchor value', async () => {
     window.history.pushState({}, '', '/calendar?anchor=not-a-date');
     renderCalendarRoute();
-    // Falls back to today's grid, where the fixture event actually lands —
-    // a garbage anchor parsed literally would show an empty, unrelated month.
     expect(await screen.findByText('Fleet Op')).toBeInTheDocument();
   });
 
-  /** The redesign's whole premise: the rail is not a calendar feed, it is every clock. */
   it('merges another clock source into the same list', async () => {
     server.use(http.get(`${ESI}/industry/jobs`, () => HttpResponse.json(jobs)));
     renderCalendarRoute();
@@ -519,49 +472,24 @@ describe('Calendar', () => {
     expect((await screen.findAllByText(/industry jobs/i)).length).toBeGreaterThan(0);
   });
 
-  /**
-   * The map's dots are pure colour, so a day cell's accessible name is the
-   * only thing that says which kinds landed on it (DESIGN.md §7) — and since
-   * the colour now means kind rather than urgency, naming a severity there
-   * would describe a signal the page no longer paints.
-   *
-   * This one is the wide branch: the stubbed `matchMedia` never matches, so
-   * the Calendar Map renders. The Day Ticker gets its own test below.
-   *
-   * The `{{`/`undefined` assertion is the point of the test: an interpolation
-   * renamed on one side only does not throw, it just ships a placeholder into
-   * a name nobody sighted will ever read.
-   */
   it('names the kinds landing on a day, rather than a severity', async () => {
     server.use(http.get(`${ESI}/industry/jobs`, () => HttpResponse.json(jobs)));
     renderCalendarRoute();
 
     expect(await screen.findByText('Fleet Op')).toBeInTheDocument();
-    // A month of cells, which is what proves this is the grid and not the ticker.
     expect(dayCells().length).toBeGreaterThan(TICKER_DAYS);
-    // Both seeded kinds, joined across days: the two fixtures are hours apart
-    // and may straddle midnight, so which cell each lands in is not the point
-    // — that every kind present is named is.
     const labels = dayLabelsWithLoad().join(' ');
     expect(labels).toContain('Calendar events');
     expect(labels).toContain('Industry jobs');
     expect(labels).not.toMatch(/\{\{|undefined/);
   });
 
-  /**
-   * The same assertion against the phone's branch, which the wide test above
-   * cannot reach: both surfaces publish the identical `calendar.map.label`
-   * group name, so a test that does not force the viewport silently exercises
-   * only the map. `/simplify` caught the Day Ticker being fed the wrong grid
-   * once already — that class of bug hides behind exactly this shared label.
-   */
   it('names the same kinds on the Day Ticker', async () => {
     useNarrowViewport();
     server.use(http.get(`${ESI}/industry/jobs`, () => HttpResponse.json(jobs)));
     renderCalendarRoute();
 
     expect(await screen.findByText('Fleet Op')).toBeInTheDocument();
-    // Exactly a fortnight of columns — the ticker, not the grid.
     expect(dayCells()).toHaveLength(TICKER_DAYS);
     const labels = dayLabelsWithLoad().join(' ');
     expect(labels).toContain('Calendar events');
@@ -569,17 +497,6 @@ describe('Calendar', () => {
     expect(labels).not.toMatch(/\{\{|undefined/);
   });
 
-  /**
-   * The acceptance test for the whole redesign. `/calendar` used to be
-   * scope-gated as a whole and rendered a page-wide re-login banner, so one
-   * revoked scope blanked everything. With six sources that is no longer
-   * defensible — the five that still read must still render.
-   *
-   * The shell's own `AuthFailureNotice` still appears, and should: it is a
-   * app-wide "one of your reads was refused" notice sitting above the outlet,
-   * not the route replacing its own content. What this pins is that the route
-   * keeps both panes and drops only the forbidden source's rows.
-   */
   it('keeps rendering the other clocks when one source is forbidden', async () => {
     server.use(
       http.get(`${ESI}/industry/jobs`, () => HttpResponse.json(jobs)),
@@ -587,12 +504,9 @@ describe('Calendar', () => {
     );
     renderCalendarRoute();
 
-    // The industry job still arrives...
     expect((await screen.findAllByText(/industry jobs/i)).length).toBeGreaterThan(0);
-    // ...both panes are still on screen rather than replaced by a banner...
     expect(screen.getByRole('group', { name: /calendar map/i })).toBeInTheDocument();
     expect(screen.getByRole('list', { name: /coming up/i })).toBeInTheDocument();
-    // ...and only the forbidden source's own rows are missing.
     expect(screen.queryByText('Fleet Op')).not.toBeInTheDocument();
   });
 
@@ -611,14 +525,6 @@ describe('Calendar', () => {
     expect(await screen.findByText('Bring your ship')).toBeInTheDocument();
   });
 
-  /**
-   * `respondToCalendarEvent` patches Dexie, but this route reads through
-   * `useRouteSnapshot` (a plain loader snapshot, not a live query) — so the
-   * rail only repaints if the route applies the RSVP locally, ahead of the
-   * next natural reload. The fixture starts `accepted` (its own badge), and a
-   * successful Decline must swap it for `Declined` with no further
-   * `GET /calendar` round trip in between.
-   */
   it('reflects an RSVP in the rail without waiting for a refetch', async () => {
     server.use(http.put(`${ESI}/calendar/1/`, () => new HttpResponse(null, { status: 204 })));
     renderCalendarRoute();
@@ -632,14 +538,6 @@ describe('Calendar', () => {
     expect(await screen.findByText('Declined')).toBeInTheDocument();
   });
 
-  /**
-   * The override is scoped to the snapshot it was set against (`asOfMs`)
-   * rather than kept forever — once a *newer* snapshot loads (here, a manual
-   * refresh), that snapshot's own data wins even though, in this fixture, it
-   * happens to still read `accepted` (an ESI-propagation-lag stand-in). A
-   * stale override winning indefinitely was the bug; trusting fresh data,
-   * even imperfect fresh data, over an old local guess is the fix.
-   */
   it('lets a fresh reload override the earlier local RSVP once one arrives', async () => {
     server.use(http.put(`${ESI}/calendar/1/`, () => new HttpResponse(null, { status: 204 })));
     renderCalendarRoute();
@@ -681,7 +579,6 @@ describe('Calendar', () => {
     renderCalendarRoute();
     expect(await screen.findByText('Later Op')).toBeInTheDocument();
 
-    // Earliest day with a load holds the first event.
     await user.click(
       dayCells().find((cell) => (cell.getAttribute('aria-label') ?? '').includes('due:'))!
     );

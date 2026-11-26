@@ -109,7 +109,6 @@ describe('loadCharacterIndustryJobs', () => {
       )
     );
     await loadCharacterIndustryJobs(CHAR_ID);
-    // A fresh cache row would answer the second load without a request.
     await db.esiCache.clear();
     await db.esiCacheMeta.clear();
     server.use(
@@ -375,7 +374,6 @@ describe('loadAllCharactersIndustryJobs', () => {
 
   it('skips a Character without the industry-jobs scope, never calling ESI for it', async () => {
     await db.tokens.bulkPut([tokenWith(CHAR_A, [JOBS_SCOPE]), tokenWith(CHAR_B, [JOBS_SCOPE])]);
-    // CHAR_C has no token at all: never granted anything.
     server.use(
       http.get(`${ESI_BASE_URL}/characters/${CHAR_A}/industry/jobs`, () =>
         HttpResponse.json([job({ job_id: 1 })])
@@ -436,7 +434,6 @@ describe('loadAllCharactersIndustryJobs', () => {
       http.get(`${ESI_BASE_URL}/characters/${CHAR_A}/industry/jobs`, () =>
         HttpResponse.json([job({ job_id: 1 })])
       ),
-      // CHAR_B is deliberately the slowest response of the three.
       http.get(`${ESI_BASE_URL}/characters/${CHAR_B}/industry/jobs`, async () => {
         await delay(30);
         return HttpResponse.json([job({ job_id: 2 })]);

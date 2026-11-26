@@ -73,11 +73,6 @@ describe('buildAppraisal', () => {
     expect(totals.spread).toBeCloseTo(totals.sell - totals.buy, 6);
   });
 
-  /**
-   * `HubAggregate` reports an unlisted side as null, never 0
-   * (`market/fuzzwork.ts`). `null * qty` is 0 in JS, so a total that summed
-   * blindly would price an item nobody sells as free.
-   */
   it('reports an unpriced side as null rather than zero', () => {
     const unlisted: AppraisalItem = {
       typeId: 99,
@@ -252,8 +247,6 @@ describe('buildAppraisal', () => {
       name: 'Astero',
       quantity: 1,
       buy: 60_000_000,
-      // No blueprint exists for a faction hull like this — market sell is
-      // whatever the last player reseller asked, here worse than LP.
       sell: 95_000_000,
       lpOption: {
         offerId: 3001,
@@ -288,7 +281,7 @@ describe('buildAppraisal', () => {
 
     it('counts the cheaper affordable LP option into cheapestBuy instead of the market sell total', () => {
       const { totals } = buildAppraisal([astero], 100);
-      expect(totals.sell).toBe(95_000_000); // market total is untouched
+      expect(totals.sell).toBe(95_000_000);
       expect(totals.cheapestBuy).toBe(850_000);
       expect(totals.cheapestBuyViaLp).toBe(1);
     });
@@ -420,7 +413,6 @@ describe('computeAppraisalRefine', () => {
       modifiers: NO_CHARACTER_MODIFIERS,
       materialPrices: { 34: 5 },
     });
-    // 10 batches x floor(415 x 10 x 0.5) Tritanium x 5 ISK
     expect(refine).toMatchObject({
       valueAtFullPrice: Math.floor(415 * 10 * BASE_STATION_REPROCESSING_RATE) * 5,
       pricedAll: true,
@@ -452,7 +444,6 @@ describe('computeAppraisalRefine', () => {
       materialPrices: { 34: 5 },
       refining: { stationRate: 0.6, taxRate: 0.1 },
     });
-    // 10 batches x floor(415 x 10 x 0.6) Tritanium x 5 ISK, less 10% tax
     expect(refine?.valueAtFullPrice).toBeCloseTo(Math.floor(415 * 10 * 0.6) * 5 * 0.9, 6);
   });
 
@@ -509,7 +500,6 @@ describe('buildHubComparison', () => {
 });
 
 describe('appraisalNet (issue #1426)', () => {
-  /** A priced item; overrides say what the case is. `appraisalNet` reads `AppraisalItem` — always the 100%-market price, never a Price-Percent-scaled `AppraisalRow` figure. */
   function item(overrides: Partial<AppraisalItem> = {}): AppraisalItem {
     return { typeId: 1, name: 'Item', quantity: 10, buy: 1_000, sell: 1_050, ...overrides };
   }
@@ -518,25 +508,18 @@ describe('appraisalNet (issue #1426)', () => {
 
   it('instant net is the raw buy total minus sales tax, with no broker fee', () => {
     const { instantNet } = appraisalNet([item()], fees);
-    // salesTaxPct(5) = 7.5 * (1 - 0.11 * 5) = 3.375%; 10,000 * 0.03375 = 337.5
     expect(instantNet).toBeCloseTo(10_000 - 337.5, 6);
   });
 
   it('list net undercuts the best sell by one legal tick, then charges tax and broker fee', () => {
     const priced = item({ quantity: 100, sell: 1_000 });
     const { listNet } = appraisalNet([priced], fees);
-    // undercutPrice(1,000) = 999.9 (an exact power of ten, so the band below
-    // uses the smaller tick) -> listValue = 99,990.
-    // tax = 99,990 * 0.03375 = 3,374.6625; broker (BrokerRelations 0,
-    // no standings) = 99,990 * 0.03 = 2,999.7.
     expect(listNet).toBeCloseTo(99_990 - 3_374.6625 - 2_999.7, 4);
   });
 
   it('floors the broker fee at 100 ISK per item, not per unit, for a small listing', () => {
     const tiny = item({ quantity: 1, sell: 10 });
     const { listNet } = appraisalNet([tiny], { ...fees, accountingLevel: 0 });
-    // undercutPrice(10) = 9.99 -> listValue = 9.99; the 3% rate fee (30c)
-    // would be far under the 100 ISK minimum, so the minimum applies once.
     expect(listNet).toBeCloseTo(9.99 - 9.99 * 0.075 - 100, 6);
   });
 
@@ -544,8 +527,6 @@ describe('appraisalNet (issue #1426)', () => {
     const noBuy = item({ typeId: 2, buy: null, sell: 1_050 });
     const noSell = item({ typeId: 3, buy: 1_000, sell: null });
     const { instantNet, listNet } = appraisalNet([noBuy, noSell], fees);
-    // noBuy contributes nothing to instantNet; noSell contributes nothing to
-    // listNet — each item's priced side still counts on the other total.
     const soloBuy = appraisalNet([noSell], fees).instantNet;
     const soloList = appraisalNet([noBuy], fees).listNet;
     expect(instantNet).toBeCloseTo(soloBuy, 6);
@@ -564,7 +545,7 @@ describe('appraisalNet (issue #1426)', () => {
   it('never nets above the matching raw gross', () => {
     const { instantNet, listNet } = appraisalNet([item({ quantity: 100 })], fees);
     const rawBuyGross = 100 * 1_000;
-    const rawListGross = 100 * 999.9; // undercutPrice(1,000)
+    const rawListGross = 100 * 999.9;
     expect(instantNet).toBeLessThan(rawBuyGross);
     expect(listNet).toBeLessThan(rawListGross);
   });
@@ -639,7 +620,6 @@ describe('compareMargin (issue #1745)', () => {
 
   it("charges broker fee on both orders and sales tax on the sell, at appraisalNet's rates", () => {
     const { afterFees } = compareMargin(1_200_000, 1_000_000, fees);
-    // salesTaxPct(5) = 3.375%; broker fee, no skills/standings = 3%.
     expect(afterFees).toBeCloseTo(
       200_000 - 1_200_000 * 0.03375 - (1_200_000 + 1_000_000) * 0.03,
       4
@@ -704,7 +684,6 @@ describe('refine on each price basis', () => {
     materialPrices: { 34: 5 },
     materialSellPrices: { 34: 8 },
   };
-  // 10 portions x floor(400 x 0.5) = 2,000 Tritanium; 50 units left over.
   const item = (): AppraisalItem => ({
     typeId: 1230,
     name: 'Veldspar',

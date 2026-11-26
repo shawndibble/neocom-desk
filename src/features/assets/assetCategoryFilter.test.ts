@@ -186,7 +186,6 @@ describe('pickedCategoryNames', () => {
 });
 
 describe('activeAssetKindFilters', () => {
-  // Echoes the key and its options, so the assertions read what was asked for.
   const t = (key: string, opts?: Record<string, unknown>) =>
     opts ? `${key}(${JSON.stringify(opts)})` : key;
   const options = { index, showBlueprintSelect: true, categoryLabel: 'Category' };

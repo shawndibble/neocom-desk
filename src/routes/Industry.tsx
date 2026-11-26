@@ -90,7 +90,6 @@ import { loadMarketWideTrees } from '@/sde/loadSde';
 import type { MarketWideTreeMap } from '@/sde/types';
 import { DialogFooter } from '@/components/ui/DialogFooter';
 
-// Only one of these renders at a time (per tab / on open): each loads on demand.
 const BuildPlanList = lazy(() =>
   guarded(() => import('@/features/industry/BuildPlanList')).then((m) => ({
     default: m.BuildPlanList,
@@ -124,19 +123,11 @@ const FitImportDialog = lazy(() =>
 
 const COMPARE_MODE = boolParam();
 
-/**
- * Build Plan manager index: create (via blueprint search)/duplicate/delete/
- * rename plans and groups, search, drag plans between groups, and open one
- * as its own full-width page (`/industry/plans/:id`, `/industry/groups/:id`)
- * — this route no longer renders any plan/group detail itself.
- */
 export function Industry() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
   const workspace = useIndustryWorkspace();
-  // Read so the page re-renders, and re-prices, when the Industry page hub changes, and so a new
-  // plan (`newPlanHubId`) never starts before page hubs are read.
   const { hydrated: industryHubHydrated } = useHubFor('industry');
   const {
     activeCharacterId,
@@ -156,11 +147,7 @@ export function Industry() {
     assumedTe,
     facilityDefaults,
   } = workspace;
-  // Seeds a new plan's ME, the same assumption its sub-builds price at.
   const { assumedMe } = pricingInputs;
-  // Character-independent, loaded once — the market-wide scan's precomputed
-  // input (issue #819). Not part of `useIndustryWorkspace`: only this index's
-  // Opportunities tab needs it, never the plan/group detail pages.
   const [marketWideTrees, setMarketWideTrees] = useState<MarketWideTreeMap | null>(null);
   const {
     failed: marketWideTreesFailed,
@@ -188,8 +175,6 @@ export function Industry() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [tab, setTab] = usePageTab(INDUSTRY_TABS);
 
-  // A plan the pilot just deleted stays hidden until its Undo toast ends and
-  // the write lands, so a sync pull in that window can't bring it back.
   const pendingDeletes = useDeferredCommits();
   const plansQuery = useLiveQuery(async () => {
     if (activeCharacterId === null) return undefined;
@@ -210,22 +195,16 @@ export function Industry() {
   const expandedGroups = useExpandedGroups((state) => state.value);
   const expandedGroupsHydrated = useHydratedStore(useExpandedGroups);
   const setExpandedGroups = useExpandedGroups((state) => state.setValue);
-  // Opening a plan (a row, "Plan", a deep link) leaves for its own
-  // page; fetch that page's chunk now so the click doesn't wait on it.
   useEffect(() => {
     preloadRouteChunk('/industry/plans/:planId');
   }, []);
 
   const [fitImportOpen, setFitImportOpen] = useState(false);
-  // EFT text a Fitting's Export menu ("Manufacture Plan") arrived with, to
-  // pre-fill and parse the Fit Import dialog instead of opening it empty.
   const [fitImportSeedText, setFitImportSeedText] = useState<string | undefined>(undefined);
   function closeFitImport() {
     setFitImportOpen(false);
     setFitImportSeedText(undefined);
   }
-  // Keyed on the navigation itself so a re-render never reopens the dialog
-  // after the pilot closes it (mirrors Market.tsx's `appraiseText` handling).
   const handledFitImportKey = useRef<string | null>(null);
   useEffect(() => {
     const text = (location.state as Partial<IndustryFitImportState> | null)?.fitImportText;
@@ -234,9 +213,6 @@ export function Industry() {
     setFitImportSeedText(text);
     setFitImportOpen(true);
   }, [location.key, location.state]);
-  // A pasted blueprint list (the app-wide paste router) becomes a Build Group
-  // once the data it needs is in, then the pilot lands on that group. The
-  // navigation's own state is cleared first so Back never replays the paste.
   const [blueprintPasteNote, setBlueprintPasteNote] = useState<string | null>(null);
   useTimedToast(blueprintPasteNote, () => setBlueprintPasteNote(null));
   const handledBlueprintPasteKey = useRef<string | null>(null);
@@ -254,7 +230,6 @@ export function Industry() {
           plans,
           ownedBlueprints,
           defaultsFrom: mostRecentlyUpdatedPlan(plans),
-          // Off disk for the same reason as `createPlan`.
           facilityDefaults: await loadActivityFacilityDefaults(),
           assumedMe,
           assumedTe,
@@ -306,21 +281,15 @@ export function Industry() {
 
   const [compareMode, setCompareMode] = useUrlParam('plans.compare', COMPARE_MODE);
   const [compareSelectedIds, setCompareSelectedIds] = useState<ReadonlySet<string>>(new Set());
-  // Compare mode can also turn off from the URL (Back, a bare /industry
-  // link), not only the toggle — the ticked plans go with it either way.
   const [prevCompareMode, setPrevCompareMode] = useState(compareMode);
   if (compareMode !== prevCompareMode) {
     setPrevCompareMode(compareMode);
     if (!compareMode) setCompareSelectedIds(new Set());
   }
   const [comparing, setComparing] = useState(false);
-  // Build Opportunities' blueprint data age, shown beside the page title.
   const [opportunitiesDataAge, setOpportunitiesDataAge] = useState<Date | null>(null);
   const [bpcSourcingHeader, setBpcSourcingHeader] = useState<BpcSourcingHeaderState | null>(null);
 
-  // One plan per "Plan" click: set from the click until this page leaves
-  // for the new plan, so a second tap while the first is still saving (the
-  // phone list's menu item has no busy state of its own) can't add a twin.
   const startingPlanRef = useRef(false);
 
   const createPlan = useCallback(
@@ -328,13 +297,10 @@ export function Industry() {
       entry: BlueprintCatalogEntry,
       seed: BuildPlanSeed | null = null,
       blueprintPrice: number | null = null,
-      // Market-Wide's row research: the plan starts at the ME/TE the row was priced at.
       research: { me: number; te: number } | null = null
     ): Promise<string | null> => {
       if (activeCharacterId === null) return null;
       const owned = findOwnedBlueprint(ownedBlueprints, entry.blueprintTypeID);
-      // Read off disk, not the workspace's render value: a click before the
-      // stores hydrate would otherwise start the plan at the fallback.
       const currentFacilityDefaults = await loadActivityFacilityDefaults();
       const plan = newBuildPlan(
         activeCharacterId,
@@ -361,8 +327,6 @@ export function Industry() {
             : {}),
         }
       );
-      // An LP Store "Plan in Industry": the redemption is the plan's
-      // Blueprint Acquisition, written as the tier modal's own LP pick.
       const seeded =
         blueprintPrice === null
           ? plan
@@ -380,13 +344,6 @@ export function Industry() {
     [activeCharacterId, ownedBlueprints, plans, assumedMe, assumedTe, t]
   );
 
-  // The Market Browser / Assets / BPC Search "jump to a Build Plan" deep
-  // links (`?product=<typeId>`, `?material=<typeId>`). Unlike the old
-  // `usePlanSelection`, this navigates to the plan's own route rather than
-  // setting in-memory selection — once resolved, the browser is simply on a
-  // different page, so there is no selection state left to keep in sync with
-  // the URL. Only the *unresolvable* cases stay on `/industry` and need the
-  // param cleaned up.
   const productParam = searchParams.get('product');
   const materialParam = searchParams.get('material');
   const planSeed = useMemo(() => parsePlanSeed(searchParams), [searchParams]);
@@ -405,8 +362,6 @@ export function Industry() {
         : null;
       if (existing) {
         const open = () => navigate(`/industry/plans/${existing.id}`, { replace: true });
-        // An LP plan opened again: the redemption's price has likely moved
-        // (hub prices, LP Value, what the pilot now owns) — refresh it.
         const stalePrice =
           blueprintPriceSeed !== null &&
           existing.materialSourcing?.[existing.blueprintTypeID]?.overridePrice !==
@@ -475,11 +430,6 @@ export function Industry() {
     [plans, compareSelectedIds]
   );
 
-  // Profit / Verdict / Runs for every row. `computeGroupResult: true` only
-  // for grouped plans — the extra owned-stock-disabled resolve
-  // `BuildGroupPanel` already pays for its one open group, paid here for
-  // every group at once so the group row can show its own rollup total;
-  // ungrouped plans skip it, since nothing on this page ever rolls them up.
   const knownGroupIds = useMemo(() => new Set(groups.map((g) => g.id)), [groups]);
   const groupedPlans = useMemo(
     () =>
@@ -514,12 +464,8 @@ export function Industry() {
   });
   const statsByPlanId = useMemo(() => {
     const map = new Map<string, PlanIndexStats>();
-    // The Runs column is the plan's own `runs` input (how many runs the
-    // plan prices), not a count of logged Production Runs.
     const runsByPlanId = new Map((plans ?? []).map((plan) => [plan.id, plan.runs]));
     const planById = new Map((plans ?? []).map((plan) => [plan.id, plan]));
-    // Reactions planned in highsec cannot run (issue #2908): the row reads
-    // "Fix location" and keeps its figures (dim tone, warning glyph).
     const reactionsBlocked = (planId: string): boolean => {
       const plan = planById.get(planId);
       const entry = plan && catalog?.byBlueprintTypeID.get(plan.blueprintTypeID);
@@ -528,17 +474,6 @@ export function Industry() {
       return planReactionLocation(plan, activity)?.state === 'highsec';
     };
     for (const row of [...groupedRows, ...ungroupedRows]) {
-      // Displayed figure is profit after fees (matches the detail page's
-      // headline number) — but the Build/Buy verdict stays keyed off
-      // `recommendation`, the build-vs-buy question, a different one
-      // (issue: list column read as "profit" while showing buy-vs-build
-      // savings, a different number than the detail page's own "profit
-      // after fees"). `recommendation` is read straight off `result` rather
-      // than re-derived from `buyCost`/`totalCost` here, so it inherits the
-      // same `unpriceable` gating `PlanVerdictHero`'s own Acquisition
-      // Verdict pill uses — a re-derived value stayed non-null (falsely
-      // confident) whenever a material was unpriced but the product itself
-      // still had a hub price.
       map.set(row.planId, {
         profit: row.result?.profit ?? null,
         verdict: reactionsBlocked(row.planId)
@@ -573,10 +508,6 @@ export function Industry() {
     const source = plans?.find((p) => p.id === id);
     if (!source) return;
     await duplicateBuildPlan(source, t('industry.copySuffix', { name: source.name }));
-    // Stays on the index, like rename/delete — duplicate is a list-management
-    // action here, not "go start editing this". Only a deep link
-    // (`?product=`/`?material=`) or an explicit row click opens a plan's own
-    // page.
   }
 
   function handleDelete(id: string) {
@@ -655,7 +586,6 @@ export function Industry() {
       catalog,
       ownedBlueprints,
       defaultsFrom: mostRecentlyUpdatedPlan(plans),
-      // Off disk for the same reason as `createPlan`.
       facilityDefaults: await loadActivityFacilityDefaults(),
       assumedMe,
       assumedTe,
@@ -672,7 +602,6 @@ export function Industry() {
     navigate(`/industry/groups/${result.groupId}`);
   }
 
-  /** Saves the plans, selects them and opens Compare on the Build Plans tab. */
   async function seedCompare(newPlans: readonly BuildPlanRecord[]) {
     await createBuildPlans(newPlans);
     setCompareSelectedIds(new Set(newPlans.map((p) => p.id)));
@@ -682,7 +611,6 @@ export function Industry() {
 
   async function handleAddOpportunitiesToCompare(rows: readonly OpportunityRow[]) {
     if (activeCharacterId === null || rows.length === 0) return;
-    // Off disk for the same reason as `createPlan`.
     const currentFacilityDefaults = await loadActivityFacilityDefaults();
     await seedCompare(
       rows.map((row) =>
@@ -699,11 +627,6 @@ export function Industry() {
     );
   }
 
-  /**
-   * Corp projects rows arrive as the plans that priced them (runs = the units
-   * still to contribute). A plan belongs to whoever builds it, so each is
-   * re-owned by the active Character and given its own id and timestamp.
-   */
   async function handleAddProjectsToCompare(plans: readonly BuildPlanRecord[]) {
     if (activeCharacterId === null || plans.length === 0) return;
     await seedCompare(
@@ -720,10 +643,6 @@ export function Industry() {
     entry: BlueprintCatalogEntry,
     research?: { me: number; te: number }
   ): Promise<boolean> {
-    // Distinct from the plain search-box create: picking a scan result or an
-    // owned Opportunities row is an explicit "go build this" choice, same as
-    // opening a `?product=` deep link, so it opens the new plan's own page
-    // rather than leaving the pilot on the Opportunities tab.
     if (startingPlanRef.current) return false;
     startingPlanRef.current = true;
     try {
@@ -732,21 +651,11 @@ export function Industry() {
         navigate(`/industry/plans/${id}`);
         return true;
       }
-    } catch {
-      // Nothing opened; the button comes back for another try.
-    }
+    } catch {}
     startingPlanRef.current = false;
     return false;
   }
 
-  /**
-   * A click on a Ranked builds or Owned blueprints row: the plan is the one
-   * "Add to Compare" would make from it — the same blueprint, owned-materials
-   * claim and hub the row's ISK/hour was priced with — so the plan opens at
-   * the row's figures instead of an unclaimed-materials cost. A row with no
-   * pricing behind it (a corp blueprint, a row not yet ranked) opens as any
-   * other plan.
-   */
   async function handleStartPlanFromRow(
     entry: BlueprintCatalogEntry,
     seed?: OpportunityPlanSeed
@@ -767,9 +676,7 @@ export function Industry() {
       await createBuildPlans([plan]);
       navigate(`/industry/plans/${plan.id}`);
       return true;
-    } catch {
-      // Nothing opened; the button comes back for another try.
-    }
+    } catch {}
     startingPlanRef.current = false;
     return false;
   }
@@ -786,13 +693,8 @@ export function Industry() {
     navigate(`/industry/plans/${buildPlanId}`);
   }
 
-  // The Trade Hub a new plan starts at (`newPlanHubId`: the Industry page hub, else the latest
-  // plan's), not a fixed default: rows price with the settings the plan page uses, and a click
-  // opens a plan with those same settings.
   const latestPlan = mostRecentlyUpdatedPlan(plans);
   const marketWideHub = newPlanHub(latestPlan);
-  // Not mounted until the plans have loaded: the hub it prices at is the latest plan's,
-  // and a scan restored at Jita would flip when that lands.
   const marketWidePanel = catalog && plans !== undefined && (
     <MarketWideOpportunitiesPanel
       key="market-wide"
@@ -810,11 +712,6 @@ export function Industry() {
       assumedTe={assumedTe}
     />
   );
-  // Waits on the pricing-settings hydration gate (issue #2054): not mounting
-  // the panel until `assumedMe` has hydrated is enough to stop its first pass
-  // from pricing every candidate at the default, without threading a readiness
-  // flag into `useOpportunities` itself. Market-Wide Build Opportunities mounts
-  // regardless: it prices nothing until the pilot scans.
   const ownedRankingPanel = !catalog ? null : !pricingInputs.hydrated ? (
     <div key="owned-ranking" className="flex justify-center py-16">
       <Spinner label={t('common.loading')} />
@@ -864,7 +761,6 @@ export function Industry() {
         />
 
         <TabPanel tabsId={INDUSTRY_TABS_ID} tabId={tab} className="space-y-4">
-          {/* BPC Sourcing needs neither the catalog nor the plans, so it stays usable when the catalog can't load; it waits only for the Character's own reads (the Owned source, the re-login banner). */}
           {tab === 'sourcing' ? (
             characterLoaded ? (
               <BpcSourcingPanel onHeaderChange={setBpcSourcingHeader} />
@@ -890,11 +786,7 @@ export function Industry() {
               {plans && catalog && buildGroupsHydrated && expandedGroupsHydrated && (
                 <Suspense fallback={<Spinner block="page" label={t('common.loading')} />}>
                   {tab === 'opportunities' ? (
-                    <div className="flex flex-col gap-4">
-                      {/* "What's profitable" (the market-wide scan) always leads,
-                    open; the owned-blueprint ranking follows it. */}
-                      {opportunitiesPanels}
-                    </div>
+                    <div className="flex flex-col gap-4">{opportunitiesPanels}</div>
                   ) : tab === 'logs' ? (
                     <ProductionLogPanel
                       characterId={activeCharacterId}
@@ -940,9 +832,6 @@ export function Industry() {
                       catalog={catalog}
                       selectedId={null}
                       onSelect={(id) => navigate(`/industry/plans/${id}`)}
-                      // Stays on the index, same as duplicate — the search box adds
-                      // a row to manage, it doesn't presume the pilot wants to edit
-                      // it immediately. `void`: `onCreate` only takes the entry.
                       onCreate={(entry) => void createPlan(entry)}
                       onDuplicate={(id) => void handleDuplicate(id)}
                       onDelete={handleDelete}

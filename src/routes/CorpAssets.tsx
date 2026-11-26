@@ -1,31 +1,3 @@
-/**
- * `/corp/assets` — the corporation's inventory ledger (issue #4671): every
- * item the corporation owns, classified the way the in-game Corporation Assets
- * window does (Offices, Corp deliveries, In space, Impounded, Asset safety,
- * Lockdown, Capsuleer deliveries) and read either by item (with stock targets
- * and the shortfall against them) or by location (office › division).
- * `docs/context/decisions/` records why this replaced the division-first tree.
- *
- * URL (ADR 0015): the tab is the path (`/corp/assets/impounded`, the bare path
- * is All; `features/corp/corpAssetsTabs.ts`) and the view state is the query —
- * `q` search, `group=location` (absent: by item), `loc` a station/structure
- * id, `div` a hangar division 1–7, `cat` the Asset Category picker's ticked
- * option ids (absent: all; an old top-level market group id still opens on
- * that category), `bp` the Blueprints select (the Group column shows the
- * top-level Asset Category), `below=1` the Below target filter. The
- * Corp overview's Corp assets widget links to these. An unknown path under
- * `/corp/assets/*`, such as an old tree deep link, redirects to `/corp/assets`
- * keeping the query.
- *
- * **Director-only, and the whole page rather than a panel**, for the same
- * reason `/corp/members` is: `canReadAssets` (`engine/corpRoles.ts`) answers
- * to `Director` alone, so anyone else following an Assets tab would land on
- * an explanation instead of a ledger. The `unknown`/`ready` split and the
- * mount-on-`ready` reasoning live in `useCorpRouteGate`.
- *
- * Blueprint/build plan linking stays explicitly disabled
- * (`blueprintTypeID={null}`): corp assets never loads the blueprint catalog.
- */
 import { useCallback, useMemo, useState, type ReactNode } from 'react';
 import { Navigate, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -161,7 +133,6 @@ const TAB_LABEL_KEY: Readonly<Record<CorpAssetTab, string>> = {
 
 const rowKeyOf = (row: ItemLedgerRow) => `${row.typeId}:${row.isBlueprintCopy ? 'c' : 'o'}`;
 
-/** Mounted only once Corp Access is `ready` — see the `/corp` loader note. */
 function CorpAssetsView({
   pageTab,
   canReadBlueprints,
@@ -174,18 +145,13 @@ function CorpAssetsView({
   const location = useLocation();
   const tabsId = useTabsId();
   const moving = pageTab === 'move';
-  // Move is no ledger state: the ledger reads All under it, and its tables are not shown.
   const tab: CorpAssetTab = moving ? 'all' : pageTab;
-  // `useRouteSnapshot` keys its reload on the Character and refresh only, so
-  // this loader must not close over changing state: the parent remounts this
-  // view (`key`) when `canReadBlueprints` flips instead.
   const loadSnapshot = useCallback(
     (characterId: number, signal: RouteSnapshotSignal) =>
       loadCorpAssetsSnapshot(characterId, signal, canReadBlueprints),
     [canReadBlueprints]
   );
   const snapshot = useRouteSnapshot<CorpAssetsSnapshot>(loadSnapshot, undefined, {
-    // Keeps the asset list on screen during a manual refresh (issue #418).
     staleWhileRevalidate: true,
     cacheKey: 'corp-assets',
   });
@@ -197,7 +163,6 @@ function CorpAssetsView({
   const byLocation = params.group === 'location';
 
   const targetsApi = useCorpStockTargets(data?.corporationId ?? null);
-  // A targeted type the corporation owns none of is in no asset read: resolve it separately.
   const unnamedTargetIds = useMemo(
     () => [...targetsApi.targets.keys()].filter((id) => !data?.labels.types.has(id)),
     [targetsApi.targets, data?.labels.types]
@@ -211,8 +176,6 @@ function CorpAssetsView({
         : new Map([...targetInfo.names, ...(data?.labels.types ?? [])]),
     [data?.labels.types, targetInfo.names]
   );
-  // The ledger paints with the names the device already has; the rest are
-  // looked up here, after first paint, and fill in as they land.
   const missingPlaceIds = useMemo(
     () => (data ? data.placeIds.filter((id) => !data.labels.locations.has(id)) : []),
     [data]
@@ -244,8 +207,6 @@ function CorpAssetsView({
     [data?.categoryByTypeId, targetInfo.categories]
   );
   const blueprintTypeIds = useBlueprintTypeIds(typeNames);
-  // Asset Category and Blueprints (issue #5607): null until the market tree
-  // loads, and while the filter keeps everything — it then stands down.
   const categoryIndex = useAssetCategoryIndex(data !== undefined && data !== null);
   const categoryPick = useMemo<CategoryPick>(
     () => (categoryIndex ? expandLegacyCategoryIds(categoryIndex, params.cat) : params.cat),
@@ -353,7 +314,6 @@ function CorpAssetsView({
     assetNames,
   ]);
 
-  // Which offices are empty is a fact about the corporation, not about the current search.
   const officeUsageWhole = useMemo(
     () => (byLocation ? officeUsage(buildLocationLedger(classified, valuation)) : new Map()),
     [byLocation, classified, valuation]
@@ -396,7 +356,6 @@ function CorpAssetsView({
     officeUsageWhole,
   ]);
 
-  // Filter options come from the whole corporation, not the current narrowing.
   const locationOptions = useMemo(() => {
     const ids = new Set<number>(classified.officeLocationIds);
     for (const item of classified.items) {
@@ -407,9 +366,7 @@ function CorpAssetsView({
       .sort((a, b) => a.label.localeCompare(b.label));
   }, [classified, labels]);
 
-  // Multi-select + bulk actions (same shape as /assets' issue #90), by item only.
   const [selectMode, setSelectMode] = useState(false);
-  // A selection belongs to the view it was made in: a tab, filter, search or group change drops it.
   const selectionScope = [
     tab,
     params.loc,
@@ -452,14 +409,11 @@ function CorpAssetsView({
 
   const itemActions = usePageItemActions({ activeCharacterId: snapshot.activeCharacterId });
   const isAbyssalType = useMutaplasmidLookup()?.isAbyssalType;
-  // A type's original and its copy are two rows but one type.
   const selectedTypeIds = [...new Set([...selectedKeys].map((key) => Number(key.split(':')[0])))];
 
   function handleBulkAddToQuickbar() {
-    // One write: `quickbar.add` closes over the rendered list, so looping it keeps only the last.
     let items = itemActions.quickbar.items;
     for (const typeId of selectedTypeIds) {
-      // Abyssal: no market; the row menu skips Quickbar too.
       if (isAbyssalType?.(typeId)) continue;
       items = addQuickbarItem(items, { typeId, name: labels.typeName(typeId) });
     }
@@ -478,7 +432,6 @@ function CorpAssetsView({
   const hasAnyAssets = (data?.inputs ?? []).length > 0;
 
   function selectTab(id: string) {
-    // A plan belongs to the Move tab: leaving it, or coming back, starts from the picker.
     const next = new URLSearchParams(location.search);
     for (const key of MOVE_PLAN_KEYS) next.delete(key);
     const search = next.toString();
@@ -488,7 +441,6 @@ function CorpAssetsView({
     });
   }
 
-  /** The by-item view narrowed to a division, deliveries or place row (its row menu's destination). */
   function itemsViewHref(row: LocationRow): string {
     const next = new URLSearchParams(location.search);
     next.delete('group');
@@ -867,7 +819,6 @@ function CorpAssetsView({
   );
 }
 
-/** Reads the tab off the path; an unknown path (an old tree link) goes to `/corp/assets`, keeping the query. */
 function CorpAssetsRoute({ canReadBlueprints }: { canReadBlueprints: boolean }) {
   const wildcard = useParams()['*'] ?? '';
   const { search } = useLocation();

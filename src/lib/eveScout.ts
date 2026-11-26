@@ -1,13 +1,3 @@
-/**
- * EVE-Scout's public list of Thera and Turnur wormhole connections (issue
- * #2330). EVE-Scout is a third-party service, not ESI: a plain browser fetch
- * with no custom headers (the endpoint allows cross-origin reads, and a
- * custom header would force a preflight it need not answer).
- *
- * Held in memory for five minutes — the scouts update the list by hand, so a
- * tighter loop only adds load on a volunteer service. A failed refresh keeps
- * the last good list rather than blanking the table.
- */
 import {
   HUB_SYSTEM_IDS,
   WORMHOLE_SHIP_SIZES,
@@ -46,14 +36,6 @@ function shipSize(value: unknown): WormholeShipSize | null {
     : null;
 }
 
-/**
- * Reads the signatures response defensively: an entry that is not a wormhole
- * out of Thera or Turnur, or lacks an exit system or an expiry, is dropped;
- * optional fields that are missing or unrecognised come back `null`.
- *
- * Field names confirmed against a live response on 2026-09-30:
- * `out_*` is the hub side, `in_*` the exit side.
- */
 export function parseEveScoutSignatures(body: unknown): TheraConnection[] {
   if (!Array.isArray(body)) return [];
   const connections: TheraConnection[] = [];
@@ -102,7 +84,6 @@ async function fetchConnections(now: number): Promise<TheraConnectionsResult> {
   }
 }
 
-/** Never rejects. `now` is injectable for tests; callers leave it out. */
 export function loadTheraConnections(now = Date.now()): Promise<TheraConnectionsResult> {
   if (cached && now - cached.at <= EVE_SCOUT_CACHE_MS) return Promise.resolve(cached.result);
   inFlight ??= fetchConnections(now).finally(() => {
@@ -111,7 +92,6 @@ export function loadTheraConnections(now = Date.now()): Promise<TheraConnections
   return inFlight;
 }
 
-/** Test seam. */
 export function clearEveScoutCache(): void {
   cached = null;
   inFlight = null;

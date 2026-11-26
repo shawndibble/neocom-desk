@@ -1,10 +1,3 @@
-/**
- * Fighters: a carrier's squadrons — each launched from a tube or waiting in
- * the fighter bay, its size, and the tubes and per-class limits they take —
- * with a search to add one. The drones rack's twin for hulls with fighter
- * tubes; renders nothing for any other hull unless the Fitting already
- * carries fighters (a pasted fit), so they can be removed.
- */
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Checkbox, IconButton, SearchInput, TypeIcon } from '@/components/ui';
@@ -31,7 +24,6 @@ export function FittingFightersPanel({
 }: {
   fitting: Fitting;
   stats: FittingStats | null;
-  /** The editor's `edit()`: applies a change to the open Fitting. */
   onChange: (change: (fitting: Fitting) => Fitting) => void;
   typeName: (typeId: number) => string;
 }) {
@@ -41,7 +33,6 @@ export function FittingFightersPanel({
   const tubes = stats?.fighters.tubes ?? null;
   if (squadrons.length === 0 && (tubes === null || tubes.total === 0)) return null;
 
-  // Before the stats land nothing launches: the hull's limits aren't known yet.
   const limits: FighterLimits = stats
     ? {
         tubes: stats.fighters.tubes.total,
@@ -129,10 +120,8 @@ export function FittingFightersPanel({
                 >
                   <Checkbox
                     checked={squadron.state === 'active'}
-                    // Launching takes a tube and class room the others may have used up.
                     disabled={squadron.state !== 'active' && !launchable}
                     onChange={(event) => {
-                      // Read now: the edit applies later, after React resets the box.
                       const state = event.target.checked ? 'active' : 'online';
                       onChange((f) => setSquadron(f, index, { state }));
                     }}

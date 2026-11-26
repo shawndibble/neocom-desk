@@ -1,9 +1,3 @@
-/**
- * Ships › Tree on a desktop (scope decision `20260926-135538`): the map is
- * the default view, a hull shows its hover card, a click opens the Ship Info
- * window's four tabs, and Start empty fit lands in the Fittings editor with a new
- * Fitting of that hull. Structure only — no stat figure is awaited.
- */
 import { test, expect } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 import { answerAnyType } from './support/universeTypes';
@@ -35,7 +29,6 @@ test.describe('Ship Tree — desktop', () => {
     await expect(info).toBeVisible();
     await expect(card).toBeHidden();
     const box = (await info.boundingBox())!;
-    // The ~40rem slide-over, not SlideOver's default 25rem.
     expect(box.width).toBeGreaterThan(600);
 
     for (const tab of ['Attributes', 'Fitting', 'Skills & Mastery', 'Blueprint']) {

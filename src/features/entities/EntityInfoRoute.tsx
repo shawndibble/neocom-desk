@@ -1,23 +1,3 @@
-/**
- * Mounted once in `App.tsx`: keeps the URL's `?info=` param and the shared
- * modals (`PublicInfoModal`, `SkillDetailModal`, `ItemInfoModal`,
- * `PlaceInfoModal`) in step.
- *
- * - `info` set (a link click, a pasted URL, Forward): the matching store's
- *   request is shown.
- * - `info` gone (Back, Close): all are cleared. Back therefore closes the
- *   modal with no extra code — the previous history entry has no `info`.
- * - The stores' `open`/`close` go through the navigator registered here, so a
- *   programmatic open makes the same history entry a link click does.
- *
- * Closing replaces the entry with the same URL without `info`: it never goes
- * Back, so the page under the modal stays as it is (any param it changed
- * while the modal was open included) and Close cannot leave the app, cold
- * link or not. Browser Back still closes the modal, as the entry before it has
- * no `info`. Opening while a modal is already open (a drill-down from a
- * character to its corporation) replaces instead of pushing, so a single Back
- * always returns to the page.
- */
 import { useCallback, useEffect, useRef } from 'react';
 import { useLocation, useNavigate, useNavigationType, type Location } from 'react-router-dom';
 import {
@@ -77,12 +57,6 @@ export function EntityInfoRoute() {
     [navigate]
   );
 
-  // A tab switch keeps the search, so `info` would outlive the page the modal
-  // was opened on (the modals close on a page change): strip it. A redirect
-  // is not a page change (`usePageLeave`), so a cold `/market?info=type-34`
-  // keeps its modal through the landing on `/market/browser`. Back or Forward
-  // onto an entry that has `info` is the pilot returning to that modal (from a
-  // Route Safety link inside it, say), so that entry keeps it.
   const navigationType = useNavigationType();
   usePageLeave(
     useCallback(
@@ -109,7 +83,6 @@ export function EntityInfoRoute() {
     const skill = useSkillDetailModalStore.getState();
     const item = useItemInfoModalStore.getState();
     const place = usePlaceInfoModalStore.getState();
-    // Only the modal `info` names stays open.
     if (
       kind !== 'character' &&
       kind !== 'corporation' &&
@@ -133,7 +106,6 @@ export function EntityInfoRoute() {
     } else if (kind === 'skill') {
       const staged = skill.staged?.typeID === id ? skill.staged.planEntries : undefined;
       skill.show({ typeID: id, planEntries: staged });
-      // Consumed: a later open must not inherit them.
       skill.stage(id, undefined);
     } else if (kind === 'place') {
       place.show({ id });

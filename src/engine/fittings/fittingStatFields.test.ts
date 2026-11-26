@@ -43,7 +43,6 @@ describe('changeVerdict', () => {
   });
 
   it('ranks the capacitor: stable beats unstable, then % , then longer depletion', () => {
-    // unstable is stored as a negated depletion time
     expect(changeVerdict({ key: 'capacitor', before: -90, after: 60 })).toBe('better');
     expect(changeVerdict({ key: 'capacitor', before: 60, after: -90 })).toBe('worse');
     expect(changeVerdict({ key: 'capacitor', before: 60, after: 70 })).toBe('better');

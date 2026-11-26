@@ -1,7 +1,3 @@
-/**
- * The Thera / Turnur modal's filter row (Hub, Exit, Fits) keeps its controls at
- * one height at desktop and phone width (DESIGN.md §3: one size per row).
- */
 import { test, expect } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 import { CONTROL_ROW_WIDTHS, expectInlineControlsAligned } from './support/controlHeights';

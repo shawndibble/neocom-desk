@@ -1,9 +1,3 @@
-/**
- * Mails the corporation's tax contact when a member asks about their mining tax, for officers
- * who are not in Neocom Desk when it happens (the question itself always lands in Needs you).
- * Sent straight from the member's own character, never through the officer mail queue: it is
- * one mail, to people who did not ask for it only because a member did.
- */
 import {
   composeTaxQuestionMail,
   type TaxQuestionMailInput,
@@ -25,7 +19,6 @@ export type TaxQuestionMailOutcome =
   | { status: 'no-recipient' }
   | { status: 'failed'; definite: boolean };
 
-/** The ids of the mailing lists the sender joined; none when they cannot read them. */
 async function senderListIds(characterId: number, scopes: readonly string[]): Promise<number[]> {
   if (!READ_LISTS_SCOPES.every((s) => scopes.includes(s))) return [];
   try {
@@ -50,7 +43,6 @@ export async function sendTaxQuestionMail(args: {
     contact?.kind === 'characters' ? Promise.resolve(null) : loadCorporationCeoId(corporationId),
     contact?.kind === 'mailingList' ? senderListIds(characterId, scopes) : [],
   ]);
-  // Named officers all being the sender still falls back to the CEO, so look it up then too.
   const needsCeo = contact?.kind === 'characters' && contact.ids.every((id) => id === characterId);
   const { recipients, fellBackToCeo } = taxMailRecipients({
     contact,

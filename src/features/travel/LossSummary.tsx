@@ -1,10 +1,4 @@
 import { idSetKey } from '@/lib/idSetKey';
-/**
- * What a lost ship cost (issue #2852): hull, fitted modules and cargo priced at
- * Jita, minus the insurance payout found in the wallet
- * journal when the victim is the active Character. Sits in Pilot Lookup's
- * loss-row expansion.
- */
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { LiveNote } from '@/components/ui';
@@ -20,14 +14,12 @@ import { useActiveCharacter } from '@/stores/activeCharacter';
 
 interface LossSummaryProps {
   detail: KillmailDetail;
-  /** zKillboard's kill-time value, shown for reference. */
   zkbValue: number | null;
 }
 
 type Insurance =
   { state: 'loading' } | { state: 'failed' } | { state: 'done'; value: LossInsurance | null };
 
-// A loss is talked about in Jita terms, whatever hub the viewer picked in Settings.
 const hub = getTradeHub('jita') ?? DEFAULT_TRADE_HUB;
 
 export function LossSummary({ detail, zkbValue }: LossSummaryProps) {

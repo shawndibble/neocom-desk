@@ -40,10 +40,8 @@ export function GroupHeader({
   group: BuildGroup;
   expanded: boolean;
   active: boolean;
-  /** A dragged plan currently resolves to this group — including via one of its member rows. */
   dropActive: boolean;
   compareMode: boolean;
-  /** 'all' | 'some' | 'none' — drives the header checkbox's indeterminate state. */
   membersSelected: 'all' | 'some' | 'none';
   onToggle: () => void;
   onSelect: () => void;
@@ -55,12 +53,8 @@ export function GroupHeader({
   const { t } = useTranslation();
   const [renaming, setRenaming] = useState(false);
   const guard = useLiftAfterHoldGuard();
-  // A collapsed group renders no member rows at all, so this header is the
-  // only rect its group has — the case #627 exists for.
   const { setNodeRef } = useDroppable({ id: groupDropId(group.id) });
 
-  // After the menu has closed: its focus hand-back would blur the new field
-  // and cancel the rename straight away.
   const startRename = () => setTimeout(() => setRenaming(true), 0);
   const items = (
     <>
@@ -86,9 +80,6 @@ export function GroupHeader({
         } ${dropActive ? DROP_INTO_CLASS : ''}`}
       >
         <RowTappableContext.Provider value>
-          {/* Compare's checkbox only ever renders on a *visible* row, so a
-          collapsed group's members are unreachable without this — it selects
-          every member at once rather than making the pilot expand first. */}
           {compareMode && (
             <label className={touchCheckboxLabelClassName}>
               <Checkbox
@@ -117,8 +108,6 @@ export function GroupHeader({
               onDone={() => setRenaming(false)}
             />
           ) : (
-            // Click opens the group, double-click renames; Rename and Delete are the
-            // trailing ⋮ (also the right-click menu).
             <span className="flex min-w-0 flex-1">
               <Tooltip content={group.name}>
                 <button
@@ -150,14 +139,7 @@ export function GroupHeader({
               buyCost={stats?.buyCost}
             />
           </span>
-          {/* Runs has no group-level meaning — a group aggregates cost, not a
-          production history of its own — so this column stays a fixed-width
-          blank rather than a second dash competing with the plan rows' real
-          one for the reader's attention. */}
           <span className="hidden w-8 shrink-0 sm:block" aria-hidden="true" />
-          {/* Unmounted while renaming: closing the menu hands focus back to the ⋮,
-          which would blur the rename field and cancel it. The spacer keeps
-          the stat columns where they are. */}
           {renaming ? (
             <span className="w-9 shrink-0 md:w-7" aria-hidden="true" />
           ) : (

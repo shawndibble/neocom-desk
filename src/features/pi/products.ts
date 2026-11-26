@@ -1,17 +1,3 @@
-/**
- * Which planetary commodities the chain planner can be pointed at.
- *
- * One list, two callers: the Goal Planner's product search and the item
- * context menu's "PI Plan" action. They must agree exactly, because the
- * planner drops a `?type=` / `?goals=` entry it cannot plan — a menu entry
- * offered on a type the search doesn't hold would seed a goal that silently
- * vanishes. Deriving both from `productOptions` is what makes that impossible.
- *
- * Membership is the graph's answer, not a table: a schematic whose tier
- * `piTier` refuses to resolve (a cycle, or a depth the game doesn't define)
- * is dropped rather than offered. P0 is absent by construction — raw
- * resources are extracted, and there is no schematic that makes one.
- */
 import { piTier } from '@/engine/pi/chain';
 import { loadPi } from '@/sde/loadSde';
 import type { PiData } from '@/sde/types';
@@ -22,7 +8,6 @@ export interface ProductOption {
   tier: 1 | 2 | 3 | 4;
 }
 
-/** Every commodity `pi.json` has a schematic for, tiered off the graph rather than a table. */
 export function productOptions(pi: PiData): ProductOption[] {
   const options: ProductOption[] = [];
   for (const [key, schematic] of Object.entries(pi.schematics)) {
@@ -39,19 +24,10 @@ export function productOptions(pi: PiData): ProductOption[] {
   return options.sort((a, b) => a.tier - b.tier || a.name.localeCompare(b.name));
 }
 
-/** The same set, by typeID — "can the planner plan this item" in one lookup. */
 export function plannableTypeIds(pi: PiData): Set<number> {
   return new Set(productOptions(pi).map((option) => option.typeId));
 }
 
-/**
- * `plannableTypeIds` over the cached `pi.json`, memoized twice over: the
- * payload by `loadSde`'s own cache, the derived set here, because the item
- * context menu asks this question from every row of a market tree.
- *
- * `peek` exists so a component mounting after the first load answers
- * synchronously and never re-renders for it.
- */
 let resolvedIds: ReadonlySet<number> | null = null;
 let inFlight: Promise<ReadonlySet<number>> | null = null;
 
@@ -62,13 +38,12 @@ export function loadPlannableTypeIds(): Promise<ReadonlySet<number>> {
       return resolvedIds;
     })
     .catch((err: unknown) => {
-      inFlight = null; // allow retry after failure, as `loadSde`'s cache does
+      inFlight = null;
       throw err;
     });
   return inFlight;
 }
 
-/** The loaded set, or null while `pi.json` has never resolved. Never fetches. */
 export function peekPlannableTypeIds(): ReadonlySet<number> | null {
   return resolvedIds;
 }

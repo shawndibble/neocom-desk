@@ -1,9 +1,3 @@
-/**
- * Per-layer presentation for the net worth chart (issue #2935). Hues reuse the
- * existing nominal `kind-*` tokens (DESIGN §1) — no new palette. Colour is
- * never the only signal: the legend carries a swatch beside each label, and
- * gaps are hatched.
- */
 import type { LayerId } from '@/engine/netWorth/series';
 
 export const LAYER_LABEL_KEYS: Record<LayerId, string> = {
@@ -30,7 +24,6 @@ export const LAYER_SWATCH: Record<LayerId, string> = {
   contracts: 'bg-kind-order-expiry',
 };
 
-/** Character line hues, cycled; a repeat gets a dash pattern so hue is never the only cue. */
 export const CHARACTER_COLORS = [
   'var(--color-kind-contract-expiry)',
   'var(--color-kind-order-expiry)',

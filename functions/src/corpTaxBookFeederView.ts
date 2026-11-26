@@ -1,17 +1,3 @@
-// The feeder view (issue #4512, spec #4504): the read model a moon owner sees, written by the
-// server only. Layout, all under `corps/{collector}/feederViews/{feederCorp}`:
-//
-//   (doc)              FeederViewSummary
-//   days/{date}        FeederViewDay: one covered UTC day
-//   refineries/{id}    FeederViewRefinery
-//   payouts/{id}       FeederViewPayout (a "not a payout" row is left out)
-//   viewers/{uid}      FeederViewerAccess: the 24h access record the rules check (never the book's `officers`)
-//
-// It holds no miner debts, statements, miner rate or margin. `buildFeederView` is pure;
-// `rebuildFeederView` reads the book and writes the diff. Rebuilt on every ledger read, rate
-// request, leave and dismissal (and later payouts and agreed rates: call
-// `rebuildFeederView` / `tryRebuildFeederView` from those writers).
-
 import { utcDay } from './timeConstants.js';
 import { createHash } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
@@ -44,22 +30,13 @@ import { SNAPSHOT_HUBS } from './marketOpenPrices.js';
 import { readFeederRows } from './corpTaxBookFeederRollup.js';
 import { bookRef, feederRef, type BookDeps, type OpenPricesReader } from './corpTaxBookStore.js';
 
-// --- Stored shapes -----------------------------------------------------------
-
-/**
- * `corps/{collector}/feederCoverage/{feederCorp}` (issue #4622): what a miner's personal
- * tab needs of a moon owner, readable by the miners the book bills. Coverage periods and the
- * read clock only: never the payee, rates, notes or the moon owner's name.
- */
 export const FEEDER_COVERAGE = 'feederCoverage';
 
 export interface MemberCoverageDoc {
   coveragePeriods: CoveragePeriod[];
-  /** The last good read of the moon owner's ledger (ms); absent before the first. */
   lastReadWellAt?: number;
 }
 
-/** The member-readable copy of a feeder record: an allow-list, so a new record field never leaks. */
 export function memberCoverageOf(
   record: Pick<FeederRecord, 'coveragePeriods' | 'lastReadWellAt'>
 ): MemberCoverageDoc {
@@ -72,7 +49,6 @@ export function memberCoverageOf(
   };
 }
 
-/** Write (or, with no record, delete) the member-readable copy. */
 export async function writeMemberCoverage(
   db: Firestore,
   collector: number,
@@ -84,7 +60,6 @@ export async function writeMemberCoverage(
   else await ref.delete();
 }
 
-/** Re-read the record and refresh its copy; never throws (the next rebuild writes it again). */
 export async function refreshMemberCoverage(
   db: Firestore,
   collector: number,
@@ -100,7 +75,6 @@ export async function refreshMemberCoverage(
 
 export interface FeederViewSummary {
   schemaVersion: 1;
-  /** Absent on a summary built before #6209. */
   rulesVersion?: number;
   feederCorporationId: number;
   collectorCorporationId: number;
@@ -121,55 +95,29 @@ export interface FeederViewSummary {
   minedVolume: number;
   minedValueIsk: number;
   accruedIsk: number;
-  /**
-   * Ore value at 100% over covered, Billable days with no agreed rate yet (#6209): owed once a
-   * rate is agreed. Absent on a summary built before it.
-   */
   pendingValueIsk?: number;
   paidIsk: number;
   balanceKind: 'owed' | 'credit' | 'even' | 'none';
   balanceIsk: number;
   lastPayout: { date: string; amount: number } | null;
   refineryCount: number;
-  /** The refineries counted (#6097): the Moon owners tab unions them with the Extractions'. */
   refineryIds: number[];
   unpricedDays: number;
   dismissedAt: number | null;
-  /** A pending removal's start and, once its notice is out, when it takes effect (#4520). */
   removalStartedAt?: number | null;
   removalEffectiveAt?: number | null;
-  /** Who the moon owner is paid as (#4619); null when unset, meaning the moon owner corporation. */
   payee?: Payee | null;
-  /** Which side set the payee last, and when (#4653); null when unknown. Never the officer. */
   payeeSetBy?: { side: 'accounting' | 'moon-owner'; at: number } | null;
-  /**
-   * The grant reads refinery names (#4654). False on a grant from before, so the page offers to
-   * grant again; absent on a view built before it existed.
-   */
   refineryNamesGranted?: boolean;
-  /**
-   * The grant reads the Extraction started notifications, so each chunk's ore is known. False on a
-   * grant from before, so the page offers to grant again; absent while the record does not know.
-   */
   chunkOreGranted?: boolean;
-  /** The moon owner turned Pop Sharing off (#6222); absent on a view built before it existed. */
   popSharingOptedOut?: boolean;
-  /**
-   * Hash of everything else the view holds, `builtAt` aside. A rebuild that hashes the same skips
-   * every write; absent on a view built before it existed (#5241).
-   */
   contentHash?: string;
 }
 
-/**
- * One ore a character mined at one refinery on one day. The moon owner sees what the in-game
- * ledger shows: ore and quantity, never an ISK value or the accounting side's rate or due (#5261).
- */
 export interface FeederViewDayLine {
   characterId: number;
   structureId: number;
   typeId: number;
-  /** Same as `quantity`; older clients read it. */
   volume: number;
   quantity: number;
 }
@@ -181,11 +129,9 @@ export interface FeederViewDay {
 
 export interface FeederViewRefinery {
   structureId: number;
-  /** The label either side's officers set (#4640); the client runs the rest of the label chain. */
   label: string | null;
   labelSetAt: string | null;
   solarSystemId: number | null;
-  /** The structure's name, read with the moon owner's grant (#4654); null when not readable. */
   structureName: null | string;
 }
 
@@ -195,16 +141,13 @@ export interface FeederViewPayout {
   amount: number;
   method: 'donation' | 'other';
   status: 'recorded' | 'waiting-for-journal' | 'matched';
-  /** The moon owner flagged it as a payment it disputes (#6209); absent when it did not. */
   disputed?: true;
 }
 
-/** `feederViews/{feeder}/viewers/{uid}`: what firestore.rules reads to let a moon owner in. */
 export interface FeederViewerAccess {
   uid: string;
   characterId: number;
   ownerHash: string;
-  /** The moon owner's corporation, which must equal the feeder id in the path. */
   corporationId: number;
   canView: true;
   canEdit: boolean;
@@ -212,7 +155,6 @@ export interface FeederViewerAccess {
   expiresAt: number;
 }
 
-/** What a moon owner's officer is told after the access check. */
 export interface FeederViewAccessResult {
   collectorCorporationId: number;
   expiresAt: number;
@@ -227,14 +169,11 @@ export const FEEDER_VIEW_VIEWERS = 'viewers';
 export const feederViewRef = (db: Firestore, collector: number, feeder: number) =>
   bookRef(db, collector).collection(FEEDER_VIEWS).doc(String(feeder));
 
-// --- Pure pieces -------------------------------------------------------------
-
 export interface SidePrices {
   buy: number | null;
   sell: number | null;
 }
 
-/** The Corp Tax Book's hub id as its station (the Trade Hubs mirror), Jita when unknown. */
 export function hubStationId(hubId: string): number {
   return (SNAPSHOT_HUBS.find((h) => h.id === hubId) ?? SNAPSHOT_HUBS[0]).stationId;
 }
@@ -244,7 +183,6 @@ export const priceKey = (typeId: number, date: string) => `${typeId}:${date}`;
 const isNumberOrNullArray = (v: unknown): v is (number | null)[] =>
   Array.isArray(v) && v.every((x) => x === null || typeof x === 'number');
 
-/** One R2 open-prices object as the station's end-of-day buy and sell by date; malformed gives nothing. */
 export function parseOpenPriceDays(body: unknown, stationId: number): Map<string, SidePrices> {
   const out = new Map<string, SidePrices>();
   if (typeof body !== 'object' || body === null) return out;
@@ -263,7 +201,6 @@ export function parseOpenPriceDays(body: unknown, stationId: number): Map<string
   return out;
 }
 
-/** What the view reads of a feeder record. */
 export type FeederViewRecord = Pick<
   FeederRecord,
   | 'status'
@@ -292,10 +229,8 @@ export type FeederViewRecord = Pick<
 
 const iso = (ms: number) => new Date(ms).toISOString();
 
-// The rate history and mode switches a record implies: the engine mirror's, re-exported for callers.
 export { deriveModeChanges, deriveOwnerRateHistory };
 
-/** The history with a requested rate dated today. A request never changes the effective rate once one is agreed. */
 export function appendRequestedRate(
   record: FeederViewRecord,
   pct: number,
@@ -303,7 +238,6 @@ export function appendRequestedRate(
 ): OwnerRateEntry[] {
   const history = deriveOwnerRateHistory(record);
   const lastRequest = [...history].reverse().find((e) => e.kind === 'requested');
-  // Re-sending the standing request adds nothing to the history.
   if (lastRequest?.pct === pct) return history;
   return [...history, { kind: 'requested', pct, effectiveFrom: utcDay(now), recordedAt: iso(now) }];
 }
@@ -326,14 +260,8 @@ export interface FeederViewInput {
   graceHours: number;
   oreForm: 'compressed' | 'raw';
   compressedByRaw: Readonly<Record<string, number>>;
-  /** Observed rows the feeder's refineries recorded, every day. */
   rows: readonly FeederViewRow[];
-  /** The hub station's end-of-day prices, by `priceKey(oreFormTypeId, date)`. */
   prices: ReadonlyMap<string, SidePrices>;
-  /**
-   * The unit prices an issued Late notice listed each miner's line at, by the line's `chargeKey`
-   * (`characterId:structureId:date`) then raw type id: what an unsaved day falls back to (#6209).
-   */
   billedPrices?: ReadonlyMap<string, Readonly<Record<string, number>>>;
   payouts: readonly (FeederPayout & { id: string })[];
 }
@@ -345,14 +273,12 @@ export interface FeederView {
   payouts: FeederViewPayout[];
 }
 
-/** The latest entry of one kind in effect on `today` (a request never reaches back). */
 const latestPct = (
   history: readonly OwnerRateEntry[],
   kind: OwnerRateEntry['kind'],
   today: string
 ) => latestOwnerRate(history, kind, today)?.pct ?? null;
 
-/** A row's notice line key (engine `observedEntryKey`): character, refinery and day. */
 const chargeKeyOf = (r: Pick<FeederViewRow, 'characterId' | 'structureId' | 'date'>) =>
   `${r.characterId}:${r.structureId}:${r.date}`;
 
@@ -389,8 +315,6 @@ export function buildFeederView(input: FeederViewInput): FeederView {
     }
     if (!isDayCovered(record.coveragePeriods, r.date)) continue;
     const priced = oreFormTypeId(r.typeId, input.compressedByRaw, compressed);
-    // The accounting side prices a moon owner's accrual with the same rule (#4621); a day with
-    // no saved price takes what the miner's line was billed at (#6209).
     const billed = input.billedPrices?.get(chargeKeyOf(r))?.[String(r.typeId)];
     const unit = moonOwnerUnitPrice(input.prices.get(priceKey(priced, r.date)), billed);
     const value = r.quantity * unit;
@@ -498,8 +422,6 @@ export function buildFeederView(input: FeederViewInput): FeederView {
   return {
     summary,
     days,
-    // A row's own system, else the structure lookup's (#4654), else one learned from a miner's
-    // ledger (#4650).
     refineries: [...refineries.values()]
       .map((r) => {
         const looked = record.refineryStructures?.[String(r.structureId)];
@@ -527,7 +449,6 @@ export function buildFeederView(input: FeederViewInput): FeederView {
   };
 }
 
-/** What the view holds, as one digest: equal digests mean a rebuild would write nothing new. */
 export function feederViewHash(view: FeederView): string {
   const summary: Partial<FeederViewSummary> = { ...view.summary };
   delete summary.builtAt;
@@ -541,11 +462,8 @@ export function feederViewHash(view: FeederView): string {
     .digest('hex');
 }
 
-// --- Rebuild -----------------------------------------------------------------
-
 const PRICE_READ_CONCURRENCY = 16;
 
-/** Make `col` hold exactly `next`, writing only what differs. */
 async function syncDocs(
   db: Firestore,
   col: CollectionReference,
@@ -582,11 +500,6 @@ async function loadPrices(
   return prices;
 }
 
-/**
- * What the Late notices listed the miners' lines at, for the covered rows with no saved price
- * (#6209). Reads nothing when every row is priced; else only the notices that can list the
- * earliest such day (issued on or after it).
- */
 async function readBilledPrices(
   book: FirebaseFirestore.DocumentReference,
   rows: readonly FeederViewRow[],
@@ -618,11 +531,6 @@ async function readBilledPrices(
   return out;
 }
 
-/**
- * Read the book and write the feeder's view. Returns false when there is no feeder record.
- * Throws when a price read fails, leaving the earlier view untouched: a half-priced view would
- * understate what is owed.
- */
 export async function rebuildFeederView(
   deps: BookDeps,
   collector: number,
@@ -633,13 +541,10 @@ export async function rebuildFeederView(
   const [bookSnap, recordSnap, rows, payoutSnap] = await Promise.all([
     book.get(),
     recordRef.get(),
-    // Every row, from the feeder's day-and-refinery mirror: what is owed sums every covered
-    // day, so a capped (unordered) read would drop an arbitrary slice and understate it.
     readFeederRows(deps.db, book, feeder),
     recordRef.collection(FEEDER_VIEW_PAYOUTS).get(),
   ]);
   const record = recordSnap.data() as FeederRecord | undefined;
-  // Before pricing: coverage and the read clock reach the miners even when a price read fails.
   await writeMemberCoverage(deps.db, collector, feeder, record);
   if (!record) return false;
 
@@ -653,7 +558,6 @@ export async function rebuildFeederView(
     if (!isDayCovered(record.coveragePeriods, r.date)) continue;
     pricedTypes.add(oreFormTypeId(r.typeId, COMPRESSED_ORE_TYPE_IDS, oreForm === 'compressed'));
   }
-  // No reader would price every day at 0 and overwrite a good view, so refuse instead.
   if (!deps.openPrices) throw new Error('rebuildFeederView needs an open-prices reader');
   const prices = await loadPrices(
     deps.openPrices,
@@ -682,14 +586,10 @@ export async function rebuildFeederView(
   });
 
   const ref = feederViewRef(deps.db, collector, feeder);
-  // Nothing changed: the summary is the only read, and nothing is written, so its `builtAt`
-  // (the client's stamp) stays put.
   const contentHash = feederViewHash(view);
   if ((await ref.get()).get('contentHash') === contentHash) return true;
   const toDocs = <T extends object>(items: T[], id: (item: T) => string) =>
     new Map(items.map((item) => [id(item), item]));
-  // Three disjoint collections; the summary goes last, once all of them hold. allSettled: no
-  // write is still running when a failure reaches the caller.
   const synced = await Promise.allSettled([
     syncDocs(
       deps.db,
@@ -713,7 +613,6 @@ export async function rebuildFeederView(
   return true;
 }
 
-/** `rebuildFeederView` for writers that must not fail on it: the earlier view stays and the next trigger retries. */
 export async function tryRebuildFeederView(
   deps: BookDeps,
   collector: number,

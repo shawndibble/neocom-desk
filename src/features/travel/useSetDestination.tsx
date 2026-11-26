@@ -1,17 +1,6 @@
-/**
- * Sends one place — an NPC station, a player structure or a solar system — to
- * the active (or a given) Character's EVE client as its autopilot destination: one
- * waypoint, clearing the others, the in-game "Set Destination". Shared by the
- * order book's "Set destination" button (`market/SetDestinationButton.tsx`)
- * and the row menus' "Set waypoint in game" (`SetWaypointMenuItem.tsx`), so
- * the two can't drift in who may send or what the outcome says.
- *
- * `locationId` must already be a place. An asset's or a blueprint's raw
- * `location_id` can be a container, ship or hangar item id, which ESI
- * refuses; those callers resolve it to its station first.
- */
 import { useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import type { Outcome } from '@/components/OutcomeNote';
 import { GrantMissingLink } from '@/app/GrantMissingLink';
 import { useCharacterLacksEndpoints } from '@/app/useGrantedScopes';
 import { useActiveCharacter } from '@/stores/activeCharacter';
@@ -20,30 +9,19 @@ import { setWaypointsInGame } from './sendWaypoints';
 import type { ScopeGroup } from '@/esi/registry';
 import { WAYPOINT_ENDPOINTS, WAYPOINT_GROUPS, waypointOutcome } from './waypointOutcome';
 
-type SetDestinationOutcome = { tone: 'status' | 'alert'; text: ReactNode } | null;
-
 interface SetDestination {
-  /** Why sending can't work yet — no Character, or no waypoint scope — or null when it can. */
   blockedReason: ReactNode;
-  /** Sending is blocked only because the browser is offline: the item reads "Needs a connection". */
   offline: boolean;
-  /** The Permissions blocking it, for a menu that can't carry a link in its reason; empty otherwise. */
   missingGroups: readonly ScopeGroup[];
   sending: boolean;
-  outcome: SetDestinationOutcome;
-  /** No-ops while blocked. */
+  outcome: Outcome | null;
   send: () => void;
 }
 
 export function useSetDestination(
   locationId: number,
   placeName: string,
-  /** `false` adds the place to the end of the route instead of replacing the route. */
   clearOthers = true,
-  /**
-   * Whose client to send it to: a row's own Character (a turn-in's, issue #6705).
-   * The active Character when omitted; `null` is no Character.
-   */
   forCharacterId?: number | null
 ): SetDestination {
   const { t } = useTranslation();
@@ -52,8 +30,7 @@ export function useSetDestination(
   const lacksScope = useCharacterLacksEndpoints(characterId, WAYPOINT_ENDPOINTS);
   const online = useOnline();
   const [sending, setSending] = useState(false);
-  const [outcome, setOutcome] = useState<SetDestinationOutcome>(null);
-  /** `sending` lags a render behind; two quick selects must not both send. */
+  const [outcome, setOutcome] = useState<Outcome | null>(null);
   const inFlight = useRef(false);
 
   const blockedReason =

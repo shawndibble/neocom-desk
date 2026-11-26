@@ -1,9 +1,3 @@
-/**
- * Close a guest's account (epic #4055, #4184): a final late notice of the unpaid days no notice
- * listed, then late notice mail stops. Credit is refunded unless the
- * guest consented to forfeit it or went 90 days without replying. Its own file
- * so the Miner page carries only the button and this mount.
- */
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SegmentedControl, TextArea, TextInput, LiveNote } from '@/components/ui';
@@ -20,7 +14,6 @@ import { useBook } from './useBook';
 import { noticeRefineryNames, useCorporationName } from './lateNoticeMailing';
 
 type Basis = 'consent' | 'no-reply';
-/** What happens to what is still owed: a final late notice goes out, or the tax is waived. */
 type Settle = 'notice' | 'dismiss';
 
 export function CloseAccountDialog({
@@ -84,7 +77,6 @@ export function CloseAccountDialog({
                 },
               }
             : undefined;
-        // Waive first, so the close finds nothing to bill; a failed close can be retried.
         if (dismissing) {
           await edit({
             action: 'dismiss',
@@ -100,7 +92,6 @@ export function CloseAccountDialog({
           reason: reason.trim(),
           credit: disposition,
           ...(notice ? { notice } : {}),
-          // The Running account's credit only this client can price (#6294).
           ...(plan ? { runningCredit: Math.round(plan.creditAfter) } : {}),
         });
         onClosed?.();

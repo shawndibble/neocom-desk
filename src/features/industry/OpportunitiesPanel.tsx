@@ -1,15 +1,3 @@
-/**
- * Build Opportunities (issue #642): ranks every manufacturing blueprint and
- * reaction formula (issue #5990) the chosen character(s) own by ISK/hour,
- * owned-materials-adjusted, at the default trade hub — the same seeding/sorting/costing layer over
- * `computeBuildPlan`/`buildVsBuy` that Build Plan Compare already prices
- * plans with, just run over every owned blueprint instead of a hand-picked
- * set. Selected rows seed real Build Plans into Compare via `onAddToCompare`.
- *
- * Whose blueprints it ranks is Industry's one Character filter
- * (`useIndustryCharacterFilter`), the same value Active Jobs reads; its
- * picker rides in the Industry `PageHeader`.
- */
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { useMemo, useState, type ReactElement } from 'react';
 import { useCharacterModifiersByCharacter } from '@/features/character/characterModifiers';
@@ -111,39 +99,16 @@ interface OpportunitiesPanelProps {
   facilityDefaults: ActivityFacilityDefaults;
   activeCharacterId: number;
   ownedStockSnapshot: OwnedStockSnapshot;
-  /**
-   * ME to quote an unowned sub-build at — `buildPlanPricingInputs.ts`'s
-   * `assumedMe`, the one pricing input this panel reads (#2055).
-   * `Industry.tsx` doesn't mount this panel until `pricingInputs.hydrated`,
-   * so this is always the pilot's own setting, never the default (#2054).
-   */
   assumedMe: number;
-  /** What a Build Plan page prices against; the Corp projects view resolves its rows through it. */
   pricingInputs: BuildPlanPricingInputs;
   onAddToCompare: (rows: readonly OpportunityRow[]) => void;
-  /** Saves the Corp projects rows' plans and opens Compare with them. */
   onAddProjectsToCompare: (plans: readonly BuildPlanRecord[]) => void;
-  /** Resolves true once it has opened the new plan (see `StartPlanButton`). */
   onStartPlan: (entry: BlueprintCatalogEntry, seed?: OpportunityPlanSeed) => Promise<boolean>;
-  /**
-   * The oldest blueprint fetch behind these rows, or null — reported up
-   * rather than drawn here, so the route can show it beside the page title
-   * (`PageHeader.meta`) instead of crowding this panel's header.
-   */
   onDataAgeChange?: (date: Date | null) => void;
 }
 
-/**
- * The columns' sort keys, at module scope: the columns themselves close over
- * selection state and `onStartPlan` (which the parent rebuilds every
- * render), but `DataTable` keys its sort memo on the active `sortValue`, so
- * keeping these stable is what stops a re-render from re-sorting every row.
- */
 const SORT_VALUE = {
   product: (row: OpportunityRow) => row.candidate.catalogEntry.productName,
-  // -1 means BPO/unlimited runs — sorts as the largest, not the smallest.
-  // `MAX_SAFE_INTEGER` rather than `Infinity`: two BPO rows would compare
-  // `Infinity - Infinity`, which is `NaN`.
   blueprint: (row: OpportunityRow) =>
     row.candidate.blueprint.runs === -1 ? Number.MAX_SAFE_INTEGER : row.candidate.blueprint.runs,
   unitMargin: (row: OpportunityRow) => unitMargin(row) ?? undefined,
@@ -155,20 +120,13 @@ const SORT_VALUE = {
   iskPerHour: (row: OpportunityRow) => row.result.iskPerHour ?? undefined,
   orderDepth: (row: OpportunityRow) => ORDER_DEPTH_RANK[row.orderDepth],
 };
-/**
- * Ranked (the default) or "All owned" (issue #2335): the same owned
- * blueprints and Character filter, either priced and ranked or listed whole.
- */
 const VIEW_PARAM = enumParam(['ranked', 'owned', 'corp'] as const, 'ranked');
-/** "Use my stock" (issue #2847): narrow Ranked to builds owned stock covers. */
 const STOCK_PARAM = enumParam(['any', 'mostly', 'full'] as const, 'any');
-/** Ranked's two row filters, read and written as one so Reset clears both in one URL write. */
 const FILTER_PARAMS = {
   'opps.stock': STOCK_PARAM,
   [OPPORTUNITIES_ACTIVITY_KEY]: OPPORTUNITIES_ACTIVITY_PARAM,
 };
 
-/** Module-level so the table's windowing sees one stable function. */
 const opportunityRowKey = (row: OpportunityRow) => row.candidate.id;
 const opportunityRowClassName = (row: OpportunityRow) =>
   row.reactionLocation ? 'text-text-dim' : undefined;
@@ -196,7 +154,6 @@ export function OpportunitiesPanel({
   const [filters, setFilters] = useUrlParams(FILTER_PARAMS);
   const stockFilter = filters['opps.stock'];
   const activityFilter = filters[OPPORTUNITIES_ACTIVITY_KEY];
-  // Industry's one page-wide filter; its picker rides in the Industry `PageHeader`.
   const [characterFilter] = useIndustryCharacterFilter();
   const {
     characterIds,
@@ -217,9 +174,6 @@ export function OpportunitiesPanel({
     onDataAgeChange,
   });
 
-  // Corp projects (issue #4786) is a view only for a Character that can see
-  // some: no permission, no corporation or no open manufacture project leaves
-  // it out, and a stale `?opps.view=corp` then reads as Ranked.
   const corpProjects = useCorpProjects(characterIds);
   const corpEntries = useMemo(
     () =>
@@ -232,12 +186,8 @@ export function OpportunitiesPanel({
   const showCorpProjects = corpEntries.length > 0;
   const view =
     urlView === 'corp' && !showCorpProjects && !corpProjects.loading ? 'ranked' : urlView;
-  // The option stays listed while the corp view is open, even as the reads refresh.
   const corpOptionShown = showCorpProjects || view === 'corp';
 
-  // Every candidate's own Build Plan, for `hubForCharacter` below (issue
-  // #2055): the same Trade Hub a fresh plan for that Character would default
-  // to (`mostRecentlyUpdatedPlan`'s rule), not a hard-coded default.
   const plansQuery = useLiveQuery(
     () => db.buildPlans.where('characterId').anyOf(characterIds).toArray(),
     [characterIds],
@@ -252,8 +202,6 @@ export function OpportunitiesPanel({
     }
     return map;
   }, [plansQuery]);
-  // The Industry page hub (its entry, or Global) is part of what a row prices at:
-  // a change re-keys the batch so rows re-price at it.
   const { hubId: industryHubId } = useHubFor('industry');
   const industryPricePercent = usePricePercentFor('industry');
   const resolveHubForCharacter = useMemo(
@@ -262,16 +210,11 @@ export function OpportunitiesPanel({
     [plansByCharacter, industryHubId]
   );
 
-  // The same latest plan, whose price basis and build location a fresh plan starts
-  // from: rows price with the plan page's settings, not their own defaults.
   const defaultsForCharacter = useMemo(
     () => (characterId: number) => mostRecentlyUpdatedPlan(plansByCharacter.get(characterId)),
     [plansByCharacter]
   );
 
-  // Each owning Character's own standings/skills (issue #2055), not just the
-  // active Character's — a candidate seeded by an alt prices at that alt's
-  // real broker fee, not the pilot currently viewing the panel.
   const modifiersByCharacter = useCharacterModifiersByCharacter(characterIds, {
     skipQueueWithoutScope: true,
     levels: 'effective',
@@ -301,9 +244,6 @@ export function OpportunitiesPanel({
     pricePercent: industryPricePercent,
   });
 
-  // Each product's history in its own row's hub region, for "vs 90d". Held while
-  // ranking streams partial rows (each batch would restart the fan-out), and
-  // never for All owned, which has no such column.
   const vs90dTargets = useMemo(
     () =>
       view !== 'ranked' || loading
@@ -343,9 +283,6 @@ export function OpportunitiesPanel({
   }
   const selectedRows = rows.filter((row) => selectedIds.has(row.candidate.id));
 
-  // Account-wide, not this panel's own `characterFilter` (issue #1231): a
-  // gate must stay true regardless of which character the filter happens to
-  // be scoped to, the same precedent `MarketWideOpportunitiesPanel` sets.
   const skillGateCharacterIds = useMemo(
     () => characterCandidates.map((c) => c.characterId),
     [characterCandidates]
@@ -364,18 +301,12 @@ export function OpportunitiesPanel({
     return verdicts;
   }, [rows, accountSkills]);
 
-  // Mounting `PriceHistoryPanel` reads the item's market history
-  // (`loadPriceHistory`) for the chart — kept out of the row tree until a
-  // pilot asks for one. The "vs 90d" column already read the same series
-  // through the shared cache, so opening a row costs no new request.
   const [historyItem, setHistoryItem] = useState<{
     typeId: number;
     itemName: string;
     regionId: number;
   } | null>(null);
 
-  // The desktop twin of the phone card's "…" menu: the shared item menu plus
-  // Price history, the one action the ranked row's click doesn't carry.
   function rowContextMenu(row: OpportunityRow, tr: ReactElement) {
     const { productTypeID, productName } = row.candidate.catalogEntry;
     if (productTypeID === null) return tr;
@@ -418,7 +349,6 @@ export function OpportunitiesPanel({
     columns: csvColumns,
   });
 
-  // A row click is the Start plan button's action, so the product name needs no link of its own.
   const startPlanFromRow = useRowStartPlan(
     (row: OpportunityRow) => onStartPlan(row.candidate.catalogEntry, row),
     (row) => row.candidate.catalogEntry
@@ -431,15 +361,9 @@ export function OpportunitiesPanel({
 
   const columns: DataTableColumn<OpportunityRow>[] = [
     {
-      // Desktop-only column now (`isDesktop` gates this whole `DataTable`
-      // below — see the render branch): the `cardCorner`/enlarged-target
-      // fix this column carried for the stacked layout moved to
-      // `MobileOpportunityList`'s own corner-pinned checkbox once the phone
-      // list stopped going through `DataTable` at all.
       id: 'select',
       header: '',
       width: COL_ICON,
-      // The label is the 36px touch target on a coarse pointer; it grows the cell, never overlays a neighbour.
       render: (row) => (
         <label className={touchCheckboxLabelClassName}>
           <Checkbox
@@ -496,15 +420,9 @@ export function OpportunitiesPanel({
         return margin !== null ? iskToneClass(margin) : undefined;
       },
       render: (row) =>
-        // Blank, not "unknown": the ISK/hour cell says what to do (issue #5990).
         row.reactionLocation
           ? null
-          : numericCell(
-              unitMargin(row),
-              // Tap: the figure is inert — the row's own controls are buttons of their own.
-              (v) => <IskAmount value={v} decimals={0} />,
-              unknown
-            ),
+          : numericCell(unitMargin(row), (v) => <IskAmount value={v} decimals={0} />, unknown),
     },
     {
       id: 'margin',
@@ -572,7 +490,6 @@ export function OpportunitiesPanel({
           ? t('industry.opportunitiesSetReactionLocation')
           : numericCell(
               row.result.iskPerHour,
-              // Tap: the figure is inert — the row's own controls are buttons of their own.
               (v) => (
                 <span className="inline-flex items-center justify-end gap-1">
                   <IskAmount value={v} decimals={0} />
@@ -618,9 +535,6 @@ export function OpportunitiesPanel({
       ),
     },
     {
-      // Same pattern `MarketWideOpportunitiesPanel` sets (issue #1781): a
-      // direct per-row action rather than routing every plan through the
-      // Compare button, which needs 2+ selected rows to do anything.
       id: 'action',
       header: '',
       width: '16ch',
@@ -647,7 +561,6 @@ export function OpportunitiesPanel({
     columns.map((column) => column.id)
   );
 
-  // `undefined` on desktop, not an empty element: `Panel` pads its header by `leading`'s truthiness.
   const viewPicker = isDesktop ? undefined : (
     <OpportunitiesViewPicker
       view={view}
@@ -655,10 +568,6 @@ export function OpportunitiesPanel({
       showCorpProjects={corpOptionShown}
     />
   );
-  // Owning no blueprint at all leaves nothing to filter: the scan above is the
-  // first step, so Ranked's filter rows hide. Only once every read has landed
-  // (an empty map also means loading or failed), never while Corp projects is
-  // offered (the toggle is its only way in). The phone's view picker stays: it is the title.
   const ownsNoBlueprints = [...ownedByCharacter.values()].every((list) => list.length === 0);
   const hideFilters =
     ownsNoBlueprints &&

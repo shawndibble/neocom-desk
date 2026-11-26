@@ -9,19 +9,12 @@ import { formatTimestamp } from '@/lib/timestamp';
 
 export type DscanShareState = { status: 'invalid' } | { status: 'ready'; rows: DscanRow[] };
 
-/**
- * The **Shared D-Scan** a Share Link opens (`routes/SharedLink.tsx`): the
- * scan's ships grouped by role (the Fleet board), rebuilt from the stored raw text by the same
- * view the live Pilot Lookup uses. Read-only; "Open Neocom Desk" carries the
- * scan into the live view.
- */
 export function DscanShareScreen({
   state,
   expiresAt,
   openInApp,
 }: {
   state: DscanShareState;
-  /** Epoch millis the Share Link dies at — shown, since the recipient never saw the sender's "works for 7 days". */
   expiresAt: number;
   openInApp?: OpenInApp;
 }) {

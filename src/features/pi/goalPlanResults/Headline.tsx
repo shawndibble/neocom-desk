@@ -1,7 +1,3 @@
-/**
- * Is it worth it: the **Lift** over the **Baseline** (never a gross margin),
- * whether every goal is met, and the caveats behind the numbers.
- */
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
@@ -28,7 +24,6 @@ import { commodityName } from '../goalPlannerFormat';
 import type { GoalAttainment, PlanCaveats } from '../goalPlanView';
 import { HOURS_PER_DAY, formatPercent, namesList, signedCompact, type PlanNames } from './format';
 
-/** A signed ISK/day figure. Zero is neutral: the sign is the whole point of a Lift. */
 function SignedIsk({ perHour }: { perHour: number }) {
   const perDay = perHour * HOURS_PER_DAY;
   const rounded = clampIskZero(perDay, 0);
@@ -53,7 +48,6 @@ export interface HeadlineProps {
   caveats: PlanCaveats;
   hasGoals: boolean;
   pricesFetchedAt: Date;
-  /** Jumps between colonies and to the hub are still being counted. */
   distancesPending: boolean;
   names: PlanNames;
 }
@@ -69,7 +63,6 @@ function liftSentence(verdict: PlanVerdict, lift: string, t: TFunction): string 
   }
 }
 
-/** The hauling half of the verdict: effort (m3 x jumps) against the Baseline. */
 function haulSentence(verdict: PlanVerdict, pending: boolean, t: TFunction): string | null {
   if (pending) return t('piPlan.verdictHaulPending');
   if (verdict.distances === 'unknown') return t('piPlan.verdictHaulUnknown');
@@ -102,15 +95,9 @@ function attainmentText(attainment: GoalAttainment, pi: PiData, t: TFunction): s
   });
 }
 
-/**
- * The verdict, announced politely once the inputs settle — half a second
- * after the last recompute, so typing a rate does not read out every digit.
- */
 function LiveVerdict({ text, pending }: { text: string; pending: boolean }) {
   const [announced, setAnnounced] = useState('');
   useEffect(() => {
-    // Wait for distances so the verdict is said once, but not forever: if
-    // they never land, say what there is after five seconds.
     const timer = setTimeout(() => setAnnounced(text), pending ? 5_000 : 500);
     return () => clearTimeout(timer);
   }, [text, pending]);
@@ -148,8 +135,6 @@ export function Headline({
   }
 
   const short = hasGoals && attainment.unmet.length > 0;
-  // Rates and customs only matter to a plan with goals; a price read off the
-  // ask flatters the Baseline as much as the plan, so it is said either way.
   const caveatLines = [
     hasGoals && caveats.estimatedRates.length > 0
       ? t('piPlan.caveatRates', { names: caveats.estimatedRates.map(names.planet).join(', ') })

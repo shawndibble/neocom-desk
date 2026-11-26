@@ -1,19 +1,11 @@
 import type { MinerRow } from './bookView';
 
-/**
- * Overdue debt by age, as a collections list reads it (Stripe Billing's invoice age):
- * 0–30, 31–60, 61–90 and over 90 days past due. A Miner counts once, in the bucket of its
- * oldest overdue Statement (`MinerRow.overdueDays`), with its whole debt, so the buckets
- * add up to the Overdue total.
- */
 export const OVERDUE_AGE_BUCKETS = ['0-30', '31-60', '61-90', 'over-90'] as const;
 export type OverdueAgeBucket = (typeof OVERDUE_AGE_BUCKETS)[number];
 
 export interface OverdueAgeRow {
   id: OverdueAgeBucket;
-  /** Miners in the bucket. */
   count: number;
-  /** What those Miners owe. */
   amount: number;
 }
 
@@ -26,7 +18,6 @@ export function overdueAgeBucketOf(days: number): OverdueAgeBucket {
   return 'over-90';
 }
 
-/** Every bucket, in age order; an empty one stays at zero so the list never reshapes. */
 export function overdueAging(miners: readonly AgedMiner[]): OverdueAgeRow[] {
   const rows = OVERDUE_AGE_BUCKETS.map((id) => ({ id, count: 0, amount: 0 }));
   for (const m of miners) {
@@ -38,7 +29,6 @@ export function overdueAging(miners: readonly AgedMiner[]): OverdueAgeRow[] {
   return rows;
 }
 
-/** The Miners tab's Balance filter (`?balance=`): who owes, who is overdue (by age), who holds credit. */
 export const MINER_BALANCES = [
   'owing',
   'overdue',
@@ -47,7 +37,6 @@ export const MINER_BALANCES = [
 ] as const;
 export type MinerBalance = 'owing' | 'overdue' | `overdue-${OverdueAgeBucket}` | 'credit';
 
-/** The Balance filter value that lists one age bucket's Miners. */
 export function balanceOfBucket(bucket: OverdueAgeBucket): `overdue-${OverdueAgeBucket}` {
   return `overdue-${bucket}`;
 }
@@ -58,7 +47,6 @@ export function matchesMinerBalance(m: AgedMiner, balance: MinerBalance): boolea
       return m.owed > 0;
     case 'overdue':
       return m.overdueDays !== null;
-    // A sub-ISK remainder is no credit, as the Credit column shows it.
     case 'credit':
       return Math.round(m.credit) > 0;
     case 'overdue-0-30':

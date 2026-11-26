@@ -1,12 +1,3 @@
-/**
- * Pledge mail: when a Member Pledges on a Request that asked for mail, one
- * in-game mail goes to the requester from the Pledger's own Character with
- * their own token (the refresh token never leaves the device). The 100-a-day
- * cap and the once-per-Pledger-per-Request rule are the server's: a slot is
- * reserved before the mail goes out, stamped once it did, and given back when
- * ESI refused it, exactly as the mail invites do (`MailInvitePanel`). A failed
- * mail never undoes the Pledge, which is saved first.
- */
 import { sendMail } from '@/features/character/mail';
 import { mailSafe } from '@/lib/mailSafe';
 import { clipToCodePoints, MAX_MAIL_SUBJECT } from '@/engine/communities/requestMail';
@@ -22,13 +13,6 @@ import {
 import { formatQuantity } from './requestFormat';
 import type { Translate } from '@/lib/translate';
 
-/**
- * `sent`: out and stamped. `unsure`: ESI gave no answer, so it may have been
- * delivered and the slot stays spent. `refused`: ESI said no, nothing went out
- * and the slot was given back. `dailyCap`: not attempted, the day's mails are
- * used. `alreadyMailed`: this Pledger mailed about this Request before.
- * `failed`: the server would not reserve it.
- */
 export type PledgeMailOutcome =
   'sent' | 'unsure' | 'refused' | 'dailyCap' | 'alreadyMailed' | 'failed';
 
@@ -62,7 +46,6 @@ export async function sendPledgeMail(
   });
 }
 
-/** The real calls: the callables for the cap and ESI for the mail, from this Character. */
 export function pledgeMailDeps(
   characterId: number,
   communityId: string,
@@ -83,7 +66,6 @@ export function pledgeMailDeps(
   };
 }
 
-/** One line of the mail: `350,000 x Reactive Metals`, with a copy's runs, ME and TE after it. */
 function lineText(t: Translate, line: RequestLine): string {
   const spec =
     line.kind === 'item'
@@ -107,7 +89,6 @@ function lineText(t: Translate, line: RequestLine): string {
   });
 }
 
-/** The mail the requester gets: who Pledged, what, and where to look. `lines` carry the Pledged quantities. */
 export function buildPledgeMail(
   t: Translate,
   input: {

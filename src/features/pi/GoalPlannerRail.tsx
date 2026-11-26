@@ -1,9 +1,3 @@
-/**
- * The Goal Planner's inputs: what the pilot wants (Goals), what they have
- * (Colonies) and how they operate (Assumptions). Goals lead on a phone, the
- * other two fold into collapsible panels after the results there; on a
- * pointer all three sit in a rail beside the results.
- */
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
@@ -38,14 +32,8 @@ import { PercentInput } from './piControls';
 import { parseDecimal } from './goalPlannerFormat';
 import { PI_MAP_HREF, piProductHref } from './piPlanLink';
 
-/** How long typing pauses before a units box re-plans. */
 const COMMIT_DEBOUNCE_MS = 300;
 
-/**
- * A units box. Text, not `type="number"`, so a comma decimal reads (and the
- * browser never swallows what it cannot parse); committed on Enter, on blur,
- * or once typing pauses — never per digit, since each commit re-plans.
- */
 function UnitsBox({
   value,
   onCommit,
@@ -132,8 +120,6 @@ function excludedText(row: PlannerColonyRow, t: TFunction): string | null {
   }
 }
 
-// --- Goals ---------------------------------------------------------------
-
 export function GoalsSection({
   goals,
   products,
@@ -170,9 +156,6 @@ export function GoalsSection({
           {shown.map((goal) => {
             const product = byId.get(goal.typeId)!;
             return (
-              // The name is a plain link (the browser's link menu stays on it); the
-              // item menu is the row's, behind the ⋮, with Remove folded in rather
-              // than a × beside it (DESIGN.md §6c "Restraint").
               <ItemContextMenu
                 key={goal.typeId}
                 typeId={goal.typeId}
@@ -230,8 +213,6 @@ export function GoalsSection({
     </Panel>
   );
 }
-
-// --- Colonies ------------------------------------------------------------
 
 function ColonyRow({
   row,
@@ -354,7 +335,6 @@ export function ColoniesSection({
   planetName: (planetId: number) => string;
   systemName: (systemId: number) => string;
   size: ControlSize;
-  /** Focus the first colony's customs rate on mount (the `#customs` deep link). */
   focusCustoms?: boolean;
   expanded: boolean;
   onToggleExpanded: () => void;
@@ -403,16 +383,12 @@ export function ColoniesSection({
   );
 }
 
-// --- Assumptions ---------------------------------------------------------
-
 export interface AssumptionsProps {
-  /** The shared PI settings, shown here and edited in the settings form. */
   hubName: string;
   buybackPct: number | null;
   buyTiers: readonly number[];
   fallbackRate: number;
   onFallbackRateChange: (rate: number) => void;
-  /** Whether any colony's rate leans on the fallback — the field shows only then. */
   fallbackInUse: boolean;
   maxP0Types: 1 | 2;
   onMaxP0TypesChange: (value: 1 | 2) => void;
@@ -430,7 +406,6 @@ function Hint({ id, children }: { id: string; children: ReactNode }) {
   );
 }
 
-/** The PI settings at a glance, with the way into the shared form. */
 function SettingsSummary(props: AssumptionsProps) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);

@@ -18,23 +18,16 @@ import { baseFittingStats } from '../__fixtures__/fittingStats';
 import { BUILT_IN_TARGET_PROFILES } from '../targetProfile';
 import type { AppliedWeapon } from '../appliedDps';
 
-/** What each fitted type adds to the fit; the fit's stats are the base plus every module's row. */
 interface Row {
   dps?: number;
   ehp?: number;
   speed?: number;
   cpu?: number;
-  /** Turns the capacitor unstable. */
   capUnstable?: boolean;
-  /** Offsets every module that turns the capacitor unstable. */
   capCover?: boolean;
-  /** A module the pilot switches on; it turns the capacitor unstable only while running. */
   toggled?: boolean;
-  /** Signature radius added, in m. */
   sig?: number;
-  /** Capacitor recharge time added, in ms. */
   recharge?: number;
-  /** Fitting rules this module breaks. */
   breaks?: RuleBreak[];
 }
 
@@ -324,7 +317,6 @@ describe('findImprovements replacing an unflyable module and the capacitor', () 
 });
 
 describe('findImprovements Make Flyable capacitor cover', () => {
-  // Module 2 flies but turns the capacitor unstable; module 6 in place of 5 steadies it.
   const base = fit([1, 5]);
   const fix: ImproveCandidate = { ...candidate(1, 2), fixesUnflyable: true };
   const swapFor = (toTypeId: number, fromTypeId = 5) => ({
@@ -380,7 +372,6 @@ describe('findImprovements Make Flyable capacitor cover', () => {
 });
 
 describe('findImprovements Make Flyable bundles', () => {
-  // Module 2 flies but takes 70 CPU next to module 5's 60: 130 of 100.
   const table = { 1: { cpu: 10 }, 2: { cpu: 70 }, 5: { cpu: 60 }, 6: { cpu: 20 }, 7: { cpu: 55 } };
   const base = fit([1, 5]);
   const prices = { 1: 50, 2: 50, 5: 100, 6: 300, 7: 100 };
@@ -459,9 +450,7 @@ describe('findImprovements guardrails', () => {
   it('Cheaper keeps damage, tank and speed each within 10%', async () => {
     const table = {
       1: {},
-      // Damage 100 → 85: 15% down.
       2: { dps: -15 },
-      // Damage 100 → 92: within 10%, a trade-off.
       3: { dps: -8 },
     };
     const result = await search('cheaper', table, [candidate(1, 2), candidate(1, 3)], {
@@ -637,7 +626,6 @@ describe('rankImproveOptions', () => {
 describe('rankImproveOptions with hull commonality (#5581)', () => {
   const option = (score: number, iskDelta: number | null, toTypeId: number) =>
     ({ score, iskDelta, candidate: candidate(1, toTypeId) }) as unknown as ImproveOption;
-  // Targets 2 and 3 are in a group on most fits; 4 is in a rare one.
   const share = (c: ImproveCandidate) => (c.toTypeId === 4 ? 0.1 : 0.9);
 
   it('puts the more common target group first within 1%, and a clear leader stays first', () => {
@@ -688,7 +676,6 @@ describe('searchableGoal', () => {
 });
 
 describe('improveCandidates', () => {
-  // 10: Tech I root; 11 its Tech II; 12 faction; 13 officer; 14 deadspace; 15 a high-slot sibling.
   const index = buildVariationIndex(
     {
       10: { parentTypeId: null, metaGroupId: 1 },
@@ -715,15 +702,14 @@ describe('improveCandidates', () => {
 
 describe('improveCandidates Rework budget', () => {
   const members = (base: number, n: number) => Array.from({ length: n }, (_, i) => base + i);
-  // Group id -> its members; every member sits in one rack.
   const groups: Record<number, number[]> = {
-    213: members(1000, 8), // Tracking Computer
-    212: members(1100, 8), // Sensor Booster
-    46: members(1200, 8), // Propulsion
-    77: members(1300, 4), // Shield Hardener
-    59: members(2000, 30), // Gyrostabilizer
-    302: members(2100, 30), // Magnetic Field Stabilizer
-    60: members(2200, 3), // Damage Control
+    213: members(1000, 8),
+    212: members(1100, 8),
+    46: members(1200, 8),
+    77: members(1300, 4),
+    59: members(2000, 30),
+    302: members(2100, 30),
+    60: members(2200, 3),
   };
   const rackOf: Record<string, string> = {};
   for (const id of [...groups[213], ...groups[212], ...groups[46], ...groups[77]])
@@ -748,7 +734,6 @@ describe('improveCandidates Rework budget', () => {
   });
 
   describe('with hull commonality (#5581)', () => {
-    // Group 999 is in no goal's table groups; the community fits add it.
     it('adds the community groups after every candidate it makes without them', () => {
       groups[999] = [3000, 3001, 3002];
       for (const id of groups[999]) {
@@ -837,7 +822,6 @@ describe('damageOf', () => {
 
 describe('overIskBudget', () => {
   it('counts an implant set against the same budget as the swaps', () => {
-    // The fit costs 900 and the fix 50; 100 of implants makes 1050.
     expect(overIskBudget(1000, 900, 50, 0)).toBe(false);
     expect(overIskBudget(1000, 900, 50, 100)).toBe(true);
   });
@@ -856,7 +840,6 @@ describe('findImprovements concurrency', () => {
   const table = { 2: { dps: 10 }, 3: { dps: 30 }, 4: { dps: 20 }, 5: { dps: 5 }, 6: { dps: 15 } };
   const candidates = [2, 3, 4, 5, 6].map((to) => candidate(1, to));
 
-  /** Answers later swaps first: the calculation of the swap to type 2 finishes last. */
   const outOfOrder = (inFlight: { now: number; max: number }) => async (f: Fitting) => {
     const typeId = f.modules[0].typeId;
     inFlight.now++;

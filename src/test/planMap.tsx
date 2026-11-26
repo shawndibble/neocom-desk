@@ -8,10 +8,6 @@ import { adviceInput, pi } from '@/features/pi/map/mapFixtures.testutil';
 import { buildMapGraph } from '@/features/pi/map/mapModel';
 import { PlanMap, type PlanMapProps } from '@/features/pi/map/PlanMap';
 
-// Shared harness for the PlanMap tests (src/features/pi/map/PlanMap*.test.tsx), one
-// file per concern so CI runs them in parallel. Each file keeps its own `vi.mock`
-// calls (vitest hoists them per file) and calls installPlanMapHarness() once.
-
 export const graph = buildMapGraph(pi);
 export let advice: PlanAdvice;
 export let adviceNone: PlanAdvice;
@@ -38,7 +34,6 @@ export function renderMap(overrides: Partial<PlanMapProps> = {}, entry = '/') {
   );
 }
 
-/** Resize observers the component created, so a test can report a width the way a browser would. */
 const observers: { cb: ResizeObserverCallback; el: Element }[] = [];
 export function observedElements(): Element[] {
   return observers.map((o) => o.el);
@@ -61,7 +56,6 @@ export function stubPhone(phone: boolean) {
     }) as unknown as MediaQueryList) as typeof window.matchMedia;
 }
 
-// A product tile is a link to its PI detail (`?product=`), not a button.
 export const product = (name: string) =>
   screen.getByRole('link', { name: new RegExp(`^${name}\\. `) });
 export const maybeProduct = (name: string) =>
@@ -73,7 +67,6 @@ export function graphName(typeId: number): string {
   return graph.byId.get(typeId)!.name;
 }
 
-/** Registers the advice build and the per-test browser stubs. Call once at module scope. */
 export function installPlanMapHarness(): void {
   beforeAll(() => {
     advice = buildPlanAdvice(adviceInput('lean'));

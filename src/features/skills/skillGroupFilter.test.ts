@@ -70,8 +70,6 @@ describe('filterSkillGroups', () => {
 
   it('matches multiple skills within one group, listing all of them', () => {
     const result = filterSkillGroups(GROUPS, 'gunnery');
-    // "Gunnery" matches the skill named Gunnery (exact) and the group name is
-    // irrelevant to matching — Small Hybrid Turret does not contain "gunnery".
     expect(result?.visibleGroupNames).toEqual(new Set(['Gunnery']));
     expect(result?.matchedSkillsByGroup.get('Gunnery')?.map((s) => s.name)).toEqual(['Gunnery']);
   });

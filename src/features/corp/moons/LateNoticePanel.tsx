@@ -34,7 +34,6 @@ function Fact({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-/** Mail state from what the book recorded; who a mail went to and whether it was read are not stored. */
 function mailText(
   d: NoticeDetail,
   t: (key: string, opts?: Record<string, unknown>) => string,
@@ -58,7 +57,6 @@ function mailText(
 
 type CopyState = 'idle' | 'copied' | 'failed';
 
-/** Officers only: reads the verify token on click, never earlier, and copies the link. */
 function CopyVerifyLink({ noticeId }: { noticeId: string }) {
   const { t } = useTranslation();
   const { characterId, corporationId } = useBook();
@@ -86,11 +84,6 @@ function CopyVerifyLink({ noticeId }: { noticeId: string }) {
   );
 }
 
-/**
- * One Miner's late notice in a side panel (#5286): the verify page's lines, with what its days
- * stand at on the Miner's Running account and the mail state. No Stop reminders box and no link
- * to the verify page: both act as the Miner. A notice takes no payment of its own.
- */
 export function LateNoticePanel({
   noticeId,
   onClose,
@@ -98,14 +91,12 @@ export function LateNoticePanel({
 }: {
   noticeId: string;
   onClose: () => void;
-  /** False on the Miner's own page, where the link would lead back to it. */
   showMinerLink?: boolean;
 }) {
   const zone = useTimeZone();
   const { t } = useTranslation();
   const { view, names, canEdit } = useBook();
   const detail = noticeDetail(view, noticeId);
-  // The officer who issued it is no Miner of the book: their name is looked up.
   const issuer = useEntityName(detail?.notice.issuedBy);
   if (!detail) return null;
   const { notice } = detail;
@@ -171,7 +162,6 @@ export function LateNoticePanel({
             )}
           </Fact>
           <Fact label={t(k('mail'))}>{mailText(detail, t, zone)}</Fact>
-          {/* The Miner's one code, which the mail asks for; an older notice's own still matches. */}
           <Fact label={t(k('code'))}>
             <span className="font-mono">{minerPaymentCode(notice.minerId)}</span>
           </Fact>
@@ -179,7 +169,6 @@ export function LateNoticePanel({
         <NoticeLines
           notice={{
             ...pricing,
-            // Each line's price sources were the book's own tiers when it was priced.
             lines: notice.lines as unknown as readonly VerifyPayloadLine[],
             amount: notice.listed,
             refineryNames,
