@@ -71,7 +71,7 @@ export function LandingSection({
       className="relative isolate scroll-mt-16 overflow-hidden"
     >
       <LandingBackdrop tone={tone} ship={ship} />
-      <Reveal className="relative mx-auto max-w-6xl px-6 py-16">
+      <Reveal className="relative mx-auto max-w-page px-4 py-16 sm:px-6">
         <p className={cx(hudLabelClassName, 'text-xs text-accent')}>
           {index} · {t(`login.header.${key}`)}
         </p>
