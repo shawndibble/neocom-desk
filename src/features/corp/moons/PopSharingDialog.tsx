@@ -1,8 +1,3 @@
-/**
- * Edits Pop Sharing settings (issue #6222): the Sharing default, or one moon's overrides. A
- * moon lists every setting with "Set for this moon"; one left unticked follows the default,
- * so a later change to the default reaches it. A read-only officer sees the same, disabled.
- */
 import { useId, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Checkbox, FieldError, SegmentedControl, TextArea, TextInput } from '@/components/ui';
@@ -31,7 +26,6 @@ import {
 
 const k = 'corpTaxBook.moons.sharing';
 
-/** A Community the officer can share with: one it is a Member of, or one already chosen. */
 export interface CommunityChoice {
   communityId: string;
   name: string;
@@ -62,14 +56,12 @@ function Row({
   children,
 }: {
   label: string;
-  /** Moon mode: whether this moon sets the setting itself, and the toggle. */
   own?: { checked: boolean; onChange: (v: boolean) => void; disabled: boolean };
   children: ReactNode;
 }) {
   const { t } = useTranslation();
   return (
     <fieldset className="border-t border-line pt-3 first:border-t-0 first:pt-0">
-      {/* The legend stays the fieldset's first child so it names the group. */}
       <legend className="float-left py-2 text-xs text-text-dim">{label}</legend>
       {own && (
         <label className="float-right flex min-h-9 items-center gap-2 text-xs">
@@ -99,20 +91,12 @@ export function PopSharingDialog({
   onSave,
 }: {
   title: string;
-  /** The settings now in effect: the default, or the moon's effective settings. */
   settings: PopSharingSettings;
-  /** Moon mode: the Sharing default, which a setting returns to when unticked. */
   defaults?: PopSharingSettings;
-  /** Moon mode: what the moon overrides now. Absent edits the Sharing default. */
   override?: PopSharingOverride;
   communities: readonly CommunityChoice[];
-  /** The book's own rate, shown for an empty start-link rate. */
   bookRatePct: number | null;
   canEdit: boolean;
-  /**
-   * The book's corporation is in no alliance (public ESI): Alliance reaches nobody, so it says so
-   * and is offered disabled, unless already chosen (it can still be unticked).
-   */
   noAlliance?: boolean;
   onClose: () => void;
   onSave: (patch: Partial<PopSharingSettings> | PopSharingOverridePatch) => Promise<void>;
@@ -142,7 +126,6 @@ export function PopSharingDialog({
               else out.delete(key);
               return out;
             });
-            // Unticked, the setting shows the default again (and drops a half-typed value).
             if (!v && defaults) {
               const field = key === 'ratePct' ? 'rate' : key;
               set(field, draftOf(defaults)[field]);
@@ -172,7 +155,6 @@ export function PopSharingDialog({
       <Row label={t(`${k}.fields.audiences`)} own={ownToggle('audiences')}>
         <ul className="space-y-0.5">
           {audienceChoices(draft.audiences, communities).map((a) => {
-            // Chosen before the corporation left its alliance: still untickable, and says why.
             const unreachable = a.kind === 'alliance' && noAlliance;
             return (
               <li key={audienceKey(a)}>
@@ -203,7 +185,6 @@ export function PopSharingDialog({
           options={POP_TIMES.map((value) => ({
             value,
             label: t(`${k}.popTime.${value}`),
-            // The selected segment stays live so the value still reads; the other is inert.
             disabled: !editable('popTime') && value !== draft.popTime,
           }))}
         />

@@ -48,7 +48,6 @@ import {
   type SourceId,
 } from './vettingRawDataFixtures';
 
-/** Mockup links go nowhere: keep the page where it is. */
 const stay = (e: { preventDefault: () => void }) => e.preventDefault();
 
 export interface BrowserFilters {
@@ -349,7 +348,6 @@ function useColumns(source: SourceId, allCharacters: boolean): DataTableColumn<R
   return columns;
 }
 
-/** A flagged row's way back to its flag: the report scrolls to it. */
 function NewFlagLink({ id, title }: { id: string; title: string }) {
   return (
     <a
@@ -362,7 +360,6 @@ function NewFlagLink({ id, title }: { id: string; title: string }) {
   );
 }
 
-/** Seconds in a corporation, to the day the read ran when the character is still there. */
 function tenureSeconds(row: RawRow): number {
   const end = row.left ? Date.parse(row.left) : READ_AT;
   return (end - Date.parse(row.joined ?? '')) / 1000;
@@ -381,13 +378,11 @@ const ALL = '__all';
 
 interface BrowserProps {
   source: SourceId;
-  /** Null: all characters. */
   characterId?: number | null;
   initial?: Partial<BrowserFilters>;
   sort?: DataTableSort;
 }
 
-/** One source's rows: filters, a character switcher, and the table. Everything is a real DataTable. */
 export function SourceBrowser({ source, characterId = null, initial, sort }: BrowserProps) {
   const who = characterId;
   const [filters, setFilters] = useState<BrowserFilters>({ ...NO_FILTERS, ...initial });
@@ -568,7 +563,6 @@ function TypeSelect({
   );
 }
 
-/** The whole proposed page: crumb, header, source tabs, character switcher, one source's browser. */
 export function DataBrowserPage({
   source = 'wallet',
   characterId = null,
@@ -621,7 +615,6 @@ export function DataBrowserPage({
   );
 }
 
-/** All characters, then each one: a joined group. Three characters fit; more than four becomes a Select. */
 function CharacterSwitch({
   who,
   onChange,

@@ -5,18 +5,11 @@ import { plainTextActionClassName } from '@/components/ui';
 const textAction = plainTextActionClassName('min-h-9 md:min-h-6');
 
 interface Props {
-  /** Days and Late notices the member has told a corporation about, not yet answered. */
   waiting: number;
-  /** What the member chose not to pay, by key, with a label to read it by. */
   notPaying: readonly { key: string; label: string }[];
   onShow: (key: string) => void;
 }
 
-/**
- * Everything the member has answered, out of the attention strip and into one quiet line
- * (resolving in the app): waiting on the corporation, and not paying. Never gone — "Show them"
- * lists them, and a hidden one comes back with one click. Nothing when there is neither.
- */
 export function QuietStatusLine({ waiting, notPaying, onShow }: Props) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);

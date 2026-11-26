@@ -1,20 +1,3 @@
-/**
- * Market Browser Sell/Buy order-book tables overflowed the whole page
- * horizontally (#2093): both `DataTable` call sites in `Market.tsx` were
- * missing the `overflow-x-auto` wrapper some other `DataTable` callers use
- * (`MaterialsTable.tsx`, `Characters.tsx`) — with the default all-columns
- * column set (`DEFAULT_VISIBLE_MARKET_ORDER_COLUMNS`) and a long
- * station name, the bare `<table>` forced `<html>` itself to scroll sideways
- * instead of just the table.
- *
- * Buy orders carry `range`/`minVolume` on top of Sell's columns, so they're
- * the wider table — this asserts on the page opened with mocked orders for
- * both, all columns visible (the default), a long NPC station name, and
- * checks the page-level scrollWidth bound `expectNoPageOverflow` already
- * uses for this exact failure mode (#1708) at pointer-input widths —
- * and, since the order book rework, that neither table scrolls sideways
- * inside its own wrapper either.
- */
 import type { Page } from '@playwright/test';
 import { test, expect, DESKTOP } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
@@ -24,10 +7,6 @@ import type { MarketOrder } from '../src/esi/endpoints';
 const WIDTHS: { width: number; height: number; bracket?: boolean }[] = [
   { width: 1024, height: 768 },
   DESKTOP,
-  // Around the cards/table switch (roughly 1365px here, measured on one
-  // machine; the exact width varies with the font, so nothing below pins
-  // which layout renders). Buy's ⋮ once scrolled out of its card just above
-  // that switch.
   { width: 1340, height: 900, bracket: true },
   { width: 1368, height: 900, bracket: true },
   { width: 1400, height: 900, bracket: true },
@@ -37,7 +16,6 @@ const WIDTHS: { width: number; height: number; bracket?: boolean }[] = [
 ];
 
 const REGION = 10000002;
-/** Jita 4-4 Caldari Navy Assembly Plant — a real NPC station id with a long name, so station-name resolution never has to guess and the location column is as wide as it gets. */
 const STATION_A = 60003760;
 
 function order(
@@ -58,8 +36,6 @@ function order(
   };
 }
 
-/** Tritanium (type_id 34) is in `public/data/types.json`, so name resolution never needs a live ESI call. */
-// A ten-digit price: Price is the one column sized by its figure, not its header.
 const SELL_ORDER = order({
   order_id: 301,
   type_id: 34,
@@ -104,7 +80,6 @@ for (const viewport of WIDTHS) {
     await expectNoPageOverflow(page);
 
     if (viewport.bracket) {
-      // Whichever layout renders, each side's ⋮ is on screen inside its card.
       for (const name of ['Sell Orders', 'Buy Orders']) {
         const row = page.locator(`table[aria-label="${name}"] tbody tr`).first();
         const more = await row.getByRole('button', { name: /^More actions/ }).boundingBox();
@@ -114,11 +89,6 @@ for (const viewport of WIDTHS) {
       }
     }
 
-    // Buy is the wider table (it carries `range` on top of Sell's columns).
-    // Since the order book rework it no longer scrolls sideways at all:
-    // Location narrows first and, once the book's own column is too narrow
-    // for the picked columns, the rows become two-line cards — so the
-    // station and every figure stay in view without a horizontal scroller.
     for (const name of ['Sell Orders', 'Buy Orders']) {
       const scroller = page.getByRole('table', { name }).locator('xpath=..');
       const { scrollWidth, clientWidth } = await scroller.evaluate((el) => ({

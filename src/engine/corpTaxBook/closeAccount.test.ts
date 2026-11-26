@@ -22,7 +22,6 @@ const guestEntry = (date: string, quantity: number): ObservedMiningEntry => ({
   oreLines: [{ typeId: ORE, quantity }],
 });
 
-/** 1,000 ISK per unit at 10%: 1,000 units owe 100,000. */
 function input(overrides: Partial<BookViewInput> = {}): BookViewInput {
   return {
     corporationId: CORP,
@@ -68,7 +67,6 @@ describe('planCloseAccount', () => {
   it('sends one final notice of every unpaid day, whatever the notice rules say', () => {
     const view = buildBookView(input());
     const plan = planCloseAccount(view, 'solo:50')!;
-    // The 17 Sep day is Billable (synced after its grace) and is listed too.
     expect(plan.notice?.listed).toBe(150_000);
     expect(plan.notice).toMatchObject({ kind: 'final', minerId: 'solo:50', characterIds: [50] });
     expect(plan.owedAfter).toBe(150_000);

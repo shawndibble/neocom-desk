@@ -54,7 +54,6 @@ async function typeName(name = 'Bob') {
   return user;
 }
 
-// The worker's first render of the panel pays the cold module load once, here.
 beforeAll(async () => {
   store.loadMailInviteStatus.mockResolvedValue({ remaining: 20, sent: [] });
   await seedToken([SEND_SCOPE]);
@@ -183,7 +182,6 @@ describe('Invite by mail panel', () => {
     await seedToken([]);
     render(<MailInvitePanel community={community} characterId={ME} />);
     expect(await screen.findByText(m.grantTitle)).toBeInTheDocument();
-    // The note and the panel read the grant through separate live queries.
     await waitFor(() => expect(screen.getByLabelText(m.nameLabel)).toBeDisabled());
     expect(screen.getByRole('button', { name: m.send })).toHaveAttribute('aria-disabled', 'true');
   });

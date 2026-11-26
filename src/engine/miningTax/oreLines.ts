@@ -1,6 +1,5 @@
 import type { OreLine } from './types';
 
-/** `from` with `take` removed, type by type (several lines of one type all count); empty lines drop. */
 export function minusLines(
   from: readonly OreLine[],
   take: readonly OreLine[] | undefined
@@ -12,7 +11,6 @@ export function minusLines(
     .filter((l) => l.quantity > 0);
 }
 
-/** `a` and `b` added together, type by type; empty lines drop, sorted by type. */
 export function addLines(a: readonly OreLine[], b: readonly OreLine[] | undefined): OreLine[] {
   const total = new Map<number, number>();
   for (const l of [...a, ...(b ?? [])])
@@ -23,7 +21,15 @@ export function addLines(a: readonly OreLine[], b: readonly OreLine[] | undefine
     .sort((x, y) => x.typeId - y.typeId);
 }
 
-/** A stored `{ typeId: price }` record as the Map `computeAssignmentValue` reads. */
 export function priceMap(unitPrices: Record<number, number>): Map<number, number> {
   return new Map(Object.entries(unitPrices).map(([typeId, price]) => [Number(typeId), price]));
+}
+
+export function sameLines(a: readonly OreLine[], b: readonly OreLine[]): boolean {
+  const x = addLines(a, []);
+  const y = addLines(b, []);
+  return (
+    x.length === y.length &&
+    x.every((l, i) => l.typeId === y[i]!.typeId && l.quantity === y[i]!.quantity)
+  );
 }

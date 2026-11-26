@@ -19,7 +19,6 @@ const ITEMS_CSV = [ITEMS_HEADER, 'true,true,1,10,1,1001,3,18,32858,2026-09-01T11
   '\n'
 );
 
-/** A tar stream carrying `entries` in the given order — the archive minus its bzip2 wrapper. */
 function tarStream(entries: [name: string, content: string][]): Readable {
   const pack = tarPack();
   for (const [name, content] of entries) pack.entry({ name }, content);
@@ -76,12 +75,6 @@ describe('streamContractsCsvEntries', () => {
     expect(items).toHaveLength(1);
   });
 
-  /**
-   * A skipped entry has to be fully consumed before the next one is read, and
-   * a small one cannot show that: it lands in a single chunk either way. The
-   * real archive's first entry is tiny (meta.json) but the ones we skip at the
-   * end are megabytes, so this uses filler big enough to span several reads.
-   */
   it('drains a large skipped entry before reading the one after it', async () => {
     const { contracts, items, handlers } = collect();
     await streamContractsCsvEntries(
@@ -99,11 +92,6 @@ describe('streamContractsCsvEntries', () => {
     expect(items[0].type_id).toBe('32858');
   });
 
-  /**
-   * The two CSVs we read are entries 2 and 3 of 7; the rest unpack to ~19MB
-   * we would otherwise decompress only to discard. Abandoning the source is
-   * how that work is skipped, so it is worth pinning.
-   */
   it('stops reading the archive once both wanted entries are done', async () => {
     const { handlers } = collect();
     const source = tarStream([
@@ -117,11 +105,6 @@ describe('streamContractsCsvEntries', () => {
     expect(source.destroyed).toBe(true);
   });
 
-  /**
-   * Items are joined against a contract map built from the entry before them,
-   * so a reordered archive would silently yield zero rows — the exact
-   * "synced, but empty" state this sync is supposed to make impossible.
-   */
   it('fails loudly if the items entry arrives before the contracts entry', async () => {
     const { handlers } = collect();
     await expect(

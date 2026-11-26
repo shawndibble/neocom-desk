@@ -10,7 +10,6 @@ import { RigKindOptions } from './RigKindOptions';
 import { RigMatchHelper } from './RigMatchHelper';
 
 interface PlanRigFitFieldProps {
-  /** The three fitted rigs, already resolved from the plan. */
   fit: RigFit;
   facility: FacilityKind;
   security: SecurityBand;
@@ -18,7 +17,6 @@ interface PlanRigFitFieldProps {
   onApplyFit: (fit: RigFit) => void;
 }
 
-/** One structure's rig slots, plus the helper that fits rigs to a hull's bonus. Shared by the Build and Reaction locations. */
 export function PlanRigFitField({
   fit,
   facility,
@@ -32,8 +30,6 @@ export function PlanRigFitField({
       <span>{t('industry.rigFitLabel')}</span>
       <div className="flex flex-wrap items-center gap-2">
         {fit.map((kind, slot) => (
-          // A slot's position is its identity, not the kind
-          // fitted in it, so the index is a stable key.
           <label key={slot} className="flex flex-col gap-1">
             <span className="sr-only">{t('industry.rigSlotLabel', { slot: slot + 1 })}</span>
             <Select value={kind} onValueChange={(value) => onSlotChange(slot, value as RigKind)}>

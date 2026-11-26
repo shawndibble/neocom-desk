@@ -22,11 +22,6 @@ interface TaxSelectionBarProps {
   actions: TaxDialogActions;
 }
 
-/**
- * Pinned above the phone tab bar (and to the bottom of the viewport on
- * desktop), so the bulk actions stay in reach wherever the ticked row sits
- * in a long ledger.
- */
 export function TaxSelectionBar({
   toolbarRef,
   selectedRows,
@@ -50,7 +45,6 @@ export function TaxSelectionBar({
         canSelectAll={selectableVisible.some((dr) => !selection.has(dr.key))}
         onSelectAll={() => onSelectAll(new Set(selectableVisible.map((dr) => dr.key)))}
         onClear={onClear}
-        // One Payee at a time: a payment pays one Payee's oldest days.
         settleUpCount={selectedPayeeIds.length === 1 ? selectedSettleUpRows.length : 0}
         onSettleUp={() => onSettleUp(selectedSettleUpRows)}
         combine={combine}

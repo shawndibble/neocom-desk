@@ -28,7 +28,6 @@ function ActivityList({ entries }: { entries: readonly SrpAuditEntry[] }) {
   );
 }
 
-/** Every audit entry of the corporation's SRP, newest first. A phone folds it away. */
 export function SrpActivityFeed({ entries }: { entries: readonly SrpAuditEntry[] }) {
   const { t } = useTranslation();
   const phone = useIsPhone();

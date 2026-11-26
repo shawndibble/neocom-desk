@@ -4,7 +4,6 @@ import { useRetryFocus } from './useRetryFocus';
 
 type Read = 'busy' | 'failed' | 'ok';
 
-/** PI layout: Retry is a sibling outside the wrapper, which exists only in the ok state. */
 function Sibling({ read, resetKey = 'a' }: { read: Read; resetKey?: string }) {
   const [ref, arm] = useRetryFocus(read, resetKey);
   return (
@@ -23,7 +22,6 @@ function Sibling({ read, resetKey = 'a' }: { read: Read; resetKey?: string }) {
   );
 }
 
-/** Pilot Lookup layout: the whole failed branch, Retry included, unmounts while loading. */
 function Unmounting({ read }: { read: Read }) {
   const [ref, arm] = useRetryFocus<HTMLElement>(read, 'a');
   return (

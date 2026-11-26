@@ -7,18 +7,10 @@ export interface AttributeDiagnosticsInput {
   attributes: CharacterAttributes;
   implants: Implants;
   baseline: AttributeBaseline;
-  /** When the sheet was fetched, as the cache recorded it. */
   fetchedAt?: Date | null;
   fromCache?: boolean;
 }
 
-/**
- * A plain-text account of why a sheet was read the way it was, for a pilot to
- * paste into a bug report: what ESI said, what was subtracted, and what is
- * left per attribute. Numbers only — no tokens, no character id or name.
- * English labels on purpose: it is a bug-report payload read by a developer,
- * not UI copy.
- */
 export function attributeDiagnostics(input: AttributeDiagnosticsInput): string {
   const { attributes, implants, baseline } = input;
   const reported = NAMES.map((name) => attributes[name]);

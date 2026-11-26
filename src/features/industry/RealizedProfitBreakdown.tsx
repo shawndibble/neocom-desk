@@ -1,10 +1,10 @@
 import { useTranslation } from 'react-i18next';
-import { Modal } from '@/components/ui';
+import { Modal, ValueList, ValueRow } from '@/components/ui';
 import { brokerFeePct, salesTaxPct } from '@/engine/industry/fees';
 import type { RealizedProfitResult } from '@/engine/industry/realizedProfit';
 import type { ResolvedStandings } from '@/engine/market/standings';
 import { formatIsk } from '@/lib/isk';
-import { Formula, Section } from './CalculationBreakdown';
+import { Section } from './CalculationBreakdown';
 import { formatPercent } from './format';
 
 interface RealizedProfitBreakdownProps {
@@ -13,21 +13,12 @@ interface RealizedProfitBreakdownProps {
   profit: RealizedProfitResult;
   accountingLevel: number;
   brokerRelationsLevel: number;
-  /** Standing toward the watched order's station owner. Absent/0 = standings assumed 0. */
   standing?: ResolvedStandings;
-  /** Net loss across the run's Run Loss records, shown apart from the profit. Absent/0 = no loss. */
-  netLoss?: number;
+  lostCost?: number;
 }
 
-/**
- * The realized counterpart to `CalculationBreakdown` (issue #824): restates a
- * logged Production Run's net profit as a rule plus that rule's own
- * confirmed-sale values, the same "rule then substituted numbers" layout
- * `CalculationBreakdown` uses for a Build Plan's forward estimate. A smaller
- * sibling rather than sharing that component outright — a run has five
- * figures to restate where the forward estimate also carries price bases,
- * job fee and material cost.
- */
+const bold = (text: string) => <span className="font-semibold">{text}</span>;
+
 export function RealizedProfitBreakdown({
   open,
   onClose,
@@ -35,7 +26,7 @@ export function RealizedProfitBreakdown({
   accountingLevel,
   brokerRelationsLevel,
   standing,
-  netLoss = 0,
+  lostCost = 0,
 }: RealizedProfitBreakdownProps) {
   const { t } = useTranslation();
   const taxPct = salesTaxPct(accountingLevel, standing?.feeDiscountFactor);
@@ -47,6 +38,8 @@ export function RealizedProfitBreakdown({
     standing?.feeDiscountFactor
   );
 
+  const margin = profit.marginPct;
+
   return (
     <Modal open={open} onClose={onClose} title={t('industry.realizedBreakdown.title')}>
       <div className="space-y-4">
@@ -54,82 +47,73 @@ export function RealizedProfitBreakdown({
           {t('industry.realizedBreakdown.intro')}
         </p>
 
-        <Section title={t('industry.realizedBreakdown.revenueTitle')}>
-          <p>{t('industry.realizedBreakdown.revenue')}</p>
-          <Formula>
-            {t('industry.realizedBreakdown.revenueFormula', {
-              revenue: formatIsk(profit.grossRevenue),
-            })}
-          </Formula>
-        </Section>
+        <ValueList>
+          <ValueRow
+            label={t('industry.realizedBreakdown.grossRevenue')}
+            value={formatIsk(profit.grossRevenue)}
+          />
+          <ValueRow
+            label={t('industry.realizedBreakdown.salesTaxLabel')}
+            note={formatPercent(taxPct)}
+            value={formatIsk(-profit.salesTax)}
+          />
+          <ValueRow
+            label={t('industry.realizedBreakdown.brokerFeeLabel')}
+            note={formatPercent(brokerPct)}
+            value={formatIsk(-profit.brokerFee)}
+          />
+          <ValueRow
+            label={bold(t('industry.realizedBreakdown.netRevenue'))}
+            value={bold(formatIsk(profit.netRevenue))}
+          />
+          <ValueRow
+            label={t('industry.realizedBreakdown.totalCost')}
+            value={formatIsk(-profit.totalCost)}
+          />
+          <ValueRow
+            label={bold(t('industry.realizedBreakdown.profit'))}
+            value={bold(formatIsk(profit.profit))}
+            tone={profit.profit < 0 ? 'danger' : 'default'}
+          />
+          <ValueRow
+            label={t('industry.realizedBreakdown.margin')}
+            note={margin === null ? t('industry.realizedBreakdown.marginUnknown') : undefined}
+            value={margin === null ? '—' : formatPercent(margin)}
+          />
+          {lostCost !== 0 && (
+            <ValueRow
+              label={t('industry.realizedBreakdown.lostCost')}
+              note={t('industry.realizedBreakdown.lostCostNote')}
+              value={formatIsk(lostCost)}
+            />
+          )}
+        </ValueList>
 
-        <Section title={t('industry.realizedBreakdown.feesTitle')}>
-          <p>
-            {t('industry.realizedBreakdown.salesTax', {
-              accounting: accountingLevel,
-              pct: formatPercent(taxPct),
-            })}
-          </p>
-          {standing?.feeDiscountFactor !== undefined && (
+        <Section title={t('industry.realizedBreakdown.notesTitle')}>
+          <div className="space-y-1.5 text-text-dim">
+            <p>{t('industry.realizedBreakdown.revenue')}</p>
             <p>
-              {t('industry.realizedBreakdown.feeDiscount', {
-                pct: formatPercent((1 - standing.feeDiscountFactor) * 100),
+              {t('industry.realizedBreakdown.salesTax', {
+                accounting: accountingLevel,
+                pct: formatPercent(taxPct),
               })}
             </p>
-          )}
-          <Formula>
-            {t('industry.realizedBreakdown.salesTaxFormula', {
-              tax: formatIsk(profit.salesTax),
-            })}
-          </Formula>
-          <p>
-            {t('industry.realizedBreakdown.brokerFee', {
-              broker: brokerRelationsLevel,
-              pct: formatPercent(brokerPct),
-              factionStanding: standing?.factionStanding ?? 0,
-              corpStanding: standing?.corpStanding ?? 0,
-            })}
-          </p>
-          <Formula>
-            {t('industry.realizedBreakdown.brokerFeeFormula', {
-              broker: formatIsk(profit.brokerFee),
-            })}
-          </Formula>
-          <Formula>
-            {t('industry.realizedBreakdown.netRevenueFormula', {
-              gross: formatIsk(profit.grossRevenue),
-              tax: formatIsk(profit.salesTax),
-              broker: formatIsk(profit.brokerFee),
-              net: formatIsk(profit.netRevenue),
-            })}
-          </Formula>
-        </Section>
-
-        <Section title={t('industry.realizedBreakdown.profitTitle')}>
-          <Formula>
-            {profit.insurance > 0
-              ? t('industry.realizedBreakdown.profitFormulaInsured', {
-                  net: formatIsk(profit.netRevenue),
-                  insurance: formatIsk(profit.insurance),
-                  cost: formatIsk(profit.totalCost),
-                  profit: formatIsk(profit.profit),
-                })
-              : t('industry.realizedBreakdown.profitFormula', {
-                  net: formatIsk(profit.netRevenue),
-                  cost: formatIsk(profit.totalCost),
-                  profit: formatIsk(profit.profit),
+            <p>
+              {t('industry.realizedBreakdown.brokerFee', {
+                broker: brokerRelationsLevel,
+                pct: formatPercent(brokerPct),
+                factionStanding: standing?.factionStanding ?? 0,
+                corpStanding: standing?.corpStanding ?? 0,
+              })}
+            </p>
+            {standing?.feeDiscountFactor !== undefined && (
+              <p>
+                {t('industry.realizedBreakdown.feeDiscount', {
+                  pct: formatPercent((1 - standing.feeDiscountFactor) * 100),
                 })}
-          </Formula>
-          {netLoss !== 0 && (
-            <p>{t('industry.realizedBreakdown.netLoss', { loss: formatIsk(-netLoss) })}</p>
-          )}
-          <p>
-            {profit.marginPct === null
-              ? t('industry.realizedBreakdown.marginUnknown')
-              : t('industry.realizedBreakdown.margin', {
-                  margin: formatPercent(profit.marginPct),
-                })}
-          </p>
+              </p>
+            )}
+          </div>
         </Section>
       </div>
     </Modal>

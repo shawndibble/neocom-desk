@@ -1,10 +1,3 @@
-/**
- * Late notices (GLOSSARY "Late notice"; decision 20261120-235011): an officer plans and issues
- * them from the Late notices tab and reads the mail first; the Miner opens the verify link (no
- * login), sees what they owe now and how to pay with their one payment code, and can stop
- * reminders; an old link from before the move still opens; closing a guest's account leaves a
- * final notice.
- */
 import type { Page } from '@playwright/test';
 import { expect, minerUrl, signInAsOfficer, test } from './support/taxBook/bookTest';
 import { lateNoticeBook } from './support/taxBook/bookScenarios';
@@ -16,7 +9,6 @@ const book = lateNoticeBook();
 
 test.beforeEach(async ({ book: emulator, esi }) => {
   await emulator.seed(book.seed.docs());
-  // The officer's Character mails the notices (the send queue, ESI's mail endpoint).
   esi((path, route) =>
     path === `/characters/${OFFICER.id}/mail` && route.request().method() === 'POST'
       ? 700_000_001
@@ -41,11 +33,9 @@ test('the run plans a notice for a Miner who is behind, and shows the mail', asy
   await expect(preview).toContainText(
     `You owe ${isk(book.cora.owed)} ISK for ${book.cora.days} days`
   );
-  // One code per Miner, whichever notice it rides on.
   await expect(preview).toContainText(`put ${minerPaymentCode(solo(MINER.cora.id))} in the reason`);
 });
 
-/** Issues the run's one planned notice (Cora's) and returns it as stored, with its verify token. */
 async function issueCorasNotice(page: Page) {
   await openRun(page);
   await page.getByRole('button', { name: 'Continue to send' }).click();
@@ -71,7 +61,6 @@ test('an officer issues the planned late notice, and it is mailed', async ({ pag
       .getByRole('table', { name: 'Notices sent' })
       .getByRole('row', { name: new RegExp(MINER.cora.name) })
   ).toContainText(`${shortDay(0)}${isk(book.cora.owed)}`);
-  // This tab's send queue mails it from the officer's Character and records the mail.
   await expect
     .poll(async () => {
       const stored = await readDoc(`corps/${CORP}/lateNotices/${notice.id}`);
@@ -80,8 +69,6 @@ test('an officer issues the planned late notice, and it is mailed', async ({ pag
     .toBe(1);
 });
 
-// Once the queue has mailed it and the book recorded the mail, the page reads the book again
-// (`useReloadOnRecordedMail`).
 test('the Notices sent table shows the notice as mailed once it is sent', async ({ page }) => {
   const notice = await issueCorasNotice(page);
   await expect
@@ -98,14 +85,12 @@ test('the Notices sent table shows the notice as mailed once it is sent', async 
 });
 
 test('the verify link shows what the Miner owes now, without a login', async ({ page }) => {
-  // An officer's visit records each account for the server (it cannot price days itself).
   await signInAsOfficer(page, './corp/moons/miners');
   await expect(page.getByRole('row', { name: new RegExp(MINER.ada.name) })).toBeVisible();
   await page.goto(`./corp-tax-book/verify/${book.tokens.ada}`);
   await expect(page.getByRole('main')).toContainText(isk(book.ada.owed));
 });
 
-// One code per Miner: the mail asks for `minerPaymentCode`, and the server stores it on the notice.
 test('the pay section gives the Miner the same code the mail did', async ({ page }) => {
   const notice = await issueCorasNotice(page);
   await page.goto(`./corp-tax-book/verify/${notice.token}`);
@@ -134,7 +119,6 @@ test("closing a guest's account leaves a final notice for the days no notice lis
   await page.getByRole('button', { name: 'More actions', exact: true }).click();
   await page.getByRole('menuitem', { name: 'Close account' }).click();
   const dialog = page.getByRole('dialog', { name: `Close ${MINER.guest.name}'s account?` });
-  // "Send a final notice" is the default answer to "What they still owe".
   await expect(dialog.getByRole('group', { name: 'What they still owe' })).toContainText(
     'Send a final notice'
   );
@@ -144,7 +128,6 @@ test("closing a guest's account leaves a final notice for the days no notice lis
   await dialog.getByRole('textbox', { name: /Reason/ }).fill('Guest fleet ended');
   await dialog.getByRole('button', { name: 'Close account' }).click();
   await expect(dialog).toBeHidden();
-  // In-app, not page.goto: closing navigates on its own, and a reload would race it.
   await page
     .getByRole('list', { name: 'Moons' })
     .getByRole('link', { name: 'Late notices' })

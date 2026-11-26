@@ -8,10 +8,8 @@ import type { Translate } from '@/lib/translate';
 
 const quantityFormat = createNumberFormat({});
 
-/** A quantity or count, thousands-separated. */
 export const formatQuantity = (value: number) => quantityFormat(value);
 
-/** `2h`, `3d`: how long ago, no "ago" (the board column says it in its header). */
 export function formatShortAge(ms: number, t: Translate): string {
   if (ms < MINUTE_MS) return t('communities.board.age.now');
   if (ms < HOUR_MS)
@@ -20,15 +18,10 @@ export function formatShortAge(ms: number, t: Translate): string {
   return t('communities.board.age.days', { count: Math.floor(ms / DAY_MS) });
 }
 
-/** Whole days until `expiresAt`, 0 once under a day, never negative. */
 export function daysLeft(expiresAt: number, now: number): number {
   return Math.max(0, Math.floor((expiresAt - now) / DAY_MS));
 }
 
-/**
- * How long a Request has left, in the wording of the surface asking: `expired`
- * once past, the `underDay` key under a day, else the `days` key with the count.
- */
 export function describeExpiry(
   expiresAt: number,
   now: number,
@@ -40,7 +33,6 @@ export function describeExpiry(
   return days === 0 ? t(keys.underDay) : t(keys.days, { count: days });
 }
 
-/** `29d left`, `<1d left`, or `expired`: the board's remaining-time text. */
 export const formatLeft = (expiresAt: number, now: number, t: Translate): string =>
   describeExpiry(expiresAt, now, t, {
     underDay: 'communities.board.leftUnderDay',
@@ -56,11 +48,9 @@ export const STATUS_TONE: Record<RequestStatus, string> = {
   expired: 'text-text-dim',
 };
 
-/** One buy line as a person reads it: an item's name, or a group's label ("All ore"). */
 export const buyLineLabel = (line: BuybackLine, t: Translate): string =>
   line.kind === 'type' ? line.name : t(`communities.board.buyback.group.${line.group}`);
 
-/** What a Request asks for, as one headline: its first line, or for a buyback its first group or item. */
 export function requestHeadline(request: CommunityRequest, t: Translate): string {
   const names = request.standing
     ? request.standing.buyLines.map((line) => buyLineLabel(line, t))
@@ -70,7 +60,6 @@ export function requestHeadline(request: CommunityRequest, t: Translate): string
   return `${names[0] ?? ''}${more}`;
 }
 
-/** "90% of Jita buy": the rate a buyback pays and what it is a percent of. */
 export function standingRateLine(standing: StandingRequest, t: Translate): string {
   const hub = TRADE_HUBS.find((h) => h.id === standing.hubId)?.systemName ?? standing.hubId;
   return t('communities.board.buyback.rateLine', {

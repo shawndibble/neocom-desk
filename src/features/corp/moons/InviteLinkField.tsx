@@ -6,18 +6,14 @@ import { Label } from './BookDialogs';
 
 const k = (key: string) => `corpTaxBook.moons.moonOwners.dialogs.invite.${key}`;
 
-/** A made invite link: read-only, selected on focus, with Copy reading "Copied" once it has. */
 export function InviteLinkField({ url }: { url: string }) {
   const { t } = useTranslation();
-  // Keyed on the link, so a new link offers Copy again.
   const [copied, setCopied] = useState<string | null>(null);
   const copy = async () => {
     try {
       await writeToClipboard(url);
       setCopied(url);
-    } catch {
-      // The field is selectable; the officer can copy by hand.
-    }
+    } catch {}
   };
   return (
     <div className="space-y-2">

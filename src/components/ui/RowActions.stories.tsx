@@ -10,10 +10,6 @@ import {
   RowMoreActions,
 } from './RowActions';
 
-/**
- * @summary One item list drawn two ways (docs/DESIGN.md §6c): right-click or touch-and-hold on the
- * row, and the visible ⋮ button. Write items with the `Menu*` pieces so both menus read one list.
- */
 const meta = {
   title: 'ui/RowActionsMenu',
   component: RowActionsMenu,
@@ -24,7 +20,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** @summary A card with the ⋮ at its header's edge; right-click anywhere on it opens the same items. */
 export const CardMenu: Story = {
   args: {
     name: 'Wallet',
@@ -54,7 +49,6 @@ export const CardMenu: Story = {
   },
 };
 
-/** @summary A row whose click goes to another page: `openHref` leads both menus with "Open in new tab". */
 export const OpenInNewTab: Story = {
   args: {
     name: 'Tritanium',

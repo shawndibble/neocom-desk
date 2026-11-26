@@ -11,11 +11,6 @@ const CHOICES = ['today', '7', '14', '30'] as const;
 const toChoice = (v: string): CoverageChoice =>
   v === 'today' ? 'today' : (Number(v) as 7 | 14 | 30);
 
-/**
- * Step 2: one confirm for the whole batch: what the book sees, and how far back to count.
- * With closed-app alerts on for the account, one checkbox chains each CEO's alerts approval
- * straight after its corp's sign-in (issue #6103); off skips it for the whole run.
- */
 export function ConfirmBatchDialog({
   corps,
   offerAlerts = false,
@@ -24,10 +19,8 @@ export function ConfirmBatchDialog({
   onClose,
 }: {
   corps: readonly AddCorpsCandidate[];
-  /** Whether closed-app alerts are on for the account and some CEO here lacks them. */
   offerAlerts?: boolean;
   onBack: () => void;
-  /** `alerts`: chain each CEO's alerts approval after its corp (always false when not offered). */
   onConnect: (choice: CoverageChoice, alerts: boolean) => void;
   onClose: () => void;
 }) {

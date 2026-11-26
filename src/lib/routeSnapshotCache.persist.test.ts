@@ -22,7 +22,6 @@ import {
 const CHAR_A = 91;
 const CHAR_B = 92;
 
-/** A reload: memory gone, Dexie kept. */
 const reload = () => resetRouteSnapshots();
 
 beforeEach(async () => {
@@ -158,7 +157,6 @@ describe('routeSnapshotCache persistence', () => {
     writeRouteSnapshot('wallet', SUPPRESSED, { previousOwner: true });
     await flushRouteSnapshotWrites();
     reload();
-    // Tier 3: every delete fails, readonly reads still work.
     const boom = () => {
       throw new Error('index damaged');
     };

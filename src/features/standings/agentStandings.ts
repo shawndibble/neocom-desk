@@ -9,12 +9,6 @@ export interface AgentChain {
   chain: StandingChain;
 }
 
-/**
- * An agent and the chain of standings that govern it, its corporation taken
- * from the agent file. `null` when the agent is not in that file, which holds
- * only basic agents: a storyline, Faction Warfare or research agent has no
- * chain here. Rejects when the agent or corporation files cannot be read.
- */
 export async function chainForAgent(
   standings: readonly CharacterStandingEntry[],
   agentId: number,
@@ -32,23 +26,13 @@ export async function chainForAgent(
 
 export interface KnownAgent {
   agent: NpcAgent;
-  /** "Security", "Distribution", "Mining"; undefined for a division the file does not name. */
   divisionName: string | undefined;
-  /** The standing ESI reports toward the agent. */
   base: number;
-  /** With the pilot's social skills. */
   effective: number;
-  /** Whether ESI reports a standing row toward this very agent. */
   hasStanding: boolean;
-  /** The faction, corporation and agent links that govern it (its last link is `base`/`effective`). */
   chain: StandingChain;
 }
 
-/**
- * Every basic agent of the corporation, whether or not the pilot has met them,
- * best effective standing first (ties by agent id). Rejects when the agent or
- * corporation files cannot be read.
- */
 export async function agentsOfCorporation(
   corporationId: number,
   standings: readonly CharacterStandingEntry[],

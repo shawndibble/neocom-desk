@@ -17,7 +17,6 @@ vi.mock('@/features/corpTaxBook/mailQueueStore', () => ({
 }));
 vi.mock('@/features/character/useEntityName', () => ({ useEntityName: () => 'Ore & Glory' }));
 
-/** Varro's late notice, as the sample book issued it. */
 const NOTICE = BOOK_VIEW.input.notices.find((n) => n.minerId === VARRO_ID)!;
 
 function Where() {

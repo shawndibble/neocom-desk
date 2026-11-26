@@ -1,6 +1,3 @@
-// Per-character cap on SRP killmail fetches. Preview and filing each cost an outbound zKillboard
-// and ESI call before the victim check, so a member could otherwise loop them against any id.
-
 import { fail } from './actorAuth.js';
 import type { Firestore } from 'firebase-admin/firestore';
 import { CORPS_COLLECTION, SRP_THROTTLE } from './srpTypes.js';
@@ -13,7 +10,6 @@ export interface ThrottleState {
   count: number;
 }
 
-/** Fixed window: a refused call is not counted, so hammering never extends the lockout. */
 export function nextThrottle(
   state: ThrottleState | undefined,
   now: number
@@ -25,7 +21,6 @@ export function nextThrottle(
   return { allowed: true, state: { windowStart: state.windowStart, count: state.count + 1 } };
 }
 
-/** Takes one fetch slot for the Character, or fails `rate-limited`. One counter doc per pilot. */
 export async function takeFetchSlot(
   deps: { db: Firestore; now: () => number },
   corporationId: number,

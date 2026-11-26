@@ -32,8 +32,6 @@ describe('visitorTags', () => {
     expect(storage.getItem(FIRST_SEEN_KEY)).toBe(String(NOW));
   });
 
-  // The EVE SSO redirect back to /callback is a second page load in the same
-  // tab — the one a first sign-in fans out from — and must still read new.
   it('keeps tagging new for the rest of the first session', () => {
     const storage = memoryStorage();
     const session = memoryStorage();
@@ -54,7 +52,6 @@ describe('visitorTags', () => {
       visitor: 'new',
       'visitor.age_days': '0',
     });
-    // A later session (a new tab) is a return visit.
     expect(visitorTags(() => storage, noSession, NOW + 2 * DAY_MS)).toEqual({
       visitor: 'returning',
       'visitor.age_days': '1-7',
@@ -100,8 +97,6 @@ describe('visitorTags', () => {
     });
   });
 
-  // The stamp ships after people already use the app: a browser that has
-  // signed in before but carries no stamp predates it, not a new install.
   it('tags an unstamped browser that already holds a Character as returning, age unknown', () => {
     const storage = memoryStorage({ [SIGNED_IN_SHELL_HINT_KEY]: '1' });
 
@@ -110,7 +105,6 @@ describe('visitorTags', () => {
       'visitor.age_days': 'unknown',
     });
     expect(storage.getItem(FIRST_SEEN_KEY)).toBe(`legacy:${NOW}`);
-    // Later loads keep saying "unknown" rather than counting from the stamp.
     expect(visitorTags(() => storage, noSession, NOW + 40 * DAY_MS)).toEqual({
       visitor: 'returning',
       'visitor.age_days': 'unknown',

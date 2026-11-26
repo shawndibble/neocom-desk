@@ -1,8 +1,3 @@
-/**
- * `/corp/vetting`'s body, for a reviewer: the queue of open reviews, the decided ones, and (for
- * a Director) settings. A path below Open or Decided is one review's report, drawn as a page of
- * its own with a crumb back.
- */
 import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -69,19 +64,15 @@ export function VettingPage() {
   const { copied, flash } = useCopyFeedback<'copied' | 'failed'>(2000);
   const [requesting, setRequesting] = useState(false);
   const roster = useReviewRoster(requesting ? characterId : null, corporationId);
-  // The tab the settings gear was pressed on, which closing the modal returns to.
   const settingsFrom = useRef<'open' | 'decided'>('open');
   const [invitesOpen, setInvitesOpen] = useState<'new' | 'list' | null>(null);
   const [rowMail, setRowMail] = useState<{ name: string; run: RequestMailRun } | null>(null);
   const names = useCharacterNames();
   const requestMail = useVettingRequestMail(characterId ?? 0, corporationId ?? 0, replace);
-  // Kept rows and the opened review live only while an officer is on Vetting, as this character
-  // in this corporation: leaving, or a switch, forgets them (the role is checked again on return).
   useEffect(() => clearVettingSession, [characterId, corporationId]);
   const reviewId = reviewIdFromPathname(pathname);
   const data = dataFromPathname(pathname);
   const canConfigure = state.status === 'ready' && state.overview.canConfigure;
-  // Settings is a modal over the queue, so the queue is what the page shows beneath it.
   const shown: VettingTabId = tab === 'settings' ? 'open' : tab;
   const settingsOpen = tab === 'settings' && canConfigure;
   const panel = useTabPanelProps(phone ? null : tabsId, shown);
@@ -142,7 +133,6 @@ export function VettingPage() {
   }
 
   const { overview } = state;
-  // A review about the viewing officer is closed to them, so the queue does not list it.
   const reviews = visibleReviews(overview.reviews, characterId);
   const open = reviews.filter((review) => !isDecided(review.state));
   const decided = reviews.filter((review) => isDecided(review.state));
@@ -163,7 +153,6 @@ export function VettingPage() {
       await writeToClipboard(applyLink(corporationId));
       flash('copied');
     } catch {
-      // The clipboard was refused: nothing was copied, and the button says so.
       flash('failed');
     }
   };
@@ -175,11 +164,9 @@ export function VettingPage() {
       await writeToClipboard(requestLink());
       flash('copied');
     } catch {
-      // The clipboard was refused: nothing was copied, and the button says so.
       flash('failed');
     }
   };
-  // By invite, the bare apply link takes nobody anywhere: the header makes an invite link instead.
   const { inviteOnly } = overview.settings;
   const copyButton = inviteOnly ? (
     <Button aria-disabled={!on || undefined} onClick={on ? () => setInvitesOpen('new') : undefined}>
@@ -215,7 +202,6 @@ export function VettingPage() {
         </p>
         <span className="flex flex-wrap gap-2">
           {on ? copyButton : <Tooltip content={t('vetting.copyOff')}>{copyButton}</Tooltip>}
-          {/* Every reviewer may hand out an invite link, by invite only or not. */}
           <Button onClick={() => setInvitesOpen('list')}>{t('vetting.invites.open')}</Button>
           <Button onClick={() => setRequesting(true)}>{t('vetting.reviewMember')}</Button>
         </span>
@@ -290,7 +276,6 @@ export function VettingPage() {
         />
       </div>
       {settingsOpen && (
-        // The URL backs the modal (`/corp/vetting/settings/<section>`), so Back is the URL's job.
         <Modal
           open
           onClose={() => navigate(tabPath(VETTING_TABS, settingsFrom.current), { replace: true })}
@@ -362,7 +347,6 @@ export function VettingPage() {
               role
             );
             replace(next);
-            // The review just made: the newest request waiting on this member.
             return (
               next.reviews
                 .filter(

@@ -1,22 +1,8 @@
-/**
- * Assets item rows at md+ (issue #2034): quantity, volume and value used to
- * sit in one unlabelled, left-packed 11px line, so no figure lined up with the
- * one above it. Each is now a fixed-width right-aligned cell under a label
- * strip; this pins that the right edges are shared down the column and under
- * the labels, and that a 40-character name or a 16-digit value cannot push a
- * neighbour.
- *
- * Assets are seeded by overriding the `/assets` route before login, so the
- * boot prefetch caches them (the pattern `openOrdersNarrow.spec.ts` documents).
- * Type 34 has a price in `mockEsi.ts`; a huge quantity of it gives the
- * oversized value. Type 269 is a 38-character name.
- */
 import type { Page } from '@playwright/test';
 import { test, expect, PHONE } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 import { CHARACTER_ID } from './support/fixtureData';
 
-/** Jita 4-4 — a real NPC station id, so name resolution never needs a live ESI call. */
 const STATION = 60003760;
 
 function asset(item_id: number, type_id: number, quantity: number) {
@@ -32,7 +18,6 @@ function asset(item_id: number, type_id: number, quantity: number) {
 }
 
 async function seedAssets(page: Page): Promise<void> {
-  // The jumps-away enhancement on the location list reads the current system.
   await page.route('**/universe/systems/30000142', (route) =>
     route.fulfill({
       status: 200,
@@ -93,7 +78,6 @@ for (const width of [1440, 1280, 1024]) {
           .map((c) => Math.round(c.getBoundingClientRect().right))
       );
 
-      // Cell order inside each row's figures span: quantity, dot, volume, dot, value.
       for (const [cell, labelIndex] of [
         [0, 0],
         [2, 1],
@@ -122,7 +106,6 @@ for (const width of [1440, 1280, 1024]) {
         parseFloat(getComputedStyle(document.documentElement).fontSize)
       );
       for (const g of gaps) {
-        // 24rem name cell + Qty + m3 + gaps: the Value cell starts well inside the row.
         expect(g.left).toBeLessThanOrEqual(40 * rem);
         expect(g.right).toBeLessThanOrEqual(g.rowRight);
       }
@@ -137,7 +120,6 @@ for (const width of [1440, 1280, 1024]) {
         .locator('[data-virtual-scroll-root] [data-index]')
         .evaluateAll((els) => els.map((el) => Math.round(el.getBoundingClientRect().height)));
       expect(new Set(heights).size).toBe(1);
-      // 48px row + the 1px bottom border; equal heights are the point.
       expect(heights[0]).toBeLessThanOrEqual(49);
     });
   });
@@ -152,8 +134,6 @@ test('the label strip is absent below md', async ({ page }) => {
   await expect(page.getByTestId('item-column-labels')).toBeHidden();
 });
 
-// #3087: the toggles sit under a "View" caption. My ships and Plan a move are
-// tabs now, so the menu holds only the view toggles and Refresh.
 for (const width of [1280, 390]) {
   test(`the Tools menu fits the viewport at ${width}px and lists no tab destinations`, async ({
     page,
@@ -177,8 +157,6 @@ for (const width of [1280, 390]) {
   });
 }
 
-// #3116: an item with no estimate (only type 34 is priced here) reads as a dim
-// dash in the same value column, not a green "0".
 for (const width of [1280, 1024, 390]) {
   test(`an unpriced item's dash shares the value column at ${width}px`, async ({ page }) => {
     await seedAssets(page);

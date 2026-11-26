@@ -1,8 +1,3 @@
-/**
- * What a finished search with no rows says: why nothing turned up, a way to
- * search again when it stopped early, and the closest swaps that broke a
- * guardrail.
- */
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui';
 import type { ImproveGoal, ImproveResult } from '@/engine/fittings/improve';
@@ -19,12 +14,10 @@ interface Props {
   result: ImproveResult;
   before: FittingStats;
   fitTotal: number | null;
-  /** A blank hull has no fitted module to vary: the message must not talk about one. */
   noModules: boolean;
   settings: ImproveSettings;
   labels: ImproveLabels;
   onSearchAgain: () => void;
-  /** Switches Reach to Rework and searches again; absent: no nudge. */
   onSearchRework?: () => void;
 }
 

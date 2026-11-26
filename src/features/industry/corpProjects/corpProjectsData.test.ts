@@ -59,7 +59,6 @@ describe('fetchManufactureProjects', () => {
       ['a', 24702, 2],
       ['c', 587, 2],
     ]);
-    // A project that is not manufacture never costs a contribution read.
     expect(contribution.mock.calls.map(([id]) => id).sort()).toEqual(['a', 'c']);
   });
 

@@ -22,9 +22,7 @@ const by = (r: ReturnType<typeof cloneTrainingTimes>, id: string) =>
 describe('cloneTrainingTimes', () => {
   it('is exact against the (primary + secondary/2) rate', () => {
     const r = cloneTrainingTimes(input());
-    // worn: 20 + 10 = 30 SP/min -> 200 min
     expect(by(r, 'worn').totalSeconds).toBe(200 * 60);
-    // int5: 25 + 10 = 35 SP/min
     expect(by(r, 'int5').totalSeconds).toBeCloseTo((6000 / 35) * 60);
     expect(by(r, 'int5').finish!.getTime()).toBeCloseTo(
       now.getTime() + by(r, 'int5').totalSeconds! * 1000,
@@ -53,9 +51,7 @@ describe('cloneTrainingTimes', () => {
         ],
       })
     );
-    // int5: first 3000 @35, second 3000 @ 19+10=29
     expect(by(r, 'int5').totalSeconds).toBeCloseTo((3000 / 35 + 3000 / 29) * 60);
-    // cha5: first 3000 @30, second @ 24+10=34
     expect(by(r, 'cha5').totalSeconds).toBeCloseTo((3000 / 30 + 3000 / 34) * 60);
   });
 
@@ -89,9 +85,8 @@ describe('cloneTrainingTimes', () => {
     });
 
     it('splits mid-skill: stay on the worn clone until ready, then switch', () => {
-      const readyAt = new Date(now.getTime() + 60 * 60 * 1000); // 60 min
+      const readyAt = new Date(now.getTime() + 60 * 60 * 1000);
       const r = cloneTrainingTimes(input({ cooldownReadyAt: readyAt }));
-      // 60 min @30 = 1800 SP, remaining 4200 @35
       const expected = 3600 + (4200 / 35) * 60;
       expect(by(r, 'int5').stayThenSwitch!.finish!.getTime()).toBeCloseTo(
         now.getTime() + expected * 1000,

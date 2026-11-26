@@ -3,12 +3,8 @@ import { http, HttpResponse } from 'msw';
 import { mswServer } from '@/test/msw';
 import type { PriorityTicket } from '@/lib/concurrency';
 
-/** The lane each request asked the gate for, in arrival order. */
 const gate = { lanes: [] as Array<PriorityTicket | undefined> };
 
-// A fresh module graph with the gate wrapped: `vitest.setup.ts` has already
-// loaded the real client (through the route-snapshot cache), so a hoisted
-// `vi.mock` would reach this file but not the client it imports.
 vi.resetModules();
 vi.doMock('./budget', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./budget')>();

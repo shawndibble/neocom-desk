@@ -51,7 +51,6 @@ describe('orderVerdict', () => {
       station: { bestPrice: 450, beatsMe: true, gapIsk: 50, gapPct: 10 },
       floor: { relist: 480, fill: 470 },
     };
-    // undercutPrice(450) = 449.90, one legal tick under the rival — 480 - 449.90 = 30.10.
     const verdict = orderVerdict(row);
     expect(verdict?.kind).toBe('letGo');
     expect(verdict?.amount).toBeCloseTo(30.1, 6);
@@ -67,7 +66,6 @@ describe('orderVerdict', () => {
       station: { bestPrice: 450, beatsMe: true, gapIsk: 50, gapPct: 10 },
       floor: { relist: 400, fill: 390 },
     };
-    // undercutPrice(450) = 449.90 — 449.90 - 400 = 49.90.
     const verdict = orderVerdict(row);
     expect(verdict?.kind).toBe('matchThem');
     expect(verdict?.amount).toBeCloseTo(49.9, 6);

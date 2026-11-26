@@ -1,10 +1,3 @@
-/**
- * The live-price status on the Appraisal page (issue #5591, mockup variant B):
- * the thin bar is the top border of the card it describes, the text sits in
- * that card's title bar, and a row still on a Fuzzwork price wears a mark.
- * Colour never carries the meaning alone: the mark is an icon with a spoken
- * and hover label.
- */
 import { priceMarkKey } from './priceStateLabel';
 import { useTranslation } from 'react-i18next';
 import { LiveStatus, ProgressBar, Tooltip } from '@/components/ui';
@@ -17,16 +10,8 @@ import type { LiveProgress } from './useAppraisalLive';
 
 const AGE_TICK_MS = 5_000;
 
-/**
- * Both lines claim the done line's width, so the title bar wraps the same way
- * while checking and when done: no layout shift when the text swaps. 13rem fits
- * "Live prices · checked 59 s ago"; a wider floor (19rem) pushed the result
- * header's hub chip and status onto two lines at 1024 (#6674). The rarer
- * "Live prices for 59 of 60 rows" line simply grows past it.
- */
 const STATUS_LINE = 'inline-block min-w-[13rem]';
 
-/** The bar alone, for the caller to lay along a card's top edge. */
 export function LivePriceBar({ live, className }: { live: LiveProgress; className?: string }) {
   const { t } = useTranslation();
   return (
@@ -55,16 +40,6 @@ function CheckedAgo({ summary, checkedAt }: { summary: string; checkedAt: number
   );
 }
 
-/**
- * "Checking live prices 23 / 60" while rows load, then "Live prices · checked
- * 14 s ago". It never says "live" for a list with a cached row: a failed row
- * turns the done line into "Live prices for 59 of 60 rows". Shows nothing
- * before any run (`checkingOnly` also hides the done line, for Compare Hubs).
- *
- * A persistent polite live region announces only the start and the finish,
- * never the per-row count or the ticking age: the bar's own value carries the
- * progress. It stays mounted so a later change is announced.
- */
 export function LivePriceStatus({
   live,
   checkingOnly = false,
@@ -96,11 +71,6 @@ export function LivePriceStatus({
   );
 }
 
-/**
- * A clock (still the cached price) or a warning (its live book failed) beside
- * a price; nothing once live. `silent` keeps the icon and tooltip but drops the
- * spoken text, for the second and later price cells of one row.
- */
 export function PriceMark({
   state,
   silent = false,

@@ -6,7 +6,6 @@ import { SYNCED_STOCK_LISTS_KEY, useStockLists } from '@/features/stockTargets/s
 import { stockFixtureRoutes, SAMPLE_STOCK_LISTS, STOCK_SCOPES } from '@/storybook/stockFixtures';
 import { Market } from './Market';
 
-/** Writes the sample markets; the store is module state, so it re-reads them. */
 async function seedLists(lists: readonly StockList[]) {
   await db.settings.put({ key: SYNCED_STOCK_LISTS_KEY, value: lists });
   useStockLists.setState({ hydrated: false });
@@ -37,24 +36,19 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 const phone = { viewport: { value: 'mobile1', isRotated: false } };
 
-/** @summary Market › Stock landing: every market the pilot stocks, worst first. */
 export const Markets: Story = {};
 
-/** @summary The market list in the phone shell. */
 export const MarketsPhone: Story = { globals: phone };
 
-/** @summary One market's Stock List: each Stock Target against listed and hangar stock. */
 export const OneMarket: Story = {
   parameters: { shell: shell('/market/stock', seedOne) },
 };
 
-/** @summary One market's Stock List in the phone shell. */
 export const OneMarketPhone: Story = {
   parameters: { shell: shell('/market/stock', seedOne) },
   globals: phone,
 };
 
-/** @summary No markets yet: the first-run empty state. */
 export const Empty: Story = {
   parameters: { shell: shell('/market/stock', seedNone) },
 };

@@ -51,7 +51,6 @@ describe('useCompareStats', () => {
     expect(result.current.failed[0]).toBe(false);
 
     computeFittingStats.mockRejectedValueOnce(new TypeError('Failed to fetch'));
-    // A stable array: a new one each render is a new input each render.
     const others = [{ name: 'b' } as unknown as Fitting];
     const second = renderHook(() => useCompareStats(others, profile));
     await waitFor(() => expect(second.result.current.failed[0]).toBe(true));

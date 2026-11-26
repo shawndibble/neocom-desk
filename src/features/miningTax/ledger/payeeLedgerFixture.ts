@@ -1,8 +1,3 @@
-/**
- * Sample Payee ledgers for the panel's stories and tests: a Corp Tax Book Payee with history, a
- * personal Payee, one with nothing billed and one in credit. Each Running account is built from
- * the same charges and payments the ledger describes, as a caller would.
- */
 import type { TaxPayment } from '@/engine/corpTaxBook/payments';
 import { MinerRunningAccount } from '@/engine/corpTaxBook/minerRunningAccount';
 import type {
@@ -11,6 +6,7 @@ import type {
   LedgerWriteOff,
   PayeeLedgerSource,
 } from '@/engine/miningTax/payeeLedger';
+import type { RecordChange } from '@/engine/miningTax/recordChanges';
 
 const ZEOLITES = 45490;
 const SYLVITE = 45491;
@@ -36,6 +32,7 @@ function sample(input: {
   payments?: SamplePayment[];
   writeOffs?: LedgerWriteOff[];
   notices?: LedgerNotice[];
+  recordChanges?: RecordChange[];
 }): PayeeLedgerSource {
   const payments = input.payments ?? [];
   const account = MinerRunningAccount.build({
@@ -56,6 +53,7 @@ function sample(input: {
     payments: payments.map(({ id, at, from }) => ({ id, at, ...(from ? { from } : {}) })),
     ...(input.writeOffs ? { writeOffs: input.writeOffs } : {}),
     ...(input.notices ? { notices: input.notices } : {}),
+    ...(input.recordChanges ? { recordChanges: input.recordChanges } : {}),
   };
 }
 
@@ -77,10 +75,6 @@ const mined = (
 const ATHANOR = 'Hakonen - Moon 4 Athanor';
 const TATARA = 'Hakonen - Moon 7 Tatara';
 
-/**
- * A Corp Tax Book Payee: weeks of mining, a credit Adjustment, part payments (the second closes a
- * day within the tolerance), a late notice and an officer's write-off.
- */
 export const CORP_BOOK_LEDGER: PayeeLedgerSource = sample({
   charges: [
     mined('c1', '2026-10-03', 4_120_000, ATHANOR, [
@@ -110,6 +104,48 @@ export const CORP_BOOK_LEDGER: PayeeLedgerSource = sample({
   writeOffs: [
     { id: 'w1', at: '2026-11-08T12:00:00Z', amount: 1_000_000, reason: 'Fleet boost credit' },
   ],
+  recordChanges: [
+    {
+      id: 'tolerance:98000001:sample:2026-10-03',
+      reason: 'tolerance',
+      at: '2026-10-05T19:42:00Z',
+      date: '2026-10-03',
+      corporationId: 98000001,
+      minerId: 'sample',
+      closeOut: {
+        billed: 5_500_000,
+        paid: 5_490_000,
+        writtenOff: 10_000,
+        tolerancePct: 0.5,
+        tolerance: 27_500,
+        paymentId: 'p1',
+      },
+    },
+    {
+      id: 'autofix-1',
+      reason: 'autoFix',
+      at: '2026-10-18T00:05:00Z',
+      date: '2026-10-17',
+      corporationId: 98000001,
+      assignments: [
+        {
+          assignmentId: 'as-17',
+          before: {
+            payeeId: 'payee-corp',
+            taxPct: 12,
+            taxOwed: 3_846_000,
+            oreLines: [{ typeId: BITUMENS, quantity: 16_900 }],
+          },
+          after: {
+            payeeId: 'payee-corp',
+            taxPct: 10,
+            taxOwed: 3_205_000,
+            oreLines: [{ typeId: BITUMENS, quantity: 16_900 }],
+          },
+        },
+      ],
+    },
+  ],
   notices: [
     {
       id: 'n1',
@@ -124,7 +160,6 @@ export const CORP_BOOK_LEDGER: PayeeLedgerSource = sample({
   ],
 });
 
-/** A personal Payee: what the pilot owes another corporation's moon, paid from their own wallet. */
 export const PERSONAL_LEDGER: PayeeLedgerSource = sample({
   charges: [
     mined('a1', '2026-10-12', 2_150_000, 'Otela VII - Moon 2', [[COESITE, 9_800]]),
@@ -137,10 +172,19 @@ export const PERSONAL_LEDGER: PayeeLedgerSource = sample({
   payments: [{ id: 'm1', amount: 4_000_000, at: '2026-10-26T20:10:00Z' }],
 });
 
-/** A Payee with nothing billed yet. */
 export const EMPTY_LEDGER: PayeeLedgerSource = sample({ charges: [] });
 
-/** A Payee who paid ahead: every day paid and money left over. */
+export const SUB_ISK_LEDGER: PayeeLedgerSource = sample({
+  charges: [
+    mined('s1', '2026-11-18', 6_000_756.144, TATARA, [[BITUMENS, 30_000]]),
+    mined('s2', '2026-11-21', 3_869_888.4, TATARA, [[BITUMENS, 20_000]]),
+  ],
+  payments: [
+    { id: 's3', amount: 6_000_756, at: '2026-11-20T10:00:00Z' },
+    { id: 's4', amount: 3_869_888, at: '2026-11-22T10:00:00Z' },
+  ],
+});
+
 export const CREDIT_LEDGER: PayeeLedgerSource = sample({
   charges: [
     mined('k1', '2026-11-02', 3_100_000, TATARA, [[BITUMENS, 16_300]]),

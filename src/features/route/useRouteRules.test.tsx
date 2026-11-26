@@ -20,7 +20,6 @@ vi.mock('@/features/route/routeSafetyData', () => ({ loadPodKills: () => loadPod
 const UEDAMA = 30045328;
 const PODDED = 30002813;
 
-/** Every Travel store, reset to read its row afresh (and, with `initial`, to its default). */
 function resetStores(initial: boolean) {
   for (const store of ROUTE_RULE_STORES) {
     const setState = store.setState as (partial: { hydrated: boolean; value?: unknown }) => void;
@@ -32,7 +31,6 @@ function resetStores(initial: boolean) {
 
 beforeEach(async () => {
   await db.settings.clear();
-  // Module singletons: drop what a previous test hydrated, so each reads its own rows.
   resetStores(true);
   clearPodKillsLoad();
   loadPodKills.mockReset().mockResolvedValue(new Map([[PODDED, 4]]));

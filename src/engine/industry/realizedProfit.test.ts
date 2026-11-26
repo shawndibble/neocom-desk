@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
+  lostUnitsCost,
   realizedProfit,
-  runLoss,
   soldUnitsMargin,
   validateLossQuantity,
 } from '@/engine/industry/realizedProfit';
@@ -18,7 +18,6 @@ describe('realizedProfit', () => {
       brokerRelationsLevel: 5,
     });
 
-    // salesTaxPct(5) = 7.5 * (1 - 0.11*5) = 3.375%
     expect(r.totalCost).toBe(550_000);
     expect(r.salesTax).toBeCloseTo(33_750, 5);
     expect(r.brokerFee).toBe(0);
@@ -38,7 +37,6 @@ describe('realizedProfit', () => {
       brokerRelationsLevel: 0,
     });
 
-    // brokerFeePct(0) = 3%
     expect(r.brokerFee).toBeCloseTo(12_000, 5);
   });
 
@@ -74,7 +72,6 @@ describe('realizedProfit', () => {
 
 describe('soldUnitsMargin', () => {
   it('reads a partial sale above unit cost as a positive margin, with the rest as unsold cost', () => {
-    // 10 units cost 1,000,000 (100k each); 4 sold for 600,000 net.
     const m = soldUnitsMargin({
       totalCost: 1_000_000,
       quantity: 10,
@@ -103,56 +100,14 @@ describe('soldUnitsMargin', () => {
   });
 });
 
-describe('realizedProfit insurance', () => {
-  const base = {
-    materialCost: 8_000_000,
-    jobFee: 1_000_000,
-    quantitySold: 0,
-    grossRevenue: 0,
-    accountingLevel: 0,
-    brokerFeeableRevenue: 0,
-    brokerRelationsLevel: 0,
-  };
-
-  it('is unchanged without an insurance payout', () => {
-    const r = realizedProfit(base);
-    expect(r.insurance).toBe(0);
-    expect(r.profit).toBe(-9_000_000);
-  });
-
-  it('adds the payout after fees, untaxed', () => {
-    const r = realizedProfit({ ...base, insurancePayout: 1_500_000 });
-    expect(r.insurance).toBe(1_500_000);
-    expect(r.salesTax).toBe(0);
-    expect(r.profit).toBe(-7_500_000);
-  });
-});
-
-describe('runLoss', () => {
-  it('writes off the lost units at the run cost per unit, net of insurance', () => {
-    const r = runLoss({
-      totalCost: 9_000_000,
-      quantity: 12,
-      quantityLost: 5,
-      insurancePayout: 1_500_000,
-    });
-    expect(r.writtenOffCost).toBe(3_750_000);
-    expect(r.insurance).toBe(1_500_000);
-    expect(r.netLoss).toBe(2_250_000);
-  });
-
-  it('handles no insurance', () => {
-    const r = runLoss({ totalCost: 9_000_000, quantity: 12, quantityLost: 12, insurancePayout: 0 });
-    expect(r.netLoss).toBe(9_000_000);
+describe('lostUnitsCost', () => {
+  it('writes the lost units off at the run cost per unit', () => {
+    expect(lostUnitsCost(9_000_000, 12, 5)).toBe(3_750_000);
   });
 
   it('caps the lost units at the run quantity and handles an empty run', () => {
-    expect(
-      runLoss({ totalCost: 100, quantity: 2, quantityLost: 9, insurancePayout: 0 }).writtenOffCost
-    ).toBe(100);
-    expect(
-      runLoss({ totalCost: 100, quantity: 0, quantityLost: 1, insurancePayout: 0 }).writtenOffCost
-    ).toBe(0);
+    expect(lostUnitsCost(100, 2, 9)).toBe(100);
+    expect(lostUnitsCost(100, 0, 1)).toBe(0);
   });
 });
 

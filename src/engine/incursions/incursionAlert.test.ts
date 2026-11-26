@@ -113,7 +113,6 @@ describe('diffIncursionNearby', () => {
   it('fires for a spawn in range when the previous feed was empty', () => {
     const prev = snapshot([]);
     const next = snapshot([entry({ jumps: 1 })]);
-    // An empty feed carries no frame to compare; a new spawn in range is news.
     expect(diffIncursionNearby(CHARACTER, prev, next)).toHaveLength(1);
   });
 });

@@ -1,11 +1,3 @@
-/**
- * Make it fit's "Implants" section: the cheapest implants that bring the
- * Fitting under budget, found by the Implant Finder's own run on the budget
- * the pilot clicked "Fix" on (no implant moves calibration, so that one has no
- * section). Only a fix that brings the whole Fitting under — every budget,
- * not just this one — is offered. A row click puts the implants in the
- * Fitting's set, planned from the clone as the set editor plans (`cloneSeedSet`).
- */
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Spinner } from '@/components/ui';
@@ -40,10 +32,8 @@ export interface MakeItFitImplantsInput {
 interface Props {
   open: boolean;
   resource: FitResource | null;
-  /** The Fitting's stats as they stand, to say what each fix frees; null until known. */
   before: FittingStats | null;
   implants: MakeItFitImplantsInput;
-  /** After a fix is put in the set, with the implants' names. */
   onApplied: (names: string) => void;
 }
 
@@ -76,7 +66,6 @@ function Implants({
     () => cloneSeedSet(basis, fitting.implantSet, profile.implantTypeIds),
     [basis, fitting.implantSet, profile.implantTypeIds]
   );
-  // Stable per Fitting and seed: the finder re-screens every family whenever this changes.
   const planned = useMemo(
     () => (seed ? { ...fitting, implantSet: seed } : fitting),
     [fitting, seed]

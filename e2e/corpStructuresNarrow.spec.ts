@@ -1,12 +1,3 @@
-/**
- * Structures on a phone (issue #6657): the dense card's second line reads on
- * one row, with the bay count and its " blocks" suffix together, and a
- * structure with an offline service says so as an "N offline" token.
- *
- * The Director fixture in `corpBoard.ts` seeds three structures, the second
- * with one offline service; this adds a fuel bay per structure through the
- * corp assets answer, the biggest a 6-digit count.
- */
 import { test, expect, PHONE } from './support/testBase';
 import { openCorpOverview, overflow } from './support/corpBoard';
 import { CORPORATION_ID } from './support/fixtureData';
@@ -34,8 +25,6 @@ test.describe('Structures on a phone', () => {
     const rows = page.locator('#route-outlet tbody tr');
     await expect(rows).toHaveCount(3);
     await expect(rows.first()).toContainText('150,000');
-    // The bay count sits inline on the meta line (its " blocks" suffix is a CSS
-    // pseudo-element, so it is the cell's height that proves one row): never a block of lines.
     const heights = await rows.evaluateAll((trs) =>
       trs.map((tr) => {
         const cell = [...tr.querySelectorAll('td')].find((td) =>

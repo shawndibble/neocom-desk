@@ -80,11 +80,9 @@ import {
   sortStacksByVolume,
 } from './movePlanView';
 
-/** SDE category 6. */
 const SHIP_CATEGORY_ID = 6;
 const HAULER_CLASS = 'Haulers and Industrial Ships';
 const HULL_CONCURRENCY = 4;
-/** More stacks than this and the picker opens with every pickup group folded. */
 const COLLAPSE_ABOVE = 12;
 
 interface Loaded {
@@ -93,17 +91,11 @@ interface Loaded {
   stacks: PickerStack[];
   typeNames: Map<number, string>;
   unitM3: Map<number, number>;
-  /** Pickup location name by location id. */
   places: Map<number, string>;
-  /** Solar system of each pickup location (null when it did not resolve). */
   systems: Map<number, number | null>;
-  /** Palette slot of each pickup location, stable from picker to plan. */
   hues: Map<number, number>;
-  /** Rigs fitted to each assembled ship, by itemID. */
   rigs: Map<number, number>;
-  /** Chosen Characters whose assets could not be read: their stock is missing from the picker. */
   skipped: SkippedCharacterAssets[];
-  /** Who flies a corporation's plan; null for a personal plan or an unnamed pilot. */
   pilotName: string | null;
 }
 
@@ -112,7 +104,6 @@ async function load(
   corp: CorpMoveSource | undefined
 ): Promise<Loaded> {
   const [{ entries: sources, skipped }, types, groupCategories] = await Promise.all([
-    // Keyed by the pilot who flies it: pickups resolve, measure jumps and start the route from them.
     corp
       ? Promise.resolve({
           entries: [
@@ -174,15 +165,7 @@ async function load(
   };
 }
 
-/** Systems resolved for owned-hull places, per load, so a re-plan never repeats a failed structure lookup. */
 const hullPlaceSystems = new WeakMap<Loaded, Map<number, number | null>>();
-
-/**
- * Where the nearest owned copy of each hull sits, and its jumps from the
- * character it is nearest to: local graph, saved Jump Basis, no ESI route call.
- * Anything unreadable leaves a hull without a place or with an unknown count,
- * never a failed plan.
- */
 
 async function ownedHullPlaces(loaded: Loaded, hullTypeIds: ReadonlySet<number>) {
   const copies = ownedHullCopies(loaded.sources, hullTypeIds);
@@ -232,42 +215,25 @@ async function ownedHullPlaces(loaded: Loaded, hullTypeIds: ReadonlySet<number>)
       return origin === null ? null : (distance.get(`${origin}:${systemId}`) ?? null);
     });
   } catch {
-    // A distance failure must not fail the plan: hulls stay owned, count unknown.
     return nearestOwnedHulls(copies, systemOf, () => null);
   }
 }
 
-/** A corporation's stock to plan a move from (Corp assets → Move) instead of the Characters' own. */
 export interface CorpMoveSource {
-  /** The active Character: the one who flies, whose skills size the haulers. */
   pilotId: number;
-  /** What the picker calls the stock's owner. */
   name: string;
   inputs: readonly CorpAssetInput[];
-  /** Changes when `inputs` is re-read, so the tab plans from the fresh stock. */
   version: string;
 }
 
 interface MovePlanTabProps {
-  /** Leaves the plan: Cancel. The page returns to its Items tab. */
   onClose: () => void;
-  /** The Characters the page's filter names. */
   characterIds: readonly number[];
   activeCharacterId: number | null;
-  /** Reports the Characters this tab's read skipped, for the header picker's `missingNames`. */
   onSkippedChange?: (names: readonly string[] | undefined) => void;
-  /** Plan from the corporation's hangars. The Characters are then unused. */
   corp?: CorpMoveSource;
 }
 
-/**
- * Plan a move: tick what to carry, say where to, see the work list per
- * Character and pickup with a suggested hauler. The Assets page's Move tab
- * mounts it. A shown plan lives in the URL (`movePlanUrl.ts`), so Back from Route
- * Safety and a pasted link rebuild it; the picker's own ticks are state.
- * Volumes and trips are an estimate from hull class; Show my route
- * opens the leg list, and Route Safety answers the safety question.
- */
 export function MovePlanTab(props: MovePlanTabProps) {
   const key = props.corp
     ? `corp:${props.corp.pilotId}:${props.corp.version}`
@@ -283,7 +249,6 @@ function MovePlanTabBody({
   corp,
 }: MovePlanTabProps) {
   const { t } = useTranslation();
-  // Frozen for this mount: a different Character set remounts the tab (`key` below).
   const [ids] = useState(characterIds);
   const isCorp = corp !== undefined;
   const [corpSource] = useState(corp);
@@ -293,7 +258,6 @@ function MovePlanTabBody({
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
   const [destSystem, setDestSystem] = useState<number | null>(null);
   const [destStation, setDestStation] = useState<number | null>(null);
-  /** A station found by search that holds none of the pilot's assets: its name and system came with the pick. */
   const [searchedStation, setSearchedStation] = useState<{
     id: number;
     name: string;
@@ -302,9 +266,7 @@ function MovePlanTabBody({
   const [working, setWorking] = useState(false);
   const [result, setResult] = useState<PlanState | null>(null);
   const [compareOpen, setCompareOpen] = useState(false);
-  /** The pilot's own folding; until they fold something, a long list opens folded. */
   const [folded, setFolded] = useState<ReadonlySet<string> | null>(null);
-  /** Folded pickup groups, `characterId:locationId`. */
   const collapsed = useMemo<ReadonlySet<string>>(
     () =>
       folded ??
@@ -316,9 +278,7 @@ function MovePlanTabBody({
     [folded, loaded]
   );
   const [planFailed, setPlanFailed] = useState(false);
-  /** Ships (itemID) the plan hauls packaged instead of flying. */
   const [packed, setPacked] = useState<ReadonlySet<number>>(new Set());
-  /** What the shown plan was worked out from, so packing a ship can re-plan it. */
   const planBase = useRef<Omit<
     Parameters<typeof planMove>[0],
     'packedShipIds' | 'haulerOverride' | 'maxIskPerHaul'
@@ -326,14 +286,11 @@ function MovePlanTabBody({
   const maxIsk = useMaxIskPerHaul((st) => st.value);
   const setMaxIsk = useMaxIskPerHaul((st) => st.setValue);
   const maxIskReady = useHydratedStore(useMaxIskPerHaul);
-  /** The pilot's hauler pick for the shown plan only; never saved, reset with each plan. */
   const [haulerOverride, setHaulerOverride] = useState<HaulerOverride | undefined>();
   const storedHaul = useActiveHaul((st) => st.value);
   const setSavedHaul = useActiveHaul((st) => st.setValue);
-  // A cleared haul stays hidden until its Undo toast ends and the write lands.
   const pendingClears = useDeferredCommits();
   const savedHaul = storedHaul && !pendingClears.hiddenIds.has(storedHaul.id) ? storedHaul : null;
-  /** The haul a new route just replaced, so its toast can put it back. */
   const [replacedHaul, setReplacedHaul] = useState<ActiveHaul | null>(null);
   const currentSystem = useCurrentSystem();
   useHydratedStore(useActiveHaul);
@@ -341,12 +298,9 @@ function MovePlanTabBody({
   const urlPlan = planFromUrl(urlValues, isCorp);
   const urlKey = movePlanKey(urlValues, isCorp);
   const navigate = useNavigate();
-  /** The plan the screen shows, as the URL names it: tells a URL change this tab made from one the pilot made (Back, a link). */
   const [shownKey, setShownKey] = useState<string | null>(null);
   const [seenUrlKey, setSeenUrlKey] = useState<string | null>(null);
-  /** The URL plan being rebuilt, so one link is worked out once. */
   const restoring = useRef<string | null>(null);
-  // The URL dropped the plan (Back): close it. Adjusted while rendering, so no frame shows the old plan.
   if (urlKey !== seenUrlKey) {
     setSeenUrlKey(urlKey);
     if (urlKey === null && shownKey !== null) {
@@ -354,14 +308,11 @@ function MovePlanTabBody({
       setResult(null);
     }
   }
-  /** Key of the plan this mount pushed a history entry for, so Back steps out of it only while that plan shows. */
   const pushedPlan = useRef<string | null>(null);
-  /** The active haul fills the tab instead of the picker or the plan. */
   const showingHaul = urlValues.mvr && savedHaul !== null;
   const setShowingHaul = (open: boolean) => setUrlValues({ mvr: open });
   const [routing, setRouting] = useState(false);
   const [routeFailed, setRouteFailed] = useState(false);
-  /** Bumped on every reset so a plan still being worked out for an old session is dropped. */
   const session = useRef(0);
   const hullSource = useRef<HullSourceData>({
     catalogue: null,
@@ -375,7 +326,6 @@ function MovePlanTabBody({
   const planHeadingRef = useRef<HTMLHeadingElement>(null);
   const deliverHeadingRef = useRef<HTMLHeadingElement>(null);
 
-  // A new plan's work is dropped when this tab goes away.
   useEffect(
     () => () => {
       session.current += 1;
@@ -415,7 +365,6 @@ function MovePlanTabBody({
 
   const hasDestination = destSystem !== null || destStation !== null;
 
-  /** Pickup locations the destination covers: a station, or every pickup in the picked system. */
   const atDestination = useMemo(
     () => coveredLocations(loaded?.systems, destSystem, destStation),
     [destStation, destSystem, loaded]
@@ -439,7 +388,6 @@ function MovePlanTabBody({
       return next;
     });
 
-  /** Ticks at the destination are kept but ignored, so changing it back restores them. */
   function chooseDestination(
     system: number | null,
     station: number | null,
@@ -450,13 +398,6 @@ function MovePlanTabBody({
     setSearchedStation(searched);
   }
 
-  /**
-   * The haulers the pilot's skills size, and whether sizing was possible.
-   * `sizing` is `unavailable` when the data it needs is missing for good (the
-   * ship data never downloaded, the pilot's skills unread), and `loading` when
-   * it is merely not in yet; "no hauler you can fly" would misreport either as
-   * the pilot's skills.
-   */
   async function loadHulls(): Promise<{
     hulls: MoveHull[];
     sizing: PlanState['haulerSizing'];
@@ -477,7 +418,6 @@ function MovePlanTabBody({
       try {
         hullHolds.current.set(hull.typeId, await hullPackHolds(hull.typeId, profile));
       } catch {
-        // Not cached: a transient failure should be retried next time.
         sizingFailures += 1;
       }
     });
@@ -485,7 +425,6 @@ function MovePlanTabBody({
       loaded.sources.flatMap((s) => s.assets.filter((a) => a.is_singleton).map((a) => a.type_id))
     );
     const sized = haulers.filter((h) => (hullHolds.current.get(h.typeId)?.length ?? 0) > 0);
-    // From the bundled ship tree, so no ESI call per hauler; a hull it lacks counts as flyable.
     const tree = await loadShipTree().catch(() => null);
     const required = new Map(tree?.ships.map((ship) => [ship.typeID, ship.required]));
     const flyable = sized.map((h) =>
@@ -510,7 +449,6 @@ function MovePlanTabBody({
     return { hulls, sizing: sizingFailures > 0 && hulls.length === 0 ? 'unavailable' : undefined };
   }
 
-  /** Works a plan out from the given picks, for a fresh plan and for one rebuilt from the URL. */
   async function computePlan(
     inputs: PlanInputs,
     packedIds: ReadonlySet<number>,
@@ -589,7 +527,6 @@ function MovePlanTabBody({
         };
         setShownKey(movePlanKey(values, isCorp));
         pushedPlan.current = movePlanKey(values, isCorp);
-        // A history entry: Back returns to the picker.
         setUrlValues(values, { push: true });
         focusAfterCommit(planHeadingRef);
       }
@@ -600,7 +537,6 @@ function MovePlanTabBody({
     }
   }
 
-  /** The picks a URL's plan names, dropping what these assets no longer hold; `null` when nothing is left to plan. */
   async function inputsFromUrl(plan: MovePlanUrlValues): Promise<PlanInputs | null> {
     if (!loaded || !plan.mvd) return null;
     const known = new Set(loaded.stacks.map((st) => st.key));
@@ -625,15 +561,12 @@ function MovePlanTabBody({
     };
   }
 
-  // The URL leads: a plan it names that the screen does not show is rebuilt (a pasted link, Route
-  // Safety's Back, Forward). A plan this tab built itself already set `shownKey`, so it is not worked out twice.
   useEffect(() => {
     if (urlKey === null) {
       restoring.current = null;
       return;
     }
     if (urlKey === shownKey || urlKey === restoring.current || !loaded || !urlPlan) return;
-    // The saved limit shapes the plan, so a link's plan waits for it.
     if (!maxIskReady) return;
     restoring.current = urlKey;
     const mine = session.current;
@@ -644,7 +577,6 @@ function MovePlanTabBody({
         const nextPacked = new Set(urlPlan.mvp);
         const override = urlPlan.mvh ?? undefined;
         const { base, state } = await computePlan(inputs, nextPacked, override);
-        // The URL moved on while this was worked out (Back): drop it.
         if (mine !== session.current || restoring.current !== urlKey) return;
         planBase.current = base;
         setSelected(inputs.selected);
@@ -654,7 +586,6 @@ function MovePlanTabBody({
         setResult(state);
         setShownKey(urlKey);
       } catch {
-        // A stale or hand-edited link: the empty planner, no error screen.
         if (mine !== session.current) return;
         restoring.current = null;
         setUrlValues(NO_MOVE_PLAN);
@@ -663,7 +594,6 @@ function MovePlanTabBody({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- runs when the URL's plan or the loaded assets change; the helpers close over `loaded`
   }, [urlKey, loaded, shownKey, maxIskReady]);
 
-  /** Works the shown plan out again for a changed ship choice or hauler. */
   function replan(nextPacked: ReadonlySet<number>, nextOverride: HaulerOverride | undefined) {
     const base = planBase.current;
     if (!base) return;
@@ -687,7 +617,6 @@ function MovePlanTabBody({
     );
   }
 
-  /** Saves the new limit and works the shown plan out again under it. */
   function changeMaxIsk(next: number | null) {
     void setMaxIsk(next);
     const base = planBase.current;
@@ -707,17 +636,14 @@ function MovePlanTabBody({
     );
   }
 
-  /** Hauls this ship packaged instead of flying it, and re-plans around its volume. */
   const packShip = (itemId: number) => replan(new Set(packed).add(itemId), haulerOverride);
 
-  /** Flies this packed ship after all, and re-plans without its volume. */
   function unpackShip(itemId: number) {
     const next = new Set(packed);
     next.delete(itemId);
     replan(next, haulerOverride);
   }
 
-  /** Saves the shown plan's route as the active haul and opens it. */
   async function commitRoute() {
     if (!loaded || !result) return;
     setRouting(true);
@@ -757,7 +683,6 @@ function MovePlanTabBody({
     }
   }
 
-  /** Show my route: a haul already saved is replaced, with an Undo that brings it back. */
   async function showRoute() {
     const before = savedHaul;
     await commitRoute();
@@ -765,7 +690,6 @@ function MovePlanTabBody({
     if (before && now && now.id !== before.id) setReplacedHaul(before);
   }
 
-  // Who the read left out is the header picker's to say (its dot and "Not included" note).
   useReportSkipped(loaded ? loaded.skipped.map((c) => c.name) : undefined, onSkippedChange);
   const name = (typeId: number) => loaded?.typeNames.get(typeId) ?? `#${typeId}`;
   const placeLabel = (id: number) => loaded?.places.get(id) ?? String(id);
@@ -790,7 +714,6 @@ function MovePlanTabBody({
       aria-label={t('assets.movePlan.title')}
       className={cx(
         'min-h-0 flex-1 scroll-pb-32 overflow-y-auto rounded-xs max-sm:scroll-pt-48',
-        // The plan's cards sit on the page; its own panel starts at the packaged volume.
         planView ? '' : 'border border-line bg-panel p-3'
       )}
     >
@@ -821,7 +744,6 @@ function MovePlanTabBody({
             onProgress={(doneLegIds) => setSavedHaul({ ...savedHaul, doneLegIds })}
             onReplan={async () => {
               const result = await replanActiveHaul(savedHaul);
-              // A tick made while the route was being worked out wins: the new plan is stale.
               const now = useActiveHaul.getState().value;
               const unchanged =
                 now?.id === savedHaul.id &&
@@ -834,7 +756,6 @@ function MovePlanTabBody({
               pendingClears.defer({
                 id: cleared.id,
                 message: t('assets.movePlan.haul.cleared'),
-                // A newer haul saved since is not this one's to clear.
                 commit: async () => {
                   if (useActiveHaul.getState().value?.id === cleared.id) await setSavedHaul(null);
                 },
@@ -857,7 +778,6 @@ function MovePlanTabBody({
             onChangeMaxIsk={changeMaxIsk}
             headingRef={planHeadingRef}
             onBack={() => {
-              // The URL closes the plan (see the effect above): step out of the entry this tab pushed, else drop the plan from the one it is on.
               if (
                 pushedPlan.current === movePlanKey({ ...urlValues, mvp: [], mvh: null }, isCorp)
               ) {
@@ -879,7 +799,6 @@ function MovePlanTabBody({
           />
         ) : (
           <>
-            {/* Pinned on a phone so the destination stays in reach while the list scrolls. */}
             <section
               aria-label={t('assets.movePlan.whereTo')}
               className="sticky -top-3 z-20 -mx-3 bg-panel px-3 pt-3 pb-1 sm:static sm:mx-0 sm:p-0"
@@ -985,7 +904,6 @@ function MovePlanTabBody({
               />
             </section>
             {planFailed && <p className="text-text-dim">{t('assets.movePlan.planFailed')}</p>}
-            {/* Sticky to the tab body's own scroller, so the totals stay in reach. */}
             <div className="sticky -bottom-3 mt-auto -mx-3 -mb-3 flex flex-wrap items-center gap-x-2 gap-y-2 border-t border-line bg-panel px-3 pt-2 pb-2">
               <div className="flex min-w-0 basis-full flex-col gap-1.5 sm:flex-1 sm:basis-0">
                 <div className="flex h-2.5 overflow-hidden rounded-full bg-line" aria-hidden="true">
@@ -1050,7 +968,6 @@ function MovePlanTabBody({
   );
 }
 
-/** Pickup locations a destination covers: one station, or every pickup in the picked system. */
 function coveredLocations(
   systems: ReadonlyMap<number, number | null> | undefined,
   system: number | null,
@@ -1062,7 +979,6 @@ function coveredLocations(
   return ids;
 }
 
-/** What a plan is worked out from: the picker's ticks and destination. */
 interface PlanInputs {
   selected: ReadonlySet<string>;
   destSystem: number | null;
@@ -1075,14 +991,9 @@ interface HullSourceData {
   catalogueFailed: boolean;
   profile: PilotProfile | null;
   profileFailed: boolean;
-  /** False when the pilot's skills could not be read, so `profile` assumes none and "can fly" means nothing. */
   skillsKnown: boolean;
 }
 
-/**
- * Loads the fitting catalogue and pilot profile only while the Move tab is open,
- * so the Assets page does not pull the fitting data on every visit.
- */
 function HullSource({
   characterId,
   intoRef,

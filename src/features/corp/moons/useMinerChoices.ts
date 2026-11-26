@@ -8,11 +8,8 @@ import { useBook } from './useBook';
 
 export interface MinerChoices {
   status: 'loading' | 'ready' | 'failed';
-  /** Every stored group, and every ungrouped character mining since the start date. */
   choices: readonly MinerChoice[];
-  /** The stored groups, which `planRegroup` needs whole. */
   stored: readonly Miner[];
-  /** A character's name, covering Miners the page itself never named. */
   name: (characterId: number) => string;
 }
 
@@ -26,10 +23,6 @@ type Fetched =
       names: Map<number, string>;
     };
 
-/**
- * The Miners a dialog can pick from. A one-Miner read (`data.scopedMiner`) holds only its
- * own, so the groups and ledger rows are read here, once per open, through the device's copies.
- */
 export function useMinerChoices(): MinerChoices {
   const { characterId, corporationId, view, data, names, settings } = useBook();
   const scoped = data.scopedMiner !== undefined;

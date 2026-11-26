@@ -1,28 +1,3 @@
-/**
- * Repairs a character's stored Assignments into a shape the ledger can
- * actually render, once per load (`snapshot.ts`, just before
- * `reconcileAssignments`). Two things it puts right — the rules themselves
- * live in `engine/miningTax/coalesce.ts`:
- *
- * - **Ejection.** A joined group is one obligation to one Payee at one rate,
- *   and the table draws it as a single row under a single Payee name. Editing
- *   one member's Payee used to leave it inside the group regardless, so the
- *   row went on claiming ore had gone somewhere it had not. A member on
- *   different terms loses its `groupId` and stands as its own row.
- * - **Fusion.** Two Assignments over one Mining Ledger Entry on identical
- *   terms are one obligation stored as two — what a day split to a second
- *   Payee and then moved back becomes. They are written back as one record,
- *   quantities and snapshots summed.
- *
- * A safety net, not the rule's enforcement: every write now goes through
- * `ledgerActions.ts`, which keeps a Combined Entry whole on write. This still
- * repairs data written before that, or arriving from another device's sync.
- *
- * Run as eject, fuse, eject: a dissolved group's two halves have to be free
- * of their `groupId` before they can fuse, and fusing can itself leave a group
- * holding a single member, which is no longer a group. Both steps are
- * idempotent, so a healthy ledger writes nothing and triggers no sync.
- */
 import { db, type MiningTaxAssignmentRecord } from '@/db';
 import { scheduleSync } from '@/sync';
 import { entryKey, type MiningLedgerEntry } from '@/engine/miningTax/types';
@@ -47,7 +22,6 @@ function coalescable(
     solarSystemId: a.solarSystemId,
     payeeId: a.payeeId,
     taxPct: a.taxPct,
-    // Paid where its Payee's account has paid the day: a paid day is never fused.
     status: accounts.statusOf(a),
     groupId: a.groupId,
     oreLines: a.oreLines,
@@ -60,7 +34,6 @@ function coalescable(
 export async function coalesceAssignments(
   characterId: number,
   entries?: readonly MiningLedgerEntry[],
-  /** Every personal Payee's account, which says which days are paid; read from Dexie when absent. */
   accounts?: PayeeRunningAccounts
 ): Promise<void> {
   const assignments = await db.miningTaxAssignments
@@ -86,8 +59,6 @@ export async function coalesceAssignments(
   }
 
   eject();
-  // The fresh ledger lets the planner tell two halves of a day from one
-  // obligation stored twice; without it (older callers) it sums as before.
   const entryLinesByKey = entries
     ? new Map(entries.map((e) => [entryKey(characterId, e.date, e.solarSystemId), e.oreLines]))
     : undefined;
@@ -115,10 +86,6 @@ export async function coalesceAssignments(
 
   if (rewritten.size === 0 && absorbedIds.length === 0) return;
 
-  // One transaction, so a repair never lands half-done. Tombstoned rather than
-  // plainly dropped: the absorbed halves may already have synced, and a bare
-  // local delete would let the next pull resurrect them beside the record
-  // that now holds their ore.
   await db.transaction('rw', db.miningTaxAssignments, db.settings, async () => {
     await putAssignments([...rewritten].map((id) => working.get(id)!));
     await deleteAssignments(absorbedIds.map((id) => ({ id, characterId })));

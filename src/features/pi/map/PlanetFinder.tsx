@@ -1,10 +1,3 @@
-/**
- * "Find a Lava planet near <home>": the nearest systems that hold the planet
- * type(s) wanted, from the SDE planet counts and the stargate graph. The
- * origin is the pilot's home system (where most of their colonies are); a pilot
- * with no colony has no home, and the finder says so rather than assuming a
- * hub.
- */
 import { fixed1 } from '@/lib/fixedFormat';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useEffect, useMemo, useState } from 'react';
@@ -41,7 +34,6 @@ export function PlanetFinder({
   types: readonly PlanetType[];
   homeSystemId: number | null;
   homeName: string | null;
-  /** Seeds "Highsec only": on from a highsec home, off from low/null/wormhole or unknown. */
   homeSecurity: number | null;
 }) {
   const { t } = useTranslation();
@@ -86,7 +78,6 @@ export function PlanetFinder({
     return () => {
       cancelled = true;
     };
-    // `types` is read through `typesKey`; `key` covers every input.
   }, [homeSystemId, typesKey, highsecOnly]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const typeNames = useMemo(() => types.map((type) => planetName(t, type)), [types, t]);

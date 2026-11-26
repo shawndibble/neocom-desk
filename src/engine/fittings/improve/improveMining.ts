@@ -1,22 +1,14 @@
-/**
- * Mine more (an Improve Goal): mining yield carries no ore input, so the ore
- * enters only through the crystal. The pilot picks an ore; its crystal family
- * is loaded into every miner before each whole-fit calculation, the baseline's
- * too, so every row's m³/s is the same ore's. Pure.
- */
 import { parseCrystal } from '../crystalChoice';
 import type { ChargeLoadStep } from './improveCharges';
 import type { ModuleAt } from '../fittingEdit';
 import { isFiring } from '../stats';
 import type { Fitting } from '../types';
 
-/** "A2" for a Type A II crystal; null for a charge that is not a mining crystal. */
 export function crystalKeyOf(name: string): string | null {
   const crystal = parseCrystal(name);
   return crystal ? `${crystal.letter}${crystal.techLevel}` : null;
 }
 
-/** The type ids among `typeIds` that are `family` mining crystals. */
 export function crystalsOfFamily(
   family: string,
   typeIds: readonly number[],
@@ -28,11 +20,6 @@ export function crystalsOfFamily(
   });
 }
 
-/**
- * `fitting` with `crystalFor(module type)` loaded in every module it names;
- * a null leaves that module's own charge. The miners' own ore is replaced,
- * so two fits compare on the one ore the pilot asked about.
- */
 export function loadCrystals(
   fitting: Fitting,
   crystalFor: (moduleTypeId: number) => number | null
@@ -46,7 +33,6 @@ export function loadCrystals(
   };
 }
 
-/** The crystal key (`crystalKeyOf`) with the best m³/s under `yieldOf`; null with no keys. */
 export async function bestCrystalKey(
   keys: readonly string[],
   yieldOf: (key: string) => Promise<number>
@@ -59,16 +45,10 @@ export async function bestCrystalKey(
   return best?.key ?? null;
 }
 
-/** The letter and tier of a crystal key: "B2" is B, II. */
 export function crystalParts(key: string): { letter: string; tier: 'I' | 'II' } {
   return { letter: key[0]!, tier: key[1] === '2' ? 'II' : 'I' };
 }
 
-/**
- * Active miners that take a crystal of the picked ore but hold none of it
- * (empty, or another ore's), and the loads that fix them with `crystalFor`'s
- * crystal. Null when there are none.
- */
 export function unloadedMiners(
   fitting: Fitting,
   crystalsOf: (moduleTypeId: number) => readonly number[],
@@ -98,11 +78,6 @@ export function unloadedMiners(
   };
 }
 
-/**
- * Whether a miner in the calculation does not hold the plan's crystal, so it
- * would mine another ore's m³/s. A miner the plan gives no crystal (it takes
- * none) holds none: its charge is `undefined`, the plan's answer `null`.
- */
 export function minerWithoutCrystal(
   rows: readonly { typeId: number; isDrone: boolean; chargeTypeId?: number }[],
   crystalFor: (moduleTypeId: number) => number | null
@@ -110,31 +85,20 @@ export function minerWithoutCrystal(
   return rows.some((row) => !row.isDrone && (row.chargeTypeId ?? null) !== crystalFor(row.typeId));
 }
 
-/** Mine more's ore plan: what each miner loads, the best crystal's key, and which crystals each miner type takes. */
 export interface CrystalPlan {
   crystalFor: (moduleTypeId: number) => number | null;
   bestKey: string;
   crystalsOf: (moduleTypeId: number) => number[];
 }
 
-/** What `crystalPlan` reads of the fit and the type catalogue. */
 export interface CrystalSource {
-  /** The ore's crystal family. */
   family: string;
-  /** The fitted miners' type ids (not drones). */
   minerTypeIds: Iterable<number>;
-  /** The charge groups a module type takes on this hull; none for a module that takes no charge. */
   chargeGroupsOf: (moduleTypeId: number) => readonly number[];
   typeIdsInGroup: (groupId: number) => readonly number[];
   nameOf: (typeId: number) => string | undefined;
 }
 
-/**
- * Mine more's ore: which crystal each miner type loads, for the family. The
- * crystal letter and tech level that `yieldOf` scores best (the open Fitting's
- * m³/s with every miner loaded so) is used for every miner type, so each row
- * is the one ore's best case. Null when no fitted miner takes a crystal of the family.
- */
 export async function crystalPlan(
   source: CrystalSource,
   yieldOf: (crystalFor: (moduleTypeId: number) => number | null) => Promise<number>

@@ -1,66 +1,37 @@
-/**
- * One row per structure, read off the corp board's items: the model the
- * Structures widget and the Structures page (`/corp/structures`) both draw.
- *
- * Pure. The board items carry the clocks and their severities
- * (`engine/corp/board.ts`); this only gathers each structure's own and says
- * whether it is a problem, so the widget's Problems only and the page's filter
- * of the same name keep exactly the same structures.
- */
 import { worstSeverity, type DeadlineSeverity } from '@/engine/character/severity';
 import type { BoardStructureSource, CorpBoardItem } from '@/engine/corp/board';
 import { formatCountdown } from '@/lib/duration';
 import type { Translate } from '@/lib/translate';
 
-/** "Efa - Helios Prime" is long on a tile; the name after the system prefix is the one a pilot knows it by. */
 export function shortStructureName(name: string): string {
   const cut = name.indexOf(' - ');
   return cut > 0 && cut + 3 < name.length ? name.slice(cut + 3) : name;
 }
 
-/** A structure clock's text: a countdown, or Dry, Offline or Soon when it cannot tick. */
 export function structureWhen(item: CorpBoardItem, t: Translate): string {
   if (item.timing === 'passed') return t('overview.board.structureDry');
   if (item.timing === 'untimed') return t('overview.board.structureOffline');
-  // A clock shorter than CCP's hour-long cache may already be over, so it is not ticked down.
   if (item.withinStaleWindow) return t('overview.board.structureSoon');
   return formatCountdown(Math.max(0, item.remainingMs ?? 0) / 1000);
 }
 
-/**
- * What a control tower adds to a structure row: its fuel bay as ESI's per-tower
- * read gave it, and the burn rate CCP's static data gives its type.
- */
 export interface TowerFacts {
-  /** Blocks in the bay when read; null when no bay was read (unknown, not empty). */
   blocks: number | null;
-  /** Blocks burned a day; null for a tower type newer than the rate table. */
   perDay: number | null;
 }
 
-/**
- * A row's structure. A control tower is one too: it is fuelled, can be
- * reinforced and unanchors; it has no services. Its `structureId` is the
- * starbase id, and `tower` marks it (its board items are keyed `sb<id>`).
- */
 export type StructureSource = BoardStructureSource & { tower?: TowerFacts };
 
 export interface StructureRow {
   source: StructureSource;
   fuel: CorpBoardItem | undefined;
-  /** The state timer (reinforcement, vulnerability); absent when none runs. */
   timer: CorpBoardItem | undefined;
-  /** One item per service switched off. */
   offline: CorpBoardItem[];
   unanchor: CorpBoardItem | undefined;
-  /** Every board item of this structure. */
   items: CorpBoardItem[];
-  /** The worst of fuel, timer and offline services. Unanchoring does not tone the row. */
   tone: DeadlineSeverity;
   lowFuel: boolean;
-  /** What Problems only keeps: the same three things the State column names. */
   problem: boolean;
-  /** Fuel time left in ms; minus infinity when dry or unknown, so those sort first. */
   remaining: number;
 }
 
@@ -99,11 +70,6 @@ function timerKey(row: StructureRow): number {
   return row.timer.deadlineMs ?? Number.NEGATIVE_INFINITY;
 }
 
-/**
- * Soonest problem first: running timers by when they end, then fuel by how
- * soon it runs out (a dry structure leads). A structure with no fuel clock at
- * all goes last.
- */
 export function byUrgency(a: StructureRow, b: StructureRow): number {
   const timers = timerKey(a) - timerKey(b);
   if (timers !== 0 && !Number.isNaN(timers)) return timers;
@@ -114,7 +80,6 @@ export function byUrgency(a: StructureRow, b: StructureRow): number {
 }
 
 export interface StructureFilter {
-  /** One corporation's structures, or null for all. */
   corp: number | null;
   problems: boolean;
   q: string;
@@ -125,7 +90,6 @@ export interface StructureNames {
   system: (systemId: number | undefined) => string;
 }
 
-/** The page's filters, AND-composed. Search reads structure, system and corporation. */
 export function filterStructureRows(
   rows: readonly StructureRow[],
   filter: StructureFilter,

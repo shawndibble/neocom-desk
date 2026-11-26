@@ -56,7 +56,7 @@ describe('loadStationBestPrices', () => {
     );
 
     const result = await loadStationBestPrices([
-      { stationId: STATION_A, typeIds: [TYPE_A, TYPE_B, TYPE_A] }, // duplicate TYPE_A
+      { stationId: STATION_A, typeIds: [TYPE_A, TYPE_B, TYPE_A] },
       { stationId: STATION_B, typeIds: [TYPE_A] },
     ]);
 
@@ -116,9 +116,7 @@ describe('loadStationBestPrices', () => {
     const result = await loadStationBestPrices(requests);
 
     expect(maxInFlight).toBeLessThanOrEqual(ESI_FANOUT_CONCURRENCY);
-    // Genuinely concurrent, not serialized down to one at a time.
     expect(maxInFlight).toBeGreaterThan(1);
-    // Every station still gets fetched eventually, just fanned out in batches.
     expect(result.size).toBe(stationCount);
   });
 

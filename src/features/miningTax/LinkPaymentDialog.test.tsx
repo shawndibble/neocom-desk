@@ -25,7 +25,6 @@ vi.mock('./payees', () => ({
 const RECORD = { id: 'p-1', characterId: 1, name: 'Moon Corp', defaultTaxPct: 10 } as PayeeRecord;
 const OTHER_RECORD = { id: 'p-2', characterId: 1, name: 'Fen Corvane' } as PayeeRecord;
 
-// Owes 600,000 over three days.
 const ACCOUNT = PayeeRunningAccount.build({
   payeeId: 'p-1',
   charges: [
@@ -152,11 +151,9 @@ describe('LinkPaymentDialog for one Payee', () => {
       candidates: [EXACT, TO_FEN, DONATION],
     });
     const matches = screen.getByRole('region', { name: 'Likely matches' });
-    // Only this Payee's own: the payment sent to another Payee is not a match here.
     expect(within(matches).getAllByRole('radio')).toHaveLength(1);
     expect(within(matches).getByRole('radio', { name: /600,000 ISK/ })).toBeChecked();
     expect(within(matches).getByText('Sent to Moon Corp')).toBeInTheDocument();
-    // The manual list holds the others, and not the match a second time.
     const manual = screen.getByRole('list', { name: 'Wallet payments' });
     expect(within(manual).getAllByRole('radio')).toHaveLength(2);
     expect(within(manual).queryByText(/600,000 ISK/)).not.toBeInTheDocument();
@@ -167,7 +164,8 @@ describe('LinkPaymentDialog for one Payee', () => {
     await userEvent.click(screen.getByText('350,000 ISK · 2026-09-10'));
     const status = screen.getByRole('status');
     expect(status).toHaveTextContent('2026-09-04');
-    expect(status).toHaveTextContent(/2026-09-0650,000 ISK · 250,000 ISK still owed/);
+    expect(status).toHaveTextContent(/2026-09-0650,000 ISK/);
+    expect(status).toHaveTextContent(/Still owed after it250,000 ISK/);
 
     await userEvent.click(screen.getByRole('button', { name: 'Link to Moon Corp' }));
 
@@ -187,7 +185,6 @@ describe('LinkPaymentDialog for one Payee', () => {
     expect(rememberPayeeEntity).toHaveBeenCalledWith(RECORD, 9001);
   });
 
-  // Audit bug 7: picking the payment the dialog offered first was recorded as `auto`.
   it('records a payment the pilot confirms as their own link, even the one offered first', async () => {
     renderDialog({ suggestions: [suggestion(EXACT)], candidates: [EXACT, DONATION] });
     await userEvent.click(screen.getByRole('button', { name: 'Link to Moon Corp' }));
@@ -219,13 +216,11 @@ describe('LinkPaymentDialog for one Payee', () => {
     expect(
       screen.queryByRole('checkbox', { name: /^Link future payments/ })
     ).not.toBeInTheDocument();
-    // Left blank it links nothing: a cargo is never assumed to be the whole balance (N4).
     expect(screen.getByRole('button', { name: 'Link to Moon Corp' })).toHaveAttribute(
       'aria-disabled',
       'true'
     );
     const input = screen.getByRole('textbox', { name: 'Value handed over' });
-    // Shorthand reads as the full amount (issue #2227), and a figure that does not parse saves nothing.
     await userEvent.type(input, '1x');
     expect(input).toHaveAttribute('aria-invalid', 'true');
     expect(screen.getByRole('button', { name: 'Link to Moon Corp' })).toHaveAttribute(
@@ -263,7 +258,6 @@ describe('LinkPaymentDialog for every Payee', () => {
 
   it("links a suggestion to the Payee it names, and offers the first one's preview", async () => {
     const { onLinked } = renderDialog(both);
-    // The first match is already picked.
     expect(screen.getByRole('status')).toHaveTextContent('2026-09-04');
     await userEvent.click(screen.getByRole('button', { name: 'Link to Moon Corp' }));
     await waitFor(() => expect(onLinked).toHaveBeenCalled());
@@ -310,13 +304,11 @@ describe('LinkPaymentDialog a failed save', () => {
       'Payment linked, but couldn’t remember who Moon Corp is paid.'
     );
     expect(onClose).not.toHaveBeenCalled();
-    // Already linked: a second click must not link it twice.
     expect(screen.getByRole('button', { name: 'Link to Moon Corp' })).toHaveAttribute(
       'aria-disabled',
       'true'
     );
     expect(linkPayment).toHaveBeenCalledTimes(1);
-    // The reload waits for the close, so it can't unmount the message unread.
     expect(onLinked).not.toHaveBeenCalled();
     await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
     expect(onLinked).toHaveBeenCalledTimes(1);
@@ -341,7 +333,6 @@ describe('LinkPaymentDialog grant note', () => {
     });
 
     expect(await screen.findByText(/Some payments can’t be seen/)).toBeInTheDocument();
-    // Names the journal's Permission only: the contracts read went through.
     expect(screen.getByText('Pilot One: grant Wallet')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Grant in EVE' }));
     expect(beginEveLogin).toHaveBeenCalledWith({ characterId: 1, groups: ['wallet'] });

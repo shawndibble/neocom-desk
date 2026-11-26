@@ -70,8 +70,6 @@ describe('loadCourierEndpoints — security', () => {
   it('leaves an unplaced endpoint’s security null, structure or unreadable alike', async () => {
     const endpoints = await loadCourierEndpoints([row()]);
 
-    // STRUCTURE is not in STATIONS, so it resolves as a player structure —
-    // no system, so no security status either.
     expect(endpoints.get(STRUCTURE)?.security).toBeNull();
   });
 });

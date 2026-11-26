@@ -15,49 +15,24 @@ import { formatCostIndex, formatPercent } from './format';
 import { rigKindLabel } from './rigFitLabels';
 import type { RigKind } from '@/engine/industry/types';
 
-/**
- * Everything the breakdown needs that a `BuildResult` does not carry: the
- * inputs the numbers were computed from. Passed as one object rather than a
- * dozen props — `ResultsSummary` already takes nine, and every member here
- * exists only to be quoted back at the reader.
- */
 export interface BreakdownContext {
-  /** Trade Hub the plan prices against, e.g. "Jita". */
   hubName: string;
-  /** Which side of the hub's order book materials are costed at. */
   materialPriceBasis: MaterialPriceBasis;
-  /** The plan carries its own sale price instead of the hub's. */
   productPriceOverridden?: boolean;
-  /** ME the job ran at; ignored for a reaction, which has none. */
   me: number;
   isReaction: boolean;
   accountingLevel: number;
   brokerRelationsLevel: number;
-  /** Standing toward the sale hub's NPC owner, for the broker fee shown here. Absent/0 = standings assumed 0. */
   standing?: ResolvedStandings;
   systemCostIndex: number | null;
-  /** Build System the cost index was read for. */
   costIndexSystemName: string;
   productName: string;
-  /** Units the job yields; null when the blueprint has no product. */
   productQuantity: number | null;
-  /** Product's lowest hub sell per unit; null when unpriced at this hub. */
   productUnitPrice: number | null;
-  /** The plan's wall-clock time on its character's free slots; absent without slot data. */
   planSeconds?: number;
-  /**
-   * The hero's sell-value basis, when it is on: what the owned materials would
-   * net if sold, and the break-even once that is added to the cost.
-   */
   sellValue?: { forgone: number; breakEvenPrice: number | null } | null;
-  /**
-   * The product sold into the hub's buy orders (issue #5007), on the hero's
-   * basis; `null` when the hub has no buy order for it, absent when unknown.
-   */
   sellNow?: ProductSellNow | null;
-  /** Names a material's typeID, for the rows that list per-sub-build rigs. */
   nameOf?: (typeID: number) => string;
-  /** Materials costed at a Depth Price, each with its book walk. */
   depthRows?: readonly { typeID: number; name: string; walk: DepthPrice }[];
 }
 
@@ -68,7 +43,6 @@ interface CalculationBreakdownProps {
   context: BreakdownContext;
 }
 
-/** Also used by `RealizedProfitBreakdown`, the Production Run sibling of this modal. */
 export function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className="space-y-1.5">
@@ -81,21 +55,10 @@ export function Section({ title, children }: { title: string; children: ReactNod
 const FORMULA_BOX =
   'rounded-xs border border-line bg-panel-2 px-2 py-1 font-mono text-[0.6875rem] text-text-dim tabular-nums';
 
-/** A worked line: the formula with this plan's own numbers substituted in. */
 export function Formula({ children }: { children: ReactNode }) {
   return <p className={`overflow-x-auto whitespace-nowrap ${FORMULA_BOX}`}>{children}</p>;
 }
 
-/**
- * The long-form answer to "where does each of these numbers come from?" —
- * one section per line of `ResultsSummary`, each stating the rule in plain
- * language and then the same rule with this plan's live values substituted
- * in. The per-row tooltips stay the shallow layer; this is the deep one.
- *
- * Deliberately reads the fee percentages from `engine/industry/fees` rather
- * than from new `BuildResult` fields: same source the result itself was
- * computed from, so the explanation cannot drift from the arithmetic.
- */
 export function CalculationBreakdown({
   open,
   onClose,

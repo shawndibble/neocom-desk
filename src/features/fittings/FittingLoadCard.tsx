@@ -17,7 +17,6 @@ interface FittingLoadCardProps {
   tooLargeToShare: boolean;
   onLoadFittingXmlDocument: (document: FittingXmlDocument) => Promise<FittingXmlListItem[]>;
   onOpenLoaded: (loaded: LoadedFitting) => Promise<void>;
-  /** No panel chrome of its own, for a host that already has a title (a dialog). */
   bare?: boolean;
 }
 
@@ -34,11 +33,6 @@ function WarningList({ title, lines }: { title: string; lines: string[] }) {
   );
 }
 
-/**
- * What the last Load couldn't place: pasted lines, a fittings file's items,
- * an In-game Fitting's unsupported slots. Shown in this card, and above the
- * editor once the Load has opened its Fitting — this card is gone by then.
- */
 export function LoadWarnings({ load }: { load: LoadOutcome | null }) {
   const { t } = useTranslation();
   if (load === null || load.unresolved.length === 0) return null;
@@ -65,7 +59,6 @@ export function LoadWarnings({ load }: { load: LoadOutcome | null }) {
   );
 }
 
-/** What a load that threw says: the item data missing offline, or anything else. */
 function classifyThrown(err: unknown): 'offline' | 'unknown' {
   return isOfflineFailure(err) ? 'offline' : 'unknown';
 }
@@ -98,7 +91,6 @@ export function FittingLoadCard({
   const [xmlLoading, setXmlLoading] = useState(false);
   const [xmlDocError, setXmlDocError] = useState<FittingXmlDocumentErrorCode | null>(null);
   const [xmlList, setXmlList] = useState<FittingXmlListItem[] | null>(null);
-  // A load that threw (as opposed to one the loader reported as unreadable): usually the item data missing offline.
   const [thrown, setThrown] = useState<'offline' | 'unknown' | null>(null);
 
   async function handleLoad() {

@@ -6,7 +6,6 @@ import { Button } from './Button';
 import { SearchInput } from './SearchInput';
 import { TextInput } from './TextInput';
 
-/** The claim DESIGN.md §3 makes: one `size` value, one height, whatever the control. */
 function heightClasses(el: Element): string[] {
   return [...el.classList].filter((c) => /(^|:)h-\d+$/.test(c));
 }
@@ -51,7 +50,6 @@ describe('SearchInput', () => {
     const { container } = render(<SearchInput aria-label="Search items" />);
     const icon = container.querySelector('svg');
     expect(icon).not.toBeNull();
-    // Phosphor marks its glyphs aria-hidden; the field's own label is the name.
     expect(icon).not.toHaveAccessibleName();
   });
 });

@@ -1,9 +1,3 @@
-/**
- * The Payee ledger on desktop (decision 20261120-235011, "A Payee ledger"): opened from the owed
- * figure on a Payee card, every charge and payment in date order with a running balance, its
- * kind and date filters, the table export, a row opened in place, and the opening row a closed
- * month leaves. Personal data only (Dexie), so this runs in the main suite.
- */
 import { readFileSync } from 'node:fs';
 import type { Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
@@ -22,7 +16,6 @@ import {
 const DAYS = [6, 5, 4];
 const PAID_BACK = 3;
 
-/** Rook billed three days, one day's tax paid since: four rows, 2,000,000 owed. */
 async function openLedger(page: Page) {
   const data = rookOwed(CHARACTER_ID, DAYS);
   data.links = [
@@ -48,8 +41,6 @@ test('the ledger lists every charge and payment with a running balance', async (
   const ledger = await openLedger(page);
   await expect(ledger).toContainText(new RegExp(`Days owed\\s*2`));
   await expect(ledger).toContainText(/Oldest unpaid/);
-  // Newest first, like a bank statement: the payment on top, the first day's charge last. Each
-  // row's balance is still the one after it in date order.
   const rows = bodyRows(ledger);
   await expect(rows).toHaveCount(4);
   await expect(rows.nth(0)).toContainText(
@@ -111,7 +102,6 @@ test("a payment's row opens in place to show the days it paid", async ({ page })
 test("a personal Payee's ledger lists its whole history, with no snapshot row", async ({
   page,
 }) => {
-  // Two days three months ago, one of them paid then; two days this week.
   const days = [100, 99, 6, 5];
   const data = rookOwed(CHARACTER_ID, days);
   data.links = [
@@ -126,7 +116,6 @@ test("a personal Payee's ledger lists its whole history, with no snapshot row", 
   await openPersonalTax(page, data, { characterId: CHARACTER_ID, mining: personalLedger(days) });
   const owed = page.getByRole('group', { name: ROOK.name });
   await expect(owed).toContainText(isk(3 * DAY_TAX));
-  // A personal account is always built from the device's full history (no device snapshot).
   await page.reload();
   await expect(owed).toContainText(isk(3 * DAY_TAX));
   await page.getByRole('button', { name: `Open the ledger of ${ROOK.name}` }).click();
@@ -142,7 +131,6 @@ test('Unlink says so with an Undo that links the same payment back', async ({ pa
   const ledger = await openLedger(page);
   await bodyRows(ledger).filter({ hasText: 'Payment' }).click();
   await ledger.getByRole('button', { name: 'Unlink' }).click();
-  // The payment pays nothing now: its day is owed again.
   await expect(ledger).toContainText(new RegExp(`Owes\\s*\u2212${isk(3 * DAY_TAX)} ISK`));
   const toast = page.getByRole('status').filter({ hasText: /Unlinked the .* ISK payment/ });
   await expect(toast).toBeVisible();

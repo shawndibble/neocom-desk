@@ -1,28 +1,3 @@
-/**
- * The global alerts panel the bell in every page header opens: a popover
- * anchored to the bell on a desktop, the body of a full-height sheet on a
- * phone (`components/ui/AlertsBell`, which owns the surface; this is its
- * content). It replaces the old Alerts page and the Overview's alerts column.
- *
- * Rows are one per notification *type* (`groupAlertsByType`), the same unit the
- * page used: a device back from a week away holds hundreds of fires, and a row
- * per fire is unusable on exactly the days it matters. The row's detail is the
- * newest fire's body. The row itself is the click target (`AlertGroupRow`): View
- * for a single fire, expand for a group of many.
- *
- * What each action means (scope decisions in
- * `docs/context/decisions/20261011-064822-overview-is-a-widget-grid-the-pilot-builds.md`):
- * Acknowledge is Dismiss for a danger type (nothing new is stored), Mark all
- * read dismisses everything *except* danger, and Snooze 1h hides a type on this
- * device only and is offered for price alerts alone. Stop these alerts turns the
- * type off, on both channels, for every Character on the account
- * (`docs/context/decisions/20261028-225816-stop-these-alerts-mutes-a-type-for-every.md`).
- *
- * Dismiss and Stop these alerts are undoable. There is no undismiss, so the
- * write is held back until the Undo toast ends (`useDeferredCommits`) and the
- * row is hidden meanwhile. Closing the panel, or the page hiding, commits what
- * is pending.
- */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAccountCharacters } from '@/features/character/useCharacters';
 import { useTranslation } from 'react-i18next';
@@ -66,15 +41,12 @@ import { isDismissOnView, setMutedForCharacters, useNotificationPreferences } fr
 import { pruneExpired, snooze, useSnoozeStore } from './snooze';
 import { useVisibleAlertEntries } from './useUnreadAlertCount';
 
-/** Fires listed under an opened group before "Show N more" — a week away can leave hundreds. */
 const FIRES_PAGE = 10;
 
-/** The slide out (150ms), the height collapse after it (200ms) and a margin; see `AlertGroupRow`. */
 const LEAVE_MS = 400;
 
 const NOTIFICATION_SETTINGS_PATH = tabPath(SETTINGS_TABS, 'notifications');
 
-/** The one deferred commit Mark all read raises; not a group key. */
 const MARK_ALL_READ_ID = 'mark-all-read';
 
 export function AlertsPanel({ variant, onClose }: AlertsPanelRenderProps) {
@@ -84,7 +56,6 @@ export function AlertsPanel({ variant, onClose }: AlertsPanelRenderProps) {
   const feedEntries = useVisibleAlertEntries();
   const deferred = useDeferredCommits();
   const { hiddenIds } = deferred;
-  /** The fires Mark all read swept; hidden while its Undo toast (or write) is pending. */
   const [markedReadIds, setMarkedReadIds] = useState<ReadonlySet<string>>(new Set());
   const allEntries = useMemo(
     () =>
@@ -98,14 +69,11 @@ export function AlertsPanel({ variant, onClose }: AlertsPanelRenderProps) {
   const dismissOnView = useNotificationPreferences((state) => isDismissOnView(state.value));
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
   const [selectedChip, setSelectedChip] = useState<AlertChip>('all');
-  /** Group key → how many of its fires are listed; absent means collapsed. */
   const [opened, setOpened] = useState<ReadonlyMap<string, number>>(new Map());
-  /** Group keys sliding out after a dismiss; their rows stay mounted until the slide ends. */
   const [leaving, setLeaving] = useState<ReadonlySet<string>>(new Set());
   const leaveTimers = useRef(new Map<string, number>());
   const reducedMotion = usePrefersReducedMotion();
   const { characters, namesById: nameById } = useAccountCharacters();
-  // One-Character device: the name is the same on every row, so it is dropped.
   const showCharacter = characters.length > 1;
   const focusAfterCommit = useFocusAfterCommit();
   const rootRef = useRef<HTMLDivElement>(null);
@@ -119,26 +87,21 @@ export function AlertsPanel({ variant, onClose }: AlertsPanelRenderProps) {
   }, []);
 
   const allGroups = useMemo(() => groupAlertsByType(allEntries), [allEntries]);
-  // A group waiting on its Undo toast is already gone as far as the heading, chips and Mark all read go.
   const liveGroups = useMemo(
     () => (hiddenIds.size === 0 ? allGroups : allGroups.filter((g) => !hiddenIds.has(g.key))),
     [allGroups, hiddenIds]
   );
   const entries = useMemo(() => liveGroups.flatMap((group) => group.entries), [liveGroups]);
   const chips = useMemo(() => usefulChips(liveGroups), [liveGroups]);
-  // A chip whose alerts have all been dismissed is gone from the bar; fall back to All.
   const chip = chips.includes(selectedChip) ? selectedChip : 'all';
-  /** What is on screen: the live rows, plus the ones still sliding out. */
   const rendered = useMemo(
     () => filterByChip(allGroups, chip).filter((g) => !hiddenIds.has(g.key) || leaving.has(g.key)),
     [allGroups, chip, hiddenIds, leaving]
   );
-  /** What the keyboard can reach: focus never lands on a row that is leaving. */
   const live = useMemo(() => rendered.filter((g) => !leaving.has(g.key)), [rendered, leaving]);
   const { count } = useMemo(() => bellBadge(entries), [entries]);
   const readable = useMemo(() => markAllReadTargets(entries), [entries]);
 
-  /** A row's dismiss control (Acknowledge on a danger row), else the row itself. */
   const rowControls = (key: string | undefined): FocusCandidate[] =>
     key === undefined
       ? []
@@ -154,7 +117,6 @@ export function AlertsPanel({ variant, onClose }: AlertsPanelRenderProps) {
         ];
   const heading = () => rootRef.current?.querySelector<HTMLElement>('h2');
 
-  /** Focus lands on the next row's ×, the previous one's if this was last, else the heading. */
   function focusNeighbour(key: string) {
     const index = live.findIndex((g) => g.key === key);
     focusAfterCommit(
@@ -173,7 +135,6 @@ export function AlertsPanel({ variant, onClose }: AlertsPanelRenderProps) {
     });
   }
 
-  /** Dismisses one fire; focus moves to a neighbouring fire, else the group's row, else the heading. */
   function dismissFire(group: AlertTypeGroup, fireIndex: number) {
     const fireControl = (id: string | undefined) =>
       id === undefined
@@ -199,7 +160,6 @@ export function AlertsPanel({ variant, onClose }: AlertsPanelRenderProps) {
     });
   }
 
-  /** Slides the row out and collapses it; with reduced motion it is simply gone. */
   function startLeaving(key: string) {
     if (reducedMotion) return;
     setLeaving((prev) => new Set(prev).add(key));
@@ -210,7 +170,6 @@ export function AlertsPanel({ variant, onClose }: AlertsPanelRenderProps) {
     );
   }
 
-  /** Hides the group now and holds `commit` until its Undo toast ends. */
   function removeWithUndo(group: AlertTypeGroup, message: string, commit: () => Promise<void>) {
     focusNeighbour(group.key);
     startLeaving(group.key);
@@ -227,12 +186,10 @@ export function AlertsPanel({ variant, onClose }: AlertsPanelRenderProps) {
     );
   }
 
-  /** Every Character on the account, the active one first (it is the one with a token to sync under). */
   function accountCharacterIds(group: AlertTypeGroup): number[] {
     const ids = new Set<number>();
     if (activeCharacterId !== null) ids.add(activeCharacterId);
     for (const character of characters) ids.add(character.characterId);
-    // A fire can be from a Character no longer on the roster.
     for (const id of group.characterIds) ids.add(id);
     return [...ids];
   }
@@ -245,7 +202,6 @@ export function AlertsPanel({ variant, onClose }: AlertsPanelRenderProps) {
         title: label,
       }),
       async () => {
-        // The mute first: if it fails the rows stay, rather than going with the type still on.
         await setMutedForCharacters(characterIds, group.target, true);
         await dismissFeedEntriesAndSync(group.entries);
       }
@@ -340,11 +296,6 @@ export function AlertsPanel({ variant, onClose }: AlertsPanelRenderProps) {
                 }}
                 onToggle={() => setShown(group.key, shown === undefined ? FIRES_PAGE : null)}
                 onDismiss={() => dismissGroup(group, label)}
-                // Acknowledge and Snooze commit at once, with no slide and no
-                // Undo, where Dismiss and Stop defer. Acknowledge is the one
-                // deliberate act the panel keeps (§4e) and undoing it would
-                // undo that deliberateness; Snooze is already reversible, since
-                // the type returns by itself when the snooze expires.
                 onAcknowledge={() => {
                   focusNeighbour(group.key);
                   void dismissFeedEntriesAndSync(group.entries);
@@ -357,7 +308,6 @@ export function AlertsPanel({ variant, onClose }: AlertsPanelRenderProps) {
                 }}
                 onStop={() => stopGroup(group, label)}
                 onSettings={() => {
-                  // The page narrows its list to this type's label (`NotificationsPanel`'s search).
                   navigate({
                     pathname: NOTIFICATION_SETTINGS_PATH,
                     search: `?search=${encodeURIComponent(label)}`,
@@ -403,7 +353,6 @@ export function AlertsPanel({ variant, onClose }: AlertsPanelRenderProps) {
       )}
 
       <div className="flex flex-wrap justify-between gap-x-4 gap-y-1 px-3.5 pt-2.5">
-        {/* One link: dismissed alerts have no history view to open, so an "Older alerts" link would only repeat this one. */}
         <Link
           to={NOTIFICATION_SETTINGS_PATH}
           className={plainTextActionClassName('min-h-9 md:min-h-0')}
@@ -428,7 +377,6 @@ export function AlertsPanel({ variant, onClose }: AlertsPanelRenderProps) {
   );
 }
 
-/** One fire inside an opened group: its own body (the group row only shows the newest), age and ×. */
 function FireRow({
   fire,
   now,
@@ -452,7 +400,6 @@ function FireRow({
       data-fire-id={fire.id}
       className="flex items-start gap-x-2 border-b border-line py-1 last:border-b-0 min-h-9 md:min-h-0"
     >
-      {/* The check sits outside the wrapping text block so it stays top-right when the body wraps. */}
       <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-0.5 self-center">
         <Link
           to={notificationUrlForSubject(

@@ -3,7 +3,6 @@ import { firstCountedScan } from '@/engine/survey/series';
 import type { LoadSurveyResult } from '@/features/survey/surveyStore';
 import { loadMoonOreTypeIds, loadTypes } from '@/sde/loadSde';
 
-/** Moon ore name → type id, by the names the Survey scanner prints (variants included). */
 export async function loadMoonOreTypeIdByName(): Promise<ReadonlyMap<string, number>> {
   const [moonIds, types] = await Promise.all([loadMoonOreTypeIds(), loadTypes()]);
   const byName = new Map<string, number>();
@@ -14,10 +13,6 @@ export async function loadMoonOreTypeIdByName(): Promise<ReadonlyMap<string, num
   return byName;
 }
 
-/**
- * A loaded Survey's first counted scan as the book keeps it on the Extraction it is linked to
- * (`surveyScan`), or undefined when the Survey did not load or has no counted scan.
- */
 export function keptSurveyScan(
   survey: LoadSurveyResult,
   typeIdByName: ReadonlyMap<string, number>

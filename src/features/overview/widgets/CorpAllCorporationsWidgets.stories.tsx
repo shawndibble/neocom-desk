@@ -21,11 +21,6 @@ import type { Builder } from './data/builderKit';
 import type { BuildContext, Feeds, KindView } from './data/types';
 import type { Widget as WidgetModel } from './layout';
 
-/**
- * The Gallery corp widgets on **All my corporations** (#6101): the real builders over a feed
- * merged from two corporations, drawn in the real Widget shell. Each row names its
- * corporation in a Corporation column (ticker, full name on hover and in the row's detail).
- */
 const meta = {
   title: 'overview/CorpAllCorporationsWidgets',
   parameters: { layout: 'fullscreen' },
@@ -39,7 +34,6 @@ const HOUR = 3_600_000;
 const MAIN = 98000001;
 const HOLDING = 98000002;
 
-/** The merged read's base: `rows` maps each row key to the corporation that holds it. */
 function across(rows: [string, number][]): CorpFeedBase {
   return {
     readable: true,
@@ -227,7 +221,6 @@ function Board({ kind, build, feeds }: { kind: string; build: Builder; feeds: Fe
 
 const ok = <T,>(data: T) => ({ data, error: false, loading: false });
 
-/** @summary Customs offices from two corporations, by system, each naming its corporation. */
 export const CustomsOffices: Story = {
   render: () => (
     <Board
@@ -238,14 +231,12 @@ export const CustomsOffices: Story = {
   ),
 };
 
-/** @summary Starbases from two corporations, soonest dry first. */
 export const Starbases: Story = {
   render: () => (
     <Board kind="corpStarbases" build={corpStarbases} feeds={{ corpStarbasesAll: ok(STARBASES) }} />
   ),
 };
 
-/** @summary Skyhooks from two corporations on one raid-window timeline. */
 export const Sovereignty: Story = {
   render: () => (
     <Board
@@ -256,21 +247,18 @@ export const Sovereignty: Story = {
   ),
 };
 
-/** @summary Open contracts from two corporations; count and collateral summed. */
 export const Contracts: Story = {
   render: () => (
     <Board kind="corpContracts" build={corpContracts} feeds={{ corpContractsAll: ok(CONTRACTS) }} />
   ),
 };
 
-/** @summary Open market orders from two corporations; count and escrow summed. */
 export const MarketOrders: Story = {
   render: () => (
     <Board kind="corpOrders" build={corpOrders} feeds={{ corpOrdersAll: ok(ORDERS) }} />
   ),
 };
 
-/** @summary One corporation's read failed: the others' rows still draw, with a note under them. */
 export const PartlyFailed: Story = {
   render: () => (
     <Board

@@ -24,7 +24,6 @@ const CURRENT: Attributes = {
 const levels = (skillTypeID: number, upTo: number): PlanStep[] =>
   Array.from({ length: upTo }, (_, i) => ({ skillTypeID, level: i + 1 }));
 
-// Two-phase fixture: int/mem then per/wil, 8000 SP each phase.
 const TWO_PHASE_SKILLS = skillMap(
   skill(1, 'intelligence', 'memory'),
   skill(2, 'perception', 'willpower')
@@ -55,7 +54,6 @@ describe('optimizeAtMarkers', () => {
       remap: false,
     });
     expect(result.segments[0].attributes).toEqual(CURRENT);
-    // 8000 SP at 30 + 8000 SP at 30 SP/min.
     expect(result.totalSeconds).toBeCloseTo(2 * (8000 / 30) * 60, 6);
     expect(result.totalSeconds).toBe(result.currentSeconds);
     expect(result.savingsSeconds).toBe(0);
@@ -69,7 +67,6 @@ describe('optimizeAtMarkers', () => {
     expect(result.segments).toHaveLength(2);
     expect(result.segments[0]).toMatchObject({ startIndex: 0, endIndex: 2, remap: false });
     expect(result.segments[0].attributes).toEqual(CURRENT);
-    // Prefix on current attributes: 8000 SP at 20 + 20/2 = 30 SP/min.
     expect(result.segments[0].seconds).toBeCloseTo((8000 / 30) * 60, 6);
     expect(result.segments[1]).toMatchObject({ startIndex: 3, endIndex: 5, remap: true });
     expect(result.segments[1].attributes.perception).toBe(27);
@@ -118,8 +115,6 @@ describe('optimizeAtMarkers', () => {
       markers: [-5, 99],
       currentAttributes: CURRENT,
     });
-    // -5 clamps to 0 (remap at the very start); 99 clamps to steps.length,
-    // an empty segment, which is dropped.
     expect(result.segments).toHaveLength(1);
     expect(result.segments[0]).toMatchObject({ startIndex: 0, endIndex: 5, remap: true });
   });
@@ -146,9 +141,7 @@ describe('optimizeAtMarkers', () => {
       implants: { perception: 3, willpower: 3 },
     });
     expect(result.segments).toHaveLength(1);
-    // 8000 SP at (27+3) + (21+3)/2 = 42 SP/min.
     expect(result.totalSeconds).toBeCloseTo((8000 / 42) * 60, 6);
-    // Baseline: (20+3) + (20+3)/2 = 34.5 SP/min.
     expect(result.currentSeconds).toBeCloseTo((8000 / 34.5) * 60, 6);
   });
 
@@ -167,7 +160,6 @@ describe('optimizeAtMarkers', () => {
         manualAttributes: [override],
       });
       expect(result.segments[1].attributes).toEqual(override);
-      // 8000 SP at 30 + 18/2 = 39 SP/min.
       expect(result.segments[1].seconds).toBeCloseTo((8000 / 39) * 60, 6);
     });
 
@@ -198,15 +190,13 @@ describe('optimizeAtMarkers', () => {
         willpower: 19,
         charisma: 30,
       };
-      // markers given out of order ([6, 3]); manualAttributes stays aligned to
-      // the input array, not to the sorted cut points ([3, 6]).
       const result = optimizeAtMarkers(steps, skills, {
         markers: [6, 3],
         currentAttributes: CURRENT,
         manualAttributes: [overrideForSecondMarker, null],
       });
       expect(result.segments[1]).toMatchObject({ startIndex: 3, remap: true });
-      expect(result.segments[1].attributes.perception).toBe(27); // computed, not overridden
+      expect(result.segments[1].attributes.perception).toBe(27);
       expect(result.segments[2]).toMatchObject({ startIndex: 6, remap: true });
       expect(result.segments[2].attributes).toEqual(overrideForSecondMarker);
     });
@@ -259,9 +249,6 @@ describe('optimizeAtMarkers', () => {
     });
 
     it('costs a later segment from where the earlier one left off, not from the plan start', () => {
-      // The Booster only covers the leading segment's actual (boosted)
-      // training time, so the remapped tail must not still get boosted once
-      // it expires at the real handoff point.
       const withLongBooster = optimizeAtMarkers(TWO_PHASE_STEPS, TWO_PHASE_SKILLS, {
         markers: [3],
         currentAttributes: CURRENT,

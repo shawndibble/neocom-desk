@@ -25,7 +25,6 @@ import { contractDomain } from './pollDomains/contracts';
 import { walletDomain } from './pollDomains/wallet';
 import { marketOrderDomain } from './pollDomains/marketOrders';
 
-/** A snapshot guard that only checks the shared `{ nowMs, entries[] }` frame. */
 const isSnapshotOfAnything = isSnapshotWith<{ nowMs: number }>('entries', () => true);
 
 const SNAPSHOT: SkillQueueSnapshot = {
@@ -350,8 +349,6 @@ describe('walletDomain.store', () => {
       value: { 7: { entries: [{ id: 5, amount: 100, thresholdIsk: 0 }], nowMs: 999 } },
     });
     await walletDomain.store.getState().hydrate();
-    // No baseline means `diffWalletBalanceChanged` fires nothing this poll and
-    // the next save writes a complete snapshot.
     expect(walletDomain.store.getState().value).toEqual(EMPTY_POLLER_STATE);
   });
 

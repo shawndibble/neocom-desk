@@ -1,15 +1,3 @@
-/**
- * Contract stock for the net worth chart (issue #5128): what a Character has
- * locked in its own open contracts. Items leave the asset list and a courier
- * reward leaves the wallet, so without this layer the chart dips until the
- * contract ends. Pure — the fetching lives in `features/netWorth`.
- *
- * Counted at item value, never at contract price (what a buyer would pay the
- * Character): that would sum one party's money into another's net worth. The one
- * exception is collateral the Character posted as acceptor of a running courier:
- * it is the Character's own ISK in escrow, so it counts until the real deadline
- * (`date_accepted` + `days_to_complete`, never the offer expiry).
- */
 import {
   isActiveContractStatus,
   withAcceptedCourierInProgress,
@@ -37,18 +25,14 @@ export interface StockContractItem {
   record_id: number;
   type_id: number;
   quantity: number;
-  /** True when the issuer hands this over; false is what the acceptor must supply. */
   is_included: boolean;
-  /** -2 is a blueprint copy. */
   raw_quantity?: number;
 }
 
-/** Delivery deadline of an accepted courier; `null` when not accepted or not derivable. */
 function runningDeadline(contract: StockContract): number | null {
   return courierDeliveryDeadlineMs(withAcceptedCourierInProgress(contract));
 }
 
-/** A contract the Character issued for themselves that is still live: not corporation-issued, not over, not expired. */
 export function isOpenOwnContract(
   contract: StockContract,
   characterId: number,
@@ -56,21 +40,17 @@ export function isOpenOwnContract(
 ): boolean {
   if (contract.issuer_id !== characterId || contract.for_corporation) return false;
   if (!isActiveContractStatus(contract.status)) return false;
-  // An expired contract stays outstanding in ESI until its items are returned.
   const expires = parseInstant(contract.date_expired);
   if (contract.type === 'courier') {
-    // Once accepted, the offer expiry no longer matters: delivery is owed by the real deadline.
     const deadline = runningDeadline(contract);
     if (deadline !== null) return deadline > now;
   }
   return expires === null || expires > now;
 }
 
-/** Collateral the Character posted by accepting a courier whose haul is still running. */
 function postedCollateral(contract: StockContract, characterId: number, now: number): number {
   if (contract.type !== 'courier' || contract.for_corporation) return 0;
   if (contract.acceptor_id !== characterId || contract.issuer_id === characterId) return 0;
-  // Only an accepted, still-outstanding courier has a deadline: finished or failed ones return null.
   const deadline = runningDeadline(contract);
   if (deadline === null || deadline <= now) return 0;
   return contract.collateral ?? 0;
@@ -80,7 +60,6 @@ function isItemContract(contract: StockContract): boolean {
   return contract.type === 'item_exchange' || contract.type === 'auction';
 }
 
-/** The Character's own open item-exchange and auction contracts: the ones whose items need reading. */
 export function openIssuedItemContracts(
   contracts: readonly StockContract[],
   characterId: number,
@@ -89,7 +68,6 @@ export function openIssuedItemContracts(
   return contracts.filter((c) => isItemContract(c) && isOpenOwnContract(c, characterId, now));
 }
 
-/** `null` when a line cannot be valued: the whole contract is then left out rather than guessed. */
 function itemsValue(
   items: readonly StockContractItem[],
   priceByTypeId: ReadonlyMap<number, number>
@@ -98,7 +76,6 @@ function itemsValue(
   for (const line of items) {
     if (!line.is_included) continue;
     const price = priceByTypeId.get(line.type_id);
-    // A blueprint copy has no price of its own, so its contract cannot be valued.
     if (price === undefined || line.raw_quantity === -2) return null;
     total += line.quantity * price;
   }
@@ -109,7 +86,6 @@ export function contractStockValue(input: {
   characterId: number;
   now: number;
   contracts: readonly StockContract[];
-  /** Items by contract id; `null` or absent = not read. */
   itemsByContractId: ReadonlyMap<number, readonly StockContractItem[] | null>;
   priceByTypeId: ReadonlyMap<number, number>;
 }): number {

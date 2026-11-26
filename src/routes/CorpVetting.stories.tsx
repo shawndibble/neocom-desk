@@ -20,11 +20,6 @@ const shell = (path: string, routes = directorRoutes) => ({
   seed: seedVettingCorporation,
 });
 
-/**
- * `/corp/vetting`, the corp's side: the queue of reviews, one review's report, and settings.
- * The real route in the app shell, against the in-memory `vettingFixture` backend (sample
- * data; reports worked out by the real checks). Kestrel Vane, a Director, is reviewing.
- */
 const meta = {
   title: 'pages/CorpVetting',
   component: CorpVetting,
@@ -38,51 +33,34 @@ type Story = StoryObj<typeof meta>;
 const phone = { viewport: { value: 'phone390', isRotated: false } } as const;
 const report = (id: string) => ({ shell: shell(`/corp/vetting/open/${id}`) });
 
-/** @summary Queue: applications and promotions in one list, result in words, sign-offs with "Yours needed". */
 export const Queue: Story = {};
-/** @summary Phone: the queue as dense cards under a segmented control. */
 export const QueuePhone: Story = { globals: phone };
 
-/** @summary Empty queue: how a review starts. */
 export const Empty: Story = { parameters: { vetting: { empty: true } } };
 
-/** @summary Vetting off: Copy apply link is inert with its reason, and a line says who turns it on. */
 export const VettingOff: Story = { parameters: { vetting: { on: false } } };
 
-/** @summary Application report with three flags: result line, flags with the rows behind them, could-not-check, decision rail. */
 export const Flagged: Story = { parameters: report(VETTING_FIXTURE_REVIEWS.flagged) };
-/** @summary Phone: the flagged report in one column, the decision after the findings. */
 export const FlaggedPhone: Story = { ...Flagged, globals: phone };
 
 const data = (source: string, query = '') => ({
   shell: shell(`/corp/vetting/open/${VETTING_FIXTURE_REVIEWS.flagged}/data/${source}${query}`),
 });
 
-/** @summary Data we read: every kept row, 4,652 wallet journal rows in one windowed table, a tab per source with its count, a character switcher and filters. */
 export const DataWeRead: Story = { parameters: data('wallet') };
-/** @summary Phone: the data page, the table scrolls sideways under a pinned first column. */
 export const DataWeReadPhone: Story = { ...DataWeRead, globals: phone };
-/** @summary Flagged rows only: the rows a flag shows, tinted, each with a link back to its flag. */
 export const DataFlaggedRows: Story = { parameters: data('wallet', '?flagged=1') };
-/** @summary Skills: the Cyno skill row tinted with its Flag link, skill names from the static data. */
 export const DataSkills: Story = { parameters: data('skills') };
-/** @summary Corporation history: joined, left and the time there. */
 export const DataHistory: Story = { parameters: data('history') };
-/** @summary Empty source: the read found nothing, said as a result. */
 export const DataEmptySource: Story = { parameters: data('contact') };
 
-/** @summary Nothing found: a neutral result line that says it is not a verdict, every check listed. */
 export const NothingFound: Story = { parameters: report(VETTING_FIXTURE_REVIEWS.nothing) };
 
-/** @summary Incomplete: the pilot did not share two sources, so three checks could not run. */
 export const Incomplete: Story = { parameters: report(VETTING_FIXTURE_REVIEWS.incomplete) };
 
-/** @summary Promotion to Director: two sign-offs, the first hidden until the caller decides, the asker barred. */
 export const Promotion: Story = { parameters: report(VETTING_FIXTURE_REVIEWS.promotion) };
-/** @summary Phone: the promotion report. */
 export const PromotionPhone: Story = { ...Promotion, globals: phone };
 
-/** @summary Reject: the confirm that needs a reason before it acts. */
 export const RejectDialog: Story = {
   ...Flagged,
   play: async ({ canvasElement }) => {
@@ -92,7 +70,6 @@ export const RejectDialog: Story = {
   },
 };
 
-/** @summary Decided: reviews that are over, kept 30 days. */
 export const Decided: Story = { parameters: { shell: shell('/corp/vetting/decided') } };
 
 const configured = { settings: VETTING_FIXTURE_CONFIGURED };
@@ -102,17 +79,11 @@ const settings = (section: string) => ({
   shell: shell(`/corp/vetting/settings/${section}`),
 });
 
-/** @summary Settings (Director), General: on or off, the welcome message and the contact line. */
 export const Settings: Story = { parameters: { shell: shell('/corp/vetting/settings') } };
-/** @summary Settings, General, for a corp that wrote its welcome and contact line. */
 export const SettingsGeneral: Story = { parameters: settings('general') };
-/** @summary Settings, Applicants: minimums, the ordered questions, invite-only and the way to the invite links. */
 export const SettingsApplicants: Story = { parameters: settings('applicants') };
-/** @summary Settings, Decisions: sign-offs, how a no reads, the reason, the mail, the reviewers' notification. */
 export const SettingsDecisions: Story = { parameters: settings('decisions') };
-/** @summary Settings, Watchlist: who the checks look for. */
 export const SettingsWatchlist: Story = { parameters: settings('watchlist') };
-/** @summary Settings with an edit not yet saved: the section is marked and the bar pins Discard and Save. */
 export const SettingsUnsaved: Story = {
   ...SettingsGeneral,
   play: async ({ canvasElement }) => {
@@ -121,13 +92,10 @@ export const SettingsUnsaved: Story = {
     await body.findByText('Unsaved changes');
   },
 };
-/** @summary Phone: every settings section in one page, each under its heading. */
 export const SettingsPhone: Story = { ...SettingsApplicants, globals: phone };
 
-/** @summary Invite-only corp: the header makes an invite link, and the queue shows where an application came from. */
 export const QueueInviteOnly: Story = { parameters: { vetting: inviteOnly } };
 
-/** @summary "New invite link": who it is for, then the link with Copy. */
 export const InviteDialog: Story = {
   ...QueueInviteOnly,
   play: async ({ canvasElement }) => {
@@ -146,22 +114,16 @@ const openInvites: Story['play'] = async ({ canvasElement }) => {
   await body.findByRole('dialog', { name: 'Invite links' });
 };
 
-/** @summary Invite links: who each is for, who made it, when, how many applications it started, Copy link and Revoke. */
 export const InvitesList: Story = { ...QueueInviteOnly, play: openInvites };
-/** @summary Phone: the invite links as a sheet. */
 export const InvitesListPhone: Story = { ...InvitesList, globals: phone };
 
-/** @summary Report of a corp that asks questions: "Their answers" beside "Their note". */
 export const ReportAnswers: Story = {
   parameters: { vetting: configured, ...report(VETTING_FIXTURE_REVIEWS.flagged) },
 };
-/** @summary Phone: the note, then the answers, in one column. */
 export const ReportAnswersPhone: Story = { ...ReportAnswers, globals: phone };
 
-/** @summary Reject where the corp shows the reason: the confirm says the pilot will see it. */
 export const RejectDialogReasonShown: Story = { ...ReportAnswers, play: RejectDialog.play };
 
-/** @summary A Personnel Manager reviews but has no Settings tab. */
 export const Recruiter: Story = {
   parameters: {
     vetting: { canConfigure: false },
@@ -169,7 +131,6 @@ export const Recruiter: Story = {
   },
 };
 
-/** @summary "Review a member": the exact name and the role they are up for. */
 export const ReviewMember: Story = {
   play: async ({ canvasElement }) => {
     const body = within(canvasElement.ownerDocument.body);
@@ -178,12 +139,10 @@ export const ReviewMember: Story = {
   },
 };
 
-/** @summary "Review a member" with the corp's member list readable: pick from the roster instead of typing the exact name. */
 export const ReviewMemberRoster: Story = {
   parameters: {
     shell: {
       ...shell('/corp/vetting/open', () => [...directorRoutes(), ...vettingRosterRoutes()]),
-      // Mail the member: the asking officer's send-mail grant.
       scopes: [...VETTING_SHELL_SCOPES, 'esi-mail.send_mail.v1'],
     },
   },
@@ -192,22 +151,17 @@ export const ReviewMemberRoster: Story = {
 
 const requests = { vetting: { extra: 'requests' as const } };
 
-/** @summary Queue with the waiting rows: mail not sent, mail sent 6 hours ago, and the one about you left out. */
 export const QueueRequests: Story = { parameters: requests };
 
-/** @summary Requested review, mail not sent: Request panel (asked by you, role, Mail not sent, Send mail), "Nothing shared yet", the rail with you barred. */
 export const RequestedNoMail: Story = {
   parameters: report(VETTING_FIXTURE_REVIEWS.waiting),
 };
-/** @summary Phone: requested review, one column. */
 export const RequestedNoMailPhone: Story = { ...RequestedNoMail, globals: phone };
 
-/** @summary Requested review, mail sent 6 hours ago: Resend waits a day, the reason printed under it. */
 export const RequestedMailed: Story = {
   parameters: { ...requests, ...report(VETTING_FIXTURE_REVIEWS.mailed) },
 };
 
-/** @summary A review about the signed-in officer: closed, with the existing wording. */
 export const AboutYou: Story = {
   parameters: { ...requests, ...report(VETTING_FIXTURE_REVIEWS.aboutYou) },
 };

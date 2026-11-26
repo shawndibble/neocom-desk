@@ -50,7 +50,6 @@ function Harness({
   sort?: { columnId: string; direction: 'asc' | 'desc' };
   filter?: WalletJournalFilter;
   rows?: JournalRow[];
-  /** The personal journal: own-Character netting on. The corp journal passes false. */
   netted?: boolean;
   keyByCharacter?: boolean;
   highlightRowKey?: string | number | null;
@@ -86,7 +85,6 @@ function Harness({
         keyByCharacter={keyByCharacter}
         highlightRowKey={highlightRowKey}
         panel={{
-          // On a phone the open panel is modal and the table behind it inert.
           open: !phone.value,
           onOpenChange: () => {},
           scopeLabel: 'All characters',
@@ -110,7 +108,6 @@ describe('JournalTable', () => {
     render(<Harness />);
     expect(screen.getByText('3 entries')).toBeInTheDocument();
     expect(screen.getByText('1 entry between your Characters left out')).toBeInTheDocument();
-    // The list still shows the transfer, marked.
     expect(screen.getAllByText('Between your Characters').length).toBeGreaterThan(0);
   });
 
@@ -137,7 +134,6 @@ describe('JournalTable', () => {
         onFilterChange={onFilterChange}
       />
     );
-    // Only the line with a Player has a menu.
     expect(screen.getAllByRole('button', { name: /More actions for/ })).toHaveLength(1);
     await userEvent.click(screen.getByRole('button', { name: /More actions for Pilot Forty-Two/ }));
     expect(
@@ -295,7 +291,6 @@ describe('JournalTable filtered summary status', () => {
       render(<Harness rows={days} />);
       const headers = document.querySelectorAll('.dt-group-header');
       expect(headers).toHaveLength(2);
-      // 5,000 - 2,000; the 900 own-Character transfer is left out.
       expect(headers[0]).toHaveTextContent('Wed 7 Oct · EVE time');
       expect(headers[0]).toHaveTextContent('+3,000');
       expect(headers[1]).toHaveTextContent('+700');

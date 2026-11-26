@@ -25,9 +25,6 @@ const CTX = {
   modifiers: NO_CHARACTER_MODIFIERS,
 };
 
-// A four-blueprint chain: PARENT (top-level material) is built from MID, MID
-// from LEAF, and LEAF from ROOT — a plain market mineral. Shaped so a test
-// can choose, per case, how deep `buildHere` reaches, up to all four levels.
 const PARENT_TYPE = 100;
 const MID_TYPE = 200;
 const LEAF_TYPE = 300;
@@ -140,20 +137,18 @@ describe('resolveMaterial — one level of build', () => {
         recipeFor: recipeFor({
           [MID_TYPE]: { method: 'manufacturing', blueprint: midBlueprint, me: 0 },
         }),
-        materialPrices: { [LEAF_TYPE]: 100, [MID_TYPE]: 999_999 }, // MID's own market price must be ignored once built
+        materialPrices: { [LEAF_TYPE]: 100, [MID_TYPE]: 999_999 },
         ctx: { ...CTX, adjustedPrices: { [LEAF_TYPE]: 100 } },
       })
     );
 
     expect(resolved.subBuild).toBeDefined();
     expect(resolved.unitPrice).toBeNull();
-    // 10 units needed at 1/run -> 10 runs -> 50 units of LEAF at 100 = 5000 materials.
     expect(resolved.subBuild?.materialCost).toBe(5000);
     expect(resolved.subBuild?.totalFees).toBeGreaterThan(0);
     expect(resolved.subBuild?.totalCost).toBe(
       (resolved.subBuild?.materialCost ?? 0) + (resolved.subBuild?.totalFees ?? 0)
     );
-    // unitCost x unitsMade (10) reproduces the job's total cost.
     expect((resolved.subBuild?.unitCost ?? 0) * 10).toBeCloseTo(
       resolved.subBuild?.totalCost ?? 0,
       6
@@ -193,12 +188,10 @@ describe('resolveMaterial — recursion', () => {
       })
     );
 
-    // 3 PARENT -> 3 runs -> 6 MID needed -> 6 runs -> 30 LEAF at 10 = 300.
     const midRow = resolved.subBuild?.inputs.find((i) => i.typeID === MID_TYPE);
     expect(midRow?.subBuild).toBeDefined();
     expect(midRow?.subBuild?.needed).toBe(6);
     expect(midRow?.subBuild?.materialCost).toBe(300);
-    // The parent's own rolled cost embeds MID's total (materials + its own fee).
     expect(resolved.subBuild?.materialCost).toBeCloseTo(6 * (midRow?.subBuild?.unitCost ?? 0), 6);
     expect(resolved.unpriced).toBe(false);
   });
@@ -217,18 +210,16 @@ describe('resolveMaterial — recursion', () => {
       })
     );
 
-    // 1 PARENT -> 2 MID -> 10 LEAF -> 30 ROOT at 2 ISK = 60.
     const midRow = resolved.subBuild?.inputs.find((i) => i.typeID === MID_TYPE);
     const leafRow = midRow?.subBuild?.inputs.find((i) => i.typeID === LEAF_TYPE);
     const rootRow = leafRow?.subBuild?.inputs.find((i) => i.typeID === ROOT_TYPE);
 
     expect(midRow?.subBuild).toBeDefined();
     expect(leafRow?.subBuild).toBeDefined();
-    expect(rootRow?.subBuild).toBeUndefined(); // ROOT bottoms out — bought, not built
+    expect(rootRow?.subBuild).toBeUndefined();
     expect(rootRow?.remainingQuantity).toBe(30);
     expect(rootRow?.lineCost).toBe(60);
 
-    // Every level's rolled-up cost is unpoisoned and non-zero, all the way up.
     expect(leafRow?.subBuild?.unitCost).not.toBeNull();
     expect(midRow?.subBuild?.unitCost).not.toBeNull();
     expect(resolved.subBuild?.unitCost).not.toBeNull();
@@ -239,7 +230,7 @@ describe('resolveMaterial — recursion', () => {
     const resolved = resolveMaterial(
       material(PARENT_TYPE, 3),
       baseOptions({
-        buildHere: new Set([PARENT_TYPE]), // MID is not chosen — buy it at the hub
+        buildHere: new Set([PARENT_TYPE]),
         recipeFor: recipeFor({
           [PARENT_TYPE]: { method: 'manufacturing', blueprint: parentBlueprint, me: 0 },
           [MID_TYPE]: { method: 'manufacturing', blueprint: midBlueprint, me: 0 },
@@ -255,7 +246,6 @@ describe('resolveMaterial — recursion', () => {
 });
 
 describe('resolveMaterial — reaction sub-builds (issue #698)', () => {
-  /** Distinct facility/cost-index from `CTX`, so a leaked context is detectable. */
   const REACTION_CTX = {
     facility: FACILITY_PRESETS.athanor,
     rigFit: ['none', 'none', 'none'] as const,
@@ -267,11 +257,6 @@ describe('resolveMaterial — reaction sub-builds (issue #698)', () => {
   const CTX_WITH_ROOT_PRICE = { ...CTX, adjustedPrices: { [ROOT_TYPE]: 3 } };
 
   it('a reaction node uses reactionCtx while a manufacturing node beneath it still uses ctx — mixed tree at multiple depths', () => {
-    // PARENT (manufacturing) -> MID (reaction) -> LEAF (manufacturing) -> ROOT (bought).
-    // MID's own job fee must be quoted against reactionCtx; LEAF's, nested
-    // beneath MID, must fall back to ctx rather than inheriting reactionCtx —
-    // the exact inheritance bug a naive `{...opts, ctx: reactionCtx}` spread
-    // would introduce.
     const resolved = resolveMaterial(
       material(PARENT_TYPE, 1),
       baseOptions({
@@ -294,12 +279,9 @@ describe('resolveMaterial — reaction sub-builds (issue #698)', () => {
     expect(midRow?.subBuild).toBeDefined();
     expect(leafRow?.subBuild).toBeDefined();
     expect(rootRow?.subBuild).toBeUndefined();
-    expect(rootRow?.lineCost).toBe(60); // 30 ROOT at 2 ISK
+    expect(rootRow?.lineCost).toBe(60);
 
-    // MID's own job fee: index 0.2, Athanor 0% tax — reactionCtx.
     expect(midRow?.subBuild?.jobFee.total).toBeCloseTo(24, 6);
-    // LEAF's own job fee, nested under MID: index 0.05, NPC station 0.25%
-    // tax — ctx, not reactionCtx. A leaked reactionCtx would give 21.6 here.
     expect(leafRow?.subBuild?.jobFee.total).toBeCloseTo(8.325, 6);
 
     expect(resolved.subBuild?.unitCost).toBeCloseTo(132.975, 6);
@@ -316,7 +298,6 @@ describe('resolveMaterial — reaction sub-builds (issue #698)', () => {
         }),
         materialPrices: { [LEAF_TYPE]: 10 },
         ctx: REACTION_CTX,
-        // No reactionCtx — a reaction-activity plan reuses its own ctx.
       })
     );
 
@@ -338,12 +319,11 @@ describe('resolveMaterial — a poisoned leaf blocks every ancestor honestly', (
             me: 0,
           },
         }),
-        materialPrices: {}, // UNPRICEABLE_TYPE has no hub listing and no recipe
+        materialPrices: {},
       })
     );
 
     expect(resolved.subBuild?.unitCost).toBeNull();
-    // Poisoned, not free: the line must not silently read as a real 0-ISK cost.
     expect(resolved.unpriced).toBe(true);
     expect(resolved.lineCost).toBe(0);
   });
@@ -393,8 +373,6 @@ describe('unpricedLeafTypeIds', () => {
       })
     );
 
-    // PARENT and MID are both built and both poisoned, but neither is what
-    // actually lacks a price — UNPRICEABLE_TYPE, two levels down, is.
     expect(unpricedLeafTypeIds([resolved])).toEqual([UNPRICEABLE_TYPE]);
   });
 
@@ -409,9 +387,6 @@ describe('unpricedLeafTypeIds', () => {
 
 describe('resolveMaterial — owned stock is one pool for the whole tree', () => {
   it('does not credit the same physical stock to two different branches that both consume it', () => {
-    // Two unrelated top-level materials, SECOND_PARENT and PARENT, each built
-    // from their own MID-shaped job that in turn eats LEAF_TYPE — and only
-    // 20 LEAF_TYPE is actually owned, less than either branch alone needs.
     const secondParentType = 101;
     const secondParentBlueprint: IndustryBlueprint = {
       name: 'Second Parent Blueprint',
@@ -443,7 +418,6 @@ describe('resolveMaterial — owned stock is one pool for the whole tree', () =>
 
     const firstLeaf = first.subBuild?.inputs.find((i) => i.typeID === LEAF_TYPE);
     const secondLeaf = second.subBuild?.inputs.find((i) => i.typeID === LEAF_TYPE);
-    // 20 owned total, split across the two branches, never 20 credited to each.
     expect((firstLeaf?.ownedQuantity ?? 0) + (secondLeaf?.ownedQuantity ?? 0)).toBe(20);
     expect(firstLeaf?.ownedQuantity).toBe(20);
     expect(secondLeaf?.ownedQuantity).toBe(0);
@@ -484,8 +458,6 @@ describe('resolveMaterial — cycle and depth guards', () => {
       })
     );
 
-    // One level of the job plans fine; its own PARENT_TYPE input must not
-    // recurse into a second job and instead falls back to being bought.
     expect(resolved.subBuild).toBeDefined();
     const innerParent = resolved.subBuild?.inputs.find((i) => i.typeID === PARENT_TYPE);
     expect(innerParent?.subBuild).toBeUndefined();
@@ -505,7 +477,7 @@ describe('resolveMaterial — cycle and depth guards', () => {
     });
 
     expect(resolved.subBuild).toBeUndefined();
-    expect(resolved.unitPrice).toBeNull(); // MID has no hub price of its own in this test
+    expect(resolved.unitPrice).toBeNull();
   });
 });
 
@@ -602,8 +574,6 @@ describe('resolveMaterial — Blueprint Acquisition (issue #838)', () => {
       acquisitionTier: { me: 8, te: 16 },
     });
     expect(inputs[1].typeID).toBe(LEAF_TYPE);
-    // The resolved tier (ME8) replaces the recipe's own me (0) for scaling —
-    // fewer LEAF units than the ME0 case (50) confirms it was actually used.
     expect(inputs[1].quantity).toBeLessThan(50);
     expect(resolved.subBuild?.materialCost).toBe(500 + inputs[1].lineCost);
   });

@@ -1,12 +1,3 @@
-/**
- * The Transactions table's Margin column (issue #1740): wires the wallet's
- * fills and journal into the pure `realizedMargins` engine. A sale's sales
- * tax is its `transaction_tax` journal line, tied to the fill by
- * `journalTransactionLinks` where ESI gives the line a context and otherwise
- * by the journal's order (`pairByProceeds`); the journal reaching back further
- * than the capped transactions (or not loading at all) just leaves sales
- * without one, so without a margin.
- */
 import type { WalletJournalEntry, WalletTransaction } from '@/esi/endpoints';
 import { journalTransactionLinks } from '@/features/character/journalTransactionLink';
 import {
@@ -17,24 +8,8 @@ import {
 } from '@/engine/market/realizedMargin';
 import { toWalletTrade } from './orderCostBasis';
 
-/** Journal amounts are floats; a sale's total matches its proceeds line to within this. */
 const AMOUNT_TOLERANCE = 0.01;
 
-/**
- * ESI's real `transaction_tax` lines carry no context, and a fill's
- * `journal_ref_id` names neither its `market_transaction` line nor its tax
- * line, so the exact keys rarely hit. What the journal does keep is order: a
- * sale's proceeds line (`market_transaction`, the sale's total, the fill's
- * timestamp) is followed by its own tax line before the next proceeds line
- * starts. So an unclaimed proceeds line of the same time and amount, and the
- * first unclaimed tax line after it with no other proceeds line in between,
- * are a sale and its tax. A tax line missing from the journal leaves the sale
- * without one rather than taking the next sale's. Same-priced sales at one
- * timestamp are interchangeable, so claiming them in order is exact.
- *
- * `claimed` holds the tax lines the exact keys already used. Returns each
- * paired sale's tax (positive ISK) by transaction id.
- */
 function pairByProceeds(
   sales: readonly WalletTransaction[],
   journal: readonly WalletJournalEntry[],
@@ -75,7 +50,6 @@ function pairByProceeds(
   return paired;
 }
 
-/** Each sale's sales tax (positive ISK) from the journal's `transaction_tax` lines, keyed by transaction id. */
 function salesTaxByTransaction(
   transactions: readonly WalletTransaction[],
   journal: readonly WalletJournalEntry[]
@@ -129,19 +103,11 @@ export interface CharacterFills {
   journal: readonly WalletJournalEntry[];
 }
 
-/** A fill of the All characters view: its id is unique across the pool. */
 export type PooledTransaction = WalletTransaction & {
   characterId: number;
   characterName: string;
 };
 
-/**
- * All characters (issue #3995): every Character's fills in one FIFO pool, so a
- * sale by one of an alt's buys gets a margin. Two Characters' wallets can carry
- * the same `transaction_id` (a trade between them is on both), so each fill is
- * renumbered to be unique across the pool; its sales tax is still linked inside
- * its own Character's journal first.
- */
 export function pooledTransactionMargins(sources: readonly CharacterFills[]): {
   rows: PooledTransaction[];
   margins: Map<number, RealizedMargin>;

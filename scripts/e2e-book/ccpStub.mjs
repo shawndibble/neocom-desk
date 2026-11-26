@@ -1,13 +1,3 @@
-/**
- * Loaded into the Functions emulator (`NODE_OPTIONS=--import`) for the Corp Tax Book browser
- * tests (`playwright.book.config.ts`). The callables reach CCP for two things: the JWKS that
- * signs an EVE access token, and ESI for who a Character is (corporation, roles, the CEO). This
- * answers both for the fake identities of `e2e/support/fixtureData.ts`, so the real server code
- * runs end to end and nothing leaves the machine. Every other host goes to the real `fetch`.
- *
- * The roster rule is shared with `e2e/support/taxBook/identities.ts`: every Character is in the
- * officer's corporation, except ids from LEFT_FROM up (leavers and guests), in OUTSIDE_CORP.
- */
 import { readFileSync } from 'node:fs';
 
 const keyDir = process.env.E2E_BOOK_KEY_DIR;

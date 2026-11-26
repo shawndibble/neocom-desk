@@ -27,9 +27,6 @@ describe('retargetPatch', () => {
   });
 
   it('clears the build system when the snapshot has none, rather than leaving the plan’s old one', () => {
-    // The four fields move together as one bundle — a Retarget that dropped
-    // a system for one that hadn't picked one would otherwise leave a stray
-    // system charging the job fee at a place the group no longer targets.
     const patch = retargetPatch(snapshot());
     expect(patch.buildSystemId).toBeUndefined();
     expect(patch.buildSystemName).toBeUndefined();
@@ -42,8 +39,6 @@ describe('retargetPatch', () => {
   });
 
   it('leaves rig fit and facility tax alone when a structure target carries neither', () => {
-    // ESI publishes no structure rig fitting, so a pick alone has nothing
-    // truer to write than what the plan already had.
     const patch = retargetPatch(snapshot({ facility: 'raitaru' }));
     expect('rigFit' in patch).toBe(false);
     expect('facilityTaxPct' in patch).toBe(false);

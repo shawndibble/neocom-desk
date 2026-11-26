@@ -36,7 +36,6 @@ describe('utility jobs', () => {
 });
 
 describe('Rework on an explorer under Best overall', () => {
-  // 538 analyzer, 481 probe launcher, 1223 scan array, 330 cloak, 212 sensor booster, 211 tracking enhancer.
   const GROUP: Record<number, number> = {
     1: 538,
     2: 538,

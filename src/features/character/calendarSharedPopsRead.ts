@@ -1,9 +1,3 @@
-/**
- * The Calendar's Shared Pops read: `fetchSharedPops` (a callable that spends ESI and Firestore
- * reads on the server) held for a few minutes in the cache the notification poll shares, never
- * called per render, then every name a pop
- * shows resolved once: its moon, its sharing corporation and its ore.
- */
 import type { BoardCorporation } from '@/engine/character/board';
 import { loadCorpLabels } from '@/features/corp/corpTicker';
 import { MINUTE_MS } from '@/lib/age';
@@ -14,28 +8,16 @@ import { loadTypeNames } from './typeNames';
 import { countedScans, summarizeSurvey } from '@/engine/survey/series';
 import { sharedPopIsShown, type SharedPopEntry, type SharedPopSurvey } from './calendarSharedPops';
 
-/** How long one read serves the Calendar before it asks again. */
 export const SHARED_POPS_TTL_MS = 5 * MINUTE_MS;
 
-/**
- * The viewer's Shared Pops from the one cache the notification poll shares
- * (`sharedPopsCache.ts`), no older than `SHARED_POPS_TTL_MS`; a failed read is not kept.
- */
 const readSharedPops = (nowMs: number): Promise<SharedPopView[]> =>
   loadSharedPopsCached(nowMs, SHARED_POPS_TTL_MS);
 
 export interface SharedPopsRead {
-  /** Every live pop with its names; `undefined` when the read failed. */
   entries?: SharedPopEntry[];
-  /** The sharing corporations by name: the filter's choices. */
   corporations: BoardCorporation[];
 }
 
-/**
- * The state of each Survey an officer linked to a pop that is on the Calendar: finished, and how
- * much of the field is left. The Survey store reaches Firebase, so it loads on demand and never
- * into the boot graph. A Survey that cannot be read (expired, offline) is left out: no state.
- */
 async function readSurveyStates(
   pops: readonly SharedPopView[],
   nowMs: number
@@ -66,9 +48,7 @@ async function readSurveyStates(
             }))
             .sort((a, b) => b.percent - a.percent),
         });
-      } catch {
-        // No state for this one: the row falls back to the officer's flag.
-      }
+      } catch {}
     })
   );
   return states;
@@ -79,7 +59,6 @@ export async function loadSharedPopsRead(nowMs: number): Promise<SharedPopsRead>
   try {
     pops = await readSharedPops(nowMs);
   } catch {
-    // Signed out of sync, offline, or the server failed: the pilot's own clocks still draw.
     return { corporations: [] };
   }
   if (pops.length === 0) return { entries: [], corporations: [] };

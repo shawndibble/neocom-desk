@@ -1,21 +1,3 @@
-/**
- * One notification type's row in the alerts panel (docs/design/alerts-panel-ux-research.md §3).
- *
- * The row is the click target: a single-fire group goes to its View destination,
- * a group of many expands, and the caret and count are the expand-state cue
- * rather than a second control. The target is a cover button (the pattern
- * `CharacterSwitcher` uses) laid under the row, so the trailing controls, the
- * Acknowledge button and the age tooltip sit above it instead of nesting in it.
- *
- * The trailing cluster is a visible `×` (dismiss, always at full strength: it
- * has no second door) and a `⋮` holding Snooze, Stop these alerts and the
- * notification settings. The `⋮` dims at rest with a pointer because the same
- * menu opens on right-click and touch-and-hold of the row; it is always full on
- * touch. A danger row has neither: Acknowledge stays a visible, worded button.
- *
- * Presentational: every action is a callback, and the fires of an opened group
- * arrive as `children`.
- */
 import { useEffect, useRef, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -38,7 +20,6 @@ import { isSnoozable } from './dangerAlert';
 import { alertTopic, type AlertTopic } from './alertTopic';
 import type { AlertTypeGroup } from './alertGroups';
 
-/** The nav icons the app already owns, one per topic chip; `NavAlerts` for a group with none. */
 const TOPIC_GLYPH: Record<AlertTopic, typeof Icon.NavAlerts> = {
   structures: Icon.NavCorp,
   market: Icon.NavMarket,
@@ -49,12 +30,6 @@ const TOPIC_GLYPH: Record<AlertTopic, typeof Icon.NavAlerts> = {
   other: Icon.NavAlerts,
 };
 
-/**
- * The `⋮` at rest: 60% of `text-dim` is 3.3:1 on `bg-panel`, which clears WCAG
- * 1.4.11's 3:1 for a control (45% measured 2.4:1 and did not). Full on hover or
- * focus in the row, while its own menu is open, and always on touch and
- * `hover:none`, where there is no hover to reveal it.
- */
 const MORE_ACTIONS_CLASS = cx(
   'opacity-60 motion-safe:transition-opacity',
   'group-hover:opacity-100 group-focus-within:opacity-100 data-[state=open]:opacity-100',
@@ -63,21 +38,14 @@ const MORE_ACTIONS_CLASS = cx(
 
 export interface AlertGroupRowProps {
   group: AlertTypeGroup;
-  /** The group's title, already translated. */
   label: string;
   now: number;
-  /** How many of its fires are listed; absent means collapsed. */
   shown: number | undefined;
-  /** Sliding out after a dismiss; the row is inert and collapses to nothing. */
   leaving: boolean;
   buttonSize: 'sm' | 'md';
-  /** A single-fire group: go to View. */
   onOpen: () => void;
-  /** A group of many: expand or collapse its fires. */
   onToggle: () => void;
-  /** The `×`: dismiss, with Undo. */
   onDismiss: () => void;
-  /** A danger group's worded button. */
   onAcknowledge: () => void;
   onSnooze: () => void;
   onStop: () => void;
@@ -102,9 +70,7 @@ export function AlertGroupRow({
   children,
 }: AlertGroupRowProps) {
   const { t } = useTranslation();
-  /** An item that removes the row: focus is already headed for a neighbour, so the menu must not take it back. */
   const acted = useRef(false);
-  /** The part that travels under a finger, and the same part the leaving slide moves. */
   const slide = useRef<HTMLDivElement>(null);
   const danger = group.severity === 'critical';
   const many = group.count > 1;
@@ -112,14 +78,8 @@ export function AlertGroupRow({
   const Glyph = TOPIC_GLYPH[topic];
   const fired = new Date(group.newestFiredAt);
 
-  // Touch and pen only, and never on a danger row, which needs a deliberate act
-  // (§3f). Nor while the group is open: the fires render inside the part that
-  // travels, so a swipe begun on one fire would carry the whole group out and
-  // dismiss every fire in it. Each fire already has its own ×.
   const swipe = useRowSwipe(slide, onDismiss, !danger && !leaving && shown === undefined);
 
-  // The hook leaves a committed row translated out. Undo puts the same row back,
-  // so clear its inline transform or it returns already off-screen.
   useEffect(() => {
     if (leaving) return;
     const el = slide.current;
@@ -200,9 +160,6 @@ export function AlertGroupRow({
         )}
       </div>
       {!danger && (
-        // A check, not a ×: dismissing is marking read, and an Undo toast backs it, so it sits
-        // close to the ⋮ (§6c). The hit areas still never touch (WCAG 2.5.8). The negative end
-        // margin lets the buttons' padding, not the row's, set the ⋮'s distance from the edge.
         <span className="relative -me-2 flex shrink-0 items-center gap-1 touch:gap-2">
           <IconButton
             icon={<Icon.Done />}
@@ -232,7 +189,6 @@ export function AlertGroupRow({
       )}
     >
       <div className={cx('min-h-0 min-w-0', leaving && 'overflow-hidden')}>
-        {/* The swipe viewport: the track sits still at the inline end while the row travels over it. */}
         <div className={cx(!danger && 'relative overflow-hidden')}>
           {!danger && (
             <div
@@ -248,7 +204,6 @@ export function AlertGroupRow({
             className={cx(
               'relative border-b border-line motion-safe:transition-[transform,opacity] motion-safe:duration-150 motion-safe:ease-in',
               danger ? 'border-l-2 border-l-danger bg-danger/5' : 'bg-panel',
-              // Toward the inline start, the same way the phone swipe goes.
               leaving && 'opacity-0 ltr:-translate-x-full rtl:translate-x-full'
             )}
           >

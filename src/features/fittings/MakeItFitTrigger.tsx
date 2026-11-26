@@ -1,8 +1,3 @@
-/**
- * The "Fix CPU" / "Fix powergrid" / "Fix calibration" link under an
- * over-budget readout, opening Make it fit. Provided only by the editor, so
- * the same gauges on read-only surfaces (Compare, overlays) show no action.
- */
 import { useContext } from 'react';
 import { useTranslation } from 'react-i18next';
 import { textActionClassName } from '@/components/ui';

@@ -27,8 +27,6 @@ function liveDeps(sending: (id: string | undefined) => void): QueueDeps {
     list: () => listQueue(),
     save: saveItems,
     send: async (item) => {
-      // The recorded time once the clock runs (re-read: a log earlier in this step may have
-      // just stamped it); else 24 hours from this send, which starts it.
       const body =
         item.kind === 'removal'
           ? fillTakesEffect(
@@ -46,7 +44,6 @@ function liveDeps(sending: (id: string | undefined) => void): QueueDeps {
     log: async (item) => {
       if (item.kind === 'removalCancelled') return;
       if (item.kind === 'removal') {
-        // Only a copy to the moon owner's CEO or payee starts the 24 hours.
         if (!startsRemovalClock(item)) return;
         const { recordRemovalNoticeSent } = await import('@/features/corp/moons/removalFlow');
         await recordRemovalNoticeSent(
@@ -57,8 +54,6 @@ function liveDeps(sending: (id: string | undefined) => void): QueueDeps {
         );
         return;
       }
-      // A sent stale-ledger copy makes this officer's claim final, so no other officer mails the
-      // spell again (#6210); unmarked, the claim lapses and another officer's client sends it.
       const spell = staleMailSpell(item);
       if (spell) {
         const { markFeederStaleMailSent } = await import('@/features/corp/taxBook/feederClient');
@@ -70,7 +65,6 @@ function liveDeps(sending: (id: string | undefined) => void): QueueDeps {
         );
         return;
       }
-      // A rate-change mail has no late notice to log on; the rate change is already in the audit trail.
       if (!isLateNoticeMail(item.kind)) return;
       const { recordLateNoticeMail } = await import('@/features/corp/taxBook/bookClient');
       await recordLateNoticeMail(item.senderCharacterId, item.corporationId, {
@@ -81,8 +75,6 @@ function liveDeps(sending: (id: string | undefined) => void): QueueDeps {
     },
     sending,
     isUnconfirmed: isUnconfirmedWrite,
-    // Another officer's cancel (or a Leave, a forced removal, a disconnect) never reaches this
-    // browser's queue: re-read the removal before mailing "removing you" (#4621).
     isStillDue: async (item) => {
       if (item.kind !== 'removal' || item.feederCorporationId === undefined) return true;
       const { readFeederRemovalState } = await import('@/features/corp/taxBook/bookClient');
@@ -97,13 +89,6 @@ function liveDeps(sending: (id: string | undefined) => void): QueueDeps {
   };
 }
 
-/**
- * Runs the Corp Tax Book send queue and shows its chip (D16, issue #4064).
- * Mounted in the shell only while the queue has rows (`MailQueueMount`), so a
- * pilot with no Corp Tax Book mail pays nothing for it. Every open tab with
- * mail waiting tries to work the queue; the Web Lock (`runMailQueue`) lets
- * one of them.
- */
 export default function MailQueueHost() {
   const { t } = useTranslation();
   const { element: slot } = usePageHeaderSlot();
@@ -114,8 +99,6 @@ export default function MailQueueHost() {
     (i) => i.status === 'waiting' || (i.status === 'sent' && !i.logged)
   );
 
-  // Work the queue while something is waiting. When another tab holds the lock
-  // this tab looks again every 15 s, so a closed worker tab hands over.
   useEffect(() => {
     if (!hasWaiting) return;
     const controller = new AbortController();
@@ -135,7 +118,6 @@ export default function MailQueueHost() {
     };
   }, [hasWaiting]);
 
-  // A once-a-second clock for the countdown, only while there is something to count.
   useEffect(() => {
     if (!hasWaiting) return;
     const id = setInterval(() => setNow(Date.now()), 1000);
@@ -168,6 +150,5 @@ export default function MailQueueHost() {
       onClearSent={() => void clearSent()}
     />
   );
-  // In the page header's slot when the page has one; else the old row above the page.
   return slot ? createPortal(chip, slot) : <div className="mb-2 flex justify-end">{chip}</div>;
 }

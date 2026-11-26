@@ -1,16 +1,7 @@
-/**
- * "Make it fit": the smallest meta-variant swaps (modules and rigs) that bring
- * an over-CPU/PG/calibration Fitting back under budget. Every candidate is
- * recalculated whole through the injected `stats` — CPU and PG depend on the
- * pilot's skills and implants, so a module's own attributes would lie — and is
- * offered only when `fitsResourceBudget` passes. Singles come first; pairs
- * are tried only when no single swap fits.
- */
 import { swapModuleType } from './fittingEdit';
 import { fitsResourceBudget, resourceOverage } from './skillGaps';
 import type { Fitting, FittingSlotKind, FittingStats } from './types';
 
-/** One fitted module or rig replaced by a sibling variant. */
 export interface FitSwap {
   slot: FittingSlotKind;
   slotIndex: number;
@@ -19,28 +10,19 @@ export interface FitSwap {
 }
 
 export interface FitOption {
-  /** One swap, or two when no single swap fits. */
   swaps: FitSwap[];
   fitting: Fitting;
   after: FittingStats;
-  /** What the swaps cost to buy net of the parts replaced; null when either price is unknown. */
   iskDelta: number | null;
 }
 
 export interface FitSwapsResult {
   options: FitOption[];
-  /** The Fitting is over budget and no swap (or pair) brings it under. */
   nothingFits: boolean;
 }
 
-/**
- * Two options within this much relative loss of the fit's headline stats
- * (damage, tank, speed) count as costing the same, so the cheaper one wins.
- * See the scope decision recorded for #2828.
- */
 export const STAT_TOLERANCE = 0.05;
 
-/** Pairs are only tried for this many best-estimated combinations. */
 export const PAIR_LIMIT = 40;
 
 export type Resource = 'cpu' | 'powergrid' | 'calibration';
@@ -79,7 +61,6 @@ function iskDeltaOf(
   return total;
 }
 
-/** Relative loss across the headline stats (damage, tank, speed); gains don't offset losses. */
 function statLoss(before: FittingStats, after: FittingStats): number {
   const pairs: [number, number][] = [
     [before.offense.dps, after.offense.dps],
@@ -89,12 +70,6 @@ function statLoss(before: FittingStats, after: FittingStats): number {
   return pairs.reduce((sum, [b, a]) => (b > 0 ? sum + Math.max(0, (b - a) / b) : sum), 0);
 }
 
-/**
- * Two options are the same offer when they replace the same module types with the same
- * ones in the same racks and land on the same figures: only the slot differs (two
- * Ballistic Control Systems, either one can be swapped). The figures are in the key so
- * slots that differ in what they hold (a loaded charge) stay separate.
- */
 function offerKey(option: FitOption): string {
   const swaps = option.swaps
     .map((swap) => `${swap.slot}:${swap.fromTypeId}>${swap.toTypeId}`)
@@ -112,7 +87,6 @@ function offerKey(option: FitOption): string {
   return `${swaps}#${figures}`;
 }
 
-/** Smallest stat loss first; options within `STAT_TOLERANCE` of the best are ordered by ISK, unpriced last; a repeat of the same offer in another slot is dropped. */
 export function rankFitOptions(before: FittingStats, options: readonly FitOption[]): FitOption[] {
   const scored = options
     .map((option) => ({ option, loss: statLoss(before, option.after) }))
@@ -142,19 +116,12 @@ export function rankFitOptions(before: FittingStats, options: readonly FitOption
 
 export interface FindFitSwapsParams {
   fitting: Fitting;
-  /** The open Fitting's own stats, as it stands. */
   before: FittingStats;
   candidates: readonly FitSwap[];
-  /** Whole-fit stats under the pilot, implants and conditions the page shows. */
   stats: (fitting: Fitting) => Promise<FittingStats>;
   priceOf: (typeId: number) => number | null;
-  /** Hands the main thread back between calculations. */
   yieldFn?: () => Promise<void>;
   isCancelled?: () => boolean;
-  /**
-   * What a swapped fit must satisfy, on top of the budget: the search is then for
-   * single swaps that bring `before` there, not for ones that free CPU or powergrid.
-   */
   accepts?: (after: FittingStats) => boolean;
 }
 
@@ -184,7 +151,6 @@ export async function findFitSwaps({
     }
   }
 
-  /** Single swaps only: the cover for a need other than CPU or powergrid has no freed-resource estimate to pair on. */
   async function findAcceptedSwaps(): Promise<FitSwapsResult> {
     if (over.length === 0 && accepts!(before)) return { options: [], nothingFits: false };
     const accepted: FitOption[] = [];
@@ -195,7 +161,6 @@ export async function findFitSwaps({
         accepted.push(option);
       }
     }
-    // Cheapest first, an unpriced swap last: the caller keeps only the first few.
     accepted.sort((a, b) => {
       if ((a.iskDelta === null) !== (b.iskDelta === null)) return a.iskDelta === null ? 1 : -1;
       return (a.iskDelta ?? 0) - (b.iskDelta ?? 0);
@@ -215,8 +180,6 @@ export async function findFitSwaps({
     return { options: rankFitOptions(before, fitting1), nothingFits: false };
   }
 
-  // Pairs: estimate each from its two singles' freed resources, keep the best
-  // few, and recalculate those whole — stacking can sink a summed estimate.
   const freed = (option: FitOption, resource: Resource) =>
     usedOf(before, resource) - usedOf(option.after, resource);
   const pairs: { swaps: FitSwap[]; estimate: number }[] = [];

@@ -33,10 +33,6 @@ import { useManualShip } from './ownShip';
 import { holeSizeCounts, useHoleSizes } from './useHoleSizes';
 import { HOUR_MS } from '@/lib/age';
 
-/**
- * Role -> clock-kind token. Identity only, never a status; the legend and the
- * lane labels carry the role's name (DESIGN.md §1, "Clock kinds").
- */
 const ROLE_COLOUR: Record<DscanRole, string> = {
   capitals: 'var(--color-kind-order-expiry)',
   industrial: 'var(--color-kind-industry-job)',
@@ -54,7 +50,6 @@ function formatRange(hull: FleetHull): string | null {
   return min === max ? formatKm(hull.minKm) : `${formatKm(hull.minKm)} – ${formatKm(hull.maxKm)}`;
 }
 
-/** Ships only: drones and structures are not hulls anyone flies, so they stay out of worth and diff. */
 function shipHulls(board: FleetBoardData): HullCount[] {
   return board.roles
     .filter((r) => r.role !== 'drones' && r.role !== 'structures')
@@ -66,30 +61,19 @@ interface Loaded {
   names: ReadonlyMap<number, string>;
   infoOf: (typeId: number) => DscanTypeInfo | undefined;
   nameOf: (typeId: number) => string;
-  /** When the scan was read, in ms: a live paste's age counts from here. */
   at: number;
 }
 
-/** How often the scan's age line re-reads the clock. */
 const AGE_TICK_MS = 15_000;
-/** The age line is not shown, so nothing needs a fast clock. */
 const IDLE_TICK_MS = HOUR_MS;
 
-/**
- * A D-Scan read for danger: an answer to "am I in danger?", the ships to watch,
- * what would change the answer, and the full scan (fleet by role, worth,
- * changes) collapsed beneath. Shared by the live Pilot Lookup view and a Shared
- * D-Scan, so both group the same way.
- */
 export function FleetBoard({
   rows,
   trackHistory = false,
   wormholeSpace = false,
 }: {
   rows: readonly DscanRow[];
-  /** Compare with, and then store as, this device's last scan. The live paste only. */
   trackHistory?: boolean;
-  /** The pilot's Current System is wormhole space. The live paste only: a shared scan was taken elsewhere. */
   wormholeSpace?: boolean;
 }) {
   const { t } = useTranslation();
@@ -98,7 +82,6 @@ export function FleetBoard({
   const lanesId = useId();
   const rowsKey = rows.map((r) => `${r.typeId}|${r.name}|${r.distanceKm}`).join(',');
 
-  // A caller re-parsing the same scan hands a new array: hold the rows until their content changes.
   const [held, setHeld] = useState({ key: rowsKey, rows });
   if (held.key !== rowsKey) setHeld({ key: rowsKey, rows });
   const heldRows = held.rows;
@@ -120,8 +103,6 @@ export function FleetBoard({
   }, [heldRows]);
   const loaded = useKeyedLoad(rowsKey, loader).data;
 
-  // The age of a live paste, re-read on a slow tick. A Shared D-Scan has none to show.
-  // A hook can't be conditional, so a Shared D-Scan joins the idle hourly clock instead.
   const now = useTicker(trackHistory ? AGE_TICK_MS : IDLE_TICK_MS);
 
   const hulls = useMemo(() => (loaded === undefined ? [] : shipHulls(loaded.board)), [loaded]);
@@ -144,7 +125,6 @@ export function FleetBoard({
           }),
     [loaded, previous, ownShipGroupId, heldRows, trackHistory]
   );
-  // The ship's name is only stated when its size is known: otherwise the read says it is not set.
   const shipName =
     loaded !== undefined && ownTypeId !== null && read?.ownShipKnown === true
       ? loaded.nameOf(ownTypeId)
@@ -257,7 +237,6 @@ export function FleetBoard({
   );
 }
 
-/** The share bar: roles as one bar with a legend. It is the control that expands the distance lanes. */
 function ShareBar({
   board,
   expanded,
@@ -329,7 +308,6 @@ function RoleCard({
 }: {
   role: FleetRole;
   names: ReadonlyMap<number, string>;
-  /** Name the smallest wormhole each hull needs (issue #5669). */
   wormholeSpace: boolean;
 }) {
   const { t } = useTranslation();
@@ -391,7 +369,6 @@ function RoleCard({
 
 const AXIS_TICKS = [0, 50, 100, DSCAN_AXIS_KM];
 
-/** One lane per role, one dot per ship at its distance. D-Scan has a range, never a bearing. */
 function Lanes({ roles }: { roles: readonly FleetRole[] }) {
   const { t } = useTranslation();
   return (

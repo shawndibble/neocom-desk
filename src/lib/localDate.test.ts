@@ -9,7 +9,6 @@ afterAll(() => {
 describe('formatLocalDate', () => {
   it('renders in the host local timezone, not UTC', () => {
     process.env.TZ = 'America/Los_Angeles';
-    // Just after UTC midnight — still the previous day in a negative-offset zone.
     expect(formatLocalDate(new Date('2026-09-01T00:00:00Z'))).toBe('2026-08-31');
   });
 

@@ -5,7 +5,6 @@ import '@/i18n';
 import { db } from '@/db';
 import { RequireCharacter } from './RequireCharacter';
 
-/** Shows where we ended up, and what destination was preserved for later. */
 function LoginStub() {
   const location = useLocation();
   const from = (location.state as { from?: string } | null)?.from ?? 'none';
@@ -37,8 +36,6 @@ async function addCharacter(): Promise<void> {
 describe('RequireCharacter', () => {
   it('shows the boot screen while the character lookup is still in flight', () => {
     renderAt('/market');
-    // Not "logged out" — redirecting here would bounce every user to /login on
-    // every cold load.
     expect(screen.getByRole('status', { name: 'Loading' })).toBeInTheDocument();
     expect(screen.queryByText(/login page/)).not.toBeInTheDocument();
   });

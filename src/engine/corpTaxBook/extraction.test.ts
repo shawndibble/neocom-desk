@@ -114,7 +114,6 @@ describe('estimateChunk', () => {
   });
 
   it('else splits the chunk volume by a linked Moon Ore Survey, at a configurable m³/h', () => {
-    // 6 days = 144h.
     expect(DEFAULT_CHUNK_M3_PER_HOUR).toBe(30_000);
     expect(
       estimateChunk(ex, {
@@ -144,7 +143,6 @@ describe('estimateChunk', () => {
       oreLines: [{ typeId: ORE_A, quantity: 100_000 }],
       measuredVolume: true,
     });
-    // No timestamp: accepted.
     expect(estimateChunk(ex, { survey, surveyVolumeM3: 1_000_000 }).measuredVolume).toBe(true);
   });
 
@@ -158,11 +156,9 @@ describe('estimateChunk', () => {
       rate: { m3PerHour: 20_000, basis: 'manual' },
     };
     expect(estimateChunk(ex, { survey, surveyVolumeM3: 0, ...rate })).toEqual(fallback);
-    // Before the chunk arrived.
     expect(estimateChunk(ex, { ...base, surveyAt: Date.parse('2026-07-06T00:00:00Z') })).toEqual(
       fallback
     );
-    // After the extraction's expiry (fracture 07-07T03:00 + 48h).
     expect(estimateChunk(ex, { ...base, surveyAt: Date.parse('2026-07-09T04:00:00Z') })).toEqual(
       fallback
     );
@@ -307,7 +303,6 @@ describe('a linked survey kept with the book', () => {
 });
 
 describe('measured chunk rate', () => {
-  // 6 days = 144h; 4_320_000 m³ is exactly 30,000 m³/h.
   const cycle = (startedAt: string, hours: number, m3: number, structureId = 1001) => ({
     structureId,
     startedAt,
@@ -337,10 +332,10 @@ describe('measured chunk rate', () => {
 
   it('learns the median of a refinery recent cycles, so an outlier does not swing it', () => {
     const rates = learnChunkRates([
-      cycle('2026-07-01T00:00:00Z', 100, 3_400_000), // 34,000
-      cycle('2026-07-10T00:00:00Z', 100, 3_500_000), // 35,000
-      cycle('2026-07-20T00:00:00Z', 100, 900_000), // 9,000 outlier
-      cycle('2026-07-01T00:00:00Z', 100, 2_000_000, 2002), // another refinery, 20,000
+      cycle('2026-07-01T00:00:00Z', 100, 3_400_000),
+      cycle('2026-07-10T00:00:00Z', 100, 3_500_000),
+      cycle('2026-07-20T00:00:00Z', 100, 900_000),
+      cycle('2026-07-01T00:00:00Z', 100, 2_000_000, 2002),
     ]);
     expect(rates.get(1001)).toEqual({ m3PerHour: 34_000, cycles: 3 });
     expect(rates.get(2002)).toEqual({ m3PerHour: 20_000, cycles: 1 });

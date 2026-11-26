@@ -33,7 +33,6 @@ import { SurveyShareScreen } from './SurveyShareScreen';
 const SCAN =
   'Clear Icicle\t25\t25,000 m3\t5,120,000.00 ISK\t28 km\nClear Icicle\t55\t55,000 m3\t11,300,000.00 ISK\t10 km';
 const SHRUNK = 'Clear Icicle\t25\t25,000 m3\t5,120,000.00 ISK\t28 km';
-// An ore the survey never showed: another field.
 const DIFFERENT = 'Blue Ice\t10\t1,000 m3\t1.00 ISK\t5 km';
 const ID = 'abc123XYZ';
 const EXPIRES = Date.UTC(2026, 9, 15);
@@ -63,7 +62,6 @@ beforeEach(() => {
 
 afterEach(cleanup);
 
-/** The panel starts folded on a survey this device just started with no details: open it. */
 async function openDetails() {
   fireEvent.click(await screen.findByRole('button', { name: 'Show additional information' }));
 }
@@ -122,7 +120,6 @@ describe('SurveyShareScreen details', () => {
     expect(screen.queryByLabelText('Notes (markdown supported)')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Show additional information' }));
     expect(screen.getByLabelText('Notes (markdown supported)')).toBeTruthy();
-    // And the pilot can fold it again.
     fireEvent.click(screen.getByRole('button', { name: 'Hide additional information' }));
     expect(screen.queryByLabelText('Notes (markdown supported)')).toBeNull();
   });
@@ -174,7 +171,6 @@ describe('SurveyShareScreen as its signed-in owner', () => {
       expect(setSurveyScanIgnored).toHaveBeenCalledWith({
         id: ID,
         expiresAt: EXPIRES,
-        // The list is newest first.
         scanId: 's2',
         ignored: true,
         characterId: 7,
@@ -203,7 +199,6 @@ describe('SurveyShareScreen as its signed-in owner', () => {
 
   it('keeps that device in charge after signing in, before the survey names the pilot', async () => {
     noteStartedHere(ID);
-    // Started with no account, so it names no owner for the signed-in Character to match.
     loadSurvey.mockResolvedValue(twoScans(null as unknown as string));
     setSurveyScanIgnored.mockResolvedValue(undefined);
     renderScreen();

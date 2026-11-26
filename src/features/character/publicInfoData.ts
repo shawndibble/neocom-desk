@@ -1,16 +1,3 @@
-/**
- * Public, unauthenticated lookups for *another* entity's Character /
- * Corporation / Alliance info — the data `PublicInfoModal` renders. Cached
- * like `stations.ts` under the global sentinel: these endpoints need no
- * scope and the fields shown (name, ticker, bio) rarely change, so the
- * `STALE_AFTER.static` window applies here too.
- *
- * `stores/publicInfo.ts` reads through these loaders too, so the
- * `{ corporationName, allianceName }` strings `CharacterHeader` shows survive
- * a cold start offline; this module also serves the full record (ticker,
- * member count, CEO) for a Character that need not be one already known
- * locally.
- */
 import {
   getCharacterPublicInfo,
   getCorporationPublicInfo,
@@ -44,9 +31,7 @@ export interface PublicCharacterInfo extends CharacterPublicInfo {
 
 export interface PublicCorporationInfo extends CorporationPublicInfo {
   corporation_id: number;
-  /** Resolved from `ceo_id` via `resolveNames`; null if that lookup failed. */
   ceoName: string | null;
-  /** Resolved from `creator_id` the same way. */
   creatorName: string | null;
 }
 
@@ -54,12 +39,6 @@ export interface PublicAllianceInfo extends AlliancePublicInfo {
   alliance_id: number;
 }
 
-/**
- * `staleAfterMs` defaults to the long static window. A caller that must notice
- * the character *changing corporation* (`stores/publicInfo`, issue #293) passes
- * a short one, so online it reads live and a lapsed row is only the offline
- * fallback.
- */
 export async function loadPublicCharacterInfo(
   characterId: number,
   options: { staleAfterMs?: number } = {}
@@ -67,7 +46,6 @@ export async function loadPublicCharacterInfo(
   return (await loadPublicCharacterInfoWithAge(characterId, options))?.info ?? null;
 }
 
-/** `loadPublicCharacterInfo`, with when the record was actually read from ESI (a cache hit is older than the call). */
 export async function loadPublicCharacterInfoWithAge(
   characterId: number,
   options: { staleAfterMs?: number } = {}
@@ -86,10 +64,6 @@ export async function loadPublicCharacterInfoWithAge(
     : null;
 }
 
-/**
- * The corporation's own public record, without resolving its CEO / creator
- * names — for a caller (the corp name in a header) that needs only the record.
- */
 export async function loadPublicCorporationRecord(
   corporationId: number
 ): Promise<(CorporationPublicInfo & { corporation_id: number }) | null> {
@@ -124,16 +98,9 @@ export async function loadPublicAllianceInfo(
 export interface PublicEmploymentHistory {
   rows: EmploymentHistoryRow[];
   summary: EmploymentSummary;
-  /** Corporation id -> name; `resolveNames` falls back to `#id`. */
   names: Map<number, string>;
 }
 
-/**
- * Another Character's corporation history. Cached under the global sentinel
- * (not the looked-up id) so `purgeCharacterCache` never has to know about
- * characters that aren't signed in here — unlike `loadEmploymentHistory`,
- * which is keyed to the active Character.
- */
 export async function loadPublicEmploymentHistory(
   characterId: number
 ): Promise<PublicEmploymentHistory | null> {
@@ -154,12 +121,6 @@ export interface PublicAllianceHistory {
   names: Map<number, string>;
 }
 
-/**
- * Another corporation's alliance history, cached under the global sentinel
- * like `loadPublicEmploymentHistory`. Null when ESI could not be reached and
- * nothing was cached — the tab hides the section rather than showing an error
- * for one part of an otherwise-loaded corporation.
- */
 export async function loadPublicAllianceHistory(
   corporationId: number
 ): Promise<PublicAllianceHistory | null> {
@@ -178,15 +139,9 @@ export async function loadPublicAllianceHistory(
 }
 
 export interface PublicAllianceCorporations {
-  /** Member corporations, by name — the order ESI gives them in means nothing. */
   corporations: { id: number; name: string | null }[];
 }
 
-/**
- * Another alliance's member corporations, cached under the global sentinel
- * like the rest of this module. Null when ESI could not be reached and
- * nothing was cached; the tab then leaves the list out.
- */
 export async function loadPublicAllianceCorporations(
   allianceId: number
 ): Promise<PublicAllianceCorporations | null> {

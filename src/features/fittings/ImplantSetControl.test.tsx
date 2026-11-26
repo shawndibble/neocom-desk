@@ -15,7 +15,6 @@ const { ImplantsEditorHost } = await import('./ImplantsEditorHost');
 function setup(implantSet: FittingImplantSet | undefined, canUseClone = true) {
   const onImplantSetChange = vi.fn();
   const basis = implantSet === undefined && canUseClone ? 'clone' : 'fitting';
-  // The page mounts the editor beside the chip; the URL joins them.
   renderInRouter(
     <>
       <ImplantSetControl basis={basis} implantSet={implantSet} />

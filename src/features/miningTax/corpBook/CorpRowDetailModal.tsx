@@ -3,7 +3,19 @@ import { useTimeZone } from '@/lib/timeFormat';
 import { dateTimeAt } from '@/features/corp/moons/moonsFormat';
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, InfoTooltip, Modal, ValueList, ValueRow } from '@/components/ui';
+import {
+  Button,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  IconButton,
+  InfoTooltip,
+  Modal,
+  ValueList,
+  ValueRow,
+} from '@/components/ui';
+import * as Icon from '@/components/ui/icons';
 import { SecurityValue } from '@/features/assets/assetBrowserRows';
 import { CharacterLink, SystemLink } from '@/features/entities';
 import { formatAge, MINUTE_MS } from '@/lib/age';
@@ -28,6 +40,7 @@ import {
   unlinkedTarget,
   type ResolveTarget,
 } from './resolve/targets';
+import type { ClosedDayPlan } from '@/engine/corpTaxBook/closedDayFix';
 import type { CorpRowInfo } from './corpRows';
 import { formatCount } from '@/lib/formatCount';
 
@@ -40,25 +53,16 @@ interface Props {
   systemName: string;
   systemSecurity: number | null | undefined;
   typeNames: ReadonlyMap<number, string>;
-  /** Opens the corp pay dialog; absent when nothing is owed. */
   onPay?: () => void;
-  /** The notice for a day the miner's own list shares with the corporation's bill: the overlap notice, or a Conflict's. */
   notice?: ReactNode;
-  /** Opens the Resolve dialog (resolving in the app) on a problem of this row. Absent: none is offered. */
   onResolve?: (target: ResolveTarget) => void;
-  /** Opens the member's own entry for this day, to fix their records. Absent: no entry lines up. */
   onFixRecords?: () => void;
-  /** Opens this Payee's ledger, which lists every payment and the days it paid. Absent: no link. */
+  closedConflict?: ClosedDayPlan;
   onOpenLedger?: () => void;
+  onEdit?: () => void;
+  onSplit?: () => void;
 }
 
-/**
- * Row detail for a day the Corp Tax Book decided (#4065): the layout of
- * `RowDetailModal` for an owed row — who it is owed to and how much, the pilot
- * and system, the ore, how it was priced — with the book's status as a few
- * facts, a Conflict's notice first and any dispute added, and none of the
- * Edit / Unassign actions: the book owns these figures, not the member's Payees.
- */
 export function CorpRowDetailModal({
   open,
   onClose,
@@ -72,7 +76,10 @@ export function CorpRowDetailModal({
   notice,
   onResolve,
   onFixRecords,
+  closedConflict,
   onOpenLedger,
+  onEdit,
+  onSplit,
 }: Props) {
   const zone = useTimeZone();
   const { t } = useTranslation();
@@ -92,7 +99,6 @@ export function CorpRowDetailModal({
   const synced = book?.summary.lastSyncedAt;
   const personal = view.personalOreLines;
   const payeeName = book?.payee.name ?? t('miningTax.corpBook.payeeName', { corp: corp.corpName });
-  // The book's side of the day as a few labelled facts, not one run-on sentence.
   const facts: [string, string][] = [];
   if (view.noticeId && (view.state === 'billed' || view.state === 'paid')) {
     facts.push([
@@ -112,14 +118,8 @@ export function CorpRowDetailModal({
   if ((view.state === 'dismissed' || view.state === 'waived') && view.billed > 0) {
     facts.push([t('miningTax.corpBook.detail.factOriginal'), `${formatIsk(view.billed)} ISK`]);
   }
-  // A conflict is the first thing to read and act on, so its notice leads.
   const conflict = view.state === 'conflict';
-  // Ore listed beyond what the book recorded: the book never bills it.
-  const excess = conflict && view.conflictCause === 'overListed';
-  // #6206: "I paid this another way" on a day a Late notice asked for while it is still owed, and
-  // what came of it. A day with an overlap says it in its notice instead.
-  // What Resolve opens on for this day: an officer's kept bill, a Conflict, a figure that differs.
-  const resolvable = rowTarget(view);
+  const resolvable = rowTarget(view, undefined, closedConflict);
   const unlinked = unlinkedTarget(view);
   const declaring =
     onResolve !== undefined &&
@@ -158,32 +158,16 @@ export function CorpRowDetailModal({
                 conflict && 'text-text-dim'
               )}
             >
-              {/* A Conflict is not owed yet, but shows what the book bills if it is left. */}
-              {conflict && !excess
+              {conflict
                 ? `${formatIsk(view.billed)} ISK`
-                : excess
+                : view.taxOwed === null
                   ? '—'
-                  : view.taxOwed === null
-                    ? '—'
-                    : `${formatIsk(owed)} ISK`}
+                  : `${formatIsk(owed)} ISK`}
             </span>
           </div>
-          {view.state === 'settling' && (
-            <p className="-mt-2 text-right text-xs text-text-dim">
-              {t('miningTax.corpBook.conflict.settlingNote', {
-                corp: corp.corpName,
-                day: view.date,
-              })}
-            </p>
-          )}
           {conflict && (
             <p className="-mt-2 text-right text-xs text-warning">
-              {t(
-                excess
-                  ? 'miningTax.corpBook.conflict.headerNotBilled'
-                  : 'miningTax.corpBook.conflict.headerNotOwed',
-                { corp: corp.corpName }
-              )}
+              {t('miningTax.corpBook.conflict.headerNotOwed', { corp: corp.corpName })}
             </p>
           )}
           <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs text-text-dim">
@@ -212,7 +196,7 @@ export function CorpRowDetailModal({
                 typeId: line.typeId,
                 name: typeLabel(typeNames, line.typeId),
                 quantity:
-                  you !== undefined && you !== line.quantity
+                  you !== undefined && line.quantity > you
                     ? t('miningTax.corpBook.detail.bookAndYou', {
                         book: formatCount(line.quantity),
                         you: formatCount(you),
@@ -232,7 +216,6 @@ export function CorpRowDetailModal({
             })}
           />
 
-          {/* On a Conflict with nothing else to say, the notice already names who to ask. */}
           {!(conflict && facts.length === 0) && (
             <div className="space-y-1.5 rounded-xs border border-line p-2 text-xs">
               <p className={eyebrowClassName}>{t('miningTax.corpBook.detail.bookTitle')}</p>
@@ -243,7 +226,6 @@ export function CorpRowDetailModal({
                   ))}
                 </ValueList>
               )}
-              {/* Why a day the member saw Paid is Billed again, and the transfer to dispute. */}
               {view.unlinkedDonation && (
                 <div className="space-y-1.5">
                   <p className="text-warning">
@@ -260,7 +242,6 @@ export function CorpRowDetailModal({
                   )}
                 </div>
               )}
-              {/* An officer kept the bill on a billed day: their reason and next step, word for word. */}
               {view.flagged?.state === 'rejected' && keptBy(view) === 'dispute' && (
                 <div className="space-y-1">
                   <p className="text-warning">
@@ -281,7 +262,9 @@ export function CorpRowDetailModal({
                 <p>{t('miningTax.corpBook.detail.reason', { reasons: view.dismissalReason })}</p>
               )}
               <p className="text-text-dim">
-                {t('miningTax.corpBook.detail.lockedShort', { corp: corp.corpName })}
+                {view.state === 'estimate' && onEdit
+                  ? t('miningTax.corpBook.detail.estimateOwn', { corp: corp.corpName })
+                  : t('miningTax.corpBook.detail.lockedShort', { corp: corp.corpName })}
               </p>
               {onResolve && resolvable && (
                 <div className="flex flex-wrap items-center gap-2">
@@ -353,6 +336,29 @@ export function CorpRowDetailModal({
               <Button variant="primary" onClick={onPay}>
                 {t('miningTax.settleUpAction')}
               </Button>
+            )}
+            {onEdit && (
+              <div className="flex">
+                <Button onClick={onEdit} className={onSplit ? 'rounded-r-none' : undefined}>
+                  {t('miningTax.detail.editAction')}
+                </Button>
+                {onSplit && (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <IconButton
+                        icon={<Icon.Expanded />}
+                        label={t('miningTax.detail.moreLabel')}
+                        className="-ml-px rounded-l-none"
+                      />
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onSelect={onSplit}>
+                        {t('miningTax.detail.splitAction')}
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
+              </div>
             )}
             <Button className="ml-auto" onClick={onClose}>
               {t('common.close')}

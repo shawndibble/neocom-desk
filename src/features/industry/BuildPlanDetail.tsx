@@ -50,7 +50,6 @@ export type { PlanPatch } from './planPatch';
 
 const NO_GROUP_MEMBERS: readonly GroupClaimMember[] = [];
 
-/** Build Plan inputs (runs, ME/TE, facility, rig, security, hub, tax) + materials/results. */
 export function BuildPlanDetail({
   plan,
   catalog,
@@ -93,9 +92,6 @@ export function BuildPlanDetail({
   );
   const productVs90d = priceVsMedianFor(usePriceVsMedian(vs90dTargets), hub.id, productTypeID);
   const facilityPreset = FACILITY_PRESETS[plan.facility];
-  // Include Reactions (issue #698): meaningless for a reaction-activity plan,
-  // which is always eligible via its own top-level facility regardless of
-  // this flag — see `reactionCraftEligible`.
   const includeReactions = plan.includeReactions ?? false;
   const { craftScopeList, reactionPlanFacilityContext, facilityContext } = usePlanFacilityContexts(
     plan,
@@ -104,15 +100,8 @@ export function BuildPlanDetail({
   );
 
   const [refreshTick, setRefreshTick] = useState(0);
-  // Verdict-first layout: the setup folds to one line at the hero's foot, the
-  // ledger follows the viewport (open where there is room beside the
-  // materials, folded on a phone until asked), and the one Calculation
-  // Breakdown is owned here so the hero's break-even ⓘ and the ledger
-  // header's ⓘ open the same modal.
   const [setupOpen, setSetupOpen] = useState(false);
   const setupFormId = useId();
-  // How the hero counts owned materials, and how they would be sold. Page
-  // setting, not plan state (`profitBasisSetting.ts`): the list reads it too.
   const profitBasis = useProfitBasis((state) => state.value);
   const setProfitBasis = useProfitBasis((state) => state.setValue);
   const [saleBasis, setSaleBasis] = useState<LiquidationBasis>('instant');
@@ -128,15 +117,9 @@ export function BuildPlanDetail({
   const { buildSystem, buildLocationName, reactionBuildSystem, reactionBuildLocationName } =
     planLocations(plan, hub.systemName, t);
 
-  // The band is derived, not typed, so it is reconciled here rather than only
-  // on edit — otherwise a plan saved before the Security field went away keeps
-  // a band nothing can correct, and still drives the rig multiplier.
   useDerivedSecurityBand(buildSystem?.id, hub.security, plan.security, (security) =>
     onChange({ kind: 'derived', patch: { security } })
   );
-  // Same reconciliation for the Reaction Location. There is no hub fallback
-  // for a place with no hub of its own — highsec is the same "nothing chosen
-  // yet" default `reactionPlanFacilityContextFor` already assumes.
   useDerivedSecurityBand(
     reactionBuildSystem?.id,
     'highsec',
@@ -196,8 +179,6 @@ export function BuildPlanDetail({
     groupMembers
   );
 
-  // The most runs the owned stock covers, off the same stock the Owned-Stock
-  // Offer reads (scoped, less Group Stock Claims ahead of this plan).
   const { groupClaimsFor, detection } = ownedStock;
   const stockRuns = useMemo(() => {
     if (!result) return null;
@@ -223,9 +204,6 @@ export function BuildPlanDetail({
     update,
   });
 
-  // "Use all" / "Use none" run inside the Materials table over every row on
-  // it (the rows the per-row offers reach, sub-build inputs included) and
-  // share a row edit's toast and Undo (`materialsEditSession.ts`).
   const materialsTable = useRef<MaterialsTableHandle>(null);
 
   const modals = useMaterialModals({
@@ -269,14 +247,10 @@ export function BuildPlanDetail({
     return <EmptyState title={t('industry.blueprintMissing')} className="py-8" />;
   }
 
-  // Units produced by the job (per-run product quantity x runs); null when
-  // the blueprint has no product. Shared by the Results panel and the
-  // Production Runs panel's "Log Production" default below.
   const productQuantity = blueprint.products[0] ? blueprint.products[0].quantity * plan.runs : null;
 
   const { itemMenuFor, itemActionsFor } = buildItemMenuProps(catalog, onSearchBpcSourcing);
 
-  // The hero's verdict, through the one path the Build Plans list prices by (`planPricing`).
   const {
     productUnitPrice,
     priceCapped: productPriceCapped,
@@ -316,7 +290,6 @@ export function BuildPlanDetail({
     result !== null &&
     !result.materials.some((m) => m.typeID === plan.blueprintTypeID && m.acquisitionTier);
 
-  /** Runs at which this plan's profit first reaches zero, applied to the plan. */
   const findBreakEvenRuns = () => {
     const runs = planBreakEvenRuns({
       plan,
@@ -468,7 +441,6 @@ export function BuildPlanDetail({
             {runsControl}
             {setupStrip}
           </div>
-          {/* Inside the panel's own padding: a rule and a gap, no second inset. */}
           {renderSetupForm('mt-3 border-t border-line pt-3')}
         </Panel>
       )}
@@ -479,12 +451,6 @@ export function BuildPlanDetail({
         />
       )}
 
-      {/*
-        Side by side from `xl`, not `lg` (issue #2165): at 1024 the fixed 20rem
-        Costs & revenue column starved Materials by ~189px, pushing Price and
-        Line total — the override input included — out of the table's frame.
-        Between `lg` and `xl` the two stack instead.
-      */}
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_20rem] xl:items-start">
         <PlanMaterialsPanel
           plan={plan}

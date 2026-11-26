@@ -36,7 +36,6 @@ describe('foldOrdersCsv', () => {
     const stations = new StationPriceFold(SNAPSHOT_HUBS, [34]);
     const rows = await foldOrdersCsv(Readable.from([`${CSV}${elsewhere}\n`]), fold, stations);
     expect(rows).toBe(6);
-    // The region-wide fold sees the 99 buy placed elsewhere; the station does not.
     expect([...fold.entries()][0]).toMatchObject({ buy: 99, sell: 6.0 });
     expect(stations.prices(60003760)).toEqual({ 34: [5.6, 6.0] });
   });
@@ -50,7 +49,6 @@ describe('foldOrdersCsv', () => {
         new StationPriceFold(SNAPSHOT_HUBS, [34])
       )
     ).rejects.toThrow(/location_id/);
-    // Without a station fold the old columns still suffice (the backfill script).
     await expect(foldOrdersCsv(Readable.from([csv]), new OpenPriceFold())).resolves.toBe(1);
   });
 
@@ -146,7 +144,6 @@ describe('foldOrderBooksCsv', () => {
     const { foldOrderBooksCsv } = await import('./marketOrdersArchive.js');
     const rows = await foldOrderBooksCsv(Readable.from([`${CSV}${elsewhere}\n`]), books);
     expect(rows).toBe(6);
-    // row(): volume_remain 5; the two 6.0/6.1 sells and two buys at the station, region-1 sell too.
     const [sell, buy] = books.toObject(60003760, { lastSyncedAt: 0, asOf: 0 }).types[34];
     expect(sell).toEqual([
       [6.0, 5, 1],

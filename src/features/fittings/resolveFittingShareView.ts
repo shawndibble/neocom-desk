@@ -1,11 +1,3 @@
-/**
- * Resolves a Fitting Share Code into the logged-out share view's Fitting and
- * profile (issue #1544) — decode, name the hull, then build the All-V
- * profile the scope decision requires (`buildAllVProfile`). The Fitting's own
- * implant set is layered on by the route's `useFittingEvaluation`, on the
- * "fitting" basis. Pulled out as its own pure-ish function, rather than
- * copied into the route, so it has its own unit test.
- */
 import { decodeFittingShare, type ShareDecodeError } from '@/engine/fittings/fittingShare';
 import { shareToFitting } from '@/engine/fittings/shareMapper';
 import { buildAllVProfile } from '@/engine/fittings/pilotProfile';

@@ -55,7 +55,6 @@ describe('usePlaceDetails', () => {
       stations: Object.fromEntries(ids.map((id) => [id, { name: `S${id}`, systemId: 30000142 }])),
       systems: { 30000142: { security: 0.95 } },
     });
-    // Real ESI answers land on separate macrotasks, so React cannot merge them.
     const source = {
       ...memory,
       stationName: async (id: number) => {
@@ -101,8 +100,6 @@ describe('usePlaceDetails', () => {
       { initialProps: { refs: [station, second] } }
     );
     await waitFor(() => expect(result.current.get(placeKey(second))?.jumps).toBeDefined());
-    // A new array identity with the same Places is not a new request.
-    // Any new read would start in the effects this rerender ran.
     rerender({ refs: [{ ...station }, { ...second }] });
     expect(s2.calls.filter((c) => c === 'systemSecurity:30000142')).toHaveLength(1);
     expect(s2.calls.filter((c) => c.startsWith('stationSystemId'))).toHaveLength(2);
@@ -223,7 +220,6 @@ describe('usePlaceDetails', () => {
         result.current.get(placeKey({ locationId: STRUCTURE, characterId: 2 }))?.systemId
       ).toBe(30002187)
     );
-    // The first Character's slow answer lands late and must not leak in.
     await act(async () => release(30000142));
     expect(result.current.get(placeKey({ locationId: STRUCTURE, characterId: 2 }))?.systemId).toBe(
       30002187
@@ -265,7 +261,6 @@ describe('usePlaceDetails', () => {
         source,
       })
     );
-    // Mounted, so every effect that would read has run.
     expect(source.calls).toEqual([]);
   });
 

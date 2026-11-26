@@ -1,7 +1,3 @@
-/**
- * Units, tolerances and SDE lookups every goal-planner step shares. See
- * `../goalPlan.ts` for how the steps compose.
- */
 import { byNumericId } from '../../compare';
 import type { PiData, PiFactoryKind, PiRawResource, PiSchematic } from '@/sde/types';
 import { piTier } from '../chain';
@@ -11,16 +7,10 @@ import { rawById } from '../rawIndex';
 
 export const HOURS_PER_DAY = 24;
 export const HOURS_PER_WEEK = 168;
-/** Below this a remaining rate is float dust, not demand. */
 export const EPSILON = 1e-9;
 
 export const byId = byNumericId;
 
-/**
- * SDE lookups the planner never expects to miss: every id it asks about came
- * out of the same `PiData`. A miss is broken data, so it throws naming the type
- * rather than letting `undefined` surface as a NaN somewhere downstream.
- */
 export function sdeMiss(what: string, typeId: number): never {
   throw new Error(`pi.json has no ${what} for type ${typeId}`);
 }
@@ -43,17 +33,10 @@ export function perHour(g: Goal): number {
 }
 
 export interface ChainRates {
-  /** Units/h of each chain type the plan makes, P0 included. */
   made: Map<number, number>;
-  /** Units/h of each P2+ chain type bought at the hub, the goal's own type included. */
   bought: Map<number, number>;
 }
 
-/**
- * A goal's chain at its rate, split into what is made and what is bought
- * (`Goal.buyShare`). Nothing beneath a bought share is demanded: the P1 and P0
- * under a bought P2 are not extracted for it.
- */
 export function chainRates(g: Goal, pi: PiData): ChainRates {
   const made = new Map<number, number>();
   const bought = new Map<number, number>();
@@ -74,7 +57,6 @@ export function chainRates(g: Goal, pi: PiData): ChainRates {
   return { made, bought };
 }
 
-/** The chain's made nodes: `{ typeId, tier, unitsPerHour }`, highest tier first. */
 export function madeNodes(
   g: Goal,
   pi: PiData
@@ -84,7 +66,6 @@ export function madeNodes(
     .sort((a, b) => b.tier - a.tier || a.typeId - b.typeId);
 }
 
-/** Adds every made chain node of `list` into `into`, summing rates per type. */
 export function expandInto(into: Map<number, number>, list: readonly Goal[], pi: PiData): void {
   for (const g of list) {
     for (const [typeId, units] of chainRates(g, pi).made) {
@@ -93,7 +74,6 @@ export function expandInto(into: Map<number, number>, list: readonly Goal[], pi:
   }
 }
 
-/** P2+ factory pins for these per-type rates, by factory kind. */
 export function factoriesOf(
   rates: ReadonlyMap<number, number>,
   pi: PiData

@@ -1,12 +1,3 @@
-/**
- * The Corp Board's widget grid across widths.
- *
- * `/corp` needs a signed-in character with corp roles and mocked corp ESI, so
- * this runs against the dev server like the other corp specs. A Director opens
- * every corp capability, so every default widget draws; long structure names
- * are deliberate, since the regression this guards is a widget that overflows
- * instead of truncating or wrapping.
- */
 import { test, expect } from './support/testBase';
 import { openCorpOverview, overflow } from './support/corpBoard';
 
@@ -45,7 +36,6 @@ test.describe('Corp Board widget grid', () => {
     await page.locator('#route-outlet').getByRole('button', { name: 'Customize' }).click();
     await page.getByRole('button', { name: 'Add widget' }).click();
     const gallery = page.getByRole('dialog', { name: 'Add a widget' });
-    // It opens in Browse all, which hides what is already on the board.
     await gallery.getByRole('button', { name: 'Not on your board' }).click();
     await expect(gallery.getByText('Moon mining ledger')).toBeVisible();
     await expect(gallery.getByText('Training', { exact: true })).toHaveCount(0);

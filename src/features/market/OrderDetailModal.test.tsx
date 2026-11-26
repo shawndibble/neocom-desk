@@ -20,7 +20,6 @@ import { characterModifiers, NO_CHARACTER_MODIFIERS } from '@/engine/industry/ch
 import { loadMutaplasmids } from '@/sde/loadSde';
 import { resetMutaplasmidLookupForTests } from '@/features/abyssal/mutaplasmidData';
 
-// Open in EVE asks whether the type is abyssal; default: nothing is.
 const { NO_ABYSSAL } = vi.hoisted(() => ({
   NO_ABYSSAL: { attributeNames: {}, mutaplasmids: {}, abyssalTypeIds: [] as number[] },
 }));
@@ -39,8 +38,6 @@ beforeEach(() => {
 const SIMPLE_ORE_PROCESSING = 60377;
 const WITH_RX_804 = characterModifiers({ skills: {}, implantTypeIds: [27174] });
 
-/** Daily point `daysAgo` days before now, so it always lands inside a `30d` filter regardless of when the suite runs. */
-/** A day of history `daysAgo` days back — these tests only ever vary the volume. */
 function historyPoint(daysAgo: number, volume: number) {
   return buildHistoryPoint({
     date: new Date(Date.now() - daysAgo * 86_400_000).toISOString().slice(0, 10),
@@ -84,11 +81,6 @@ const BASE_ROW: OpenOrderRow = {
   frequentlyUndercut: false,
 };
 
-/**
- * The content with a finished view. `skills` stands in for the order
- * owner's skills in the snapshot: the ledger's fee lines are derived from
- * them the way Order Detail's view assembly does.
- */
 function renderModal({
   skills,
   ...overrides
@@ -123,7 +115,6 @@ function renderModal({
   return { onClose, onCheckDeeper };
 }
 
-/** Opens every folded section — all four start collapsed. */
 function expandAll() {
   for (const button of screen.getAllByRole('button', { expanded: false })) {
     fireEvent.click(button);
@@ -149,13 +140,9 @@ describe('OrderDetailModal', () => {
     renderModal({ row });
 
     expect(screen.getByRole('dialog', { name: 'Tritanium' })).toBeInTheDocument();
-    // Whose order, where, which side and how much is left, under the title —
-    // several characters can hold an order on the same thing.
     expect(screen.getByText(/^Alpha · Jita IV - Moon 4/)).toHaveTextContent(
       'Alpha · Jita IV - Moon 4 · Sell · 10 of 10 left'
     );
-    // With a floor in hand the verdict is the call itself, not the badge's
-    // generic explanation, and the price it calls for is one Copy away.
     expect(screen.getByText('Put the price up')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Copy 700.00' })).toBeInTheDocument();
     expect(
@@ -174,15 +161,12 @@ describe('OrderDetailModal', () => {
 
     const fact = (label: string) => screen.getByText(label).nextElementSibling;
     expect(fact('Your price')).toHaveTextContent('500.00');
-    // Nobody under you at this station: you are the cheapest here.
     expect(fact('Cheapest here')).toHaveTextContent('You');
-    // Holding nets price - fill: 500 - 520.
     expect(fact('You keep a unit')).toHaveTextContent('-20.00');
     expect(fact('You keep a unit')?.firstElementChild).toHaveClass('text-isk-neg');
   });
 
   it('prints a break-even unit as an unsigned, uncoloured 0.00', () => {
-    // price 500 - fill 500: neither a gain nor a loss.
     renderModal({ row: { ...BASE_ROW, floor: { relist: 520, fill: 500 } } });
     const kept = screen.getByText('You keep a unit').nextElementSibling?.firstElementChild;
     expect(kept).toHaveTextContent(/^0\.00$/);
@@ -284,7 +268,7 @@ describe('OrderDetailModal', () => {
     const deep: RegionCompetition = { competitors: [], fetchedAt: Date.now(), truncated: false };
     const row: OpenOrderRow = {
       ...BASE_ROW,
-      deepUndercut: { worst: null, byScope: { region: null } }, // 'system' deliberately absent
+      deepUndercut: { worst: null, byScope: { region: null } },
     };
     renderModal({ row, deep, stationChecked: true });
     expandAll();
@@ -308,9 +292,6 @@ describe('OrderDetailModal', () => {
   });
 
   it('shows a rival price and jump count for a checked, beaten region scope', () => {
-    // Deliberately not the row's own `problem`/badge, so the "Region" text in
-    // this section can't be confused with a "Region" scope-distance badge in
-    // the quick-answer heading above it.
     const deep: RegionCompetition = {
       competitors: [
         {
@@ -362,7 +343,6 @@ describe('OrderDetailModal', () => {
 
     const whoSection = screen.getByText('Who is cheaper').closest('section')!;
     const regionRow = within(whoSection).getByText('Region').closest('div');
-    // The "their price" / "I am over by" / "distance" columns of that row.
     expect(regionRow).toHaveTextContent('450.00');
     expect(regionRow).toHaveTextContent('10.0%');
     expect(regionRow).toHaveTextContent('4 jumps');
@@ -429,7 +409,6 @@ describe('OrderDetailModal', () => {
 
     const whoSection = screen.getByText('Who is cheaper').closest('section')!;
     const stationRow = within(whoSection).getByText('Station').closest('div');
-    // A real price, not the "unavailable" copy — that's the whole point of #538.
     expect(stationRow).toHaveTextContent('480.00');
     expect(stationRow).toHaveTextContent('4.0%');
   });
@@ -473,17 +452,10 @@ describe('OrderDetailModal', () => {
     expandAll();
     expect(screen.getByText("We don't know what this cost you")).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Link a build' })).toBeInTheDocument();
-    // The hint used to offer "or type in what it cost" — a route the app has
-    // never had (issue #1020). Nothing may re-advertise it while the
-    // hand-entered cost basis stays deferred.
     expect(screen.queryByText(/type in what it cost/i)).not.toBeInTheDocument();
-    // Linking a build is the only real route, and it needs a Build Plan that
-    // a pure trader does not have — so the hint has to name that up front
-    // rather than send them to a page that will not help.
     const costSection = screen.getByText('What it cost you').closest('section')!;
     expect(within(costSection).getByText(/build plan on the Industry page/i)).toBeInTheDocument();
     expect(screen.queryByText(/^0(\.00)? ISK$/)).not.toBeInTheDocument();
-    // No "You keep a unit" fact without a floor to work it out from.
     expect(screen.queryByText('You keep a unit')).not.toBeInTheDocument();
   });
 
@@ -507,20 +479,13 @@ describe('OrderDetailModal', () => {
     expect(screen.getByText('3,000 ISK')).toBeInTheDocument();
     expect(screen.getByText('1,200 ISK')).toBeInTheDocument();
     expect(screen.getByText('4,200 ISK')).toBeInTheDocument();
-    // Cost per unit reads straight off the cost basis, not re-derived.
     expect(screen.getByText('Cost per unit')).toBeInTheDocument();
     expect(screen.getByText('600.00 ISK')).toBeInTheDocument();
-    // ONE floor on screen: the fill floor's label and its number must not
-    // appear as a second visible ledger row.
     expect(screen.queryByText('If you leave it and it sells')).not.toBeInTheDocument();
     expect(screen.queryByText('620.96 ISK')).not.toBeInTheDocument();
   });
 
   it('sums cost per unit, sales tax and broker fee to exactly the relist floor shown', () => {
-    // Real orderFloor() math this time (not the hand-picked literals of the
-    // fixture above), so the sum is actually checked rather than eyeballed —
-    // unitCost + salesTax(relist) + relistFee(relist, relist) === relist by
-    // construction (relistBreakEvenPrice solves for exactly that revenue).
     const skills: CharacterSkills = {
       ...SKILLS,
       accountingLevel: 3,
@@ -556,11 +521,7 @@ describe('OrderDetailModal', () => {
     const brokerFeeValue = rowValue('Broker fee (relist discount applied)');
 
     expect(costPerUnit).toBeCloseTo(unitCost, 2);
-    // The ledger math sums to the EXACT break-even, never the rounded-up
-    // price the "Never sell below" row now displays (issue #1421) —
-    // `belowFloor` detection stays exact for the same reason.
     expect(costPerUnit + salesTax + brokerFeeValue).toBeCloseTo(floor.relist, 1);
-    // The displayed figure is that same break-even, rounded UP to a legal price.
     const relistShown = rowValue('Never sell below');
     expect(relistShown).toBe(roundPriceUp(floor.relist));
   });
@@ -573,9 +534,6 @@ describe('OrderDetailModal', () => {
   });
 
   it('reads station and system as "not checked" — not as a player structure — when the station lookup itself failed to load', () => {
-    // stationsLoaded: false must never be confused with "this location isn't
-    // an NPC station": the lookup simply hasn't answered yet (e.g. a first
-    // offline visit, since that file is outside the install precache).
     renderModal({ stationsLoaded: false, deep: null });
     expandAll();
 
@@ -667,8 +625,6 @@ describe('OrderDetailModal', () => {
       expect(
         within(whoSection).getByText('Incomplete data — some pages could not be loaded')
       ).toBeInTheDocument();
-      // And the "check deeper" button must not come back — this is a
-      // resolved (if partial) fetch, not the pre-fetch state.
       expect(
         within(whoSection).queryByRole('button', { name: 'Refresh system & region prices' })
       ).not.toBeInTheDocument();
@@ -690,8 +646,6 @@ describe('OrderDetailModal', () => {
         points: [historyPoint(1, 100), historyPoint(2, 100), historyPoint(3, 100)],
         fetchedAt: Date.now(),
       };
-      // regionUnitsPerDay = 300/30 = 10/day; myShare defaults to 1 (deep not
-      // fetched); volumeRemain is BASE_ROW's 10 -> ceil(10/10) = 1 day.
       renderModal({ history });
 
       expect(screen.getByRole('button', { name: /The numbers/ })).toHaveTextContent(
@@ -704,14 +658,12 @@ describe('OrderDetailModal', () => {
 
     it('shows "can\'t tell" (never a number) for an item with no sales in the last 30 days', () => {
       const history: PriceHistoryResult = {
-        points: [historyPoint(45, 500)], // outside the 30-day window entirely
+        points: [historyPoint(45, 500)],
         fetchedAt: Date.now(),
       };
       renderModal({ history });
       expandAll();
 
-      // Scoped to the "Sells out in" card itself — "60d" elsewhere on the
-      // modal (BASE_ROW's own expiry card) is a different stat entirely.
       const chip = screen.getByText('Sells out in').closest('div') as HTMLElement;
       expect(within(chip).getByText('Nothing has sold in the last 30 days')).toBeInTheDocument();
       expect(within(chip).queryByText(/^\d+d$/)).not.toBeInTheDocument();
@@ -728,8 +680,6 @@ describe('OrderDetailModal', () => {
         points: [historyPoint(1, 30), historyPoint(2, 30), historyPoint(3, 30)],
         fetchedAt: Date.now(),
       };
-      // regionUnitsPerDay = 90/30 = 3/day; volumeRemain 1000 -> ceil(1000/3)
-      // = 334 days, far past BASE_ROW's 60-day expiry.
       const row: OpenOrderRow = { ...BASE_ROW, volumeRemain: 1000, volumeTotal: 1000 };
       renderModal({ row, history });
       expandAll();
@@ -743,10 +693,6 @@ describe('OrderDetailModal', () => {
         points: [historyPoint(1, 300), historyPoint(2, 300), historyPoint(3, 300)],
         fetchedAt: Date.now(),
       };
-      // regionUnitsPerDay = 900/30 = 30/day. A same-side rival priced at or
-      // better than mine, holding the same remaining volume as my order,
-      // halves my share of that rate: myShare = 100/(100+100) = 0.5, so
-      // 15/day -> ceil(100/15) = 7 days, not the naive ceil(100/30) = 4.
       const deep: RegionCompetition = {
         competitors: [
           {
@@ -823,11 +769,8 @@ describe('OrderDetailModal', () => {
 
       expect(screen.getByText('Lower price or wait out other sellers.')).toBeInTheDocument();
       expect(screen.queryByText('Do not chase this one')).not.toBeInTheDocument();
-      // No floor to advise a match against, but the cheapest rival is still a
-      // fact worth stating (owner decision, issue #1428) — never a price to copy.
       expect(screen.getByText('Cheapest here').nextElementSibling).toHaveTextContent('450.00');
       expect(screen.queryByRole('button', { name: /^Copy / })).not.toBeInTheDocument();
-      // And the exits card says why it has nothing to offer.
       expect(
         screen.getByText(
           'Link a build, or buy with this character, and we can work out what each way out is worth.'
@@ -841,8 +784,6 @@ describe('OrderDetailModal', () => {
       expandAll();
 
       expect(screen.getByText('Do not chase this one')).toBeInTheDocument();
-      // Holding nets price - fill; undercutting (one legal tick under the
-      // 450 rival, i.e. 449.90 — issue #1421) nets that price - relist.
       expect(screen.getByText('Hold at 500.00')).toBeInTheDocument();
       expect(screen.getByText('+30.00 / unit')).toBeInTheDocument();
       expect(screen.getByText('Undercut the station at 449.90')).toBeInTheDocument();
@@ -858,7 +799,6 @@ describe('OrderDetailModal', () => {
       renderModal({ row, stationChecked: true });
 
       const user = userEvent.setup();
-      // The verdict's own suggested price: undercutPrice(450) = 449.90.
       await user.click(screen.getByRole('button', { name: 'Copy 449.90' }));
       expect(written).toEqual(['449.90']);
       expect(screen.getAllByText('Copied to clipboard').length).toBeGreaterThan(0);
@@ -881,7 +821,6 @@ describe('OrderDetailModal', () => {
       };
       renderModal({ row, stationChecked: true });
 
-      // outbidPrice(520) = 520.10 — one legal tick over the rival bid.
       const user = userEvent.setup();
       await user.click(screen.getByRole('button', { name: 'Copy 520.10' }));
       expect(written).toEqual(['520.10']);
@@ -918,8 +857,6 @@ describe('OrderDetailModal', () => {
       });
       expandAll();
 
-      // UNDERCUT_ROW asks 500 with no local buy order, so Amarr's 600 bid is
-      // +100 a unit across its 10 remaining units; Rens bids under the ask.
       expect(screen.getByText(/Amarr bids 600.00/)).toBeInTheDocument();
       expect(screen.getByText('9 jumps')).toBeInTheDocument();
       expect(screen.getByText('+100.00 / unit, 1,000.00 in all')).toBeInTheDocument();
@@ -1015,7 +952,6 @@ describe('OrderDetailModal', () => {
   });
 
   describe('reprocess and sell the materials', () => {
-    /** 10 units refine into 1,000 Tritanium at 100%; the assumed 50% station halves it. */
     const REPROCESSING = {
       entry: {
         portionSize: 10,
@@ -1039,7 +975,6 @@ describe('OrderDetailModal', () => {
       renderModal({ row: FLOORED_ROW, reprocessing: REPROCESSING });
       expandAll();
 
-      // 10 units -> 500 Tritanium at 2 ISK = 1,000 over 10 units = 100 a unit.
       expect(
         screen.getByText('Reprocess and sell the materials, 100.00 a unit')
       ).toBeInTheDocument();
@@ -1074,7 +1009,6 @@ describe('OrderDetailModal', () => {
         row: FLOORED_ROW,
         reprocessing: {
           ...REPROCESSING,
-          // No specialisation attribute = scrap.
           entry: { portionSize: 10, materials: [{ typeID: 34, quantity: 1000 }] },
           modifiers: WITH_RX_804,
         },
@@ -1126,7 +1060,6 @@ describe('OrderDetailModal', () => {
     it('starts every section folded, each with its own one-line trailing read (#4012)', () => {
       renderModal({ row: RICH_ROW, stationChecked: true });
 
-      // Collapsed: only the heading/trailing row shows, not the content.
       expect(screen.queryByText('Qty')).not.toBeInTheDocument();
       expect(screen.queryByText('Hold at')).not.toBeInTheDocument();
 
@@ -1137,7 +1070,6 @@ describe('OrderDetailModal', () => {
       for (const section of [who, numbers, cost, exits]) {
         expect(section).toHaveAttribute('aria-expanded', 'false');
       }
-      // One-line trailing reads, visible without expanding.
       expect(who).toHaveTextContent('Station · 450.00');
       expect(numbers).toHaveTextContent("Can't tell yet");
       expect(cost).toHaveTextContent('Floor 480.00');
@@ -1188,12 +1120,12 @@ describe('OrderDetailModal', () => {
       expect(copyButton()).toHaveAccessibleName('Copy 449.90');
 
       cleanup();
-      renderModal({ row: RICH_ROW, stationChecked: true }); // letGo: undercutting to 449.90 loses money against a 480 floor
+      renderModal({ row: RICH_ROW, stationChecked: true });
       expect(screen.getByText('Do not chase this one')).toBeInTheDocument();
       expect(copyButton()).not.toBeInTheDocument();
 
       cleanup();
-      renderModal({ row: { ...BASE_ROW, floor: { relist: 400, fill: 390 } } }); // healthy -> leaveItAlone
+      renderModal({ row: { ...BASE_ROW, floor: { relist: 400, fill: 390 } } });
       expect(screen.getByText('Leave it alone')).toBeInTheDocument();
       expect(copyButton()).not.toBeInTheDocument();
     });
@@ -1206,7 +1138,6 @@ describe('OrderDetailModal', () => {
       };
       renderModal({ row });
       expect(screen.queryByRole('button', { name: /^Copy / })).not.toBeInTheDocument();
-      // The fix list's short call heads it; the badge's advice sits under.
       expect(screen.getByText('Relist it')).toBeInTheDocument();
       expect(
         screen.getByText('Relist it, or move the stock somewhere it sells.')
@@ -1215,7 +1146,6 @@ describe('OrderDetailModal', () => {
     });
 
     it('pins Copy to the sheet foot on a phone, once, instead of the verdict block', () => {
-      // `useIsPhone` reads a max-width query; answering yes is how a phone looks under test.
       stubViewport(() => true);
 
       renderModal({
@@ -1225,10 +1155,8 @@ describe('OrderDetailModal', () => {
       const [copy, ...others] = screen.getAllByRole('button', { name: /^Copy / });
       expect(others).toHaveLength(0);
       expect(copy).toHaveAccessibleName('Copy 449.90');
-      // In the Modal footer: outside the scrolling body (the `tabIndex={-1}` scroller).
       expect(copy.closest('[tabindex="-1"]')).toBeNull();
       expect(screen.getByRole('dialog')).toContainElement(copy);
-      // View in Market stays with the verdict.
       expect(screen.getByRole('link', { name: 'View in Market' })).toBeInTheDocument();
     });
   });

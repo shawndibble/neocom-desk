@@ -8,11 +8,6 @@ import { formatCubicMetres } from '@/lib/volume';
 import { CargoPickerBody } from './HaulingCargoControl';
 import { totalCargoM3, useHaulingCargo } from './haulingCargo';
 
-/**
- * The Appraisal page's settings modal: the refining setup its Refine total is
- * worked out from, and the hauling ship its hold bar fills. Every control
- * applies as it changes.
- */
 export function AppraisalSettingsForm({ characterId }: { characterId: number | null }) {
   const { t } = useTranslation();
   const refining = useRefiningSetup();

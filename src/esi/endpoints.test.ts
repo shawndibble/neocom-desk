@@ -66,8 +66,6 @@ beforeEach(() => {
 });
 afterEach(() => {
   configureEsi({ getToken: null });
-  // The app-wide budget (issue #655) is module state: the 429 test below would
-  // otherwise leave the circuit shut for every test that follows it.
   resetEsiBudget();
 });
 
@@ -652,13 +650,10 @@ describe('wallet journal + transactions', () => {
 
     expect(fromIds).toEqual([null, '20', '10']);
     expect(transactions.items.map((t) => t.transaction_id)).toEqual([20, 10]);
-    // Stopped because a page came back empty, not because the cap bit.
     expect(transactions.truncated).toBe(false);
   });
 
   it('getCharacterWalletTransactions drops a fill repeated across pages and stops when a page adds nothing new', async () => {
-    // Live ESI answers `from_id` inclusively: each page leads with the id it
-    // was asked from, and the oldest page is that one fill on its own.
     const txn = (transaction_id: number) => ({
       transaction_id,
       date: '2026-08-01T00:00:00Z',
@@ -688,7 +683,6 @@ describe('wallet journal + transactions', () => {
 
     expect(transactions.items.map((t) => t.transaction_id)).toEqual([30, 20, 10]);
     expect(fromIds).toEqual([null, '20', '10']);
-    // History ran out; the cap never bit.
     expect(transactions.truncated).toBe(false);
   });
 });

@@ -46,15 +46,8 @@ import { loadWithSnapshot, pruneCommunitySnapshots } from '@/features/communitie
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useReconnectCount } from '@/stores/network';
 
-/** The switcher's "back to the list" value; no Community id can equal it. */
 const ALL = '__all';
 
-/**
- * Communities (issue #3597, ADR 0018): the Communities the active Character
- * belongs to, with create, and an admin or Member view of the open one. A
- * Member is one Character, so switching Character switches the list. The open
- * Community rides in `?community=` so a reload or a shared tab lands on it.
- */
 export function Communities() {
   const { t } = useTranslation();
   const hydrated = useActiveCharacter((s) => s.hydrated);
@@ -64,29 +57,21 @@ export function Communities() {
     [characterId]
   );
   const [params, setParams] = useSearchParams();
-  // Tagged with the Character it was loaded for, so switching Character reads
-  // as "loading" until its own list lands, never the previous one's.
   const [loaded, setLoaded] = useState<{
     characterId: number;
     list: CommunitySummary[];
-    /** The live read failed, so this is the last list read while online (`communityCache.ts`). */
     cached: boolean;
   } | null>(null);
   const communities = loaded && loaded.characterId === characterId ? loaded.list : null;
   const cached = loaded?.characterId === characterId && loaded.cached;
-  // Tagged like `loaded`: one Character's failure is not another's.
   const [failedFor, setFailedFor] = useState<number | null>(null);
   const failed = failedFor === characterId;
   const [creating, setCreating] = useState(false);
-  // On a phone the open Community stacks under the list, so a tap on a row
-  // scrolls it into view rather than changing something off screen.
   const detailRef = useRef<HTMLDivElement>(null);
   const scrollToDetail = useRef(false);
 
-  // Bumped after a change, to refetch the list.
   const [reload, setReload] = useState(0);
   const refresh = () => setReload((n) => n + 1);
-  // The connection coming back is a retry: the list was last read while offline.
   const reconnects = useReconnectCount();
 
   useEffect(() => {
@@ -94,18 +79,14 @@ export function Communities() {
     let cancelled = false;
     (async () => {
       try {
-        // Offline, the last list read answers (read-only); a refusal does not.
         const { value: list, cached } = await loadWithSnapshot({
           characterId,
           kind: 'list',
           live: () => loadMyCommunities(characterId),
         });
         if (!cached) {
-          // Tells the Community alerts poll whether this Character has anything to watch.
           void rememberCommunityAdmin(characterId, list).catch(() => {});
-          // And the nav badge's poll, whether it has any board to read.
           void rememberCommunityWatch(characterId, list).catch(() => {});
-          // A Community the Character is no longer in leaves no roster behind.
           void pruneCommunitySnapshots(
             characterId,
             list.map((community) => community.id)
@@ -134,9 +115,6 @@ export function Communities() {
     });
   }, [openId, reduced]);
 
-  // The old Invites tab's `?tab=invites` opens Manage › Invites once. Dropped
-  // from the URL as soon as the Community is on screen, so a reload or a
-  // Character switch does not open it again.
   const legacyInvites = params.get('tab') === INVITES_TAB_PARAM;
   const openShown = communities?.some((community) => community.id === openId) ?? false;
   useEffect(() => {
@@ -166,8 +144,6 @@ export function Communities() {
       <PageHeader
         title={t('communities.title')}
         actions={
-          // Primary only while it is the one thing to do; once in a Community it
-          // steps back. Always md: level with the alerts bell beside it.
           <NeedsConnection>
             <Button
               variant={communities?.length === 0 ? 'primary' : 'ghost'}
@@ -179,7 +155,6 @@ export function Communities() {
           </NeedsConnection>
         }
       />
-      {/* Inside a Community its own card says what it is; the intro is for the list. */}
       {!selected && <p className="text-xs text-text-dim">{t('communities.intro')}</p>}
 
       {cached && (
@@ -192,8 +167,6 @@ export function Communities() {
       )}
       {failed && selected && <InlineError>{t('communities.loadFailed')}</InlineError>}
       {selected && communities ? (
-        // Inside a Community the list steps back into a switcher: the open one
-        // by name, the others a pick away, and "All Communities" for the list.
         communities.length > 1 && (
           <Select
             value={selected.id}
@@ -255,7 +228,6 @@ export function Communities() {
                         {t('communities.memberCount', { count: community.memberCount })}
                       </span>
                     </span>
-                    {/* Only the exception is marked: every row is a Community the Character is a Member of. */}
                     {isCommunityAdmin(community, characterId) && (
                       <span className={communityBadgeClassName}>{t('communities.adminBadge')}</span>
                     )}

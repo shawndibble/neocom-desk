@@ -214,8 +214,6 @@ describe('belowMarketContracts', () => {
     });
 
     it('never counts the contract being valued as its own comparable', () => {
-      // Contract 1 is the cheapest single-type offer; its value comes from the
-      // next cheapest, and only three others count toward the minimum.
       const rows = [
         offer({ contractId: 1, typeId: NO_MARKET, quantity: 2, price: 2 }),
         ...others(3, 50),
@@ -248,13 +246,11 @@ describe('belowMarketContracts', () => {
         bpc({ contractId: 2, runs: 2, price: 100 }),
         bpc({ contractId: 3, runs: 1, price: 70 }),
         bpc({ contractId: 4, runs: 5, quantity: 2, price: 1_000 }),
-        // Different ME: not the same thing.
         bpc({ contractId: 5, runs: 10, me: 0, price: 10 }),
       ];
       const [result] = belowMarketContracts(rows, pricing(), { includeOther: true }).filter(
         (c) => c.contractId === 1
       );
-      // Others at 50, 70, 100 ISK/run; cheapest 50 × 3 runs. Never the original's 1B book.
       expect(result).toMatchObject({ market: 0, pricedLines: 0, other: 150, otherOfferCount: 3 });
     });
 

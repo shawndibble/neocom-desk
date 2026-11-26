@@ -5,14 +5,8 @@ import { SetWaypointMenuItem } from '@/features/travel/SetWaypointMenuItem';
 import type { SourceToggle } from './bpcSourcingUrl';
 import { TRADE_HUBS } from '@/market/hubs';
 
-/**
- * Rows the table shows, taken from the top of the current sort. A broad
- * search can match six figures of synced contracts; past a couple of hundred
- * the answer is to narrow the search, not to scroll.
- */
 export const RESULT_LIMIT = 200;
 
-/** The market lookup's region: the Region filter's, else the pilot's market hub's once known. */
 export function marketLookupRegion(
   regionId: number | null,
   hubHydrated: boolean,
@@ -22,17 +16,11 @@ export function marketLookupRegion(
   return hubHydrated ? hubRegionId : null;
 }
 
-/**
- * "Set waypoint in game" for a row whose Location names its station or
- * structure; nothing for one that names none (an unresolved location, or an
- * owned blueprint inside a container or ship).
- */
 export function waypointItemFor(
   row: BpcSearchRow,
   ownedPlaceIds: ReadonlyMap<number, number>
 ): ReactNode {
   const waypoint = waypointOnlyItemFor(row, ownedPlaceIds);
-  // A contract row also opens its window in the EVE client.
   if (row.source !== 'contract') return waypoint;
   return (
     <>
@@ -67,7 +55,6 @@ function waypointOnlyItemFor(
   );
 }
 
-/** The Trade Hub station in `regionId`, or 0 when the region holds none — nothing gets marked. */
 export function hubStationIn(regionId: number | null): number {
   return TRADE_HUBS.find((hub) => hub.regionId === regionId)?.stationId ?? 0;
 }

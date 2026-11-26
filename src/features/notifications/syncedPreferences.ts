@@ -1,25 +1,3 @@
-/**
- * The synced slice of Notification Preferences (issue #363, GLOSSARY.md round
- * 44/45): the **feed** half of every per-Character event/eve-type toggle, and
- * every threshold (structure fuel, corp wallet, personal wallet balance),
- * cross-device. Everything else in
- * `preferences.ts` — the master switch, the browser channel, and the browser
- * half of those same toggles — stays device-local, since the permission it
- * gates is itself per-device.
- *
- * `mergeSettings` (`src/sync/merge.ts`) is whole-value last-write-wins per
- * key, so this is one key carrying every Character's feed data, not one key
- * per Character: `SYNCED_SETTING_KEYS` is an exact-match allow-list, and a
- * per-Character key scheme can't be expressed in it without weakening that
- * allow-list into a prefix match. The accepted trade: two devices editing
- * *different* Characters' feed prefs concurrently, both before a sync, can
- * have one edit clobber the other. Rare (it takes two devices open on the
- * same account at once) and no worse than the pre-existing single-row local
- * model this mirrors.
- *
- * These functions are pure — no Dexie/fetch — so the actual read (Dexie) and
- * write (`setSyncedSetting`) live in `preferences.ts` and `NotificationsPanel.tsx`.
- */
 import {
   isEventEnabledFor,
   isEveTypeEnabledFor,
@@ -38,22 +16,9 @@ export interface SyncedFeedPrefs {
   perCharacter: Record<number, Partial<Record<NotificationEventId, boolean>>>;
   eveNotificationTypesByCharacter: Record<number, Record<string, boolean>>;
   thresholdsByCharacter: Record<number, CharacterEventThresholds>;
-  /** Absent from a blob written before issue #6225, which then changes nothing. */
   mutedSharedPopCorporations?: number[];
 }
 
-// ---------------------------------------------------------------------------
-// Extraction (local -> synced blob)
-// ---------------------------------------------------------------------------
-
-/**
- * Feed-channel flags only, and only where explicitly set. A legacy bare
- * boolean applied to both channels, so it counts as an explicit feed value
- * too. An event never touched (absent, or set on `browser` alone) is omitted
- * rather than materialized to its default — the default is shared code both
- * devices already run, so shipping it would just be noise, and would wrongly
- * pin a future default change to whatever value happened to sync first.
- */
 function extractFeedFromEventMap(
   map: EventEnabledMap
 ): Partial<Record<NotificationEventId, boolean>> {
@@ -78,7 +43,6 @@ function extractFeedFromEveTypeMap(map: EveTypeEnabledMap): Record<string, boole
   return result;
 }
 
-/** The full local preferences value, reduced to the slice `SYNCED_NOTIFICATION_FEED_PREFS_KEY` carries. */
 export function toSyncedFeedPrefs(value: NotificationPreferencesValue): SyncedFeedPrefs {
   const perCharacter: Record<number, Partial<Record<NotificationEventId, boolean>>> = {};
   for (const [characterIdRaw, map] of Object.entries(value.perCharacter)) {
@@ -104,16 +68,11 @@ export function toSyncedFeedPrefs(value: NotificationPreferencesValue): SyncedFe
     perCharacter,
     eveNotificationTypesByCharacter,
     thresholdsByCharacter,
-    // Carried once set, an empty list included: unmuting the last one must reach other devices.
     ...(value.mutedSharedPopCorporations === undefined
       ? {}
       : { mutedSharedPopCorporations: [...value.mutedSharedPopCorporations] }),
   };
 }
-
-// ---------------------------------------------------------------------------
-// Validation of a value pulled off the wire
-// ---------------------------------------------------------------------------
 
 function isBooleanMap(raw: unknown): raw is Record<string, boolean> {
   if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return false;
@@ -126,13 +85,6 @@ function isOptionalFiniteNumber(raw: unknown): boolean {
   return raw === undefined || (typeof raw === 'number' && Number.isFinite(raw));
 }
 
-/**
- * Structurally identical to `preferences.ts`'s own `isCharacterEventThresholds`
- * today, but kept as its own predicate: this one validates the *synced wire
- * shape* (`SyncedFeedPrefs`), the other the *local Dexie shape*
- * (`NotificationPreferencesValue`) — two different trust boundaries that
- * happen to agree now but aren't guaranteed to stay identical.
- */
 function isThresholds(raw: unknown): raw is CharacterEventThresholds {
   if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return false;
   const r = raw as Record<string, unknown>;
@@ -173,15 +125,6 @@ function isSyncedFeedPrefs(raw: unknown): raw is SyncedFeedPrefs {
   );
 }
 
-// ---------------------------------------------------------------------------
-// Merge (synced blob -> local value)
-// ---------------------------------------------------------------------------
-
-/**
- * Writes synced feed values into a copy of `local`, sourcing the browser
- * flag from `local` itself so a remote device's browser-channel choice (or a
- * remote legacy bare boolean, which implies one) never crosses over.
- */
 function mergeFeedIntoEventMap(
   local: EventEnabledMap,
   feed: Partial<Record<NotificationEventId, boolean>>
@@ -206,13 +149,6 @@ function mergeFeedIntoEveTypeMap(
   return next;
 }
 
-/**
- * Applies a synced feed-prefs blob (as pulled from Dexie under
- * `SYNCED_NOTIFICATION_FEED_PREFS_KEY`) onto a local preferences value.
- * `synced` is `unknown` because it came off the wire — a malformed or
- * unrecognized shape degrades to `value` unchanged rather than throwing or
- * corrupting local state.
- */
 export function withSyncedFeedPrefsApplied(
   value: NotificationPreferencesValue,
   synced: unknown

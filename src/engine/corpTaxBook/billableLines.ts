@@ -1,9 +1,3 @@
-/**
- * A Miner's billable lines (D4, #6294): every Billable day charge of theirs and every officer
- * Adjustment, priced as the charge prices it. A Running account bills them as its days, and a
- * late notice keeps the ones it asked for, as they were priced (`LateNoticeLine`). A dismissed
- * day bills nothing (the day rows say who dismissed it: `activeDismissalFor`).
- */
 import {
   adjustmentLineKey,
   type LateNoticeLine,
@@ -12,23 +6,18 @@ import type { Adjustment } from './adjustments';
 import type { DayCharge } from './charges';
 import { activeDismissalFor, type Dismissal } from './dismissals';
 
-/** One line a Miner's account bills: a mined day charge, or an Adjustment (`correction`). */
 export type BillableLine = LateNoticeLine;
 
 export interface BillableLines {
-  /** Oldest first, then by key. */
   lines: BillableLine[];
 }
 
 export function minerBillableLines(input: {
   minerId: string;
-  /** The book's start date: earlier mining owes nothing. */
   startDate: string;
-  /** Day charges; only this Miner's are used. */
   charges: readonly DayCharge[];
   adjustments: readonly Adjustment[];
   dismissals: readonly Dismissal[];
-  /** The Miner's last Billable day; undefined bills nothing. */
   billableThrough: string | undefined;
 }): BillableLines {
   const { minerId, billableThrough } = input;
@@ -71,7 +60,6 @@ export function minerBillableLines(input: {
   return out;
 }
 
-/** Whether every ore line of a line was priced at the hub's saved close-of-day price. */
 export function savedPrice(line: Pick<BillableLine, 'kind' | 'priceSources'>): boolean {
   return (
     line.kind === 'correction' ||

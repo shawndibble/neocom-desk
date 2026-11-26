@@ -9,7 +9,6 @@ import { ownedStockSale } from '@/engine/industry/ownedStockSale';
 import type { MaterialCostLine } from '@/engine/industry/types';
 import { formatIsk } from '@/lib/isk';
 
-/** One material the plan needs 100 of and the player already holds all 100 of. */
 const OWNED_MATERIALS: MaterialCostLine[] = [
   {
     typeID: 34,
@@ -106,7 +105,6 @@ describe('ResultsSummary: jargon tooltips (UX-REVIEW #8)', () => {
     const jobFeeButton = screen.getByRole('button', { name: /about total job cost/i });
     fireEvent.focus(jobFeeButton);
     const tooltipId = jobFeeButton.getAttribute('aria-describedby')!;
-    // 3,737,181 x 0.00005 = 186.86 -> 187
     expect(document.getElementById(tooltipId)?.textContent).toContain('±187 ISK');
   });
 });
@@ -203,7 +201,6 @@ describe('ResultsSummary: job cost breakdown (#116)', () => {
     expect(jobFeeButton).toHaveAttribute('aria-expanded', 'true');
 
     expect(screen.getByText('EIV').closest('div')).toHaveTextContent('1,000');
-    // The system the index was read for is the cost index row's second line.
     expect(screen.getByText('Jita').closest('div')).toHaveTextContent('Cost index');
     expect(screen.getByText('Jita').closest('div')).toHaveTextContent('50');
     expect(screen.getByText('SCC surcharge').closest('div')).toHaveTextContent('10');
@@ -244,7 +241,6 @@ describe('ResultsSummary: owned materials', () => {
 
   it('charges the forgone sale as a line on the sell-value basis', () => {
     renderSummary({ ownedSale: OWNED_SALE, profitBasis: 'sellValue', profit: 435 - 92_500 });
-    // Sell now: 100 x 1,000 gross, less 7.5% sales tax, no broker fee.
     expect(screen.getByText('Your materials').closest('div')?.parentElement).toHaveTextContent(
       '-92,500'
     );

@@ -96,7 +96,6 @@ describe('UsedInSection', () => {
     const actions = renderSection(catalogOf([entry(638, 587, 'Rifter', 4500)]));
 
     fireEvent.contextMenu(screen.getByText('Rifter').closest('li')!);
-    // Enabled, not "checking…": the row already knows its blueprint.
     expect(screen.getByRole('menuitem', { name: 'Build Plan' })).not.toHaveAttribute(
       'aria-disabled',
       'true'
@@ -130,10 +129,8 @@ describe('UsedInSection', () => {
       onNavigate,
       '/market?info=type-34'
     );
-    // A cold link's tab landing: TabRoute replaces `/market` with the default tab.
     await act(() => router.navigate!('/market/browser?info=type-34', { replace: true }));
     expect(onNavigate).not.toHaveBeenCalled();
-    // A drill-down on the landed page is judged from there, not from `/market`.
     await act(() => router.navigate!('/market/browser?info=type-35'));
     expect(onNavigate).not.toHaveBeenCalled();
 

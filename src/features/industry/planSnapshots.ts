@@ -1,14 +1,3 @@
-/**
- * Prices several Build Plans in one `loadMarketSnapshots` call: each plan's
- * own request plus, when it has a Reaction Location (issue #698), a
- * reaction-activity request for that location's cost index. One call, not
- * two: a second call the same tick would race the first on a cold cache and
- * fetch hub prices, adjusted prices and cost indices twice.
- *
- * Blueprint Acquisition's region-market and LP Store offers load alongside,
- * one load per (Character, Trade Hub) covering every blueprint those plans
- * need, not one per plan.
- */
 import type { BuildPlanRecord } from '@/db';
 import { industryActivityOf, type IndustryBlueprint } from '@/engine/industry/types';
 import { DEFAULT_TRADE_HUB, getTradeHub, type TradeHub } from '@/market/hubs';
@@ -25,19 +14,14 @@ import { loadInventionMarket, type InventionMarket } from './inventionSources';
 
 export interface PlanSnapshots {
   snapshot: Promise<MarketSnapshot>;
-  /** Null when the plan has no Reaction Location configured. */
   reactionSnapshot: Promise<MarketSnapshot> | null;
-  /** Region market and LP Store offers for the plan's blueprints; never rejects. */
   blueprintOffers: Promise<BlueprintOffersLookup>;
-  /** Invention recipes and prices for the same blueprints (issue #3990); never rejects. */
   inventionMarket: Promise<InventionMarket | null>;
 }
 
-/** Returns one entry per `members` item, in order. */
 export function loadPlanSnapshots(
   members: readonly { plan: BuildPlanRecord; blueprint: IndustryBlueprint }[],
   sources: RecipeCatalog,
-  /** The Industry percent (issue #6531): each plan keeps its own hub but prices at this. Absent is 100. */
   pricePercent?: number
 ): PlanSnapshots[] {
   const requests: MarketSnapshotRequest[] = [];

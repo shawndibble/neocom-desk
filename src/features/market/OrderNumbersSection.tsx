@@ -8,7 +8,6 @@ import { formatCount } from '@/lib/formatCount';
 import { useTimeZone } from '@/lib/timeFormat';
 import { formatDateOnly } from '@/lib/timestamp';
 
-/** "The numbers": rank, sell-through, volume, expiry and the net if it sells as listed. */
 export function OrderNumbersSection({
   row,
   deep,
@@ -47,7 +46,6 @@ export function OrderNumbersSection({
         )
       : sellValue;
 
-  // Buy orders fill rather than sell out (#1733).
   const sellsOutLabel = t(row.isBuyOrder ? 'market.orders.fillsIn' : 'market.orders.sellsOutIn');
 
   return (

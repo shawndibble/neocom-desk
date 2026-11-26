@@ -1,21 +1,3 @@
-/**
- * Fitting evaluation: what the dogma engine sees for a Fitting and a pilot,
- * and the numbers that come back. Every stats caller goes through here —
- * the editor (`useFittingWorkspace`), the logged-out Fitting Share Code view, the
- * Variations panel, the applied-DPS overlay and Fitting Compare — so the
- * engine inputs are assembled in one place:
- *
- * - the pilot's skills, with the implants/boosters the implant basis picks
- *   (the pilot's own clone, or the set the Fitting carries);
- * - the pilot's selected Damage Profile, and nothing at all until its
- *   stored value has been read, so a pilot who picked Guristas doesn't get
- *   a uniform calculation thrown away a moment later.
- *
- * Before this, each caller assembled those itself and kept missing one
- * (Variations forgot the Damage Profile, then the basis; the share view
- * forgot the Damage Profile). `dogmaFittingEngine.ts` stays the seam to the
- * engine itself (ADR 0016); this module sits above it.
- */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { applyImplantBasis, type ImplantBasis } from '@/engine/fittings/implantBasis';
 import type { Fitting, FittingStats, PilotProfile } from '@/engine/fittings/types';
@@ -29,6 +11,8 @@ import { useDamageProfiles, type DamageProfiles } from './damageProfiles';
 import { explainModule, type ChargeBasis, type DogmaAssetProgress } from './dogmaFittingEngine';
 import type { AffectedAttribute } from '@/engine/fittings/affectedBy';
 import { loadFittingPrice } from './fittingPrice';
+import { fittingItemCounts } from '@/engine/fittings/fittingExport';
+import { resolveTypeNames } from './resolvedTypeNames';
 import { useDogmaEngine } from './fittingContext';
 import { useRetryOnReconnect } from '@/lib/useRetryOnReconnect';
 import { useKeyedLoad } from '@/lib/useAsyncLoad';
@@ -48,52 +32,23 @@ export type { SkillGainEvaluator, VariantEvaluator };
 
 export interface FittingEvaluationInput {
   fitting: Fitting | null;
-  /** The pilot's own skills and clone; null while loading. */
   profile: PilotProfile | null;
-  /** "My clone" vs the Fitting's own set, already resolved for this Fitting. */
   implantBasis: ImplantBasis;
 }
 
 export interface FittingEvaluation {
-  /**
-   * The latest stats. After an edit to the same hull these are the previous
-   * fit's until the new calculation lands, so the bars don't blank on every
-   * click. A different hull drops them at once.
-   */
   stats: FittingStats | null;
-  /**
-   * The stats of exactly the Fitting given, or null while its calculation is
-   * pending — what anything read per module (module results, a Load's drone
-   * launch) must use, since `stats` can be the previous edit's.
-   */
   currentStats: FittingStats | null;
-  /** The Abyssal weather `stats` were worked out in (null: normal space) — which lags a new pick until it lands. */
   statsWeatherTypeId: number | null;
   statsProgress: DogmaAssetProgress | null;
   statsError: boolean;
-  /** Calculates again after `statsError` — the engine refetches its assets if those failed. */
   retry: () => void;
-  /** The Damage Profile every evaluation's EHP is measured against, and the pilot's custom ones. */
   damageProfiles: DamageProfiles;
-  /** The open Fitting at the default Trade Hub; independent of the engine, so usually first. */
   price: Appraisal | null;
-  /** Null until the pilot, the Damage Profile and the engine are all ready. */
   variants: VariantEvaluator | null;
-  /**
-   * What changed each attribute of the open Fitting's module at
-   * `moduleIndex` ("Affected by"), under exactly what its stats are worked
-   * out under. Null until the pilot, the Damage Profile and the engine are ready.
-   */
   explainModule: ((moduleIndex: number) => Promise<AffectedAttribute[]>) | null;
-  /** What the Charge Picker works a charge out under — the stats' own basis; null until the pilot and the Damage Profile are ready. */
   chargeBasis: ChargeBasis | null;
-  /** "What to train"; null until the pilot, the Damage Profile and the engine are ready. */
   skillGains: SkillGainEvaluator | null;
-  /**
-   * The open Fitting in normal space and inside Abyssal weather
-   * `weatherTypeId`, both under the page's other conditions (Overheat all
-   * included). Null until ready.
-   */
   compareWeather:
     ((weatherTypeId: number) => Promise<{ before: FittingStats; after: FittingStats }>) | null;
 }
@@ -107,8 +62,6 @@ export function useFittingEvaluation({
   const damageProfile = damageProfiles.hydrated ? damageProfiles.selected : null;
   const conditions = useStatsConditions();
 
-  // Keyed on the carried set, not the Fitting: an edit that leaves the set
-  // alone keeps this object, and with it `variants` and its baseline.
   const implantSet = fitting?.implantSet;
   const pilot = useMemo(
     () => (profile === null ? null : applyImplantBasis(profile, implantSet, implantBasis)),
@@ -125,14 +78,8 @@ export function useFittingEvaluation({
   const [attempt, setAttempt] = useState(0);
   const retry = useCallback(() => setAttempt((n) => n + 1), []);
   const engine = useDogmaEngine();
-  // A failure while offline mends itself when the connection returns.
   useRetryOnReconnect(statsError, retry);
 
-  // A different hull (or none) is a different Fitting: drop the old numbers at
-  // once rather than show them under the new one's header — a swap from one
-  // open Fitting straight to another (a new paste, a pasted link,
-  // Back/Forward). An edit to the same hull keeps them until the
-  // recalculation below lands, so the bars don't blank on every click.
   const hullTypeId = fitting?.shipTypeId ?? null;
   const [statsHull, setStatsHull] = useState(hullTypeId);
   if (statsHull !== hullTypeId) {
@@ -168,13 +115,14 @@ export function useFittingEvaluation({
     };
   }, [fitting, pilot, damageProfile, conditions, attempt]);
 
-  // Priced at the pilot's Trade Hub (Settings, or the Price section's select).
+  useEffect(() => {
+    if (fitting !== null) resolveTypeNames(fittingItemCounts(fitting).keys());
+  }, [fitting]);
+
   const { hubId, hydrated: hubHydrated } = useHubFor('fittings');
   const percent = usePricePercentFor('fittings');
 
-  // The clone's implants are already bought: priced like the multibuy list, without them.
   const cloneImplants = profile?.implantTypeIds;
-  // Keyed by hull: a different hull drops the old price, an edit refreshes behind it.
   const loadPrice = useCallback(async () => {
     const hub = getTradeHub(hubId) ?? DEFAULT_TRADE_HUB;
     return loadFittingPrice(fitting!, hub, cloneImplants, percent);
@@ -183,7 +131,6 @@ export function useFittingEvaluation({
     useKeyedLoad(fitting === null ? null : String(fitting.shipTypeId), loadPrice, !hubHydrated)
       .data ?? null;
 
-  // One baseline for Variations and "What to train" alike.
   const evaluators = useMemo(() => {
     if (fitting === null || pilot === null || damageProfile === null || engine === null)
       return null;

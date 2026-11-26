@@ -113,7 +113,6 @@ describe('planAccount', () => {
     });
     const used = joined.groups.flatMap((g) => g.planetIds);
     expect([...used].sort()).toEqual([1, 2, 3]);
-    // A chain's gain is its own colonies' figure less what they make apart, never the whole account's.
     for (const g of joined.groups.filter((g) => g.typeId !== null)) {
       expect(g.gainPerDay).toBeGreaterThan(0);
     }
@@ -132,7 +131,6 @@ describe('planAccount', () => {
       (g) => g.typeId === COOLANT
     );
     expect(open?.thin).toBeNull();
-    // 10% of 2,000 a day is 200 a day counted; the plan makes about 3,000.
     expect(thin?.thin).toMatchObject({ tradesPerDay: 2000, countedPerDay: 200, sharePct: 10 });
     expect(thin!.thin!.planPerDay).toBeGreaterThan(200);
     expect(thin ? thin.iskPerDay : 0).toBeLessThan(open!.iskPerDay);

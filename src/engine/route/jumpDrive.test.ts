@@ -24,7 +24,6 @@ describe('lightYearDistance', () => {
   });
 
   it('matches the baked map for a known pair: Jita to Amarr is ~20.3 ly', () => {
-    // Positions from public/data/market/systemPositions.json (Fuzzwork SDE dump).
     const jita = { x: -13.64, y: 6.42, z: 12.42 };
     const amarr = { x: -21.64, y: 4.25, z: -6.09 };
     expect(lightYearDistance(jita, amarr)).toBeCloseTo(20.28, 1);
@@ -45,7 +44,6 @@ describe('jumpFuel', () => {
 });
 
 describe('jumpFatigue', () => {
-  // CCP's Phoebe Travel Change Update (2014-10) worked examples.
   it('first jump takes the minimum fatigue and cooldown (Archon, 5 ly)', () => {
     expect(jumpFatigue({ fatigueMinutes: 0, distanceLy: 5 })).toEqual({
       fatigueMinutes: 60,
@@ -56,7 +54,7 @@ describe('jumpFatigue', () => {
   it('applies the 1 + LY multiplier and 10% cooldown (Ark, distances treated as 1 ly)', () => {
     const second = jumpFatigue({ fatigueMinutes: 18, distanceLy: 10, distanceFactor: 0.1 });
     expect(second.fatigueMinutes).toBeCloseTo(36);
-    expect(second.cooldownMinutes).toBeCloseTo(2); // 1.8 min is under the 1 + 1 minimum
+    expect(second.cooldownMinutes).toBeCloseTo(2);
     const third = jumpFatigue({ fatigueMinutes: 34, distanceLy: 10, distanceFactor: 0.1 });
     expect(third.fatigueMinutes).toBeCloseTo(68);
     expect(third.cooldownMinutes).toBeCloseTo(3.4);

@@ -6,11 +6,6 @@ import { IndustryGroupPage } from '@/routes/IndustryGroupPage';
 import { PlanetaryIndustry } from '@/routes/PlanetaryIndustry';
 import { renderPageRoutes } from '@/test/renderPage';
 
-/**
- * Hydrates the active Character from Dexie first, then renders the Industry
- * and Planetary Industry routes through `renderPageRoutes`. Seed Dexie and push
- * the URL first. The App-level wiring stays in `Industry.app.test.tsx`.
- */
 export async function renderIndustryRoutes(): Promise<RenderResult> {
   await useActiveCharacter.getState().hydrate();
   return renderPageRoutes([

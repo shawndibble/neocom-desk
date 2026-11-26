@@ -1,7 +1,3 @@
-/**
- * Phone layouts for the SRP member mockups: dense two-line `DataTable` cards,
- * the pilot's recent losses first, the paste field behind a disclosure.
- */
 import { useState } from 'react';
 import {
   Button,
@@ -22,8 +18,6 @@ const amountText = (c: Claim) =>
   c.amount === null ? 'Officer sets amount' : `${formatIskCompact(c.amount)} ISK`;
 
 const canRefile = (c: Claim) => c.state === 'Rejected' && !c.refiled;
-
-// ---------------------------------------------------------------- Losses
 
 function LostAction({ ship }: { ship: LostShip }) {
   if (ship.kind === 'open') {
@@ -86,7 +80,6 @@ export function PhoneGrantCard() {
   );
 }
 
-/** The one-line grant prompt kept above a form that is already in use. */
 export function PhoneGrantLine() {
   return (
     <div className="flex items-center justify-between gap-3 rounded-xs border border-line px-3 py-2">
@@ -116,8 +109,6 @@ export function PhonePaste({ form, open }: { form?: FormState; open: boolean }) 
     </Panel>
   );
 }
-
-// ---------------------------------------------------------------- Claims
 
 const OPEN_FIRST = { Pending: 0, Approved: 0, Paid: 1, Rejected: 1 } as const;
 const ordered = (claims: Claim[]) =>
@@ -191,8 +182,6 @@ export function PhoneClaims({
     </Panel>
   );
 }
-
-// ------------------------------------------------------------ Detail sheet
 
 export function ClaimDetailSheet({ claim }: { claim: Claim }) {
   const timeline = [

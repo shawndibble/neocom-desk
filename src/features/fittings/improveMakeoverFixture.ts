@@ -1,4 +1,3 @@
-/** A small Makeover for the component test and the stories: the PvE Drake from #5548. */
 import { baseFittingStats } from '@/engine/fittings/__fixtures__/fittingStats';
 import type { ImproveCandidate } from '@/engine/fittings/improve';
 import { moveKey } from '@/engine/fittings/improve';

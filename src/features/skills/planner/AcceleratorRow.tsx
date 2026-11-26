@@ -1,13 +1,3 @@
-/**
- * The phone's Accelerator line on Skills › Plans (GLOSSARY.md **Accelerator**):
- * one tall row saying what is injected and whether its time is set, opening a
- * sheet with the shared `AcceleratorSection` and the attribute sheet it boosts.
- *
- * The editor is set once per booster, so on a phone it no longer sits open
- * above the queue; the row only says when it needs the pilot (a detected bonus
- * with no time left set, which leaves training times off). Desktop keeps the
- * inline editor in `AttributesPane`.
- */
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Eyebrow, Modal } from '@/components/ui';
@@ -28,15 +18,12 @@ export function AcceleratorRow({
   attributes,
 }: {
   characterId: number;
-  /** The typed-in accelerator, only while it is still running. */
   running: CharacterAcceleratorRecord | null;
   detectedBonus: number | null;
   nowMs: number;
-  /** The attribute chips, shown under the editor as what the booster adds to. */
   attributes: ReactNode;
 }) {
   const { t } = useTranslation();
-  // Purges a run-out record. The section does too, but here it is mounted only while the sheet is open.
   useCharacterAccelerators();
   const [open, setOpen] = useState(false);
   const state = resolveAccelerator(running, detectedBonus, nowMs);

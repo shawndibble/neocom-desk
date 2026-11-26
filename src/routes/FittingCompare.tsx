@@ -55,11 +55,6 @@ import {
 } from '@/features/fittings/fittingCompareCsv';
 import { useModuleDiffNames } from '@/features/fittings/useModuleDiffNames';
 
-/**
- * Fitting vs Fitting compare: up to three Fittings, entirely in the URL
- * (`?f=…&f=…&f=…`) — copying the address bar reproduces the same comparison.
- * Phone shows two columns at a time with paging.
- */
 const VERDICT_TONE_CLASS = {
   good: 'text-success',
   bad: 'text-danger',
@@ -111,12 +106,7 @@ export function FittingCompare() {
     setCodes((prev) => [...prev, code].slice(0, MAX_COMPARE_SLOTS));
   }
   function removeSlot(index: number) {
-    // Pending adds only ever append, so a rendered index still names the same slot in `prev`.
     setCodes((prev) => prev.filter((_, i) => i !== index));
-    // The pressed Remove leaves with its column. The next column slides into
-    // this index; failing that the previous one, then "Add fitting". The URL
-    // write lands in a later commit than this handler's, so a candidate only
-    // counts once the column count has dropped (before that, it is the old button).
     const expected = codes.length - 1;
     const afterRemoval = (find: () => HTMLElement | null | undefined) => () =>
       countRef.current === expected ? find() : null;
@@ -131,12 +121,7 @@ export function FittingCompare() {
 
   const anyError = slots.some((slot) => slot?.shareError);
   const anyStatsFailed = stats.failed.some(Boolean);
-  // The failure is the ship data never having downloaded, and there is no connection to fetch it.
   const shipDataNeedsConnection = useShipDataNeedsConnection();
-  // Slots whose stats calculated. A slot that failed is left out of the table (its column shows a
-  // dash) so one bad Fitting doesn't hide the rest; best/differs are worked out over these only.
-  // `stats.values` can still be longer than `fittings` for a render after a slot is removed, so a
-  // slot also needs its Fitting.
   const okSlots = useMemo(
     () => stats.values.flatMap((s, index) => (s && fittings[index] ? [index] : [])),
     [stats.values, fittings]
@@ -147,13 +132,8 @@ export function FittingCompare() {
     slots.every((slot) => slot !== null) &&
     stats.values.every((s, index) => s !== null || stats.failed[index]);
   const statsReady = settled && okSlots.length > 0;
-  // One Fitting has nothing to differ from, so show all its stats rather than an empty table.
   const showDifferencesOnly = differencesOnly && okSlots.length >= 2;
 
-  // Price rows join the table once every shown Fitting's hub fetch has settled (succeeded or
-  // failed) — a slower network fetch than the stats calc must not delay the rest of the table
-  // from appearing. A settled failure on one slot still lets the rest show their price, same as
-  // `okSlots` doing this for `stats` above.
   const priceSettled = okSlots.every(
     (index) => price.values[index] !== null || price.failed[index]
   );
@@ -180,8 +160,6 @@ export function FittingCompare() {
     return position === -1 ? null : position;
   };
 
-  // Exports hold every Fitting, not the phone pager's window, and the rows
-  // the Differences-only toggle leaves on screen. Raw tables, so `source: 'rows'`.
   const csvFittings = useMemo(
     () =>
       slots.map((slot, index) => {
@@ -189,7 +167,6 @@ export function FittingCompare() {
         return {
           name: slot?.fitting?.name ?? '',
           statsIndex: position === -1 ? null : position,
-          // The header's verdicts, in the words it prints under the name.
           fits: fitVerdict(t, stats.values[index])?.text ?? null,
           canFly:
             canFlyVerdict(t, canFly.values[index], Boolean(canFly.failed[index]))?.text ?? null,
@@ -253,8 +230,6 @@ export function FittingCompare() {
         </div>
       );
     }
-    // Whole-fit CPU/PG/calibration budget — additional to "Can fly" (a skills check), not a
-    // replacement: a fit can fly but not fit (over budget), and the two must read distinctly.
     const fits = fitVerdict(t, stats.values[index]);
     const flyVerdict = canFlyVerdict(t, canFly.values[index], Boolean(canFly.failed[index]));
     const name = slot.fitting?.name ?? '';
@@ -347,7 +322,6 @@ export function FittingCompare() {
         }
       />
 
-      {/* One wrapping toolbar from `md` up (label + select stay adjacent per group); phones keep the stacked rows. The differences toggle lives in the Stats panel header so loading fits never wraps this row. Nothing to measure until a Fitting is added, so no pickers before then. */}
       {count > 0 && (
         <div
           data-testid="compare-controls"

@@ -51,7 +51,6 @@ describe('fetchAllPagesStatus', () => {
     const { items } = await fetchAllPagesStatus<string>('/markets/10000002/orders');
 
     expect([...pagesRequested].sort()).toEqual([1, 2, 3]);
-    // Page 1 alone (it carries X-Pages), then 2 and 3 together.
     expect(pagesRequested[0]).toBe(1);
     expect(maxInFlight).toBe(2);
     expect(items).toEqual(['item-1a', 'item-1b', 'item-2a', 'item-2b', 'item-3a', 'item-3b']);
@@ -103,10 +102,6 @@ describe('fetchAllPagesStatus', () => {
   });
 });
 
-/**
- * A short list must stay distinguishable from a complete one, or a truncated
- * view renders under a fresh DataAgeBadge as if it were whole.
- */
 describe('fetchAllPagesStatus', () => {
   function pagedHandler(totalPages: number, failFrom?: number) {
     return http.get(`${ESI_BASE_URL}/markets/10000002/orders`, ({ request }) => {
@@ -203,11 +198,6 @@ describe('fetchAllPagesStatus', () => {
   });
 });
 
-/**
- * A multi-page read must log once, not once per page — otherwise a single
- * large asset/journal load could crowd the bounded activity buffer with
- * near-identical rows (issue #32).
- */
 describe('fetchAllPagesStatus — activity log (issue #32)', () => {
   it('emits exactly one success event for a multi-page read', async () => {
     server.use(
@@ -261,13 +251,7 @@ describe('fetchAllPagesStatus — activity log (issue #32)', () => {
   });
 });
 
-/**
- * Pages 2..N run a few at a time rather than one after another — a 20-page
- * asset walk was 20 serial round trips. The sequential contract still holds:
- * items in page order, a 404 after page 1 ends the data, anything else throws.
- */
 describe('fetchAllPagesStatus — parallel page walk', () => {
-  /** Answers each page after `delayFor(page)` ms, recording concurrency. */
   function slowPagedHandler(
     totalPages: number,
     delayFor: (page: number) => number,
@@ -289,7 +273,6 @@ describe('fetchAllPagesStatus — parallel page walk', () => {
   }
 
   it('caps pages in flight at PAGE_FETCH_CONCURRENCY and keeps page order when later pages answer first', async () => {
-    // Earlier pages answer slowest, so arrival order is the reverse of page order.
     const { handler, state } = slowPagedHandler(10, (page) => (page === 1 ? 0 : 60 - page * 5));
     server.use(handler);
 
@@ -302,8 +285,6 @@ describe('fetchAllPagesStatus — parallel page walk', () => {
   });
 
   it('keeps only the pages before the first 404, even when a later page answered', async () => {
-    // Page 3 404s at once while 2, 4 and 5 are still in flight; 4 and 5 then
-    // answer 200 and must be discarded.
     const { handler, state } = slowPagedHandler(
       8,
       (page) => (page === 1 || page === 3 ? 0 : 30),
@@ -320,7 +301,6 @@ describe('fetchAllPagesStatus — parallel page walk', () => {
       pagesReported: 8,
     });
     expect(state.requested).toContain(4);
-    // Nothing is dispatched once the 404 is known.
     expect(Math.max(...state.requested)).toBe(5);
   });
 
@@ -364,8 +344,6 @@ describe('fetchAllPagesStatus — parallel page walk', () => {
     controller.abort();
 
     await expect(walk).rejects.toMatchObject({ name: 'AbortError' });
-    // Nothing is dispatched after the abort; the pages already sent were the
-    // first batch only. (A stray rejection would fail the run as unhandled.)
     expect(Math.max(...state.requested)).toBeLessThanOrEqual(1 + PAGE_FETCH_CONCURRENCY);
   });
 
@@ -382,7 +360,6 @@ describe('fetchAllPagesStatus — parallel page walk', () => {
 });
 
 describe('fetchAllPagesStatus — per-page ETag revalidation', () => {
-  /** Three pages whose ETag is `"p<page>"`; a matching If-None-Match gets a 304. */
   function etaggedHandler(pages: number, changed: ReadonlySet<number> = new Set()) {
     const sent: Array<[number, string | null]> = [];
     const handler = http.get(`${ESI_BASE_URL}/markets/10000002/orders`, ({ request }) => {
@@ -428,7 +405,6 @@ describe('fetchAllPagesStatus — per-page ETag revalidation', () => {
       [3, '"p3"'],
     ]);
     expect(result).toMatchObject({ truncated: false, pagesFetched: 3, pagesReported: 3 });
-    // A 304 page contributes nothing to `items`; the caller restores it from what it holds.
     expect(result.items).toEqual(['item-2']);
     expect(result.pageResponses).toEqual([
       { items: null, etag: '"p1"', notModified: true },
@@ -461,7 +437,6 @@ describe('fetchAllPagesStatus — per-page ETag revalidation', () => {
         const ifNoneMatch = request.headers.get('if-none-match');
         sent.push([page, ifNoneMatch]);
         const etag = `"p${page}"`;
-        // A 304 that leaves X-Pages off would otherwise read as a 1-page list.
         if (ifNoneMatch === etag)
           return new HttpResponse(null, { status: 304, headers: { ETag: etag } });
         return HttpResponse.json([`item-${page}`], { headers: { 'X-Pages': '3', ETag: etag } });

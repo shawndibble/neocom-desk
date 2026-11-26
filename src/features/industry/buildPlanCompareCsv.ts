@@ -4,7 +4,6 @@ import type { HubOrderCounts } from '@/market/fuzzwork';
 import { COMPARE_COLUMN_IDS, type CompareColumnId } from './compareColumns';
 import type { ComparedBuildRow } from './useComparedBuildResults';
 
-/** A figure off the row's result — blank while loading, on a failed row, or where it's unpriceable. */
 function figure(
   pick: (result: BuildResult) => number | null
 ): (row: ComparedBuildRow) => number | null {
@@ -12,21 +11,11 @@ function figure(
 }
 
 export interface CompareCsvOptions {
-  /** Why a plan has no figures (a failed compute, or an unpriceable material or product); null when it resolved. */
   unresolvedReason?: (row: ComparedBuildRow) => string | null | undefined;
-  /** A row's average orders traded per day in the hub's region. */
   ordersPerDay?: (row: ComparedBuildRow) => number | null | undefined;
-  /** A row's open order counts at the chosen hub; null/undefined while loading, failed or unknown. */
   hubCounts?: (row: ComparedBuildRow) => HubOrderCounts | null | undefined;
 }
 
-/**
- * Export columns for Compare mode's table, in its order. Time is raw seconds
- * and margin a raw percent (the table's `20%` is `20`), so both sort and sum;
- * every cell the table shows as "…" or "—" is blank. Every column is
- * exported whatever the column picker hides — the picker is a view choice,
- * the file holds the whole comparison.
- */
 export function buildPlanCompareCsvColumns(
   t: CsvTranslate,
   {

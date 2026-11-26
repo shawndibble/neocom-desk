@@ -10,12 +10,10 @@ import {
 const T0 = 1_000_000;
 const FIVE_MIN = 5 * 60 * 1000;
 
-/** `issuerId`/`acceptorId` default to the common test characterId (7) — the character is party to the contract unless a test overrides one to prove otherwise. */
 function contractEntry(
   contractId: number,
   status: ContractEntrySnapshot['status'],
   issuerId = 7,
-  // An unaccepted contract has no acceptor; ESI sends 0.
   acceptorId = status === 'outstanding' ? 0 : 7
 ): ContractEntrySnapshot {
   return { contractId, status, issuerId, acceptorId };
@@ -54,8 +52,6 @@ describe('diffContractAccepted', () => {
   });
 
   it('does not fire for a courier a baseline already recorded as accepted but outstanding', () => {
-    // Baselines saved before `withAcceptedCourierInProgress` hold accepted couriers as
-    // `outstanding` with their acceptor set; only the label changed, nobody accepted anything.
     const prev = contractSnapshot([contractEntry(1, 'outstanding', 7, 9)], T0);
     const next = contractSnapshot([contractEntry(1, 'in_progress', 7, 9)], T0 + FIVE_MIN);
     expect(diffContractAccepted(7, prev, next)).toEqual([]);

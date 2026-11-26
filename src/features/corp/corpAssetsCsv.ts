@@ -1,12 +1,3 @@
-/**
- * Export columns for the Corp assets ledger's two tables: every column the
- * table can offer, plus what the screen keeps in the expanded row (stacks) or
- * the group header (location totals).
- *
- * By item stays one row per type, so Quantity, Value and Volume still add up;
- * Stacks lists every stack with its path, quantity and state, and a type with
- * more stacks than one workbook cell holds continues in "Stacks (2)", ….
- */
 import type { CsvColumn, CsvTranslate } from '@/lib/csv';
 import { exportFlag } from '@/lib/exportFlag';
 import { joined } from '@/lib/exportSheets';
@@ -23,19 +14,15 @@ import type { ItemTableRow } from './CorpAssetItemTable';
 
 export interface CorpAssetItemCsvContext {
   labels: LedgerLabels;
-  /** In-game names by item id, shown first on the stack that has one. */
   assetNames: AssetNameMap;
-  /** The SDE blueprint typeIDs, to tell an original from an ordinary item; null while unknown. */
   blueprintTypeIds: ReadonlySet<number> | null;
 }
 
 export function corpAssetItemCsvColumns(
   t: CsvTranslate,
   { labels, assetNames, blueprintTypeIds }: CorpAssetItemCsvContext,
-  /** The rows exported: a type with more stacks than one cell holds spills into "Stacks (2)", … */
   rows: readonly ItemTableRow[] = []
 ): CsvColumn<ItemTableRow>[] {
-  // One build per row, shared by the column count and every Stacks cell.
   const parts = new WeakMap<ItemTableRow, string[]>();
   const partsOf = (row: ItemTableRow): string[] => {
     let cached = parts.get(row);
@@ -87,7 +74,6 @@ export function corpAssetItemCsvColumns(
   ];
 }
 
-/** The row's stacks `; `-joined, cut between stacks into cells that fit a workbook cell. */
 function stackParts(
   row: ItemTableRow,
   t: CsvTranslate,
@@ -129,7 +115,6 @@ export function corpAssetLocationCsvColumns(
     },
     { header: t('corp.assets.column.value'), value: (r) => r.cell.estimatedValue },
     { header: t('corp.assets.column.volume'), value: (r) => r.cell.volume },
-    // The group header's facts, on every row of the group.
     { header: t('corp.assets.csv.groupItems'), value: (r) => r.groupItems },
     { header: t('corp.assets.csv.groupValue'), value: (r) => r.groupValue },
     { header: t('corp.assets.csv.divisionsInUse'), value: (r) => r.groupDivisionsInUse },

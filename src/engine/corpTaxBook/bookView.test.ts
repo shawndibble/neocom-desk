@@ -32,7 +32,6 @@ function entry(
   };
 }
 
-/** 1,000 ISK per unit at 10%: 1,000 units owe 100,000. */
 function input(overrides: Partial<BookViewInput> = {}): BookViewInput {
   return {
     corporationId: CORP,
@@ -194,7 +193,6 @@ describe('buildBookView: a Running account per Miner', () => {
         ]),
       })
     );
-    // Read whole: August is owed again, as if no checkpoint were stored.
     expect(bookMiner(view, 'solo:1')!.account.owes).toEqual({
       amount: 200_000,
       days: 2,
@@ -390,7 +388,6 @@ describe('buildBookView with a feeder', () => {
         { typeId: ORE, quantity: 150 },
         { typeId: ORE2, quantity: 300 },
       ]);
-      // Only ORE is priced in this fixture: 150 units at 1,000.
       expect(r.estimatedValue).toBe(150_000);
     });
 
@@ -428,7 +425,7 @@ describe('buildBookView with a feeder', () => {
     });
 
     it('splits a notified base ore into the variants mined, and counts them as mined', () => {
-      const BRIMFUL = 46280; // Brimful Zeolites: the notification lists only Zeolites.
+      const BRIMFUL = 46280;
       const r = row({
         now: '2026-09-16T14:00:00Z',
         entries: [mine('2026-09-16', ORE, 300), mine('2026-09-16', BRIMFUL, 500)],
@@ -474,7 +471,6 @@ describe('buildBookView with a feeder', () => {
         { typeId: ORE2, quantity: 200 },
       ]);
       expect(r.minedPct).toBe(100);
-      // A still-active chunk with nothing known stays unknown.
       expect(row({ now: '2026-09-16T14:00:00Z', entries: minedBoth }).oreSource).toBe('unknown');
     });
 
@@ -486,7 +482,6 @@ describe('buildBookView with a feeder', () => {
 
     it('prices a four-ore survey chunk into estimatedValue', () => {
       const ores = [ORE, ORE2, 45492, 45493];
-      // Zeolites 28%, 33%, 18%, 21% of a 1,000-unit chunk.
       const lines = [280, 330, 180, 210].map((quantity, i) => ({ typeId: ores[i], quantity }));
       const r = buildBookView(
         input({
@@ -548,10 +543,10 @@ describe('buildBookView: moon owner coverage (#4618)', () => {
     const view = buildBookView(
       input({
         entries: [
-          fed(1, '2026-08-20', 1000), // before the first period
-          fed(1, '2026-09-01', 1000), // inside the first period
-          fed(1, '2026-09-05', 1000), // the gap after it ended
-          fed(1, '2026-09-10', 1000), // inside the rejoined period
+          fed(1, '2026-08-20', 1000),
+          fed(1, '2026-09-01', 1000),
+          fed(1, '2026-09-05', 1000),
+          fed(1, '2026-09-10', 1000),
         ],
         feeders: [
           {
@@ -587,7 +582,6 @@ describe('buildBookView: moon owner coverage (#4618)', () => {
   });
 
   it('a disconnected moon owner’s unread last day never holds the miner’s own-refinery day', () => {
-    // Read well at 12 Sep 00:00: 11 Sep never closed for it, so coverage ended on 10 Sep.
     const view = buildBookView(
       input({
         entries: [fed(1, '2026-09-11', 1000), entry(1, '2026-09-11', 1000)],
@@ -775,7 +769,6 @@ describe('the Miner ledger (minerLedgerSource into payeeLedger)', () => {
   });
 
   it('owes a day’s shortfall again when an officer exempts it from tolerance, with no Market adjustment row', () => {
-    // 15 Sep is 100,000; paying 99,700 leaves 300 short (0.3%), forgiven by default.
     const payments = [pay('a', 99_700, '2026-09-15T10:00:00Z')];
     const forgiven = ledgerOf(buildBookView(running(payments)));
     const tolerance = (l: ReturnType<typeof ledgerOf>) =>
@@ -818,11 +811,9 @@ describe('the Miner ledger (minerLedgerSource into payeeLedger)', () => {
       ],
     });
     const l = ledgerOf(view);
-    // Listed as held, but out of the balance.
     const heldRow = l.rows.find((e) => e.date === '2026-09-16');
     expect(heldRow?.kind === 'charge' && heldRow.held).toBe(true);
     expect(l.balance).toBe(view.miners[0].owed - view.miners[0].credit);
-    // Held, with the dispute that holds it: never "not billable yet".
     const day = minerDetail(view, 'solo:1')!.days.find((d) => d.date === '2026-09-16')!;
     expect(day.disputed).toEqual({ disputeId: 'd1', until: '2026-10-01T00:00:00.000Z' });
     expect(l.notYetBilled).toEqual(ledgerOf(buildBookView(running([]))).notYetBilled);
@@ -864,7 +855,6 @@ describe('the Miner ledger (minerLedgerSource into payeeLedger)', () => {
   });
 
   it('gives each day a tolerance forgave its own dated row, tying out to the account', () => {
-    // Day 15 is 100,000 and day 16 is 200,000. Paying 299,000 leaves day 16 1,000 short (0.5%).
     const view = buildBookView(running([pay('a', 299_000, '2026-09-17T10:00:00Z')]));
     const l = ledgerOf(view);
     expect(l.rows.map((e) => [e.kind, e.date, e.paid])).toEqual([

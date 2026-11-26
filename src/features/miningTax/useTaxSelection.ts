@@ -11,10 +11,6 @@ import type { TaxDialogActions } from '@/features/miningTax/useTaxDialogs';
 import { isSelectableRow } from '@/features/miningTax/useTaxColumns';
 import { useStickyClearance } from '@/lib/useStickyClearance';
 
-/**
- * The Open table's select column and what the bulk actions read from it.
- * Feeds all three (settle up / combine / dismiss), never just bulk-pay.
- */
 export function useTaxSelection(
   openRows: readonly DisplayRow[],
   settleUpRowsFor: (members: readonly GroupMember[]) => SettleUpRow[],
@@ -22,17 +18,12 @@ export function useTaxSelection(
 ) {
   const { t } = useTranslation();
   const toolbarRef = useRef<HTMLDivElement>(null);
-  // Row keys checked in the Open table's select column.
   const [selection, setSelection] = useState<ReadonlySet<string>>(new Set());
 
-  // Every bulk action reads the selection narrowed to what is *on screen*:
-  // selection state survives a filter change, so acting on the full set would
-  // let Dismiss reach entries the pilot cannot see.
   const selectedRows = useMemo(
     () => openRows.filter((dr) => selection.has(dr.key)),
     [openRows, selection]
   );
-  // The sticky toolbar covers the page bottom: reserve its height as scroll padding so a focused row clears it.
   useStickyClearance(toolbarRef, 'selection-toolbar', {
     enabled: selectedRows.length > 0,
   });
@@ -64,7 +55,6 @@ export function useTaxSelection(
 
   const selectableVisible = openRows.filter(isSelectableRow);
 
-  // The selection bar's "Link payment": one transfer pays one Payee.
   const selectedPayeeIds = [...new Set(selectedSettleUpRows.map((r) => r.assignment.payeeId))];
   const linkSelectedBlocked =
     selectedSettleUpRows.length === 0

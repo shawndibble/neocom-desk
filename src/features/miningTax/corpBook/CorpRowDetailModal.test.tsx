@@ -107,6 +107,20 @@ describe('CorpRowDetailModal', () => {
     expect(screen.queryByRole('button', { name: /unassign/i })).not.toBeInTheDocument();
   });
 
+  it("offers Edit, and Split under its menu, on an open day's estimate", async () => {
+    const user = userEvent.setup();
+    const onEdit = vi.fn();
+    const onSplit = vi.fn();
+    const estimate = { ...corp, view: { ...corp.view, state: 'estimate' as const } };
+    renderModal({ corp: estimate, onEdit, onSplit });
+    expect(screen.getByText(/it is your own entry: edit it, or split off ore/)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /^edit/i }));
+    expect(onEdit).toHaveBeenCalledOnce();
+    await user.click(screen.getByRole('button', { name: /more/i }));
+    await user.click(await screen.findByRole('menuitem', { name: /split/i }));
+    expect(onSplit).toHaveBeenCalledOnce();
+  });
+
   it('opens the book diff as its own dialog from "Compare with the book", not inline', async () => {
     const user = userEvent.setup();
     renderModal();
@@ -163,39 +177,6 @@ describe('CorpRowDetailModal', () => {
     expect(screen.queryByRole('button', { name: /settle up/i })).not.toBeInTheDocument();
   });
 
-  it('shows an over-listed excess as never billed: the book did not record it', () => {
-    const excess: BookRowView = {
-      ...view,
-      state: 'conflict',
-      conflictCause: 'overListed',
-      taxOwed: null,
-      billed: 0,
-      dispute: undefined,
-    };
-    renderModal({ corp: { ...corp, view: excess } });
-    expect(
-      screen.getByText("Not billed · Brass Meridian Logistics's book did not record this ore")
-    ).toBeInTheDocument();
-    expect(screen.queryByText(/Late notice/)).not.toBeInTheDocument();
-  });
-
-  it('shows Settling ore as not billed yet, waiting on the refinery log, with no conflict', () => {
-    const settling: BookRowView = {
-      ...view,
-      state: 'settling',
-      taxOwed: null,
-      billed: 0,
-      dispute: undefined,
-    };
-    renderModal({ corp: { ...corp, view: settling } });
-    expect(
-      screen.getByText(
-        /^Not billed yet · Brass Meridian Logistics's refinery log hasn't caught up with your mining on/
-      )
-    ).toBeInTheDocument();
-    expect(screen.queryByText(/did not record this ore/)).not.toBeInTheDocument();
-  });
-
   it('says why the day is locked and keeps the billed amount once it is paid', () => {
     const paid: BookRowView = {
       ...view,
@@ -239,8 +220,6 @@ describe('CorpRowDetailModal', () => {
       )
     ).toBeInTheDocument();
   });
-
-  // The Bureau report: the book holds the payment but spent it on an older day it still bills.
 
   it('says what a Market adjustment forgave', () => {
     renderModal({ corp: { ...corp, view: { ...view, forgivenIsk: 1_000 } } });
@@ -308,7 +287,6 @@ describe('CorpRowDetailModal: Resolve on a Late notice (#6206, resolving in the 
     expect(screen.queryByRole('button', { name: 'Resolve' })).toBeNull();
   });
 
-  // A plain billed day can still be paid, or said no to: pay / not paying.
   it('offers a plain billed day Resolve even before a Late notice asks for it', async () => {
     const onResolve = vi.fn();
     renderModal({ onResolve, corp: { ...corp, view: { ...view, dispute: undefined } } });

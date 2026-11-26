@@ -1,12 +1,3 @@
-/**
- * The detail modal's model for a `skyhookRaid` Calendar item: system, the stock
- * at risk, and the window's two ends, plus the system for Set destination. It
- * is the corp Sovereignty widget's `RowDetailModel`, so the same modal draws it
- * (`RowDetailModal`) and the two surfaces cannot drift.
- *
- * ESI sends no silo capacity, so "silo fill" is the unsecured and secured stock
- * in units, never a percentage (see the `calendar.skyhookRaid.note` line).
- */
 import { raidState } from '@/engine/corp/sovereignty';
 import type { RowDetailModel } from '@/features/overview/widgets/data/types';
 import type { Translate } from '@/lib/translate';

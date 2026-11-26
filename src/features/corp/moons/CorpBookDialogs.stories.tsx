@@ -14,16 +14,9 @@ import { TurnOnBook } from './TurnOnBook';
 import { useAuditSubject } from './useAuditSubject';
 import { BOOK_CONTEXT, BOOK_VIEW, MOON_ID, VARRO_ID } from './corpBookFixture';
 
-/**
- * Every `/corp/moons` dialog and side panel that reads only the book, open on the same
- * sample book as `corp/CorpBookSections`, plus the Director's turn-on screen. The
- * components are the route's own; nothing here is a mockup. Settings has its own
- * stories (`corp/BookSettingsDialog`).
- */
 const MINER = BOOK_VIEW.miners.find((m) => m.id === VARRO_ID)!;
 const DETAIL = minerDetail(BOOK_VIEW, VARRO_ID)!;
 const NAME = BOOK_CONTEXT.names.character(MINER.mainCharacterId);
-/** Close account is a guest's only (the Miner page offers it for nobody else). */
 const GUEST = BOOK_VIEW.miners.find((m) => m.standing === 'guest')!;
 const PAYMENT = DETAIL.payments[0] ?? { id: 'p3', amount: 3_000_000, at: '2026-09-16T08:00:00Z' };
 const DONATION = { id: 'u1', amount: 15_000_000, at: '2026-10-16T08:12:00Z' };
@@ -64,7 +57,6 @@ const AUDIT: AuditEntry[] = [
   },
 ];
 
-/** The route's own subject resolver, so Miner names link like the real panel's. */
 function ActivityFeed() {
   return <AuditFeed entries={AUDIT} subject={useAuditSubject()} />;
 }
@@ -84,7 +76,6 @@ type Story = StoryObj<typeof meta>;
 const phone = { globals: { viewport: { value: 'mobile1', isRotated: false } } };
 const noop = () => {};
 
-/** @summary Activity (the header's button): the book's audit log in a side panel. */
 export const Activity: Story = {
   render: () => (
     <SlideOver open onClose={noop} title="Activity" wide>
@@ -92,10 +83,8 @@ export const Activity: Story = {
     </SlideOver>
   ),
 };
-/** @summary Activity, phone. */
 export const ActivityPhone: Story = { ...Activity, ...phone };
 
-/** @summary Record a payment against a Miner. */
 export const RecordPayment: Story = {
   render: () => (
     <RecordPaymentDialog
@@ -107,25 +96,20 @@ export const RecordPayment: Story = {
     />
   ),
 };
-/** @summary Record a payment, phone. */
 export const RecordPaymentPhone: Story = { ...RecordPayment, ...phone };
 
-/** @summary Mark all or part of a payment as not tax. */
 export const MarkNotTax: Story = {
   render: () => <MarkNotTaxDialog open onClose={noop} payment={PAYMENT} fromName={NAME} />,
 };
 
-/** @summary Assign an unmatched donation to a Miner. */
 export const AssignDonation: Story = {
   render: () => <AssignDonationDialog open onClose={noop} payment={DONATION} fromName="Pilot 99" />,
 };
 
-/** @summary Per-day rate override (Corrections ⋮). */
 export const RateOverride: Story = {
   render: () => <RateOverrideDialog open onClose={noop} days={DETAIL.days} />,
 };
 
-/** @summary Charge or credit line on the Miner's account (Corrections ⋮). */
 export const Adjustment: Story = {
   render: () => (
     <AdjustmentDialog
@@ -138,7 +122,6 @@ export const Adjustment: Story = {
   ),
 };
 
-/** @summary Close a Miner's account: final late notice and what is written off. */
 export const CloseAccount: Story = {
   render: () => (
     <CloseAccountDialog
@@ -149,18 +132,14 @@ export const CloseAccount: Story = {
     />
   ),
 };
-/** @summary Close account, phone. */
 export const CloseAccountPhone: Story = { ...CloseAccount, ...phone };
 
-/** @summary Link a moon survey to an extraction (moon page). */
 export const LinkSurvey: Story = {
   render: () => <LinkSurveyDialog open onClose={noop} extractionId={MOON_ID} />,
 };
 
-/** @summary Delete the book (from Settings). */
 export const DeleteBook: Story = { render: () => <DeleteBookDialog onClose={noop} /> };
 
-/** @summary Setup: a Director turns the book on (the "Run my own book" choice). */
 export const TurnOn: Story = {
   render: () => (
     <div className="mx-auto max-w-page p-4">
@@ -174,5 +153,4 @@ export const TurnOn: Story = {
     </div>
   ),
 };
-/** @summary Setup turn-on, phone. */
 export const TurnOnPhone: Story = { ...TurnOn, ...phone };

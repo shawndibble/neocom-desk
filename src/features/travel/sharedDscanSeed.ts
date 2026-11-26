@@ -1,10 +1,3 @@
-/**
- * "Open Neocom Desk" from a **Shared D-Scan**: the live Pilot Lookup with the
- * scan already pasted in. Same shape as the Shared Appraisal's seed
- * (`features/market/sharedAppraisalSeed.ts`): the share travels as
- * `?share=<id>` and is re-read on arrival, so it survives the login a visitor
- * with no Character goes through first.
- */
 import { useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { parseDscanSnapshot } from '@/engine/pilotList/dscanSnapshot';
@@ -16,12 +9,6 @@ export function sharedDscanOpenInApp(shareId: string): OpenInApp {
   return { path: `/travel/pilot?${new URLSearchParams({ [SHARE_PARAM]: shareId }).toString()}` };
 }
 
-/**
- * Reads `?share=` once, strips it from the URL (a reload must not re-paste
- * over what the pilot has since done), and hands the stored scan text to
- * `onSeed`. A dead or unreadable share seeds nothing — the share page itself
- * is where that gets explained.
- */
 export function useSharedDscanSeed(onSeed: (text: string) => void): void {
   const [searchParams, setSearchParams] = useSearchParams();
   const shareId = searchParams.get(SHARE_PARAM);

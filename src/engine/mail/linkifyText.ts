@@ -3,7 +3,6 @@ export type LinkifiedPart = { kind: 'text'; text: string } | { kind: 'link'; hre
 const URL_PATTERN = /https?:\/\/[^\s<>"]+/gi;
 const TRAILING = /[.,;:!?)\]}'"]+$/;
 
-/** Split plain text into prose and http(s) links. Other schemes stay text. */
 export function linkifyText(text: string): LinkifiedPart[] {
   const parts: LinkifiedPart[] = [];
   let last = 0;

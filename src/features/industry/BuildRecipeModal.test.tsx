@@ -97,7 +97,6 @@ describe('BuildRecipeModal', () => {
     expect(screen.getByText(/How to build Mechanical Parts/)).toBeInTheDocument();
     expect(screen.getByText('Tritanium')).toBeInTheDocument();
     expect(screen.getByText('Pyerite')).toBeInTheDocument();
-    // The built input gets its own "Build it" link into that material's recipe.
     expect(screen.getByRole('button', { name: 'Build it' })).toBeInTheDocument();
   });
 

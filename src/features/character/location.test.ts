@@ -45,11 +45,9 @@ describe('loadCharacterSolarSystemId', () => {
     try {
       expect(await loadCharacterSolarSystemId(CHARACTER_ID)).toBe(30000142);
 
-      // Same page load asking again: inside the 5 s TTL, no second call.
       expect(await loadCharacterSolarSystemId(CHARACTER_ID)).toBe(30000142);
       expect(calls).toBe(1);
 
-      // The pilot flew on; opening another page 30 s later must see it.
       systemId = 30002187;
       vi.setSystemTime(Date.now() + 30_000);
       expect(await loadCharacterSolarSystemId(CHARACTER_ID)).toBe(30002187);

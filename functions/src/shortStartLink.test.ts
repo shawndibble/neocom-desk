@@ -60,10 +60,6 @@ describe('shortIdFor', () => {
   });
 });
 
-/**
- * A store that keeps links in memory, honouring the real one's rules: the same link renews
- * (free), a different live link holds its id, and a caller's new links are limited.
- */
 function memoryStore() {
   const rows = new Map<string, { search: string; expiresAt: number }>();
   const callers = new Map<string, CallerState>();

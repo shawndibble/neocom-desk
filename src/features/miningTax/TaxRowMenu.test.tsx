@@ -63,8 +63,6 @@ describe('TaxRowMenu', () => {
     expect(onAction).toHaveBeenCalledWith({ id: 'join' }, outstanding);
   });
 
-  // The label keys live in a record, which the `t('a.b')` guard in i18n cannot see: an item
-  // whose key is missing renders the raw key instead of a word (miningTax.corpBook.payAction).
   it('labels every corp book action with a translated word, not a key', async () => {
     const corp = {
       kind: 'row',

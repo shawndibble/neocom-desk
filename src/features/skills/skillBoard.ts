@@ -1,9 +1,3 @@
-/**
- * The Skills › Trained board: every skill in the SDE, grouped, with the
- * character's trained level, queued level and whether its book is missing.
- * Pure — the route hands in the catalog, the corrected trained levels and the
- * queue; nothing here reads a clock or storage.
- */
 import type { SkillType } from '@/sde/types';
 import { stripEveMarkup } from './typeDisplay';
 import type { SkillGroup } from './skillsCsv';
@@ -12,36 +6,25 @@ export interface BoardSkill {
   skillTypeID: number;
   name: string;
   rank: number;
-  /** 0 when untrained or not injected. */
   level: number;
-  /** Null when not injected, or when ESI withheld it. */
   sp: number | null;
-  /** In the character's ESI skills at all. False means the skill book is still needed. */
   injected: boolean;
-  /** The highest level waiting in the queue, only when above `level`. */
   queuedLevel: number | null;
-  /** Markup-stripped description, for the row's tooltip. */
   description: string | null;
 }
 
 export interface BoardGroup {
   groupName: string;
-  /** Skills in the group, trained or not. */
   total: number;
-  /** Skills at level 1 or higher. */
   trained: number;
-  /** Skills with a higher level waiting in the queue. */
   queued: number;
   skills: BoardSkill[];
 }
 
 export interface BuildSkillBoardInput {
   catalog: readonly SkillType[];
-  /** Corrected trained levels (ESI plus finished queue entries), keyed by skill. */
   trained: ReadonlyMap<number, { level: number; sp: number | null }>;
-  /** `queuedLevelsBySkill`'s output. */
   queuedLevels: ReadonlyMap<number, number>;
-  /** Group for trained skills the SDE does not know. */
   unknownGroupName: string;
 }
 
@@ -100,11 +83,6 @@ export function buildSkillBoard({
   return groups.sort((a, b) => a.groupName.localeCompare(b.groupName));
 }
 
-/**
- * Every skill the board lists in the CSV's `SkillGroup` shape, trained or not:
- * the board shows the whole catalog, so the file does too, with `injected`
- * telling an owned skill from a book still to buy.
- */
 export function boardCsvGroups(
   groups: readonly BoardGroup[],
   plannedLevels: ReadonlyMap<number, number> = new Map()

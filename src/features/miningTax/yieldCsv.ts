@@ -5,21 +5,9 @@ import { joined } from '@/lib/exportSheets';
 import { oreLinesText, sumUnits } from './oreBreakdown';
 import { sumVolume, volumeDisplayMode, type VolumeSum } from './volume';
 
-/**
- * Export columns for the Mining Yield Overview table and the two tables in
- * its day detail modal. Every data column the table can offer, not just the
- * ColumnPicker's selection (the Market order book's precedent) — minus
- * Overview's `total`, which is the same figure as Raw sell value.
- *
- * A value the table shows as "—" (an unpriced line, a volume nothing in the
- * row had a known unit volume for) exports blank, never 0: a blank lets a
- * spreadsheet SUM() skip it, a zero would claim it was measured.
- */
-
 export interface YieldOverviewCsvContext {
   showRefining: boolean;
   systemNames: ReadonlyMap<number, string>;
-  /** A system's security status; absent where it could not be read. */
   systemSecurity: ReadonlyMap<number, number>;
   typeNames: ReadonlyMap<number, string>;
   typeVolumes: ReadonlyMap<number, number>;
@@ -33,7 +21,6 @@ export function yieldOverviewCsvColumns(
   t: CsvTranslate,
   { showRefining, systemNames, systemSecurity, typeNames, typeVolumes }: YieldOverviewCsvContext
 ): CsvColumn<MiningYieldRow>[] {
-  // Volume and "volume unknown for" read the same sum; one per row.
   const volumes = new WeakMap<MiningYieldRow, VolumeSum>();
   const volumeOf = (row: MiningYieldRow): VolumeSum => {
     let volume = volumes.get(row);
@@ -63,7 +50,6 @@ export function yieldOverviewCsvColumns(
       value: (row) => systemSecurity.get(row.entry.solarSystemId) ?? null,
     },
     {
-      // Only the ores whose size is known add up: with any unknown this is a floor, and the next column names them.
       header: t('miningTax.overview.volumeColumn'),
       value: (row) => {
         const volume = volumeOf(row);
@@ -80,7 +66,6 @@ export function yieldOverviewCsvColumns(
       },
     },
     {
-      // Nothing priced is blank, never a 0 that reads as worthless.
       header: t('miningTax.overview.rawSellValue'),
       value: (row) => (nothingPriced(row.valuation) ? null : row.valuation.rawValue),
     },
@@ -89,7 +74,6 @@ export function yieldOverviewCsvColumns(
       value: (row) => (nothingPriced(row.valuation) ? null : row.valuation.refineValue),
     },
     {
-      // With some ores unpriced the values are floors; this names them so a floor never reads as exact.
       header: t('miningTax.csvUnpricedOres'),
       value: (row) => {
         const unpriced = row.valuation.lines.filter((line) => line.rawValue === 0);
@@ -99,7 +83,6 @@ export function yieldOverviewCsvColumns(
       },
     },
     {
-      // Every ore with its units — the table's two-name summary drops the rest.
       header: t('miningTax.overview.oreBreakdownColumn'),
       value: (row) => oreLinesText(row.entry.oreLines, (id) => typeLabel(typeNames, id)),
     },
@@ -111,12 +94,10 @@ export function yieldOverviewCsvColumns(
   return columns.filter((c): c is CsvColumn<MiningYieldRow> => c !== false);
 }
 
-/** False for a type that cannot be refined at all, where "left over" would claim a refine that never existed. */
 function hasReprocessing(line: OreLineValuation): boolean {
   return line.batches > 0 || line.unitsLeftOver > 0 || line.refineOutputs.length > 0;
 }
 
-/** The detail modal's "Ore mined" table. */
 export function yieldOreCsvColumns(
   t: CsvTranslate,
   typeNames: ReadonlyMap<number, string>,
@@ -150,7 +131,6 @@ export function yieldOreCsvColumns(
       value: (line) => (hasReprocessing(line) ? line.batches : null),
     },
     {
-      // Units short of a whole batch refine into nothing; blank where the type has no reprocessing data at all.
       header: t('miningTax.overview.detail.leftOverColumn'),
       value: (line) => (hasReprocessing(line) ? line.unitsLeftOver : null),
     }
@@ -158,15 +138,12 @@ export function yieldOreCsvColumns(
   return columns;
 }
 
-/** One material the day refines into — the detail modal's "Refines into" row. */
 export interface YieldRefinedRow {
   typeId: number;
   quantity: number;
-  /** Null when the material had no price — never a zero standing in for "free". */
   value: number | null;
 }
 
-/** The detail modal's "Refines into" table. */
 export function yieldRefinesCsvColumns(
   t: CsvTranslate,
   typeNames: ReadonlyMap<number, string>

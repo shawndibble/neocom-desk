@@ -5,14 +5,6 @@ import type { StickyHeaderState } from './useStickyTableHeader';
 
 type HeaderProps<T> = Omit<ComponentProps<typeof DataTableHeader<T>>, 'floating'>;
 
-/**
- * The copy of a table-mode table's header pinned over the top of the screen
- * while its rows scroll under it on a phone (`useStickyTableHeader` says
- * where). Presentational: the real header stays the one assistive tech reads,
- * so this is `aria-hidden` with its controls out of the tab order; a tap on
- * a sort button still sorts. Its own box scrolls sideways in step with the
- * real wrapper, which keeps the pinned column pinned.
- */
 export function DataTableStickyHeader<T>({
   state,
   ...header

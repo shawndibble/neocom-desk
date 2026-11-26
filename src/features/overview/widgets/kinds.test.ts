@@ -102,7 +102,6 @@ describe('widget kind catalogue', () => {
   });
 
   it('gates every available corp kind on a capability, and only corp kinds', () => {
-    // Corp kills reads zKillboard, not corp ESI: no role or scope can gate it.
     const UNGATED = new Set(['corpKills']);
     for (const k of boardKinds('corp')) {
       if (k.availability === 'available' && !UNGATED.has(k.id)) {
@@ -191,11 +190,8 @@ describe('widget kind catalogue', () => {
     const v = (id: string) => getKind(id)!.views;
     expect(v('sp')).toEqual(['number', 'table']);
     expect(v('priceWatch')).toEqual(['number', 'table']);
-    // No per-payee breakdown exists, so there is nothing honest to chart.
     expect(v('miningTax')).toEqual(['number', 'table']);
     expect(v('wallet')).toEqual(['number', 'chart', 'table']);
-    // zKillboard sends all-time totals only: no series to chart, no range to pick. The table
-    // is one row per corporation.
     expect(v('corpKills')).toEqual(['number', 'table']);
     expect(v('netWorth')).toEqual(['number', 'chart', 'table']);
   });
@@ -203,7 +199,6 @@ describe('widget kind catalogue', () => {
   it('opens each kind in a view it offers, per the defaults matrix', () => {
     for (const k of WIDGET_KINDS) expect(k.views, k.id).toContain(k.defaultView);
     const view = (id: string) => getKind(id)!.defaultView;
-    // Not everything is a Number: some answer best as a chart, some as a table.
     for (const id of ['training', 'sp', 'location', 'miningTax'])
       expect(view(id), id).toBe('number');
     for (const id of ['wallet', 'netWorth', 'lp', 'profit', 'miningYield', 'routeSafety']) {
@@ -285,7 +280,6 @@ describe('widget kind catalogue', () => {
 
   it('applies the range only to a Show that reads a window', () => {
     const corp = getKind('corpWallet')!;
-    // Divisions are balances now: no window, as before the merge.
     expect(rangeAppliesTo(corp, undefined)).toBe(false);
     expect(rangeAppliesTo(corp, 'divisions')).toBe(false);
     expect(rangeAppliesTo(corp, 'flow')).toBe(true);
@@ -306,7 +300,6 @@ describe('widget kind catalogue', () => {
       emptyMessageKey: 'overview.widgets.corpWallet.shows.sources.empty',
     });
     expect(widgetKeys(getKind('wallet')!, 'nope').titleKey).toBe('overview.widgets.wallet.title');
-    // Structures keeps its own name on Problems only.
     expect(widgetKeys(getKind('structures')!, 'problems').titleKey).toBe(
       'overview.widgets.structures.title'
     );

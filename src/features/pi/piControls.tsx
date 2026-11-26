@@ -1,15 +1,3 @@
-/**
- * Controls the Advisor's "How you play" column and the Goal Planner's rail
- * share, so the two tabs ask the same questions the same way.
- *
- * - `Assume`: a label and its control on one line.
- * - `CadenceRow`: one of the two cadence habits, as a select of offered days.
- * - `PercentInput`: a percentage box that holds what is typed. Rendering the
- *   parsed value straight back made decimals unreachable ("12." parses to 12
- *   and React restores "12"). `commitOn="change"` writes every valid
- *   keystroke (the Advisor's behaviour); `"blur"` writes on blur or Enter
- *   only, so a half-typed figure never reprices the page mid-typing.
- */
 import { useId, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -25,7 +13,6 @@ import type { ControlSize } from '@/components/ui';
 import { PI_CADENCE_DAYS, type PiCadenceDays } from './cadencePref';
 import { parseDecimal } from './goalPlannerFormat';
 
-/** A label and its control, on one line. */
 export function Assume({ label, children }: { label: ReactNode; children: ReactNode }) {
   return (
     <div className="flex items-center justify-between gap-2">
@@ -35,11 +22,6 @@ export function Assume({ label, children }: { label: ReactNode; children: ReactN
   );
 }
 
-/**
- * One cadence, as a sentence with a hole in it. Two controls, not one:
- * restarting an extractor does not empty the Launchpad, and hauling does not
- * reinstall a program — see `cadencePref.ts`.
- */
 export function CadenceRow({
   label,
   hint,
@@ -89,14 +71,12 @@ export function CadenceRow({
   );
 }
 
-/** A typed rate in [0, 100] (comma or dot decimals), or null. */
 function parsePercent(text: string): number | null {
   const value = parseDecimal(text);
   return value !== null && value <= 100 ? value : null;
 }
 
 export interface PercentInputProps {
-  /** The rate in force, as a percentage; null shows the box empty (with `placeholder`). */
   value: number | null;
   onCommit: (percent: number) => void;
   commitOn: 'change' | 'blur';
@@ -126,7 +106,6 @@ export function PercentInput({
   const errorId = useId();
   const shown = text ?? (value === null ? '' : String(value));
 
-  /** Checks the text, says so when it is not a rate, and commits one that is. */
   const settle = (raw: string, commit: boolean) => {
     if (raw.trim() === '') {
       setInvalid(false);
@@ -158,14 +137,10 @@ export function PercentInput({
         value={shown}
         onChange={(event) => {
           setText(event.target.value);
-          // Every keystroke is checked, so "150" says it is out of range
-          // instead of quietly leaving "15" stored; only `change` commits here.
           settle(event.target.value, commitOn === 'change');
         }}
         onBlur={(event) => {
           if (commitOn === 'blur') settle(event.target.value, true);
-          // The typed text is gone, so an error about it would describe a
-          // value the box no longer shows.
           setText(null);
           setInvalid(false);
         }}

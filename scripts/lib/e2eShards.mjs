@@ -1,14 +1,3 @@
-/**
- * Splits e2e spec files into shards of roughly equal run time.
- *
- * Playwright's own `--shard` cuts the sorted test list into contiguous runs,
- * so every test of a big parametrized sweep (`coreOnlyCharacterSweep` is ~100
- * tests) lands in one shard and that shard sets the job's wall time. This
- * deals whole files out by measured weight instead: heaviest first, each to
- * the lightest shard so far (longest-processing-time-first).
- */
-
-/** The weight of a file with no measurement: the median, so a new spec is neither free nor huge. */
 function medianWeight(weights) {
   const values = Object.values(weights).sort((a, b) => a - b);
   if (values.length === 0) return 1;
@@ -16,22 +5,11 @@ function medianWeight(weights) {
   return values.length % 2 ? values[mid] : (values[mid - 1] + values[mid]) / 2;
 }
 
-/**
- * Total weight of `files`, a file with no measurement counting as the median.
- * @param {string[]} files
- * @param {Record<string, number>} weights
- */
 export function totalWeight(files, weights) {
   const fallback = medianWeight(weights);
   return files.reduce((sum, file) => sum + (weights[file] ?? fallback), 0);
 }
 
-/**
- * @param {string[]} files   every spec file, e.g. `e2e/foo.spec.ts`
- * @param {Record<string, number>} weights  seconds of worker time per file
- * @param {number} shardCount
- * @returns {string[][]} one sorted file list per shard, index 0 = shard 1
- */
 export function partitionByWeight(files, weights, shardCount) {
   const fallback = medianWeight(weights);
   const weighted = files
@@ -48,14 +26,6 @@ export function partitionByWeight(files, weights, shardCount) {
   return shards.map((shard) => shard.files.sort());
 }
 
-/**
- * Sums per-file seconds out of a Playwright list-reporter log. Lines look like
- *   `  ✓    1 [chromium] › e2e/foo.spec.ts:10:3 › title (3.6s)`
- * with `ms`, `s` or `m` units, and a trailing `(retry #1)` on a retried
- * attempt (counted: it is real worker time).
- * @param {string} log
- * @returns {Record<string, number>} whole seconds per file, sorted by name
- */
 export function parseListReporterLog(log) {
   const text = log.replace(/\x1b\[[0-9;]*m/g, '').replace(/\r/g, '');
   const unit = { ms: 0.001, s: 1, m: 60 };

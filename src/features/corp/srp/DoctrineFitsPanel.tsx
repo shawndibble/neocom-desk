@@ -1,10 +1,3 @@
-/**
- * The Director's Doctrine Fits: a list of the corp's own copies, with Add from my Fittings and
- * Paste EFT. Each row carries one action, Delete, so there is no ⋮ (§6c). Adds and deletes
- * are their own writes, apart from the settings form's Save (a Hull Rule names a fit by the id its
- * add returns, so a fit cannot wait for Save); each says so with a toast.
- * Which hull checks which fit is set in Hull Rules.
- */
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -33,7 +26,6 @@ interface Props {
   onAdd: (input: SaveDoctrineInput) => Promise<void>;
   onRemove: (id: string) => Promise<void>;
   onRetry: () => void;
-  /** A new fit's hull gets its Hull Rules row, so attaching it is one tick away. */
   onAdded: (hullTypeId: number) => void;
 }
 
@@ -47,7 +39,6 @@ export function DoctrineFitsPanel({
 }: Props) {
   const { t } = useTranslation();
   const [adding, setAdding] = useState<DoctrineSource | null>(null);
-  // A deleted fit stays hidden until its Undo toast ends and the write lands.
   const pendingDeletes = useDeferredCommits();
   const [toast, setToast] = useState<string | null>(null);
   const triggerRef = useRef<HTMLElement | null>(null);
@@ -93,7 +84,6 @@ export function DoctrineFitsPanel({
       className: 'text-text-dim',
       render: (f) => {
         const c = coverages.get(f.id);
-        // Loading or an unread book shows nothing: never a zero that was not measured.
         if (!c) return coverage.loading ? t('common.loading') : null;
         const name = typeName(c.shortOn);
         const args = {

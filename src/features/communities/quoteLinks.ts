@@ -1,11 +1,3 @@
-/**
- * Links a held buyback Quote to the seller's contracts (issue #4780). Reads the
- * seller's own contracts to the buyer Character since the quote, reads their
- * items (cached for good), runs the pure matcher in
- * `engine/communities/buybackContracts.ts`, and saves the ids and statuses on
- * the quote when they changed. Only ids and statuses reach Firestore: never a
- * price, the issuer or the items.
- */
 import type { Contract } from '@/esi/endpoints';
 import type { HeldQuote, QuoteLinkRef } from '@/engine/communities/buyback';
 import {
@@ -20,7 +12,6 @@ import { loadContracts } from '@/features/character/contracts';
 import { characterIdForUid } from '@/sync/uid';
 import { saveQuoteLinks } from './requestStore';
 
-/** Item reads one run may make; the rest wait for the next run (a read item list is cached for good). */
 const MAX_ITEM_READS = 20;
 
 export type QuoteLinkStatus = 'ok' | 'needs-scope' | 'read-failed';
@@ -28,11 +19,9 @@ export type QuoteLinkStatus = 'ok' | 'needs-scope' | 'read-failed';
 export interface QuoteLinksResult {
   status: QuoteLinkStatus;
   links: QuoteLink[];
-  /** The seller's own contracts by id, for opening the detail modal. */
   contracts: ReadonlyMap<number, Contract>;
 }
 
-/** The Character the contracts go to: the named buyer, else the requester. Null when neither is a Character. */
 export const buyerOf = (request: CommunityRequest): number | null =>
   request.standing?.buyerCharacterId ?? characterIdForUid(request.ownerUid);
 
@@ -64,7 +53,6 @@ export async function syncQuoteLinks({
   if (read?.needsReauth) return none('needs-scope');
   if (!read?.cached) return none('read-failed');
 
-  // Only this seller's own item exchanges to the buyer, made since the quote, have items worth reading.
   const candidates = read.cached.data.filter(
     (c) =>
       c.issuer_id === characterId &&
@@ -104,7 +92,6 @@ export async function syncQuoteLinks({
         .map((item) => ({ typeId: item.type_id, quantity: item.quantity })),
     });
   }
-  // Something unread may be a link: keep what is stored rather than overwrite it with less.
   if (degraded && facts.length === 0 && candidates.length > 0) return none('read-failed');
 
   const links = linkQuoteContracts(quote, characterId, buyerId, facts, now);

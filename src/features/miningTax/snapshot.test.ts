@@ -82,7 +82,6 @@ describe('loadMoonMiningTaxSnapshot', () => {
     await db.esiCache.put({
       characterId: CHAR_A,
       key: LEDGER_KEY,
-      // ESI now reports more than the assignment's own snapshot.
       value: [{ date: '2026-09-04', quantity: 150, solar_system_id: 1, type_id: MOON_ORE }],
       fetchedAt: 1,
     });
@@ -102,10 +101,6 @@ describe('loadMoonMiningTaxSnapshot', () => {
 
     const snapshot = await loadMoonMiningTaxSnapshot();
 
-    // The whole typeId stays claimed by the reviewing Assignment (presence-
-    // based coverage, rowStatus.ts) — the growth shows up as `needs-review`,
-    // never as a second, separately-assignable "unassigned" residual for the
-    // same ore.
     const [row] = snapshot.rows;
     expect(row.assignments[0].status).toBe('needs-review');
     expect(row.unassignedOreLines).toEqual([]);
@@ -123,7 +118,6 @@ describe('loadMoonMiningTaxSnapshot', () => {
       value: [{ date: '2026-09-04', quantity: 100, solar_system_id: 1, type_id: MOON_ORE }],
       fetchedAt: 1,
     });
-    // CHAR_B has no cached ledger row at all — no entries, but still tracked.
 
     const snapshot = await loadMoonMiningTaxSnapshot();
 

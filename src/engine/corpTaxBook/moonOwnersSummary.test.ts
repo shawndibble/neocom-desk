@@ -1,8 +1,3 @@
-// The Moon owners tab reads each moon owner's server-built view summary instead of every ledger
-// row it recorded (issue #5717, ADR 0032). The summary is assembled here from the functions
-// mirror of the engine (`buildFeederView` sits in a module that needs the functions runtime, which
-// the root install lacks) the way the server does, and the row it gives must equal the row the
-// entries give. A summary behind its record is never used.
 import { describe, expect, it } from 'vitest';
 import * as server from '../../../functions/src/corpTaxBookEngine';
 import {
@@ -64,12 +59,11 @@ const payout = (id: string, date: string, amount: number): MoonOwnerPayout => ({
 const ENTRIES = [
   entry(A, '2026-10-05', 1000),
   entry(A, '2026-10-06', 400, 11),
-  entry(A, '2026-09-20', 900), // before coverage: mined, never owed
+  entry(A, '2026-09-20', 900),
   entry(B, '2026-10-05', 250, 20),
 ];
 const PRICE = 123.45;
 
-/** The summary the server writes for `f`, from the same rows, prices and payouts. */
 function serverSummary(
   f: MoonOwnerFeeder,
   entries: readonly ObservedMiningEntry[]
@@ -148,7 +142,6 @@ const withSummaries = (i: MoonOwnersInput, entries = i.entries): MoonOwnersInput
   summaries: new Map(i.feeders.map((f) => [f.corporationId, serverSummary(f, entries)])),
 });
 
-/** The tab built from summaries, with no entry at all. */
 const fromSummaries = (i: MoonOwnersInput) => buildMoonOwners({ ...withSummaries(i), entries: [] });
 
 const FEEDERS: Record<string, MoonOwnerFeeder[]> = {
@@ -226,9 +219,7 @@ describe('the Moon owners tab from summaries', () => {
     ] as TaxRate[]) {
       const rates: TaxRate[] = [{ scope: 'corp', pct: 12, effectiveFrom: '2026-01-01' }, extra];
       const i = input([feeder(A)], { rates });
-      // Entries held: the same rate as the entry path. Everything else still from the summary.
       expect(buildMoonOwners(withSummaries(i)).rows).toEqual(buildMoonOwners(i).rows);
-      // No entries held: no rate is invented.
       const bare = fromSummaries(i).rows[0]!;
       expect(bare.minerRatePct).toBeUndefined();
       expect({ ...bare, minerRatePct: undefined }).toEqual({
@@ -253,7 +244,6 @@ describe('summaryFor', () => {
     const s = serverSummary(i.feeders[0]!, ENTRIES);
     const old = { ...i, summaries: new Map([[A, { ...s, schemaVersion: 2 as never }]]) };
     expect(summaryFor(old, i.feeders[0]!)).toBeUndefined();
-    // Built before #6209's accrual rules: its figures cannot stand.
     const before = { ...i, summaries: new Map([[A, { ...s, rulesVersion: undefined }]]) };
     expect(summaryFor(before, i.feeders[0]!)).toBeUndefined();
   });
@@ -293,7 +283,6 @@ describe('summaryFor', () => {
     const moved = feeder(A, { payouts: [payout('p1', '2026-10-10', 500)], ...over });
     const stale = { ...i, feeders: [moved], summaries: new Map([[A, s]]) };
     expect(summaryFor(stale, moved)).toBeUndefined();
-    // And the row is the entries' row, not the summary's.
     expect(buildMoonOwners(stale).rows).toEqual(
       buildMoonOwners({ ...stale, summaries: undefined }).rows
     );
@@ -332,7 +321,6 @@ describe('moonOwnersNeedRows (#5717)', () => {
       const same =
         JSON.stringify(buildMoonOwners({ ...i, entries: [] }).rows) ===
         JSON.stringify(buildMoonOwners(i).rows);
-      // A tab that renders the same with no rows must not ask for them; one that differs must.
       if (!same) expect(moonOwnersNeedRows(bare(i))).toBe(true);
     }
   );
@@ -362,7 +350,6 @@ describe('moonOwnersNeedRows (#5717)', () => {
 });
 
 describe('refineries seen, from a summary (#6097)', () => {
-  // A's ledger rows are at refineries 10 and 11.
   const i = withSummaries(input([feeder(A)]));
   const rowWith = (summary: Partial<MoonOwnerSummary>, extraction: number[]) =>
     buildMoonOwners({

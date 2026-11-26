@@ -17,11 +17,6 @@ import { formatCount } from '@/lib/formatCount';
 import { useOreNames } from './useOreNames';
 import { isk, shortDate } from './noticeFormat';
 
-/**
- * The days a Miner still owes, oldest first, one line each: the day, its refinery, what is left
- * of it (with the day's whole tax when part is paid). A day whose ore the notice lists opens
- * to it; a day mined since has no lines to show and is a plain line.
- */
 export function OwedDayList({
   days,
   notice,
@@ -84,7 +79,6 @@ export function OwedDayList({
   );
 }
 
-/** One day's ore, each with its price, and its tax. */
 function DayOre({
   rows,
   oreNames,

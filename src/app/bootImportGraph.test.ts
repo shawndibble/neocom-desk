@@ -1,22 +1,5 @@
 import { describe, it, expect } from 'vitest';
 
-/**
- * Firebase must stay out of the startup bundle (see the boundary note in
- * `src/sync/index.ts`): every path from `src/main.tsx` to a module that
- * imports `firebase/*` or `@/sync/firebaseApp` has to cross a dynamic
- * `import()`, so Vite splits it into an async chunk. A single static import
- * anywhere along the way drags the whole SDK into the entry chunk — it has
- * leaked back that way before (analytics, web push, the projection upload).
- *
- * The signed-in shell (`Layout`, `Overview`) is the other boundary: it is
- * its own chunk so a first visit to /login does not download it, and a
- * returning user's boot preloads it (`bootShellPreload.ts`). Any static
- * import of either from the entry's graph would fold it back in.
- *
- * This walks the *static* import graph from the entry. Type-only imports are
- * erased by the compiler and dynamic `import()` is the escape hatch, so both
- * are ignored.
- */
 const sources = import.meta.glob<string>(
   ['/src/**/*.{ts,tsx}', '!/src/**/*.test.{ts,tsx}', '!/src/**/*.d.ts', '!/src/test/**'],
   { query: '?raw', import: 'default', eager: true }
@@ -24,28 +7,19 @@ const sources = import.meta.glob<string>(
 
 const ENTRY = '/src/main.tsx';
 
-/** Split from the entry, but fetched at boot by every returning user. */
 const SIGNED_IN_SHELL = ['/src/app/Layout.tsx', '/src/routes/Overview.tsx'];
 
-/**
- * Drops whole-line `//` comments only. Block comments are deliberately left
- * in: stripping them needs a string-aware scan (`accept="image/*"` followed by
- * any later comment close would erase every import in between — a silent
- * false negative), whereas leaving them costs at most a false positive, and a
- * JSDoc line starts with `*`, which the line-anchored patterns never match.
- */
 function stripLineComments(source: string): string {
   return source.replace(/^\s*\/\/.*$/gm, '');
 }
 
-/** Static, value-level specifiers: `import x from`, `export … from`, `import 'x'`. */
 function staticSpecifiers(source: string): string[] {
   const code = stripLineComments(source);
   const out: string[] = [];
   const fromClause =
     /(?:^|[\n;])\s*(import|export)\s+(type\s+)?([^;'"]*?)\s*from\s*['"]([^'"]+)['"]/g;
   for (const match of code.matchAll(fromClause)) {
-    if (match[2]) continue; // `import type` / `export type`
+    if (match[2]) continue;
     out.push(match[4]);
   }
   const bare = /(?:^|[\n;])\s*import\s*['"]([^'"]+)['"]/g;
@@ -63,7 +37,7 @@ function resolve(from: string, specifier: string): string | undefined {
       else if (segment !== '.') parts.push(segment);
     }
     base = parts.join('/');
-  } else return undefined; // bare package: a leaf, checked by the caller
+  } else return undefined;
   base = base.replace(/\?.*$/, '');
   for (const candidate of [
     base,
@@ -74,7 +48,7 @@ function resolve(from: string, specifier: string): string | undefined {
   ]) {
     if (candidate in sources) return candidate;
   }
-  return undefined; // css, json, svg, …
+  return undefined;
 }
 
 const isFirebaseSpecifier = (specifier: string) =>
@@ -83,9 +57,7 @@ const isFirebaseSpecifier = (specifier: string) =>
   specifier.startsWith('@firebase/');
 
 interface StaticGraph {
-  /** Each reached module's importer, for printing the chain that reached it. */
   parent: Map<string, string | null>;
-  /** Every Firebase specifier reached, with the chain from the entry. */
   firebaseLeaks: string[];
 }
 
@@ -116,9 +88,7 @@ function chainTo(parent: Map<string, string | null>, file: string): string {
   return chain.join(' -> ');
 }
 
-/** What the entry chunk holds: everything a first-time /login visit loads. */
 const graph = walkFrom([ENTRY]);
-/** Plus the shell a returning user's boot fetches right behind it. */
 const bootGraph = walkFrom([ENTRY, ...SIGNED_IN_SHELL]);
 
 describe('startup import graph', () => {
@@ -136,8 +106,6 @@ describe('startup import graph', () => {
           `const lazy = () => import('./lazy');`,
           `// import { gone } from './comment';`,
           ` * import { gone } from './jsdoc';`,
-          // A glob inside a string must not open a "comment" that swallows
-          // the imports after it.
           `const input = '<input accept="image/*">';`,
           `import { j } from './j';`,
           `/** a later comment */`,
@@ -152,8 +120,6 @@ describe('startup import graph', () => {
     expect(resolve(ENTRY, './app/App')).toBe('/src/app/App.tsx');
     expect(graph.parent.has('/src/routes/Login.tsx')).toBe(true);
     expect(graph.parent.has('/src/app/RequireCharacter.tsx')).toBe(true);
-    // The shell walk has to reach real code too, or the checks below that
-    // run over it would pass on an empty graph.
     expect(bootGraph.parent.has('/src/features/notifications/projectionUpload.ts')).toBe(true);
   });
 
@@ -165,9 +131,6 @@ describe('startup import graph', () => {
   });
 
   it('keeps the boot shell preload light: nothing it imports pulls in more code', () => {
-    // It runs second in the entry, ahead of App, precisely so the fetch starts
-    // early; a runtime import here would put that module's evaluation (and,
-    // for a package, its weight) in front of the preload.
     const preload = '/src/app/bootShellPreload.ts';
     const reached = new Set<string>([preload]);
     const bare: string[] = [];
@@ -189,10 +152,7 @@ describe('startup import graph', () => {
       '/src/app/routeChunks.ts',
       '/src/app/routerPath.ts',
       '/src/app/signedInShellHint.ts',
-      // Import-free state `routeChunks` reads (a cancelled import waits for a
-      // running stale-build recovery); the recovery code itself stays out.
       '/src/app/staleBuildState.ts',
-      // Import-free guarded localStorage access `signedInShellHint` reads through.
       '/src/lib/safeLocalStorage.ts',
     ]);
   });
@@ -215,9 +175,6 @@ describe('Share Link import graph', () => {
   });
 
   it("loads each share type's screen on demand, not with the route", () => {
-    // A survey link must not download the appraisal, D-scan and fitting
-    // screens (the fitting one drags in the dogma engine and the abyssal
-    // weather picker). Each type crosses a dynamic import().
     const reached = [
       '/src/routes/FittingShared.tsx',
       '/src/features/fittings/AbyssalWeatherPicker.tsx',

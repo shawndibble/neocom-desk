@@ -1,9 +1,3 @@
-/**
- * Moon names for the Corp Tax Book (issue #4194): `GET /universe/moons/{id}`
- * is public and a moon's name never changes, so each is read once through the
- * same static-entity cache as stations and systems, and one that ESI cannot
- * name is left out (the caller prints a fallback) rather than failing the page.
- */
 import { loadStaticEntity } from '@/esi/cache';
 import { getUniverseMoon } from '@/esi/endpoints';
 

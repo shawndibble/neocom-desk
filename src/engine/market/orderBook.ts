@@ -1,10 +1,4 @@
 import { DAY_MS } from '@/lib/age';
-/**
- * Order-book reduction (ADR 0003): splitting a region's raw order list into
- * sell/buy, and resolving each order's location to a display-ready station
- * name or "unknown structure" fact. Pure — callers adapt ESI/SDE shapes at
- * the boundary and translate `stationName === null` into copy themselves.
- */
 
 export interface RawOrder {
   is_buy_order: boolean;
@@ -15,7 +9,6 @@ export interface OrderBook<T extends RawOrder> {
   buy: T[];
 }
 
-/** Splits a region order book into sell/buy, preserving each side's relative order. */
 export function splitOrderBook<T extends RawOrder>(orders: readonly T[]): OrderBook<T> {
   const sell: T[] = [];
   const buy: T[] = [];
@@ -34,18 +27,11 @@ export interface SolarSystemLookup {
 }
 
 export interface ResolvedOrderLocation {
-  /** Null when location_id is not a known NPC station — a player structure, never dropped. */
   stationName: string | null;
   systemName: string;
   security: number;
 }
 
-/**
- * Resolves an order's location_id against the snapshot's NPC station map. An
- * unresolved location_id is a player structure — its name needs a scope this
- * app does not take (ADR 0003), so the system/security still resolve from
- * the order's own system_id.
- */
 export function resolveOrderLocation(
   order: { location_id: number; system_id: number },
   npcStations: ReadonlyMap<number, NpcStationLookup>,
@@ -61,13 +47,6 @@ export function resolveOrderLocation(
   };
 }
 
-/**
- * Narrows an order book to one location_id: Trade Hub mode's own-station
- * filter (GLOSSARY.md: "filters the rows down to the hub's own station") and
- * the order-row "filter to this station" context-menu action share this
- * function. `null` passes every order through, for the context-menu action's
- * undo.
- */
 export function filterOrdersByLocation<T extends { location_id: number }>(
   orders: readonly T[],
   locationId: number | null
@@ -77,16 +56,9 @@ export function filterOrdersByLocation<T extends { location_id: number }>(
 }
 
 export interface OrderBookSummary {
-  /** Cheapest sell order's price; null when the side has no orders. */
   bestSell: number | null;
-  /** Highest buy order's price; null when the side has no orders. */
   bestBuy: number | null;
-  /** bestSell - bestBuy; null unless both sides have an order — never derived from a missing side treated as zero. */
   spread: number | null;
-  /**
-   * Sum of sell-side volume_remain: what a buyer could actually acquire right
-   * now. Buy-side volume is demand, not supply, so it is not part of this.
-   */
   availableVolume: number;
 }
 
@@ -95,7 +67,6 @@ interface PricedOrder extends RawOrder {
   volume_remain: number;
 }
 
-/** Compare Set summary (GLOSSARY.md "Compare"): best sell, best buy, spread and available volume for one item's order book. Pure; callers pass an already location-filtered order list. */
 export function summarizeOrderBook<T extends PricedOrder>(orders: readonly T[]): OrderBookSummary {
   const { sell, buy } = splitOrderBook(orders);
   const bestSell = sell.length === 0 ? null : Math.min(...sell.map((o) => o.price));
@@ -108,7 +79,6 @@ export function summarizeOrderBook<T extends PricedOrder>(orders: readonly T[]):
   };
 }
 
-/** An order's expiry: issued + duration (days). */
 export function orderExpiry(order: { issued: string; duration: number }): Date {
   const issued = new Date(order.issued);
   return new Date(issued.getTime() + order.duration * DAY_MS);

@@ -68,7 +68,6 @@ describe('createCoalescedRebuild', () => {
     for (let i = 1; i <= 5; i++) {
       const write = deferred();
       schedule(write.promise.then(() => void (prefs = i)));
-      // The last write is still persisting when the quiet period ends.
       setTimeout(write.resolve, DELAY + i * 100);
     }
     await vi.advanceTimersByTimeAsync(DELAY * 3);

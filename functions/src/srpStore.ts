@@ -1,15 +1,3 @@
-// SRP (ADR 0026): the admin-SDK half of the callables. Parsing is
-// in srp.ts, the layout and shapes in srpTypes.ts. Every write to a
-// corporation's SRP data goes through here and appends to the audit log in
-// the same transaction; clients have no write path (firestore.rules).
-// The caller's EVE access token is verified and used for ESI reads, then
-// dropped: it is never written to Firestore or to the audit log.
-//
-// Two kinds of caller (ADR 0026):
-//   - a member: any Character in the corporation, proven by public affiliation;
-//   - an officer: Director or Accountant (the CEO holds every role), re-read
-//     from ESI roles. Settings need a Director; the CEO can always reclaim.
-
 import { randomBytes } from 'node:crypto';
 import { type Firestore, type Transaction } from 'firebase-admin/firestore';
 import { HttpsError } from 'firebase-functions/v2/https';
@@ -55,15 +43,9 @@ import { takeFetchSlot } from './srpThrottle.js';
 import { requireLiveRoles, verifyCallerToken, fail, type Caller } from './actorAuth.js';
 import { HOUR_MS } from './timeConstants.js';
 
-/**
- * How long an officer record lets rules show the queue, claims, audit and settings. Short on
- * purpose: rules read only this record, so a demoted or removed officer keeps read access until
- * it expires. (ADR 0023 accepted 24h for the Tax Book; SRP holds every pilot's claims.)
- */
 export const SRP_OFFICER_TTL_MS = HOUR_MS;
 
 export interface SrpDeps extends Pick<BookDeps, 'db' | 'now' | 'verifyToken' | 'readIdentity'> {
-  /** A Character's corporation from public ESI: no token, no scope. */
   lookupCorporation: CorporationLookup;
 }
 
@@ -78,19 +60,12 @@ export const claimRef = (db: Firestore, corporationId: number, killmailId: numbe
 
 const rand = () => randomBytes(6).toString('base64url');
 
-// --- Member check ----------------------------------------------------------
-
 export interface SrpMember {
   characterId: number;
   characterName: string;
   corporationId: number;
 }
 
-/**
- * Whether the caller is in the corporation right now, from public affiliation.
- * Needs no corp scope and no role, so any pilot passes. The file-claim callable
- * also checks the corporation at the time of the loss.
- */
 export async function authorizeMember(
   deps: SrpDeps,
   caller: Caller,
@@ -104,12 +79,6 @@ export async function authorizeMember(
   return { characterId: claims.characterId, characterName: claims.name, corporationId };
 }
 
-// --- Officer check ---------------------------------------------------------
-
-/**
- * What the caller may do as an SRP officer; ESI roles re-read per call (`live`). Keeps the 1h
- * `srpOfficers/{uid}` record in step: written when SRP is on and they hold the role, deleted on demotion.
- */
 export async function authorizeSrpOfficer(
   deps: SrpDeps,
   caller: Caller,
@@ -130,7 +99,6 @@ export async function authorizeSrpOfficer(
       corporationId: call.corporationId,
       need: 'canEdit',
       denied: { message: 'No SRP officer role in this corporation', reason: 'not-an-officer' },
-      // A failed renewal revokes the read access the old check granted.
       onDenied: () => revokeOfficer(officerRef, held),
     });
     access = {
@@ -156,8 +124,6 @@ export async function authorizeSrpOfficer(
   return access;
 }
 
-// --- Audit -----------------------------------------------------------------
-
 export function appendSrpAudit(
   tx: Transaction,
   deps: SrpDeps,
@@ -175,20 +141,16 @@ export function appendSrpAudit(
   );
 }
 
-// --- Callables -------------------------------------------------------------
-
 export interface VerifySrpOfficerResult {
   corporationId: number;
   isCeo: boolean;
   isDirector: boolean;
   canManage: boolean;
   srpEnabled: boolean;
-  /** A settings doc exists (SRP was turned on once); false before that, so a client skips the read the rules refuse. */
   settingsExist: boolean;
   expiresAt: number;
 }
 
-/** Checks roles with ESI and records officer access for an hour, so rules show the queue. */
 export async function verifySrpOfficer(
   deps: SrpDeps,
   caller: Caller,
@@ -211,14 +173,12 @@ export async function verifySrpOfficer(
 export interface SrpStatus {
   corporationId: number;
   enabled: boolean;
-  /** The rules a pilot sees when filing; absent while SRP is off. */
   settings?: Pick<
     SrpSettings,
     'killmailPct' | 'appraisalPct' | 'hullRules' | 'windowDays' | 'requireFleetOrFc'
   >;
 }
 
-/** What a member needs to show the SRP page: is it on, and the corp's rules. Members read no doc. */
 export async function getSrpStatus(
   deps: SrpDeps,
   caller: Caller,
@@ -241,7 +201,6 @@ export async function getSrpStatus(
   };
 }
 
-/** A Director turns SRP on: first time it creates the defaults, later it re-enables kept settings. */
 export async function turnOnSrp(deps: SrpDeps, caller: Caller, call: BookCall) {
   const access = await authorizeSrpOfficer(deps, caller, call, 'director');
   const now = deps.now();
@@ -273,7 +232,6 @@ export async function turnOnSrp(deps: SrpDeps, caller: Caller, call: BookCall) {
   return { corporationId: call.corporationId };
 }
 
-/** A Director turns SRP off: members stop seeing it; claims, rules and the log are kept. */
 export async function turnOffSrp(deps: SrpDeps, caller: Caller, call: BookCall) {
   const access = await authorizeSrpOfficer(deps, caller, call, 'director');
   const ref = srpSettingsRef(deps.db, call.corporationId);
@@ -286,7 +244,6 @@ export async function turnOffSrp(deps: SrpDeps, caller: Caller, call: BookCall) 
   return { corporationId: call.corporationId };
 }
 
-/** Every Doctrine Fit a rule lists exists in this corp and is for the rule's own hull. */
 async function requireRuleDoctrines(
   deps: SrpDeps,
   corporationId: number,
@@ -312,7 +269,6 @@ async function requireRuleDoctrines(
   }
 }
 
-/** A Director saves the corp's percents, Hull Rules, claim window and Fleet-or-FC requirement. */
 export async function saveSrpSettings(
   deps: SrpDeps,
   caller: Caller,
@@ -334,7 +290,6 @@ export async function saveSrpSettings(
   return { corporationId: call.corporationId };
 }
 
-/** The CEO can always reclaim SRP: becomes owner, turns it on, and every other officer must re-verify. */
 export async function reclaimSrp(deps: SrpDeps, caller: Caller, call: BookCall) {
   const access = await authorizeSrpOfficer(deps, caller, call, 'ceo');
   const ref = srpSettingsRef(deps.db, call.corporationId);
@@ -361,26 +316,20 @@ export async function reclaimSrp(deps: SrpDeps, caller: Caller, call: BookCall) 
   return { officersRevoked: revoked };
 }
 
-// --- Filing a claim -----------------------------------------------------------
-
 export interface SrpFileDeps extends SrpDeps {
-  /** ESI, zKillboard and the Jita price source; faked in tests. */
   killmails: SrpKillmailSource;
 }
 
 export interface FiledSrpClaim {
   killmailId: number;
   state: 'pending';
-  /** Whole ISK, or null when an officer must type it. */
   amount: number | null;
   basis: SrpBasis | null;
-  /** The doctrine-fit result stored on the claim; 'not-checked' when the hull lists no fit. */
   doctrineCheck: DoctrineCheckRecord;
 }
 
 const isValue = (n: unknown): n is number => typeof n === 'number' && Number.isFinite(n) && n >= 1;
 
-/** zKillboard is third-party: any failure is "no answer", never a failed filing. */
 async function softZkill(source: SrpKillmailSource, killmailId: number): Promise<ZkillRecord> {
   try {
     const z = await source.zkill(killmailId);
@@ -402,7 +351,6 @@ export async function softJita(
   }
 }
 
-/** One claim per killmail; a Rejected one may be re-filed once. Throws on anything else. */
 function refileDecision(existing: Record<string, unknown> | undefined): 'new' | 'refile' {
   if (!existing) return 'new';
   const refiles = typeof existing.refileCount === 'number' ? existing.refileCount : 0;
@@ -410,21 +358,15 @@ function refileDecision(existing: Record<string, unknown> | undefined): 'new' | 
   fail('already-exists', 'This killmail already has an SRP claim', 'already-claimed');
 }
 
-/**
- * The killmail the pilot names, fetched by the server, once it is the caller's own loss while in
- * this corporation. Shared by filing and the pre-filing doctrine preview, which share one
- * per-pilot fetch budget.
- */
 export async function fetchOwnLoss(
   deps: SrpFileDeps,
   member: SrpMember,
   ref: KillmailRef
 ): Promise<{ zkill: ZkillRecord; hash: string; km: EsiKillmail }> {
   await takeFetchSlot(deps, member.corporationId, member.characterId);
-  // With the hash in hand the two reads are independent; only a bare id needs zKillboard first.
   const zkillRead = softZkill(deps.killmails, ref.killmailId);
   const kmRead = ref.hash ? deps.killmails.killmail(ref.killmailId, ref.hash) : null;
-  kmRead?.catch(() => undefined); // its failure surfaces at the await below
+  kmRead?.catch(() => undefined);
   const zkill = await zkillRead;
   const hash = ref.hash ?? zkill.hash;
   if (!hash) {
@@ -448,7 +390,6 @@ export async function fetchOwnLoss(
   return { zkill, hash, km };
 }
 
-/** The doctrine-fit result for a loss: the hull's own rule, the fits it lists that still exist. */
 export async function doctrineCheckOf(
   db: Firestore,
   settings: Pick<SrpSettings, 'hullRules'>,
@@ -460,11 +401,6 @@ export async function doctrineCheckOf(
   return checkDoctrine(victim, rule, doctrines);
 }
 
-/**
- * What the corp's pricing chain makes of a loss: the hull's class, the values it used and the
- * result. The Jita Appraisal is read only when the chain needs it. Shared by filing and the
- * pre-filing preview so the preview never quotes an amount the filing would not give.
- */
 export async function priceLoss(
   source: SrpKillmailSource,
   settings: Pick<SrpSettings, 'killmailPct' | 'appraisalPct' | 'hullRules'>,
@@ -491,10 +427,6 @@ export async function priceLoss(
   return { classId, values, result };
 }
 
-/**
- * A pilot files an SRP Claim against their own killmail. The server fetches the killmail and
- * decides hull, system, time and amount; the client sends only the link and the notes.
- */
 export async function fileSrpClaim(
   deps: SrpFileDeps,
   caller: Caller,
@@ -514,8 +446,6 @@ export async function fileSrpClaim(
   const { killmailId } = input.ref;
   const ref = claimRef(deps.db, corporationId, killmailId);
   const { zkill, hash, km } = await fetchOwnLoss(deps, member, input.ref);
-  // Only after the victim checks: before them, `already-claimed` would tell any member whether
-  // another pilot's killmail has a claim. The transaction below re-checks against a racing filing.
   const early = refileDecision((await ref.get()).data());
   if (early === 'refile' && input.note === null) {
     fail('invalid-argument', 'A re-filed claim needs a note', 'note-required');
@@ -544,7 +474,6 @@ export async function fileSrpClaim(
   const suggested: SrpSuggestion | null =
     result.kind === 'officer' && result.suggested ? result.suggested : null;
   const rule = matchedHullRule(settings.hullRules, hullTypeId, classId);
-  // A snapshot at filing, never re-evaluated; a mismatch flags the claim, it never refuses it.
   const doctrineCheck = await doctrineCheckOf(deps.db, settings, corporationId, km.victim);
 
   const base = {

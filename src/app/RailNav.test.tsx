@@ -37,7 +37,6 @@ vi.mock('./syncStatus', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./syncStatus')>()),
   isSyncConfigured: () => false,
 }));
-// The palette itself is `CommandPalette.test.tsx`'s subject; here only whether it opens.
 vi.mock('@/features/commandPalette/CommandPaletteHost', () => ({
   CommandPaletteHost: () => null,
 }));
@@ -227,7 +226,6 @@ describe('the rail', () => {
 
     await user.click(within(rail()).getByRole('button', { name: /^Industry views/ }));
     const industry = within(rail()).getByRole('list', { name: 'Industry' });
-    // One section open at a time: looking inside Industry closes Market.
     expect(within(rail()).queryByRole('list', { name: 'Market' })).not.toBeInTheDocument();
 
     await user.click(within(rail()).getByRole('link', { name: 'Wallet' }));
@@ -325,16 +323,13 @@ describe('the rail', () => {
     renderAt('/overview');
 
     await user.click(within(rail()).getByRole('button', { name: 'Customize' }));
-    // One fixed name; `aria-pressed` says whether it is on.
     const mining = within(rail()).getByRole('button', { name: 'Show Mining in navigation' });
     expect(mining).toHaveAttribute('aria-pressed', 'true');
     await user.click(mining);
     await waitFor(() => expect(useHiddenNav.getState().value).toEqual(['/mining']));
-    // Still listed while editing, so it can be shown again.
     expect(
       within(rail()).getByRole('button', { name: 'Show Mining in navigation' })
     ).toHaveAttribute('aria-pressed', 'false');
-    // Struck through, not faded: a fade drops the label below 4.5:1.
     const miningLink = within(rail()).getByRole('link', { name: /mining/i });
     expect(miningLink).toHaveClass('line-through');
     expect(miningLink.className).not.toMatch(/opacity-/);
@@ -449,7 +444,6 @@ describe('the More sheet editor', () => {
     await user.click(within(sheet).getByRole('button', { name: /hide pages you don't use/i }));
     await user.click(within(sheet).getByRole('button', { name: 'Show Mining in navigation' }));
     await waitFor(() => expect(useHiddenNav.getState().value).toEqual(['/mining']));
-    // No fade, and no second eye glyph: the toggle button alone marks it.
     const tile = within(sheet).getByRole('link', { name: /mining/i }).parentElement!;
     expect(tile.className).not.toMatch(/opacity-/);
     expect(tile.querySelector(':scope > svg')).toBeNull();

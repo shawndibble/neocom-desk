@@ -3,8 +3,6 @@ import { assertFails, type RulesTestEnvironment } from '@firebase/rules-unit-tes
 import { deleteDoc, doc, getDoc, setDoc } from 'firebase/firestore';
 import { characterAuth, createRulesEnv } from './testEnv';
 
-// Alerts Grant (issue #3753, ADR 0020): function-only. Not even the owning
-// Character may read or write its doc; the encrypted token never reaches a client.
 let env: RulesTestEnvironment;
 const PATH = 'alertGrants/1';
 

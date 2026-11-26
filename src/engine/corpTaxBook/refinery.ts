@@ -1,12 +1,6 @@
-/**
- * Where an observed row came from and what to call its refinery. A refinery's
- * identity is its structure id, so two refineries never merge even in one
- * system on one day; the label is only for people to read.
- */
 import type { MiningLedgerEntry } from '../miningTax/types';
 import type { ObservedMiningEntry, ObservedRow } from './types';
 
-/** The corporation whose refinery recorded the row; absent means the book's own corporation. */
 export function sourceCorporationOf(
   row: Pick<ObservedRow, 'sourceCorporationId'>,
   bookCorporationId: number
@@ -16,28 +10,19 @@ export function sourceCorporationOf(
 
 export interface OfficerLabel {
   label: string;
-  /** ISO instant of the edit; the latest wins, from either side's officers. */
   setAt: string;
 }
 
 export interface RefineryLabelInput {
   structureId: number;
   officerLabels?: readonly OfficerLabel[];
-  /** The structure's name, when ESI let us read it. */
   structureName?: string;
-  /** The system, from an observed row or learned from a miner's own ledger. */
   systemName?: string;
-  /** The feeder corporation's name. */
   feederName?: string;
 }
 
 export type RefineryLabelSource = 'officer' | 'structure' | 'system' | 'feeder' | 'id';
 
-/**
- * First that works: an officer's free-text label (last edit wins), the
- * structure name, the learned system, then the feeder's name plus the
- * structure id so two refineries never look alike.
- */
 export function refineryLabel(input: RefineryLabelInput): {
   label: string;
   source: RefineryLabelSource;
@@ -56,20 +41,14 @@ export function refineryLabel(input: RefineryLabelInput): {
   return { label: String(input.structureId), source: 'id' };
 }
 
-/**
- * What a screen knows about each refinery, by structure id. `ownerName` is for
- * officer and moon owner screens only: a miner's line never names the moon owner.
- */
 export interface RefineryLabelSources {
   officerLabels?: (structureId: number) => readonly OfficerLabel[] | undefined;
   structureName?: (structureId: number) => string | undefined;
   systemName?: (structureId: number) => string | undefined;
   ownerName?: (structureId: number) => string | undefined;
-  /** What a refinery with nothing known reads as; the plain id when absent. */
   fallback?: (structureId: number) => string;
 }
 
-/** Every refinery cell through `refineryLabel`, from one screen's sources. */
 export function refineryLabeler(sources: RefineryLabelSources): (structureId: number) => string {
   return (structureId) => {
     const officerLabels = sources.officerLabels?.(structureId);
@@ -87,10 +66,6 @@ export function refineryLabeler(sources: RefineryLabelSources): (structureId: nu
   };
 }
 
-/**
- * Each refinery's system (a row's, else one learned from a miner's own ledger)
- * and its moon owner (absent: the book's own).
- */
 export function refineryFacts(
   rows: readonly Pick<ObservedRow, 'structureId' | 'solarSystemId' | 'sourceCorporationId'>[],
   learnedSystems?: ReadonlyMap<number, number>
@@ -109,14 +84,9 @@ export function refineryFacts(
   return { systemOf, sourceOf };
 }
 
-/**
- * What the server's `/universe/structures` lookup read for one moon owner refinery (#4654),
- * with the moon owner's own token. `denied`: ESI said 403 or 404 (no docking access, gone).
- */
 export interface StoredRefineryStructure {
   name?: string;
   solarSystemId?: number;
-  /** When it was last looked up (ms). */
   checkedAt: number;
   denied?: boolean;
 }
@@ -126,10 +96,6 @@ interface MoonOwnerRefineryFacts {
   refineryStructures?: Readonly<Record<string, StoredRefineryStructure>>;
 }
 
-/**
- * Each moon owner refinery's system, from their records, by structure id: the one the structure
- * lookup read wins over the one learned from a miner's own ledger (#4654).
- */
 export function learnedSystemsOf(feeders: readonly MoonOwnerRefineryFacts[]): Map<number, number> {
   const systems = new Map<number, number>();
   for (const f of feeders) {
@@ -145,7 +111,6 @@ export function learnedSystemsOf(feeders: readonly MoonOwnerRefineryFacts[]): Ma
   return systems;
 }
 
-/** The structure names the lookups read for the moon owners' refineries, by structure id. */
 export function structureNamesOf(feeders: readonly MoonOwnerRefineryFacts[]): Map<number, string> {
   const names = new Map<number, string>();
   for (const f of feeders)
@@ -155,13 +120,11 @@ export function structureNamesOf(feeders: readonly MoonOwnerRefineryFacts[]): Ma
   return names;
 }
 
-/** A label stored on a moon owner's record, keyed by structure id. */
 export interface StoredRefineryLabel extends OfficerLabel {
   setBy?: number;
   side?: 'accounting' | 'moon-owner';
 }
 
-/** The officer labels on the moon owners' records, by structure id. */
 export function officerLabelsOf(
   feeders: readonly { refineryLabels?: Readonly<Record<string, StoredRefineryLabel>> }[]
 ): Map<number, OfficerLabel[]> {
@@ -178,11 +141,6 @@ const sameOre = (a: ObservedMiningEntry['oreLines'], b: MiningLedgerEntry['oreLi
   a.length === b.length &&
   a.every((l, i) => l.typeId === b[i].typeId && l.quantity === b[i].quantity);
 
-/**
- * Learns each refinery's system by matching its entries (same character, day
- * and ore) against the miner's own ledger entries. When matches disagree the
- * most common system wins; a tie learns nothing (a kept system never moves).
- */
 export function learnRefinerySystems(
   entries: readonly ObservedMiningEntry[],
   personal: readonly MiningLedgerEntry[]
@@ -211,10 +169,6 @@ export function learnRefinerySystems(
   return learned;
 }
 
-/**
- * What a miner's own ledger can teach the book: the systems of moon owner
- * refineries whose rows carry none (a moon owner's grant is ledger-only).
- */
 export function ownerRefinerySystemsToLearn(
   entries: readonly ObservedMiningEntry[],
   personal: readonly MiningLedgerEntry[]

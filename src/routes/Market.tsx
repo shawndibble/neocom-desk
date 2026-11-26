@@ -95,8 +95,6 @@ import { useOrderRowSkills } from '@/features/market/useOrderRowSkills';
 import { useRefiningSetup } from '@/features/refining/useRefiningSetup';
 import { SELL_ORDER_COLUMN_IDS, BUY_ORDER_COLUMN_IDS } from '@/features/market/marketOrderColumns';
 
-// One tab renders at a time: each panel loads on first visit, or as the
-// pilot reaches for its tab (`preloadTab`).
 const TAB_LOADERS = {
   orders: named(() => import('@/features/market/OrdersTab'), 'OrdersTab'),
   stock: named(() => import('@/features/stockTargets/StockTab'), 'StockTab'),
@@ -109,59 +107,22 @@ const TransactionsPanel = lazy(TAB_LOADERS.history);
 const AppraisalPanel = lazy(TAB_LOADERS.appraisal);
 const preloadTab = preloadFrom(TAB_LOADERS);
 
-/** Rows shown per side before "show all" (GLOSSARY.md). */
 const ROW_CAP = 15;
 
-/**
- * The page's own top-level tabs: Browser, Open orders, Stock, History (the
- * character's wallet fills), Appraisal. Distinct from `itemTab` below, the
- * selected item's own Order Book / Price History split.
- */
 type MarketTab = (typeof MARKET_TABS.tabs)[number]['id'];
 
-/**
- * The two sections quoted at a Trade Hub, and so the two that share the page
- * header's hub picker and refresh button.
- *
- * Appraisal deliberately does *not* get the **Location Mode** chips beside
- * them. Fuzzwork's aggregates — the appraisal's price source — are per
- * station, so a Region appraisal would mean one paginated ESI order-book call
- * per pasted line. A control drawn on a tab where it cannot do anything is
- * worse than one that is not there, so the chips stay with the Browser.
- */
 function usesHubPicker(tab: MarketTab): boolean {
   return tab === 'browser' || tab === 'appraisal';
 }
 
-/**
- * Market Browser: find an item (search + Market Group tree, left) and see its
- * live Order Book at the current Location Mode's region (right), read from
- * ESI (ADR 0003). Location Mode (GLOSSARY.md round 9) is either Trade Hub
- * (that hub's region, filtered to its station) or Region (the whole region,
- * every station) — a device-local preference like the hub setting it
- * replaces as the sole location control. A globally-traded item (PLEX today)
- * overrides either mode: its own Global Market Region always wins (round
- * 12). The catalogue (groups/types/systems/stations/regions) is lazy-loaded,
- * not precached (GLOSSARY.md round 10) — most installs never open /market.
- */
 export function Market() {
   const { t } = useTranslation();
   const location = useLocation();
   const [tab, setTab] = usePageTab(MARKET_TABS);
   const navigate = useNavigate();
-  // Hauling's reload and its scan's Data Age sit in this page's title bar rather
-  // than the panel header: the panel hands them up through this callback.
   const [haulingRefresh, setHaulingRefresh] = useState<HaulingRefreshInfo | null>(null);
-  // Issue #726: true only immediately after the Quickbar's "View in
-  // Appraisal" action, so the panel mounts with its Compare Hubs section
-  // already open instead of collapsed.
   const [expandCompareOnAppraisal, setExpandCompareOnAppraisal] = useState(false);
-  // `expandCompare` defaults false so every ordinary tab switch clears it —
-  // only `handleViewQuickbarInAppraisal` passes `true`, and only that call's
-  // own value should reach the next `AppraisalPanel` mount.
   function changeTab(next: MarketTab, expandCompare = false) {
-    // The query string rides along between tabs, but Hauling's `from`/`to`/`cat`
-    // are its own: crossing into or out of Hauling starts the other tab clean.
     if (next !== tab && (next === 'hauling' || tab === 'hauling')) {
       navigate(tabPath(MARKET_TABS, next));
     } else {
@@ -170,8 +131,6 @@ export function Market() {
     setExpandCompareOnAppraisal(expandCompare);
   }
   const isPhone = useIsPhone();
-  // Open orders and History hang their Character picker, Refresh, export and
-  // data age on the page header rather than on a title bar of their own.
   const tabOwnsHeader = tab === 'orders' || tab === 'history';
   const { slots: headerSlots, metaSlot, scopeSlot, actionsSlot } = usePageHeaderSlots();
   const viewsTabsId = useTabsId();
@@ -179,14 +138,9 @@ export function Market() {
   const marketTabs = MARKET_TABS.tabs.map((item) => ({ id: item.id, label: t(item.labelKey) }));
   const searchInputRef = useRef<HTMLInputElement>(null);
 
-  // The Appraisal tab's other half of the same control pair as the header's hub picker.
   const savedPricePercent = useMarketPricePercent((state) => state.value);
   const setPricePercent = useMarketPricePercent((state) => state.setValue);
   useHydratedStore(useMarketPricePercent);
-  // `?percent=` overrides the saved Price Percent for this visit, the way
-  // `?hub=` overrides the saved hub — what a Shared Appraisal's "Open Neocom
-  // Desk" lands with. Typing a percent writes the setting and drops the
-  // override, so the field never fights the URL.
   const [searchParams, setSearchParams] = useSearchParams();
   const percentOverride = parsePricePercentParam(searchParams.get(PRICE_PERCENT_PARAM));
   const pricePercent = percentOverride ?? savedPricePercent;
@@ -207,13 +161,7 @@ export function Market() {
   const addToCompare = useCompareSet((state) => state.add);
   const removeFromCompare = useCompareSet((state) => state.remove);
 
-  // The Quickbar (GLOSSARY.md): Editable Data, one record per character. Reads
-  // as [] rather than requiring an active character — Market Browser itself
-  // needs none — so Add to Quickbar is disabled with nobody active.
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
-  // Item Actions (issue #2041): every item menu's Quickbar add, Show info (the
-  // one Item Detail modal, priced at `orderBookLocation`) and the lazy
-  // blueprint catalog behind Build Plan.
   const itemActions = usePageItemActions({
     activeCharacterId,
     lazyBlueprints: true,
@@ -225,16 +173,11 @@ export function Market() {
     pinWithTarget: handlePinWithTarget,
   } = itemActions.quickbar;
 
-  // Issue #726: sends the Quickbar's contents into Appraisal, landing
-  // directly on the multi-hub view (#689) rather than a collapsed one.
   function handleViewQuickbarInAppraisal() {
     appraisal.appraiseText(quickbarToPasteText(quickbarItems));
     changeTab('appraisal', true);
   }
 
-  // Narrow screens show one column at a time (GLOSSARY.md round 8); matches
-  // the grid's own `lg:` breakpoint so the JS-driven visibility and the CSS
-  // layout switch at the same width.
   const isDesktop = useIsDesktop();
   const online = useOnline();
 
@@ -279,8 +222,6 @@ export function Market() {
     setCompareRegionIds,
   } = useMarketBrowser({ groups, types, marketRegions, groupsById });
 
-  // Spoken summary of the finder's result: the visible notes and the swap to
-  // "No results" are plain text, so a screen reader hears nothing as you type.
   let browserStatus: string | null = null;
   if (filterResult) {
     browserStatus =
@@ -291,14 +232,7 @@ export function Market() {
     browserStatus = t('market.searchTooShort', { min: MARKET_TREE_MIN_QUERY_LENGTH });
   }
 
-  // Focus management for the finder <-> item panel swap below the `lg:`
-  // breakpoint (issue #1485): selecting an item hides the finder and shows
-  // the item panel with no focus cue, and Back does the reverse. `enabled:
-  // !isDesktop` — see `useFocusHeading`'s own doc comment for why that's a
-  // separate param rather than folded into the key.
   const itemHeadingRef = useRef<HTMLHeadingElement>(null);
-  // The Order Book's buttons that unmount themselves ("Show all", "Only this
-  // station", "Clear filter") hand focus on through these (#3353).
   const focusAfterCommit = useFocusAfterCommit();
   const sellHeadingRef = useRef<HTMLHeadingElement>(null);
   const buyHeadingRef = useRef<HTMLHeadingElement>(null);
@@ -309,13 +243,7 @@ export function Market() {
   );
   const selectedPinned = quickbarItems.some((item) => item.typeId === selectedTypeId);
 
-  // The finder Panel's own root, so Back can look up the tree button the
-  // item was opened from without a global `document.querySelector` risking a
-  // same-id match elsewhere (the Quickbar list also renders per-typeId rows).
   const finderPanelRef = useRef<HTMLElement>(null);
-  // The item that was open when Back was pressed — read once by the effect
-  // below, then cleared, so an unrelated `selectedTypeId` change (e.g. a
-  // fresh deep link) never triggers a focus restore that wasn't asked for.
   const backToFinderTypeIdRef = useRef<number | null>(null);
   function handleBackToFinderAndRestoreFocus() {
     backToFinderTypeIdRef.current = selectedTypeId;
@@ -333,17 +261,11 @@ export function Market() {
     else searchInputRef.current?.focus();
   }, [selectedTypeId]);
 
-  // Held here rather than inside `AppraisalPanel` so a pasted list survives a
-  // trip to the Browser tab, and so the header's refresh button can drive it.
   const { setup: refiningSetup, hydrated: refiningHydrated } = useRefiningSetup();
-  // Appraisal prices at its own page hub, apart from the hub the Browser is on.
-  // On its tab `?hub=` overrides it for the visit, as `?percent=` does the Price
-  // Percent (a Shared Appraisal's "Open Neocom Desk"); a pick drops the override.
   const { hubId: appraisalHubId } = useHubFor('appraisal');
   const appraisalHubOverride =
     tab === 'appraisal' ? getTradeHub(searchParams.get('hub') as TradeHub['id']) : undefined;
   const appraisalHub = appraisalHubOverride ?? getTradeHub(appraisalHubId) ?? DEFAULT_TRADE_HUB;
-  /** After the Appraisal's hub menu wrote its pick: a link's visit-only hub then gives way to it. */
   function handleAppraisalHubPicked() {
     if (appraisalHubOverride === undefined) return;
     setSearchParams(
@@ -362,9 +284,6 @@ export function Market() {
     refiningSetup,
     refiningHydrated
   );
-  // A Fitting's Export menu, or a page-level paste (`app/GlobalPasteRouter.tsx`),
-  // lands here with a list to appraise. Keyed on the navigation itself so a
-  // re-render never re-submits it.
   const handledAppraiseKey = useRef<string | null>(null);
   useEffect(() => {
     const text = (location.state as Partial<MarketAppraiseState> | null)?.appraiseText;
@@ -372,13 +291,8 @@ export function Market() {
     handledAppraiseKey.current = location.key;
     appraisal.appraiseText(text);
   }, [location.key, location.state, appraisal]);
-  // "Open Neocom Desk" on a stored Appraisal Share Link lands here with
-  // `?share=<id>`, its hub and percent riding `?hub=` and `?percent=`.
   const sharedSeed = useSharedAppraisalSeed((text) => appraisal.appraiseText(text));
-  // The appraised list rides `?list=`, so Back and a reload restore it.
   useAppraisalListUrl(appraisal, tab === 'appraisal');
-  // Feeds the net-of-fees chips' broker fee — resolved once per character,
-  // same as every other configurable-Trade-Hub broker-fee surface.
   const tradeHubStandings = useTradeHubStandings(activeCharacterId);
 
   const {
@@ -465,23 +379,13 @@ export function Market() {
   const selectedBlueprintTypeId =
     selectedTypeId === null ? null : itemActions.actions.blueprintFor(selectedTypeId);
 
-  /**
-   * A blueprint *original* can be sold on the market; a **copy** cannot — BPCs
-   * are contract-only. So an empty order book on a blueprint is the one case
-   * where "nobody is selling this" is misleading, and the honest answer is to
-   * point at the BPC search rather than leave the pilot to conclude the item
-   * is unavailable.
-   */
   const selectedIsBlueprint =
     selectedTypeId !== null &&
     (itemActions.actions.blueprints?.byBlueprintTypeID.has(selectedTypeId) ?? false);
 
-  // Hide bait sells trims what the table shows (`shownSell`); export, depth
-  // and best prices keep the real book (`sortedSell`).
   const sellRowCap = sellShowAll ? undefined : ROW_CAP;
   const buyRowCap = buyShowAll ? undefined : ROW_CAP;
 
-  // One station, already named by the scope bar: no Location column to repeat it.
   const singleStationBook =
     !(rangeAcross && browserFilterValue.jumps !== 'any') && effectiveLocation.mode === 'hub';
   const knownJumps = jumpRangeFilter.jumpsStatus === 'ready' ? jumpRangeFilter.jumps : null;
@@ -558,14 +462,8 @@ export function Market() {
     knownJumps,
   });
 
-  // A phone shows one side of the book at a time (`BookSideToggle`).
   const [phoneSide, setPhoneSide] = useState<BookSide>('sell');
 
-  // Narrow screens only: on desktop the item finder is already on screen
-  // beside the item, so there is nothing to go back to. It sits in the
-  // Panel's `leading` slot, immediately left of the item name — it means
-  // "back from this item", so it belongs against the name rather than parked
-  // on the opposite edge of the header.
   const showBackControl = !isDesktop && selectedTypeId !== null;
   const itemPanelLeading = showBackControl ? (
     <IconButton
@@ -621,20 +519,10 @@ export function Market() {
               />
             ) : undefined
           }
-          // Only the Character tabs have a picker; the others must not lock the row.
           scope={tabOwnsHeader ? scopeSlot : undefined}
           actions={
             usesHubPicker(tab) ? (
               <>
-                {/* The mode chip and the picker next to it printed the same words
-                  twice — "TRADE HUB · REGION · TRADE HUB [Jita]". The selected segment
-                  *is* the picker's label, so the picker keeps the string as its
-                  `aria-label` only: still announced, no longer duplicated on
-                  screen.
-
-                  Browser only: see `usesHubPicker`. Appraisal prices at a
-                  station, so it has no Region mode to toggle into, and its hub
-                  picker sits in the panel beside Price %. */}
                 {tab === 'browser' && (
                   <SegmentedControl
                     label={t('market.locationMode')}
@@ -656,8 +544,6 @@ export function Market() {
                     className="w-32 sm:w-44"
                   />
                 ) : (
-                  // "All regions" (`null` to the picker) fans the selected item's
-                  // book out over every region; see `allRegionsFetchKey`.
                   <RegionSelect
                     options={marketRegions ?? []}
                     value={allRegions ? null : chosenRegionId}
@@ -678,10 +564,6 @@ export function Market() {
                   icon={<Icon.Refresh />}
                   label={t('market.refresh')}
                   onClick={handleRefresh}
-                  // Section-aware: on the Browser this re-reads the selected
-                  // item's order book, on Appraisal it re-prices the pasted
-                  // list. Both are "refresh what is on screen", and neither has
-                  // anything to do until there *is* something on screen.
                   busy={
                     tab === 'appraisal'
                       ? appraisal.result === null || appraisal.loading || appraisal.live.checking
@@ -718,8 +600,6 @@ export function Market() {
 
             {tab === 'history' && <TransactionsPanel headerSlots={headerSlots} />}
 
-            {/* The list itself lives in `useAppraisal` at route level, so switching
-          to the Browser and back does not throw away a forty-line paste. */}
             {tab === 'appraisal' && (
               <AppraisalPanel
                 controller={appraisal}
@@ -738,16 +618,12 @@ export function Market() {
             )}
           </Suspense>
 
-          {/* Hauling picks its own From/To hubs, so the header hub picker
-              (`usesHubPicker`) stays off it. */}
           {tab === 'hauling' && <HaulingPanel onRefreshInfoChange={setHaulingRefresh} />}
 
           {tab === 'browser' && (
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-[22rem_1fr] lg:items-start">
               <Panel
                 ref={finderPanelRef}
-                // Sticky beside a long order book, so the search stays in reach
-                // while the book scrolls.
                 fill
                 className={
                   isDesktop || selectedTypeId === null
@@ -834,9 +710,6 @@ export function Market() {
               </Panel>
 
               <Panel
-                // `min-w-0`: a grid track doesn't shrink a child below its own
-                // intrinsic content width by default — a wide table row here
-                // was forcing the whole page to scroll sideways.
                 className={`min-w-0 ${isDesktop || selectedTypeId !== null ? '' : 'hidden'}`}
                 title={selectedItem?.name}
                 headingRef={itemHeadingRef}
@@ -876,7 +749,6 @@ export function Market() {
                       />
                       <DropdownMenu
                         onOpenChange={(open) => {
-                          // Market loads the blueprint catalog lazily; Build Plan needs it.
                           if (open) itemActions.actions.requestBlueprints();
                         }}
                       >
@@ -953,8 +825,6 @@ export function Market() {
                       hasCharacter={activeCharacterId !== null}
                       itemName={selectedItem?.name ?? ''}
                     />
-                    {/* Above every tab: Variations and Price History are readers
-                      its note names. */}
                     <OrderBookScopeBar
                       scope={bookScope}
                       filterValue={browserFilterValue}
@@ -974,8 +844,6 @@ export function Market() {
                             typeId={selectedTypeId}
                             itemName={selectedItem?.name ?? ''}
                             compare={
-                              // A Global Market Region item trades nowhere
-                              // else, so there is no other region to compare.
                               resolvedRegion.override || !marketRegions
                                 ? undefined
                                 : {
@@ -1005,10 +873,6 @@ export function Market() {
                         (!orderBookView || orderBookFailed) ? (
                         <Spinner block="panel" label={t('common.loading')} />
                       ) : orderBookFailed ? (
-                        // Not the empty book: ESI didn't answer (a 420, or the Error
-                        // Budget declining to send), which says nothing about who
-                        // trades the item — so no "nobody is selling" copy and no
-                        // blueprint BPC hint, just the failure and a way to retry.
                         <EmptyState
                           title={t('market.orderBookFailedTitle')}
                           hint={t(
@@ -1032,7 +896,6 @@ export function Market() {
                               })}
                             </p>
                           )}
-                          {/* In the book, not the finder's funnel, so a collapsed bar can't hide why a range isn't applying. */}
                           {(jumpNoteShown || failedRegionCount > 0) && (
                             <div className="flex flex-col items-end gap-1 text-xs text-text-dim">
                               {jumpNoteShown && <JumpRangeNote status={jumpRangeFilter.status} />}
@@ -1054,7 +917,6 @@ export function Market() {
                                 ref={clearFilterRef}
                                 size="sm"
                                 onClick={() => {
-                                  // Sell's heading, or Buy's when the phone toggle hides Sell.
                                   focusAfterCommit(
                                     isPhone && phoneSide === 'buy' ? buyHeadingRef : sellHeadingRef
                                   );
@@ -1246,7 +1108,6 @@ export function Market() {
           <Toast
             message={t('market.sharedAppraisalLoadFailed')}
             tone="danger"
-            // Stays mounted, busy, until the retry settles: it unmounts only on success.
             action={{
               label: sharedSeed.retrying ? t('common.loading') : t('common.retry'),
               onAction: sharedSeed.retrying ? () => {} : sharedSeed.retry,

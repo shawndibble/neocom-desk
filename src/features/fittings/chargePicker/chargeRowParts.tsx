@@ -2,7 +2,6 @@ import { useTranslation } from 'react-i18next';
 import { cx } from '@/lib/cx';
 import { reach, type ChargeChoice } from '@/engine/fittings/chargeChoice';
 
-/** Solid optimal, dashed falloff, on one km scale shared down a list; a tick at the target distance. */
 export function RangeBar({
   choice,
   maxReach,
@@ -39,7 +38,6 @@ export function DamageText({ choice }: { choice: ChargeChoice }) {
   const parts = (['em', 'thermal', 'kinetic', 'explosive'] as const)
     .filter((key) => choice.damage![key] > 0.005)
     .map((key) => ({ key, share: Math.round(choice.damage![key] * 100) }));
-  // Rounded shares can sum to 99 or 101: the largest takes up the difference.
   const largest = parts.reduce<(typeof parts)[number] | null>(
     (a, b) => (a === null || b.share > a.share ? b : a),
     null

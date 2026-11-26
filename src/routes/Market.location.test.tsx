@@ -57,7 +57,6 @@ describe('Location Mode and the Global Market Region (issue #3)', () => {
     await user.type(await screen.findByRole('searchbox'), 'rift');
     await user.click(await screen.findByText('Rifter'));
     await screen.findByRole('table', { name: 'Sell Orders' });
-    // Distance is the finder's inline key filter; the rest sits behind the funnel.
     expect(within(finder()).getByRole('combobox', { name: 'Distance' })).toBeInTheDocument();
     expect(screen.queryByRole('spinbutton', { name: 'Min quantity' })).not.toBeInTheDocument();
     await user.click(within(finder()).getByRole('button', { name: 'Filters' }));
@@ -85,7 +84,6 @@ describe('Location Mode and the Global Market Region (issue #3)', () => {
     await user.click(within(finder()).getByRole('button', { name: 'Filters' }));
     await user.click(within(finder()).getByRole('button', { name: 'NPC stations only' }));
 
-    // The player-structure sell order drops out; the Jita 4-4 one stays.
     await waitFor(() =>
       expect(
         within(screen.getByRole('table', { name: 'Sell Orders' })).queryByText('2,000,000')
@@ -96,7 +94,6 @@ describe('Location Mode and the Global Market Region (issue #3)', () => {
     ).toBeInTheDocument();
 
     await user.type(within(finder()).getByRole('spinbutton', { name: 'Min quantity' }), '6');
-    // Jita's orders have 5 (sell) and 3 (buy) left, so both sides empty — and the hint says why.
     expect(
       await screen.findAllByText('No orders match the filters. Loosen them to see more.')
     ).toHaveLength(2);
@@ -132,7 +129,6 @@ describe('Location Mode and the Global Market Region (issue #3)', () => {
     renderMarketRoute();
 
     const sellTable = await screen.findByRole('table', { name: 'Sell Orders' });
-    // Off by default: the bait row shows, flagged.
     expect(within(sellTable).getByText('50,000,000')).toBeInTheDocument();
     expect(screen.queryByText(/bait sells? hidden/)).not.toBeInTheDocument();
 
@@ -175,7 +171,6 @@ describe('Location Mode and the Global Market Region (issue #3)', () => {
     const sellTable = await screen.findByRole('table', { name: 'Sell Orders' });
     expect(within(sellTable).getByText('2,000,000')).toBeInTheDocument();
     expect(within(sellTable).getByText('Unknown Structure', { exact: false })).toBeInTheDocument();
-    // Same region as Trade Hub mode was already fetched, so this is the cached result, not a refetch.
     expect(hits.count).toBe(1);
   });
 
@@ -187,23 +182,13 @@ describe('Location Mode and the Global Market Region (issue #3)', () => {
 
     await user.click(await screen.findByRole('combobox', { name: 'Region' }));
     expect(
-      // The selected option renders a leading, aria-hidden "✓" indicator
-      // alongside the label — stripped here since `textContent` includes it
-      // even though it's invisible to the accessibility tree. Alphabetical:
-      // `RegionSelect` sorts by name.
       (await screen.findAllByRole('option')).map((o) => o.textContent?.replace(/^✓/, ''))
     ).toEqual(['All regions', 'Domain', 'The Forge']);
   });
 
   it('a globally-traded item reads its Global Market Region regardless of Location Mode, with an explanatory note', async () => {
     const hits = { count: 0 };
-    server.use(
-      plexOrdersHandler(hits),
-      // PLEX's Variations table falls back to Tritanium (same market group,
-      // fixtures in @/test/marketMocks), whose order book lives at the Forge region rather
-      // than PLEX's Global Market Region.
-      ordersHandler({ count: 0 })
-    );
+    server.use(plexOrdersHandler(hits), ordersHandler({ count: 0 }));
     const user = userEvent.setup({ delay: null });
     renderMarketRoute();
 
@@ -212,7 +197,6 @@ describe('Location Mode and the Global Market Region (issue #3)', () => {
 
     expect(await screen.findByText(/GPMR-01/)).toBeInTheDocument();
     const sellTable = await screen.findByRole('table', { name: 'Sell Orders' });
-    // PLEX orders still carry ordinary station ids, so Trade Hub mode's Jita filter still applies.
     expect(within(sellTable).getByText('3,000,000')).toBeInTheDocument();
     expect(hits.count).toBe(1);
   });
@@ -242,7 +226,6 @@ describe('Shareable Market Browser URLs (issue #4)', () => {
 
     await user.type(await screen.findByRole('searchbox'), 'rift');
     await user.click(await screen.findByText('Rifter'));
-    // Past the search debounce: a late write must not undo the selection.
     await vi.advanceTimersByTimeAsync(450);
     const params = Object.fromEntries(new URLSearchParams(window.location.search));
     expect(params).toEqual({ 'browser.q': 'rift', type: '587', hub: 'jita' });
@@ -265,8 +248,6 @@ describe('Shareable Market Browser URLs (issue #4)', () => {
 
     await user.type(await screen.findByRole('searchbox'), 'rift');
     await user.click(await screen.findByText('Rifter'));
-    // The tree search box is URL-backed too (ADR 0015), written once typing
-    // pauses — it rides along with every location change from here on.
     const params = () => Object.fromEntries(new URLSearchParams(window.location.search));
     await waitFor(() =>
       expect(params()).toEqual({ 'browser.q': 'rift', type: '587', hub: 'jita' })
@@ -300,7 +281,6 @@ describe('Shareable Market Browser URLs (issue #4)', () => {
     window.history.pushState({}, '', '/market?type=587&region=not-a-number');
     renderMarketRoute();
 
-    // Falls back to the persisted default (Trade Hub mode, Jita) rather than erroring.
     expect(await screen.findByRole('heading', { name: 'Rifter', level: 2 })).toBeInTheDocument();
     const sellTable = await screen.findByRole('table', { name: 'Sell Orders' });
     expect(within(sellTable).queryByText('2,000,000')).not.toBeInTheDocument();
@@ -308,7 +288,6 @@ describe('Shareable Market Browser URLs (issue #4)', () => {
 
   it('a stored region no longer among the Market Regions falls back to the hub region (issue #3891)', async () => {
     server.use(ordersHandler({ count: 0 }));
-    // A wormhole region whose market emptied between SDE bakes.
     await db.settings.put({
       key: LOCATION_MODE_SETTING_KEY,
       value: { mode: 'region', regionId: 11000012 },
@@ -316,7 +295,6 @@ describe('Shareable Market Browser URLs (issue #4)', () => {
     window.history.pushState({}, '', '/market?type=587');
     renderMarketRoute();
 
-    // Still Region mode, over the Jita hub's region: the player structure shows.
     const sellTable = await screen.findByRole('table', { name: 'Sell Orders' });
     expect(await within(sellTable).findByText('2,000,000')).toBeInTheDocument();
   });
@@ -344,12 +322,10 @@ describe('Shareable Market Browser URLs (issue #4)', () => {
     const user = userEvent.setup({ delay: null });
     renderMarketRoute();
     await screen.findByRole('heading', { name: 'Rifter', level: 2 });
-    // The linked hub is copied into the Market page hub only once page hubs
-    // have hydrated; toggling before then would find the old Jita default.
     await waitFor(() => expect(usePageHubs.getState().value.market).toBe('amarr'));
 
     await user.click(screen.getByRole('button', { name: 'Region' }));
-    expect(window.location.search).toBe('?type=587&region=10000043'); // Domain, Amarr's region
+    expect(window.location.search).toBe('?type=587&region=10000043');
 
     await user.click(screen.getByRole('button', { name: 'Trade Hub' }));
     expect(window.location.search).toBe('?type=587&hub=amarr');
@@ -365,7 +341,6 @@ describe('Shareable Market Browser URLs (issue #4)', () => {
     await user.click(screen.getByRole('button', { name: 'Amarr VIII' }));
     expect(screen.getByRole('button', { name: /, Trade Hub$/ })).toHaveTextContent('Amarr');
 
-    // The Market's own pick must not touch the Global hub other pages read.
     expect(await db.settings.get('sync.marketHub')).toBeUndefined();
     await waitFor(() => expect(usePageHubs.getState().value.market).toBe('amarr'));
 
@@ -383,8 +358,6 @@ describe('Shareable Market Browser URLs (issue #4)', () => {
     await screen.findByRole('button', SHIPS_GROUP);
     expect(await screen.findByRole('button', { name: /, Trade Hub$/ })).toHaveTextContent('Amarr');
 
-    // Another device (or Settings' "Default trade hub") moves Global to
-    // Dodixie: it must not reach a Market with its own hub.
     await useMarketHub.getState().setValue('dodixie');
 
     expect(screen.getByRole('button', { name: /, Trade Hub$/ })).toHaveTextContent('Amarr');
@@ -402,7 +375,6 @@ describe('Shareable Market Browser URLs (issue #4)', () => {
     await user.click(screen.getByRole('button', { name: 'App setting' }));
 
     await waitFor(() => expect(usePageHubs.getState().value.market).toBeUndefined());
-    // The page follows Global into its URL rather than re-adopting the old link.
     await waitFor(() => expect(window.location.search).toContain('hub=jita'));
     expect(usePageHubs.getState().value.market).toBeUndefined();
   });
@@ -412,26 +384,18 @@ describe('Shareable Market Browser URLs (issue #4)', () => {
     renderMarketRoute();
     await screen.findByRole('button', SHIPS_GROUP);
 
-    // Waited on the text: the button is there at once, reading Jita, before the fold lands.
     await waitFor(() =>
       expect(screen.getByRole('button', { name: /, Trade Hub$/ })).toHaveTextContent('Hek')
     );
     await waitFor(() =>
       expect(usePageHubs.getState().value).toEqual({ market: 'hek', appraisal: 'hek' })
     );
-    // The device row stays for an older build on this device; a marker records the fold.
     expect((await db.settings.get('marketBrowserHub'))?.value).toBe('hek');
     expect(await db.settings.get('marketBrowserHubMigrated')).toBeDefined();
   });
 
   it('browser back and forward move through previous selections', async () => {
-    server.use(
-      ordersHandler({ count: 0 }),
-      // Tritanium's Variations table falls back to PLEX (same market group,
-      // fixtures in @/test/marketMocks), whose order book lives at its own Global Market
-      // Region rather than Tritanium's.
-      plexOrdersHandler({ count: 0 })
-    );
+    server.use(ordersHandler({ count: 0 }), plexOrdersHandler({ count: 0 }));
     const user = userEvent.setup({ delay: null });
     renderMarketRoute();
 

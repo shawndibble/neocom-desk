@@ -28,7 +28,6 @@ import { setSrpMemberBackendOverride, type SrpMemberBackend } from './srpMemberB
 import type { SrpClaimValues } from '../srpTypes';
 import type { SrpHistoryState, SrpQueueData } from './useSrpQueue';
 
-/** A Toast renders its line twice on purpose (visible, aria-hidden + sr-only live region); take the first. */
 const findLine = async (text: string | RegExp) => (await screen.findAllByText(text))[0]!;
 
 const claim = (killmailId: number, over: Partial<SrpClaim> = {}): SrpClaim => ({
@@ -178,7 +177,6 @@ describe('OfficerQueue pending', () => {
     await userEvent.click(approve);
     expect(data.approve).not.toHaveBeenCalled();
     await userEvent.type(screen.getByLabelText('Amount for Pilot3'), '2500000');
-    // The reason tooltip unwraps once an amount is typed, so the button is a fresh element.
     const ready = screen.getAllByRole('button', { name: 'Approve' })[2]!;
     expect(ready).not.toHaveAttribute('aria-disabled', 'true');
     await userEvent.click(ready);
@@ -362,7 +360,6 @@ describe('OfficerQueue row menu', () => {
   it('opens the ⋮ with the detail-only actions, and Change amount opens its dialog', async () => {
     setup(pendingSet());
     const more = screen.getAllByRole('button', { name: /More actions/ });
-    // Claim 3 has no figure to change, so it has no menu; the paid claim is not in Pending.
     expect(more.length).toBeGreaterThan(0);
     expect(screen.queryByRole('button', { name: /More actions.*Pilot3/ })).toBeNull();
     await userEvent.click(screen.getByRole('button', { name: /More actions.*Pilot1/ }));
@@ -370,7 +367,6 @@ describe('OfficerQueue row menu', () => {
     expect(screen.getByRole('menuitem', { name: 'Show info' })).toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: /Open in EVE/ })).toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: /zKillboard/ })).toBeInTheDocument();
-    // Approve and Reject are the row's own buttons: not repeated in the menu.
     expect(screen.queryByRole('menuitem', { name: 'Approve' })).toBeNull();
     await userEvent.click(screen.getByRole('menuitem', { name: 'Change amount' }));
     expect(await screen.findByRole('dialog', { name: /Change amount/ })).toBeInTheDocument();
@@ -397,8 +393,6 @@ describe('OfficerQueue own claim', () => {
       'aria-disabled',
       'true'
     );
-    // Hover first: a click leaves the pointer on the button, so a later hover
-    // fires no pointerenter and the bubble races the click's open/close.
     await userEvent.hover(approve);
     expect(await screen.findByRole('tooltip')).toHaveTextContent(
       'You cannot decide your own claim. Another officer must.'
@@ -406,7 +400,6 @@ describe('OfficerQueue own claim', () => {
     await userEvent.unhover(approve);
     await userEvent.click(approve);
     expect(data.approve).not.toHaveBeenCalled();
-    // Another officer's claim stays live.
     expect(screen.getAllByRole('button', { name: 'Approve' })[1]).not.toHaveAttribute(
       'aria-disabled'
     );
@@ -556,7 +549,6 @@ describe('OfficerQueue pending columns', () => {
     expect(within(table).queryByRole('columnheader', { name: 'Fleet or FC' })).toBeNull();
 
     await userEvent.click(screen.getByRole('button', { name: 'Columns' }));
-    // Every catalog id names a real column: the menu reads each one's header.
     for (const name of ['Hull', 'Lost', 'Fleet or FC']) {
       expect(await screen.findByRole('menuitemcheckbox', { name })).toBeInTheDocument();
     }

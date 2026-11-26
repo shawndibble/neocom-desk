@@ -5,13 +5,6 @@ import { loadCharacterModifiers } from '@/features/character/characterModifiers'
 import { loadReprocessing } from '@/sde/loadSde';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 
-/**
- * The active Character's skills multiplier on a facility's base yield, with no
- * ore in mind (`referenceSkillsMultiplier`): what a reprocessing yield typed in
- * Settings is divided by. Null with no active Character, while it loads, or if
- * the skills could not be read, so a form falls back to asking for the base
- * yield itself rather than guessing a multiplier.
- */
 export function useReferenceSkillsMultiplier(): number | null {
   const characterId = useActiveCharacter((state) => state.activeCharacterId);
   const [loaded, setLoaded] = useState<{ characterId: number; multiplier: number } | null>(null);
@@ -35,7 +28,6 @@ export function useReferenceSkillsMultiplier(): number | null {
           multiplier: referenceSkillsMultiplier(modifiers, [...skillIds]),
         });
       } catch (error) {
-        // The form falls back to the base yield box; the failure is still worth knowing about.
         captureException(error);
       }
     })();

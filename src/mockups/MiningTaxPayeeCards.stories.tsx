@@ -6,27 +6,6 @@ import { textActionClassName } from '@/components/ui/textActionClassName';
 import { cx } from '@/lib/cx';
 import { NewComponent } from './NewComponent';
 
-/**
- * Mining › Tax, the Payee cards and the phone ledger.
- *
- * A card exists to take an action (pay, link a payment, fix a conflict), so:
- *  - a card shows only for a Payee with something to do; one that is settled or in credit is not
- *    a card (a credit is a one-line note under the heading, with its Ledger link);
- *  - the card names no hidden controls: the name and the figure are plain text, Settle up is the
- *    one primary button, and Ledger and Link payment are text actions on the same row (no room:
- *    they fold into the ⋮ menu, shown as B);
- *  - the ledger of a Payee with no card is reached from Manage Payees (the PAYEES button), and
- *    the table's Payee filter keeps filtering the entries.
- *
- * Money reads by colour and sign, never the word "credit": green is yours, red with a minus is
- * owed, on the cards and the ledger Balance. Ledger amounts stay uncoloured (as on desktop);
- * a charge keeps its minus so it is told apart from a payment.
- *
- * The phone ledger drops the four-line label/value stack per row for a two-line row: what it was
- * and its signed amount, then the date and the running balance. Empty cells are not drawn.
- *
- * New components in this mockup: `PayeeActionCard`, `CreditNote`, `LedgerPhoneRow`.
- */
 const meta = {
   title: 'mockups/MiningTaxPayeeCards',
   tags: ['!manifest'],
@@ -72,7 +51,6 @@ const OTELA: CardPayee = {
   linkPayment: true,
 };
 
-/** Ledger and Link payment: text actions split by a hairline from `sm` up, one ⋮ menu below. */
 function SecondaryActions({ linkPayment }: { linkPayment: boolean }) {
   return (
     <>
@@ -190,20 +168,16 @@ function Cards({
   );
 }
 
-/** @summary Desktop, two payees due plus a credit note: Ledger | Link payment split by a hairline. */
 export const Proposed: Story = {
   render: () => <Cards payees={[STAR_TAIL, BUREAU]} total="9,212,437" credit />,
 };
 
-/** @summary Desktop, three payees due: three columns, same row of actions in each. */
 export const ThreePayees: Story = {
   render: () => <Cards payees={[STAR_TAIL, BUREAU, OTELA]} total="10,416,746" />,
 };
 
-/** @summary Desktop, one payee due: a single full-width row, no total line. */
 export const SinglePayee: Story = { render: () => <Cards payees={[STAR_TAIL]} /> };
 
-/** @summary Phone: Settle up plus one ⋮ menu holding Ledger and Link payment. */
 export const ProposedPhone: Story = {
   ...phone,
   render: () => <Cards payees={[STAR_TAIL, BUREAU]} total="9,212,437" credit />,
@@ -212,7 +186,6 @@ export const ProposedPhone: Story = {
 interface Row {
   what: string;
   date: string;
-  /** Signed from the pilot's side: a charge adds to what is owed, a payment takes it off. */
   amount: { charge?: string; credit?: string };
   balance: { text: string; credit?: boolean };
 }
@@ -252,7 +225,6 @@ function LedgerPhoneRow({ row }: { row: Row }) {
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline justify-between gap-2">
           <span className="truncate text-sm font-semibold">{row.what}</span>
-          {/* Charged and Credited were two labelled rows, one always blank: one signed figure. */}
           <span className={cx('shrink-0 text-sm tabular-nums', 'text-text')}>
             {sign}
             {value}
@@ -278,7 +250,6 @@ function Frame({ children }: { children: ReactNode }) {
   return <div className="space-y-3 p-4">{children}</div>;
 }
 
-/** @summary Phone ledger: two lines per row, one signed amount, empty cells not drawn. */
 export const LedgerPhone: Story = {
   ...phone,
   render: () => (

@@ -16,7 +16,6 @@ const fetchMock = vi.fn<(url: string) => Promise<Response>>(
   async () => new Response('{}', { status: 200 })
 );
 
-// What `lazy-chunks.json` names. Empty by default, so the SDE tests count only SDE fetches.
 const chunkList = { files: [] as string[] };
 const chunkFetch = vi.fn<(url: string) => Promise<Response>>();
 function routedFetch(url: string, init?: RequestInit) {
@@ -53,7 +52,6 @@ describe('warmLazySde', () => {
     expect(fetchMock).toHaveBeenCalledTimes(LAZY_SDE_FILES.length);
     const fetched = fetchMock.mock.calls.map(([url]) => String(url));
     LAZY_SDE_FILES.forEach((file, i) => expect(fetched[i]).toContain(`data/${file}`));
-    // ~2x headroom under `sw.ts`'s sde-data maxEntries (150) for stale `?v=` entries.
     expect(LAZY_SDE_FILES.length * 2).toBeLessThanOrEqual(150);
     expect(warmDogma).toHaveBeenCalledOnce();
   });
@@ -285,7 +283,6 @@ describe('cachedLazySdeFiles', () => {
 describe('overlapping passes', () => {
   it('fetch each file once when the background warm and a forced pass run together', async () => {
     env({});
-    // A real cache: a finished fetch is found by whichever pass arrives later.
     const stored = new Set<string>();
     vi.stubGlobal('caches', {
       match: vi.fn(async (url: string) => (stored.has(url) ? new Response('x') : undefined)),

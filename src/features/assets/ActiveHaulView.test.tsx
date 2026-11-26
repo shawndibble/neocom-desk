@@ -177,12 +177,10 @@ describe('ActiveHaulView', () => {
 
   it('says what happens at each stop, and what is in the hold on the way there', async () => {
     renderView();
-    // Leg 1 flies out empty, then loads where it ends: two lines, two places.
     expect(screen.getAllByText('Flying empty')).toHaveLength(2);
     expect(screen.getByText(/Load 80 m³/)).toBeTruthy();
     expect(screen.getByText(/Drop 80 m³/)).toBeTruthy();
     expect(screen.queryByText(/on arrival/)).toBeNull();
-    // An empty hold has nothing to open; a loaded one folds until asked.
     expect(screen.queryByRole('button', { name: 'Show cargo for leg 1' })).toBeNull();
     expect(screen.queryByText('Dodixie IX: 80 m³')).toBeNull();
     await userEvent.click(screen.getByRole('button', { name: 'Show cargo for leg 2' }));
@@ -211,7 +209,6 @@ describe('ActiveHaulView', () => {
         plan: { ...haul.plan, sections: [{ ...haul.plan.sections[0], legs: stacked }] },
       },
     });
-    // The stop the pilot is flying to opens on what to pick up there.
     expect(screen.getByText('3,200,000 × Item 34')).toBeTruthy();
     await userEvent.click(
       screen.getByRole('button', { name: 'Show items for Load 20 m³ at the end of leg 3' })

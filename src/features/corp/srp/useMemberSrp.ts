@@ -1,8 +1,3 @@
-/**
- * The member page's data: the corp's rules, the pilot's own claims and, once the
- * killmail Permission is granted, their lost ships with hull and system names. Reads go through
- * `srpMemberBackend` so Storybook and tests stand in for the network.
- */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { DAY_MS } from '@/lib/age';
 import { useEndpointsGranted } from '@/app/useGrantedScopes';
@@ -25,22 +20,15 @@ export interface LostRow extends LostLoss {
 export interface MemberSrp {
   status: Load<SrpStatus>;
   claims: Load<MemberClaim[]>;
-  /** `denied`: the killmail Permission is not granted, so the page asks for it. */
   losses: Load<LostRow[]> | { state: 'denied' } | { state: 'unknown' };
   names: { hull: (typeId: number) => string; system: (systemId: number) => string };
   retry: () => void;
   file: (input: FileSrpClaimInput) => Promise<FiledSrpClaim>;
-  /** The doctrine check a filing of this killmail would store; nothing is written. */
   previewDoctrine: (killmail: string) => Promise<DoctrinePreview>;
 }
 
 export const KILLMAIL_ENDPOINTS = ['getCharacterKillmailsRecent'] as const;
 
-/**
- * Runs `load` whenever `key` changes (or `retry` is called). A result belongs to the key it was read
- * for: after a Character or corporation switch the page reads `loading`, never the last one's data.
- * A retry keeps what is shown until the new read lands.
- */
 function useLoad<T>(key: string, load: (() => Promise<T>) | null): [Load<T>, () => void] {
   const [stored, setStored] = useState<{ key: string; result: Load<T> } | null>(null);
   const [attempt, setAttempt] = useState(0);
@@ -81,13 +69,11 @@ export function useMemberSrp(characterId: number, corporationId: number): Member
     enabled && granted === true
       ? async () => ({
           losses: await backend.lostLosses(characterId, corporationId),
-          // When the read landed: "too old" is judged against it, not against each render.
           at: Date.now(),
         })
       : null
   );
 
-  // The page learned the answer: the nav entry follows it without waiting for its own probe.
   useEffect(() => {
     if (status.state === 'ready') recordSrpProbe(characterId, corporationId, status.value.enabled);
   }, [status, characterId, corporationId]);
@@ -105,7 +91,6 @@ export function useMemberSrp(characterId: number, corporationId: number): Member
     ];
     if (typeIds.length === 0) return;
     let cancelled = false;
-    // A failed SDE read leaves the `#id` fallbacks in place.
     loadTypeNames(typeIds)
       .then((map) => !cancelled && setHullNames(map))
       .catch(() => undefined);
@@ -137,7 +122,6 @@ export function useMemberSrp(characterId: number, corporationId: number): Member
     const now = losses.value.at;
     return {
       state: 'ready',
-      // A loss past the corp's window is not listed: nothing can be filed for it.
       value: losses.value.losses.flatMap((loss) => {
         const kind = lostRowKind(loss, { claims: claimList ?? [], hullRules, windowDays, now });
         if (kind === 'old') return [];

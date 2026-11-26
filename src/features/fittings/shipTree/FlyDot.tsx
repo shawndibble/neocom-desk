@@ -2,11 +2,6 @@ import { tileTone } from '@/engine/shipTree/rules';
 import type { ShipTreeHullStatus } from '@/engine/shipTree/types';
 import { cx } from '@/lib/cx';
 
-/**
- * A search result's state at a glance, by shape as well as fill: hollow ring
- * can't fly, filled dot can fly, gold star Mastery V. Gold and white are only
- * ~1.4:1 apart, so the star carries the Mastery V meaning, not the colour.
- */
 export function FlyDot({ status }: { status: ShipTreeHullStatus | undefined }) {
   const tone = tileTone(status);
   if (tone === 'elite') {

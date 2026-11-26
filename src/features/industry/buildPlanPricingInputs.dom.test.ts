@@ -29,8 +29,6 @@ vi.mock('@/features/market/useTradeHubStandings', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/features/market/useTradeHubStandings')>()),
   useTradeHubStandings: vi.fn(),
 }));
-// Controllable stand-ins for the real synced-setting stores, so hydration can
-// be flipped deterministically instead of racing a real Dexie read.
 vi.mock('./assumedMe', () => ({
   useAssumedMe: create(() => ({ value: 0, hydrated: false, hydrate: vi.fn() })),
 }));
@@ -88,7 +86,6 @@ function inputs(overrides: Partial<BuildPlanPricingInputs> = {}): BuildPlanPrici
 
 beforeEach(() => {
   mockedAssumedMe.setState({ value: 0, hydrated: false, hydrate: vi.fn() });
-  // A real setting: an earlier test's render hydrates it from Dexie.
   useProfitBasis.setState({ value: useProfitBasis.getInitialState().value, hydrated: false });
   mockedBpcContracts.mockReset();
   mockedBpcContracts.mockResolvedValue(null);
@@ -111,7 +108,6 @@ describe('useBuildPlanPricingInputs', () => {
     expect(isPricingReady(result.current)).toBe(false);
 
     act(() => mockedAssumedMe.setState({ value: 4, hydrated: true }));
-    // Every setting gates it: the profit basis is part of what a row prices.
     expect(isPricingReady(result.current)).toBe(false);
 
     act(() => useProfitBasis.setState({ value: 'free', hydrated: true }));
@@ -142,7 +138,6 @@ describe('useBuildPlanPricingInputs', () => {
   it("loads the Character's standings and BPC Sourcing rows, and reloads both on a Character switch", async () => {
     const rowsFor1 = [row({ typeId: 10, regionId: JITA.regionId })];
     const rowsFor2 = [row({ typeId: 20, regionId: AMARR.regionId })];
-    // One shared public snapshot, re-read on the switch (it may have republished).
     mockedBpcContracts
       .mockResolvedValueOnce(snapshotOf(rowsFor1))
       .mockResolvedValueOnce(snapshotOf(rowsFor2));

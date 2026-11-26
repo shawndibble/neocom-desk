@@ -25,10 +25,6 @@ import {
   travelState,
 } from '@/test/travelMocks';
 
-// Shared harness for the Travel route tests (src/routes/Travel*.test.tsx), one
-// file per concern so CI runs them in parallel. The `vi.mock` calls stay in each
-// test file (vitest hoists them per file); their factories live in travelMocks.tsx.
-
 export const CHAR_ID = 91;
 export const ESI = 'https://esi.evetech.net';
 
@@ -133,11 +129,6 @@ export const server = mswServer(
 
 export function installTravelHarness(): void {
   beforeAll(async () => {
-    // One throwaway render of a Route Safety route, so no test pays for the
-    // first one. A worker's first render — compiling the route chunk, warming
-    // jsdom and React — cost seconds on top of a warm render, and it landed on
-    // whichever test ran first. Done here under the hook's own budget;
-    // `beforeEach` clears every cache it filled.
     await routeChunks.loadTravel();
     await resetState();
     window.history.pushState({}, '', `/travel/route?from=${JITA}&to=${UEDAMA}`);
@@ -176,29 +167,21 @@ export async function resetState() {
   await db.settings.put({ key: ACTIVE_CHARACTER_KEY, value: CHAR_ID });
 }
 
-/** The system picker's text box; the Route rules ship picker is a combobox too. */
 export async function systemPickerInput(): Promise<HTMLElement> {
   const boxes = await screen.findAllByRole('combobox');
   return boxes.find((box) => box.tagName === 'INPUT') ?? boxes[0];
 }
 
-/** One labelled figure from the route summary strip, e.g. `routeFact('Jumps')` → "4". */
 export function routeFact(label: string) {
   const summary = within(screen.getByRole('group', { name: 'Route summary' }));
   return summary.getByText(label, { selector: 'span' }).parentElement?.lastElementChild
     ?.textContent;
 }
 
-/**
- * The Travel page on its own route (its tabs, legacy tab paths and info
- * modals), with no App boot or signed-in shell. The App wiring tests
- * (Travel.test.tsx's redirects) render `<App />`.
- */
 export function renderTravelRoute() {
   return renderPageRoute('/travel', <Travel />);
 }
 
-/** Opens Route Safety at `/travel/route<search>`. */
 export function visit(search: string) {
   window.history.pushState({}, '', `/travel/route${search}`);
   renderTravelRoute();

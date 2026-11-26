@@ -48,7 +48,7 @@ describe('isHaulingCategoryId', () => {
   it('accepts the offered categories and Everything, and nothing else', () => {
     expect(isHaulingCategoryId(11)).toBe(true);
     expect(isHaulingCategoryId(EVERYTHING_CATEGORY_ID)).toBe(true);
-    expect(isHaulingCategoryId(4)).toBe(false); // Ships
+    expect(isHaulingCategoryId(4)).toBe(false);
   });
 
   it('offers the bulk-goods categories: Manufacture & Research, Structures and their modifications and equipment', () => {
@@ -56,7 +56,6 @@ describe('isHaulingCategoryId', () => {
   });
 
   it('keeps out the groups with nothing to haul by volume', () => {
-    // Blueprints & Reactions, Skills, Ship SKINs, Apparel, Personalization, Special Edition Assets, Pilot's Services.
     for (const id of [2, 150, 1954, 1396, 3628, 1659, 1922])
       expect(isHaulingCategoryId(id)).toBe(false);
   });

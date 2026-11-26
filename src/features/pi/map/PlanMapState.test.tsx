@@ -27,7 +27,6 @@ import {
   withWhatIf,
 } from '@/test/planMap';
 
-// What-if Bigger chains: the solver is `useWhatIfChains`'s own test; here only what the Map draws.
 let mockWhatIf: WhatIfChainsState = { byType: new Map(), pending: false };
 const whatIfAskedFor = vi.fn();
 vi.mock('@/features/pi/useBiggerChains', () => ({
@@ -38,7 +37,6 @@ vi.mock('@/features/pi/useBiggerChains', () => ({
   },
 }));
 
-// The finder reads the SDE and the stargate graph; its own behaviour is not under test here.
 vi.mock('@/features/pi/map/PlanetFinder', () => ({
   PlanetFinder: ({ types }: { types: readonly string[] }) => (
     <div data-testid="finder">finder for {types.join(',')}</div>
@@ -96,7 +94,6 @@ describe('PlanMap: what-if row', () => {
     const legend = screen.getByLabelText('Map legend');
     expect(legend).toHaveTextContent('ISK a day from one planet');
     expect(legend).toHaveTextContent("worse than that planet's simplest product");
-    // No multi-planet chain on this board, so no Est. entry.
     expect(legend).not.toHaveTextContent('Est.');
   });
 });
@@ -109,7 +106,6 @@ describe('PlanMap: phone', () => {
     expect(screen.queryByRole('group', { name: /^Planet map/ })).toBeNull();
     const switcher = screen.getByRole('group', { name: 'Product tier' });
     await user.click(within(switcher).getByRole('button', { name: 'P1' }));
-    // The row's title carries the accent cue at rest, before any tap (DESIGN.md §6c "Phone cards").
     expect(
       within(screen.getByRole('link', { name: /^Biofuels/ })).getByText('Biofuels')
     ).toHaveClass('text-accent');
@@ -150,7 +146,6 @@ describe('PlanMap: the picks note says what is shared with Plan', () => {
   });
 });
 
-// A colony's richness override is the URL's `?planet=`, in the same drawer as a product.
 describe('PlanMap richness drawer', () => {
   it("opens a colony's richness chips from ?planet= on a phone", async () => {
     stubPhone(true);
@@ -202,7 +197,6 @@ describe('PlanMap richness drawer', () => {
         <Search />
       </MemoryRouter>
     );
-    // The map drops an id it does not know from the URL: once gone, it has been read.
     await waitFor(() => expect(screen.getByTestId('search')).toBeEmptyDOMElement());
     expect(screen.queryByRole('group', { name: 'Resources you would pull here' })).toBeNull();
   });
@@ -310,13 +304,11 @@ describe('PlanMap: what-if Bigger chains, when the pilot hauls between planets',
     });
     expect(within(dialog).getByText('Add Lava and Plasma planets')).toBeInTheDocument();
     expect(screen.getByTestId('finder')).toHaveTextContent('finder for lava,plasma');
-    // Unticking one leaves the other, and the panel open.
     await user.click(planet('Lava'));
     expect(planet('Lava')).toHaveAttribute('aria-pressed', 'false');
     expect(planet('Plasma')).toHaveAttribute('aria-pressed', 'true');
     expect(whatIfAskedFor).toHaveBeenLastCalledWith([['plasma']]);
     expect(screen.getByRole('dialog', { name: 'Where to put a new Plasma colony' })).toBeVisible();
-    // The last one off closes it.
     await user.click(planet('Plasma'));
     expect(screen.queryByRole('dialog', { name: /Where to put/ })).toBeNull();
   });
@@ -344,7 +336,6 @@ describe('PlanMap: what-if Bigger chains, when the pilot hauls between planets',
     expect(whatIfAskedFor).not.toHaveBeenCalled();
     const dialog = screen.getByRole('dialog', { name: 'Where to put a new Lava colony' });
     expect(within(dialog).queryByText('Bigger chains with it')).toBeNull();
-    // Gas and Lava raws: not lit by a Lava planet alone, and no what-if figure anywhere.
     expect(maybeProduct('Camera Drones')).toBeNull();
     expect(screen.queryAllByRole('link', { name: /With a Lava planet added/ })).toEqual([]);
   });

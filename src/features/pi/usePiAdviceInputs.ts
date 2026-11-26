@@ -27,7 +27,6 @@ import { useHydratedStore } from '@/lib/useHydratedStore';
 
 export type PiAdviceInputsState =
   | { status: 'loading' }
-  /** Prices unreadable. `input` runs on empty books (null until skills load): only price-free wins survive, ISK figures null. */
   | { status: 'prices-failed'; input: PlanAdviceInput | null }
   | { status: 'ready'; input: PlanAdviceInput; prices: PlanPrices; hubName: string };
 
@@ -36,22 +35,6 @@ interface Skills {
   interplanetaryConsolidation: number | null;
 }
 
-/**
- * Everything `buildPlanAdvice` needs, for Plan, Map and Colonies alike, so the
- * three tabs cannot drift apart: the snapshot comes in, prices follow the hub,
- * skills follow the character, and the routes to the market follow the hub and
- * the pilot's route rules. Each is read on its own clock, so a change to one
- * (the sell market, the hauling preference) recomputes without refetching the
- * others. The input is ready as soon as prices and skills are in; routes land
- * after and re-make it, a leg that has not resolved being unknown rather than
- * assumed.
- *
- * Prices that could not be read (a thrown read, `failed`, or a hub that quoted
- * nothing) are `prices-failed`, never zero: the caller shows the shared notice
- * and hides every figure that derives from them.
- *
- * @param reloadKey Any value that changes when prices must be re-read.
- */
 export function usePiAdviceInputs(
   snapshot: GoalPlannerSnapshot | null,
   characterId: number | null,
@@ -64,7 +47,6 @@ export function usePiAdviceInputs(
     snapshot !== null &&
     shared.characterId === characterId &&
     shared.snapshot === snapshot;
-  // Always called so the hook order is stable; no snapshot loads nothing.
   const local = useLiveAdviceInputs(served ? null : snapshot, characterId, preference, reloadKey);
   return served ? withPreference(shared.state, preference) : local;
 }
@@ -77,11 +59,6 @@ interface SharedInputs {
 
 const SharedAdviceInputs = createContext<SharedInputs | null>(null);
 
-/**
- * Reads the advice inputs once for a subtree. The PI page mounts this inside its
- * `PiSnapshotProvider` so Plan, Map and Colonies share one prices, skills and
- * routes load, and one model run per preference, across tab switches.
- */
 export function PiAdviceInputsProvider({
   characterId,
   reloadKey = 0,
@@ -111,7 +88,6 @@ function inputFor(input: PlanAdviceInput, preference: RebuildPreference): PlanAd
   return variant;
 }
 
-/** The shared state re-read under another preference; the same input object per (input, preference), so the advice cache hits. */
 function withPreference(state: PiAdviceInputsState, preference: RebuildPreference) {
   if (state.status === 'loading') return state;
   if (state.status === 'ready') return stable(state, inputFor(state.input, preference));
@@ -143,9 +119,6 @@ function useLiveAdviceInputs(
   const richness = usePlanetRichness(characterId);
 
   const pi = snapshot?.pi ?? null;
-  // Keyed by hub only: a refresh of the colonies keeps the last prices on
-  // screen instead of blanking every figure while they are read again.
-  // `reloadKey` re-reads them: it is a dependency of the loader on purpose.
   const loadPrices = useCallback(
     () => (pi ? loadGoalPlannerPrices(hub, pi) : Promise.reject(new Error('no snapshot'))),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `reloadKey` is the caller's "read again" signal, not read by the loader.
@@ -158,7 +131,6 @@ function useLiveAdviceInputs(
   const pricesFailed = pricedNow !== null && (prices === null || prices.failed);
 
   const nowMs = snapshot?.nowMs ?? null;
-  // Keyed by character: a re-read of the colonies keeps the last skills too.
   const loadSkills = useCallback(async (): Promise<Skills> => {
     if (characterId === null || nowMs === null) throw new Error('no character');
     const [commandCenterUpgrades, interplanetaryConsolidation] = await Promise.all([
@@ -183,7 +155,6 @@ function useLiveAdviceInputs(
   const routesKey = `${basis.key}|${hub.systemId}|${systemKey}`;
   const loadRoutes = useCallback(async () => {
     const ids = systemKey === '' ? [] : systemKey.split(',').map(Number);
-    // One sweep out of the hub answers every colony, not a search per colony.
     const [swept, systems] = await Promise.all([
       localRoutesFromOrigin(hub.systemId, ids, basis.rules, basis.network).catch(() => null),
       loadSolarSystemsById().catch(() => null),
@@ -212,7 +183,6 @@ function useLiveAdviceInputs(
   return useMemo((): PiAdviceInputsState => {
     if (!snapshot) return { status: 'loading' };
     const usable = pricesFailed ? null : prices;
-    // Hold until the routes settle: ready-without-routes would run the whole advice model, then run it again with them.
     if (buybackPct === null && systemKey !== '' && !routes) return { status: 'loading' };
     if (!skills || !richness) {
       return pricesFailed ? { status: 'prices-failed', input: null } : { status: 'loading' };

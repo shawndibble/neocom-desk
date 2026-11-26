@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import type { MiningTaxAssignmentRecord } from '@/db';
@@ -92,11 +92,45 @@ describe('SettleUpDialog', () => {
     expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
   });
 
-  it('says what the amount pays, oldest day first', () => {
+  it('says what the amount pays, oldest day first: the date and the amount only', () => {
     renderDialog({ record: vi.fn() });
     const status = screen.getByRole('status');
-    expect(status).toHaveTextContent('2026-09-04');
-    expect(status).toHaveTextContent('2026-09-06');
+    const items = within(status).getAllByRole('listitem');
+    expect(items.map((li) => li.textContent)).toEqual([
+      '2026-09-04100,000 ISK',
+      '2026-09-05200,000 ISK',
+      '2026-09-06300,000 ISK',
+    ]);
+    expect(status).not.toHaveTextContent(/· paid/);
+  });
+
+  it("lists an open day's estimate the amount covers, noted as an estimate, and credit only beyond it", () => {
+    const outcome: PaymentOutcome = {
+      lines: [{ date: '2026-09-05', applied: 200_000, remainingAfter: 0, settled: true }],
+      openLines: [{ date: '2026-09-06', applied: 50_000 }],
+      owedBefore: 200_000,
+      owedAfter: 0,
+      creditAfter: 10_000,
+      creditAdded: 10_000,
+    };
+    render(
+      <SettleUpDialog
+        open
+        onClose={vi.fn()}
+        rows={ROWS}
+        onPaid={vi.fn()}
+        owedFor={() => 260_000}
+        preview={() => outcome}
+        reason="x"
+        record={vi.fn()}
+      />
+    );
+    const items = within(screen.getByRole('status')).getAllByRole('listitem');
+    expect(items.map((li) => li.textContent)).toEqual([
+      '2026-09-05200,000 ISK',
+      '2026-09-06, Estimate until the day closes50,000 ISK',
+      'Credit for your next days10,000 ISK',
+    ]);
   });
 
   it('a smaller amount part-pays the next day, and says what is left', async () => {
@@ -106,7 +140,7 @@ describe('SettleUpDialog', () => {
     await user.type(screen.getByRole('textbox', { name: /amount you sent/i }), '150000');
     const status = screen.getByRole('status');
     expect(status).toHaveTextContent('2026-09-05');
-    expect(status).toHaveTextContent(/150,000 ISK still owed/);
+    expect(status).toHaveTextContent(/Still owed after it450,000 ISK/);
     expect(status).not.toHaveTextContent('2026-09-06');
   });
 
@@ -115,7 +149,7 @@ describe('SettleUpDialog', () => {
     renderDialog({ record: vi.fn() });
     await user.click(screen.getByRole('button', { name: /different amount/i }));
     await user.type(screen.getByRole('textbox', { name: /amount you sent/i }), '700000');
-    expect(screen.getByRole('status')).toHaveTextContent(/100,000 ISK more than is owed/);
+    expect(screen.getByRole('status')).toHaveTextContent(/Credit for your next days100,000 ISK/);
   });
 
   it('records one payment for the Payee: the amount sent and the day', async () => {

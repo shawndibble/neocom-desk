@@ -1,18 +1,7 @@
-/**
- * Item Detail's roll tables at phone width: the owned module's rolls and an
- * abyssal type's roll ranges stay tables (`responsive="table"`) and scroll
- * sideways in their own wrapper (DESIGN.md §4a). Without one, the table
- * widened the dialog body, which then scrolled as a whole and pushed Roll
- * quality off the phone's edge.
- *
- * Containment only, no pixel figures. MutaMarket isn't reachable in E2E
- * (Firebase is blanked), so the estimate line shows its unavailable state.
- */
 import type { Page } from '@playwright/test';
 import { test, expect, PHONE } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 
-/** 5MN Abyssal Microwarpdrive, made from a 5MN Microwarpdrive II by an Unstable mutaplasmid. */
 const ABYSSAL_TYPE = 47740;
 const ITEM_ID = 1_000_000_001;
 
@@ -38,7 +27,6 @@ async function mockRolls(page: Page) {
   );
 }
 
-/** The dialog's scrolling body never scrolls sideways; the named table's own wrapper does. */
 async function expectTableScrollsAlone(page: Page, tableName: string) {
   const table = page.getByRole('table', { name: tableName });
   await expect(table).toBeVisible({ timeout: 15_000 });
@@ -56,7 +44,6 @@ async function expectTableScrollsAlone(page: Page, tableName: string) {
   });
   expect(widths.bodyScroll).toBeLessThanOrEqual(widths.bodyClient);
   expect(widths.wrapperOverflowX).toBe('auto');
-  // The table really is wider than a phone, so the wrapper is what scrolls.
   expect(widths.wrapperScroll).toBeGreaterThan(widths.wrapperClient);
 }
 

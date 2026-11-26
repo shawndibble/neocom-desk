@@ -9,7 +9,6 @@ import { LANDING_ANCHORS } from './landingAnchors';
 
 type Callback = (entries: { target: Element; isIntersecting: boolean }[]) => void;
 
-/** Installs a mock IntersectionObserver and returns a function reporting one observed element's visibility. */
 function mockObserver(): (target: Element, visible: boolean) => void {
   let callback: Callback = () => {};
   class MockObserver {
@@ -69,7 +68,6 @@ describe('LandingHeader', () => {
     const report = mockObserver();
     const { onLogin, hero, bottom } = setup();
     const name = { name: 'Log in with EVE Online' };
-    // Nothing has reported yet: stay hidden.
     expect(screen.queryByRole('button', name)).toBeNull();
     report(hero(), true);
     report(bottom(), false);

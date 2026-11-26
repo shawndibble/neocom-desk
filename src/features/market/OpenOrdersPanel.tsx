@@ -100,21 +100,12 @@ const TABLE_LABEL_KEY: Record<OpenOrdersView, string> = {
 
 interface OpenOrdersPanelProps {
   headerSlots: PageHeaderSlots;
-  /** Corporation is the data source: the corp's orders in the same page, the same look. */
   corporation?: boolean;
-  /** Corporation source only: the role reads corp orders but the grant lacks the scope, so ask for it. */
   corporationNeedsGrant?: boolean;
-  /** Set when the Character can read corp orders: adds "Corporation" to the Character picker. */
   onChooseCorporation?: () => void;
-  /** Corporation source only: the picker went straight to This character or All characters. */
   onLeaveCorporation?: () => void;
 }
 
-/**
- * Market's Open Orders tab: every selling character's open market orders as a
- * fix list — the orders that need the pilot, worst first, in one flat table
- * that says what is wrong and what to do, with Watch and All one segment away.
- */
 export function OpenOrdersPanel({
   headerSlots,
   corporation = false,
@@ -124,9 +115,7 @@ export function OpenOrdersPanel({
 }: OpenOrdersPanelProps) {
   const { t } = useTranslation();
   const viewedFromUrl = useViewedCharacterId();
-  // The URL's Character narrows Character rows; the corporation's are not any Character's.
   const viewedCharacterId = corporation ? undefined : viewedFromUrl;
-  // The source is fixed for a mount (the caller keys the panel by it).
   const { data, error, loading, hydrated, activeCharacterId, refresh } = useRouteSnapshot(
     corporation
       ? corporationNeedsGrant
@@ -137,8 +126,6 @@ export function OpenOrdersPanel({
     { cacheKey: corporation ? 'market:corp-orders' : 'market:open-orders' }
   );
   const deviceCharacterCount = useCharacterCount();
-  // A manual refresh re-prices too: station prices otherwise answer from the
-  // 15-minute price cache.
   const refreshOrders = useCallback(() => {
     if (data) invalidateStationBestPrices(data.stationPrices);
     refresh();
@@ -149,8 +136,6 @@ export function OpenOrdersPanel({
     rowsFilter: urlRowsFilter,
     setFilter: setUrlFilter,
   } = useOpenOrdersFilterState(activeCharacterId);
-  // Issuers are not Characters: a remembered Character pick filters nothing here,
-  // and is left in the URL for the way back.
   const filter = useMemo(
     () => (corporation ? { ...urlFilter, characterIds: [] } : urlFilter),
     [corporation, urlFilter]
@@ -161,37 +146,18 @@ export function OpenOrdersPanel({
   );
   const setFilter = (next: OpenOrdersFilter) =>
     setUrlFilter(corporation ? { ...next, characterIds: urlFilter.characterIds } : next);
-  /**
-   * The order a Notification Event (an undercut, or a fill) sent the reader
-   * to, spent once on arrival (`useHighlightParam`'s own doc). Landing on the
-   * row that prompted the click, decision `20260908-123516`.
-   */
   const highlightParamId = useHighlightParam();
-  /** `?open=` opens the order's modal as a row click would, and flashes the row too. */
   const openParamId = useOpenParam();
   const highlightId = highlightParamId ?? openParamId;
-  /** A segment click ends the highlighted row's hold on the segment shown. */
   const [viewPicked, setViewPicked] = useState(false);
   const isPhone = useIsPhone();
   const [detailOrderId, setDetailOrderId] = useState<number | null>(openParamId);
-  /** The table's header-click sort, held here so the work-through walks rows in the order they show. */
   const [tableSort, setTableSort] = useState<DataTableSort | null>(null);
   const [legendOpen, setLegendOpen] = useState(false);
-  /**
-   * The Order Detail modal's loading, page-level: its caches outlive any one
-   * modal, and its region and structure books also reclassify the rows below
-   * (`useOrderDetail`'s own doc).
-   */
   const orderDetail = useOrderDetail();
   const structureFees = useStructureFees((state) => state.value);
   useHydratedStore(useStructureFees);
-  /**
-   * Active campaign turn-ins (#6708), their LP at the Market page's hub as
-   * every other Market figure prices. A Character's orders only: a
-   * corporation's stock is no one Character's to turn in.
-   */
   const { hubId, hydrated: hubHydrated } = useHubFor('market');
-  // Idle until the hub settles (a first load at the default hub would flip rows) and for a corporation.
   const turnInLoad = useTurnInOffers(
     corporation || !hubHydrated ? null : (getTradeHub(hubId) ?? DEFAULT_TRADE_HUB)
   );
@@ -203,11 +169,6 @@ export function OpenOrdersPanel({
         : undefined,
     [turnIns]
   );
-  /**
-   * Opens an order's Order Detail (its turn-in shows there too). Stable, so the
-   * table's columns are not rebuilt every render. The modal loads what the
-   * order needs as it opens (`useOpenOrderDetail`).
-   */
   const openDetails = useCallback((row: OpenOrderRow) => setDetailOrderId(row.orderId), []);
 
   const {
@@ -216,8 +177,6 @@ export function OpenOrdersPanel({
     reset: resetColumns,
   } = useColumnVisibility(useVisibleOpenOrderColumns, OPEN_ORDER_DEFAULT_COLUMNS);
 
-  // A Character named in the URL narrows the whole page to that Character —
-  // its rows, grant notes and skipped note — and is stated by the readout.
   const viewedCharacter = useLiveQuery(
     async () =>
       viewedCharacterId === undefined ? undefined : db.characters.get(viewedCharacterId),
@@ -287,33 +246,12 @@ export function OpenOrdersPanel({
     turnInPerItem,
   ]);
 
-  /**
-   * The highlighted row, found before any segment or filter narrows the
-   * screen — null when nothing matches is harmless (decision
-   * `20260908-123516`). It only widens the segment shown (`shownView`), never
-   * an active content filter (search/problem/character).
-   */
   const highlightedRow = useMemo(
     () => (highlightId === null ? null : (allRows.find((r) => r.orderId === highlightId) ?? null)),
     [allRows, highlightId]
   );
 
-  /**
-   * Takes this load's `OrderProblem` reading for every open order and drops
-   * the history of orders that have since closed. Runs off `allRows` rather
-   * than inside the loader because the reading it stores is the
-   * classification `buildOpenOrderRows` just produced — nothing earlier in
-   * the chain knows it.
-   *
-   * Re-fires whenever a deeper check reclassifies a row; because every
-   * reading from one load shares `snapshot.now`, `appendOrderProblemSample`
-   * replaces that load's sample instead of appending a second one, and the
-   * spacing guard covers loads further apart. Fire-and-forget: a failed
-   * write costs one sample from a deliberately gappy series, not worth an
-   * error state on a page whose job is elsewhere.
-   */
   useEffect(() => {
-    // Order history is the Character's own: a corporation order's issuer may be an alt.
     if (!snapshot || corporation) return;
     const characterIds = sampleableCharacterIds(snapshot.openOrders.entries);
     void recordOrderProblemSamples(
@@ -330,8 +268,6 @@ export function OpenOrdersPanel({
 
   const problemCounts = useMemo(() => openOrderProblemCounts(allRows), [allRows]);
 
-  // The ceiling is per Character, so the figure shows for exactly one: the picked Character, or
-  // the only one with orders. Never a sum, and never under the Corporation source.
   const orderSlots = useMemo(() => {
     if (!snapshot || corporation) return undefined;
     const ids =
@@ -361,12 +297,6 @@ export function OpenOrdersPanel({
     return m;
   }, [entriesWithOrders]);
 
-  /**
-   * Every location currently holding an open order — the location filter's
-   * option catalog, so a saved pick from a station that has since sold out
-   * can still be seen and untoggled rather than just quietly narrowing to
-   * nothing (see `filter.locationIds` below).
-   */
   const locationOptions = useMemo(
     () =>
       locationFilterOptions(allRows, (locationId) =>
@@ -391,10 +321,8 @@ export function OpenOrdersPanel({
     onOpenTurnIn: openDetails,
   });
 
-  /** The header sort, dropped once the Columns menu hides its column. */
   const sortColumn = tableSort && columns.find((c) => c.id === tableSort.columnId);
   const activeSort = sortColumn ? tableSort : null;
-  /** Every row the funnel matched, in the table's order. */
   const sortedRows = useMemo(
     () =>
       sortColumn && tableSort
@@ -403,7 +331,6 @@ export function OpenOrdersPanel({
     [fixList.matching, sortColumn, tableSort]
   );
 
-  // Every row the funnel matched, whichever segment shows, so `rows` as given.
   const csvColumns = useMemo<CsvColumn<OpenOrderRow>[]>(() => ordersCsvColumns(t), [t]);
   const ordersExport = useTableExport({
     surface: 'orders-open',
@@ -412,8 +339,6 @@ export function OpenOrdersPanel({
     source: 'rows',
   });
 
-  // Whoever has a floor on any matched order: each note checks that
-  // character's own grant, since each floor prices with its standings.
   const floorCharacters = useMemo(
     () =>
       [...new Set(fixList.matching.filter((row) => row.floor).map((row) => row.characterId))].map(
@@ -446,16 +371,8 @@ export function OpenOrdersPanel({
     rowCount: allRows.length,
   });
 
-  /**
-   * The segment on screen: the picked one, widened to All while the
-   * work-through's current order, or (until the pilot picks a segment) the
-   * highlighted one, sits outside it — the walk takes in Watch's system and
-   * region undercuts too.
-   */
   const view = shownView(filter.view, workCurrent ?? (viewPicked ? null : highlightedRow));
-  // A work-through shows its current order in the modal; a row click shows its own.
   const modalRow = workCurrent ?? detailRow;
-  // A walk replaces a row-click modal: drop it, so it cannot reappear when the walk ends.
   const walking = workCurrent !== null;
   const [wasWalking, setWasWalking] = useState(false);
   if (walking !== wasWalking) {
@@ -467,16 +384,6 @@ export function OpenOrdersPanel({
     [sortedRows, view]
   );
 
-  /**
-   * `CharacterFilterControl`'s `value`: `'current'` only for the exact
-   * single-id array `characterFilterOnChange` itself writes for that literal
-   * value (`[activeCharacterId]`), everything else `'all'` — the closest this
-   * narrowed picker can still say honestly. That covers a legacy hand-picked
-   * subset link and the Overview Orders widget's deep link naming one *other*
-   * alt the same way: the label reads "All characters" rather than lying that
-   * it is "This character", while the table itself keeps filtering to
-   * whatever `characterIds` holds (`matchesCharacterIds` reads it directly).
-   */
   const characterFilterValue: CharacterFilterValue =
     filter.characterIds.length === 1 && filter.characterIds[0] === activeCharacterId
       ? 'current'
@@ -491,16 +398,12 @@ export function OpenOrdersPanel({
           <CharacterFilterControl<CharacterScopeChoice>
             activeCharacterId={activeCharacterId}
             value={corporation ? 'corporation' : characterFilterValue}
-            // Under Corporation the entries are issuers, so All counts the device's Characters.
             characterCount={corporation ? deviceCharacterCount : entriesWithOrders.length}
-            // The faces are the same Characters the count is: those with orders.
             allCharacterIds={
               corporation ? undefined : entriesWithOrders.map((entry) => entry.characterId)
             }
             corporation={onChooseCorporation !== undefined}
-            // The body shows its spinner for the same first load (a switch to or from Corporation remounts).
             loading={loading && !data}
-            // Who "All" leaves out (never granted orders): the trigger's dot and menu note.
             missingNames={snapshot?.openOrders.skipped.map((c) => c.name)}
             onChange={(next) => {
               if (next === 'corporation') {
@@ -519,7 +422,6 @@ export function OpenOrdersPanel({
       }
       actions={
         <>
-          {/* Export before Refresh, as on every header (DESIGN.md §6c Header controls). */}
           {snapshot && (
             <TableActionsMenu
               name={t('market.orders.tableName')}
@@ -572,8 +474,6 @@ export function OpenOrdersPanel({
     location: (locationId) =>
       locationNamesById.get(locationId) ??
       t('market.orders.filter.unknownLocation', { id: locationId }),
-    // Only while the header's control reads "All characters" over a pick it
-    // cannot name; "This character" already says itself there.
     character:
       characterFilterValue === 'all'
         ? (characterId) => characterNamesById.get(characterId) ?? String(characterId)
@@ -589,9 +489,7 @@ export function OpenOrdersPanel({
     setFilter({ ...filter, view: next });
   }
 
-  /** Same menu Transactions carries — an order row names an item like any other. */
   function rowContextMenu(row: OpenOrderRow, tr: ReactElement) {
-    // The price "Do this" names, so the menu and the cell never disagree.
     const newPrice = doThisPrice(rowFixCall(row).call);
     return (
       <ItemContextMenu
@@ -605,10 +503,8 @@ export function OpenOrdersPanel({
                 </MenuItem>
               </MenuGroup>
             )}
-            {/* Only where the station is named: an unnamed structure has nothing to show. */}
             {row.stationName !== null && (
               <>
-                {/* View route opens Route Safety, so it sits with View in Market, not under In game. */}
                 <MenuGroup id="primary">
                   <ViewRouteMenuItem locationId={row.locationId} />
                 </MenuGroup>
@@ -632,7 +528,6 @@ export function OpenOrdersPanel({
 
   const tableLabel = t(TABLE_LABEL_KEY[view]);
   const noOrders = reauthEntries.length === 0 && !corpReauth && allRows.length === 0;
-  // The grant banner alone says why the corporation's list is empty; no list chrome under it.
   const corpGrantOnly = corpReauth && allRows.length === 0;
 
   return (
@@ -678,7 +573,6 @@ export function OpenOrdersPanel({
           {fromCacheAny && <CachedNotice withBadge fetchedAt={oldestFetchedAt} />}
 
           {corpGrantOnly ? null : noOrders ? (
-            // Every Character skipped: the "hasn't shared" note below already says why.
             notShared.length > 0 && snapshot.openOrders.entries.length === 0 ? null : (
               <CachedEmptyState
                 result={{ fromCache: fromCacheAny }}
@@ -741,8 +635,6 @@ export function OpenOrdersPanel({
                   active={activeFilters}
                   resultCount={viewRows.length}
                   actions={
-                    // The phone cards ignore column choices, so the picker
-                    // would have nothing to act on there.
                     !isPhone && (
                       <ColumnPickerMenu
                         available={OPEN_ORDER_COLUMN_IDS}
@@ -777,10 +669,6 @@ export function OpenOrdersPanel({
                 </FilterBar>
               </div>
 
-              {/*
-                Only a funnel filter narrows: a segment hiding the rest is not
-                a failed match (issue #2032), and its count is on its button.
-              */}
               <LiveStatus>
                 {fixList.matching.length === 0
                   ? t('orders.noResults')
@@ -812,12 +700,9 @@ export function OpenOrdersPanel({
                   rowContextMenu={rowContextMenu}
                 />
               ) : (
-                // Many columns on: the table scrolls sideways in its own frame,
-                // never the page.
                 <div className="min-w-0 overflow-x-auto">
                   <DataTable
                     {...ordersExport.tableProps}
-                    // The ⋮ in the text colour, as the order book's.
                     className="dt-actions-pinned-only"
                     density="compact"
                     columns={columns}
@@ -844,8 +729,6 @@ export function OpenOrdersPanel({
             </>
           )}
 
-          {/* With the picker on All, it names who is left out itself (`missingNames`);
-              otherwise (no picker, or one Character's view) the foot still says so. */}
           <ListNotes
             floorCharacters={floorCharacters}
             notShared={pickerNamesMissing ? [] : notShared}
@@ -853,10 +736,6 @@ export function OpenOrdersPanel({
 
           {modalRow && (
             <OrderDetailModal
-              // Keyed by orderId so the modal remounts (and its folded-section
-              // state resets) between orders (issue #1428). A work-through keeps
-              // one modal across every order: a remount per Next would push a
-              // history entry each time.
               key={workCurrent ? 'work-through' : modalRow.orderId}
               row={modalRow}
               snapshot={snapshot}

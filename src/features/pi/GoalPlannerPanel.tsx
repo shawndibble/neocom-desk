@@ -1,27 +1,4 @@
 import { idSetKey } from '@/lib/idSetKey';
-/**
- * The Plan tab: a **Goal Plan** over the active Character's colonies — "here
- * are my colonies and the products I want per day; what does each colony do,
- * and is it worth more than what they earn anyway?"
- *
- * The page wires reads to the engine and nothing else: `goalPlannerSnapshot`
- * reads, `goalPlannerModel` adapts, `planBest` / `planDiff` answer,
- * `goalPlanView` reads the answer, and `GoalPlannerRail` /
- * `GoalPlannerResults` draw. Goals and switched-off colonies are URL state
- * (the route owns them); the standing assumptions are device-local prefs; the
- * customs rate is the synced per-system override Colonies and Map read too.
- *
- * ## Layout
- *
- * DOM (and so tab) order is Goals, Colonies, Assumptions, results: the
- * inputs before the answer they drive. On a pointer a grid puts the three in
- * a rail beside the results, which span the rail's rows plus a trailing `1fr`
- * row so the rail panels stay packed at the top. On a phone the same order
- * stacks: Colonies and Assumptions start folded there, so the answer sits two
- * header rows below the goals. No CSS `order` — a reordered phone layout
- * would send keyboard and screen-reader users through a different sequence
- * than the one on screen (WCAG 2.4.3).
- */
 import { useCallback, useDeferredValue, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useLocation } from 'react-router-dom';
@@ -96,7 +73,6 @@ export interface GoalPlannerPanelProps {
   characterId: number;
   goals: Goal[];
   onGoalsChange: (goals: Goal[]) => void;
-  /** Planet ids switched off. */
   disabled: number[];
   onDisabledChange: (ids: number[]) => void;
 }
@@ -110,7 +86,6 @@ function Loading() {
   );
 }
 
-/** Item menus here read the page's Item Actions, which the Planetary Industry route provides. */
 export function GoalPlannerPanel(props: GoalPlannerPanelProps) {
   return <GoalPlanner {...props} />;
 }
@@ -124,31 +99,23 @@ function GoalPlanner({
 }: GoalPlannerPanelProps) {
   const { t } = useTranslation();
   const mdUp = useMediaQuery(MD_UP);
-  // Phone-sized (36px) controls below `md`; the dense tier beside a pointer.
   const size = mdUp ? 'sm' : 'md';
-  // Folded on a phone, open beside a pointer, until the pilot says otherwise.
-  // `#customs` lands on the customs rate fields: Colonies open, first rate focused.
   const { hash } = useLocation();
   const [toCustoms, setToCustoms] = useState(hash === PLAN_CUSTOMS_HASH);
   const [coloniesOpen, setColoniesOpen] = useState<boolean | null>(toCustoms ? true : null);
   const [assumptionsOpen, setAssumptionsOpen] = useState<boolean | null>(null);
 
-  // --- Reads ---
   const { snapshot, failed } = usePiSnapshot(characterId);
 
-  // --- Prefs ---
   const prefs = useGoalPlannerPrefs((state) => state.value);
   const setPrefs = useGoalPlannerPrefs((state) => state.setValue);
   const cadence = useCadence((state) => state.value);
   useHydratedStore(useGoalPlannerPrefs, useCadence);
 
-  // Where the plan sells, and what it may buy there, are the shared PI
-  // settings: the page strip and the settings form edit the same record.
   const { hub, hydrated: hubHydrated, buybackPct, buyTiers } = useSellHub();
   const buysAnything = buyTiers.length > 0;
   const buysP1 = buyTiers.includes(1);
 
-  // --- Prices, keyed on the hub so a hub switch never refetches colonies ---
   const pi = snapshot?.pi ?? null;
   const loadPrices = useCallback(
     () => (pi ? loadGoalPlannerPrices(hub, pi) : Promise.reject(new Error('no snapshot'))),
@@ -157,7 +124,6 @@ function GoalPlanner({
   const prices: PlanPrices | null =
     useKeyedLoad(pi && hubHydrated ? hub.id : null, loadPrices).data ?? null;
 
-  // --- Customs: edits layered over the snapshot, written through to the synced setting ---
   const [customsEdits, setCustomsEdits] = useState<CustomsOverrides | null>(null);
   const customsOverrides = customsEdits ?? snapshot?.customsOverrides ?? null;
   const writeCustoms = useCallback(
@@ -175,7 +141,6 @@ function GoalPlanner({
     [characterId, customsEdits, snapshot]
   );
 
-  // --- Inputs, deferred so typing a rate never waits on a re-plan ---
   const restartHours = cadence.restartDays * HOURS_PER_DAY;
   const haulHours = cadence.haulDays * HOURS_PER_DAY;
   const richness = usePlanetRichness(characterId);
@@ -197,20 +162,15 @@ function GoalPlanner({
   const products = useMemo(() => (pi ? productOptions(pi) : []), [pi]);
   const plannable = useMemo(() => new Set(products.map((p) => p.typeId)), [products]);
 
-  // Once the payload is in, a goal it cannot plan (a hand-edited link) leaves the URL.
   useEffect(() => {
     if (plannable.size === 0) return;
     const kept = plannableGoals(goals, plannable);
     if (kept.length !== goals.length) onGoalsChange(kept);
   }, [goals, plannable, onGoalsChange]);
 
-  // Keyed on the goals' serialized form: a new array with the same goals never re-plans.
   const goalsKey = useDeferredValue(serializeGoals(plannableGoals(goals, plannable)) ?? '');
   const plannedGoals = useMemo(() => parseGoals(goalsKey), [goalsKey]);
 
-  // The hub only absorbs a share of a P2+ product's daily volume; the plan counts
-  // no more than that as sold. The plan does not wait: a product whose volume is
-  // unread is uncapped until it lands.
   const goalTypeIds = useMemo(
     () =>
       plannedGoals
@@ -219,7 +179,6 @@ function GoalPlanner({
     [plannedGoals, products]
   );
   const { trades } = useHubTradesPerDay(goalTypeIds, hub.regionId);
-  // Only the picked (goal) products cost a history read for the "vs 90d" flag.
   const pickedTypeIds = useMemo(
     () => plannedGoals.filter((goal) => goal.unitsPerDay > 0).map((goal) => goal.typeId),
     [plannedGoals]
@@ -230,16 +189,11 @@ function GoalPlanner({
     [trades]
   );
 
-  // --- Jumps on the pilot's route basis: each colony's system to the hub, and
-  // between colony systems for the host choice. The plan does not wait for
-  // them: until they resolve every leg is unknown (no host is penalised) and
-  // the plan is re-made when they land.
   const basis = useSharedJumpBasis();
   const systemKey = useMemo(() => idSetKey(rows.map((row) => row.systemId)), [rows]);
   const [jumps, setJumps] = useState<{
     key: string;
     bySystem: Map<number, number | null>;
-    /** Colony system to colony system, keyed `low-high`, for the host choice. */
     pairs: Map<string, number | null>;
   } | null>(null);
   const jumpsKey = `${basis.key}|${hub.systemId}|${systemKey}`;
@@ -329,7 +283,6 @@ function GoalPlanner({
     };
   }, [snapshot, pi, rows, hub, t]);
 
-  // --- States ---
   if (failed) {
     return <EmptyState title={t('piPlan.loadFailedTitle')} hint={t('piPlan.loadFailedHint')} />;
   }
@@ -345,7 +298,6 @@ function GoalPlanner({
       <EmptyState
         title={t(unknown ? 'piPlan.noColoniesUnknownTitle' : 'piPlan.noColoniesTitle')}
         hint={
-          // Buying P1 covers P1 goals only; a P2+ goal needs a colony to host it.
           plannedGoals.length > 0 &&
           plannedGoals.every((goal) => products.find((p) => p.typeId === goal.typeId)?.tier === 1)
             ? `${t('piPlan.noColoniesHint')} ${t('piPlan.noColoniesBuyHint')}`
@@ -383,12 +335,9 @@ function GoalPlanner({
             best.baseline.haulEffort
           )
         : null;
-    // Until distances land the plan is made without them and re-made after,
-    // which can move the host: say so rather than announce a verdict twice.
     const distancesPending = jumpsFn === undefined && rows.length > 0;
     const hasGoals = plannedGoals.some((goal) => goal.unitsPerDay > 0);
     const steps = changeSteps(best.plan, planDiff(best.plan, planned), rows);
-    // Only units sent to the hub are capped, so only those can be over the share.
     const soldPerDay = new Map<number, number>();
     for (const f of best.plan.flows) {
       if (f.to === 'hub')
@@ -495,7 +444,7 @@ function GoalPlanner({
           focusCustoms={toCustoms}
           expanded={coloniesOpen ?? mdUp}
           onToggleExpanded={() => {
-            setToCustoms(false); // the deep link's focus is one-shot
+            setToCustoms(false);
             setColoniesOpen(!(coloniesOpen ?? mdUp));
           }}
           onToggle={(planetId, enabled) =>

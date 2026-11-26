@@ -10,30 +10,19 @@ interface FittingEditorLayoutProps {
   addMode: AddMode;
   addOpen: boolean;
   addTitle: string;
-  /** The module browser, shown docked, in the slide-out or in the sheet. */
   addPanel: ReactNode;
   onCloseAdd: () => void;
-  /** The saved Ring | List choice has loaded; the page body waits for it. */
   viewHydrated: boolean;
   view: FittingView;
   onViewChange: (view: FittingView) => void;
   editor: ReactNode;
   statsSections: ReactNode;
-  /** Something asked for the stats column (Improve's "See all in What to train"): a phone shows its Stats tab. */
   statsRequested?: boolean;
-  /** Improve holds the left column on a narrower desktop: one column, the stats above the editor (`leftColumn`). */
   statsFirst?: boolean;
-  /** Improve, open on desktop: a column left of the editor and stats, where the docked browser sits. */
   improveColumn?: ReactNode;
-  /** The Alpha/Omega badge, at the far end of the phone's tab row. */
   alpha?: ComponentProps<typeof AlphaCloneChip>;
 }
 
-/**
- * Where the Fitting editor's parts sit: the phone's Ring / List / Stats tabs, or
- * the docked / slide-out browser beside the Ring | List column and the stats.
- * Also hosts the Add panel's sheet and slide-out wrappers.
- */
 export function FittingEditorLayout({
   addMode,
   addOpen,
@@ -51,15 +40,12 @@ export function FittingEditorLayout({
   alpha,
 }: FittingEditorLayoutProps) {
   const { t } = useTranslation();
-  // Below desktop the Ring, the List and the stats are one set of tabs.
   const [phoneTab, setPhoneTab] = useState<'editor' | 'stats'>('editor');
-  // One-shot on the request rising, so the pilot can still leave the Stats tab afterwards.
   const [statsSeen, setStatsSeen] = useState(statsRequested);
   if (statsSeen !== statsRequested) {
     setStatsSeen(statsRequested);
     if (statsRequested) setPhoneTab('stats');
   }
-  // The tab bar renders on the phone sheet only.
   const viewTabsId = useTabsId();
 
   return (
@@ -119,7 +105,6 @@ export function FittingEditorLayout({
                   {addPanel}
                 </Panel>
               )}
-              {/* The Ring | List switch is in the editor panel's header. */}
               <div
                 data-testid="fitting-editor-column"
                 {...{ [RING_ROOM_ATTR]: '' }}
@@ -139,7 +124,6 @@ export function FittingEditorLayout({
       {addMode === 'slideOut' && (
         <SlideOver
           side="left"
-          // Clears the app's 12rem nav, so it slides out where the docked column sits.
           className="md:left-48"
           open={addOpen}
           onClose={onCloseAdd}
@@ -152,13 +136,7 @@ export function FittingEditorLayout({
   );
 }
 
-/**
- * With Improve open, its column sits left of the editor grid, in the page's own
- * flow like the docked browser: it never covers the nav or the page header.
- */
 function ImproveBeside({ column, children }: { column?: ReactNode; children: ReactNode }) {
-  // The same element either way, so opening or closing Improve never remounts the
-  // editor beside it (and loses its state): only the wrapper's display changes.
   return (
     <div className={column ? 'grid grid-cols-[24rem_minmax(0,1fr)] items-start gap-3' : 'contents'}>
       {column}

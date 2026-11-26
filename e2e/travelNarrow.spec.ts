@@ -1,24 +1,3 @@
-/**
- * Travel at 390px (issue #2519).
- *
- * - Route Safety with no stops opened on a folded Stops panel and an empty
- *   state with nothing to press: the panel now stays open on a phone until
- *   there is a stop worth folding.
- * - A long Current System name ("TASH-MURKON PRIME (CURRENT SYSTEM)") pushed
- *   the shared solar-system picker past the screen: its trigger
- *   now shrinks and ends in an ellipsis instead, at the same height.
- * - Thera / Turnur's filtered-to-zero state gained Reset filters (now in its
- *   modal on Route Safety, where it keeps the page's From).
- *
- * The shared ESI mock answers the Current System with Jita; tests that need
- * a long name override `/location` (a later `page.route` wins). It doesn't
- * answer `/universe/system_jumps` or `/universe/system_kills`, which Route
- * Safety reads once it has a route, so both are answered empty here.
- *
- * Issue #2522: the itinerary's leg headers and Travel's status notes set no
- * size, so they fell through to the browser's 16px; they now sit on the 14px
- * body size (`text-sm`).
- */
 import type { Locator, Page } from '@playwright/test';
 import { test, expect, PHONE, DESKTOP } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
@@ -26,7 +5,6 @@ import { CHARACTER_ID } from './support/fixtureData';
 import { expectNoPageOverflow } from './support/overflow';
 import { openTheraModal } from './support/theraModal';
 
-/** A cold dev server can take longer than Playwright's default 5s to serve the route. */
 const COLD_LOAD = { timeout: 15_000 };
 
 const JITA = 30000142;
@@ -36,7 +14,6 @@ const AMARR = 30002187;
 const DODIXIE = 30002659;
 const THERA = 31000005;
 
-/** Empty by default; `unavailable` answers 503 so Route Safety reports the figures as unread. */
 async function mockUniverseStats(page: Page, unavailable = false) {
   await page.route(/esi\.evetech\.net\/(.*\/)?universe\/system_(jumps|kills)/, (route) =>
     unavailable
@@ -55,7 +32,6 @@ async function mockCurrentSystem(page: Page, systemId: number) {
   );
 }
 
-/** One large hole out of Thera into Jita, alive for a day. */
 async function mockOneTheraHole(page: Page) {
   await page.route('https://api.eve-scout.com/**', (route) =>
     route.fulfill({
@@ -92,7 +68,6 @@ async function expectPickerFits(page: Page, name: RegExp) {
   await expectNoPageOverflow(page);
   const box = (await trigger.boundingBox())!;
   expect(box.x + box.width).toBeLessThanOrEqual(PHONE.width);
-  // Truncated, not wrapped: one control-height line (`h-9` on a phone).
   expect(box.height).toBe(36);
 }
 
@@ -201,14 +176,12 @@ test.describe('Travel at 390px', () => {
   test("Route Safety's unread last-hour figures note is 14px", async ({ page }) => {
     await mockUniverseStats(page, true);
     await signInAndGoto(page, `./travel/route?stops=${AMARR}`);
-    // LiveNote: the visible <p> has no role (its sr-only sibling carries the status).
     const note = page.locator('p', { hasText: "last-hour figures couldn't be loaded" });
     await expect(note).toBeVisible(COLD_LOAD);
     await expectFontSize(note, 14);
   });
 
   test('the Thera modal with no From sets its note at 14px', async ({ page }) => {
-    // No Current System to fall back on: ESI has no location for the character.
     await page.route(`https://esi.evetech.net/**/characters/${CHARACTER_ID}/location*`, (route) =>
       route.fulfill({ status: 404, contentType: 'application/json', body: '{"error":"none"}' })
     );
@@ -230,6 +203,5 @@ test('Route Safety at 1280px: Stops never folds, and the Jita picker keeps its h
   await expect(trigger).toBeVisible(COLD_LOAD);
   await expect(page.getByRole('button', { name: 'Edit stops' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: /^add stop/i })).toBeVisible();
-  // `md:h-9`: the same single line as before the trigger learned to truncate.
   expect((await trigger.boundingBox())!.height).toBe(36);
 });

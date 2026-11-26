@@ -8,26 +8,16 @@ import { cx } from '@/lib/cx';
 import { screenshotSrc, screenshotSrcSet, type Screenshot } from './screenshots';
 import { ScreenshotZoom, ZoomBadge } from './ScreenshotZoom';
 import { SHOWCASE_TABS, type ShowcaseTab } from './showcaseTabs';
+import { TourVideoLink } from './TourVideo';
 
-/**
- * The features band: tabs by area, each showing one large, uncropped
- * screenshot in a window frame beside what that area does, and, where the tab
- * bundles more than its own name, an "Also includes" row of the other features.
- * Selecting a picture enlarges it.
- */
 export function FeatureShowcase() {
   const { t } = useTranslation();
   const tabsId = useTabsId();
   const [tabId, setTabId] = useState(SHOWCASE_TABS[0].id);
   const [zoomed, setZoomed] = useState<Screenshot | null>(null);
   const tab = SHOWCASE_TABS.find((entry) => entry.id === tabId) ?? SHOWCASE_TABS[0];
-  // A feature that only repeats the tab's own name says nothing the tab does not.
-  const tabName = t(`login.showcase.${tab.id}.tab`);
-  const alsoIncludes = tab.features.filter(
-    ({ key }) => t(`login.features.${key}.name`) !== tabName
-  );
   return (
-    <div className="mt-6">
+    <div className="mt-8">
       <Tabs
         tabsId={tabsId}
         label={t('login.showcase.label')}
@@ -35,37 +25,41 @@ export function FeatureShowcase() {
         value={tabId}
         onChange={setTabId}
       />
-      <TabPanel tabsId={tabsId} tabId={tab.id} className="mt-6">
-        <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
+      <TabPanel tabsId={tabsId} tabId={tab.id} className="mt-7">
+        <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-7 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)] lg:gap-10">
           <WindowFrame tab={tab} onOpen={setZoomed} />
           <div>
-            <ul className="space-y-3 text-sm">
-              {tab.bullets.map((bullet) => (
-                <li key={bullet} className="flex gap-2.5">
-                  <span aria-hidden="true" className="mt-2 h-px w-3 shrink-0 bg-accent" />
-                  <span className="text-text-dim">{t(`login.showcase.${tab.id}.${bullet}`)}</span>
+            <ul className="divide-y divide-line border-y border-line">
+              {tab.items.map((item) => (
+                <li key={item} className="py-4">
+                  <h3 className="text-base font-semibold text-balance">
+                    {t(`login.showcase.${tab.id}.${item}.question`)}
+                  </h3>
+                  <p className="mt-1.5 text-sm text-text-dim">
+                    {t(`login.showcase.${tab.id}.${item}.answer`)}
+                  </p>
                 </li>
               ))}
             </ul>
-            {alsoIncludes.length > 0 && (
-              <>
-                <p className={cx(eyebrowClassName, 'mt-6')}>{t('login.showcase.covers')}</p>
-                <ul className="mt-2 flex flex-wrap gap-2">
-                  {alsoIncludes.map(({ icon: Icon, key }) => (
-                    <li
-                      key={key}
-                      className="flex items-center gap-2 rounded-xs border border-line bg-panel px-3 py-1.5 text-sm"
-                    >
-                      <Icon
-                        size={ICON_SIZE.md}
-                        aria-hidden="true"
-                        className="shrink-0 text-accent"
-                      />
-                      {t(`login.features.${key}.name`)}
-                    </li>
-                  ))}
-                </ul>
-              </>
+            <div className="mt-5 flex flex-wrap items-center gap-2">
+              <span className={eyebrowClassName}>{t('login.showcase.covers')}</span>
+              {tab.features.map(({ icon: Icon, key }) => (
+                <span
+                  key={key}
+                  className="flex items-center gap-2 rounded-xs border border-line bg-panel px-3 py-1.5 text-sm"
+                >
+                  <Icon size={ICON_SIZE.md} aria-hidden="true" className="shrink-0 text-accent" />
+                  {t(`login.features.${key}.name`)}
+                </span>
+              ))}
+            </div>
+            {tab.videos.length > 0 && (
+              <div className="mt-4 flex flex-wrap items-center gap-2">
+                <span className={eyebrowClassName}>{t('login.showcase.watch')}</span>
+                {tab.videos.map((video) => (
+                  <TourVideoLink key={video} video={video} variant="button" />
+                ))}
+              </div>
             )}
           </div>
         </div>
@@ -75,14 +69,12 @@ export function FeatureShowcase() {
   );
 }
 
-/** What selecting a picture does, appended to its alt text (a button's children are presentational). */
 function useEnlargeLabel() {
   const { t } = useTranslation();
   return (shot: Screenshot) =>
     t('login.screenshotEnlarge', { alt: t(`login.screenshots.${shot.key}.alt`) });
 }
 
-/** A window around the capture: a title bar carrying the caption, then the whole picture, never cropped. */
 function WindowFrame({ tab, onOpen }: { tab: ShowcaseTab; onOpen: (shot: Screenshot) => void }) {
   const { t } = useTranslation();
   const enlargeLabel = useEnlargeLabel();
@@ -104,7 +96,6 @@ function WindowFrame({ tab, onOpen }: { tab: ShowcaseTab; onOpen: (shot: Screens
   );
 }
 
-/** A capture that opens enlarged; explicit width/height reserve its box before the lazy image arrives. */
 function ShotButton({
   shot,
   label,

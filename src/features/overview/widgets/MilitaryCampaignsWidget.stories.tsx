@@ -13,11 +13,6 @@ import { militaryCampaigns } from './data/militaryCampaignsModels';
 import type { BuildContext, KindView } from './data/types';
 import type { CampaignFaction, Widget as WidgetModel } from './layout';
 
-/**
- * The Overview's `militaryCampaigns` widget (issue #6709): the real builder over a sample
- * read, drawn in the real Widget shell. A turn-in row opens `TurnInDetail`; the other rows
- * open nothing. Rings are the widget `donut` chart.
- */
 const meta = {
   title: 'overview/MilitaryCampaignsWidget',
   parameters: { layout: 'fullscreen' },
@@ -156,28 +151,22 @@ function Campaigns({
 
 const PHONE = { viewport: { value: 'mobile1', isRotated: false } } as const;
 
-/** @summary Table (default): one line per row; turn-in rows open TurnInDetail. */
 export const TableView: Story = { render: () => <Campaigns feed={data()} view="table" /> };
 
-/** @summary Table in the phone shell. */
 export const TableViewPhone: Story = { ...TableView, globals: PHONE };
 
-/** @summary Number on All factions: one small ring per Active campaign, ISK waiting under it. */
 export const NumberAllFactions: Story = {
   render: () => <Campaigns feed={data()} view="number" />,
 };
 
-/** @summary Number on Caldari: completed objectives of the target with its ring. */
 export const NumberCaldari: Story = {
   render: () => <Campaigns feed={data()} view="number" faction="caldari" />,
 };
 
-/** @summary Table on Caldari only. */
 export const TableCaldari: Story = {
   render: () => <Campaigns feed={data()} view="table" faction="caldari" />,
 };
 
-/** @summary Some Characters lack Military Campaigns: their rows are gone, one mark in the header. */
 export const SomeCharactersMissing: Story = {
   render: () => (
     <Campaigns
@@ -192,7 +181,6 @@ export const SomeCharactersMissing: Story = {
   ),
 };
 
-/** @summary No Character in scope has Military Campaigns: the needs-permission state. */
 export const NeedsPermission: Story = {
   render: () => (
     <Campaigns
@@ -205,12 +193,10 @@ export const NeedsPermission: Story = {
   ),
 };
 
-/** @summary Campaigns running, nothing joined or held: a plain line under the rings. */
 export const NothingJoined: Story = {
   render: () => <Campaigns feed={data({ rows: [] })} view="table" />,
 };
 
-/** @summary No Active campaign: "No Military Campaign running". */
 export const Empty: Story = {
   render: () => <Campaigns feed={data({ campaigns: [], rows: [] })} view="table" />,
 };

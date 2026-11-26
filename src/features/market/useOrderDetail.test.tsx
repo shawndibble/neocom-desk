@@ -22,7 +22,6 @@ const SKILLS: CharacterSkills = {
   modifiers: NO_CHARACTER_MODIFIERS,
 };
 
-/** Best buy / sell at a station, as the station-price loader returns it. */
 function aggregate(buyMax: number | null) {
   return { buyMax, sellMin: null, buyVolume: 1, sellVolume: 0 };
 }
@@ -34,7 +33,6 @@ const SNAPSHOT: OrderDetailSnapshot = {
   skillsByCharacter: new Map([[1, SKILLS]]),
 };
 
-/** The panel's one Order Detail plus the modal's view of one open order. */
 function renderOpenDetail(
   loaders: OrderDetailLoaders,
   row: OpenOrderRow = openOrderRow(),
@@ -96,7 +94,6 @@ describe('useOrderDetail', () => {
       expect(loaders.stationBestPrices).toHaveBeenCalledWith([
         { stationId: JITA_STATION, typeIds: [34, 35] },
       ]);
-      // A material nobody bids on here is left unpriced, not priced at zero.
       expect(result.current.view.reprocessing).toEqual({
         entry: ENTRY,
         materialPrices: { 34: 4.2 },
@@ -116,7 +113,6 @@ describe('useOrderDetail', () => {
           modifiers: NO_CHARACTER_MODIFIERS,
         })
       );
-      // Any station-price call is the hub sweep for the item itself, never a material lookup.
       for (const [requests] of loaders.stationBestPrices.mock.calls) {
         expect(requests.every((request) => request.typeIds.includes(SCORDITE))).toBe(true);
       }
@@ -197,8 +193,6 @@ describe('useOrderDetail', () => {
       const { result, rerender } = renderOpenDetail(loaders);
       expect(loaders.jumpsBetween).not.toHaveBeenCalledWith(JITA_SYSTEM, PERIMETER);
 
-      // The panel hands over a newer copy of the row once the region book
-      // reclassifies it.
       const rival = {
         scope: 'region' as const,
         price: 490,
@@ -247,9 +241,7 @@ describe('useOrderDetail', () => {
       const { result, rerender } = renderOpenDetail(loaders, structureRow);
       await waitFor(() => expect(loaders.structureCompetition).toHaveBeenCalledTimes(1));
 
-      // A background refresh hands over a newer snapshot.
       rerender({ row: structureRow, snapshot: { ...SNAPSHOT } });
-      // A retry would start in the effect that rerender ran, as checkDeeper's does below.
       expect(loaders.structureCompetition).toHaveBeenCalledTimes(1);
 
       act(() => result.current.checkDeeper());
@@ -301,7 +293,6 @@ describe('useOrderDetail', () => {
 
     it('caps the region-book fan-out at ESI_FANOUT_CONCURRENCY distinct items, never firing every item at once', () => {
       const loaders = fakeOrderDetailLoaders();
-      // Never resolves, so the in-flight call count is directly observable.
       loaders.regionCompetition.mockImplementation(() => new Promise(() => {}));
       const { result } = renderHook(() => useOrderDetail(), {
         wrapper: ({ children }: { children: ReactNode }) =>

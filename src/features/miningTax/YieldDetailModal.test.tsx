@@ -113,7 +113,6 @@ describe('YieldDetailModal', () => {
     const ore = screen.getByRole('table', { name: 'Ore mined' });
     const veldspar = within(ore).getByRole('row', { name: /Veldspar/ });
     expect(within(veldspar).getByText('250')).toBeInTheDocument();
-    // 250 units x 0.1 m³
     expect(within(veldspar).getByText('25')).toBeInTheDocument();
   });
 
@@ -144,9 +143,6 @@ describe('YieldDetailModal', () => {
 
   it('keeps both tables plain tables on a phone (compare across columns)', () => {
     renderModal();
-    // The stacked-card layout lives in stylesheet rules jsdom never loads, so
-    // this pins that neither table opts into it; the e2e spec measures the
-    // real layout.
     expect(screen.getByRole('table', { name: 'Ore mined' })).not.toHaveClass('dt-stack');
     expect(screen.getByRole('table', { name: 'Refines into' })).not.toHaveClass('dt-stack');
   });

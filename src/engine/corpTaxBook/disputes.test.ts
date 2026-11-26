@@ -56,7 +56,6 @@ describe('disputesToShow (#6206)', () => {
     expect(disputesToShow([dispute()], one)).toHaveLength(1);
     const both = [...one, dismissal('77:1000:2026-11-01')];
     expect(disputesToShow([dispute()], both)).toEqual([]);
-    // A Miner dismissal made after the day covers it too; a reversed one never does.
     expect(disputesToShow([dispute()], [dismissal('m-a', { scope: 'miner' })])).toEqual([]);
     const reversed = both.map((d) => ({
       ...d,
@@ -84,14 +83,12 @@ describe('disputedTax (#6206)', () => {
 
   it('prices only the disputed ore, at the day charge’s prices and rate', () => {
     const charges = [
-      // The day also holds ore nobody disputed: it stays billed.
       charge('60:1000:2026-11-01', [
         { typeId: 45490, quantity: 100 },
         { typeId: 45492, quantity: 999 },
       ]),
       charge('77:1000:2026-11-01', [{ typeId: 45491, quantity: 50 }]),
     ];
-    // 100 × 1000 × 10% + 50 × 2000 × 10%
     expect(disputedTax(dispute(), charges)).toBe(20_000);
   });
 
@@ -176,7 +173,6 @@ describe('disputedTax on a rate dispute', () => {
     taxPct: 12,
   };
 
-  // Waiving a rate dispute credits only the difference between the two rates.
   it('prices the gap between the billed rate and the claimed one', () => {
     const rate = dispute({
       kind: 'rate',

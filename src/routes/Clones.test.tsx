@@ -48,7 +48,6 @@ const clonesPayload = {
       implants: [],
     },
   ],
-  // Just jumped: with Infomorph Synchronizing III (21h cooldown), always on cooldown.
   last_clone_jump_date: new Date().toISOString(),
 };
 
@@ -75,7 +74,6 @@ const server = mswServer(
   http.get(`${ESI}/universe/systems/30000142`, () =>
     HttpResponse.json({ system_id: 30000142, name: 'Jita', security_status: 0.9459 })
   ),
-  // Only the worn implant has a price; the jump clone's implant has none.
   http.get('https://market.fuzzwork.co.uk/aggregates/', ({ request }) => {
     const types = new URL(request.url).searchParams.get('types')?.split(',') ?? [];
     const body: Record<string, unknown> = {};
@@ -180,19 +178,13 @@ beforeEach(async () => {
   window.history.pushState({}, '', '/clones');
 });
 
-/** The Clones page on its own route, with no App boot or signed-in shell. */
 const renderClonesRoute = () => renderPageRoute('/clones', <Clones />);
 
-// The one App-level test below: its graph and shell chunk load here, under the
-// hook's own budget, not inside the test's findBy. Every other test renders the
-// page on its own (`renderClonesRoute`).
 beforeAll(async () => {
   await Promise.all([import('@/app/App'), routeChunks.loadLayout(), routeChunks.loadClones()]);
 }, 30_000);
 
 describe('Clones', () => {
-  // The one App-level test of the Clones route: it mounts at /clones inside the
-  // signed-in shell, its rail link current.
   it('lists jump clones with resolved location and implant names, and the cooldown, at /clones inside the shell', async () => {
     const { App } = await import('@/app/App');
     render(<App />);
@@ -227,9 +219,6 @@ describe('Clones', () => {
   it('surfaces the home station and last jump-clone-change date', async () => {
     renderClonesRoute();
     await screen.findByText('High-grade Ascendancy Alpha');
-    // Home station shares its id with a jump clone, so its name resolves
-    // from the same batch — appearing once in the home-location line and
-    // again in the jump-clone table row.
     expect(
       screen.getAllByText('Jita IV - Moon 4 - Caldari Navy Assembly Plant').length
     ).toBeGreaterThan(1);
@@ -239,21 +228,10 @@ describe('Clones', () => {
   });
 
   it('leaves implants on "Type #id" rather than fanning out when the names batch is rate-limited', async () => {
-    // A large jump-clone implant batch is more likely to hit ESI's error-limit
-    // throttling than a small one — and a throttle is exactly when the per-id
-    // fallback must NOT fire (issue #655 item D). ESI's error limit is 100
-    // non-2xx responses per minute counted globally across every route, so
-    // answering one throttled batch with one GET /universe/types/{id} per
-    // implant would deepen the outage for every other panel in the app.
-    // Degrading to the placeholder until something asks again is the trade.
-    // The one type request below is the tooltip description lookup (#1379), one
-    // per distinct implant — it is not a name fallback, and the name stays a
-    // placeholder even though that response carries one.
     let typeRequests = 0;
     server.use(
       http.post(
         `${ESI}/universe/names`,
-        // retry-after: 0 so esiFetch's one blind retry doesn't idle the test.
         () => new HttpResponse(null, { status: 429, headers: { 'retry-after': '0' } })
       ),
       http.get(`${ESI}/universe/types/19540`, () => {
@@ -302,7 +280,6 @@ describe('Clones', () => {
     expect(alpha.closest('li')).toHaveTextContent(/^Alpha\s*Jita IV - Moon 4 - Caldari Navy/);
     expect(screen.getByText('Beta')).toBeInTheDocument();
     expect(screen.queryByText('Unnamed')).not.toBeInTheDocument();
-    // An unnamed clone: the place is the heading, not repeated under it.
     const unnamed = screen.getAllByRole('heading', {
       name: 'Jita IV - Moon 4 - Caldari Navy Assembly Plant',
       level: 3,
@@ -407,8 +384,6 @@ describe('Clones', () => {
   it('carries the same character header the Overview tab shows, not a page title', async () => {
     renderClonesRoute();
 
-    // Identity, corp/alliance and SP: identical to /overview, so nothing above
-    // the tabs moves as you switch between them.
     expect(await screen.findByRole('heading', { level: 1, name: 'Pilot One' })).toBeInTheDocument();
     expect(await screen.findByRole('link', { name: 'Test Corp' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Test Alliance' })).toBeInTheDocument();
@@ -427,8 +402,6 @@ describe('Clones', () => {
   });
 
   it('offers Refresh even when there is nothing to show', async () => {
-    // The empty and failed states are the ones a Refresh exists for, so the
-    // panel's toolbar has to outlive its rows.
     server.use(
       http.get(`${ESI}/characters/${CHAR_ID}/clones`, () => HttpResponse.json({ jump_clones: [] }))
     );
@@ -462,17 +435,14 @@ describe('Clones', () => {
     );
     renderClonesRoute();
     expect(await screen.findByText('Showing saved data.')).toBeInTheDocument();
-    // getByText: exactly one — the note beside the data, no full banner over it.
     expect(screen.getByText(/: log in again$/)).toBeInTheDocument();
     expect(await screen.findAllByText('High-grade Ascendancy Alpha')).not.toHaveLength(0);
   });
 
   it('shows jumps away on the home clone and each clone, the count opening the route to that station', async () => {
     renderClonesRoute();
-    // The Character is in Jita's system, the home and first clone's station: 0 jumps.
     const counts = await screen.findAllByRole('button', { name: '0 jumps' });
     expect(counts).toHaveLength(2);
-    // The structure is outside the ACL: no system, so the existing unknown text.
     expect(screen.getByText('-')).toBeInTheDocument();
     fireEvent.click(counts[1]);
     await waitFor(() => expect(window.location.pathname).not.toBe('/clones'));
@@ -613,7 +583,6 @@ describe('Clones', () => {
     expect(row).toHaveTextContent('1 implant');
     expect(await screen.findAllByText(/at risk if podded/)).toHaveLength(1);
     await waitFor(() => expect(row).toHaveTextContent(/2\.5M/));
-    // The jump clone's implant has no price: said, not counted as free.
     const clone = screen
       .getByRole('link', { name: 'High-grade Ascendancy Alpha' })
       .closest('li')
@@ -628,7 +597,6 @@ describe('Clones', () => {
       )
     );
     renderClonesRoute();
-    // Names the one Permission missing; the clones table stays.
     expect(await screen.findByText(/: grant Character details$/)).toBeInTheDocument();
     expect(screen.getByText('High-grade Ascendancy Alpha')).toBeInTheDocument();
     expect(screen.queryByText(/: log in again$/)).not.toBeInTheDocument();

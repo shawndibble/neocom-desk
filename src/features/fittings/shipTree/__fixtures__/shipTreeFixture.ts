@@ -1,8 +1,3 @@
-/**
- * A two-faction Ship Tree for the tab's component tests: Caldari (Corvette,
- * Frigate, Navy Frigate, Interceptor — the last needing Omega) and the
- * Guristas (one Frigate class drawing on Caldari and Gallente skills).
- */
 import type { EngineSkill, TrainedSkill } from '@/engine/types';
 import type { SkillCatalog } from '@/features/skills/skillMap';
 import type { MasteryMap, ShipTreeData, ShipTreeShip } from '@/sde/types';
@@ -137,7 +132,6 @@ export const SHIP_TREE: ShipTreeData = {
   ],
 };
 
-/** Merlin: every tier trained by the fixture pilot (Mastery V). Crow: tier I only. */
 export const MASTERIES: MasteryMap = {
   [MERLIN]: [
     [{ skillTypeID: CALDARI_FRIGATE, level: 1 }],
@@ -147,7 +141,6 @@ export const MASTERIES: MasteryMap = {
     [{ skillTypeID: SPACESHIP_COMMAND, level: 5 }],
   ],
   [CROW]: [
-    // Level 0: CCP lists the skill under the tier but asks for nothing yet.
     [
       { skillTypeID: INTERCEPTORS, level: 1 },
       { skillTypeID: GALLENTE_FRIGATE, level: 0 },
@@ -184,7 +177,6 @@ export const CATALOG = {
   unlocksByTypeID: new Map(),
 } as unknown as SkillCatalog;
 
-/** Spaceship Command V and Caldari Frigate IV: every Caldari T1 hull, no Interceptor. */
 export const TRAINED: ReadonlyMap<number, TrainedSkill> = new Map([
   [SPACESHIP_COMMAND, { level: 5, sp: 256_000 }],
   [CALDARI_FRIGATE, { level: 4, sp: 45_255 }],

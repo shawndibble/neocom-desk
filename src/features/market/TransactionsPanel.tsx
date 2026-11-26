@@ -85,30 +85,24 @@ import { useHighlightParam } from '@/lib/useHighlightParam';
 import { highlightedTransactionId } from './transactionHighlight';
 import { formatCount } from '@/lib/formatCount';
 
-/** Static keys, so the i18n key scan sees every string. */
 const MARGIN_GAP_COPY: Record<MarginGap, { label: string; hint: string }> = {
   noBuy: { label: 'wallet.marginGap.noBuy', hint: 'wallet.marginGapHint.noBuy' },
   noTax: { label: 'wallet.marginGap.noTax', hint: 'wallet.marginGapHint.noTax' },
   outside: { label: 'wallet.marginGap.outside', hint: 'wallet.marginGapHint.outside' },
 };
 
-/** The gap label is `text-xs`, so each letter takes about this much of a digit's `ch`. */
 const GAP_LABEL_CH_PER_CHAR = 0.85;
 
 const HISTORY_CHARACTER_PARAMS = { 'txn.chars': characterFilterParam('current') };
 
-/** Stable identity, so the fallback doesn't invalidate the column memo every render. */
 const NO_TYPE_NAMES: ReadonlyMap<number, string> = new Map();
 const NO_JOURNAL: readonly WalletJournalEntry[] = [];
 
 interface Snapshot {
   transactionsResult: CachedResult<WalletTransaction[]> | null;
-  /** 401/403 (or a failed token refresh) means "grant the Wallet Permission", not "offline". */
   transactionsNeedsReauth: boolean;
-  /** The fetch stopped at the transactions page cap; older history is missing. */
   transactionsTruncated: boolean;
   typeNames: Map<number, string>;
-  /** Only for the Margin column's sales tax lines; null when it couldn't be read. */
   journal: WalletJournalEntry[] | null;
 }
 
@@ -116,14 +110,12 @@ async function loadTransactionsSnapshot(
   characterId: number,
   signal: RouteSnapshotSignal
 ): Promise<Snapshot> {
-  // A journal that fails to load only blanks the Margin column, never the tab.
   const [{ cached: transactionsResult, needsReauth: transactionsNeedsReauth }, journalResult] =
     await Promise.all([
       loadWalletTransactionsWithStatus(characterId, { archive: true }),
       loadWalletJournal(characterId, { archive: true }).catch(() => null),
     ]);
   const transactionsTruncated = transactionsResult?.truncated ?? false;
-  // Already superseded: skip the ESI name resolve, its result would be discarded.
   const typeIds = signal.cancelled
     ? []
     : [...new Set((transactionsResult?.data ?? []).map((txn) => txn.type_id))];
@@ -137,14 +129,8 @@ async function loadTransactionsSnapshot(
   };
 }
 
-/** Module-level so the table's windowing and row memo see one stable function. */
 const transactionRowKey = (txn: WalletTransaction) => txn.transaction_id;
 
-/**
- * Market's History tab: a character's recent buy/sell fills. Personal only:
- * the corporation's fills live on `/corp/wallet`, beside the corp journal
- * they reconcile against.
- */
 interface TransactionsPanelProps {
   headerSlots: PageHeaderSlots;
 }
@@ -157,7 +143,6 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
     useRouteSnapshot(loadTransactionsSnapshot, undefined, { cacheKey: 'market:transactions' });
   const highlightTypeId = useHighlightParam();
 
-  // This Character / All characters (issue #3995). Hidden for a one-Character account.
   const rememberedCharacterFilter = useRememberedCharacterFilter<typeof HISTORY_CHARACTER_PARAMS>(
     'transactions',
     'txn.chars'
@@ -206,7 +191,6 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
         : (data?.journal ?? NO_JOURNAL),
     [allScope, allFills, data]
   );
-  // Worked out over every fill, not the filtered rows — a filter must not change what a sale cost.
   const { margins, gaps } = useMemo(
     () =>
       allScope && pooled ? pooled : transactionMarginReport(allScope ? [] : transactions, journal),
@@ -218,8 +202,6 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
       : null
     : singleArchiveSince;
 
-  // One filter bar on this tab, so the scope key never changes and the
-  // filter never needs `useUrlFilter`'s scope-reset.
   const [filter, setFilter, rowsFilter] = useUrlFilter<WalletTransactionFilter>(
     'transactions',
     TRANSACTION_FILTER_PARAMS,
@@ -234,11 +216,6 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
     () => summarizeTrading(filteredTransactions, margins, journal, rowsFilter, archiveSince, gaps),
     [filteredTransactions, margins, gaps, journal, rowsFilter, archiveSince]
   );
-  /**
-   * The alert names the *item*; the table is keyed by transaction. Resolving
-   * one to the other is this panel's job because only it knows that rule —
-   * the newest sell of that item (`transactionHighlight.ts`).
-   */
   const highlightId = useMemo(
     () => highlightedTransactionId(transactions, highlightTypeId),
     [transactions, highlightTypeId]
@@ -249,13 +226,6 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
     DEFAULT_VISIBLE_TRANSACTIONS_COLUMNS,
     TRANSACTIONS_PHONE_OFF_BY_DEFAULT
   );
-  // Names for every distinct place in the loaded fills, whether or not the
-  // Location column is ticked: the Station filter and the By station headers
-  // name them too. Only the few ids present are asked (a structure's name is a
-  // lookup each), never the filtered rows, so the filter lists stations a
-  // filter has hidden.
-  // Under All a fill's place is asked as the Character that made it, since a
-  // structure's name is ACL-checked per Character.
   const placeOwnerOf = useCallback(
     (txn: WalletTransaction) =>
       allScope ? (txn as PooledTransaction).characterId : activeCharacterId,
@@ -282,8 +252,6 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
     [placeDetails, placeOwnerOf, t]
   );
 
-  // Every column the table can show, whichever the picker has ticked, plus the
-  // character a fill belongs to (the table only draws it under All).
   const characterNames = useCharacterNames();
   const csvColumns = useMemo(
     () =>
@@ -304,8 +272,6 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
     truncated: transactionsTruncated,
   });
 
-  // One name per location id: grouping and filtering key on the id alone, so
-  // under All the first Character's resolved name stands for the station.
   const stationNames = useMemo(() => {
     const names = new Map<number, string>();
     for (const txn of transactions) {
@@ -362,7 +328,6 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
     [byStation, rowsFilter.stationsBy, stationNameOf, t]
   );
 
-  // Number columns fit the loaded rows, not a worst case; see `fitColumnWidth`.
   const numberWidths = useMemo(() => {
     const chars = (pick: (txn: WalletTransaction) => number | null) =>
       transactions.map((txn) => {
@@ -505,8 +470,6 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
       >,
     [columns]
   );
-  // Filtered only at the table's input, so a sort on a hidden column survives
-  // until it returns.
   const shownColumns = useMemo(
     () =>
       columns.filter(
@@ -517,8 +480,6 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
     [columns, isVisible]
   );
 
-  // The picker rides in the page header in every state (loading, error, empty),
-  // so a pilot can always switch scope out of a dead end.
   const headerChrome = (
     <PageHeaderPortals
       slots={headerSlots}
@@ -537,7 +498,6 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
             value={characterFilter}
             characterCount={characterCount}
             loading={allScope && allFills.status === 'loading'}
-            // Who "All" leaves out (no wallet grant): the trigger's dot and menu note.
             missingNames={
               allScope && allFills.status === 'ready'
                 ? allFills.data.skipped.map((c) => c.name)
@@ -549,7 +509,6 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
       }
       actions={
         <>
-          {/* Export before Refresh, as on every header (DESIGN.md §6c Header controls). */}
           {transactionsResult && (
             <TableActionsMenu
               name={t('market.sections.transactions')}
@@ -650,7 +609,6 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
               resultCount={filteredTransactions.length}
               actions={
                 <>
-                  {/* A view, not a filter: it changes the table's row grain (DESIGN.md §6c). */}
                   <SegmentedControl
                     label={t('wallet.viewLabel')}
                     uppercase={false}
@@ -704,8 +662,6 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
                   hugColumns
                   groupBy={stationGroupBy}
                   responsive="table"
-                  // `transactions` already arrives newest-first (the `sort` above) —
-                  // matches that so a header click is the first thing that reorders it.
                   defaultSort={{ columnId: 'date', direction: 'desc' }}
                 />
               </div>

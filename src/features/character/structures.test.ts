@@ -49,8 +49,6 @@ describe('loadStructureName', () => {
     expect((await db.esiCache.get([CHARACTER_ID, 'structure:1000000000001']))?.value).toMatchObject(
       { name: 'Amarr VIII (Oris) - Emperor Family Academy' }
     );
-    // Mirrored to the shared roster row too, so a Character with no ACL access
-    // of their own can still read the name another Character resolved.
     expect((await db.esiCache.get([0, 'structure:1000000000001']))?.value).toMatchObject({
       name: 'Amarr VIII (Oris) - Emperor Family Academy',
     });
@@ -63,8 +61,6 @@ describe('loadStructureName', () => {
       value: { name: 'Resolved By An Alt', owner_id: 1, solar_system_id: 30000142 },
       fetchedAt: Date.now(),
     });
-    // No handler registered for this id: `onUnhandledRequest: 'error'` fails
-    // the test if this path reaches the network at all.
 
     const name = await loadStructureName(CHARACTER_ID, 1000000000009);
 
@@ -92,8 +88,6 @@ describe('loadStructureName', () => {
 
     expect(name).toBe('Seen By The Alt');
     expect(requestsByToken).toHaveLength(2);
-    // Shared, so a third Character with no memo of its own reads it with no
-    // further request.
     await seedCharacter(THIRD_CHARACTER_ID);
     expect(await loadStructureName(THIRD_CHARACTER_ID, 1000000000010)).toBe('Seen By The Alt');
     expect(requestsByToken).toHaveLength(2);
@@ -111,17 +105,12 @@ describe('loadStructureName', () => {
     );
 
     expect(await loadStructureName(CHARACTER_ID, 1000000000011)).toBeNull();
-    expect(requests).toBe(2); // this Character, then the one other Character
+    expect(requests).toBe(2);
 
-    // A Character new to the roster still gets its own live shot — it could
-    // be the one with real access — but that shot alone does not re-sweep
-    // the rest of the roster the memo already covers.
     await seedCharacter(THIRD_CHARACTER_ID);
     expect(await loadStructureName(THIRD_CHARACTER_ID, 1000000000011)).toBeNull();
     expect(requests).toBe(3);
 
-    // Asked again, even by the original Character: no further requests at
-    // all — its own memo answers first, then the roster memo.
     expect(await loadStructureName(CHARACTER_ID, 1000000000011)).toBeNull();
     expect(requests).toBe(3);
   });
@@ -150,9 +139,6 @@ describe('loadStructureName', () => {
       http.get(`${ESI_BASE_URL}/universe/structures/1000000000013`, ({ request }) => {
         requests += 1;
         const auth = request.headers.get('authorization') ?? '';
-        // The asking Character is confirmed off the ACL; the fallback
-        // Character's own attempt is inconclusive (a network blip), never a
-        // real answer about whether it can see the structure.
         return auth.includes(String(OTHER_CHARACTER_ID))
           ? HttpResponse.error()
           : HttpResponse.json({ error: 'Forbidden' }, { status: 403 });
@@ -166,11 +152,6 @@ describe('loadStructureName', () => {
     expect(requests).toBe(2);
     expect(await db.esiCache.get([0, 'structure:1000000000013:roster-forbidden'])).toBeUndefined();
 
-    // Asked again: the inconclusive attempt was not memoized, so the fallback
-    // Character is tried again rather than a citadel it could actually see
-    // staying hidden for a day over one blip. (The asking Character itself
-    // makes no new request here — its own 403 from moments ago is still
-    // within its own same-day memo.)
     expect(await loadStructureName(CHARACTER_ID, 1000000000013)).toBeNull();
     expect(requests).toBe(3);
   });
@@ -217,8 +198,6 @@ describe('loadStructureName', () => {
     );
 
     expect(await loadStructureName(CHARACTER_ID, 1000000000005)).toBeNull();
-    // What a reload looks like from this module: Dexie survives, the in-memory
-    // revalidation state does not.
     resetRevalidationState();
     expect(await loadStructureName(CHARACTER_ID, 1000000000005)).toBeNull();
 
@@ -252,8 +231,6 @@ describe('loadStructureName', () => {
     );
 
     expect(await loadStructureName(CHARACTER_ID, 1000000000007)).toBeNull();
-    // Age the memo past its window rather than faking timers: the row is the
-    // only state that decides this.
     const row = await db.esiCache.get([CHARACTER_ID, 'structure:1000000000007:forbidden']);
     expect(row).toBeDefined();
     await db.esiCache.put({ ...row!, fetchedAt: row!.fetchedAt - STALE_AFTER.static - 1 });

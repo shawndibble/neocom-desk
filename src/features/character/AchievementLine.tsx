@@ -5,7 +5,6 @@ import { EmptyCell } from './ContactCells';
 import type { AchievementParts } from './achievement';
 import { useCharacterAchievements } from './useCharacterAchievements';
 
-/** "1,240 points", or null for none. */
 function usePoints(score: number | null): string | null {
   const { t } = useTranslation();
   return score === null
@@ -13,7 +12,6 @@ function usePoints(score: number | null): string | null {
     : t('characters.achievement.points', { count: score, points: formatCount(score) });
 }
 
-/** "Title · 1,240 points" under a Character's corporation (issue #4777). */
 export function AchievementLine({ parts }: { parts: AchievementParts | null | undefined }) {
   const { t } = useTranslation();
   const points = usePoints(parts?.score ?? null);
@@ -33,17 +31,11 @@ export function AchievementLine({ parts }: { parts: AchievementParts | null | un
   );
 }
 
-/** `AchievementLine` for one Character it reads itself (the overview header). */
 export function CharacterAchievementLine({ characterId }: { characterId: number }) {
   const achievements = useCharacterAchievements([characterId]);
   return <AchievementLine parts={achievements.partsOf(characterId)} />;
 }
 
-/**
- * The Title / Score column's cell: title over points. `stacks` is a table whose
- * phone rows fold into one meta line (Contacts, Corp / Alliance's shape); the
- * Characters table scrolls sideways instead, so its cell keeps two lines.
- */
 export function AchievementCell({
   parts,
   stacks,

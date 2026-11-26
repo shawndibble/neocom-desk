@@ -1,33 +1,17 @@
-/**
- * The Members page's Players view as a flat row list (ADR: players in two layers). Pure: no
- * fetch/DOM/Dexie imports. Each stored Miner group with a corporation member becomes a Player
- * parent row, followed by its characters when open; members in no group stay single rows.
- *
- * A Player's "last seen" is the latest of its characters that are in the corporation: a character
- * outside it has no activity here, so it is excluded from the aggregate and shown as "No data".
- *
- * Sorting is per Player: a column orders the Player rows and loose members by what the row shows
- * (Member: the main's name; Last seen: the latest in-corp sighting; any other column: the main's own
- * value). Alts stay under their parent in a fixed order, and an outside character never drives it.
- */
 import type { MemberStanding } from '@/engine/corp/members';
 import { sortRowsBy } from '@/components/ui/dataTableSort';
 
-/** A stored Miner group as the roster reads it (the optional lists are the Player-slice claim state). */
 export interface PlayerGroup {
   id: string;
   mainCharacterId: number;
   characterIds: readonly number[];
-  /** Officer claims: billed with the group, not signed in as themselves yet. */
   officerClaimed?: readonly number[];
-  /** LEGACY: waiting on the old guest confirmation. */
   pendingConfirmation?: readonly number[];
   provenCharacterIds?: readonly number[];
 }
 
 export type CharacterChip = 'unsigned' | 'pending' | 'declined' | 'conflict';
 
-/** The least a roster row must carry for this builder. */
 export interface PlayerSourceRow {
   characterId: number;
   name: string | null;
@@ -35,58 +19,40 @@ export interface PlayerSourceRow {
 }
 
 export interface PlayerLine<R extends PlayerSourceRow> {
-  /** `p:<group>` for a Player, `p:<group>:<id>` for its other characters, `c:<id>` for a lone member. */
   key: string;
   kind: 'player' | 'alt' | 'loose';
   groupId: string | null;
   group: PlayerGroup | null;
-  /** The group holds at least one character that is in the corporation. */
   groupHasMember: boolean;
-  /** This row's own character (a Player's is its main). */
   characterId: number;
   name: string;
-  /** The character's roster row; null for one outside the corporation. */
   member: R | null;
   outside: boolean;
-  /** In the order they read: not signed in, pending, declined, conflict. */
   chips: CharacterChip[];
-  /** Player only. */
   expanded: boolean;
   characterCount: number;
   outsideCount: number;
   unsignedCount: number;
-  /** Player only: the roster row of its latest-seen corporation character, whose standing is the Player's. */
   seen: R | null;
 }
 
 export interface PlayerLinesInput<R extends PlayerSourceRow> {
-  /** The whole roster, unfiltered. */
   rows: readonly R[];
   groups: readonly PlayerGroup[];
-  /** Names for characters that are not on the roster. */
   names: ReadonlyMap<number, string>;
-  /** Roster characters that pass the search and every filter. */
   matchedIds: ReadonlySet<number>;
-  /** Whether an outside character's name is a search hit (never while a ship/place/dark filter is on). */
   outsideMatches: (name: string) => boolean;
-  /** A search or filter is on: matching Players open themselves and stay open. */
   filtering: boolean;
-  /** Group-row keys the reader opened. */
   expanded: ReadonlySet<string>;
-  /** A `?highlight` character id (it keys the row; opening its Player is the view's job). */
   highlightId: number | null;
   conflictIds?: ReadonlySet<number>;
   declinedIds?: ReadonlySet<number>;
-  /** Column and direction; default Last seen, most recent first (the roster's `?sort=`). */
   sort?: { columnId: string; direction: 'asc' | 'desc' };
-  /** A column's sort value for a roster row (every column but Member and Last seen). */
   columnValue?: (columnId: string, row: R) => string | number | undefined;
 }
 
-/** The label for a character nobody has named yet. The one fallback every roster name lookup shares. */
 export const unknownCharacterName = (id: number): string => `#${id}`;
 
-/** Most recently seen first: an unknown span sorts last. */
 const byRecency = (a: PlayerSourceRow | null, b: PlayerSourceRow | null): number => {
   const x = a?.standing.darkForMs ?? Number.POSITIVE_INFINITY;
   const y = b?.standing.darkForMs ?? Number.POSITIVE_INFINITY;
@@ -108,7 +74,6 @@ export function buildPlayerLines<R extends PlayerSourceRow>(
     return chips;
   };
 
-  // Each character sits in the first group that holds it; a group left with one character is no Player.
   const placed = new Set<number>();
   const players: { group: PlayerGroup; ids: number[] }[] = [];
   for (const group of input.groups) {
@@ -137,8 +102,6 @@ export function buildPlayerLines<R extends PlayerSourceRow>(
     if (input.filtering && !hit) continue;
 
     const key = `p:${group.id}`;
-    // A highlight does not force the Player open (that would pin it): it is reported in
-    // `highlightPlayerKey` so the view can seed the reader's own expansion once.
     const open = input.filtering || input.expanded.has(key);
 
     const base = {
@@ -225,7 +188,6 @@ export function buildPlayerLines<R extends PlayerSourceRow>(
     });
   }
 
-  // Recency then name is the tie order; the column sort is stable on top of it.
   entries.sort((a, b) => byRecency(a.sort, b.sort) || a.name.localeCompare(b.name));
   const { columnId, direction } = input.sort ?? { columnId: 'lastSeen', direction: 'desc' };
   const valueOf = (e: (typeof entries)[number]): string | number | undefined => {

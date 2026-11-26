@@ -77,10 +77,8 @@ describe('createMarketItemCatalogue', () => {
     const catalogue = createMarketItemCatalogue(load);
     await expect(catalogue.load()).rejects.toThrow('offline');
     expect(catalogue.peek()).toBeNull();
-    // Another keystroke: no refetch.
     await expect(catalogue.load()).rejects.toThrow('offline');
     expect(load).toHaveBeenCalledTimes(1);
-    // The next opening retries.
     await expect(catalogue.load({ retry: true })).resolves.toBeDefined();
     expect(load).toHaveBeenCalledTimes(2);
   });

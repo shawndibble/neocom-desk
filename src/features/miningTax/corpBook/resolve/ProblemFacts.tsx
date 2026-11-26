@@ -4,18 +4,21 @@ import { dateTimeAt } from '@/features/corp/moons/moonsFormat';
 import { formatCount } from '@/lib/formatCount';
 import { formatIsk } from '@/lib/isk';
 import { isoDay } from '../memberFlag';
+import { ClosedDayFacts } from '../ClosedDayConflict';
+import type { ConflictNames } from '../closedConflicts';
 import type { ResolveTarget } from './targets';
 
 const k = (key: string) => `miningTax.resolve.facts.${key}`;
 
-/**
- * A fact's figure, exact: the Resolve dialog is where the member checks the money to the ISK, so
- * no shorthand (and no second, screen-reader copy of the figure in the sentence).
- */
 const isk = (value: number) => formatIsk(value, 0);
 
-/** What the app knows about a problem, above its choices: the figures, never advice. */
-export function ProblemFacts({ target }: { target: ResolveTarget }) {
+const CONFLICT_FACT = {
+  otherPayee: 'conflict',
+  ownNeedsReview: 'conflictOwnNeedsReview',
+  ownerCollected: 'conflictOwnerCollected',
+} as const;
+
+export function ProblemFacts({ target, names }: { target: ResolveTarget; names: ConflictNames }) {
   const zone = useTimeZone();
   const { t } = useTranslation();
   const { problem } = target;
@@ -87,10 +90,17 @@ export function ProblemFacts({ target }: { target: ResolveTarget }) {
       );
     }
     case 'conflict':
+      if (problem.plan)
+        return (
+          <>
+            <ClosedDayFacts plan={problem.plan} names={names} />
+            {bills}
+          </>
+        );
       return (
         <>
           <p>
-            {t(k('conflict'), {
+            {t(k(CONFLICT_FACT[row?.conflictCause ?? 'otherPayee']), {
               corp,
               payee: target.payeeName ?? t(k('anotherPayee')),
               date: isoDay(row?.resolvesAt),

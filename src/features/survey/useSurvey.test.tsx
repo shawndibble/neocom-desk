@@ -139,7 +139,6 @@ describe('useSurvey polling', () => {
       await vi.advanceTimersByTimeAsync(1);
     });
     expect(loadSurvey).toHaveBeenCalledTimes(busy + 1);
-    // A new scan came in: back to the quick pace.
     await tick();
     expect(loadSurvey).toHaveBeenCalledTimes(busy + 2);
   });

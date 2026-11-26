@@ -44,23 +44,15 @@ export const SORT_KEYS: readonly CharacterSortKey[] = [
   'alerts',
 ];
 export const SORT_DIRECTIONS: readonly SortDirection[] = ['asc', 'desc'];
-/** `unknown` left out: it means "no cached queue yet", not a state anyone filters for. */
 export const QUEUE_FILTER_STATES: readonly QueueState[] = [
   'training',
   'endingSoon',
   'paused',
   'idle',
 ];
-/** Radix `SelectItem` can't take `''`, so "any corporation" needs a sentinel. */
 export const ALL_CORPS_VALUE = '__all__';
-/** Same reasoning as `ALL_CORPS_VALUE` — "any Group" needs a non-empty sentinel. `UNGROUPED_VALUE` (above) doubles as this filter's "no Group" option, same as the group column's Select. */
 export const ALL_GROUPS_VALUE = '__all_groups__';
 
-/**
- * The filter bar, in the URL (ADR 0015) as one group: the bar hands back sort
- * and filters together, and the search box shares the group so a pending
- * keystroke flushes with a sort change instead of being dropped.
- */
 export const FILTER_PARAMS = {
   q: textParam(),
   sort: enumParam(SORT_KEYS, 'name'),
@@ -72,19 +64,16 @@ export const FILTER_PARAMS = {
   alerts: boolParam(),
 };
 
-/** Everything behind the funnel — the search box stays out, it commits on its own. */
 export interface RosterFilter {
   sortKey: CharacterSortKey;
   sortDirection: SortDirection;
   queue: QueueState | null;
   corp: string | null;
-  /** A group id, `UNGROUPED_VALUE` for "no group", or null for "any group". */
   group: string | null;
   starredOnly: boolean;
   alertsOnly: boolean;
 }
 
-/** Sort is left out: it reorders, it never hides anyone, so it isn't a "filter on". */
 export function activeRosterFilterCount(filter: RosterFilter): number {
   return [
     filter.queue !== null,
@@ -95,12 +84,6 @@ export function activeRosterFilterCount(filter: RosterFilter): number {
   ].filter(Boolean).length;
 }
 
-/**
- * The funnel's pills, in the panel's order. Sort is left out for the same
- * reason as in `activeRosterFilterCount`, and so is the search box, which
- * shows its own text. `groups` names the Group filter: `groupFilterOptions`,
- * so a deleted Group still has a name to clear.
- */
 export function activeRosterFilters(
   filter: RosterFilter,
   t: Translate,
@@ -142,11 +125,6 @@ export function activeRosterFilters(
   return active;
 }
 
-/**
- * Table view's header-click sort, over the whole roster in one flat table
- * (decision 20260927-071415 dropped the old one-`DataTable`-per-group-section
- * layout). Unsorted (the filter bar's order) by default.
- */
 export const TABLE_SORT = optionalSortParam();
 
 interface CharactersViewInput {
@@ -156,32 +134,19 @@ interface CharactersViewInput {
   attentionById: ReadonlyMap<number, AttentionEntry>;
   groups: readonly CharacterGroup[];
   starred: readonly number[];
-  /** Character ids marked SP Farm: the only ones SP extraction readiness applies to. */
   spFarm: readonly number[];
   alertCounts: ReadonlyMap<number, number>;
   notTrainingAlertEnabledFor: (characterId: number) => boolean;
   visibleColumns: readonly CharacterColumnId[];
   spExtractionEnabled: boolean;
   whereabouts: WhereaboutsLookup;
-  /** Newest Net Worth Snapshot per Character; none for one never snapshotted. */
   netWorthById: ReadonlyMap<number, LatestNetWorth>;
-  /** Each Character's typed-in accelerator. */
   acceleratorById: ReadonlyMap<number, CharacterAcceleratorRecord>;
-  /** The accelerator bonus each Character's cached attribute sheet implies. */
   detectedAcceleratorById: ReadonlyMap<number, number | null>;
-  /** Each Character's corporation standing; absent until read. */
   corpStandingById: ReadonlyMap<number, CorpStanding>;
-  /** This device's Alerts Grants, keyed by Character id. */
   alertsGrants: Readonly<Record<number, AlertsGrantRecord>>;
 }
 
-/**
- * What the Characters page shows, derived from the roster and the URL: the
- * search/filter/sort params, which characters match, their order, the table's
- * rows and the filter menus' options. Not `useMemo`'d: several inputs are
- * `Map`s the React Compiler lint can't trust as memo dependencies, and the
- * work is roster-sized.
- */
 export function useCharactersView(input: CharactersViewInput) {
   const {
     characters,
@@ -224,14 +189,8 @@ export function useCharactersView(input: CharactersViewInput) {
     groups.length > 0,
     isSyncConfigured()
   );
-  // `id` is already known available here, so this is just "is it checked" —
-  // `visibleAvailableColumns` (below, `handleToggleColumn`'s own zero-columns
-  // guard) is for narrowing the *raw stored* list, which can hold ids that
-  // aren't available right now; this list already excludes those.
   const activeColumnIds = availableColumnIds.filter((id) => visibleColumns.includes(id));
 
-  // A sort on a column that isn't on screen (hand-edited link, or since
-  // hidden in the Columns picker) reads as unsorted.
   const tableSort =
     tableSortParam && (activeColumnIds as readonly string[]).includes(tableSortParam.columnId)
       ? tableSortParam
@@ -242,23 +201,6 @@ export function useCharactersView(input: CharactersViewInput) {
     for (const characterId of group.characterIds) groupIdByCharacterId.set(characterId, group.id);
   }
 
-  /**
-   * `rosterCore`'s own `stats` (`rosterCoreMap`) plus the two fields it can't
-   * carry itself — group name and alert count both live in stores outside
-   * `groups.ts`'s Dexie-free scope (`groups.ts`'s `CharacterSortStats`
-   * doc comment). Built here, not in `rosterCore` state, so `applyRoster`/
-   * `mergeRosterEntry` stay a pure roster-snapshot mirror; this just layers
-   * the two extra keys on top for `sortCharacterIds` to read when `sortKey`
-   * is `'group'`/`'alerts'`.
-   *
-   * Not `useMemo`: its only stable-looking input, `groupIdByCharacterId`, is
-   * a `Map` — the React Compiler lint (`react-hooks/preserve-manual-
-   * memoization`) can't prove a `Map` dependency is never mutated in place,
-   * so it refuses to trust this memo (and, transitively, the one that builds
-   * `groupIdByCharacterId`). `renderTable`/`renderCardList` already rebuild
-   * their `CharacterRow[]` unmemoized every render for the same roster-sized
-   * data, so recomputing this map alongside them costs nothing extra.
-   */
   const sortStatsById = new Map<number, CharacterSortStats>();
   for (const [characterId, core] of rosterCore) {
     const base = core.stats;
@@ -273,7 +215,6 @@ export function useCharactersView(input: CharactersViewInput) {
 
   const query = search.trim().toLowerCase();
   const narrowing = query.length > 0 || activeRosterFilterCount(rosterFilter) > 0;
-  /** Search and funnel filters as one test, so card view, table view and the "nothing matches" state can't disagree. */
   function matchesFilters(characterId: number): boolean {
     const corpName = corporationNameById[characterId] ?? '';
     if (query) {
@@ -303,13 +244,6 @@ export function useCharactersView(input: CharactersViewInput) {
     return true;
   }
 
-  /**
-   * The table's rows: the whole (filtered) roster, in the roster sort. Built
-   * up here, not inside `renderTable`, because the export hook below needs
-   * them before the loading early return — which also lets card view export
-   * the same rows (the DataTable's own column sort applies only while it's
-   * mounted).
-   */
   const tableRows: CharacterRow[] = partitionStarredFirst(
     sortCharacterIds(
       (characters ?? [])
@@ -351,9 +285,6 @@ export function useCharactersView(input: CharactersViewInput) {
   const allIds = (characters ?? []).map((character) => character.characterId);
   const ungroupedIds = ungroupedCharacterIds(groups, allIds);
   const noMatches = narrowing && !allIds.some((id) => matchesFilters(id));
-  // Only corps the roster actually has, plus a pasted-link value that isn't
-  // one of them — dropping it would blank the trigger while the badge still
-  // counts it, a filter the pilot can neither see nor clear.
   const corpOptions = [
     ...new Set(
       [...allIds.map((id) => corporationNameById[id]), rosterFilter.corp ?? undefined].filter(
@@ -361,9 +292,6 @@ export function useCharactersView(input: CharactersViewInput) {
       )
     ),
   ].sort((a, b) => a.localeCompare(b));
-  // Same "keep a stale selection visible so it can be cleared" reasoning as
-  // `corpOptions` — a group filtered on, then deleted, would otherwise blank
-  // the Select's trigger while the filter chip count still counts it.
   const groupFilterOptions =
     rosterFilter.group !== null &&
     rosterFilter.group !== UNGROUPED_VALUE &&

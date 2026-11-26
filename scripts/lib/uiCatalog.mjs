@@ -1,6 +1,3 @@
-// Pure formatting for the Storybook components manifest (`ui:catalog`).
-// Output is compact text for an agent's context, not for humans to browse.
-
 const firstLine = (text = '') =>
   text
     .replace(/^@summary\s*/, '')
@@ -53,7 +50,6 @@ const distance = (a, b) => {
   return row[b.length];
 };
 
-/** Names containing the query (either way round) or within 2 edits of it. */
 export const closeMatches = (query, names) => {
   const q = query.toLowerCase();
   return names.filter((n) => {

@@ -1,10 +1,3 @@
-/**
- * The EVE mail an officer gets when a corporation member asks about their mining tax from the
- * Mining › Tax tab, for officers who are not in Neocom Desk when it happens. The question itself
- * always lands in the corporation's Needs you queue; this only says it is there. Pure, plain
- * English (like the other Corp Tax Book composers); names and the note come from a member, so
- * they are cleaned before they go in.
- */
 import { formatIsk } from '../../lib/isk';
 import { mailSafe } from '../../lib/mailSafe';
 import { clipToCodePoints, MAX_MAIL_SUBJECT } from '../communities/requestMail';
@@ -20,12 +13,9 @@ export interface TaxQuestionMailInput {
   kind: 'paid' | 'notOwed' | 'notPaying';
   memberName: string;
   corpName: string;
-  /** E.g. "2026-11-02" or a short range; already formatted. */
   days: string;
   amountIsk: number;
-  /** The member's own words; may be empty. */
   note: string;
-  /** Each transfer the member sent, for 'paid'. */
   transfers?: { amountIsk: number; at: string; journalRef: number }[];
 }
 

@@ -34,44 +34,24 @@ export interface GroupMember {
 interface GroupSummaryModalProps {
   open: boolean;
   onClose: () => void;
-  /** 2+ Assignments combined into one obligation (issue #523), earliest date first. */
   members: readonly GroupMember[];
   systemName: string;
   systemSecurity: number | null | undefined;
   typeNames: ReadonlyMap<number, string>;
   payeeDisplayName: string;
   busy: boolean;
-  /** Why the last row action wrote nothing, shown until the next one — `useLedgerAction`'s message. */
   saveError?: string | null;
-  /** Opens the one edit form for the whole combined entry (`EntryEditDialog`). */
   onEdit: () => void;
-  /** Settles this Payee's whole balance — offered while any day is still owed. */
   onSettleUp?: () => void;
-  /** "Take out of combined": that day keeps its Assignment and becomes its own row. */
   onTakeOut: (member: GroupMember) => void;
-  /** "Uncombine all": every day keeps its Assignment and becomes its own row. */
   onUncombine: () => void;
-  /** Accepts the new ore total on every day that grew since it was paid. */
   onResolve: () => void;
-  /** Opens "Link a payment" for this entry's owed days. */
   onLinkWalletPayment?: () => void;
-  /** Deletes every day's Assignment — asked first. */
   onUnassignAll: () => void;
-  /** Opens its Payee's ledger: every payment and the days it paid. Absent: no link. */
   onOpenLedger?: () => void;
-  /** Opens with the "unassign all days?" question showing — the row menu's Unassign. */
   startWithUnassignConfirm?: boolean;
 }
 
-/**
- * A combined entry (mockup F1, scope decision 20261004): one obligation, with
- * each EVE day still shown on its own — its own ore, and its own value → tax
- * line — because a session that ran past midnight UTC is one bill but two
- * ledger days. One Edit for the whole entry (the per-day Edit buttons made
- * a pilot correct the same session twice); the rarer moves — take a day out,
- * uncombine — sit in the chevron attached to the Edit button (a split button, the
- * same as a single entry's detail).
- */
 export function GroupSummaryModal({
   open,
   onClose,

@@ -76,42 +76,18 @@ import { useKeyedLoad } from '@/lib/useAsyncLoad';
 import { cx } from '@/lib/cx';
 import { moveHighlight, type ComboboxNavKey } from '@/lib/comboboxNav';
 
-/** Section header over each group in the sourcing strip: Cheapest by region, Market BPOs, Contract BPOs. */
 const SOURCING_GROUP_HEADER = `pb-2 ${eyebrowClassName}`;
 
-/**
- * One card width for region and BPO cards alike from `sm`, so the groups
- * share a row. On a phone a region cell is narrower and the row scrolls
- * sideways rather than wrapping six cells into three rows above the offers.
- */
 const REGION_CELL_WIDTH = 'w-28 shrink-0 sm:w-32';
 
-/** A BPO card keeps the region cell's three lines; on a phone the Market and Contract groups share a two-column row instead of one full-width line each. */
 const BPO_CARD_LAYOUT = 'w-full sm:w-32';
 
-/**
- * What the Industry page header shows for this tab: when the contract snapshot
- * last synced (beside the title) and the Refresh button (beside the settings
- * gear). `null` while the tab is not mounted.
- */
 export interface BpcSourcingHeaderState {
   dataAge: Date | null;
   busy: boolean;
   refresh: () => void;
 }
 
-/**
- * Public BPC contract search (issue #608, ADR 0013): searches a server-synced
- * snapshot of every publicly contracted blueprint copy for sale, across every
- * region. Not per-character — read-only, cached for offline.
- *
- * Industry's third tab rather than its own route: a BPC is an industry input,
- * ME/TE/runs are industry vocabulary (and are literally `BuildPlanRecord`'s
- * own fields), and the thing you do after finding one is run a job. It loads
- * its own snapshot rather than joining Industry's, because the two share no
- * data — this one is global and R2-backed, Industry's is per-character
- * and ESI-backed.
- */
 export function BpcSourcingPanel({
   onHeaderChange,
 }: {
@@ -157,15 +133,10 @@ export function BpcSourcingPanel({
     sourceData,
   } = useBpcSourcingData();
 
-  /** The row whose contract detail is open, if any. */
   const [openRow, setOpenRow] = useState<BpcContractRow | null>(null);
-  // The Community Offer whose "ask to copy…" dialog is open.
   const [askRow, setAskRow] = useState<Extract<BpcSearchRow, { source: 'community' }> | null>(null);
   const navigate = useNavigate();
   const location = useLocation();
-  // The route a row click opens, if it is a page: an LP offer's store (this offer picked;
-  // `affordableOnly=0` so an offer the pilot can't yet afford stays in view) or the item's
-  // Market entry. A contract row opens a modal; an owned row creates a plan (async, no URL).
   const rowRouteHref = (row: BpcSearchRow): string | undefined => {
     if (row.source === 'lp') {
       return `/wallet/lp-store/${row.corporationId}?${new URLSearchParams({ offer: String(row.offerId), affordableOnly: '0' })}`;
@@ -176,7 +147,6 @@ export function BpcSourcingPanel({
     return undefined;
   };
 
-  // Retry can unmount into the spinner: focus waits on the always-mounted card wrapper.
   const [cardRef, , holdRetryFocus] = useRetryFocus(
     loading
       ? 'busy'
@@ -216,10 +186,6 @@ export function BpcSourcingPanel({
   const selectedName =
     selectedTypeId === null ? null : (blueprintNames.get(selectedTypeId) ?? `#${selectedTypeId}`);
 
-  // The suggestion list is an inline ARIA combobox, the same hand-built
-  // pattern as BuildLocationPicker: focus stays in the search box, arrow keys
-  // move a highlight, Enter picks it, Escape hides the list. The highlight is
-  // clamped rather than reset when a filter change shrinks the list.
   const suggestionIdPrefix = useId();
   const suggestionListboxId = `${suggestionIdPrefix}-listbox`;
   const suggestionOptionId = (typeId: number) => `${suggestionIdPrefix}-option-${typeId}`;
@@ -232,7 +198,6 @@ export function BpcSourcingPanel({
       : null;
 
   function handleSuggestionKeyDown(e: KeyboardEvent<HTMLInputElement>) {
-    // ArrowDown brings an Escape-dismissed list back, as a combobox does.
     if (openSuggestions === null) {
       if (e.key === 'ArrowDown' && suggestionsDismissed && suggestions.length > 0) {
         e.preventDefault();
@@ -279,7 +244,6 @@ export function BpcSourcingPanel({
     onKeyDown: handleSuggestionKeyDown,
   };
 
-  /** Picking from the autocomplete puts the blueprint's full name in the box, the way a combobox does — the field keeps showing what is being filtered on. */
   function selectBlueprint(suggestion: BlueprintSuggestion) {
     setParams({
       'sourcing.type': suggestion.typeId,
@@ -293,7 +257,6 @@ export function BpcSourcingPanel({
 
   const hideDefaults = { hideAuctions: hideAuctionsDefault, hidePlex: hidePlexDefault };
 
-  /** Includes the Dexie-backed space filter — unlike the sourcing.* params here, nothing else resets it. */
   function resetSourcingFilters() {
     changeFilter({
       typeQuery: '',
@@ -312,7 +275,6 @@ export function BpcSourcingPanel({
     void setSpaceFilter(SPACE_KINDS);
   }
 
-  /** Editing the text drops the pinned blueprint — otherwise the box would show one name while the table filtered on another. */
   function changeFilter(next: UiFilter) {
     if (next.typeQuery !== uiFilter.typeQuery) {
       setHighlightedIndex(null);
@@ -339,7 +301,6 @@ export function BpcSourcingPanel({
     [rows, originals, regionNames]
   );
 
-  // The market region may hold no contract listing, so `regionNames` may not name it.
   const unnamedMarketRegionId =
     marketRegionId === null || regionNames.has(marketRegionId) ? null : marketRegionId;
   const loadMarketRegionName = useCallback(
@@ -358,9 +319,6 @@ export function BpcSourcingPanel({
   );
   const marketRegionLabel = marketRegionId === null ? null : regionLabel(marketRegionId);
 
-  // An owned blueprint's `location_id` can be a container or ship; it only
-  // resolved to a name because it is a station or structure, so only then is
-  // it somewhere a waypoint can go.
   const ownedPlaceIds = useMemo(
     () =>
       new Map(
@@ -378,11 +336,7 @@ export function BpcSourcingPanel({
     () => [selectedMarketBpo, selectedContractBpo].filter((bpo): bpo is BpoOffer => bpo !== null),
     [selectedMarketBpo, selectedContractBpo]
   );
-  // System + security for each card, the same local SDE lookup Item Offers uses.
   const bpoCardLocations = useOfferLocations(selectedBpoCards);
-  // The copy the CHEAPEST chip would quote, if it has an honest price to
-  // compare a BPO with — so a card never claims "may be cheaper" against a
-  // bundle's or barter's price.
   const cheapestCopy = useMemo(
     () => (selectedTypeId === null ? null : cheapestComparableCopy(filteredRows)),
     [selectedTypeId, filteredRows]
@@ -394,10 +348,6 @@ export function BpcSourcingPanel({
         : contractLocations.get(bpo.locationId)?.name) ?? null,
     [market.locations, contractLocations]
   );
-  // The regions a pilot prices against, not every region the blueprint is
-  // listed in (`baselineRegions`): The Forge, their market hub's, the nearest
-  // hub's, and where they are when one of those coincides: three at most.
-  // Hidden under a Region filter, which already narrows the rows to one.
   const nearestHubRegionId = nearestHub(TRADE_HUBS, jumpFilter.jumps)?.regionId ?? null;
   const currentRegionId =
     currentSystem.systemId === null
@@ -426,11 +376,7 @@ export function BpcSourcingPanel({
         : best,
     null
   );
-  // One accent for the whole row: the cheapest region cell, or a BPO card
-  // only when it is strictly the cheapest box shown (the row needs two boxes).
   const cheapestCard = cheapestSourcingCard(cheapestRegionId?.price ?? null, selectedBpoCards);
-  // A hub's region is named already; the pilot's own region may have no
-  // contract to name it, so its name is read from the SDE like the market region's.
   const [loadedRegionNames, setLoadedRegionNames] = useState<ReadonlyMap<number, string>>(
     new Map()
   );
@@ -463,8 +409,6 @@ export function BpcSourcingPanel({
     loadedRegionNames.get(regionId) ??
     `#${regionId}`;
 
-  // Every listed copy, not the filtered board: a tight ME, price or region
-  // filter must not shrink the pool a copy's price is judged against.
   const peerDiffOf = useMemo(
     () => bpcPeerDiffs(sourceData.contractRows),
     [sourceData.contractRows]
@@ -486,7 +430,6 @@ export function BpcSourcingPanel({
     onAsk: setAskRow,
   });
 
-  // One badge per row the table marks (`bpoBadgeRows`), built once so each BPO column reads it.
   const bpoBadges = useMemo(() => {
     const badges = new Map<BpcSearchRow, BpcBpoBadge>();
     if (selectedTypeId !== null) return badges;
@@ -502,7 +445,6 @@ export function BpcSourcingPanel({
     }
     return badges;
   }, [selectedTypeId, displayRows, bpoByType, bpoLocationName, regionLabel]);
-  // Every column and every badge fact, whatever the column picker shows.
   const csvColumns = useMemo(
     () =>
       bpcSourcingCsvColumns(t, {
@@ -521,16 +463,12 @@ export function BpcSourcingPanel({
   );
   const sourcingExport = useTableExport({
     surface: 'bpc-sourcing',
-    // Every match in the table's order, not just the `RESULT_LIMIT` it mounts.
     rows: displayRows,
     source: 'sorted-rows',
     columns: csvColumns,
   });
 
   if (!hydrated || activeCharacterId === null) {
-    // No redirect of its own: the Industry route this sits in already sends a
-    // characterless visitor to /characters, and a second `Navigate` racing it
-    // from inside a tab is how you get a redirect loop.
     return <Spinner block="page" label={t('common.loading')} />;
   }
 
@@ -567,16 +505,11 @@ export function BpcSourcingPanel({
           .join(' ');
 
   return (
-    // No header of its own: the tab above already reads "BPC Search", the
-    // data age sits beside the page title and Refresh beside the settings
-    // gear (`onHeaderChange`). The table keeps its accessible name from
-    // `bpcContracts.title`.
     <>
       <h2 ref={cardRef} tabIndex={-1} className="sr-only focus:outline-none">
         {t('bpcContracts.title')}
       </h2>
       <LiveStatus>
-        {/* What the visible branch below says. */}
         {loading
           ? ''
           : error
@@ -591,8 +524,6 @@ export function BpcSourcingPanel({
         ) : error ? (
           <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
         ) : contractsResult === null && ownedBlueprints.length === 0 ? (
-          // The public index was unreachable and nothing is cached, and there are
-          // no owned blueprints to search either: not "no listings synced yet".
           <LoadFailedState
             title={t('common.contractIndexUnreachableTitle')}
             hint={t('common.contractIndexUnreachableHint')}
@@ -602,9 +533,6 @@ export function BpcSourcingPanel({
             }}
           />
         ) : rows.length === 0 && originals.length === 0 && ownedBlueprints.length === 0 ? (
-          // Nothing to search from either source — distinct from
-          // `noFilterMatches` below, which is "some data exists, the filter
-          // just excludes it all."
           <EmptyState title={t('bpcContracts.emptyTitle')} hint={t('bpcContracts.emptyHint')} />
         ) : (
           <>
@@ -612,7 +540,6 @@ export function BpcSourcingPanel({
               <CachedNotice className="px-3 pt-2" fetchedAt={contractsResult.fetchedAt} />
             )}
             {contractsResult === null && (
-              // Owned blueprints still list, but no public offers came back.
               <p className="px-3 pt-2 text-[0.6875rem] text-warning uppercase">
                 {t('common.contractIndexUnreachableTitle')}
               </p>
@@ -651,18 +578,12 @@ export function BpcSourcingPanel({
                 </>
               }
             />
-            {/* Outside the bar: collapsed, its controls unmount, and this is
-              exactly when the pilot needs telling the range is not applied. */}
             {(jumpFilter.status === 'no-origin' || jumpFilter.status === 'unknown') && (
               <div className="border-b border-line px-3 py-2">
                 <JumpRangeNote status={jumpFilter.status} />
               </div>
             )}
 
-            {/* Inset on its own ground with an accent edge, because as a plain
-              list flush against the filter bar it read as more page furniture
-              and went unnoticed — the whole feature hangs on picking from it. */}
-            {/* Always mounted, so the count is announced when the list appears. */}
             <LiveStatus>
               {openSuggestions !== null &&
                 (highlightedSuggestion
@@ -689,7 +610,6 @@ export function BpcSourcingPanel({
                       id={suggestionOptionId(suggestion.typeId)}
                       role="option"
                       aria-selected={suggestion === highlightedSuggestion}
-                      // Keeps focus in the search box, so a click never blurs it first.
                       onMouseDown={(e) => e.preventDefault()}
                       onClick={() => selectBlueprint(suggestion)}
                       className={cx(
@@ -700,9 +620,6 @@ export function BpcSourcingPanel({
                       )}
                     >
                       <span className="min-w-0 flex-1 truncate">{suggestion.name}</span>
-                      {/* Hidden on the narrowest screens rather than wrapped: three
-                          columns in a 390px row squeezes the name, which is the
-                          one part that has to stay readable. */}
                       <span className="hidden shrink-0 text-[0.6875rem] tabular-nums text-text-dim sm:inline">
                         {t('bpcContracts.suggestionBestMeTe', {
                           me: suggestion.bestMe,
@@ -719,12 +636,9 @@ export function BpcSourcingPanel({
             )}
 
             {selectedName !== null && summary !== null && (
-              // Name and close share the first line on a phone; the stats strip
-              // wraps beneath instead of the close button taking a line of its own.
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-line px-3 py-2">
                 <div className="min-w-0 max-sm:flex-1">
                   <p className="truncate text-base font-semibold">{selectedName}</p>
-                  {/* The phone's sort bar counts the offers instead. */}
                   <p className="text-[0.6875rem] text-text-dim max-sm:hidden">
                     {t('bpcContracts.offersOnContract', { count: summary.offerCount })}
                   </p>
@@ -768,22 +682,10 @@ export function BpcSourcingPanel({
             )}
 
             {(regionCells.length > 0 || selectedBpoCards.length > 0) && (
-              // One wrapping row: [Cheapest by region] [Market BPOs] [Contract BPOs],
-              // every card the same width; on a phone the region cells take the
-              // first line (scrolling sideways) and the two BPO groups share the
-              // next in two columns. A group with no card is left out.
               <div className="grid grid-cols-2 gap-x-2 gap-y-2 border-b border-line px-3 py-2 sm:flex sm:flex-row sm:flex-wrap sm:gap-x-4">
                 {regionCells.length > 0 && (
                   <div className="col-span-2 min-w-0 max-w-full">
                     <p className={SOURCING_GROUP_HEADER}>{t('bpcContracts.cheapestByRegion')}</p>
-                    {/* A fixed order (The Forge first), so a cell stays where the pilot
-                    looks for it; the accent marks the cheapest. Hovering a name says
-                    why the region is here. */}
-                    {/* `relative` makes the row the containing block of each
-                    price's absolutely positioned screen-reader text
-                    (`IskAmount`'s `sr-only`). Without it that text escaped
-                    the row's scroll clip and the whole page scrolled
-                    sideways on a phone, not just this row. */}
                     <ul
                       aria-label={t('bpcContracts.cheapestByRegion')}
                       className="relative flex gap-2 max-sm:-mx-3 max-sm:overflow-x-auto max-sm:px-3 sm:flex-wrap"
@@ -808,7 +710,6 @@ export function BpcSourcingPanel({
                             >
                               {baselineRegionName(cell.regionId)}
                             </HintText>
-                            {/* Price and offer count share a line: two lines a cell, not three. */}
                             {cell.listing === null ? (
                               <span className="text-[0.6875rem] text-text-dim">
                                 {t('bpcContracts.regionNoOffers')}
@@ -879,12 +780,6 @@ export function BpcSourcingPanel({
                   label={t('bpcContracts.title')}
                   columns={columns}
                   rows={shownRows}
-                  // Index included deliberately: a contract lists the same
-                  // blueprint once per copy, so contractId+typeId is not
-                  // unique — 70% of rows in a live pull shared one, and the
-                  // duplicate React keys left the previous blueprint's rows
-                  // in the table beside the chosen one. An owned row's
-                  // item_id is already unique on its own.
                   rowKey={(row, index) =>
                     row.source === 'contract'
                       ? `${row.contract.contractId}:${row.typeId}:${index}`
@@ -897,14 +792,7 @@ export function BpcSourcingPanel({
                             : `owned:${row.itemId}`
                   }
                   {...sortProps}
-                  // A two-line card per offer on a phone — price at the right of
-                  // the title line, everything else on one dim line under it —
-                  // and a sort picker, since the header row it would sort from
-                  // is gone. The cap above follows that same sort.
                   stackLayout="dense"
-                  // Name, price and the More actions button centred on one
-                  // line, the button's 36px touch target no longer making that
-                  // line button-tall (Hauling's opt-in, `index.css`).
                   className="dt-dense-tight"
                   mobileSort
                   stackSummary={
@@ -915,9 +803,6 @@ export function BpcSourcingPanel({
                         })
                       : t('bpcContracts.mobile.offerCount', { count: displayRows.length })
                   }
-                  // A contract row opens its contract; a market row opens the
-                  // item's Market entry. Owned and Community rows have no
-                  // contract: nothing to open.
                   rowClickable={(row) => row.source !== 'community'}
                   onRowClick={(row) => {
                     if (row.source === 'community') return;
@@ -927,8 +812,6 @@ export function BpcSourcingPanel({
                       return;
                     }
                     if (row.source === 'owned') {
-                      // No contract to open: start a Build Plan from the owned
-                      // blueprint, seeded with its own ME/TE/runs.
                       void loadPlannableIndex().then((index) => {
                         const productTypeId = plannableProductTypeID(index, row.typeId);
                         if (productTypeId === null) return;
@@ -948,10 +831,6 @@ export function BpcSourcingPanel({
                   rowMoreActions
                   rowHref={rowRouteHref}
                   rowContextMenu={(row, tr) => (
-                    // The Offer's own ME/TE/runs, not the defaults, so a pilot
-                    // shopping a specific copy sees what *that* copy builds. A
-                    // BPO's -1 runs falls back to the unseeded default instead
-                    // of a fabricated run count.
                     <BuildPlanContextMenu
                       typeId={row.typeId}
                       itemName={blueprintNames.get(row.typeId)}
@@ -965,7 +844,6 @@ export function BpcSourcingPanel({
                       extraItems={waypointItemFor(row, ownedPlaceIds)}
                     />
                   )}
-                  // At most RESULT_LIMIT rows, but a phone still mounts only a screenful.
                   virtualize
                 />
               </>
@@ -986,12 +864,7 @@ export function BpcSourcingPanel({
         {openRow !== null && (
           <BpcContractModal
             row={openRow}
-            // Every listed copy, not the filtered board: a tight ME, price or region
-            // filter must not shrink the pool a fair price is judged against.
             comparables={sourceData.contractRows}
-            // Non-null past the `activeCharacterId === null` guard above; the
-            // modal needs one to resolve a player-structure location, whose ACL
-            // is per Character (#655 item F).
             characterId={activeCharacterId}
             blueprintName={blueprintNames.get(openRow.typeId) ?? `#${openRow.typeId}`}
             regionName={regionNames.get(openRow.regionId) ?? `#${openRow.regionId}`}
@@ -999,10 +872,6 @@ export function BpcSourcingPanel({
           />
         )}
       </Panel>
-      {/* One quiet line just under the card: what the list was capped to and
-        which market was checked. The cap follows the phone's sort bar
-        (`stackSummary`) there, so it is left off at that width. Only where
-        the table itself shows, never under a spinner or an error. */}
       {showsTable && (marketNote !== null || capNote !== null) && (
         <p className="px-3 pt-2 text-[0.6875rem] text-text-dim">
           {capNote !== null && <span className="max-sm:hidden">{capNote} </span>}

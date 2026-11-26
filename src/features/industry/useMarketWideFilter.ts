@@ -8,11 +8,6 @@ import { useHydratedStore } from '@/lib/useHydratedStore';
 import { useSalesShare } from './salesSharePref';
 import { MARKET_WIDE_FILTER, type MarketWideFilterState } from './marketWideFilter';
 
-/**
- * The panel's filter, held in the URL. The share assumption is a remembered
- * default behind its URL key (`salesSharePref.ts`): a link's `marketWide.share`
- * wins, only an edit is stored.
- */
 export function useMarketWideFilter(): {
   filter: MarketWideFilterState;
   setFilter: (next: MarketWideFilterState) => void;

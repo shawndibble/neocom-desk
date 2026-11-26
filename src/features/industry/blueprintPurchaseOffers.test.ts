@@ -21,7 +21,6 @@ vi.mock('./ownedStockDetection', () => ({
 }));
 const lpValueState = vi.hoisted(() => ({ value: 0, hydrate: async () => {} }));
 vi.mock('@/features/loyalty/lpValue', () => ({ useLpValue: { getState: () => lpValueState } }));
-// Blueprints never read a store's market LP Value; mocked so its loaders stay out.
 vi.mock('@/features/loyalty/marketLpValue', () => ({ loadMarketLpValues: vi.fn() }));
 
 const JITA = getTradeHub('jita')!;
@@ -89,7 +88,6 @@ beforeEach(() => {
   vi.mocked(loadOwnedStockSnapshot).mockResolvedValue(ownedHulls(0) as never);
   vi.mocked(loadGlobalMarketOverrides).mockResolvedValue(new Map());
   vi.mocked(db.characters.toArray).mockResolvedValue([{ characterId: 7 }] as never);
-  // The pilot values LP at 4 ISK.
   lpValueState.value = 4;
 });
 
@@ -106,7 +104,6 @@ describe('loadBlueprintPurchaseOffers', () => {
 
   it('prices an LP redemption at the pilot’s LP Value', async () => {
     const offersFor = await loadBlueprintPurchaseOffers(7, JITA, [BLUEPRINT]);
-    // 1,000 ISK + 500 LP at 4 ISK/LP.
     expect(offersFor(BLUEPRINT)).toEqual([{ me: 0, te: 0, runs: 1, quantity: 1, price: 3_000 }]);
   });
 
@@ -119,7 +116,6 @@ describe('loadBlueprintPurchaseOffers', () => {
   it('rounds the price to whole ISK', async () => {
     lpValueState.value = 2.3333;
     const offersFor = await loadBlueprintPurchaseOffers(7, JITA, [BLUEPRINT]);
-    // 1,000 + 500 × 2.3333 = 2,166.65.
     expect(offersFor(BLUEPRINT)).toEqual([expect.objectContaining({ price: 2_167 })]);
   });
 
@@ -137,7 +133,6 @@ describe('loadBlueprintPurchaseOffers', () => {
     ] as never);
     const offersFor = await loadBlueprintPurchaseOffers(7, JITA, [BLUEPRINT]);
     expect(findLpOfferMatches).toHaveBeenCalledWith(8, [BLUEPRINT]);
-    // Both Characters see the same corp offer — it is one offer, not two.
     expect(offersFor(BLUEPRINT)).toHaveLength(1);
   });
 

@@ -25,7 +25,6 @@ describe('startLinkPath', () => {
   });
 
   it('round-trips every field, including characters a URL must escape', () => {
-    // A payee with an ID travels as the ID alone: ESI names it.
     const expected = { ...FULL, payee: { id: 98000001, name: '' } };
     expect(parseStartLink(queryOf(startLinkPath(FULL)))).toEqual(expected);
   });

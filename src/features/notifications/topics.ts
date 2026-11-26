@@ -1,9 +1,3 @@
-/**
- * The seven Topics Settings > Notifications files its events under: the five
- * named groups, Corp, and EVE notifications (`eventGroups.ts`). A phone shows
- * them as a list with a one-line state each; a desktop shows them as tabs.
- * Pure: the caller supplies how to read one Character's value.
- */
 import { EVENT_GROUP_KEYS, groupNotificationEvents } from './eventGroups';
 import type { NotificationEventId } from './events';
 import type { NotificationChannel } from './eventSelection';
@@ -16,7 +10,6 @@ export interface Topic {
   eventIds: readonly NotificationEventId[];
 }
 
-/** Files `ids` (all events, or a search's subset) into topics; empty topics are left out. */
 export function notificationTopics(ids: readonly NotificationEventId[]): Topic[] {
   const layout = groupNotificationEvents(ids);
   const topics: Topic[] = layout.groups.map((group) => ({
@@ -29,12 +22,9 @@ export function notificationTopics(ids: readonly NotificationEventId[]): Topic[]
 }
 
 export interface TopicSummary {
-  /** Events with Device pop-ups on for at least one Character that can use them. */
   device: number;
-  /** Events with Alerts on for at least one Character that can use them. */
   alerts: number;
   total: number;
-  /** False when no Character can use any event of the topic. */
   usable: boolean;
 }
 

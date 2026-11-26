@@ -21,8 +21,6 @@ describe('buildInjectorFacts', () => {
   });
 
   it('walks brackets from totalSp + unallocatedSp, crediting unallocated against the gap', () => {
-    // spToTrain 1.5M, unallocated 500k -> gap 1M. Bracket SP starts at
-    // totalSp (4.3M) + unallocated (500k) = 4.8M, so the walk crosses 5M.
     const facts = buildInjectorFacts(scheduled, 4_300_000, 500_000, null);
     expect(facts.gapSp).toBe(1_000_000);
     expect(facts.count).toBe(3);
@@ -46,7 +44,6 @@ describe('buildInjectorFacts', () => {
   });
 
   describe('Alpha clone total-SP cap', () => {
-    // spToTrain 1.5M, unallocated 0 -> gap 1.5M.
     it('matches Omega while the plan stays under the cap', () => {
       const alpha = buildInjectorFacts(scheduled, 10_000_000, 0, null, 'alpha');
       const omega = buildInjectorFacts(scheduled, 10_000_000, 0, null, 'omega');
@@ -55,16 +52,14 @@ describe('buildInjectorFacts', () => {
     });
 
     it('clamps the gap to the headroom below the cap and reports the shortfall', () => {
-      // headroom = 20M - 19.5M = 500k of the 1.5M gap
       const facts = buildInjectorFacts(scheduled, 19_500_000, 0, null, 'alpha');
       expect(facts.gapSp).toBe(1_500_000);
       expect(facts.alphaShortfallSp).toBe(1_000_000);
-      expect(facts.count).toBe(2); // 2 x 400k covers 500k, not the 4 an Omega needs
+      expect(facts.count).toBe(2);
       expect(facts.none).toBe(false);
     });
 
     it('counts unallocated SP against the headroom', () => {
-      // bracket SP 19M + 500k = 19.5M -> headroom 500k; gap = 1.5M - 500k = 1M
       const facts = buildInjectorFacts(scheduled, 19_000_000, 500_000, null, 'alpha');
       expect(facts.alphaShortfallSp).toBe(500_000);
     });

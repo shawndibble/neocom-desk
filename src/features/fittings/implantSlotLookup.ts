@@ -1,9 +1,3 @@
-/**
- * Each implant's and booster's own EVE slot, from the market tree (the baked
- * SDE carries no slot attribute; `implantEntriesFromMarket`). Once per session.
- * The engine needs it to place a clone's implants (`fittingToDogmaFit`), and the
- * Implant Finder to place a set's.
- */
 import {
   boosterEntriesFromMarket,
   implantEntriesFromMarket,

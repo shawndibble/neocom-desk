@@ -1,11 +1,3 @@
-/**
- * The loss an insurance payout in the wallet journal paid for: its fit, what it
- * cost and Open as Fitting, the same body as Pilot Lookup's loss rows. The
- * journal names no killmail, so the loss is found by time among the pilot's
- * zKillboard losses (`matchLossToPayout`). Opens only from the Wallet, never
- * from inside another modal; it lives in the journal row, so leaving the page
- * unmounts it, which is what closes it when Open as Fitting navigates.
- */
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { LiveNote, Modal, Spinner } from '@/components/ui';
@@ -23,7 +15,6 @@ type Found =
   | { state: 'found'; entry: PilotKillmail; read: Expanded };
 
 interface InsuranceLossModalProps {
-  /** The journal line's `date`. */
   payoutDate: string;
   characterId: number;
   onClose: () => void;

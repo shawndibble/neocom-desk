@@ -11,10 +11,8 @@ import { catalogueTypeName } from '@/features/fittings/useFittingCatalogue';
 type RowProps = ComponentProps<typeof ModuleRow>;
 
 interface FittingModuleDialogProps {
-  /** The fitted module whose dialog is open; null while it is closed. */
   module: RowProps['module'] | null;
   moduleIndex: number;
-  /** Rack named in the title while `module` is null (the closing frame). */
   fallbackSlot: FittingSlotKind;
   onClose: () => void;
   placement: ComponentProps<typeof Modal>['placement'];
@@ -39,7 +37,6 @@ interface FittingModuleDialogProps {
   variants: ComponentProps<typeof FittingMutationPanel>['variants'];
 }
 
-/** A fitted module's dialog: its row, then Variations, Mutation and Affected-by folds. */
 export function FittingModuleDialog(props: FittingModuleDialogProps) {
   const { t } = useTranslation();
   const { module, moduleIndex, catalogue, edit } = props;

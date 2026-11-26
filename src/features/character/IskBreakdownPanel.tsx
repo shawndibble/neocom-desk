@@ -1,9 +1,3 @@
-/**
- * "Where the ISK went" (issue #3908): the right side panel the Journal opens.
- * It reads the Journal's own filters, so its totals are the Journal's
- * filtered In / Out / Net, and a ref type clicked here is the Journal's
- * ref-type filter. Non-modal (`SlideOver`): the Journal stays live behind it.
- */
 import { useCallback, useMemo, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -34,35 +28,19 @@ import { formatIsk } from '@/lib/isk';
 interface IskBreakdownPanelProps {
   open: boolean;
   onClose: () => void;
-  /** The Character scope in words, e.g. "All characters". */
   scopeLabel: string;
-  /** The date range in words, e.g. "last 30 days". */
   rangeLabel: string;
-  /** The Journal's filtered rows: the totals. */
   totals: JournalBreakdown;
-  /** The Journal's rows without its ref-type filter: the list, so the picked row stays among the rest. */
   breakdown: JournalBreakdown;
   selectedRefType: string | null;
   onSelectRefType: (refType: string) => void;
-  /**
-   * The personal journal's By party list: every Journal Party in the rows without
-   * the party filter. Absent on the corp journal, which has no By party view.
-   */
   parties?: {
     rows: readonly PartyBreakdownRow[];
     nameFor: (id: number) => string;
     selected: string | null;
     onSelect: (partyId: number) => void;
   };
-  /**
-   * Own-Character netting data (coverage note, "Between your Characters"):
-   * absent for the corp journal and a one-Character account, which net nothing.
-   */
   coverage?: JournalCoverage;
-  /**
-   * Where the daily chart (#3914) goes: under the In / Out / Net totals,
-   * above the ref-type list.
-   */
   chart?: ReactNode;
 }
 
@@ -262,7 +240,6 @@ export function IskBreakdownPanel({
   );
 }
 
-/** "N of M Characters loaded", naming those left out, when any is. */
 function JournalCoverageNote({ coverage }: { coverage: JournalCoverage }) {
   const { t } = useTranslation();
   if (coverage.missing.length === 0) return null;
@@ -276,7 +253,6 @@ function JournalCoverageNote({ coverage }: { coverage: JournalCoverage }) {
   );
 }
 
-/** The own-Character transfers left out of In and Out, with what counts and what does not. */
 export function BetweenYourCharactersRow({ count }: { count: number }) {
   const { t } = useTranslation();
   return (

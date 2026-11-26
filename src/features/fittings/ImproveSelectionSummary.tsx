@@ -1,8 +1,3 @@
-/**
- * The ticked set checked together: how many changes, the DPS and EHP they
- * move (a figure that stays put is left out), what they cost, and any
- * problem they cause. While the check runs, or if it failed, a line says so.
- */
 import { useTranslation } from 'react-i18next';
 import { IskAmount, LiveNote } from '@/components/ui';
 import type { FittingStats } from '@/engine/fittings/types';
@@ -13,14 +8,12 @@ import { m3Format, m3sFormat } from './improveLineText';
 
 interface Props {
   summary: SelectionSummary | null;
-  /** The set's checked stats: null when the check failed, undefined while it runs. */
   checked: FittingStats | null | undefined;
   iskBudget: number | null;
 }
 
 export function ImproveSelectionSummary({ summary, checked, iskBudget }: Props) {
   const { t } = useTranslation();
-  // Only a figure the ticks move, compared as shown: "DPS 0 → 0" tells the pilot nothing.
   const figures: string[] = [];
   if (summary) {
     const dps = [m3sFormat(summary.dps.before), m3sFormat(summary.dps.after)];
@@ -65,10 +58,6 @@ export function ImproveSelectionSummary({ summary, checked, iskBudget }: Props) 
   );
 }
 
-/**
- * The ticked set's price: the fit's total cost after with what the
- * ticks add to it, or just that change when there is no total to compare.
- */
 function SelectionCost({
   summary,
   iskBudget,

@@ -26,20 +26,17 @@ interface ClonesSummaryCardsProps {
   characterSystemId: number | null;
   characterSystemName: string | null;
   securities: ReadonlyMap<number, number>;
-  /** Whether the worn-implants read came back at all. */
   hasWorn: boolean;
   wornIds: readonly number[];
   wornValue: ImplantValue | null;
   homeLocationId: number | undefined;
   homeLocationName: string | null;
-  /** False while the name is the "Station #id" fallback: nothing to open yet. */
   homeLocationResolved: boolean;
   homeSecurity: number | undefined;
   homeJumps: JumpsAwayResult | undefined;
   lastStationChangeDate: string | null;
 }
 
-/** The cooldown, current location and respawn cards above the clone list. */
 export function ClonesSummaryCards({
   cooldown,
   lastCloneJumpDate,
@@ -63,7 +60,6 @@ export function ClonesSummaryCards({
   const cooldownHours = cloneJumpCooldownHours(infomorphLevel);
   const cooldownFraction = cooldownProgress(lastCloneJumpDate, cooldownHours, new Date(loadedAt));
 
-  // Empty (no element at all) when there is no last jump and no reduction to state.
   const cooldownNote = [
     lastCloneJumpDate &&
       t('clones.lastJump', {
@@ -80,7 +76,6 @@ export function ClonesSummaryCards({
       <Panel className="h-full">
         <section aria-label={t('clones.cooldown')} className="space-y-1">
           <h3 className={eyebrowClassName}>{t('clones.cooldownShared')}</h3>
-          {/* The header above names it; the value wraps rather than sitting in a nowrap chip. */}
           <p className={`font-medium tabular-nums ${STAT_CHIP_TONE_TEXT_CLASS[cooldownTone]}`}>
             {cooldown.onCooldown && cooldown.readyAt
               ? t('clones.cooldownOnCooldownValue', {

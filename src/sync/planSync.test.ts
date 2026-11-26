@@ -65,9 +65,6 @@ interface FakeRef {
 }
 const pathOf = (target: unknown): string => (target as FakeQuery).col.path;
 
-// In-memory Firestore double: collection path -> doc id -> data. getDocs applies
-// '==' where-filters like the real backend, and like the deployed rules, which
-// only allow filtered list queries.
 const fake = vi.hoisted(() => {
   const remoteStore = new Map<string, Map<string, Record<string, unknown>>>();
   const getDocsImpl = async (target: {
@@ -81,8 +78,6 @@ const fake = vi.hoisted(() => {
       .filter(([, d]) =>
         filters.every((f) => {
           if (f.op === '==') return d[f.field] === f.value;
-          // Firestore's range operator excludes docs missing the field
-          // entirely — feed docs written before issue #581 added `updatedAt`.
           if (f.op === '>') {
             const field = d[f.field];
             return typeof field === 'number' && field > (f.value as number);
@@ -118,8 +113,6 @@ vi.mock('firebase/firestore/lite', () => ({
   }),
 }));
 
-// Real implementation by default — only the outcome is overridden per test,
-// so the purge/spare-global assertions elsewhere still exercise real Dexie.
 vi.mock('@/esi/cachePurge', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/esi/cachePurge')>();
   return { ...actual, purgeCharacterCacheOrSuppress: vi.fn(actual.purgeCharacterCacheOrSuppress) };
@@ -129,8 +122,6 @@ vi.mock('./firebaseApp', () => ({
   getSyncFirestore: () => ({}),
 }));
 
-// The change marker (issue #5073) has its own suite (planSyncMarker.test.ts);
-// here it reads as never-written so no pass here is ever skipped.
 vi.mock('./syncMarker', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./syncMarker')>()),
   readRemoteMarker: vi.fn(async () => null),
@@ -155,7 +146,6 @@ const PRODUCTION_LOSSES_PATH = 'characters/char:1/productionLosses';
 const SETTINGS_PATH = 'characters/char:1/settings';
 const NOTIFICATION_FEED_PATH = 'characters/char:1/notificationFeed';
 
-/** setDoc calls that wrote a Notification Feed row (the heartbeat write is not one). */
 function feedWrites() {
   return vi
     .mocked(setDoc)
@@ -193,12 +183,6 @@ function buildPlan(overrides: Partial<BuildPlanRecord> = {}): BuildPlanRecord {
   };
 }
 
-/**
- * What a legacy `rigLevel`-only remote doc resolves to once it round-trips
- * through `toLocalRecord` — every pull normalizes to `rigFit` (issue #609),
- * dropping the legacy field. Takes the exact remote record rather than
- * rebuilding one, so `updatedAt` (and everything else) matches byte-for-byte.
- */
 function pulledBuildPlan(remote: BuildPlanRecord): BuildPlanRecord {
   const rest = { ...remote, rigFit: ['meT1', 'teT1', 'none'] as const };
   delete rest.rigLevel;
@@ -312,9 +296,6 @@ function feedRow(overrides: Partial<NotificationFeedRecord> = {}): NotificationF
 
 function remoteFeedDoc(overrides: DocData = {}): DocData {
   const merged = { ...feedRow(), ownerHash: HASH, ...overrides };
-  // A seeded doc needs *some* transport stamp for the cursor to read. It is no
-  // longer derivable from the row — `toRemoteFeedDoc` stamps the wall clock of
-  // the write — so a test about pull ordering passes `updatedAt` explicitly.
   const firedAt = merged.firedAt as number;
   const dismissedAt = merged.dismissedAt as number | undefined;
   return { updatedAt: Math.max(firedAt, dismissedAt ?? 0), ...merged };
@@ -327,10 +308,6 @@ function seedRemote(path: string, docs: DocData[]): void {
 const SETTINGS_META_KEY = 'sync.__settingsMeta';
 const SETTINGS_TOMBSTONES_KEY = 'sync.__settingsTombstones';
 
-// Seed a synced setting locally as if setSyncedSetting had written it. The
-// allow-list is empty in production, so tests can't call setSyncedSetting;
-// planSync tolerates keys written outside it (a real device that synced before
-// a key was removed from the allow-list is in exactly this state).
 async function seedLocalSetting(
   key: string,
   value: unknown,
@@ -346,12 +323,10 @@ async function readLocalSettingsTombstones(): Promise<SyncedSettingTombstone[]> 
   return Array.isArray(record?.value) ? (record.value as SyncedSettingTombstone[]) : [];
 }
 
-/** Lets queued microtasks and IO callbacks run, without waiting on wall-clock time. */
 async function settle(turns = 20) {
   for (let i = 0; i < turns; i++) await new Promise<void>((resolve) => setImmediate(resolve));
 }
 
-// Only timers are faked (never setImmediate): fake-indexeddb schedules on it.
 const fakeTimers = () => vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
 
 afterEach(() => {
@@ -359,9 +334,6 @@ afterEach(() => {
 });
 
 beforeEach(async () => {
-  // Helpers like markPlanDeleted schedule a debounced sync that outlives
-  // their test; left alone it fires mid-way through a later test and queues
-  // a pass right behind that test's own, so "the last status" turns flaky.
   await haltSync();
   resetSyncHalt();
   remoteStore.clear();
@@ -385,7 +357,6 @@ beforeEach(async () => {
   await db.characters.put({ characterId: 1, name: 'Pilot', ownerHash: HASH, addedAt: 1 });
 });
 
-/** One read per synced collection per Character pass — derived, so a new collection can't strand a hard-coded count. */
 const COLLECTION_COUNT = REMOTE_COLLECTIONS.length;
 
 describe('markers field mapping', () => {
@@ -435,9 +406,6 @@ describe('milestones field mapping', () => {
 });
 
 describe('plan lens field mapping (What-If Implants + Booster)', () => {
-  // The two lenses a plan is costed under are Editable Data like the entries
-  // themselves — a plan that synced without them would quote different
-  // training times on the other device.
   const whatIfImplants = { kind: 'custom' as const, bonuses: { memory: 5, perception: 4 } };
   const booster = { enabled: true, bonus: 12, startsAt: null, expiresAt: 4_102_444_800_000 };
 
@@ -516,7 +484,6 @@ describe('plan boosters list field mapping (#1407)', () => {
     const legacy = { enabled: true, bonus: 20, startsAt: null, expiresAt: 9000 };
     await db.skillPlans.add(plan({ boosters, booster: legacy }));
     await triggerSync(1);
-    // Push overwrites the legacy mirror with boosters[0], not what was stored.
     expect(remoteStore.get(PLANS_PATH)?.get('p1')?.booster).toEqual(boosters[0]);
 
     await db.skillPlans.delete('p1');
@@ -571,10 +538,10 @@ describe('triggerSync: plans', () => {
   it('markPlanDeleted pushes a tombstone and clears the local one after sync', async () => {
     await db.skillPlans.put(plan());
     seedRemote(PLANS_PATH, [remoteDoc()]);
-    await markPlanDeleted(1, 'p1'); // also schedules a debounced sync
+    await markPlanDeleted(1, 'p1');
     expect(await db.skillPlans.get('p1')).toBeUndefined();
 
-    await triggerSync(1); // cancels the pending debounce and syncs now
+    await triggerSync(1);
     const doc = remoteStore.get(PLANS_PATH)?.get('p1');
     expect(doc?.deleted).toBe(true);
     expect(doc?.ownerHash).toBe(HASH);
@@ -590,11 +557,6 @@ describe('triggerSync: plans', () => {
   });
 
   it('a learned remote tombstone is recorded locally, not just acted on (#436)', async () => {
-    // Every collection gets this, not just account-wide ones (see the
-    // decision doc for #436): a deletion pulled from remote previously left
-    // no local trace once the row itself was gone, so a sibling Character's
-    // own accountWideBackfill.ts scan could never see a deletion this device
-    // only *learned* rather than originated.
     const deletedAt = Date.now() - 100;
     await db.skillPlans.put(plan({ updatedAt: Date.now() - 5000 }));
     seedRemote(PLANS_PATH, [remoteDoc({ deleted: true, updatedAt: deletedAt })]);
@@ -613,9 +575,6 @@ describe('triggerSync: plans', () => {
   });
 
   it('wipes the character ESI cache when ownerHash changed, sparing global rows', async () => {
-    // The previous owner's cached wallet/mail/assets must not survive into the
-    // new owner's session. GLOBAL_CACHE_CHARACTER_ID rows are public universe
-    // data owned by nobody — purging them would be churn with no benefit.
     await db.settings.put({ key: 'sync.__ownerHash.1', value: 'previous-owner-hash' });
     await db.esiCache.bulkPut([
       { characterId: 1, key: 'wallet:journal', value: 'secret', fetchedAt: 1 },
@@ -689,9 +648,6 @@ describe('triggerSync: plans', () => {
   });
 
   it('leaves the ownerHash bookmark unadvanced when the purge only reached suppression', async () => {
-    // Suppression can be memory-only, so advancing the bookmark would burn the
-    // last retry: after a reload the marker is gone, the hash matches and the
-    // previous owner's rows read normally again.
     const purge = vi.mocked(await import('@/esi/cachePurge')).purgeCharacterCacheOrSuppress;
     purge.mockResolvedValueOnce('suppressed');
     await db.settings.put({ key: 'sync.__ownerHash.1', value: 'previous-owner-hash' });
@@ -717,10 +673,6 @@ describe('triggerSync: plans', () => {
 describe('triggerSync: ownerHash-scoped reads', () => {
   it('queries every collection filtered by the character ownerHash', async () => {
     await triggerSync(1);
-    // plans + buildPlans + quickbars + stationPins + planetRichness +
-    // productionRuns + productionSaleLinks + productionOrderWatches + payees +
-    // fittings + miningTaxAssignments + notificationFeed + settings, each read through a
-    // where clause.
     expect(vi.mocked(where)).toHaveBeenCalledTimes(COLLECTION_COUNT);
     expect(vi.mocked(where)).toHaveBeenCalledWith('ownerHash', '==', HASH);
     for (const call of vi.mocked(getDocs).mock.calls) {
@@ -740,9 +692,6 @@ describe('triggerSync: ownerHash-scoped reads', () => {
   });
 
   describe("a previous owner's doc at an id this owner writes", () => {
-    // The rules' `update` needs the stored doc's ownerHash to match; the pull
-    // never sees such a doc, so the write lands on it as an update and is refused.
-    // The double's two-argument write, as the module mock defines it.
     const write = vi.mocked(setDoc).getMockImplementation() as unknown as (
       ref: unknown,
       data: unknown
@@ -797,7 +746,6 @@ describe('triggerSync: ownerHash-scoped reads', () => {
     });
 
     it('leaves the doc alone when this device cannot prove it owns the Character', async () => {
-      // A previous owner's device: its Firebase session outlives the revoked EVE grant.
       vi.mocked(confirmOwnership).mockResolvedValueOnce(false);
       seedRemote(SETTINGS_PATH, [
         { key: 'sync.tradeHub', value: 'amarr', updatedAt: 1, ownerHash: 'previous-owner' },
@@ -825,17 +773,6 @@ describe('triggerSync: ownerHash-scoped reads', () => {
   });
 });
 
-/**
- * The class of bug this pins: a field the UI writes onto a record, that the
- * collection's remote mapping then forgets, so the value is saved locally and
- * quietly never leaves the device (What-If Implants and the Booster were
- * exactly that, one layer up).
- *
- * A mapping (`sync/syncedCollections.ts`) lists its fields explicitly — never a spread, because
- * Firestore rejects `undefined` and a record carries local-only shapes — so
- * nothing but a test can notice the omission. The pinned key lists make
- * adding a field to a record fail here until its round trip is decided.
- */
 describe('every stored field of a plan reaches the remote doc and comes back', () => {
   const fullSkillPlan: Required<SkillPlanRecord> = {
     id: 'p1',
@@ -848,20 +785,12 @@ describe('every stored field of a plan reaches the remote doc and comes back', (
       { intelligence: 17, memory: 17, perception: 27, willpower: 21, charisma: 17 },
     ],
     whatIfImplants: { kind: 'preset', preset: '+4' },
-    // Identical content on purpose: pushing derives the legacy mirror from
-    // boosters[0] (planSync.ts), so the generic per-field loop below only
-    // holds if this fixture already agrees with itself the way a real write
-    // would.
     booster: { enabled: true, bonus: 6, startsAt: null, expiresAt: 4_102_444_800_000 },
     boosters: [{ enabled: true, bonus: 6, startsAt: null, expiresAt: 4_102_444_800_000 }],
     milestones: [{ id: 'm1', name: 'Fly Loki', skillTypeID: 3327, level: 5 }],
     updatedAt: Date.now() - 1000,
   };
 
-  // `rigLevel` is the pre-#609 legacy field: excluded here since this app
-  // never writes it any more (`rigFit` is the one field that actually
-  // reaches the remote doc — see `resolveRigFit` in planSync.ts), so pinning
-  // it here would demand a round trip that no longer happens.
   const fullBuildPlan: Required<Omit<BuildPlanRecord, 'rigLevel'>> = {
     id: 'b1',
     characterId: 1,
@@ -966,9 +895,6 @@ describe('every stored field of a plan reaches the remote doc and comes back', (
     await triggerSync(1);
     const remote = remoteStore.get(path)?.get(record.id);
     expect(remote).toBeDefined();
-    // Asserted key by key, and each wrapped back into a one-key object, so a
-    // missing field fails naming itself rather than as one line of a
-    // whole-document diff.
     for (const [key, value] of Object.entries(record)) {
       expect({ [key]: remote?.[key] }).toEqual({ [key]: value });
     }
@@ -986,9 +912,6 @@ describe('every stored field of a plan reaches the remote doc and comes back', (
 
 describe('triggerSync: build plans', () => {
   it('drops a half-written build system rather than syncing an unlabelled one', async () => {
-    // The id is what the fee is charged at and the name is what labels it, so
-    // syncing one without the other would put a Badivefi fee under a Jita
-    // heading. Neither travels unless both do.
     await db.buildPlans.put(buildPlan({ buildSystemId: 30003888 }));
     await triggerSync(1);
     const remote = remoteStore.get(BUILD_PLANS_PATH)?.get('b1');
@@ -998,9 +921,6 @@ describe('triggerSync: build plans', () => {
   });
 
   it("syncs a picked location's id even when ESI withheld its name", async () => {
-    // Unlike the build system pair, these two are independent: the id alone
-    // still lets the search box name the place through the same stand-in
-    // label the picker composes for an unnamed structure.
     await db.buildPlans.put(buildPlan({ buildLocationId: 1035466617946 }));
     await triggerSync(1);
     const remote = remoteStore.get(BUILD_PLANS_PATH)?.get('b1');
@@ -1268,8 +1188,6 @@ describe('triggerSync: planet richness (#425)', () => {
   });
 
   it('keeps the ordering itself intact, since order is the entire payload', async () => {
-    // A ranking is only meaningful as a sequence — a round trip that sorted,
-    // deduped or reversed it would silently invert what the pilot recorded.
     const order = [2270, 2073, 2268, 2267];
     await db.planetRichness.put({
       id: '1:40000001',
@@ -1283,10 +1201,6 @@ describe('triggerSync: planet richness (#425)', () => {
   });
 
   it('a Character added on a fully-stale device does not resurrect a deleted ranking (#436)', async () => {
-    // Same scenario as the station pins case below, proving the accountWide
-    // check is genuinely generic (issue #436's AC#4) rather than only wired
-    // up for station pins: every planet richness row is account-wide by
-    // definition (no `scope` to opt out of, unlike station pins).
     const now = Date.now();
     const staleUpdatedAt = now - 10_000;
     const deletedAt = now - 5_000;
@@ -1403,11 +1317,6 @@ describe('triggerSync: Production Log (#525)', () => {
   });
 
   it('gives two sale links against the same run independent documents, so linking different sales on two devices never collides (issue #525 finding 1/2)', async () => {
-    // "Device A" links transaction 1001, "device B" links transaction 1002 —
-    // both to the same run, before either has seen the other's write. Because
-    // each link is keyed on its own deterministic transaction id rather than
-    // sharing one document (or an array field) with the run, both survive a
-    // sync with no field to be clobbered.
     await db.productionRuns.put(productionRun());
     await db.productionSaleLinks.put(productionSaleLink({ id: '1:txn:1001', transactionId: 1001 }));
     await db.productionSaleLinks.put(productionSaleLink({ id: '1:txn:1002', transactionId: 1002 }));
@@ -1530,12 +1439,9 @@ describe('triggerSync: station pins', () => {
     const staleUpdatedAt = now - 10_000;
     const deletedAt = now - 5_000;
 
-    // This device never pulled Character 1's deletion: its local copy of the
-    // account-wide pin still predates it.
     await db.stationPins.put(
       stationPin({ id: '1:60003760', scope: 'account', updatedAt: staleUpdatedAt })
     );
-    // Another device already deleted it and pushed the tombstone remotely.
     seedRemote(STATION_PINS_PATH, [
       {
         id: '1:60003760',
@@ -1548,18 +1454,11 @@ describe('triggerSync: station pins', () => {
       },
     ]);
 
-    // A Character new to this device is added; the backfill clones the
-    // still-local, still-stale row onto it — no tombstone anywhere names
-    // '4:60003760' yet.
     await db.characters.put({ characterId: 4, name: 'Alt', ownerHash: HASH, addedAt: 1 });
     expect(await backfillAccountWideData(4)).toBe(true);
     expect(await db.stationPins.get('4:60003760')).toMatchObject({ updatedAt: staleUpdatedAt });
 
-    // Sync both, per the acceptance criteria: Character 1 first, learning the
-    // deletion it had not yet pulled locally...
     await triggerSync(1);
-    // ...then the newly added Character, whose sync must not push the stale
-    // clone now that the account-wide deletion is known locally.
     await triggerSync(4);
 
     expect(await db.stationPins.get('4:60003760')).toBeUndefined();
@@ -1571,9 +1470,6 @@ describe('triggerSync: station pins', () => {
     const staleUpdatedAt = now - 10_000;
     const deletedAt = now - 5_000;
 
-    // A resurrected clone that was already pushed remotely on an earlier,
-    // pre-fix sync — its remote copy is live, not a tombstone, and shares the
-    // resurrected row's own (stale) updatedAt.
     await db.characters.put({ characterId: 4, name: 'Alt', ownerHash: HASH, addedAt: 1 });
     await db.stationPins.put(
       stationPin({ id: '4:60003760', characterId: 4, scope: 'account', updatedAt: staleUpdatedAt })
@@ -1589,7 +1485,6 @@ describe('triggerSync: station pins', () => {
         deleted: false,
       },
     ]);
-    // Character 1 already learned the account-wide deletion on an earlier sync.
     await db.settings.put({
       key: 'sync.__stationPinTombstones.1',
       value: [{ id: '1:60003760', deletedAt }],
@@ -1599,7 +1494,6 @@ describe('triggerSync: station pins', () => {
 
     expect(await db.stationPins.get('4:60003760')).toBeUndefined();
     const doc = remoteStore.get('characters/char:4/stationPins')?.get('4:60003760');
-    // The real deletion time, not the stale live doc's updatedAt.
     expect(doc).toMatchObject({ deleted: true, updatedAt: deletedAt });
     const tombstones = await db.settings.get('sync.__stationPinTombstones.4');
     expect(tombstones?.value).toEqual([{ id: '4:60003760', deletedAt }]);
@@ -1611,8 +1505,6 @@ describe('triggerSync: notification feed', () => {
     await db.notificationFeed.put(feedRow());
     await triggerSync(1);
     expect(remoteStore.get(NOTIFICATION_FEED_PATH)?.get('occ-1')).toEqual(
-      // `updatedAt` is stamped at upload now (#1207), so it is the one field
-      // the seeded fixture cannot predict.
       remoteFeedDoc({ updatedAt: expect.any(Number) })
     );
   });
@@ -1628,13 +1520,6 @@ describe('triggerSync: notification feed', () => {
   });
 
   it('pushes a back-dated row on an incremental pass (#1207)', async () => {
-    // The reported bug. A skill completion is dated by its `finish_date` and a
-    // wallet change by the journal entry's `date`
-    // (`engine/occurrenceKey.occurrenceFiredAt`), so a row written now can sit
-    // days below this device's own pull cursor. It had never been uploaded;
-    // being old is not evidence that it had.
-    // A pull that carries this device's cursor up to now — what the other
-    // device's ordinary recent activity does in the field.
     const now = Date.now();
     seedRemote(NOTIFICATION_FEED_PATH, [
       remoteFeedDoc({ id: 'from-other-device', firedAt: now, updatedAt: now }),
@@ -1651,14 +1536,11 @@ describe('triggerSync: notification feed', () => {
 
   it('pulls a back-dated row the other device wrote just now (#1207)', async () => {
     const now = Date.now();
-    // Cursor first, from ordinary recent activity.
     seedRemote(NOTIFICATION_FEED_PATH, [
       remoteFeedDoc({ id: 'earlier', firedAt: now, updatedAt: now }),
     ]);
     await triggerSync(1);
 
-    // The other device uploads a ten-day-old skill completion. Written now, so
-    // its transport stamp is now, whatever the occurrence is dated.
     seedRemote(NOTIFICATION_FEED_PATH, [
       remoteFeedDoc({ id: 'earlier', firedAt: now, updatedAt: now }),
       remoteFeedDoc({
@@ -1673,8 +1555,6 @@ describe('triggerSync: notification feed', () => {
   });
 
   it('does not re-push a row it read back unchanged from the remote side', async () => {
-    // Both sides already hold it — the Scheduled Push handler wrote it here
-    // while the other device uploaded it. Nothing to introduce.
     await db.notificationFeed.put(feedRow());
     seedRemote(NOTIFICATION_FEED_PATH, [remoteFeedDoc()]);
     await triggerSync(1);
@@ -1690,8 +1570,6 @@ describe('triggerSync: notification feed', () => {
     await triggerSync(1);
     expect((await db.notificationFeed.get('occ-1'))?.syncedAt).toEqual(expect.any(Number));
 
-    // A transfer. The rows survive as this device's archive, but the new
-    // owner's collection has never held them.
     await db.settings.put({ key: 'sync.__ownerHash.1', value: 'previous-owner-hash' });
     remoteStore.clear();
     await triggerSync(1);
@@ -1720,7 +1598,6 @@ describe('triggerSync: notification feed', () => {
     seedRemote(NOTIFICATION_FEED_PATH, [remoteFeedDoc()]);
     await triggerSync(1);
     expect(await db.notificationFeed.get('occ-1')).toEqual(
-      // Seeing it in the remote collection is the same fact a push records.
       feedRow({ syncedAt: expect.any(Number) })
     );
   });
@@ -1737,7 +1614,6 @@ describe('triggerSync: notification feed', () => {
         updatedAt: Date.now(),
       }),
     ]);
-    // What `fillTimeSettle` leaves behind: re-dated, settled, `syncedAt` cleared.
     await db.notificationFeed.put(
       feedRow({ eventId: 'marketOrderFilled', firedAt: sold, fillMatch, fillSettledAt: noticed })
     );
@@ -1795,12 +1671,7 @@ describe('triggerSync: notification feed', () => {
   });
 
   it('a dismissal pulls in even for a row outside this device’s push window', async () => {
-    // Outside by *count* — the 100-row half of the sync window. Age is a
-    // different story since issue #582: a row past 30 days is purged remotely
-    // rather than reconciled (see the retention block below).
     const now = Date.now();
-    // Older than all 100 rows below, but nowhere near 30 days old: the row
-    // cap is what leaves it out of pushEligible here, not the age half.
     const firedAt = now - 1000;
     const dismissedAt = now - 10;
     await db.notificationFeed.bulkPut(
@@ -1829,8 +1700,6 @@ describe('triggerSync: notification feed', () => {
 
     expect(deleteDoc).toHaveBeenCalledTimes(1);
     expect(remoteStore.get(NOTIFICATION_FEED_PATH)?.has('occ-1')).toBe(false);
-    // Pulled would mean writing it locally only for trimFeed to drop it and
-    // the next pass to pull it again — the churn the purge exists to stop.
     expect(await db.notificationFeed.get('occ-1')).toBeUndefined();
   });
 
@@ -1844,12 +1713,6 @@ describe('triggerSync: notification feed', () => {
     expect(remoteStore.get(NOTIFICATION_FEED_PATH)?.has('occ-1')).toBe(false);
     expect(await db.notificationFeed.get('occ-1')).toMatchObject({ id: 'occ-1', firedAt });
 
-    // The second device's pass. Dropping the pull cursor is what makes it
-    // one: a device that has never synced this collection reads the whole
-    // owned set, so `mergeFeed` reaches the pushEligible check instead of
-    // short-circuiting on `since` — and that check is the property AC4 turns
-    // on. The row is outside the push window it was purged for, so nothing
-    // puts it back for the first device to pull again.
     await db.settings.delete(pullCursorKey(1, 'notificationFeed'));
     await triggerSync(1);
     expect(remoteStore.get(NOTIFICATION_FEED_PATH)?.has('occ-1')).toBe(false);
@@ -1877,12 +1740,7 @@ describe('triggerSync: settings', () => {
   });
 
   it('never pushes the device-local cache-purge-pending marker', async () => {
-    // A stuck purge is one device's storage problem; syncing the marker would
-    // suppress the ESI cache on every other device. Not being a 'sync.' key is
-    // what keeps it local.
     await db.settings.put({ key: `${CACHE_PURGE_PENDING_PREFIX}1`, value: true });
-    // Seeded rather than written through setSyncedSetting: this test is about
-    // the purge marker staying local, not about the synced-key allow-list.
     await seedLocalSetting('sync.tradeHub', 'jita');
 
     await triggerSync(1);
@@ -1933,10 +1791,7 @@ describe('triggerSync: settings', () => {
       { key: 'sync.tradeHub', value: 'amarr', updatedAt: remoteAt, ownerHash: HASH },
     ]);
     await seedLocalSetting('sync.tradeHub', 'jita', Date.now() - 60_000);
-    // Something for the settings pass to push, so a write lands between its
-    // read and its local apply.
     await seedLocalSetting('sync.corpDarkAfterDays', 7);
-    // The first write of the pass is that settings push (nothing else is local).
     let edited = false;
     vi.mocked(setDoc).mockImplementationOnce((async (ref: FakeRef) => {
       edited = ref.col.path === SETTINGS_PATH;
@@ -1961,7 +1816,6 @@ describe('triggerSync: settings', () => {
   });
 
   it('never writes a remote setting with a non-synced key into Dexie', async () => {
-    // A hostile/compromised remote doc must not overwrite arbitrary Dexie keys.
     seedRemote(SETTINGS_PATH, [
       { key: 'activeCharacterId', value: 999, updatedAt: Date.now() + 60_000, ownerHash: HASH },
       {
@@ -2002,10 +1856,6 @@ describe('triggerSync: settings', () => {
   });
 
   it('deleteSyncedSetting propagates a tombstone to remote and keeps the local one', async () => {
-    // The local tombstone survives a successful push: it is the only defense
-    // against a stale device re-pushing its pre-delete copy once the remote
-    // tombstone ages past TOMBSTONE_TTL_MS and gets purged. It clears only
-    // once a remote write is observed postdating the delete (see merge.ts).
     await seedLocalSetting('sync.tradeHub', 'jita', Date.now() - 5_000);
     seedRemote(SETTINGS_PATH, [
       { key: 'sync.tradeHub', value: 'jita', updatedAt: Date.now() - 5_000, ownerHash: HASH },
@@ -2047,7 +1897,6 @@ describe('triggerSync: settings', () => {
   });
 
   it('a rewrite after the delete supersedes the local settings tombstone', async () => {
-    // seedLocalSetting stands in for setSyncedSetting re-adding an allow-listed key.
     await db.settings.put({
       key: SETTINGS_TOMBSTONES_KEY,
       value: [{ key: 'sync.tradeHub', deletedAt: Date.now() - 1_000 }],
@@ -2124,14 +1973,11 @@ describe('sync orchestration', () => {
 
     const p1 = triggerSync(1);
     const p2 = triggerSync(2);
-    // Give character 2 every chance to (incorrectly) start while 1 is blocked.
     await settle();
     expect(order.some((path) => path.includes('char:2'))).toBe(false);
 
     release();
     await Promise.all([p1, p2]);
-    // One getDocs per synced collection (see the collection-count comment in
-    // the "debounces scheduleSync" test above).
     expect(order.filter((path) => path.includes('char:2'))).toHaveLength(COLLECTION_COUNT);
   });
 
@@ -2139,11 +1985,10 @@ describe('sync orchestration', () => {
     const p999 = triggerSync(999);
     const p1 = triggerSync(1);
     await expect(p999).rejects.toThrow(/Unknown character/);
-    await p1; // chain not poisoned by the failure
+    await p1;
     expect(getSyncStatus(1).state).toBe('idle');
   });
 
-  /** Blocks every read whose path `match`es until `release` is called. */
   function gateReads(match: (path: string) => boolean) {
     let release!: () => void;
     const gate = new Promise<void>((resolve) => {
@@ -2203,15 +2048,12 @@ describe('sync orchestration', () => {
     const p2 = triggerSync(2);
     const p1Settled = p1.catch(() => {});
     await settle();
-    // The plans pull of character 1 has failed, but its buildPlans pull is
-    // still running under the char:1 session — char:2 must not sign in over it.
     expect(firstReadOf(order, 2)).toBe(-1);
 
     release();
     await p1Settled;
     await expect(p1).rejects.toThrow('plans offline');
     await p2;
-    // The failure did not skip the collections after it.
     expect(order.filter((path) => path.startsWith('characters/char:1/'))).toHaveLength(
       COLLECTION_COUNT
     );
@@ -2227,7 +2069,6 @@ describe('sync orchestration', () => {
     release();
     await Promise.all([edit, ...background]);
 
-    // Waits for the one sync already in flight, not for the whole sweep.
     expect(firstReadOf(order, 2)).toBeLessThan(firstReadOf(order, 1));
     expect(firstReadOf(order, 1)).toBeLessThan(firstReadOf(order, 3));
   });
@@ -2248,7 +2089,6 @@ describe('sync orchestration', () => {
     await Promise.all(queued);
 
     expect(firstReadOf(order, 1)).toBeLessThan(firstReadOf(order, 3));
-    // Coalesced: character 1 synced once, not once per trigger.
     expect(order.filter((path) => path.startsWith('characters/char:1/'))).toHaveLength(
       COLLECTION_COUNT
     );
@@ -2280,8 +2120,6 @@ describe('sync orchestration', () => {
     const first = triggerSync(1);
     await settle();
 
-    // An edit lands after the running pass already read its local rows —
-    // what flushSync (removeCharacter.ts) does right before deleting them.
     await db.skillPlans.put(plan({ id: 'p9', updatedAt: Date.now() }));
     const flush = triggerSync(1);
     let flushed = false;
@@ -2294,7 +2132,6 @@ describe('sync orchestration', () => {
 
     expect(flushed).toBe(true);
     expect(remoteStore.get(PLANS_PATH)?.has('p9')).toBe(true);
-    // Two passes, not one per caller and not one only.
     expect(vi.mocked(getDocs).mock.calls.filter(([q]) => pathOf(q) === PLANS_PATH)).toHaveLength(2);
   });
 
@@ -2335,21 +2172,15 @@ describe('sync orchestration', () => {
     scheduleSync(1, 20);
     scheduleSync(1, 20);
     scheduleSync(1, 20);
-    // One sync = one getDocs per collection (plans + buildPlans + quickbars +
-    // stationPins + planetRichness + productionRuns + productionSaleLinks +
-    // productionOrderWatches + payees + miningTaxAssignments +
-    // notificationFeed + settings).
     await vi.waitFor(() => expect(vi.mocked(getDocs)).toHaveBeenCalledTimes(COLLECTION_COUNT));
-    // The heartbeat write follows a Dexie read after the last getDocs, so wait for it.
     await vi.waitFor(() => expect(vi.mocked(setDoc)).toHaveBeenCalledTimes(1));
-    await vi.advanceTimersByTimeAsync(100); // no extra runs
+    await vi.advanceTimersByTimeAsync(100);
     expect(vi.mocked(getDocs)).toHaveBeenCalledTimes(COLLECTION_COUNT);
-    expect(vi.mocked(setDoc)).toHaveBeenCalledTimes(1); // the heartbeat, once
+    expect(vi.mocked(setDoc)).toHaveBeenCalledTimes(1);
   });
 });
 
 describe('a pass narrowed to the collections an edit touched (#4896)', () => {
-  /** Every pull cursor Character 1 holds, keyed by setting key. */
   async function cursors(): Promise<Map<string, unknown>> {
     const keys = REMOTE_COLLECTIONS.map((c) => pullCursorKey(1, c.remoteName));
     const rows = await db.settings.bulkGet(keys);
@@ -2367,16 +2198,13 @@ describe('a pass narrowed to the collections an edit touched (#4896)', () => {
     const before = await cursors();
     vi.mocked(getDocs).mockClear();
     vi.mocked(setDoc).mockClear();
-    // Another device's plan edit: a full pass would pull it, this one must not.
     seedRemote(PLANS_PATH, [remoteDoc({ id: 'elsewhere', updatedAt: Date.now() + 1000 })]);
 
     await db.quickbars.put(quickbar({ updatedAt: Date.now() }));
     scheduleSync(1, { collections: ['quickbars'], debounceMs: 10 });
     await waitForPush(QUICKBARS_PATH, '1');
 
-    // Pulled before it pushed: last-write-wins still saw the remote copy.
     expect(vi.mocked(getDocs).mock.calls.map(([q]) => pathOf(q))).toEqual([QUICKBARS_PATH]);
-    // The quickbar push only — no heartbeat, which means "every collection synced".
     expect(vi.mocked(setDoc)).toHaveBeenCalledTimes(1);
     expect(await db.skillPlans.get('elsewhere')).toBeUndefined();
     const after = await cursors();
@@ -2411,7 +2239,6 @@ describe('a pass narrowed to the collections an edit touched (#4896)', () => {
     const first = triggerSync(1);
     await settle();
     await db.quickbars.put(quickbar({ updatedAt: Date.now() }));
-    // What the Overview's mining tax write does on boot, mid-way through pass 1.
     scheduleSync(1, { collections: ['quickbars'], debounceMs: 0 });
     await vi.waitFor(() => expect(hasPendingSync(1)).toBe(false));
     release();
@@ -2487,7 +2314,6 @@ describe('haltSync', () => {
     release();
     await halt;
     await Promise.all(syncs);
-    // A delete-all is about to purge whatever character 2 would have pushed.
     expect(
       vi.mocked(getDocs).mock.calls.some(([q]) => pathOf(q).startsWith('characters/char:2/'))
     ).toBe(false);
@@ -2516,14 +2342,9 @@ describe('haltSync', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Issue #581: incremental pull
-// ---------------------------------------------------------------------------
-
 const PLANS_CURSOR_KEY = 'sync.__pullCursor.1.plans';
 const OWNER_FILTER = { field: 'ownerHash', op: '==', value: HASH };
 
-/** The where-constraints the read of `path` used, for reads made after `from`. */
 function filtersFor(path: string, from = 0): FakeFilter[] | undefined {
   const call = vi
     .mocked(getDocs)
@@ -2542,8 +2363,6 @@ async function readCursor(key: string): Promise<{ high: number; fullAt: number }
 
 describe('triggerSync: incremental pull', () => {
   it('reads the whole collection when no cursor is stored yet (AC7)', async () => {
-    // An in-place upgrade: remote docs predate this device by weeks, and an
-    // `updatedAt >` filter seeded from nothing would never surface them.
     seedRemote(PLANS_PATH, [remoteDoc({ updatedAt: Date.now() - 20 * 24 * 60 * 60 * 1000 })]);
 
     await triggerSync(1);
@@ -2564,21 +2383,18 @@ describe('triggerSync: incremental pull', () => {
       OWNER_FILTER,
       { field: 'updatedAt', op: '>', value: updatedAt },
     ]);
-    // Nothing changed remotely, so the window is empty and the row survives.
     expect(await db.skillPlans.get('p1')).toBeDefined();
   });
 
   it('does not re-push a local row the cursor already covers', async () => {
     const updatedAt = Date.now() - 5000;
     await db.skillPlans.put(plan({ updatedAt }));
-    await triggerSync(1); // pushes p1
-    await triggerSync(1); // reads it back, cursor now at its updatedAt
+    await triggerSync(1);
+    await triggerSync(1);
 
     vi.mocked(setDoc).mockClear();
     await triggerSync(1);
 
-    // The regression this guards: remote absence below the cursor read as
-    // "never seen", re-uploading every row 2s after every mutation.
     expect(
       vi
         .mocked(setDoc)
@@ -2599,8 +2415,6 @@ describe('triggerSync: incremental pull', () => {
     await triggerSync(1);
 
     expect(await db.skillPlans.get('p1')).toBeUndefined();
-    // A tombstone is an ordinary doc carrying updatedAt, so no full read was
-    // needed to notice it.
     expect(filtersFor(PLANS_PATH, from)).toEqual([
       OWNER_FILTER,
       { field: 'updatedAt', op: '>', value: updatedAt },
@@ -2624,8 +2438,6 @@ describe('triggerSync: incremental pull', () => {
     seedRemote(PLANS_PATH, [remoteDoc({ id: 'p1', updatedAt: newest })]);
     await triggerSync(1);
 
-    // Written while the first pass was in flight: after the newest doc it saw,
-    // but before the clock reached `now`. A Date.now() cursor would skip it.
     seedRemote(PLANS_PATH, [
       remoteDoc({ id: 'p1', updatedAt: newest }),
       remoteDoc({ id: 'p2', updatedAt: newest + 1000 }),
@@ -2654,9 +2466,6 @@ describe('triggerSync: incremental pull', () => {
   });
 
   it('writes the feed transport stamp on push as a wall clock, not the row’s own dates (#1207)', async () => {
-    // Inverted from #581's original rule. A cursor orders *writes*; a feed
-    // row's own timestamps order *occurrences*, and back-dating one below
-    // every other device's cursor is what hid it from their pulls.
     const dismissedAt = Date.now() - 500;
     const before = Date.now();
     await db.notificationFeed.put(feedRow({ dismissedAt }));
@@ -2679,7 +2488,7 @@ describe('triggerSync: incremental pull', () => {
       },
     ]);
 
-    await triggerSync(1); // no cursor stored: a full read
+    await triggerSync(1);
 
     expect(remoteStore.get(PLANS_PATH)?.has('p1')).toBe(false);
   });
@@ -2692,8 +2501,6 @@ describe('triggerSync: incremental pull', () => {
 
     await triggerSync(1);
 
-    // Housekeeping the incremental path cannot do — an expired tombstone is
-    // below every live cursor by definition.
     expect(filtersFor(PLANS_PATH)).toEqual([OWNER_FILTER]);
     expect((await readCursor(PLANS_CURSOR_KEY))?.fullAt).toBeGreaterThan(
       Date.now() - TOMBSTONE_TTL_MS
@@ -2707,8 +2514,6 @@ describe('triggerSync: incremental pull', () => {
 
     await triggerSync(1);
 
-    // fullAt is a property of this device, not of the data: a quiet collection
-    // must not drift back into a full read on every pass.
     expect((await readCursor(PLANS_CURSOR_KEY))?.fullAt).toBe(first?.fullAt);
   });
 
@@ -2717,8 +2522,6 @@ describe('triggerSync: incremental pull', () => {
     await triggerSync(1);
     expect(await readCursor(PLANS_CURSOR_KEY)).toBeDefined();
 
-    // A transfer: the new owner's docs can carry an updatedAt below the old
-    // owner's high-water mark, so a surviving cursor would hide them.
     await db.settings.put({ key: 'sync.__ownerHash.1', value: 'previous-owner-hash' });
     remoteStore.clear();
     const from = readsSoFar();
@@ -2747,8 +2550,6 @@ describe('triggerSync: incremental pull', () => {
 
     await triggerSync(1);
 
-    // firestore.indexes.json is deployed by hand, so a client that ships ahead
-    // of that deploy must keep syncing rather than throw on every pass.
     expect(await db.skillPlans.get('p2')).toBeDefined();
   });
 
@@ -2758,8 +2559,6 @@ describe('triggerSync: incremental pull', () => {
     await triggerSync(1);
     const before = await readCursor(PLANS_CURSOR_KEY);
 
-    // A window with something new in it (which would move the cursor) and a
-    // push that fails before any of it is applied.
     seedRemote(PLANS_PATH, [
       remoteDoc({ id: 'p1', updatedAt }),
       remoteDoc({ id: 'p3', updatedAt: Date.now() }),
@@ -2768,7 +2567,6 @@ describe('triggerSync: incremental pull', () => {
     vi.mocked(setDoc).mockRejectedValueOnce(new Error('offline'));
     await expect(triggerSync(1)).rejects.toThrow('offline');
 
-    // Otherwise the window that failed to apply is never read again.
     expect(await readCursor(PLANS_CURSOR_KEY)).toEqual(before);
     expect(await db.skillPlans.get('p3')).toBeUndefined();
   });
@@ -2784,8 +2582,8 @@ describe('triggerSync: incremental settings pull (#5045)', () => {
   it('costs one filtered read and no writes once nothing has changed', async () => {
     await seedLocalSetting('sync.tradeHub', 'jita', Date.now() - 5_000);
     await deleteSyncedSetting('sync.corpDarkAfterDays');
-    await triggerSync(1); // full read: pushes the value and the tombstone
-    await triggerSync(1); // reads both back, cursor now at the newest of them
+    await triggerSync(1);
+    await triggerSync(1);
     const cursor = await readCursor(SETTINGS_CURSOR_KEY);
 
     vi.mocked(setDoc).mockClear();
@@ -2796,7 +2594,6 @@ describe('triggerSync: incremental settings pull (#5045)', () => {
       OWNER_FILTER,
       { field: 'updatedAt', op: '>', value: cursor?.high },
     ]);
-    // Neither the value nor the never-expiring tombstone goes up again.
     expect(settingsWrites()).toEqual([]);
     expect((await db.settings.get('sync.tradeHub'))?.value).toBe('jita');
     expect(await readLocalSettingsTombstones()).toHaveLength(1);
@@ -2844,8 +2641,7 @@ describe('triggerSync: incremental settings pull (#5045)', () => {
       { key: 'sync.corpDarkAfterDays', value: 7, updatedAt: remoteAt + 1, ownerHash: HASH },
     ]);
     await triggerSync(1);
-    await triggerSync(1); // cursor now above the tradeHub doc
-    // useSyncedSetting's legacy seed: a bare put, no LWW stamp.
+    await triggerSync(1);
     await db.settings.put({ key: 'sync.tradeHub', value: 'jita' });
     const meta = (await db.settings.get(SETTINGS_META_KEY))?.value as Record<string, number>;
     delete meta['sync.tradeHub'];
@@ -2862,9 +2658,6 @@ describe('triggerSync: incremental settings pull (#5045)', () => {
   });
 
   it('relays a value pulled for one Character to another whose cursor is already past it', async () => {
-    // Settings are one local set, but each Character has its own remote copy
-    // and cursor. A device holding only Character 2 learns of this edit only
-    // if this device pushes it into Character 2's collection.
     const SETTINGS_PATH_2 = 'characters/char:2/settings';
     await db.characters.put({ characterId: 2, name: 'Alt', ownerHash: HASH, addedAt: 2 });
     const now = Date.now();
@@ -2872,9 +2665,8 @@ describe('triggerSync: incremental settings pull (#5045)', () => {
       { key: 'sync.corpDarkAfterDays', value: 7, updatedAt: now - 1_000, ownerHash: HASH },
     ]);
     await triggerSync(2);
-    await triggerSync(2); // Character 2's cursor now at now - 1000
+    await triggerSync(2);
 
-    // Another device, holding only Character 1, edited a setting earlier.
     seedRemote(SETTINGS_PATH, [
       { key: 'sync.tradeHub', value: 'amarr', updatedAt: now - 5_000, ownerHash: HASH },
     ]);
@@ -2890,7 +2682,6 @@ describe('triggerSync: incremental settings pull (#5045)', () => {
       updatedAt: now - 5_000,
     });
 
-    // Reconciled: both Characters are back on one windowed read.
     const after = readsSoFar();
     await triggerSync(1);
     await triggerSync(2);
@@ -2904,7 +2695,6 @@ describe('triggerSync: incremental settings pull (#5045)', () => {
     seedRemote(SETTINGS_PATH, [
       { key: 'sync.tradeHub', value: 'amarr', updatedAt: Date.now() + 60_000, ownerHash: HASH },
     ]);
-    // Something for the pass to push, so a write lands between read and apply.
     await seedLocalSetting('sync.corpDarkAfterDays', 7);
     vi.mocked(setDoc).mockImplementationOnce((async () => {
       await seedLocalSetting('sync.tradeHub', 'dodixie', Date.now() + 120_000);
@@ -2912,7 +2702,6 @@ describe('triggerSync: incremental settings pull (#5045)', () => {
 
     await triggerSync(1);
 
-    // The pull was dropped; advancing past it would hide it from every later window.
     expect((await db.settings.get('sync.tradeHub'))?.value).toBe('dodixie');
     expect(await readCursor(SETTINGS_CURSOR_KEY)).toEqual(before);
   });
@@ -3013,7 +2802,6 @@ describe('triggerSync: a collection the rules do not know yet (B4)', () => {
       lastSyncedAt: expect.any(Number),
     });
     expect(await db.miningTaxPaymentLinks.count()).toBe(1);
-    // Its cursor never advanced: the next pass reads it again.
     expect(await db.settings.get(pullCursorKey(1, 'miningTaxPaymentLinks'))).toBeUndefined();
     expect(await db.settings.get(pullCursorKey(1, 'miningTaxAssignments'))).toBeDefined();
   });

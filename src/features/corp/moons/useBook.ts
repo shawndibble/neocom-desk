@@ -7,7 +7,6 @@ export function useBook(): BookContextValue {
   return ctx;
 }
 
-/** The message a callable error carries, for a dialog's error line. */
 export function editErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }

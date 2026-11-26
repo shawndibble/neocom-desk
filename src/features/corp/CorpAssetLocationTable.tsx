@@ -1,9 +1,3 @@
-/**
- * Corp assets, grouped by location (issue #4671): a group per office with a
- * row per division (and its Corp deliveries), and on All a group for every
- * other place. A row click unfolds what it holds, nested by container
- * (`CorpAssetContents`); its row menu opens the by-item view filtered to it.
- */
 import { useMemo, type ReactElement, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
@@ -33,7 +27,6 @@ import type { LedgerLabels, LocationRow } from './assetLedgerView';
 import { corpAssetLocationCsvColumns } from './corpAssetsCsv';
 import { CorpAssetContents } from './CorpAssetContents';
 
-/** `undefined` sinks a row to the end of its group in either sort direction: Corp deliveries always lists after the divisions. */
 function sinkDeliveries<V extends string | number | undefined>(
   value: (row: LocationRow) => V
 ): (row: LocationRow) => V | undefined {
@@ -54,9 +47,7 @@ export function CorpAssetLocationTable({
 }: {
   rows: readonly LocationRow[];
   labels: LedgerLabels;
-  /** In-game names of containers and ships, for the unfolded contents. */
   assetNames: AssetNameMap;
-  /** The by-item view filtered to this row: the row menu's destination. */
   itemsViewHref: (row: LocationRow) => string;
   renderToolbar: (columnPicker: ReactNode, exportMenu: ReactNode) => ReactNode;
   truncated: boolean;
@@ -141,9 +132,6 @@ export function CorpAssetLocationTable({
     ),
   ];
 
-  // The row click unfolds the row, so the jump to the by-item view it used to
-  // make lives here: a one-action menu, a recorded §6c exception
-  // (docs/context/decisions/20261121-111052-corp-assets-location-rows-unfold-on-click-show.md).
   const rowContextMenu = (row: LocationRow, tr: ReactElement) => {
     if (row.cell.itemCount === 0) return tr;
     const href = itemsViewHref(row);
@@ -216,7 +204,6 @@ export function CorpAssetLocationTable({
               key: (r) => r.groupKey,
               allWidths: true,
               minSize: 1,
-              // An office the corporation keeps nothing in starts folded: its header and flag say it all.
               defaultExpanded: (group) => !group[0].groupEmpty,
               renderHeader: (group) => {
                 const first = group[0];

@@ -1,27 +1,15 @@
-/**
- * One Character's gap to a Fitting: which skills they still lack and the
- * time to train them, from the same schedule "What to train" and Fit Check
- * use. Pure — the caller supplies the missing skills (`computeSkillGaps`) and
- * the schedule that trains them (`scheduleEntries`).
- */
 import type { PlanEntry, ScheduledStep } from '@/engine/types';
 
 export interface GapSkill {
   skillTypeID: number;
-  /** The highest level the schedule trains this skill to. */
   targetLevel: number;
-  /** Time spent on this skill across the schedule. */
   seconds: number;
-  /** The Fitting asks for this skill; false for a prerequisite the schedule pulls in. */
   direct: boolean;
 }
 
 export interface CharacterFlyGap {
-  /** Skills the Fitting requires that the Character lacks — the active-Character gap count. */
   missingCount: number;
-  /** The whole schedule, prerequisites included. */
   totalSeconds: number;
-  /** Every skill the schedule trains, in training order. */
   skills: GapSkill[];
 }
 

@@ -1,8 +1,3 @@
-/**
- * The logged-out landing page's permissions disclosure (the read-scope
- * paragraph under the trust cards) is body text, not fine
- * print: 14px, capped near 768px so a line stays readable (issue #3514).
- */
 import { test, expect, PHONE } from './support/testBase';
 
 const PARAGRAPHS = [/^Here is everything logging in grants/];

@@ -1,17 +1,10 @@
-/**
- * Appraisal → Janice. The pasted text goes to our Janice proxy Worker
- * (workers/janice-proxy), which holds the API key, and comes back as the link
- * to an appraisal Janice has stored at the same hub and Price Percent.
- */
 import type { TradeHub } from '@/market/hubs';
 
-/** The deployed proxy Worker. Public by design; the Janice key lives in the Worker. */
 export const JANICE_PROXY_URL = 'https://janice.neocomdesk.com';
 
 export type JaniceFailure =
   'too-large' | 'nothing-parsed' | 'rate-limited' | 'popup-blocked' | 'failed';
 
-/** Where an appraisal link may point: the tab is only ever sent to Janice. */
 const JANICE_APPRAISAL_PREFIX = 'https://janice.e-351.com/a/';
 
 const REQUEST_TIMEOUT_MS = 20_000;

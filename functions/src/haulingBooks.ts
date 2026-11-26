@@ -1,23 +1,11 @@
-/**
- * The hauling scan's order books (the `public-data-hauling-books` job): every type's
- * best price levels at each Trade Hub station, folded from one EVE Ref market-order
- * snapshot. The client builds the scan's order-book pass from these instead of one ESI
- * request per item. Pure: no fetch, no R2.
- */
-
-/** Price levels kept per side: deep enough for a lot and the 1% crowded band, small enough to ship (Jita is about 1.2 MB gzipped). */
 export const BOOK_LEVELS = 30;
 
-/** `[price, units, orders]`: every order at exactly that price. */
 export type StoredLevel = [number, number, number];
-/** A type's `[sell, buy]` ladders: sell cheapest first, buy dearest first. */
 export type StoredBook = [StoredLevel[], StoredLevel[]];
 
 export interface HaulingBooksObject {
   stationId: number;
-  /** When this object was written. */
   lastSyncedAt: number;
-  /** When the EVE Ref snapshot it was built from was published. */
   asOf: number;
   types: Record<number, StoredBook>;
 }
@@ -38,7 +26,6 @@ export class HaulingBookFold {
     for (const id of stationIds) this.stations.set(id, new Map());
   }
 
-  /** Adds one order; orders at other stations and spent orders are ignored. */
   add(stationId: number, typeId: number, isBuy: boolean, price: number, units: number): void {
     const types = this.stations.get(stationId);
     if (!types || !(units > 0) || !(price > 0)) return;

@@ -1,12 +1,3 @@
-/**
- * Valuation (D11) is the personal Moon Mining Tax tab's engine, so a member
- * and their corp see the same amount due: the same Ore Form mapping
- * (`oreFormTypeId`), the same saved-snapshot merge (`mergeSnapshotDay`), the
- * same saved → historical → live buy → live sell chain (`resolveTaxUnitPrice`)
- * and the same Σ quantity × price × pct (`computeAssignmentValue`). What the
- * book brings is its own trade hub and Ore Form, which the caller loads the
- * prices for; this module never fetches.
- */
 import { oreFormTypeId } from '../miningTax/oreForm';
 import {
   mergeSnapshotDay,
@@ -18,34 +9,21 @@ import { computeAssignmentValue, type AssignmentValue } from '../miningTax/valua
 import type { ObservedMiningEntry } from './types';
 
 export interface OreFormSetting {
-  /** SDE raw → Compressed type ids. */
   compressedByRaw: Readonly<Record<string, number>>;
-  /** The book's Ore Form: Compressed (default) or Raw. */
   compressed: boolean;
 }
 
-/** One day's price inputs at the book's hub, keyed by the type actually priced (the Ore Form type). */
 export interface DayPriceInputs {
   ore: OreFormSetting;
-  /**
-   * Saved snapshots for the day, lowest priority first — the personal tab
-   * passes the per-browser snapshot, then the server's 6h snapshot, so the
-   * server wins for a type both priced.
-   */
   saved: readonly SnapshotDay[];
   historical?: SnapshotDay;
-  /** Today's live book. */
   live?: SnapshotDay;
 }
 
-/** The same shape as the personal tab's `UnitPrices`, keyed by raw type id. */
 export interface DayPrices {
-  /** Per-unit price by raw type id; 0 when unpriced. */
   prices: Map<number, number>;
   sources: Map<number, TaxPriceSource>;
-  /** Raw types with no usable price that day. */
   unpriced: Set<number>;
-  /** Raw types valued at today's live sell for want of any buy side. */
   sellFallback: Set<number>;
 }
 
@@ -75,12 +53,6 @@ export function priceObservedDay(rawTypeIds: readonly number[], inputs: DayPrice
   return day;
 }
 
-/**
- * What a moon owner's ore is worth (#4621): the hub's saved end-of-day open buy, else its open
- * sell, else the unit price the miner's line was billed at (#6209), else 0 (unpriced). No live
- * tier: the server writes the moon owner's page with this rule, so the accounting side values a
- * moon owner's accrual with it too and both show one figure.
- */
 export function moonOwnerUnitPrice(
   side: { buy?: number | null; sell?: number | null } | undefined,
   billed?: number
@@ -91,10 +63,6 @@ export function moonOwnerUnitPrice(
   return 0;
 }
 
-/**
- * A day's moon owner unit prices by raw type id (`moonOwnerUnitPrice` over the saved prices), with
- * the price the miners' lines are billed at standing in where the day has no saved one (#6209).
- */
 export function moonOwnerDayPrices(
   own: ReadonlyMap<number, number>,
   billed: ReadonlyMap<number, number>
@@ -106,7 +74,6 @@ export function moonOwnerDayPrices(
   return out;
 }
 
-/** One Observed Mining Entry's value and tax, at its day's prices (by raw type id) and rate. */
 export function valueObservedEntry(
   entry: ObservedMiningEntry,
   prices: ReadonlyMap<number, number>,

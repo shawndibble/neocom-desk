@@ -1,17 +1,6 @@
 import type { Translate } from './translate';
 import { formatDateTime, guardFormula, toCell, type ExportValue } from './exportCells';
 
-/**
- * CSV serializer (RFC 4180 + Excel formula-injection guard). No library: none
- * surveyed handle the BOM or the formula-injection sanitization, so the hard
- * part is ours regardless.
- */
-
-/**
- * What a column builder needs from i18next: a key in, a string out. Declared
- * structurally rather than as i18next's `TFunction` so a test can pass
- * `(k) => k` and pin key names without constructing a real translator.
- */
 export type CsvTranslate = Translate;
 
 export interface CsvColumn<T> {
@@ -22,14 +11,6 @@ export interface CsvColumn<T> {
 const BOM = '\uFEFF';
 const DELIMITER = ',';
 
-/**
- * Every text field is quoted, not just the ones holding a delimiter: an
- * importer left splitting on spaces or semicolons (OpenOffice's Text Import
- * dialog remembers its last separator) then still keeps "Cap Booster 200" in
- * one cell. Numbers and dates stay bare — a quoted value lands as text, and
- * the point of those columns is that they sort and sum. See `exportCells.ts`
- * for how a value's kind is decided.
- */
 function renderField(value: ExportValue): string {
   const cell = toCell(value);
   switch (cell.kind) {
@@ -52,21 +33,10 @@ export function toCsv<T>(rows: readonly T[], columns: readonly CsvColumn<T>[]): 
   return `${BOM}${[header, ...dataLines].join('\r\n')}\r\n`;
 }
 
-/**
- * One filename convention for every export surface:
- * `neocom-<surface>-<YYYY-MM-DD>.csv`. `date` is a parameter rather than a
- * `new Date()` inside, so callers' tests pin the name without freezing the
- * clock. Local calendar parts, not `toISOString()` — the file is named for
- * the user's day.
- *
- * `options.partial` appends `-partial`: a truncated fetch (pages missing)
- * must never hand out a file that looks complete just because it opens fine.
- */
 export function csvFilename(base: string, date: Date, options?: { partial?: boolean }): string {
   return exportFilename(base, date, 'csv', options);
 }
 
-/** `csvFilename`'s convention for any export format (`xlsx`, …). */
 export function exportFilename(
   base: string,
   date: Date,
@@ -79,11 +49,6 @@ export function exportFilename(
   return `neocom-${base}-${stamp}${suffix}.${extension}`;
 }
 
-/**
- * A free-text label (a corp's own division name) reduced to a filename-safe
- * slug, so a name like "SRP / Reimbursements!!" can't inject a path
- * separator or otherwise land as a surprising filename fragment.
- */
 export function slugifyForFilename(label: string): string {
   const slug = label
     .toLowerCase()

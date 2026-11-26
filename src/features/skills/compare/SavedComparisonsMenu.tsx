@@ -55,8 +55,6 @@ function SavedComparisonRow({
     else setDraftName(comparison.name);
   }
 
-  // Enter and Escape unmount the focused input; hand focus to the Rename button.
-  // Blur does not: the pilot is already moving on.
   function endRename(commit: boolean) {
     if (commit) commitRename();
     else {
@@ -78,12 +76,10 @@ function SavedComparisonRow({
           onBlur={commitRename}
           onKeyDown={(e) => {
             if (e.key === 'Enter') {
-              // Focus moves to a button mid-keystroke: its keypress must not click it.
               e.preventDefault();
               endRename(true);
             }
             if (e.key === 'Escape') {
-              // The popover would otherwise take this Escape and close with the rename.
               e.stopPropagation();
               endRename(false);
             }
@@ -122,19 +118,13 @@ function SavedComparisonRow({
 
 interface SavedComparisonsMenuProps {
   selectedIds: readonly number[];
-  /** The saved comparison the current selection came from, if any. */
   activeComparisonId: string | null;
-  /** The roster once it has loaded; `undefined` while it is still loading. */
   roster: readonly { characterId: number }[] | undefined;
-  /** A saved comparison was loaded: its selection (members since removed already dropped). */
   onApply: (ids: number[], comparisonId: string, someRemoved: boolean) => void;
-  /** The current selection was saved: the comparison it is now linked to. */
   onSaved: (comparisonId: string) => void;
-  /** The linked comparison was deleted: the selection is no longer one. */
   onUnlinked: () => void;
 }
 
-/** The drawer's saved comparisons: save the current selection, reopen, rename or delete one. */
 export function SavedComparisonsMenu({
   selectedIds,
   activeComparisonId,
@@ -172,14 +162,6 @@ export function SavedComparisonsMenu({
     onSaved(comparison.id);
   }
 
-  /**
-   * A saved comparison is clickable on the very first frame — the list renders
-   * straight out of the comparisons store — while the roster arrives from a
-   * `useLiveQuery` a tick or more later. Resolving against a roster that has
-   * not loaded yet drops every id, which left an empty selection under a false
-   * "some characters were removed" notice that nothing re-ran once the roster
-   * did arrive (#594). So read the roster directly for that one early click.
-   */
   async function handleLoad(comparison: SavedComparison) {
     const known = new Set(
       (roster ?? (await db.characters.toArray())).map((character) => character.characterId)
@@ -193,17 +175,12 @@ export function SavedComparisonsMenu({
     if (!deletingId) return;
     const id = deletingId;
     const index = value.items.findIndex((item) => item.id === id);
-    // The row goes only after the dialog has closed (an awaited write), so
-    // focus is requested once the write resolves: the next comparison's name
-    // button, else the previous one's, else the section heading.
     const near = [value.items[index + 1], value.items[index - 1]].map(
       (item) => () => (item ? loadButtons.current.get(item.id) : null)
     );
     if (activeComparisonId === id) onUnlinked();
     setDeletingId(null);
     await setValue(removeComparison(value, id, Date.now()));
-    // One macrotask on: the dialog's own focus restore (to the row being
-    // deleted) runs in a passive effect and must not land after this request.
     await new Promise((resolve) => setTimeout(resolve, 0));
     focusAfterCommit(...near, headingRef);
   }
@@ -227,7 +204,6 @@ export function SavedComparisonsMenu({
           align="end"
           aria-label={t('skillCompare.saved')}
           className="w-80 p-2"
-          // The delete confirm is a dialog over this popover: moving into it is not a dismissal.
           onInteractOutside={(event) => {
             if (deletingId !== null) event.preventDefault();
           }}

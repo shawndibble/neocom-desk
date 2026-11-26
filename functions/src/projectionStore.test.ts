@@ -15,22 +15,14 @@ import {
 } from './dispatchProjections.js';
 import type { ProjectionRowInput } from './registerDevice.js';
 
-// A deliberately tiny in-memory Firestore: only what projectionStore.ts uses
-// (`where` with ==, <=, <, array-contains; doc get/set/update/delete; batch).
-// It follows real Firestore semantics where it matters here — a document
-// missing a field never matches `where(field, '==', x)` — so the legacy-row
-// test proves the device-scoped query alone would leave those rows behind.
 type Data = Record<string, unknown>;
 type Op = '==' | '<=' | '<' | 'array-contains';
 
 class FakeFirestore {
   readonly collections = new Map<string, Map<string, Data>>();
-  /** Batch commits left to fail before they start succeeding again. */
   failCommits = 0;
-  /** Batched set/delete ops committed, to prove what a call actually wrote. */
   batchWrites = 0;
   batchDeletes = 0;
-  /** `get()` calls on a collection query (not a single doc), by `where` field names. */
   queryGets: string[] = [];
 
   private store(name: string): Map<string, Data> {
@@ -62,10 +54,6 @@ class FakeFirestore {
       get: async () => this.snapshotOf(name, id),
       set: async (data: Data, options?: { mergeFields?: string[] }) => {
         if (!options?.mergeFields) return void store.set(id, { ...data });
-        // The Admin SDK: listed fields are written, a listed field set to
-        // `FieldValue.delete()` is deleted, every other field is kept — and a
-        // listed field absent from `data` throws ("Input data is missing for
-        // field …") before anything is written.
         const missing = options.mergeFields.find((field) => !(field in data));
         if (missing) throw new Error(`Input data is missing for field "${missing}".`);
         const next: Data = { ...(store.get(id) ?? {}) };
@@ -313,7 +301,6 @@ describe('writeDeviceRegistration', () => {
     await upload(db, 'B', [{ characterId: CHAR, rows: [] }], [CHAR], { [CHAR]: ['Z'] });
     await upload(db, 'B', [{ characterId: CHAR, rows: [] }], [CHAR], { [CHAR]: [] });
 
-    // An upload that omits the list (older client) keeps this device's stored one.
     await upload(db, 'A', [{ characterId: CHAR, rows: [] }]);
     expect(db.get('deviceRegistrations', 'A')?.eveTypesByCharacter).toEqual({
       [String(CHAR)]: ['X', 'Y'],
@@ -351,7 +338,6 @@ describe('writeDeviceRegistration', () => {
     });
     expect(first?.polledServerEvents).toEqual(['priceAlertTriggered']);
 
-    // The tick's baselines survive a re-registration for Characters still held.
     db.seed('deviceRegistrations', 'A', {
       ...first,
       serverEventBaselines: {
@@ -359,7 +345,6 @@ describe('writeDeviceRegistration', () => {
         [String(other)]: {},
       },
     });
-    // An older client omits both: this device's stored lists stay.
     await upload(db, 'A', [{ characterId: CHAR, rows: [] }]);
     const second = db.get('deviceRegistrations', 'A');
     expect(second?.serverEventsByCharacter).toEqual({
@@ -368,7 +353,6 @@ describe('writeDeviceRegistration', () => {
     expect(second?.serverInputsByCharacter).toEqual({
       [String(CHAR)]: { priceStationId: 60003760 },
     });
-    // The reading of a retired event (a loss list) is dropped with the rest of the stale baseline.
     expect(second?.serverEventBaselines).toEqual({ [String(CHAR)]: { priceAlerts: [] } });
     expect(second?.polledServerEvents).toEqual(['priceAlertTriggered']);
   });
@@ -384,10 +368,8 @@ describe('writeDeviceRegistration', () => {
       eveTypesByCharacter: {},
       routeRules: rules,
     });
-    // The poller's own state rides on the doc; an upload never wipes it.
     const nearbyState = { characters: {}, pushed: { k: 1 } };
     await asFirestore(db).collection('deviceRegistrations').doc('A').update({ nearbyState });
-    // An older client sends no rules.
     await upload(db, 'A', [{ characterId: CHAR, rows: [] }]);
     const doc = db.get('deviceRegistrations', 'A');
     expect(doc?.nearbyState).toEqual(nearbyState);
@@ -400,7 +382,6 @@ describe('writeDeviceRegistration', () => {
     const skillB = row('skillTrainingComplete');
 
     await upload(db, 'A', [{ characterId: CHAR, rows: [jobA] }]);
-    // B has industry jobs switched off, so its Projection omits jobA entirely.
     await upload(db, 'B', [{ characterId: CHAR, rows: [skillB] }]);
 
     expect(unfiredRowsOf(db, 'A')).toEqual([projectionDocId('A', jobA.occurrenceKey)]);
@@ -464,7 +445,6 @@ describe('writeDeviceRegistration', () => {
       { characterId: CHAR, rows: [kept] },
       { characterId: 2, rows: [dropped] },
     ]);
-    // Device B's rows for Character 2 must survive A dropping it.
     await upload(db, 'B', [{ characterId: 2, rows: [dropped] }]);
 
     await upload(db, 'A', [{ characterId: CHAR, rows: [kept] }]);
@@ -492,11 +472,8 @@ describe('writeDeviceRegistration', () => {
       fired: true,
       firedAt: NOW,
     });
-    // A pre-#2240 registration: no per-device marker.
     db.seed('deviceRegistrations', 'A', { fcmToken: 'token-A', characterIds: [CHAR] });
 
-    // This upload no longer mentions legacyOther, so a blind delete of the
-    // uploaded keys alone would miss it.
     await upload(db, 'A', [{ characterId: CHAR, rows: [legacy] }]);
 
     expect(db.get('projections', legacy.occurrenceKey)).toBeUndefined();
@@ -508,7 +485,6 @@ describe('writeDeviceRegistration', () => {
   it('sweeps legacy rows for a Character the marked device newly adds', async () => {
     const db = new FakeFirestore();
     await upload(db, 'A', [{ characterId: CHAR, rows: [] }]);
-    // Character 2's legacy rows come from a device that has not upgraded yet.
     const legacy = { ...row('industryJobComplete'), occurrenceKey: '2:job:1' };
     db.seed('projections', legacy.occurrenceKey, {
       ...legacy,
@@ -541,7 +517,6 @@ describe('writeDeviceRegistration', () => {
     db.failCommits = 1;
 
     await expect(upload(db, 'A', [{ characterId: CHAR, rows: [legacy] }])).rejects.toThrow();
-    // The registration landed without the marker, so the retry still sweeps.
     expect(db.get('deviceRegistrations', 'A')?.perDeviceProjections).toBeUndefined();
 
     await upload(db, 'A', [{ characterId: CHAR, rows: [legacy] }]);
@@ -554,7 +529,6 @@ describe('writeDeviceRegistration', () => {
   it('skips the legacy sweep once the device has uploaded per-device before', async () => {
     const db = new FakeFirestore();
     await upload(db, 'A', [{ characterId: CHAR, rows: [] }]);
-    // A straggler written by a device that never re-registered after the deploy.
     const straggler = row('industryJobComplete');
     db.seed('projections', straggler.occurrenceKey, {
       ...straggler,
@@ -705,9 +679,6 @@ describe('dispatchDueProjections', () => {
   });
 });
 
-// The Firestore queries in `dispatchDueProjections` and `purgeFiredProjections` re-express `isDue` and
-// `isPastRetention` as `where` filters (a query cannot call them), so these
-// pin each query's boundary to the function it mirrors.
 describe('dispatchDueProjections query boundaries', () => {
   it.each([-1, 0, 1])(
     'dispatches a row exactly when isDue says so (fireAt = now %i)',
@@ -762,7 +733,6 @@ describe('dispatchDueProjections paging and lookups', () => {
     await dispatchDueProjections(asFirestore(db), messaging, NOW, () => {}, { pageSize: 2 });
 
     expect(messaging.sent).toHaveLength(5);
-    // 2 + 2 + 1: the short last page ends the run.
     expect(db.queryGets.filter((n) => n === 'projections')).toHaveLength(3);
   });
 
@@ -807,7 +777,6 @@ describe('dispatchDueProjections paging and lookups', () => {
     await dispatchDueProjections(asFirestore(db), messaging, NOW);
 
     expect(messaging.sent).toHaveLength(4);
-    // One due query + one holder lookup per distinct Character (1 and 2).
     expect(db.queryGets.filter((n) => n === 'deviceRegistrations')).toHaveLength(2);
   });
 

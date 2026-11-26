@@ -121,7 +121,6 @@ describe('withSyncedFeedPrefsApplied', () => {
       ...BASE,
       perCharacter: { 1: { [EVENT_A]: { browser: true, feed: true } } },
     };
-    // Another device stored a bare `false` (pre-channel-split "both off").
     const synced = toSyncedFeedPrefs({ ...BASE, perCharacter: { 1: { [EVENT_A]: false } } });
     const merged = withSyncedFeedPrefsApplied(local, synced);
     expect(merged.perCharacter[1]?.[EVENT_A]).toEqual({ browser: true, feed: false });

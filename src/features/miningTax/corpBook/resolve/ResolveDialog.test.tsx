@@ -2,6 +2,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 import '@/i18n';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import type { ClosedDayPlan } from '@/engine/corpTaxBook/closedDayFix';
 import type { BookRowView } from '@/engine/corpTaxBook/personal';
 
 const submit = vi.hoisted(() => ({
@@ -23,7 +24,6 @@ const row = {
   date: '2026-11-06',
   recordKey: '7:1000:2026-11-06',
   oreLines: [{ typeId: 45490, quantity: 100 }],
-  // The member's own record has less ore: there is something to dispute.
   personalOreLines: [{ typeId: 45490, quantity: 90 }],
   billed: 1_840_320,
   taxOwed: 1_840_320,
@@ -64,7 +64,6 @@ describe('ResolveDialog', () => {
     expect(screen.getByRole('radio', { name: /I don't owe this/ })).toBeChecked();
   });
 
-  // The "f-it" way out: one click, nothing sent, and honest about the bill.
   it('hides a problem on this device without sending anything', async () => {
     const user = userEvent.setup();
     const props = open({ ...base, kind: 'figure', bookAsksMore: true });
@@ -163,7 +162,6 @@ describe('ResolveDialog', () => {
     expect(screen.queryByRole('radio', { name: /I don't owe this/ })).toBeNull();
   });
 
-  // The hold does not renew, and the member can say it again.
   it('lets the member say it again after an officer kept the bill, and says the hold does not renew', async () => {
     const user = userEvent.setup();
     submit.tellNotOwed.mockClear();
@@ -273,14 +271,16 @@ describe('ResolveDialog', () => {
     expect(screen.queryByText(/until\s+while/)).not.toBeInTheDocument();
   });
 
-  it('fixes your own records on a Conflict in one click', async () => {
+  it('shows what Fix my records changes, then fixes your own records in one click', async () => {
     const user = userEvent.setup();
     const onFixRecords = vi.fn();
+    const plan = { state: 'conflict', fixes: [] } as unknown as ClosedDayPlan;
     open(
-      { ...base, kind: 'conflict', row: { ...row, state: 'conflict' } as BookRowView },
-      { onFixRecords, payeeName: 'Rock Hound' }
+      { ...base, kind: 'conflict', row: { ...row, state: 'conflict' } as BookRowView, plan },
+      { onFixRecords, payeeName: 'Rock Hound', fixPreview: <p>Rock Hound: 60 → 30</p> }
     );
-    await user.click(screen.getByRole('button', { name: 'Fix it' }));
+    expect(screen.getByText('Rock Hound: 60 → 30')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Fix my records' }));
     expect(onFixRecords).toHaveBeenCalled();
   });
 });

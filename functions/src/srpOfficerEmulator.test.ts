@@ -1,5 +1,3 @@
-// SRP officer actions against the Firestore emulator (issue #4853, ADR 0026). Runs only under the
-// emulator (`npm run test:emulator`); a plain `npm test` skips it.
 import type { Caller } from './actorAuth.js';
 import { afterAll, beforeEach, expect, it } from 'vitest';
 import {
@@ -252,7 +250,6 @@ emulatorSuite('SRP officer actions (emulator)', () => {
     expect(batch.results[0]).toMatchObject({ ok: false, reason: 'amount-changed' });
     expect(await claimDoc(1)).toMatchObject({ state: 'pending' });
     await approve(1, DIRECTOR, { expectedAmount: 900_000 });
-    // Approved amount is then changed under a second officer about to pay.
     await changeSrpClaimAmount(
       deps(),
       who(ACCOUNTANT),
@@ -307,7 +304,6 @@ emulatorSuite('SRP officer actions (emulator)', () => {
 
   it('two racing approvals: exactly one wins', async () => {
     await seed(1);
-    // Both transactions deadlock and abort; staggered, the retries no longer deadlock again.
     const restore = staggerTransactionRetries();
     try {
       const results = await Promise.allSettled([approve(1), approve(1, ACCOUNTANT)]);

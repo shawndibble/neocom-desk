@@ -16,12 +16,6 @@ export interface ClosestCharacters {
   total: number;
 }
 
-/**
- * Every roster Character's time to finish `entries`. Fetches nothing until
- * `enabled`; inputs are kept for the life of the hook, so reopening is
- * instant and editing the plan re-ranks without a request. Results arrive
- * one Character at a time, so rows appear and re-sort as data lands.
- */
 export function useClosestCharacters(
   characterIds: readonly number[],
   entries: readonly PlanEntry[],

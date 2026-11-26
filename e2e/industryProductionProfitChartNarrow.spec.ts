@@ -1,18 +1,3 @@
-/**
- * Production Log profit chart Y-axis at 390px (issue #1160) — the same
- * clipping bug already fixed on `WalletBalanceChart` (#764) and
- * `PriceHistoryChart`/`MiningYieldCharts` (#772): a `YAxis` narrow enough
- * that a wide tick label's leading digit renders outside the SVG's own
- * coordinate space rather than a plain CSS overflow. Only a real browser
- * lays that out, so this asserts actual rendered geometry rather than
- * trusting that the source now imports the same constants as those charts.
- *
- * Two production runs, sold on two different local days, so
- * `productionProfitHistory` emits the two cumulative points the chart needs
- * to render at all (`profitHistoryPoints.length >= 2` gates it) — the
- * second day's sale is priced to push the running total past 1B ISK, the
- * threshold #764 reproduced the clip at.
- */
 import type { Page } from '@playwright/test';
 import { test, expect, PHONE } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
@@ -21,7 +6,6 @@ import { CHARACTER_ID } from './support/fixtureData';
 const PLAN_ID = 'e2e-profit-plan-1';
 const RUN_ID_SMALL = 'e2e-profit-run-small';
 const RUN_ID_LARGE = 'e2e-profit-run-large';
-/** Rifter / Rifter Blueprint — same pair the industry Logs spec above uses. */
 const PRODUCT_TYPE_ID = 587;
 const BLUEPRINT_TYPE_ID = 691;
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -64,9 +48,6 @@ async function seedProfitHistory(page: Page): Promise<void> {
           hubId: 'jita',
           updatedAt: now,
         });
-        // A small, ordinary first point — the running total after this one
-        // stays well under 1B, so the second run's jump is what the test
-        // exercises.
         tx.objectStore('productionRuns').put({
           id: smallRunId,
           characterId,
@@ -88,9 +69,6 @@ async function seedProfitHistory(page: Page): Promise<void> {
           linkedAt: threeDaysAgo,
           updatedAt: threeDaysAgo,
         });
-        // A single large batch, sold for enough that the cumulative running
-        // total crosses 1B ISK on this second point — #764's own repro
-        // threshold for the leading digit clipping outside the axis gutter.
         tx.objectStore('productionRuns').put({
           id: largeRunId,
           characterId,
@@ -140,8 +118,6 @@ test.describe('production profit chart — 390px width', () => {
 
     const chart = page.getByRole('img', { name: 'Realized profit over time' });
     await expect(chart).toBeVisible();
-    // The tallest tick's text only exists once Recharts has measured and
-    // laid out the axis — `toBeVisible` above only confirms the container.
     await expect(
       chart.locator('.recharts-yAxis-tick-labels .recharts-cartesian-axis-tick-value')
     ).not.toHaveCount(0);
@@ -161,19 +137,12 @@ test.describe('production profit chart — 390px width', () => {
     });
 
     expect(geometry.tickLefts.length).toBeGreaterThan(0);
-    // Anchors this test to the 1B+ scenario specifically — without it, a
-    // seed that silently degraded to small-magnitude ticks would still pass
-    // the geometry check below trivially (a narrow number always clears the
-    // left edge), and the regression this guards against would go untested.
     expect(
       geometry.tickTexts.some((text) => text.includes('B')),
       `no billion-scale tick rendered — tick texts: ${geometry.tickTexts.join(', ')}`
     ).toBe(true);
     const minTickLeft = Math.min(...geometry.tickLefts);
     const reported = `tick texts: ${geometry.tickTexts.join(', ')}; leftmost tick at ${Math.round(minTickLeft)}px, chart container at ${Math.round(geometry.containerLeft)}px`;
-    // A clipped leading digit renders outside the chart's own box — its
-    // glyphs start to the left of the container that's supposed to hold
-    // them. A tolerance of 1px absorbs sub-pixel rounding, not a real clip.
     expect(
       minTickLeft,
       `Y-axis tick renders outside the chart container — ${reported}`

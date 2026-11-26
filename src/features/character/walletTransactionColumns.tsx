@@ -1,13 +1,3 @@
-/**
- * The six columns every wallet transactions table starts with — date, item,
- * side, quantity, unit price, total — built once so the personal panel (Market
- * History) and the corp wallet's Transactions tab read the same: same order,
- * market ISK precision, and the same phone layout (date over time, the item
- * name wrapping to two lines rather than truncating).
- *
- * Each panel adds its own columns around these (the personal one its
- * Character, margin and Location columns) and keeps its own row menu.
- */
 import type { DataTableColumn } from '@/components/ui';
 import {
   COL_DATETIME,
@@ -26,22 +16,13 @@ import { transactionTotal } from './walletTransactionsCsv';
 
 export interface WalletTransactionBaseColumnsOptions {
   t: Translate;
-  /** The Time format preference's zone (`useTimeZone()`). */
   timeZone: string | undefined;
-  /** `useIsPhone()`: the date column narrows to its stacked width. */
   isPhone: boolean;
-  /** The item's display name, the same spelling the search and the CSV use. */
   nameFor: (typeId: number) => string;
-  /**
-   * Number column widths. The personal panel fits them to the loaded rows;
-   * without them each takes the shared worst case from `dataTableWidths`.
-   */
   widths?: { quantity?: string; unitPrice?: string; total?: string };
-  /** The pinned item column sits on a `Panel` surface (see `DataTableColumn`). */
   stickyStartOnPanel?: boolean;
 }
 
-/** In that order, date first: the personal panel slots its Character column in after it. */
 export function walletTransactionBaseColumns<T extends WalletTransactionCommon>({
   t,
   timeZone,
@@ -54,7 +35,6 @@ export function walletTransactionBaseColumns<T extends WalletTransactionCommon>(
     {
       id: 'date',
       header: t('wallet.date'),
-      // Stacked date over time below `sm` (see render), one line from there up.
       width: isPhone ? COL_DATETIME_STACKED : COL_DATETIME,
       className: 'whitespace-nowrap text-text-dim max-sm:px-1',
       headerClassName: 'max-sm:px-1',
@@ -74,12 +54,9 @@ export function walletTransactionBaseColumns<T extends WalletTransactionCommon>(
     {
       id: 'item',
       header: t('wallet.item'),
-      /** Pinned while the figures scroll sideways on a phone. */
       stickyStart: true,
       stickyStartOnPanel,
-      // Takes the width the number columns leave; never under ~18ch, so names wrap on words.
       minWidth: '18ch',
-      // Wraps to two lines on a phone rather than truncating to "Repu…".
       className: 'sm:truncate',
       render: (txn) => (
         <span className="max-sm:line-clamp-2 max-sm:break-words">
@@ -92,7 +69,6 @@ export function walletTransactionBaseColumns<T extends WalletTransactionCommon>(
       id: 'side',
       header: t('wallet.side'),
       width: '7ch',
-      // The Total's sign and tone already say buy or sell (off by default on a phone).
       render: (txn) => (txn.is_buy ? t('wallet.buy') : t('wallet.sell')),
       sortValue: (txn) => (txn.is_buy ? 0 : 1),
     },

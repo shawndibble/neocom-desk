@@ -1,11 +1,3 @@
-/**
- * A Market Trend widget's two settings, offered from its menu: which Trade
- * Hubs it prices at (a checkbox group in the menu itself) and which items it
- * draws (a dialog, since the choice is a list of up to a few hundred names).
- *
- * Neither is stored until it differs from the default: no hubs picked is the
- * Overview page hub, no items picked is the Quickbar.
- */
 import { useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -44,7 +36,6 @@ import {
   type TrendSourceItem,
 } from './trendCatalogue';
 
-/** The hubs a widget prices at: its own picks, else the Overview page hub. */
 function useTrendHubs(widget: Widget): { pilot: string; current: string[] } {
   const pilot = useHubFor('overview').hubId;
   return { pilot, current: widget.trendHubs ?? [pilot] };
@@ -56,7 +47,6 @@ export function TrendHubsMenuGroup({ widget }: { widget: Widget }) {
   const { pilot, current } = useTrendHubs(widget);
   const toggle = (id: string, on: boolean) => {
     const next = on ? [...current, id] : current.filter((hub) => hub !== id);
-    // Back on the pilot's hub alone is the default, so nothing is stored.
     setTrendHubs(widget.id, next.length === 1 && next[0] === pilot ? [] : next);
   };
   return (
@@ -69,7 +59,6 @@ export function TrendHubsMenuGroup({ widget }: { widget: Widget }) {
             key={hub.id}
             checked={on}
             disabled={on ? current.length === 1 : current.length >= MAX_TREND_HUBS}
-            // The menu stays open, so several hubs are one visit.
             onSelect={(event) => event.preventDefault()}
             onCheckedChange={(next) => toggle(hub.id, next)}
           >
@@ -84,7 +73,6 @@ export function TrendHubsMenuGroup({ widget }: { widget: Widget }) {
 type SourceChoice = 'quickbar' | TrendSource['id'];
 const SOURCE_CHOICES: readonly SourceChoice[] = ['quickbar', ...TREND_SOURCE_IDS];
 
-/** PLEX, the one global-market item known before the global markets list loads. */
 const PLEX_TYPE_ID = 44992;
 
 type Catalogue =
@@ -106,20 +94,16 @@ export function TrendItemsDialog({
   const characterId = useActiveCharacter((state) => state.activeCharacterId);
   const quickbar = useQuickbar(characterId).items;
   const { current: hubs } = useTrendHubs(widget);
-  // Global-market items are drawn once whatever the hubs; until the list loads only PLEX is known to be.
   const globals = useGlobalMarketOverrides(open);
   const [source, setSource] = useState<SourceChoice>('quickbar');
-  // Null until the pilot edits, so a Quickbar that loads after the dialog opens still seeds the list.
   const [edited, setEdited] = useState<number[] | null>(null);
   const picked =
     edited ?? widget.trendItems ?? quickbar.slice(0, TREND_MAX_SERIES).map((item) => item.typeId);
-  // A widget's stored picks may not be in the Quickbar (the presets); their names come from the catalogue, so it loads on open.
   const needsNames = (widget.trendItems ?? []).some((id) => !quickbar.some((q) => q.typeId === id));
   const [catalogue, setCatalogue] = useState<Catalogue>({
     status: needsNames ? 'loading' : 'idle',
   });
 
-  // The market catalogue is a lazy download; only choosing a source that needs it fetches it, once.
   const requested = useRef(false);
   const mounted = useRef(true);
   useEffect(() => {
@@ -144,7 +128,6 @@ export function TrendItemsDialog({
   };
   useEffect(() => {
     if (needsNames && !requested.current) fetchCatalogue();
-    // Once, on open: the initial state above already shows loading.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const loadCatalogue = () => {
@@ -192,7 +175,6 @@ export function TrendItemsDialog({
   const resultsRef = useRef<HTMLUListElement>(null);
   const selectedRef = useRef<HTMLUListElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
-  // The row a pick leaves would drop keyboard focus with it; hand it to the row that takes its place.
   const refocus = useRef<{ list: 'results' | 'selected'; index: number } | null>(null);
   const [justAdded, setJustAdded] = useState<number | null>(null);
   const toggle = (typeId: number, on: boolean) => {
@@ -209,9 +191,7 @@ export function TrendItemsDialog({
     const list = target.list === 'results' ? resultsRef.current : selectedRef.current;
     const buttons = [...(list?.querySelectorAll<HTMLButtonElement>('button:not(:disabled)') ?? [])];
     const next = buttons[Math.min(target.index, buttons.length - 1)];
-    // Without a neighbour, leave focus on the dialog rather than raise a phone's keyboard on the search box.
     next?.focus({ preventScroll: true });
-    // The row that just landed may sit below the fold of a short dialog.
     selectedRef.current?.querySelector('.row-pulse')?.scrollIntoView?.({ block: 'nearest' });
   }, [picked]);
 
@@ -221,7 +201,6 @@ export function TrendItemsDialog({
         className="grid gap-3"
         onSubmit={(event) => {
           event.preventDefault();
-          // Untouched picks on a widget that follows the Quickbar: saving would detach it for nothing.
           const followed = quickbar.slice(0, TREND_MAX_SERIES).map((item) => item.typeId);
           const unchanged =
             picked.length === followed.length && picked.every((id, i) => id === followed[i]);
@@ -238,11 +217,9 @@ export function TrendItemsDialog({
           value={query}
           onChange={(event) => {
             setQuery(event.target.value);
-            // A failed load is retried with the Retry button, not on every keystroke.
             if (event.target.value.trim() !== '' && catalogue.status === 'idle') loadCatalogue();
           }}
           onKeyDown={(event) => {
-            // Enter searches; it must not submit the dialog's form.
             if (event.key === 'Enter') event.preventDefault();
           }}
           placeholder={t('overview.menu.trendSearchPlaceholder')}
@@ -269,7 +246,6 @@ export function TrendItemsDialog({
           className="grid max-h-60 gap-1 overflow-y-auto"
           aria-label={t('overview.menu.trendList')}
         >
-          {/* A picked item leaves this list and shows only under Selected, so each item is in one place. */}
           {available.map((item) => (
             <li key={item.typeId}>
               <button

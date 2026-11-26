@@ -1,18 +1,3 @@
-/**
- * The red strip under a page header while an unacknowledged danger Alert
- * exists: a structure under attack is the one thing worth interrupting a
- * widget board for. The Overview mounts it; it draws nothing otherwise.
- *
- * Acknowledge is Dismiss for the whole danger type (the panel's rule, so the
- * strip and the panel never disagree about what is still outstanding), which
- * lets the next-newest danger type, if any, take the strip.
- *
- * Acknowledge unmounts the button that ran it, so focus is moved to the page
- * heading once the strip is gone (WCAG 2.4.3). The strip is an alert only the
- * first time this session shows a given danger entry; coming back to the
- * Overview later renders it as a plain status so a screen reader is not told
- * the same news again on every mount.
- */
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
@@ -27,7 +12,6 @@ import { dismissFeedEntriesAndSync } from './feedSync';
 import { isDismissOnView, useNotificationPreferences } from './preferences';
 import { useVisibleAlertEntries } from './useUnreadAlertCount';
 
-/** Which banner instance announced each danger entry this session (module-level: it outlives a route change). */
 const announcedBy = new Map<string, symbol>();
 
 export function DangerBanner() {
@@ -41,7 +25,6 @@ export function DangerBanner() {
   const focusAfterCommit = useFocusAfterCommit();
   const entryId = entry?.id;
   const [self] = useState(() => Symbol('DangerBanner'));
-  // An entry is an alert only for the instance that first showed it; a later mount sees a status.
   const fresh = entryId !== undefined && (announcedBy.get(entryId) ?? self) === self;
   useEffect(() => {
     if (entryId !== undefined && !announcedBy.has(entryId)) announcedBy.set(entryId, self);
@@ -79,7 +62,6 @@ export function DangerBanner() {
           size={size}
           aria-label={t('alerts.panel.acknowledgeLabel', { title: entry.title })}
           onClick={() => {
-            // The strip may hand over to the next danger type (button stays) or vanish (heading).
             focusAfterCommit(() => document.querySelector<HTMLElement>('h1'));
             void dismissFeedEntriesAndSync(dangerEntries);
           }}

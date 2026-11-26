@@ -206,7 +206,6 @@ describe('evaluateModuleUpgrades', () => {
     entries.map((e) => ({ skillTypeID: e.skillTypeID, level: e.targetLevel, seconds: 60 }));
 
   it('works out each upgrade under its whole schedule, keeping only those that need training and help', async () => {
-    // Both arguments typed, so the call's `trained` can be read back below.
     const compare = vi.fn(async (...[variant]: [Fitting, readonly unknown[]]) => ({
       before: stats(500),
       after: stats(variant.modules[0]!.typeId === RAILGUN_II ? 550 : 500),
@@ -238,7 +237,6 @@ describe('evaluateModuleUpgrades', () => {
         ],
       }),
     ]);
-    // The afterburner needs nothing trained: never calculated.
     expect(compare).toHaveBeenCalledTimes(1);
     expect(compare.mock.calls[0]![1]).toEqual([
       { skillTypeID: 3307, targetLevel: 5 },

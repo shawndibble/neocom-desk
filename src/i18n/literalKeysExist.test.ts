@@ -3,7 +3,6 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import en from './locales/en.json';
 
-/** Every `t('a.b.c')` with a literal key in `src` must resolve in en.json (issue #3253). */
 function sourceFiles(dir: string): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
     const path = join(dir, entry.name);
@@ -12,9 +11,7 @@ function sourceFiles(dir: string): string[] {
   });
 }
 
-/** Already missing when this guard landed; each belongs to its own fix (PI pages are mid-overhaul). Shrink, never grow. */
 const KNOWN_MISSING = new Set([
-  'settings.notifications.installRequiredLink',
   'piPlan.find.whatIfChip',
   'piPlan.make.failedTitle',
   'piPlan.make.failedHint',

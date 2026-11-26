@@ -26,7 +26,6 @@ describe('CompareCanFlyByCharacter', () => {
   beforeEach(() => {
     loadActivePilotProfile.mockReset();
     fittingCanFly.mockReset();
-    // The mocked profile carries its Character id as `skillLevels`, so the fake can-fly can branch on it.
     loadActivePilotProfile.mockImplementation(async (id: number) => ({ skillLevels: id }));
     fittingCanFly.mockImplementation(async (_fitting: Fitting, id: unknown) => {
       if (id === 3) throw new Error('offline');

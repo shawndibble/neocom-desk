@@ -13,14 +13,13 @@ vi.mock('./corporationFactions', () => ({ loadCorporationFactions: mocks.faction
 
 const CALDARI_NAVY = 1000035;
 const GURISTAS_CORP = 1000127;
-// [id, name, level, divisionId, corporationId, stationId, isLocator]
 const INDEX = buildAgentIndex({
   divisions: { 22: 'Security', 23: 'Distribution' },
   agents: [
     [3009001, 'Alpha', 3, 22, CALDARI_NAVY, 60003760, 0],
     [3009002, 'Bravo', 2, 23, CALDARI_NAVY, 60003761, 1],
     [3009003, 'Charlie', 4, 22, CALDARI_NAVY, 60003762, 0],
-    [3009004, 'Delta', 1, 22, CALDARI_NAVY, 60003763, 0], // no standing row
+    [3009004, 'Delta', 1, 22, CALDARI_NAVY, 60003763, 0],
     [3009005, 'Echo', 2, 22, GURISTAS_CORP, 60000001, 0],
   ],
 } as never);

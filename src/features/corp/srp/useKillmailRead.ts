@@ -4,7 +4,6 @@ import { useKeyedLoad } from '@/lib/useAsyncLoad';
 import { srpMemberBackend } from './srpMemberBackend';
 import type { KillmailSubject, Read } from './SrpKillmailView';
 
-/** The ESI killmail, read once per modal. */
 export function useKillmailRead(subject: KillmailSubject): Read<Killmail | null> {
   const { killmailId, killmailHash } = subject;
   const load = useCallback(

@@ -1,4 +1,3 @@
-/** Fetch + cache layer for the Mail view: headers list + one body on demand. */
 import { db } from '@/db';
 import {
   getCharacterMailHeaders,
@@ -44,15 +43,9 @@ export const KEYS = {
 } as const;
 
 export interface MailHeadersResult extends StatusResult<MailHeader[]> {
-  /** True when a next `last_mail_id` page may exist (issue #161). */
   hasMore: boolean;
 }
 
-/**
- * Up to the 50 most recent mail headers. ESI or cache, with the auth-failure
- * state exposed so the view can offer a re-login instead of a silent empty
- * state when the mail scope was revoked (issue #14).
- */
 export async function loadMailHeaders(characterId: number): Promise<MailHeadersResult> {
   const result = await loadWithCacheStatus(
     characterId,
@@ -65,19 +58,9 @@ export async function loadMailHeaders(characterId: number): Promise<MailHeadersR
 export interface LoadMoreMailHeadersResult {
   headers: MailHeader[];
   hasMore: boolean;
-  /** Set when the page could not be loaded: `offline` for a network failure, `error` for the rest. */
   failure?: 'offline' | 'error';
 }
 
-/**
- * Fetches the next older page via `last_mail_id` (the lowest `mail_id`
- * already loaded), merges it into the given list, and writes the merged list
- * back to the cache (issue #161: pagination beyond the 50-cap). On failure
- * the given list is returned unchanged, with `hasMore` left true so the
- * "load more" affordance stays available to retry — an auth failure also
- * signals the app-wide reauth banner (`emitEsiAuthFailure`), same as every
- * other read-through loader.
- */
 export async function loadMoreMailHeaders(
   characterId: number,
   currentHeaders: readonly MailHeader[]
@@ -103,17 +86,14 @@ export async function loadMoreMailHeaders(
   }
 }
 
-/** Everything the Mail list needs from one Character's mailbox: headers, label counts, list names. */
 export interface MailOwnerLoad {
   headers: CachedResult<MailHeader[]> | null;
   labels: CachedResult<MailLabels> | null;
   lists: MailingList[];
-  /** 401/403 (or a failed token refresh) on any of the three reads: "log in again", not "offline". */
   needsReauth: boolean;
   hasMore: boolean;
 }
 
-/** The three reads at once — ESI or cache, each on its own freshness window. */
 export async function loadMailOwner(characterId: number): Promise<MailOwnerLoad> {
   const [headers, labels, lists] = await Promise.all([
     loadMailHeaders(characterId),
@@ -129,7 +109,6 @@ export async function loadMailOwner(characterId: number): Promise<MailOwnerLoad>
   };
 }
 
-/** Same shape as `loadMailOwner`, from Dexie only — never a live call. */
 export async function loadMailOwnerCacheOnly(characterId: number): Promise<MailOwnerLoad> {
   const [headers, labels, lists] = await Promise.all([
     readCachedRows<MailHeader[]>([characterId], KEYS.headers),
@@ -146,14 +125,12 @@ export async function loadMailOwnerCacheOnly(characterId: number): Promise<MailO
   };
 }
 
-/** Cached label sets for many Characters, for per-Character unread figures — never a live call. */
 export function readMailLabelsForCharacters(
   characterIds: readonly number[]
 ): Promise<Map<number, CachedResult<MailLabels>>> {
   return readCachedRows<MailLabels>(characterIds, KEYS.labels);
 }
 
-/** System + Custom Labels with unread counts — the tab bar's four buckets (GLOSSARY.md round 18) and the custom-label filter chips (round 22). ESI or cache. */
 export function loadMailLabels(characterId: number): Promise<StatusResult<MailLabels>> {
   const { fetchLive, conditional } = conditionalFetch((options) =>
     getCharacterMailLabels(characterId, options)
@@ -161,7 +138,6 @@ export function loadMailLabels(characterId: number): Promise<StatusResult<MailLa
   return loadWithCacheStatus(characterId, KEYS.labels, fetchLive, { conditional });
 }
 
-/** A character's mailing-list memberships — resolves a `mailing_list` recipient's real name (issue #416). Membership changes rarely, so it gets the `static` freshness tier, same as a mail body. */
 export function loadMailingLists(characterId: number): Promise<StatusResult<MailingList[]>> {
   const { fetchLive, conditional } = conditionalFetch((options) =>
     getCharacterMailingLists(characterId, options)
@@ -172,7 +148,6 @@ export function loadMailingLists(characterId: number): Promise<StatusResult<Mail
   });
 }
 
-/** One mail's full body, fetched on open. ESI or cache. */
 export function loadMailBody(
   characterId: number,
   mailId: number
@@ -180,23 +155,12 @@ export function loadMailBody(
   const { fetchLive, conditional } = conditionalFetch((options) =>
     getCharacterMail(characterId, mailId, options)
   );
-  return loadWithCache(
-    characterId,
-    KEYS.body(mailId),
-    fetchLive,
-    // A delivered mail's body never changes. Not even the `read` flag moves
-    // it — that lives on the header, and its write goes through ESI, not
-    // through this cache, so a stale body is never the reason it drifts.
-    { staleAfterMs: STALE_AFTER.static, conditional }
-  );
+  return loadWithCache(characterId, KEYS.body(mailId), fetchLive, {
+    staleAfterMs: STALE_AFTER.static,
+    conditional,
+  });
 }
 
-/**
- * After a header load that reached ESI: fetches and caches the bodies of the
- * newest mail (unread first) that are not cached yet, so the reader shows
- * them offline. A delivered body does not change, so a cached one is not
- * fetched again until the daily prune drops it after 7 days. Bounds, gate and failure memory: `detailPrefetch.ts`.
- */
 export function prefetchMailBodies(
   characterId: number,
   headers: readonly MailHeader[]
@@ -216,45 +180,17 @@ export function prefetchMailBodies(
   });
 }
 
-/**
- * Pushes the "read" write to ESI, alongside the session-local mark-read that
- * always happens regardless. Errors are otherwise swallowed — nothing for a
- * caller to react to, just another chance next time this mail reopens — but
- * an auth failure still signals the app-wide reauth banner
- * (`reportWriteAuthFailure`, which asks for this endpoint's Permission only
- * when the grant lacks it): a stale grant (e.g. a token that predates `organize_mail`'s addition,
- * issue #741) would otherwise fail silently on every open with no way for the
- * user to learn a re-login would fix it.
- *
- * On success, patches the cached header list's own `is_read` flag rather than
- * refetching from ESI: the local write already knows the true state, while a
- * refetch risks losing a race with ESI's own propagation delay. Without this
- * the session-local mark-read (Mail.tsx's `locallyReadIds`) is the only thing
- * showing the mail as read, and it's gone the moment the headers reload from
- * cache — leaving a message that reopens as unread on every return visit
- * inside the 10-minute cache window.
- */
 export async function markMailReadOnEsi(characterId: number, mailId: number): Promise<void> {
   await setMailReadOnEsi(characterId, mailId, true);
 }
 
-/** How a Mail organize write ended: `skipped` is "the Permission is not held" (nothing was requested). */
 export type MailWriteResult = 'done' | 'skipped' | 'failed';
 
-/**
- * Sets one mail's read flag on ESI (so the game client shows it too), then
- * patches the cached header the same way as `markMailReadOnEsi`, and the
- * cached label counts so a reload agrees. Nothing else is stored: ESI stays
- * the source of truth.
- */
 export async function setMailReadOnEsi(
   characterId: number,
   mailId: number,
   read: boolean
 ): Promise<MailWriteResult> {
-  // Opening a mail is not a request to write, and `organize_mail` is off by
-  // default (Write to EVE): without the scope skip quietly, rather than fail
-  // and raise the grant notice on every open. The Mail view offers the grant.
   if (!(await grantHoldsEndpointScope(characterId, 'putCharacterMail'))) return 'skipped';
   try {
     await putCharacterMail(characterId, mailId, { read });
@@ -262,7 +198,6 @@ export async function setMailReadOnEsi(
     await reportWriteAuthFailure(characterId, err, 'putCharacterMail');
     return 'failed';
   }
-  // ESI has answered: the write is done even if tidying the local copy fails.
   try {
     const before = await patchCachedHeaders(characterId, mailId, (header) => ({
       ...header,
@@ -271,24 +206,16 @@ export async function setMailReadOnEsi(
     if (before !== undefined && Boolean(before.is_read) !== read) {
       await patchCachedUnreadCounts(characterId, before, read ? -1 : 1);
     }
-  } catch {
-    // Deliberately not rethrown: see above.
-  }
+  } catch {}
   return 'done';
 }
 
-/**
- * Deletes one mail on ESI (in game too; irreversible), then drops the local
- * copies: the cached header, the cached body and any Reply/Forward draft for
- * it. A mail that fails to delete is left exactly as it was.
- */
 export async function deleteMailOnEsi(
   characterId: number,
   mailId: number
 ): Promise<MailWriteResult> {
   if (!(await grantHoldsEndpointScope(characterId, 'putCharacterMail'))) return 'skipped';
   try {
-    // The same route as the read-flag PUT, so one registry entry and one Permission cover both.
     await esiFetch<void>(`/characters/${characterId}/mail/${mailId}/`, {
       characterId,
       method: 'DELETE',
@@ -298,8 +225,6 @@ export async function deleteMailOnEsi(
     await reportWriteAuthFailure(characterId, err, 'putCharacterMail');
     return 'failed';
   }
-  // ESI has answered 204: the mail is gone in EVE, so it is deleted even if
-  // dropping the local copies fails (a stale cached row ages out on the daily prune).
   try {
     const before = await patchCachedHeaders(characterId, mailId, null);
     if (before !== undefined && before.is_read === false) {
@@ -307,13 +232,10 @@ export async function deleteMailOnEsi(
     }
     await db.esiCache.delete([characterId, KEYS.body(mailId)]);
     await clearDraft(characterId, mailId);
-  } catch {
-    // Deliberately not rethrown: see above.
-  }
+  } catch {}
   return 'done';
 }
 
-/** One cache patch at a time per Character: a bulk action writes three mails at once, and two read-patch-writes interleaved would drop each other's change. */
 const cachePatchQueue = new Map<number, Promise<unknown>>();
 
 function serializePerCharacter<T>(characterId: number, run: () => Promise<T>): Promise<T> {
@@ -325,12 +247,6 @@ function serializePerCharacter<T>(characterId: number, run: () => Promise<T>): P
   return next;
 }
 
-/**
- * Rewrites one mail in the cached header list (`null` removes it), keeping the
- * list's own age: it was not re-read from ESI, and restamping it would show a
- * days-old list as just fetched. Resolves to the mail as it was, or undefined
- * when the list or the mail is not cached.
- */
 function patchCachedHeaders(
   characterId: number,
   mailId: number,
@@ -351,7 +267,6 @@ function patchCachedHeaders(
   });
 }
 
-/** Moves the cached label unread counts (each label the mail carries, and the total) by `change`, floored at zero, so the folder chips agree after a reload. */
 function patchCachedUnreadCounts(
   characterId: number,
   header: MailHeader,
@@ -377,16 +292,6 @@ function patchCachedUnreadCounts(
   });
 }
 
-/**
- * Sends a Reply or Forward (`MailSendBody.approved_cost` — see there for why
- * it's never set). Auth failure signals the app-wide reauth banner like
- * every other write in this file; every other failure is left for the
- * caller to display inline (no toast component in this app).
- *
- * On success, deletes the cached headers row rather than patching it: unlike
- * `markMailReadOnEsi`, the new mail's shape (timestamp, `mail_id`) is not
- * known locally, so the next Mail load simply refetches instead of guessing.
- */
 export async function sendMail(
   characterId: number,
   recipients: readonly MailRecipient[],

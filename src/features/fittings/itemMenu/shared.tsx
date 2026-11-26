@@ -1,4 +1,3 @@
-/** Pieces the item menu's per-item files share. */
 import { useTranslation } from 'react-i18next';
 import type { ReactNode } from 'react';
 import {
@@ -13,7 +12,6 @@ import type { FittingModule, FittingSlotKind } from '@/engine/fittings/types';
 import type { FittingItemActions } from '../fittingItemActions';
 import { slotName } from './menuContext';
 
-/** A menu item that stays focusable when `reason` is set, stating it in a tooltip instead of going native-disabled. */
 export function GuardedMenuItem({
   reason,
   onSelect,
@@ -30,11 +28,6 @@ export function GuardedMenuItem({
   );
 }
 
-/**
- * "Put <charge> in cargo…": the cargo quantity dialog for the charge a module
- * holds, so the spare rounds a fit carries are one step from the weapon
- * instead of a trip through the Add panel. Starts at what the cargo holds.
- */
 export function ChargeToCargoItem({
   actions,
   chargeTypeId,
@@ -50,11 +43,6 @@ export function ChargeToCargoItem({
   );
 }
 
-/**
- * A weapon group's charge choices: what the cargo holds that it takes
- * (loaded out of the hold), then every other charge it takes (the hold left
- * alone, as the Add panel's Charges tab does). Not the one it holds now.
- */
 export function ChangeChargeItems({
   actions,
   module,
@@ -92,7 +80,6 @@ export function ChangeChargeItems({
   );
 }
 
-/** "Load into all compatible" and "Load into" for a charge, from cargo or not. */
 export function ChargeLoadItems({
   actions,
   typeId,

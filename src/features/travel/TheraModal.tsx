@@ -1,18 +1,3 @@
-/**
- * Thera / Turnur, a modal on Route Safety (issues #2330, #2499; it was a
- * Travel tab until the modal scope decision): the current wormhole connections
- * out of the two public hubs, from EVE-Scout, as a slim table of open holes
- * with each exit's jump distance from the page's From, counted by the page's
- * own route rules. Use in route pins a hole on the route's first leg.
- *
- * Conditions, never verdicts (decision `20260912-172628`): a row gives the
- * exit's security, the hole's size and remaining life; the pilot decides.
- *
- * Hub, Exit and Fits are local to the modal (not in the URL) and start at
- * Both, K-space and Any each time it opens. Under K-space, holes into J-space
- * have no gate route from anywhere, so they fold into a group under the table
- * instead of sinking to its bottom.
- */
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -61,15 +46,11 @@ const DEFAULT_FILTER = { hub: 'all', exit: 'kspace', shipSize: 'any' } as const;
 export interface TheraModalProps {
   open: boolean;
   onClose: () => void;
-  /** The Route Safety page's From: where each exit's jumps are counted from. */
   originId: number | null;
-  /** The page's route rules, so a jump count here is the one the route would use. */
   routeQuery: RouteQuery;
-  /** Pins the hole on the route's first leg. */
   onUse: (holeId: string) => void;
 }
 
-/** Mounted only while open, so the filters and the EVE-Scout read start fresh each time. */
 export function TheraModal({ open, onClose, ...rest }: TheraModalProps) {
   const { t } = useTranslation();
   const isPhone = useIsPhone();
@@ -117,7 +98,6 @@ function TheraModalBody({
           <DataAgeBadge date={state.fetchedAt} note={t('travel.thera.dataAgeNote')} />
         )}
       </div>
-      {/* One row, one size: every control takes `md` (DESIGN.md §3). */}
       <div className="flex flex-wrap items-end gap-3">
         <Labelled label={t('travel.thera.hubLabel')}>
           <SegmentedControl
@@ -166,7 +146,6 @@ function TheraModalBody({
   );
 }
 
-/** A micro-label over a control: the row reads left to right, each group named once. */
 function Labelled({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="flex flex-col items-start gap-1">
@@ -178,7 +157,6 @@ function Labelled({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-/** A labelled select sized to the row's one control size. */
 function OptionSelect<V extends string>({
   label,
   value,
@@ -221,7 +199,6 @@ function TheraBody({
   hasOrigin: boolean;
   originName: string | null;
   onUse?: (row: TheraConnectionRow) => void;
-  /** Set while any filter is off its default. */
   onResetFilters?: () => void;
 }) {
   const { t } = useTranslation();
@@ -229,7 +206,6 @@ function TheraBody({
     state.kind === 'loading' ? 'busy' : state.kind === 'unavailable' ? 'failed' : 'ok',
     null
   );
-  // One wrapper in every state, so focus on Retry has somewhere to stay while the list loads.
   const wrap = (children: ReactNode) => (
     <div ref={resultRef} tabIndex={-1} className="outline-none">
       {children}
@@ -261,17 +237,12 @@ function TheraBody({
       />
     );
   }
-  // Longest-lived first: the table's jumps sort is stable, so ties (every
-  // J-space hole) keep this order.
   const ordered = longestLifeFirst(state.rows);
   const rows = filterTheraConnections(ordered, filter);
-  // Under K-space the holes into J-space fold under the table; any other
-  // exit filter shows exactly what it names.
   const jspace =
     filter.exit === 'kspace'
       ? filterTheraConnections(ordered, { ...filter, exit: 'wormhole' })
       : [];
-  // One live region, always mounted, so a change of message is announced.
   const jumpsNote = !hasOrigin
     ? ''
     : state.distancesLoading
@@ -308,8 +279,6 @@ function TheraBody({
           }
           hint={listed ? t('travel.thera.noMatchHint') : t('travel.thera.emptyHint')}
           action={
-            // Only a zero the filters made: when EVE-Scout lists nothing,
-            // there is nothing to reset.
             listed && onResetFilters ? (
               <Button size="sm" onClick={onResetFilters}>
                 {t('common.resetFilters')}
@@ -323,7 +292,6 @@ function TheraBody({
   );
 }
 
-/** Holes into J-space under the K-space table: collapsed, and the same rows when opened. */
 function JspaceGroup({ rows }: { rows: readonly TheraConnectionRow[] }) {
   const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);

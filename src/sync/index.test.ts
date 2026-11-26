@@ -1,7 +1,3 @@
-// Pins the barrel's `await import('./planSync')` forwarding: a dropped argument
-// (debounceMs) or a swallowed promise would be invisible in the UI until a sync
-// silently stopped happening.
-
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   markBuildPlanDeleted,

@@ -16,9 +16,9 @@ const pi = JSON.parse(
   readFileSync(resolve(process.cwd(), 'public/data/pi.json'), 'utf8')
 ) as PiData;
 
-const COOLANT = 9832; // P2
-const ROBOTICS = 9848; // P3
-const NANO_FACTORY = 2869; // P4
+const COOLANT = 9832;
+const ROBOTICS = 9848;
+const NANO_FACTORY = 2869;
 
 function books(): ChainBasis['books'] {
   const book: Record<number, number> = {};
@@ -80,7 +80,6 @@ describe('buildChainEstimate', () => {
       expect(view!.unitsPerDay).toBeGreaterThan(0);
       expect(view!.planets.length).toBeGreaterThanOrEqual(2);
       expect(view!.m3PerWeek).toBeGreaterThan(0);
-      // A weekly hauler moves a week's load at once.
       expect(view!.m3PerHaul).toBeCloseTo(view!.m3PerWeek, 6);
       expect(view!.ccLevel).toBe(5);
     }

@@ -31,7 +31,6 @@ describe('DataGate', () => {
     const onRetry = vi.fn();
     render(<DataGate status="failed" title="Blueprint data couldn't load" onRetry={onRetry} />);
     expect(screen.getByText("Blueprint data couldn't load")).toBeInTheDocument();
-    // Announced too, through the always-mounted live region.
     await waitFor(() =>
       expect(screen.getByRole('status')).toHaveTextContent("Blueprint data couldn't load")
     );

@@ -1,22 +1,12 @@
-/**
- * The member list behind "Review a member": rows, filtering, who cannot be picked, and the role
- * suggestions. Pure; `useReviewRoster.ts` reads the roster, `MemberCombobox.tsx` draws it.
- */
-
 export interface RosterMember {
   characterId: number;
   name: string;
-  /** The member's first corp title, when titles could be read. */
   title?: string;
-  /** Last seen (epoch ms), when member tracking could be read. */
   lastSeenMs?: number;
-  /** Already has a review waiting: when it was asked, and by whom when the overview says. */
   waiting?: { at: number; by?: string };
-  /** The officer themself. */
   you?: boolean;
 }
 
-/** Common EVE corporation roles, offered after the corp's own titles. */
 export const EVE_ROLE_SUGGESTIONS = [
   'Director',
   'Personnel Manager',
@@ -26,12 +16,10 @@ export const EVE_ROLE_SUGGESTIONS = [
   'Security Officer',
 ] as const;
 
-/** A member with a review waiting, or the officer themself, stays listed but is not pickable. */
 export function pickable(member: RosterMember): boolean {
   return !member.waiting && !member.you;
 }
 
-/** Flags the officer and members who already have a review waiting. */
 export function markMembers(
   members: readonly RosterMember[],
   context: { selfId: number | null; waiting: ReadonlyMap<number, { at: number; by?: string }> }
@@ -46,7 +34,6 @@ export function markMembers(
   });
 }
 
-/** Names starting with the query first, then names containing it; all members, by name, when empty. */
 export function narrowMembers(members: readonly RosterMember[], query: string): RosterMember[] {
   const q = query.trim().toLowerCase();
   const byName = [...members].sort((a, b) => a.name.localeCompare(b.name));
@@ -58,7 +45,6 @@ export function narrowMembers(members: readonly RosterMember[], query: string): 
   return [...starts, ...inside];
 }
 
-/** A name split around the query's first match, so the match can be bold. */
 export function matchParts(
   name: string,
   query: string
@@ -73,7 +59,6 @@ export function matchParts(
   };
 }
 
-/** Role chips: the corp's titles first, then EVE roles that are not a title; typing narrows both. */
 export function roleSuggestions(
   value: string,
   corpTitles: readonly string[],

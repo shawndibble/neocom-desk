@@ -87,7 +87,6 @@ describe('shared interaction recipe (DESIGN.md §6c)', () => {
 
 describe('primitives compose the shared recipe', () => {
   it('has no ad-hoc transition-colors or press scale, and no pointer-events-none on a button', () => {
-    // Layout.tsx keeps one ad-hoc transition-colors (its own chrome, outside the primitives).
     const adHoc = sourceFiles('src')
       .filter((file) => !file.endsWith('Layout.tsx'))
       .filter((file) => !file.endsWith('controlStyles.test.ts'))
@@ -133,8 +132,6 @@ describe('touch tier', () => {
   });
 
   it('keeps a bare checkbox target 36px wide beside long text, so rows stay aligned', () => {
-    // A flex item shrinks by default: a long caption beside it squeezed the
-    // label narrower and slid the box left of its neighbours' boxes.
     expect(touchCheckboxLabelClassName).toContain('shrink-0');
   });
 
@@ -146,17 +143,11 @@ describe('touch tier', () => {
 
   it('grows the resize grip itself to 36px on touch, and draws nothing over it', () => {
     expect(resizeHandleTouchClassName).toContain('touch:h-9');
-    // It used to drop the real border and redraw the hairline centred in the
-    // band. The grip now carries a `grabberClassName` mark on that centre
-    // line, and the two sat on top of each other — so the border stays put and
-    // this only grows the band (§6c: no overhang to enlarge a hit area).
     expect(resizeHandleTouchClassName).not.toContain('after:');
     expect(resizeHandleTouchClassName).not.toContain('before:');
   });
 
   it('draws one grabber mark for every draggable overlay edge', () => {
-    // `Modal`'s sheet and the CompareDrawer's resize grip both take this, so
-    // the mark §6c describes as one cue cannot drift into two.
     expect(grabberClassName).toContain('rounded-full');
     expect(grabberClassName).toContain('bg-line-bright');
   });

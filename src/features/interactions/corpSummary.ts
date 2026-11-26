@@ -1,19 +1,13 @@
-/**
- * What the Corporation scope's stat chips need, from the corp book facts and the corp's
- * killmails with the player. A chip with nothing to say is null (the UI hides it). Pure.
- */
 import { DAY_MS } from '@/lib/age';
 import type { BookFacts } from './corpBookInteractions';
 import type { CorpKill } from './corpOtherInteractions';
 
-/** A loss counts as hostile for this long. */
 export const HOSTILE_WINDOW_DAYS = 90;
 
 export interface CorpMemberChips {
   owedNow: number | null;
   taxPaid: number | null;
   lateNotices: number | null;
-  /** Epoch ms of the oldest record the corp book holds for them. */
   memberSince: number | null;
 }
 
@@ -21,7 +15,6 @@ export interface CorpOutsiderChips {
   hostile: boolean;
   ourLosses: { count: number; isk: number } | null;
   theirLosses: { count: number; isk: number } | null;
-  /** Epoch ms of the newest killmail between us. */
   lastHostile: number | null;
 }
 

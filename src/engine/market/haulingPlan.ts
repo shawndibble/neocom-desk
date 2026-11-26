@@ -1,33 +1,3 @@
-/**
- * The Trip Plan: what to load into one hold, from one Trade Hub bound for
- * another, given the space a hauler has and the ISK they are willing to
- * spend.
- *
- * The plan is a *suggestion the user edits*: every item starts selected at a
- * suggested quantity; an override either unticks an item or pins a typed
- * quantity. Pinned items keep what was typed and reserve their space and ISK
- * first, and the rest are filled from what is left — so ticking, unticking and
- * typing all run through this one function and the totals can never disagree
- * with the list.
- *
- * Each suggested quantity is the smallest of four limits, and the plan names
- * the one that applied so a hauler can see why (`limitedBy`):
- * - `sales`: a week of expected sales (`demandCapUnits`),
- * - `supply`: the units that are profitable to buy with a margin to spare — the
- *   origin's ladder past the break-even price loses money, and a unit just
- *   under it loses the moment a price slips. Sold straight into the
- *   destination's buy orders there is no sales horizon, and this is the depth
- *   both books keep a unit profitable to (`walkInstant`),
- * - `space`: what fits in the room left in the holds that accept the item,
- * - `budget`: what the remaining ISK buys through the origin's ladder.
- *
- * Cargo Space is a set of holds (`cargoHolds.ts`): each item goes into a
- * Specialised Hold that accepts it first, narrowest first, and spills into the
- * general hold once that is full. An item no Specialised Hold accepts only
- * uses the general hold.
- *
- * Pure: no fetch/DOM/Dexie.
- */
 import { brokerFeePct, salesTax, salesTaxPct } from '@/engine/industry/fees';
 import type { AppraisalNetFees } from './appraisal';
 import {
@@ -49,37 +19,21 @@ import { roundPriceDown } from './priceTick';
 export interface TripCandidate {
   typeId: number;
   name: string;
-  /** m³ of one unit as hauled — packaged volume where the type has one. */
   unitVolumeM3: number;
-  /** The origin's sell ladder: what buying units costs. */
   buyLadder: readonly LadderLevel[];
-  /** Expected Sell Price at the destination (ignored when `destBuyLadder` is set). */
   expectedPrice: number;
-  /**
-   * A week of expected sales, from `estimateSale`; null when the lot is sold
-   * straight into buy orders, where there is no sales horizon — only book depth.
-   */
   demandCapUnits: number | null;
-  /** The destination's buy ladder, dearest first: set when the lot is sold into it instead of listed. */
   destBuyLadder?: readonly LadderLevel[];
-  /**
-   * The fee rates this lot's sale pays, when they are not the plan's own: a
-   * scan that picks each item's lane can sell at different hubs, and the
-   * broker fee follows the standing toward each hub's owner.
-   */
   fees?: AppraisalNetFees;
-  /** The item's SDE group and category, which decide the holds it may go in; absent or null means the general hold only. */
   groupId?: number | null;
   categoryId?: number | null;
 }
 
-/** A user's change to one suggested line. `quantity` wins over the suggestion; `selected: false` removes the line. */
 export interface TripOverride {
   selected?: boolean;
   quantity?: number;
 }
 
-/** A row is on the trip unless the user unticked it (no override at all means ticked). */
 export function isOnTrip(overrides: ReadonlyMap<number, TripOverride>, typeId: number): boolean {
   return overrides.get(typeId)?.selected !== false;
 }
@@ -93,11 +47,9 @@ export interface TripLine {
   volumeM3: number;
   cost: number;
   profit: number;
-  /** The dearest unit price still worth paying at the origin; null when no unit clears the margin. */
   maxBuyPrice: number | null;
   selected: boolean;
   limitedBy: QuantityLimit;
-  /** The holds the line is loaded into, in fill order; empty when space never limits or nothing ships. */
   placements: HoldPlacement[];
 }
 
@@ -120,30 +72,20 @@ export const holdsCapacityM3 = (holds: readonly HoldUse[]): number =>
   holds.reduce((sum, h) => sum + h.capacityM3, 0);
 
 export interface TripPlan {
-  /** One line per candidate, in the order given (an unselected or zero line stays, with quantity 0). */
   lines: TripLine[];
   totals: { volumeM3: number; cost: number; profit: number; items: number };
-  /** The limit that stopped the plan short, when one did: space and budget outrank a plain sales cap. */
   binding: 'space' | 'budget' | 'sales' | null;
-  /** Each hold, general first, with what the plan put in it; empty when space never limits. A hold no candidate fits stays at 0. */
   holds: HoldUse[];
 }
 
 export interface PlanTripInput {
   candidates: readonly TripCandidate[];
-  /** The Cargo Space's holds; null or empty means the user has not said, so space never limits. */
   holds: readonly CargoHold[] | null;
-  /** ISK to spend; null means no limit. */
   budgetIsk: number | null;
   fees: AppraisalNetFees;
   overrides: ReadonlyMap<number, TripOverride>;
 }
 
-/**
- * Units of `ladder` that cost enough less than a unit is worth after fees to
- * clear `minUnitMarginPct` — past this every further unit earns too little to
- * survive a price slipping before it is bought or sold.
- */
 export function profitableDepth(
   candidate: TripCandidate,
   planFees: AppraisalNetFees,
@@ -173,17 +115,6 @@ export function profitableDepth(
   return candidate.buyLadder.reduce((sum, l) => (l.price <= breakEven ? sum + l.units : sum), 0);
 }
 
-/**
- * The dearest price a unit may be bought at and still clear `minMarginPct`
- * after every fee: the line to hold when the origin's book has moved since
- * the plan was made. Buying past it only loses money once the sale is paid
- * for. Null when no unit on today's books clears the margin.
- *
- * Listed, it is the break-even price less the margin, rounded down to a price
- * the market can hold. Sold into buy orders it is what the weakest bid the lot
- * sells into nets after sales tax, less the margin: the origin price of any
- * unit in the lot can rise to there before that unit stops clearing it.
- */
 export function maxBuyPrice(
   candidate: TripCandidate,
   planFees: AppraisalNetFees,
@@ -199,8 +130,6 @@ export function maxBuyPrice(
       minMarginPct,
     });
     if (units <= 0) return null;
-    // The weakest bid the lot sells into sets the ceiling: any unit bought
-    // dearer than what that bid nets, less the margin, loses its margin.
     let sold = 0;
     for (const level of candidate.destBuyLadder) {
       sold += level.units;
@@ -229,7 +158,6 @@ export function maxBuyPrice(
   return roundPriceDown(limit) ?? limit;
 }
 
-/** The most units `budget` ISK buys through `ladder`, up to `max`. */
 function affordableUnits(ladder: readonly LadderLevel[], budget: number, max: number): number {
   let lo = 0;
   let hi = max;
@@ -271,7 +199,6 @@ function lineFor(
 
 const FILL_ORDER: readonly HoldKind[] = [...SPECIALISED_HOLD_KINDS, 'general'];
 
-/** One hold per kind (two of a kind add up), general first then narrowest first; holds of no size are dropped. */
 function holdUses(holds: readonly CargoHold[] | null): HoldUse[] {
   const byKind = new Map<HoldKind, number>();
   for (const { kind, capacityM3 } of holds ?? []) {
@@ -284,7 +211,6 @@ function holdUses(holds: readonly CargoHold[] | null): HoldUse[] {
   }));
 }
 
-/** The holds `candidate` may go in, in the order it fills them: Specialised Holds narrowest first, then the general hold. */
 function eligibleHolds(holds: readonly HoldUse[], candidate: TripCandidate): HoldUse[] {
   const item = { groupId: candidate.groupId ?? null, categoryId: candidate.categoryId ?? null };
   return FILL_ORDER.flatMap((kind) => {
@@ -295,15 +221,9 @@ function eligibleHolds(holds: readonly HoldUse[], candidate: TripCandidate): Hol
 
 const freeM3 = (hold: HoldUse) => Math.max(0, hold.capacityM3 - hold.usedM3);
 
-/** Whole units of `unitVolumeM3` that fit in a hold's free room (a hair of slack so 3.8 / 0.38 is 10, not 9). */
 const unitsIn = (hold: HoldUse, unitVolumeM3: number) =>
   Math.floor(freeM3(hold) / unitVolumeM3 + 1e-9);
 
-/**
- * Loads `quantity` units into `eligible`, in order, and records the room they
- * take. A typed quantity can exceed every hold: what is left over-fills the
- * last hold it may use, so the overflow stays visible rather than vanishing.
- */
 function load(eligible: readonly HoldUse[], quantity: number, unitVolumeM3: number) {
   const placements: HoldPlacement[] = [];
   let left = quantity;
@@ -335,7 +255,6 @@ export function planTrip(input: PlanTripInput): TripPlan {
         }
       : line;
 
-  // 1. Unticked items ship nothing; typed quantities are kept and reserve their share first.
   const auto: TripCandidate[] = [];
   for (const candidate of candidates) {
     const override = overrides.get(candidate.typeId);
@@ -353,7 +272,6 @@ export function planTrip(input: PlanTripInput): TripPlan {
     }
   }
 
-  // 2. Rank what is left by profit per share of the scarcest resource, then fill in that order.
   const sized = auto.map((candidate) => {
     const supplyCap = profitableDepth(candidate, fees);
     const salesCap =
@@ -368,7 +286,6 @@ export function planTrip(input: PlanTripInput): TripPlan {
       fees: candidate.fees ?? fees,
       destBuyLadder: candidate.destBuyLadder,
     });
-    // Judged against the room this item can actually use, not every hold's.
     const usableM3 = eligibleHolds(holds, candidate).reduce((sum, h) => sum + freeM3(h), 0);
     let scarcity = 0;
     if (spaceLimits && usableM3 > 0) {
@@ -410,7 +327,6 @@ export function planTrip(input: PlanTripInput): TripPlan {
     }
 
     let sizedLine = lineFor(candidate, quantity, true, limitedBy, fees);
-    // A lot the limit cut too small to pay (a listing's broker fee has a floor) ships nothing.
     if (sizedLine.quantity > 0 && sizedLine.profit <= 0) {
       sizedLine = lineFor(candidate, 0, true, limitedBy, fees);
     }
@@ -443,7 +359,6 @@ export function planTrip(input: PlanTripInput): TripPlan {
   };
 }
 
-/** The text EVE's Multibuy window reads: one `Name Qty` line per shipped item. */
 export function multibuyText(lines: readonly { name: string; quantity: number }[]): string {
   return lines
     .filter((l) => l.quantity > 0)

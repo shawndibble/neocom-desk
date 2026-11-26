@@ -1,24 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-/** Most deferred commits held at once; the oldest commits when one more arrives. */
 export const DEFERRED_COMMIT_CAP = 3;
 
 export interface DeferredCommit {
-  /** What the write targets; also the row to hide while it is pending. */
   id: string;
-  /** What the Undo toast says. */
   message: string;
-  /** The real write, run when the toast ends without Undo. */
   commit: () => void | Promise<void>;
 }
 
-/**
- * Deferred-commit Undo: the caller hides a row and raises a toast now, and the
- * real write runs only when the toast ends. `undo` cancels it. Anything still
- * pending commits at once when the page hides or leaves, so a delete is never
- * lost; a committing id stays in `hiddenIds` until its write settles, so the
- * row can't flash back between the toast and the write.
- */
 export function useDeferredCommits() {
   const [items, setItems] = useState<readonly DeferredCommit[]>([]);
   const [settling, setSettling] = useState<ReadonlySet<string>>(new Set());
@@ -29,7 +18,6 @@ export function useDeferredCommits() {
     try {
       await item.commit();
     } catch {
-      // A failed write leaves the row in place: it reappears when `settling` clears.
     } finally {
       setSettling((prev) => {
         const next = new Set(prev);

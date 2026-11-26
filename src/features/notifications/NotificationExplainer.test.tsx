@@ -18,7 +18,6 @@ const CHAR_ID = 44;
 
 function stubNotification(permission: NotificationPermission, answer: NotificationPermission) {
   const stub = { permission, requestPermission: vi.fn() };
-  // Like a real browser: the live permission changes once the ask resolves.
   stub.requestPermission.mockImplementation(async () => {
     stub.permission = answer;
     return answer;
@@ -201,7 +200,6 @@ describe('NotificationExplainer', () => {
       expect(turnOn).toHaveAttribute('aria-disabled', 'true');
       await user.click(turnOn);
       expect(beginAlertsLogin).not.toHaveBeenCalled();
-      // The click above closed any bubble; re-enter for a fresh hover.
       await user.unhover(turnOn);
       await user.hover(turnOn);
       expect((await screen.findAllByText('Needs a connection')).length).toBeGreaterThan(0);

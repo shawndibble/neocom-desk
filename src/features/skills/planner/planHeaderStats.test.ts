@@ -25,8 +25,6 @@ const CURRENT: Attributes = {
   charisma: 19,
 };
 
-// Six distinct attribute-pair skills, one step each, so a remapCount above
-// MAX_SUPPORTED_REMAPS places a remap the evaluated (capped) run cannot.
 const PAIRS: [AttributeName, AttributeName][] = [
   ['intelligence', 'memory'],
   ['perception', 'willpower'],
@@ -75,18 +73,12 @@ describe('evaluateOptimizationBadge', () => {
       capped: true,
     });
 
-    // The badge never claims the (larger) uncapped savings.
     const uncapped = placeRemaps(STEPS, SKILLS, { remapCount: 6, currentAttributes: CURRENT });
     expect(uncapped.savingsSeconds).toBeGreaterThan(capped.savingsSeconds);
   });
 
-  // A plan with no remaps to spend has none to place, so there is no savings
-  // figure to report. The badge used to render "Remap savings: None" here,
-  // which asserts that remapping cannot help this plan — a verdict the run
-  // never reached, and one that contradicts the editor's own "raise Remaps
-  // available and optimize again". No chip at all, as for an empty plan.
   it('threads timedRemap through to placeRemaps, so the badge cannot disagree with the button', () => {
-    const timedRemap = { notBeforeSeconds: 1e9 }; // past the whole plan
+    const timedRemap = { notBeforeSeconds: 1e9 };
     const badge = evaluateOptimizationBadge(STEPS, SKILLS, {
       remapCount: 1,
       currentAttributes: CURRENT,
@@ -98,7 +90,7 @@ describe('evaluateOptimizationBadge', () => {
       timedRemap,
     });
     expect(badge).toMatchObject({ savingsSeconds: direct.savingsSeconds });
-    expect(direct.savingsSeconds).toBe(0); // sanity: the constraint actually bit
+    expect(direct.savingsSeconds).toBe(0);
   });
 
   it('returns null when the plan has no remaps to spend', () => {

@@ -1,9 +1,3 @@
-/**
- * Step 3 of `planGoals` — where the P2+ factories go (`placeHost`) — and its
- * settle-up once release and refill (step 5) show what is actually made
- * (`settleHost`). Host ranking and step numbers are in the module header of
- * `../goalPlan.ts`.
- */
 import type { PiData, PiFactoryKind } from '@/sde/types';
 import type { ColonyBaseline } from '../baseline';
 import { piTier } from '../chain';
@@ -16,9 +10,7 @@ import { EPSILON, byId, expandInto, factoriesOf, madeNodes, schematicOf } from '
 export interface HostContext {
   colonies: readonly PlannerColony[];
   pi: PiData;
-  /** Each colony's Baseline, read for the forfeit tie-break. */
   baselines: ReadonlyMap<number, ColonyBaseline>;
-  /** Host here instead of choosing; see `PlanGoalsInput.hostPlanetId`. */
   hostPlanetId?: number;
 }
 
@@ -26,7 +18,6 @@ function baselineIsk(result: ColonyBaseline | undefined): number {
   return result?.status === 'ok' ? result.iskPerHour : 0;
 }
 
-/** Colonies whose planet type carries every factory `madeHigh` needs. */
 export function eligibleHosts(
   madeHigh: readonly number[],
   colonies: readonly PlannerColony[],
@@ -36,7 +27,6 @@ export function eligibleHosts(
   return colonies.filter((c) => schematics.every((s) => s.planetTypes.includes(c.planetType)));
 }
 
-/** Every P2+ type these goals' chains make, ascending. */
 export function madeHighOf(goals: readonly Goal[], pi: PiData): number[] {
   const made = new Set<number>();
   for (const g of goals) {
@@ -45,10 +35,6 @@ export function madeHighOf(goals: readonly Goal[], pi: PiData): number[] {
   return [...made].sort(byId);
 }
 
-/**
- * The host for `madeHigh` (every P2+ type the plan makes), or null with the
- * factory kind that has nowhere to go.
- */
 export function chooseHost(
   madeHigh: readonly number[],
   demandedP0: readonly number[],
@@ -65,7 +51,6 @@ export function chooseHost(
     return { host: forced, reason: 'forced' };
   }
   if (eligible.length === 0) {
-    // Name the factory no colony can carry; the P4's High-Tech plant in practice.
     const stranded =
       schematics.find((s) => !colonies.some((c) => s.planetTypes.includes(c.planetType))) ??
       [...schematics].sort((a, b) => a.planetTypes.length - b.planetTypes.length)[0];
@@ -92,19 +77,11 @@ export function chooseHost(
 export interface HostPlacement {
   host: PlannerColony | null;
   reason: FactoryHostReason | null;
-  /** The P2+ factories fitted on `host`, at the goals' full rates. */
   factories: PinCounts;
-  /** `no-factory-host` / `host-over-budget`, in the order found. */
   shortfalls: Shortfall[];
-  /** Live P2+ goals that cannot be made: no host, or one that cannot be built. */
   dead: Goal[];
 }
 
-/**
- * Picks and fits the factory host for the goals `triage` leaves live. A
- * missing host is reported whatever else blocks a goal; a host whose
- * factories overrun it makes nothing.
- */
 export function placeHost(
   goals: readonly Goal[],
   triage: GoalTriage,
@@ -115,8 +92,6 @@ export function placeHost(
   const shortfalls: Shortfall[] = [];
   const dead: Goal[] = [];
   const liveHigh = triage.live.filter((g) => tierOf(g.typeId) >= 2);
-  // A missing host is its own fix, whatever else blocks a goal: check every
-  // P2+ goal, not only the ones a type gap leaves standing.
   const allHigh = goals.filter((g) => tierOf(g.typeId) >= 2);
   if (allHigh.length > 0 && liveHigh.length < allHigh.length) {
     const madeAll = madeHighOf(allHigh, pi);
@@ -139,7 +114,6 @@ export function placeHost(
     if (fit.fits) {
       return { host: choice.host, reason: choice.reason, factories, shortfalls, dead };
     }
-    // A host that cannot carry its factories makes nothing at all.
     shortfalls.push({
       kind: 'host-over-budget',
       planetId: choice.host.planetId,
@@ -155,19 +129,11 @@ export function placeHost(
 export interface SettledHost {
   host: PlannerColony | null;
   reason: FactoryHostReason | null;
-  /** The factories the achieved rates need; `{}` with no host. */
   factories: PinCounts;
-  /** Each planned P2+ goal at the rate it actually reaches. */
   highAchieved: Goal[];
-  /** Every chain node of `highAchieved`, per hour. */
   madeHighRates: Map<number, number>;
 }
 
-/**
- * After release and refill (step 5): the host at what it actually makes. Factories are
- * re-counted on the achieved rates, and a host that ends up making nothing is
- * an ordinary colony again.
- */
 export function settleHost(
   plannedHigh: readonly Goal[],
   highFraction: ReadonlyMap<number, number>,
@@ -186,7 +152,6 @@ export function settleHost(
     pi
   );
   if (host && ![...madeHighRates.values()].some((u) => u > EPSILON)) {
-    // Nothing gets made: no host, and its colony is an ordinary one again.
     host = null;
     reason = null;
   }

@@ -67,7 +67,6 @@ describe('checkWorkbenchFit', () => {
         [2185, 5],
       ])
     );
-    // What the editor's Missing skills chip checks once it's opened: no cargo.
     expect([...check.requirementTypeIds].sort((a, b) => a - b)).toEqual([
       626, 2048, 2185, 3001, 12789,
     ]);
@@ -90,7 +89,6 @@ describe('checkWorkbenchFit', () => {
   });
 
   it('an unread item the game still has leaves the fit current and still matchable', () => {
-    // A filament in cargo: the loader's catalogue leaves filaments out (#2513, #2536).
     const check = checkWorkbenchFit(
       '[Vexor, A]\nHeavy Neutron Blaster II\n\n\nFierce Exotic Filament x3',
       data
@@ -100,7 +98,6 @@ describe('checkWorkbenchFit', () => {
   });
 
   it('an unread fitted module stays current but is never matched, though the game has it', () => {
-    // A mutated module reads as a fitted line: dropped, the rest could equal a smaller group.
     const check = checkWorkbenchFit(
       '[Vexor, A]\nHeavy Neutron Blaster II\nLarge Abyssal Shield Extender',
       data

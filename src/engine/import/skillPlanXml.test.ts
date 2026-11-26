@@ -15,8 +15,6 @@ describe('parseSkillPlanXml', () => {
   });
 
   it('maps the priority attribute onto a PlanPriority band (#27)', () => {
-    // EVEMon priority: 1 = most urgent .. 99, default 3. Threshold is that
-    // default: below it is 'high', above it is 'low', at it is 'normal'.
     expect(
       parseSkillPlanXml({ entries: [{ skillName: 'Gunnery', level: 4, priority: 1 }] }, CATALOG)
         .entries
@@ -32,8 +30,6 @@ describe('parseSkillPlanXml', () => {
   });
 
   it('never emits an explicit priority: undefined key for an entry with no priority', () => {
-    // A bare `priority: undefined` key would later clobber an existing
-    // priority when a caller merges this entry via object-spread.
     const result = parseSkillPlanXml({ entries: [{ skillName: 'Gunnery', level: 4 }] }, CATALOG);
     expect(Object.prototype.hasOwnProperty.call(result.entries[0], 'priority')).toBe(false);
   });

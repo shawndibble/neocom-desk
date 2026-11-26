@@ -1,9 +1,3 @@
-// Per-collection two-way sync passes (pull, merge, push) for one character:
-// every editable collection. The Notification Feed and synced settings passes
-// live in feedSync.ts and settingsSync.ts. planSync.ts owns the driver
-// (syncCharacter) and the mutation API and calls these; none of them import it back.
-// Merge policy is pure and lives in merge.ts.
-
 import {
   collection,
   deleteDoc,
@@ -45,17 +39,6 @@ export async function runBounded(writes: (() => Promise<unknown>)[]): Promise<vo
   });
 }
 
-/**
- * `setDoc` for a doc carrying this owner's `ownerHash`, over whatever a
- * previous owner left at the same id. Ids derived from a key (a setting, a
- * station, a feed occurrence) recur across owners, and the pull never shows
- * the old doc (it reads `ownerHash == current`), so the write is an update the
- * rules refuse: `hashMatches` reads the stored hash. Delete is uid-only for
- * exactly this (firestore.rules), so the stale doc is removed and the write
- * retried once — but only once `ctx.confirmOwner` proves this device is the
- * current owner; otherwise the refusal stands. Not atomic: a failed retry
- * leaves the id empty, and the local row pushes it again next pass.
- */
 export async function setOwnedDoc(
   ref: DocumentReference,
   data: DocumentData,
@@ -75,25 +58,11 @@ async function writeTombstones(key: string, tombstones: LocalTombstone[]): Promi
   await db.settings.put({ key, value: tombstones });
 }
 
-// ---------------------------------------------------------------------------
-// Generic editable-collection sync (every EDITABLE_COLLECTIONS declaration)
-// ---------------------------------------------------------------------------
-
-/**
- * Account-wide collections only (issue #436): the shared key a deletion is
- * recognized by regardless of which Character's id a row was copied onto,
- * and the current per-key deletion times to check it against. See
- * `AccountWideTombstones` in merge.ts.
- *
- * Merge policy, not part of a collection's declaration: its `deletedAtByKey`
- * comes from accountWideBackfill.ts, which itself reads the registry.
- */
 interface AccountWideMerge<L extends EditableRecord> {
   sharedKey: (record: L) => string | undefined;
   deletedAtByKey: () => Promise<Map<string, number>>;
 }
 
-/** Pairs a merge hook with its typed declaration, then erases the row type for the lookup below. */
 function accountWideMerge<L extends EditableRecord>(
   collection: EditableCollection<L, RemoteDoc & L>,
   merge: AccountWideMerge<L>
@@ -103,16 +72,10 @@ function accountWideMerge<L extends EditableRecord>(
 
 const ACCOUNT_WIDE_MERGES = new Map([
   accountWideMerge<StationPinRecord>(STATION_PINS, {
-    // Only an account-wide row can be resurrected onto a Character added
-    // after the delete (accountWideBackfill.ts only ever copies `scope:
-    // 'account'` rows) — a `character`-scoped pin at the same locationId
-    // must not be caught by a deletion that only ever applied to the
-    // account-wide one.
     sharedKey: (row) => (row.scope === 'account' ? String(row.locationId) : undefined),
     deletedAtByKey: stationPinDeletedAtByKey,
   }),
   accountWideMerge<PlanetRichnessRecord>(PLANET_RICHNESS, {
-    // Every row is account-wide — no per-Character variant exists to opt out.
     sharedKey: (row) => String(row.planetId),
     deletedAtByKey: planetRichnessDeletedAtByKey,
   }),
@@ -124,40 +87,15 @@ export interface SyncContext {
   ownerHash: string;
   characterId: number;
   now: number;
-  /** Called after a pass pushes at least one doc, so the driver bumps the change marker. */
   onPush?: () => void;
-  /**
-   * Whether this device provably holds the Character now (`confirmOwnership`),
-   * asked at most once a pass. Without it `setOwnedDoc` never deletes.
-   */
   confirmOwner?: () => Promise<boolean>;
 }
 
-/**
- * The only remote read in the app, and the only reason any field of a synced
- * document is indexed at all.
- *
- * `firestore.indexes.json` exempts every field of every synced collection
- * group from automatic indexing (`fieldPath: "*"`) and re-enables exactly
- * one: `ownerHash` — issue #583, which is what stops Firestore storing an
- * index entry per skill in a plan queue, per Quickbar item and per ore line
- * for queries nobody makes. **So adding a `where(...)` or `orderBy(...)` on
- * any other field here needs that field re-enabled in `fieldOverrides`
- * first, and the exemptions redeployed.** A composite index still covers its
- * own fields (an exemption applies only to automatic indexing), which is how
- * the incremental pull's `updatedAt` filter below works without one.
- *
- * Miss that and the query throws `failed-precondition` at runtime — the same
- * error a missing *composite* index gives, so it reads as one. `isMissingIndex`'s
- * full read is no safety net here either: it filters on `ownerHash` too.
- */
 async function fetchOwnedDocs<R extends { ownerHash: string }>(
   col: CollectionReference,
   ownerHash: string,
   since?: number
 ): Promise<R[]> {
-  // Rules allow listing only what the client's where clause provably scopes to;
-  // an unfiltered getDocs would also trip over stale-hash docs after a transfer.
   const owned = where('ownerHash', '==', ownerHash);
   const snapshot = await getDocs(
     since === undefined ? query(col, owned) : query(col, owned, where('updatedAt', '>', since))
@@ -165,43 +103,15 @@ async function fetchOwnedDocs<R extends { ownerHash: string }>(
   return snapshot.docs.map((d) => d.data() as R);
 }
 
-// ---------------------------------------------------------------------------
-// Incremental pull (issue #581)
-//
-// Every pass used to re-read every owned doc in all 12 collections — a full
-// collection scan each, on app start, on every Character switch and 2s after
-// every mutation. Firestore bills per document read, so that cost grows with
-// users x mutations x accumulated rows while the stored data barely moves.
-//
-// So each (Character, collection) carries a pull cursor and the read is
-// filtered to `updatedAt > cursor`. Remote tombstones are ordinary docs
-// carrying `updatedAt`, so a delete arrives through that window exactly like
-// an edit. What a partial remote set costs is the two `mergeRecords`
-// decisions that used to read remote *absence* — see its `since` docstring.
-//
-// The Notification Feed (feedSync.ts) and synced settings (settingsSync.ts,
-// issue #5045) read through the same cursor; `mergeFeed` and `mergeSettings`
-// each document how they read a partial remote set.
-// ---------------------------------------------------------------------------
-
-/** How stale a cursor may get before the pass falls back to an unfiltered read. */
 const FULL_RECONCILE_INTERVAL_MS = TOMBSTONE_TTL_MS;
 
 interface PullWindow<R> {
-  /** The docs to merge: the whole owned set, or only what changed since the cursor. */
   remote: R[];
-  /** Lower bound the merge must assume, or `undefined` when this was a full read. */
   since: number | undefined;
-  /** Where to store `next`, once the pass has applied everything it read. */
   cursorKey: string;
   next: PullCursor;
 }
 
-/**
- * `forceFull` makes this pass an unfiltered read whatever the cursor says, for
- * a caller whose local state a window cannot reconcile (settingsSync.ts, an
- * unstamped value). It is recorded as a full read like any other.
- */
 export async function pullOwnedDocs<R extends { ownerHash: string; updatedAt?: number }>(
   col: CollectionReference,
   ctx: SyncContext,
@@ -210,8 +120,6 @@ export async function pullOwnedDocs<R extends { ownerHash: string; updatedAt?: n
 ): Promise<PullWindow<R>> {
   const cursorKey = pullCursorKey(ctx.characterId, collectionName);
   const cursor = await readPullCursor(cursorKey);
-  // No cursor at all = an in-place upgrade, or a fresh device: full read, so
-  // pre-existing remote docs can never be missed.
   const fresh =
     !forceFull && cursor !== undefined && ctx.now - cursor.fullAt <= FULL_RECONCILE_INTERVAL_MS;
   let since = fresh ? cursor.high : undefined;
@@ -223,7 +131,6 @@ export async function pullOwnedDocs<R extends { ownerHash: string; updatedAt?: n
     since = undefined;
     remote = await fetchOwnedDocs<R>(col, ctx.ownerHash);
   }
-  // The high-water mark actually observed, never `ctx.now` (see PullCursor).
   const observed = remote.reduce((high, d) => Math.max(high, d.updatedAt ?? 0), 0);
   return {
     remote,
@@ -291,29 +198,12 @@ export async function syncEditableCollection(
   if (plan.deleteLocal.length > 0) {
     await table.bulkDelete(plan.deleteLocal);
   }
-  // A remote tombstone pulled down here (`deleteLocal`) previously left no
-  // local trace once the row itself was gone — so `deletedAtByKey()`
-  // (accountWideBackfill.ts, and `accountWide` above) only ever saw a
-  // deletion this device originated itself, never one it merely learned by
-  // pulling. Recording it here closes that gap for every collection, not
-  // just account-wide ones: it is exactly the same fact a locally-originated
-  // delete already records via `recordDeletion`, just learned a step later.
-  //
-  // Two distinct sources land in `deleteLocal`, with two distinct correct
-  // timestamps: an ordinary remote tombstone (`r.deleted`) carries its
-  // deletion time as `r.updatedAt`, but `accountWide`'s self-heal (merge.ts)
-  // always pairs its `deleteLocal` push with a `pushTombstones` entry whose
-  // `deletedAt` is the real deletion time — `remoteById.get(id)?.updatedAt`
-  // there would be the row's pre-deletion, still-live remote copy, which is
-  // stale by definition (that mismatch is exactly what triggered the
-  // self-heal). `pushTombstones` is checked first for that reason.
   const remoteById = new Map(remote.map((r) => [r.id, r]));
   const pushTombstoneById = new Map(plan.pushTombstones.map((t) => [t.id, t.deletedAt]));
   const learned: LocalTombstone[] = plan.deleteLocal.flatMap((id) => {
     const deletedAt = pushTombstoneById.get(id) ?? remoteById.get(id)?.updatedAt;
     return deletedAt !== undefined ? [{ id, deletedAt }] : [];
   });
-  // Pushed tombstones are now recorded remotely; resolved ones are dropped.
   const settled = new Set([...plan.clearLocalTombstones, ...plan.pushTombstones.map((t) => t.id)]);
   if (settled.size > 0 || learned.length > 0) {
     await writeTombstones(tombstonesKey, [
@@ -322,7 +212,5 @@ export async function syncEditableCollection(
     ]);
   }
 
-  // Last, and only once every write above landed: a throw mid-pass must leave
-  // the cursor where it was so the next pass re-reads the same window.
   await writePullCursor(pull.cursorKey, pull.next);
 }

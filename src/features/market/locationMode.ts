@@ -1,9 +1,3 @@
-/**
- * Market Browser's Location Mode: Region or Trade Hub (GLOSSARY.md round 9),
- * persisted under the plain (non-`sync.`-prefixed) key 'marketLocationMode' —
- * a device-local view preference like `hub.ts`'s Trade Hub setting, never
- * synced.
- */
 import { ALL_REGIONS, type RegionChoice } from '@/engine/market/locationMode';
 import { createLocalSetting } from '@/lib/useLocalSetting';
 
@@ -13,10 +7,6 @@ export type LocationMode = 'hub' | 'region';
 
 export interface LocationModeValue {
   mode: LocationMode;
-  /**
-   * Selected Market Region when mode is 'region', or `'all'` for All regions;
-   * null until the user picks one (read as the hub's region).
-   */
   regionId: RegionChoice | null;
 }
 

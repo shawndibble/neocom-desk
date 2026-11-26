@@ -23,7 +23,6 @@ function stats(tubes: number, used = 0): FittingStats {
   } as FittingStats;
 }
 
-/** Applies each change the panel asks for to `fitting`, the way `edit()` does. */
 function applied(onChange: ReturnType<typeof vi.fn>, fitting: Fitting): Fitting {
   return onChange.mock.calls.reduce(
     (current, [change]) => (change as (f: Fitting) => Fitting)(current),

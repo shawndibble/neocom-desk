@@ -1,15 +1,3 @@
-/**
- * The conditions every number on the Fittings pages is worked out under,
- * beyond the pilot and the Damage Profile: the Abyssal weather
- * (`abyssalWeatherSelection.ts`), the "Overheat all" switch, any skill
- * overrides ("what if my skills were…" — `engine/fittings/skillOverrides.ts`)
- * and what other saved Fittings project onto it (bursts, remote reps, webs…). One set for
- * the session, read by the editor, its Variations, the applied-DPS overlay
- * and Fitting Compare alike, so no two numbers on screen are in different
- * conditions. Neither is saved or put in a Fitting Share Code: each is a question
- * asked of a fit, not part of it. The projected sources alone belong to a
- * Character (its saved Fittings), so they go when the active Character does.
- */
 import { useMemo } from 'react';
 import { create } from 'zustand';
 import {
@@ -40,23 +28,15 @@ interface SkillOverridesSelection {
   setSkills: (skills: SkillOverrides) => void;
 }
 
-/**
- * The pilot's skill overrides for the session. The fit checks and the
- * Missing Skills chip stay on the Character's real skills: these change
- * only what the numbers are worked out under.
- */
 export const useSkillOverrides = create<SkillOverridesSelection>((set) => ({
   skills: NO_SKILL_OVERRIDES,
   setSkills: (skills) => set({ skills }),
 }));
 
-/** One saved Fitting projecting onto the open one, and how many ships of it. */
 export interface ProjectedSource {
-  /** The My Fittings record it came from. */
   id: string;
   name: string;
   count: number;
-  /** What one ship of it projects, worked out when it was added. */
   projection: ProjectedEffects;
 }
 
@@ -70,9 +50,6 @@ export const useProjectedSources = create<ProjectedSourcesSelection>((set) => ({
   setSources: (sources) => set({ sources }),
 }));
 
-// The sources are the active Character's own saved Fittings: another
-// Character's list doesn't have them, so switching lets go of them all.
-// Opening a different Fitting keeps them, as it keeps the weather.
 useActiveCharacter.subscribe((state, previous) => {
   if (state.activeCharacterId === previous.activeCharacterId) return;
   if (useProjectedSources.getState().sources.length > 0) {
@@ -81,16 +58,12 @@ useActiveCharacter.subscribe((state, previous) => {
 });
 
 export interface StatsConditions {
-  /** An Abyssal weather beacon's type id, or null for normal space. */
   weatherTypeId: number | null;
   overheatAll: boolean;
-  /** Absent: the pilot's own skills. */
   skills?: SkillOverrides;
-  /** Absent: nothing projected onto the Fitting. */
   projected?: ProjectedEffects;
 }
 
-/** The session's conditions, one stable object while none of them changes. */
 export function useStatsConditions(): StatsConditions {
   const weatherTypeId = useAbyssalWeather((state) => state.weatherTypeId);
   const overheatAll = useOverheatAll((state) => state.overheatAll);
@@ -107,11 +80,6 @@ export function useStatsConditions(): StatsConditions {
   }, [weatherTypeId, overheatAll, skills, sources]);
 }
 
-/**
- * `profile` under the conditions' skill overrides; itself when there are
- * none. Synchronous unless All V needs the skill list loaded, so a
- * calculation with no overrides starts in the same tick it always did.
- */
 export function pilotUnder(
   profile: PilotProfile,
   conditions: StatsConditions
@@ -128,7 +96,6 @@ export function pilotUnder(
   );
 }
 
-/** The engine seam's options for `conditions`. */
 export function statsOptions(conditions: StatsConditions): StatsOptions {
   return {
     ...(conditions.weatherTypeId === null ? {} : { weatherTypeId: conditions.weatherTypeId }),

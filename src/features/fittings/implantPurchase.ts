@@ -1,14 +1,3 @@
-/**
- * Everything the Implant Finder needs to say where an implant or booster
- * can be had and what it costs the pilot: sell orders at every Trade Hub,
- * every LP Store offer that hands it out, what each store's LP is valued at,
- * the pilot's LP with each store, and the turn-ins they already own or would
- * have to buy at their hub. Ranking those is `engine/fittings/implantSources.ts`.
- *
- * LP Stores carry no index of what they sell, so every store's offers are
- * read — each cached a day by `loadLoyaltyStoreOffers`, and remembered here
- * for the session, so only the first search pays for the fan-out.
- */
 import { detectOwnedStock } from '@/engine/industry/ownedStock';
 import type { LpOfferInput, SourceContext } from '@/engine/fittings/implantSources';
 import type { HubPrice } from '@/engine/fittings/implantFinder';
@@ -41,11 +30,6 @@ function offersOf(corporationId: number): Promise<LoyaltyStoreOffer[]> {
   return pending;
 }
 
-/**
- * Every LP Store offer, from any store, that hands out one of `typeIds`.
- * Not `findLpOfferMatches`: that reads only the stores a Character holds LP
- * with, and an offer the pilot can't redeem yet is still worth showing.
- */
 export async function loadLpOffersFor(
   typeIds: readonly number[],
   onProgress?: (done: number, total: number) => void
@@ -78,11 +62,9 @@ export async function loadLpOffersFor(
   return found;
 }
 
-/** One LP Store the shown offers come from, for the "Your LP" line. */
 export interface LpStoreSummary {
   corporationId: number;
   corpName: string;
-  /** Null when the pilot's LP can't be read (no Character, or no loyalty scope). */
   balance: number | null;
   rate: LpRate;
 }
@@ -91,7 +73,6 @@ export interface ImplantPurchase {
   offersFor: (typeId: number) => readonly LpOfferInput[];
   context: SourceContext;
   stores: LpStoreSummary[];
-  /** Names of the turn-ins the offers ask for (pirate tags and the like). */
   itemName: (typeId: number) => string;
 }
 
@@ -134,11 +115,6 @@ async function pricesAtEveryHub(
   );
 }
 
-/**
- * Where each of `typeIds` can be had, and what it costs this pilot, buying at `hub`.
- * `percent`, the Fittings page's price percent, scales every hub's market prices
- * (the implants and the LP turn-in items); the LP rate is the Loyalty valuation, left as it is.
- */
 export async function loadImplantPurchase(
   typeIds: readonly number[],
   hub: TradeHub,
@@ -146,7 +122,6 @@ export async function loadImplantPurchase(
   onProgress?: (done: number, total: number) => void,
   percent = 100
 ): Promise<ImplantPurchase> {
-  // The owned-stock snapshot doesn't depend on the offers, so it loads alongside them.
   const [lpOffers, hubPrices, balances, snapshot] = await Promise.all([
     loadLpOffersFor(typeIds, onProgress),
     pricesAtEveryHub(typeIds, percent),

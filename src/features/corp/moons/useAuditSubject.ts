@@ -5,15 +5,10 @@ import { NOTICE_ID_FIELD } from '../../../../functions/src/corpTaxBookLateNotice
 import { minerPath } from './moonsPaths';
 import { useBook } from './useBook';
 
-/**
- * The Miner an entry is about: their name, the page it links to, and a late notice entry's amount.
- * `inSentence` false: the entry's own wording does not name them, so the link goes after it.
- */
 export type AuditSubject = (
   entry: AuditEntry
 ) => { name: string; amount?: number; path?: string; inSentence?: boolean } | null;
 
-/** Entries about one late notice; the `issueStatement` and `recordMail` names are older servers'. */
 const NOTICE_ACTIONS = new Set([
   'issueLateNotice',
   LEGACY_ISSUE_ACTION,
@@ -23,10 +18,6 @@ const NOTICE_ACTIONS = new Set([
 ]);
 const ISSUE_ACTIONS = new Set(['issueLateNotice', LEGACY_ISSUE_ACTION]);
 
-/**
- * Resolves an entry's Miner, from its own `minerId` or its late notice's, so old entries (which
- * store only the notice's id) name them too. Notice entries name them in the sentence.
- */
 export function useAuditSubject(): AuditSubject {
   const { view, names } = useBook();
   const notices = useMemo(

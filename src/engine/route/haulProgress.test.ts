@@ -39,7 +39,6 @@ const leg = (
   ...extra,
 });
 
-/** Jita → Amarr (pickup) → Dodixie (pickup) → Jita (delivery). */
 const section: HaulSection = {
   characterId: 1,
   name: 'Alice',

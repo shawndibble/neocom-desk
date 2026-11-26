@@ -1,9 +1,3 @@
-/**
- * An event's warn-ahead times, one set per Character: thresholds are saved per
- * Character (`preferences.ts`), so the row's Warn ahead control opens a list of
- * them instead of repeating them on every row. Only for the Characters the
- * caller passes (those the event applies to and has on).
- */
 import { useTranslation } from 'react-i18next';
 import { ThresholdControls } from './EventThresholds';
 import type { EventThresholds } from './eventEntries';

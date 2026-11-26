@@ -77,7 +77,6 @@ describe('ContractTimeline', () => {
     const steps = screen.getAllByRole('listitem');
     expect(steps.map((li) => li.querySelector('b')?.textContent)).toEqual(['Issued', 'Cancelled']);
     expect(screen.queryByText('Waiting')).not.toBeInTheDocument();
-    // The outcome carries no second line: ESI does not say when.
     expect(steps[1]!.querySelector('span:not([aria-hidden])')).toBeNull();
   });
 

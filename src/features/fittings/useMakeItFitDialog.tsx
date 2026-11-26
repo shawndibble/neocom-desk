@@ -11,7 +11,6 @@ import type { FittingWorkspace } from './useFittingWorkspace';
 
 interface UseMakeItFitDialogArgs {
   workspace: FittingWorkspace;
-  /** Null on the Start screen, where there is nothing to fix. */
   fitting: Fitting | null;
   catalogue: FittingCatalogue | null;
   characterId: number | null;
@@ -21,10 +20,6 @@ interface UseMakeItFitDialogArgs {
   edit: FittingWorkspace['edit'];
 }
 
-/**
- * Make it fit: `open(resource)` from a budget's "Fix" link, and the `dialog`
- * (with its confirmation toast) to render once in the editor.
- */
 export function useMakeItFitDialog({
   workspace,
   fitting,
@@ -36,9 +31,7 @@ export function useMakeItFitDialog({
   edit,
 }: UseMakeItFitDialogArgs): { open: (resource: FitResource) => void; dialog: ReactNode } {
   const { t } = useTranslation();
-  // Which budget's "Fix" link opened Make it fit; null while it is closed.
   const [resource, setResource] = useState<FitResource | null>(null);
-  // What the last applied Make it fit option changed, for its confirmation toast.
   const [applied, setApplied] = useState<string | null>(null);
   useTimedToast(applied, () => setApplied(null));
   const open = useCallback((next: FitResource) => setResource(next), []);
@@ -99,7 +92,6 @@ export function useMakeItFitDialog({
           );
         }}
       />
-      {/* No Undo here: the editor has no in-app undo, only the browser's Back (one swap is one history entry). */}
       {applied !== null && <Toast message={applied} />}
     </>
   );

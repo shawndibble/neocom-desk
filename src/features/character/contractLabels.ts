@@ -1,10 +1,3 @@
-/**
- * ESI's `type`/`status`/`availability` enums are wire slugs, not game nouns
- * (unlike a market/asset item name) — GLOSSARY.md round 10's "game data stays
- * English" doesn't cover them, so they pass through i18next like any other
- * UI copy. Shared by the Contracts table and the detail modal so the two
- * never drift.
- */
 import type { Contract } from '@/esi/endpoints';
 
 export const CONTRACT_TYPE_KEY: Record<Contract['type'], string> = {

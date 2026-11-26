@@ -58,7 +58,7 @@ describe('checkWorkbenchFits', () => {
     const yieldToUi = vi.fn(() => Promise.resolve());
     const checks = await checkWorkbenchFits(fits(300), data, () => false, yieldToUi);
     expect(checks?.size).toBe(300);
-    expect(yieldToUi).toHaveBeenCalledTimes(11); // 12 chunks of 25
+    expect(yieldToUi).toHaveBeenCalledTimes(11);
   });
 
   it('stops when cancelled part way', async () => {

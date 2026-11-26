@@ -1,5 +1,3 @@
-// fileSrpClaim against the Firestore emulator (issue #4850, ADR 0026). Runs only under the
-// emulator (`npm run test:emulator`); a plain `npm test` skips it.
 import type { Caller } from './actorAuth.js';
 import { afterAll, beforeEach, expect, it } from 'vitest';
 import { clearEmulator, emulatorDb as db, emulatorSuite } from './testSupport/emulator.js';
@@ -19,8 +17,8 @@ const CORP = 98000001;
 const DAY = 86_400_000;
 const T0 = Date.parse('2026-10-23T12:00:00Z');
 const HASH = 'b'.repeat(40);
-const HULL = 587; // Rifter
-const GROUP = 25; // Frigate
+const HULL = 587;
+const GROUP = 25;
 
 let now = T0;
 const affiliations = new Map<number, number>();

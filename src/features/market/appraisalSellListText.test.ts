@@ -5,7 +5,6 @@ import { appraisalSellListText } from './appraisalSellListText';
 const ITEMS: AppraisalItem[] = [
   { typeId: 2048, name: 'Damage Control II', quantity: 3, buy: 498_500, sell: 512_000 },
   { typeId: 999, name: 'Civilian Gatling Railgun', quantity: 4, buy: null, sell: 1_000 },
-  // Nobody selling — no legal undercut price, so it drops out entirely.
   { typeId: 555, name: 'Unlisted Widget', quantity: 1, buy: 10, sell: null },
 ];
 

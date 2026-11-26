@@ -113,7 +113,6 @@ describe('useLazyRowCache', () => {
     });
     expect(result.current.failedKeys.has('a')).toBe(true);
 
-    // A retry attempt is a no-op: still marked attempted.
     await act(async () => {
       await result.current.load('a', fetchValue, { sticky: true });
     });

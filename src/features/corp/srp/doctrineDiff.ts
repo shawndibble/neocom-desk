@@ -1,4 +1,3 @@
-/** A doctrine diff as readable lines: multisets of type ids grouped into "2x Module". Pure. */
 import type { DoctrineDiff } from '@/engine/srpDoctrine';
 
 export type DiffSectionKey = keyof DoctrineDiff;
@@ -26,7 +25,6 @@ export function groupTypeIds(ids: readonly number[]): DiffLine[] {
   return [...counts].map(([typeId, count]) => ({ typeId, count }));
 }
 
-/** The parts of a diff that say something, missing before extra, modules before rigs. */
 export function diffSections(diff: DoctrineDiff): DiffSection[] {
   return ORDER.flatMap((key) =>
     diff[key].length > 0 ? [{ key, lines: groupTypeIds(diff[key]) }] : []

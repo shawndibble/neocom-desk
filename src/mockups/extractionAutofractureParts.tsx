@@ -16,7 +16,6 @@ const LABEL_W = 'sm:w-48 lg:w-64 xl:w-80';
 const LABEL_LEFT = 'sm:left-48 lg:left-64 xl:left-80';
 const LABEL_MARGIN = 'sm:ml-48 lg:ml-64 xl:ml-80';
 const NOW = Date.parse(BOOK_VIEW.input.now);
-/** Chunk breaks on its own about 3 h after it arrives; the field lasts 48 h after the fracture. */
 const AUTO_H = 3;
 const FIELD_H = 48;
 
@@ -58,7 +57,6 @@ function row(
   };
 }
 
-/** One row per state the ticket names, relative to the book's fixture clock. */
 // eslint-disable-next-line react-refresh/only-export-components -- throwaway mockup fixture
 export const STATE_ROWS: ExtractionRow[] = [
   row('pulled', 1003, 5, 'extracting', -9 * 24, 2 * 24 + 5),
@@ -67,7 +65,6 @@ export const STATE_ROWS: ExtractionRow[] = [
   row('early', 1002, 4, 'fractured', -20 * 24, -10, { atH: -5, by: 'laser' }),
   row('expired', 1001, 3, 'expired', -30 * 24, -4 * 24, { atH: -4 * 24 + 3, by: 'auto' }),
 ];
-// The ready row has not fractured yet: its auto-fracture time is arrival + 3 h.
 STATE_ROWS[1] = {
   ...STATE_ROWS[1],
   fracturedAt: undefined,
@@ -93,7 +90,6 @@ function partsOf(e: ExtractionRow): Parts {
   return { start, ready, fracture, end, early: e.fracturedBy === 'laser', projected };
 }
 
-/** The dates an officer plans around, each in local time with the time left where it is still ahead. */
 function PlanTip({ p }: { p: Parts }) {
   const line = (label: string, ms: number) => (
     <div>
@@ -122,7 +118,6 @@ export function ProposedTimeline({
 }: {
   rows: readonly ExtractionRow[];
   title: string;
-  /** The row whose tooltip is shown open (the story focuses it). */
   openRow?: string;
 }) {
   const { names } = useBook();
@@ -186,7 +181,6 @@ export function ProposedTimeline({
                           className="absolute inset-y-1 rounded-xs bg-line-bright"
                           style={{ left: pct(p.start), width: width(p.start, p.ready) }}
                         />
-                        {/* One bar, Ready to Expired: the whole time the chunk can be mined or is about to be. */}
                         <span
                           className={cx(
                             'absolute inset-y-0 min-w-1.5 rounded-xs',

@@ -54,7 +54,6 @@ describe('FittingAffectedByPanel', () => {
     expect(screen.getByText('15%')).toBeInTheDocument();
     expect(screen.getByText('×1.1')).toBeInTheDocument();
     expect(screen.getByText('stacking penalty 87%')).toBeInTheDocument();
-    // A source that isn't running changes nothing, so it isn't listed.
     expect(screen.queryByText(/Fleet boost #12/)).toBeNull();
     expect(screen.queryByText(/not running/)).toBeNull();
   });
@@ -120,7 +119,6 @@ describe('FittingAffectedByPanel', () => {
     );
     expect(await screen.findByText('12 s → 9.76 s')).toBeInTheDocument();
     expect(screen.queryByText(/12000/)).toBeNull();
-    // A percentage stays a percentage; an added amount is in the attribute's own unit.
     expect(screen.getByText('-10%')).toBeInTheDocument();
     expect(screen.getByText('+0.5')).toBeInTheDocument();
     expect(screen.getByText('50 % → 60 %')).toBeInTheDocument();

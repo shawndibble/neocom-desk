@@ -24,7 +24,6 @@ describe('esiIdentityReader', () => {
       expect(c.headers['X-User-Agent']).toMatch(/Neocom Desk/);
       expect(c.headers['X-User-Agent']).not.toMatch(/@/);
     }
-    // The token only goes to the one endpoint that needs it.
     expect(calls.filter((c) => c.headers.Authorization).map((c) => c.url)).toEqual([
       'https://esi.evetech.net/latest/characters/7/roles/',
     ]);
@@ -67,8 +66,6 @@ describe('esiIdCategoryLookup (#4621)', () => {
 });
 
 describe('esiCorporationLookup', () => {
-  // GET /characters/{id}/ is cached by ESI for a day, so a Character that just moved corporation
-  // still reads as the old one there; the bulk affiliation lookup is fresh.
   it('asks the affiliation endpoint, not the day-cached character page', async () => {
     const calls: { url: string; init: RequestInit }[] = [];
     const fetchMock = vi.fn(async (url: string, init: RequestInit) => {

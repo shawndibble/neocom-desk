@@ -1,8 +1,3 @@
-/**
- * Asked before a pilot's first scan joins a Survey that shows an ore the paste
- * lacks. The scanner prints nothing for a collapsed ore group, so a missing ore
- * is usually a section left closed, and the board would count it as mined out.
- */
 import { Trans, useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui';
 

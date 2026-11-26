@@ -1,17 +1,3 @@
-/**
- * Keeps the appraised list in the address as `?list=<code>` (#5403), per the
- * "URL holds view state" rule (ADR 0015). Its codec is async, so it does not
- * go through `lib/urlState.ts`.
- *
- * - **Written** (replace, not push) whenever a list is submitted while the
- *   Appraisal tab is showing; Clear removes it. Typing alone never writes.
- * - **Read** once per `list` value. It appraises only while nothing has been
- *   typed or appraised yet this visit, so arriving via Back never overwrites
- *   the pilot's work. A code that fails to decode is stripped either way.
- * - A list too long to encode is not written; the Appraisal works from memory
- *   and this is the one case Back will not restore. A stale `list` from an
- *   earlier, shorter paste is removed so Back never shows a different list.
- */
 import { useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { decodeAppraisalList, encodeAppraisalList } from '@/engine/market/appraisalListCode';
@@ -27,8 +13,6 @@ export function useAppraisalListUrl(
   const listParam = searchParams.get(APPRAISAL_LIST_PARAM);
   const { submitted, text, appraiseText } = appraisal;
 
-  // An async write must patch the params as last rendered, not the ones this
-  // render closed over: `?share=` is stripped in the same tick by its own hook.
   const latest = useRef({ submitted, text, appraiseText, searchParams, setSearchParams });
   useEffect(() => {
     latest.current = { submitted, text, appraiseText, searchParams, setSearchParams };

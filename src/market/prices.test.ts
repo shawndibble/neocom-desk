@@ -25,8 +25,6 @@ import {
 const server = mswServer();
 
 beforeEach(() => {
-  // The fallback sources are down unless a test brings one up, so "Fuzzwork
-  // failed" still means "no price" for the tests that predate the fallback.
   server.use(...fallbackSourcesDown);
 });
 afterEach(() => {
@@ -56,10 +54,10 @@ describe('getHubPrices', () => {
     expect(first.get(34)).toEqual({ sellMin: 3.8, buyMax: 3.71, sellVolume: 200, buyVolume: 100 });
     expect(hits.count).toBe(1);
 
-    now += 1000; // well within TTL
+    now += 1000;
     const second = await getHubPrices(DEFAULT_TRADE_HUB, [34], clock);
     expect(second.get(34)).toEqual(first.get(34));
-    expect(hits.count).toBe(1); // served from cache, no second request
+    expect(hits.count).toBe(1);
   });
 
   it('re-fetches inside the TTL for type ids that were invalidated', async () => {
@@ -85,7 +83,7 @@ describe('getHubPrices', () => {
 
     invalidateHubPrices(DEFAULT_TRADE_HUB.stationId + 1, [34]);
     await getHubPrices(DEFAULT_TRADE_HUB, [34], clock);
-    expect(hits.count).toBe(1); // still cached
+    expect(hits.count).toBe(1);
   });
 
   it('re-fetches once the 15-minute TTL has elapsed', async () => {
@@ -131,8 +129,8 @@ describe('getHubPrices', () => {
     const failed = await getHubPrices(DEFAULT_TRADE_HUB, [34], clock);
     expect(failed.get(34)).toEqual({ sellMin: null, buyMax: null, sellVolume: 0, buyVolume: 0 });
 
-    now += 1000; // well inside HUB_PRICE_TTL_MS
-    clearFuzzworkBackoff(); // the outage is remembered for a minute; a later ask tries again
+    now += 1000;
+    clearFuzzworkBackoff();
     const retried = await getHubPrices(DEFAULT_TRADE_HUB, [34], clock);
 
     expect(attempt).toBe(2);
@@ -222,9 +220,6 @@ describe('getRegionSellPrices', () => {
 });
 
 describe('getStationPrices', () => {
-  // issue #1423: `marketOrderUndercutDomain` calls this directly with a bare
-  // station (order location) id, sharing `getHubPrices`' cache rather than
-  // paying an uncached Fuzzwork request per station per poll.
   it('shares the cache with getHubPrices — a second call inside the TTL makes no fetch', async () => {
     const hits = { count: 0 };
     server.use(fuzzworkHandler(hits));
@@ -235,12 +230,11 @@ describe('getStationPrices', () => {
     expect(first.get(34)).toEqual({ sellMin: 3.8, buyMax: 3.71, sellVolume: 200, buyVolume: 100 });
     expect(hits.count).toBe(1);
 
-    now += 1000; // well within TTL
+    now += 1000;
     const second = await getStationPrices(DEFAULT_TRADE_HUB.stationId, [34], clock);
     expect(second.get(34)).toEqual(first.get(34));
-    expect(hits.count).toBe(1); // served from cache, no second request
+    expect(hits.count).toBe(1);
 
-    // getHubPrices for the same station/type reads the very same cache entry.
     const viaHub = await getHubPrices(DEFAULT_TRADE_HUB, [34], clock);
     expect(viaHub.get(34)).toEqual(first.get(34));
     expect(hits.count).toBe(1);
@@ -261,8 +255,8 @@ describe('getStationPrices', () => {
     expect(first.get(34)).toEqual({ sellMin: null, buyMax: null, sellVolume: 0, buyVolume: 0 });
     expect(attempt).toBe(1);
 
-    now += 1000; // well within TTL — nothing was cached, so this retries
-    clearFuzzworkBackoff(); // the outage is remembered for a minute; a later ask tries again
+    now += 1000;
+    clearFuzzworkBackoff();
     const second = await getStationPrices(DEFAULT_TRADE_HUB.stationId, [34], clock);
     expect(second.get(34)).toEqual({ sellMin: null, buyMax: null, sellVolume: 0, buyVolume: 0 });
     expect(attempt).toBe(2);
@@ -320,7 +314,7 @@ describe('price status (unreachable)', () => {
 
   it('is unreachable when only some of the requested types failed to load', async () => {
     server.use(fuzzworkHandler({ count: 0 }));
-    await getHubPrices(DEFAULT_TRADE_HUB, [34]); // 34 cached
+    await getHubPrices(DEFAULT_TRADE_HUB, [34]);
     server.use(http.get(FUZZWORK_AGGREGATES_URL, () => HttpResponse.error()));
 
     const { prices, unreachable } = await getHubPricesWithStatus(DEFAULT_TRADE_HUB, [34, 35]);
@@ -356,13 +350,11 @@ describe('getAdjustedPrices', () => {
   });
 });
 
-/** A fresh copy of this module, as on a page load: memory empty, Dexie kept. */
 async function freshPricesModule(): Promise<typeof import('./prices')> {
   vi.resetModules();
   return import('./prices');
 }
 
-/** `freshPricesModule`, once the write behind the last fetch (never awaited by its caller) has landed. */
 async function reloadPricesModule(): Promise<typeof import('./prices')> {
   await vi.waitFor(async () => expect(await db.esiCache.count()).toBeGreaterThan(0));
   return freshPricesModule();
@@ -449,7 +441,7 @@ describe('persistence across a reload', () => {
     expect(after.get(34)).toEqual(before.get(34));
     expect(hits.count).toBe(1);
 
-    now += 2; // past the TTL, measured from the original fetch
+    now += 2;
     await (await reloadPricesModule()).getHubPrices(DEFAULT_TRADE_HUB, [34], clock);
     expect(hits.count).toBe(2);
   });
@@ -502,10 +494,8 @@ describe('persistence across a reload', () => {
     now += ADJUSTED_PRICE_TTL_MS + 1;
     const reloaded = await reloadPricesModule();
 
-    // Live call is parked: only the stored row can answer.
     const stale = await reloaded.getAdjustedPrices(clock, { allowStale: true });
     expect(stale.get(34)).toEqual({ adjusted: 5.5, average: 5.2 });
-    // A second display-only caller is not queued behind the refresh.
     const again = await reloaded.getAdjustedPrices(clock, { allowStale: true });
     expect(again.get(34)).toEqual({ adjusted: 5.5, average: 5.2 });
 
@@ -592,12 +582,10 @@ describe('clearMarketPriceCache while a fetch is in flight', () => {
     const clock = () => 1_000_000;
 
     const straddling = getHubPrices(DEFAULT_TRADE_HUB, [34], clock);
-    await vi.waitFor(() => expect(hits.count).toBe(1), { interval: 5 }); // the request is on the wire
+    await vi.waitFor(() => expect(hits.count).toBe(1), { interval: 5 });
     clearMarketPriceCache();
-    // Its caller still gets its answer…
     expect((await straddling).get(34)?.sellMin).toBe(3.8);
 
-    // …but the next ask after the clear starts cold.
     await getHubPrices(DEFAULT_TRADE_HUB, [34], clock);
     expect(hits.count).toBe(2);
   });
@@ -616,7 +604,7 @@ describe('invalidateHubPrices while a fetch is in flight', () => {
     const clock = () => 1_000_000;
 
     const before = getHubPrices(DEFAULT_TRADE_HUB, [34], clock);
-    await vi.waitFor(() => expect(hits.count).toBe(1), { interval: 5 }); // the request is on the wire
+    await vi.waitFor(() => expect(hits.count).toBe(1), { interval: 5 });
     invalidateHubPrices(DEFAULT_TRADE_HUB.stationId, [34]);
     await Promise.all([before, getHubPrices(DEFAULT_TRADE_HUB, [34], clock)]);
 
@@ -637,13 +625,11 @@ describe('a Fuzzwork request that never answers', () => {
           init?.signal?.addEventListener('abort', () => reject(init.signal?.reason));
         })
     );
-    // Only Fuzzwork hangs; the fallback sources refuse at once.
     vi.stubGlobal('fetch', (input: RequestInfo | URL, init?: RequestInit) =>
       String(input).includes('fuzzwork')
         ? hung(input, init)
         : Promise.reject(new TypeError('network down'))
     );
-    // Only the timer is faked: the persisted-price read before the fetch needs real turns.
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     const clock = () => 1_000_000;
 
@@ -657,16 +643,12 @@ describe('a Fuzzwork request that never answers', () => {
       buyVolume: 0,
     });
 
-    // A dead promise left in flight would be joined here and hang. The outage is
-    // remembered, so this ask skips the hung Fuzzwork call and answers at once.
     expect((await getHubPrices(DEFAULT_TRADE_HUB, [34], clock)).get(34)?.sellMin).toBeNull();
     expect(hung).toHaveBeenCalledTimes(1);
   });
 });
 
 describe('when Fuzzwork is down', () => {
-  // The reload tests above reset the module registry, so the instance the fallback
-  // lazily imports is not the one imported at the top of this file.
   beforeEach(async () => {
     (await import('@/features/market/marketOpenPrices')).resetMarketOpenPricesCache();
   });
@@ -713,7 +695,6 @@ describe('when Fuzzwork is down', () => {
     expect(first.stale).toBe(true);
     expect(first.unreachable).toBe(false);
 
-    // Fuzzwork is back: the stale close was not held, so the live price replaces it.
     server.use(fuzzworkHandler({ count: 0 }));
     clearFuzzworkBackoff();
     const second = await getHubPricesWithStatus(DEFAULT_TRADE_HUB, [34]);

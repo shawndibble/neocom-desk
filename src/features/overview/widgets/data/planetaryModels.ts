@@ -1,7 +1,3 @@
-/**
- * Planetary builder: colonies and when each runs dry. Same contract as `models.ts`:
- * pure, derived at render time.
- */
 import { HOUR_MS } from '@/lib/age';
 import type { DeadlineSeverity } from '@/engine/character/severity';
 import { highlightHref } from '@/lib/highlightParam';
@@ -16,12 +12,8 @@ import type { Translate } from '@/lib/translate';
 
 const C = 'overview.widgets.chart';
 
-// --- Planetary --------------------------------------------------------------------
-
 interface ColonyFacts {
-  /** Unique on the board: two Characters can each hold a colony on one planet. */
   key: string;
-  /** The planet's id, which the Colonies page highlights by. */
   planetId: number;
   name: string;
   kind: 'running' | 'expired' | 'idle';
@@ -32,7 +24,6 @@ interface ColonyFacts {
 
 const COLONY_ORDER = { expired: 0, running: 1, idle: 2 } as const;
 
-/** The planet's name, with its owner when the board reads every Character. */
 function colonyLabel(t: Translate, colony: BoardColony): string {
   const name = colony.name ?? t('overview.widgets.planetary.unnamed', { id: colony.planetId });
   return colony.ownerName === undefined ? name : `${name} · ${colony.ownerName}`;
@@ -63,7 +54,6 @@ function colonyFacts(data: PlanetaryBoardData, t: Translate): ColonyFacts[] {
   );
 }
 
-/** "Ending soon" rather than "Running" for a colony the severity ladder already flags. */
 function colonyState(t: Translate, colony: ColonyFacts): string {
   if (colony.kind === 'expired') return t('overview.widgets.planetary.state.stopped');
   if (colony.kind === 'idle') return t('overview.widgets.planetary.state.idle');
@@ -83,7 +73,6 @@ export const planetary: Builder = (feeds, { t, now }) => {
   const idle = colonies.filter((colony) => colony.kind === 'idle').length;
   const tone = planetarySeverity(data) ?? 'clear';
 
-  // The question is when the first extractor runs out, not how many colonies there are.
   let number: NumberModel;
   if (nextBatch?.expiryMs) {
     const together = nextBatch.colonies.length;
@@ -180,8 +169,6 @@ export const planetary: Builder = (feeds, { t, now }) => {
         ]
       : [],
     summary: planetarySummary(t, data),
-    // Every colony on its own bar, stopped first then soonest: the batches hid which planet to visit.
-    // A stopped or idle colony has no time left, so its bar is empty and its state is the figure.
     chart:
       hbarsFromRows(
         t,

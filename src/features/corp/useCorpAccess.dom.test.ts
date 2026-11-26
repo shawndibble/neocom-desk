@@ -21,13 +21,7 @@ const mockedLoadRoles = vi.mocked(loadCharacterRoles);
 const mockedGrantedScopes = vi.mocked(useGrantedScopes);
 
 const CHARACTER_ID = 42;
-/**
- * Derived, not listed: this stands for "the Character granted corp access",
- * and the Grant button asks for the whole group. A hand-written copy went
- * stale the moment a capability grew a second scope requirement.
- */
 const ALL_CORP_SCOPES = [...scopesForGroup('corp')];
-/** The one scope that gates whether the hook will even ask ESI for roles. */
 const ROLES_SCOPE = ESI_REGISTRY.getCharacterRoles.scope;
 
 function rolesResolvingTo(roles: readonly string[]): StatusResult<CharacterCorporationRoles> {
@@ -50,15 +44,7 @@ beforeEach(() => {
 });
 
 describe('useCorpAccess — unknown', () => {
-  /**
-   * The rule this ticket establishes: `unknown` renders as nothing, never a
-   * placeholder. A nav item that flickers into existence on load is worse than
-   * one that appears a beat late — so the first frames of a cold load must
-   * stay `unknown`, which renders as nothing, exactly like `none`.
-   */
   it('is unknown on the first frames of a cold load, and renders as nothing', () => {
-    // The roles scope must already be granted here, or the hook skips the
-    // fetch entirely and answers the separate `not-granted` state instead.
     mockedGrantedScopes.mockReturnValue(ALL_CORP_SCOPES);
     mockedLoadRoles.mockReturnValue(new Promise(() => {}));
     const { result } = renderHook(() => useCorpAccess());
@@ -66,13 +52,6 @@ describe('useCorpAccess — unknown', () => {
     expect(result.current.missingScopes).toEqual([]);
   });
 
-  /**
-   * `useGrantedScopes()` answers `undefined` (not `[]`) while unknown, and the
-   * roles fetch is gated on the same resolved grant containing `ROLES_SCOPE` —
-   * so a roles snapshot landing before scopes resolve is unreachable (the
-   * fetch cannot start without them). This test covers the transition once
-   * scopes resolve and turn out to include it.
-   */
   it('stays unknown while the granted scopes are unresolved, then reads roles once they resolve with the roles scope', async () => {
     mockedGrantedScopes.mockReturnValue(undefined);
     mockedLoadRoles.mockResolvedValue(rolesResolvingTo(['Director']));
@@ -89,8 +68,6 @@ describe('useCorpAccess — unknown', () => {
 
   it('is unknown when no Character is active yet, and asks ESI for nothing', () => {
     useActiveCharacter.setState({ activeCharacterId: null, hydrated: false });
-    // The real `useGrantedScopes` answers `undefined` in this situation too —
-    // match that here rather than the mock's default `[]`.
     mockedGrantedScopes.mockReturnValue(undefined);
     const { result } = renderHook(() => useCorpAccess());
     expect(result.current.state).toBe('unknown');
@@ -128,8 +105,6 @@ describe('useCorpAccess — not-granted', () => {
 });
 
 describe('useCorpAccess — none', () => {
-  // #6102: the whole Base Grant carries every corp scope now, so a line
-  // member holds them all; the roles answer alone keeps every corp read off.
   it('is none for a character holding the whole Base Grant but no corp role, and renders nothing', async () => {
     mockedGrantedScopes.mockReturnValue([...SCOPES]);
     mockedLoadRoles.mockResolvedValue(rolesResolvingTo([]));
@@ -140,13 +115,6 @@ describe('useCorpAccess — none', () => {
   });
 });
 
-/**
- * There is no error member in the contract, and a failed read must not be
- * mistaken for a resolved one: `none` claims the Character holds no corp role,
- * which a read that never completed is no evidence for. It stays `unknown` —
- * identical on screen, but not a lie, and not a state a Director who happened
- * to cold-start offline is pinned to for the session.
- */
 describe('useCorpAccess — a roles read that could not complete', () => {
   it('stays unknown when the roles read fails outright, rather than claiming none', async () => {
     mockedGrantedScopes.mockReturnValue(ALL_CORP_SCOPES);
@@ -212,15 +180,11 @@ describe('useCorpAccess — a roles read that could not complete', () => {
 
 describe('useCorpAccess — roles-without-grant', () => {
   it('reports the scopes a capable character has not granted, and still renders nothing', async () => {
-    // Holds the roles scope alone — enough to read the role, not enough for
-    // any capability's own endpoints.
     mockedGrantedScopes.mockReturnValue([ROLES_SCOPE]);
     mockedLoadRoles.mockResolvedValue(rolesResolvingTo(['Station_Manager']));
     const { result } = renderHook(() => useCorpAccess());
     await waitFor(() => expect(result.current.state).toBe('roles-without-grant'));
     expect(result.current.capabilities.canReadStructures).toBe(true);
-    // Two scopes, one role: `Station_Manager` opens the structure list and the
-    // moon-extraction schedule, and each sits behind a scope of its own.
     expect(result.current.missingScopes).toEqual([
       'esi-corporations.read_structures.v1',
       'esi-industry.read_corporation_mining.v1',
@@ -281,9 +245,6 @@ describe('useCorpAccess — ready', () => {
   });
 
   it('is ready for a partial role holding only the scopes that role needs', async () => {
-    // Derived from the capability, not listed: the point is that the *other*
-    // capabilities' scopes are absent and it is `ready` anyway — not how many
-    // scopes this one happens to need today.
     mockedGrantedScopes.mockReturnValue([...CORP_SCOPES_FOR_CAPABILITY.canReadWallet, ROLES_SCOPE]);
     mockedLoadRoles.mockResolvedValue(rolesResolvingTo(['Junior_Accountant']));
     const { result } = renderHook(() => useCorpAccess());
@@ -292,12 +253,6 @@ describe('useCorpAccess — ready', () => {
     expect(result.current.capabilities.canReadMembers).toBe(false);
   });
 
-  /**
-   * Issue #4058's re-grant path: an Accountant whose corp grant predates the
-   * mining scope keeps their wallet (still `ready`), is told the mining scope
-   * is missing so the grant can be offered, and cannot read the ledger until
-   * they grant it.
-   */
   it('stays ready for an Accountant missing only the mining-ledger scope, and asks for it', async () => {
     mockedGrantedScopes.mockReturnValue([...CORP_SCOPES_FOR_CAPABILITY.canReadWallet, ROLES_SCOPE]);
     mockedLoadRoles.mockResolvedValue(rolesResolvingTo(['Accountant']));
@@ -329,11 +284,6 @@ describe('useCorpAccess — ready', () => {
 });
 
 describe('useCorpAccess — switching Character', () => {
-  /**
-   * Roles are per-character. Carrying the previous Character's answer across a
-   * switch would render corp UI for an alt who has no roles at all — so the
-   * state must fall back to `unknown` until the new read lands.
-   */
   it("does not carry one Character's roles over to the next", async () => {
     mockedGrantedScopes.mockReturnValue(ALL_CORP_SCOPES);
     mockedLoadRoles.mockResolvedValue(rolesResolvingTo(['Director']));
@@ -346,21 +296,12 @@ describe('useCorpAccess — switching Character', () => {
     expect(result.current.state).toBe('unknown');
   });
 
-  /**
-   * AC 3: two Characters on one device hold different grants, and each renders
-   * according to its own. Same roles on both sides, so only the *grant* can
-   * move the state — a Director who granted corp access does not lend it to
-   * the alt beside them.
-   */
   it('answers per Character when one has granted corp access and the other has not', async () => {
     mockedLoadRoles.mockResolvedValue(rolesResolvingTo(['Director']));
     mockedGrantedScopes.mockReturnValue(ALL_CORP_SCOPES);
     const { result, rerender } = renderHook(() => useCorpAccess());
     await waitFor(() => expect(result.current.state).toBe('ready'));
 
-    // The alt: same roles, no corp grant of its own — but it does hold the
-    // roles scope, or the read would never fire and the state would be
-    // `not-granted` instead.
     mockedGrantedScopes.mockReturnValue([ROLES_SCOPE]);
     useActiveCharacter.setState({ activeCharacterId: 77, hydrated: true });
     rerender();
@@ -381,13 +322,6 @@ describe('useCorpAccess — switching Character', () => {
   });
 });
 
-/**
- * The Settings Corporation Permission row (#295) reports the roles themselves, not just
- * the capabilities they imply: "you hold Station_Manager" is the sentence that
- * explains why only structures are readable, and a capability list cannot say
- * it. Raw ESI strings, for the same reason `corpCapabilities` tolerates
- * unrecognised ones — CCP extends the enum without notice.
- */
 describe('useCorpAccess — the roles held', () => {
   it('reports the corporation-wide roles once they have resolved', async () => {
     mockedGrantedScopes.mockReturnValue(ALL_CORP_SCOPES);
@@ -405,11 +339,6 @@ describe('useCorpAccess — the roles held', () => {
     expect(result.current.roles).toEqual([]);
   });
 
-  /**
-   * `none` means "resolved, and holds no capability" — which a member with only
-   * office-scoped or cosmetic roles still is. The row says so honestly rather
-   * than claiming an empty role list.
-   */
   it('reports roles that grant no capability, alongside the none state', async () => {
     mockedGrantedScopes.mockReturnValue(ALL_CORP_SCOPES);
     mockedLoadRoles.mockResolvedValue(rolesResolvingTo(['Hangar_Take_1']));

@@ -3,7 +3,6 @@ import { kmValue } from '../rangeText';
 import { fmt1 } from './fixedFormat';
 import type { Translate } from '@/lib/translate';
 
-/** Support out's headline: remote repair handed out, else how many modules reach another ship. */
 export function supportMeta(s: FittingStats, t: Translate): string {
   const { remoteRepair, rows } = s.support;
   const repair = remoteRepair.shield + remoteRepair.armor + remoteRepair.hull;
@@ -13,7 +12,6 @@ export function supportMeta(s: FittingStats, t: Translate): string {
   });
 }
 
-/** Fleet boosts' headline: how far the first burst reaches, else the compressor. */
 export function fleetBoostsMeta(s: FittingStats, t: Translate): string {
   const { bursts, compressors } = s.fleetSupport;
   const meters = bursts[0]?.rangeMeters ?? compressors[0]?.rangeMeters ?? 0;

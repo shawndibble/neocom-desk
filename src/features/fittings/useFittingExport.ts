@@ -32,11 +32,6 @@ import { useTimedToast, NOTICE_MS } from '@/components/ui/useTimedToast';
 
 const ASSETS_ENDPOINTS: readonly EsiEndpointId[] = ['getCharacterAssets'];
 
-/**
- * What Export does — copy a format, open Appraisal — and the brief notice
- * a copy leaves. Shared by the Export menu and the phone header's one menu.
- * `cloneImplants` (the pilot's active clone) stay off the multibuy list.
- */
 export function useFittingExport(fitting: Fitting, cloneImplants: readonly number[] = []) {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -45,9 +40,6 @@ export function useFittingExport(fitting: Fitting, cloneImplants: readonly numbe
   const canSubtractOwned = characterId !== null && !lacksAssets;
   const [notice, setNotice] = useState<string | null>(null);
 
-  // This Fitting's Fitting Share Code, encoded as it changes rather than on
-  // the click — encoding awaits a compressor, and a copy after that await can
-  // fall outside the click on Safari.
   const encode = useCallback(() => fittingShareCode(fitting), [fitting]);
   const encoded = useAsyncLoad(encode);
 
@@ -67,10 +59,6 @@ export function useFittingExport(fitting: Fitting, cloneImplants: readonly numbe
     }
   }
 
-  /**
-   * The multibuy list less what every Character holds at the Appraisal's
-   * "Minus owned" station (its saved pick, else the Appraisal page hub).
-   */
   async function copyMultibuyMinusOwned() {
     try {
       const ownedPref = useAppraisalOwnedPref.getState();
@@ -112,26 +100,13 @@ export function useFittingExport(fitting: Fitting, cloneImplants: readonly numbe
     }
   }
 
-  /**
-   * The short, 7-day **Share Link**: the Fitting Share Code stored under a
-   * `/s/<id>`. The same code shared again gets the same link. When saving
-   * outlasts the click and the browser refuses the copy, the link is already
-   * made — choosing it again copies it straight away, inside the click.
-   */
   async function copyShareLink() {
-    // The code encoded ahead of time keeps a reused link's copy free of any
-    // await, so it stays inside the click — which is the whole retry path.
     const code = encoded.status === 'ready' ? encoded.data : await fittingShareCode(fitting);
     if (code === null) {
       setNotice(t('fittings.export.tooLarge'));
       return;
     }
     let url = existingShareLink('fitting', code);
-    /**
-     * The short link is a sync-server write, which hangs or fails with no
-     * connection. The permanent view link carries the whole code and opens
-     * from it locally, so it stands in.
-     */
     const copyPermanentInstead = async (noticeKey: string) => {
       try {
         await writeToClipboard(fittingShareViewUrl(code));
@@ -157,7 +132,6 @@ export function useFittingExport(fitting: Fitting, cloneImplants: readonly numbe
           characterId,
         });
       } catch {
-        // Lie-fi, or the store refused: the permanent link still works.
         await copyPermanentInstead('fittings.export.copied.permanentLinkFallback');
         return;
       }
@@ -170,12 +144,10 @@ export function useFittingExport(fitting: Fitting, cloneImplants: readonly numbe
     }
   }
 
-  /** The game's fittings XML, as a file — the fitting window imports it from disk. */
   async function downloadEveXml() {
     try {
       const text = await exportFitting('eveXml', fitting);
       if (text === null) return;
-      // Characters a Windows filename can't hold.
       const filename = `${fitting.name.replace(/[\\/:*?"<>|]+/g, ' ').trim() || 'fitting'}.xml`;
       downloadTextFile(filename, text, 'application/xml;charset=utf-8');
       setNotice(t('fittings.export.downloaded.eveXml'));
@@ -192,11 +164,6 @@ export function useFittingExport(fitting: Fitting, cloneImplants: readonly numbe
     });
   }
 
-  /**
-   * Industry's Fit Import, without the copy/paste round-trip: the same EFT
-   * text Export's own "Copy EFT" would put on the clipboard, handed straight
-   * to the Fit Import dialog pre-filled and already parsed.
-   */
   async function openManufacturePlan() {
     const text = await exportFitting('eft', fitting);
     if (text === null) return;

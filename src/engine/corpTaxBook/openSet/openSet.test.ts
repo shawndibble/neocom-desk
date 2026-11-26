@@ -10,7 +10,6 @@ const ORE = 45490;
 const MOON = 40_000_050;
 const NOW = '2026-09-18T14:00:00Z';
 
-/** Laser fired 10 Aug: the pull runs 10-12 Aug at the default 48 h expiry. */
 const PULL: SyncExtraction = {
   structureId: 1001,
   moonId: MOON,
@@ -21,7 +20,6 @@ const PULL: SyncExtraction = {
 };
 const PULL_ID = '1001_' + Date.parse(PULL.extractionStartTime);
 
-/** One row; stamped rows carry the moon, as the server writes it (`placeObservedRows`). */
 function row(
   characterId: number,
   date: string,
@@ -41,7 +39,6 @@ function row(
 
 const keyOf = (characterId: number, date: string) => `${characterId}:1001:${date}`;
 
-/** The whole book an officer reads. */
 function officer(over: Partial<OpenSetInput> = {}): OpenSetInput {
   return {
     corporationId: CORP,
@@ -64,7 +61,6 @@ function officer(over: Partial<OpenSetInput> = {}): OpenSetInput {
   };
 }
 
-/** What a member reads of the same book: their own rows and records, no Extractions. */
 function member(book: OpenSetInput, characterIds: readonly number[]): OpenSetInput {
   const mine = new Set(characterIds);
   const minerIds = new Set(
@@ -80,7 +76,6 @@ function member(book: OpenSetInput, characterIds: readonly number[]): OpenSetInp
   };
 }
 
-/** One Miner's settlement as both sides must read it (the Extraction id is officer-only). */
 function settlementOf(open: OpenSet, minerId: string) {
   const s = open.miners.get(minerId);
   return {
@@ -177,8 +172,6 @@ describe('settleOpenSet: officer and member agree', () => {
 
   it('waives a snapshot’s held day by what dismissing its dispute credited', () => {
     const held = '2026-06-20';
-    // Adjustments dated on or before `through` are in the snapshot already: the waiver
-    // `dismissDispute` writes on the held day is counted once (from the dispute), the other never.
     const adjustment = (id: string, date: string, amount: number) => ({
       id,
       minerId: 'solo:1',
@@ -243,7 +236,6 @@ describe('settleOpenSet: officer and member agree', () => {
     expect(settleOpenSet(book).charges[0]).toMatchObject({ moonId: MOON, extractionId: PULL_ID });
     const own = settleOpenSet(member(book, [1])).charges[0];
     expect(own.moonId).toBe(MOON);
-    // Extractions are officer-only (firestore.rules): a member's rows carry no Extraction id.
     expect(own.extractionId).toBeUndefined();
   });
 

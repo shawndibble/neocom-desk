@@ -77,13 +77,6 @@ import { isoDateParam, optionalSortParam, type UrlSort } from '@/lib/urlState';
 import { formatCount } from '@/lib/formatCount';
 import { DividedList } from '@/components/ui/DividedList';
 
-/**
- * Dynamic import, not a static one: `ProductionProfitChart.tsx` statically
- * imports Recharts, so this is the boundary that keeps the library out of
- * the initial page bundle — it only loads once the Logs tab actually
- * renders a chart (see `character/WalletBalanceChart.tsx`'s bundle-size
- * precedent).
- */
 const LazyProductionProfitChart = lazy(() => guarded(() => import('./ProductionProfitChart')));
 
 interface ProductionLogPanelProps {
@@ -91,7 +84,6 @@ interface ProductionLogPanelProps {
   catalog: BlueprintCatalog;
   skills: SkillLevels;
   plans: BuildPlanRecord[];
-  /** Row click on the runs table: hands back the run's own Build Plan so the caller can jump to it. */
   onOpenRun?: (buildPlanId: string) => void;
 }
 
@@ -103,24 +95,18 @@ interface ItemRow {
   unitsSold: number;
   realizedProfit: number;
   revenue: number;
-  /** Null when nothing has sold for this item yet — a percentage of zero revenue is not a number. */
   avgMarginPct: number | null;
-  /** Net revenue less the sold units' share of cost (issue #1785). */
   soldUnitsMargin: number;
   unsoldCost: number;
 }
 
-/** The date range in the URL (ADR 0015); both ends open by default. */
 const DATE_RANGE_PARAMS = { 'records.from': isoDateParam(), 'records.to': isoDateParam() };
-/** Both tables start unsorted, in the order the rollup builds them. */
 const TABLE_SORT = optionalSortParam();
 
-/** A URL sort naming a column this table does not have reads as unsorted. */
 function knownSort(sort: UrlSort | null, columns: readonly { id: string }[]): UrlSort | null {
   return sort !== null && columns.some((column) => column.id === sort.columnId) ? sort : null;
 }
 
-/** Every row this run's own id backs, grouped once instead of `.filter()`-ed once per run. */
 function groupByRunId<T extends { runId: string }>(rows: readonly T[]): Map<string, T[]> {
   const map = new Map<string, T[]>();
   for (const row of rows) {
@@ -131,8 +117,6 @@ function groupByRunId<T extends { runId: string }>(rows: readonly T[]): Map<stri
   return map;
 }
 
-/** One label-over-value block, matching the design's larger dashboard stat (distinct from the compact `StatChip`). */
-/** One ledger line of the Records rollup: uppercase label left, figure right. */
 function TotalRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between gap-2 px-2.5 py-1.5 text-[0.6875rem]">
@@ -142,13 +126,6 @@ function TotalRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-/**
- * The Logs tab's From/To pair — copies `Wallet.tsx`'s `JournalDateRange`
- * layout exactly (a visible `<label>` rather than `FilterField`, so the
- * caption shows inline as well as in the mobile sheet) since this is the same
- * shape of control: two `date` inputs bounding one collection by a stored
- * timestamp.
- */
 function ProductionLogDateRange({
   draft,
   setDraft,
@@ -174,11 +151,6 @@ function ProductionLogDateRange({
   );
 }
 
-/**
- * One end of the range, in a `FilterField` so its pill can focus it. In the
- * sheet the field captions it above, so the inline caption beside the input
- * is kept for screen readers only rather than shown twice.
- */
 function DateBound({
   label,
   value,
@@ -206,7 +178,6 @@ function DateBound({
 
 interface RunRow extends ProductionRunSummary {
   itemName: string;
-  /** Whether the run's own Build Plan still exists — a run outlives a deleted plan (locked financial record), so this gates the row-click navigation rather than a display column. */
   planExists: boolean;
 }
 
@@ -219,7 +190,6 @@ interface Rollup {
   totalCostLogged: number;
   totalRevenueLinked: number;
   openInventoryValue: number;
-  /** Realized profit over linked revenue, weighted — null until a sale is linked. */
   avgMarginPct: number | null;
 }
 
@@ -232,7 +202,6 @@ function buildRollup(
   skills: SkillLevels,
   catalog: BlueprintCatalog,
   planIds: ReadonlySet<string>,
-  /** Each run's own Build Plan's Trade Hub standing (issue #1238), keyed by `run.buildPlanId` — see `standingByPlanId` below. */
   standingByPlanId: ReadonlyMap<string, ResolvedStandings>,
   timeZone?: string
 ): Rollup {
@@ -285,9 +254,6 @@ function buildRollup(
       });
     }
   }
-  // Margin is computed per item over its combined revenue, not averaged from
-  // the per-run percentages — a weighted rollup, the same reasoning
-  // `realizedProfit`'s own marginPct uses per run.
   const itemRows = Array.from(byItem.values()).map((row) => ({
     ...row,
     avgMarginPct: row.revenue > 0 ? (row.realizedProfit / row.revenue) * 100 : null,
@@ -318,17 +284,6 @@ function buildRollup(
   };
 }
 
-/**
- * Cross-plan, cross-item realized-profit rollup (issue #525) — the aggregate
- * "Production Log" the original design mockup's final step showed. Distinct
- * from `ProductionRunsPanel`, which is scoped to one Build Plan's own runs:
- * this reads every Production Run the character has logged, grouped by
- * product, regardless of which plan it came from. Rendered as the Industry
- * route's "Records" tab (a peer of the Build Plan list/detail grid, per
- * `Tabs`' own "peer views within a page" contract) rather than the mockup's
- * undecided-at-the-time "own panel vs. dedicated route" choice — a tab needed
- * neither.
- */
 export function ProductionLogPanel({
   characterId,
   catalog,
@@ -347,8 +302,6 @@ export function ProductionLogPanel({
     setDateRange({ 'records.from': next.startDate, 'records.to': next.endDate });
   const [itemSort, setItemSort] = useUrlParam('records.itemSort', TABLE_SORT);
   const [runSort, setRunSort] = useUrlParam('records.runSort', TABLE_SORT);
-  // The per-run ledger folds away by default: "By item" is the read that
-  // says what is making money, the run list is the audit trail behind it.
   const [runsExpanded, setRunsExpanded] = useState(false);
   const itemColumnsShown = useColumnVisibility(
     useVisibleProductionLogItemColumns,
@@ -366,9 +319,6 @@ export function ProductionLogPanel({
 
   const planIds = useMemo(() => new Set(plans.map((p) => p.id)), [plans]);
 
-  // Every Trade Hub's standing for this character (issue #1238), resolved
-  // once — each run below reads its own plan's hub out of this map rather
-  // than the panel fetching per-plan.
   const tradeHubStandings = useTradeHubStandings(characterId);
   const standingByPlanId = useMemo(() => {
     const map = new Map<string, ResolvedStandings>();
@@ -379,10 +329,6 @@ export function ProductionLogPanel({
     return map;
   }, [plans, tradeHubStandings]);
 
-  // The character's full history recomputes here, not on every keystroke in
-  // the date filter or unrelated parent re-render — `filter` is the only
-  // piece of this that changes often, and everything else it's paired with
-  // (`runs`/`saleLinks`/`orderWatches`) only changes on an actual Dexie write.
   const rollup = useMemo(
     () =>
       buildRollup(
@@ -423,8 +369,6 @@ export function ProductionLogPanel({
     [profitHistoryPoints]
   );
 
-  // Memoized, and above the early return, so the `sortValue`s `DataTable`
-  // keys its sort on keep their identity across renders.
   const columns = useMemo<DataTableColumn<ItemRow>[]>(
     () => [
       {
@@ -496,8 +440,6 @@ export function ProductionLogPanel({
     [t]
   );
 
-  // `soldActionsColumn` is appended below the early return: `sale` is a fresh
-  // object every render, and none of the sortable columns need it.
   const baseRunColumns = useMemo<DataTableColumn<RunRow>[]>(
     () => [
       loggedAtColumn(t, timeZone),
@@ -505,8 +447,6 @@ export function ProductionLogPanel({
         id: 'item',
         header: t('industry.productionRunColumnItem'),
         sortValue: (r) => r.itemName,
-        // A row that opens the run's plan carries the plan's accent cue (the plan page links the
-        // product); an inert row (no plan, or no way to open it) links the item's Show info.
         render: (r) =>
           r.planExists && onOpenRun ? (
             <span className={entityLinkClassName()}>{r.itemName}</span>
@@ -530,8 +470,6 @@ export function ProductionLogPanel({
     rows: rollup.itemRows,
     columns: itemsCsvColumns,
   });
-  // Folded by default, so its table is often unmounted — then the export
-  // falls back to the rollup's own order.
   const runsExport = useTableExport({
     surface: 'production-log-runs',
     rows: rollup.runRows,
@@ -650,9 +588,6 @@ export function ProductionLogPanel({
         />
       ) : (
         <>
-          {/* Full width, outside the totals/chart grid: eight figure columns
-                do not fit the column beside the totals, and with no chart
-                the totals would otherwise sit beside an empty column. */}
           <div className="mt-4 min-w-0 space-y-4">
             <div>
               <div className="flex items-center justify-between gap-2 border-b border-line pb-1">

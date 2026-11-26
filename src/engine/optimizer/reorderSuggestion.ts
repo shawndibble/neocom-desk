@@ -1,19 +1,3 @@
-/**
- * "Suggest full reorder": group plan steps by (primary, secondary) attribute
- * pair to reduce remap-boundary fragmentation, while honoring prerequisites
- * and keeping the original relative order within each group (stable).
- *
- * Prereq-constrained grouped emission: groups are ordered by first occurrence,
- * then stable-sorted so higher-priority groups (per `priorities`, #27) come
- * first; repeatedly scan groups in that order, emitting each group's ready
- * steps. A step is ready once every lower plan level of its own skill and
- * every plan level covered by its prereqs has been emitted (levels absent
- * from the plan count as already trained). Each pass over a valid plan emits
- * at least one step, so this terminates with a valid permutation — priority
- * only affects interleaving order, never which steps are ready, so a
- * lower-priority prerequisite still emits before the higher-priority step
- * that needs it.
- */
 import { pairKey } from '@/engine/optimizer/bestAttributes';
 import { priorityRank } from '@/engine/skills/planPriority';
 import { spBetween, timeToTrain, trainingRate } from '@/engine/skills/sp';
@@ -28,7 +12,6 @@ import type {
 } from '@/engine/types';
 
 interface PlanIndex {
-  /** Sorted plan levels per skill. */
   planLevels: Map<number, number[]>;
   emitted: Map<number, Set<number>>;
 }
@@ -44,10 +27,9 @@ function buildPlanIndex(steps: readonly PlanStep[]): PlanIndex {
   return { planLevels, emitted: new Map() };
 }
 
-/** All plan levels of `typeID` up to `level` already emitted? */
 function requirementMet(index: PlanIndex, typeID: number, level: number): boolean {
   const levels = index.planLevels.get(typeID);
-  if (!levels) return true; // not in plan: assume already trained
+  if (!levels) return true;
   const emitted = index.emitted.get(typeID);
   for (const l of levels) {
     if (l > level) break;
@@ -76,7 +58,6 @@ function markEmitted(index: PlanIndex, step: PlanStep): void {
   set.add(step.level);
 }
 
-/** True when `steps` satisfies same-skill level order and in-plan prereqs. */
 export function isValidOrder(
   steps: readonly PlanStep[],
   skills: ReadonlyMap<number, EngineSkill>
@@ -89,16 +70,6 @@ export function isValidOrder(
   return true;
 }
 
-/**
- * Split `steps` into deadline segments: one per Plan Milestone whose anchor
- * is still in the plan, in the anchor's current order, plus a final tail of
- * everything no milestone needs. A segment holds its anchor step plus every
- * not-yet-claimed plan step the anchor transitively needs (lower levels of
- * its own skill and in-plan prereqs), so each segment is closed under
- * in-plan prerequisites and the concatenation stays prereq-valid. Reached or
- * orphaned milestones (anchor not in `steps`) are ignored. Each segment keeps
- * the original relative order of its steps.
- */
 function splitByMilestones(
   steps: readonly PlanStep[],
   skills: ReadonlyMap<number, EngineSkill>,
@@ -131,18 +102,6 @@ function splitByMilestones(
   return segments.filter((seg) => seg.length > 0);
 }
 
-/**
- * Reorder steps grouped by attribute pair; prereq-valid and stable.
- *
- * `priorities` (#27) maps a skill typeID to the user's (or an inherited,
- * see `effectivePriority`) urgency for it; a step's group is keyed by its
- * skill's priority too, and groups are emitted highest-priority first, tied
- * groups keeping their original first-occurrence order. `milestones` makes each Plan
- * Milestone a hard deadline: its skills (and prerequisites) all come before
- * later milestones' and the rest, whatever the priority; grouping and
- * priority only interleave within a deadline segment. Omit `priorities` (or pass an
- * empty map) to fall back to pure attribute-pair grouping.
- */
 function suggestReorderSegment(
   steps: readonly PlanStep[],
   skills: ReadonlyMap<number, EngineSkill>,
@@ -168,7 +127,6 @@ function suggestReorderSegment(
     group.push(step);
   }
 
-  // Stable sort: groups tied on priority keep their first-occurrence order.
   const order = groups.map((_, i) => i).sort((a, b) => groupRanks[a] - groupRanks[b]);
   const orderedGroups = order.map((i) => groups[i]);
 
@@ -210,25 +168,9 @@ export interface SortShortestFirstOptions {
   attributes: Attributes;
   implants?: Implants;
   cloneState?: CloneState;
-  /** Plan Milestones as hard deadlines; see `splitByMilestones`. */
   milestones?: readonly PlanMilestone[];
 }
 
-/**
- * Reorder steps to front-load the quick ones: prereq-valid, and honoring
- * Priority tiers (#27) — High before Normal before Low, using the same
- * already-effective `priorities` map `suggestReorder` takes, so a
- * lower-priority prerequisite already carries its dependent's urgency by the
- * time it reaches here. Within a tier, a ready-set selection repeatedly picks
- * the ready step with the lowest (priorityRank, seconds, original index) —
- * scanning ready steps in original order and only replacing the current pick
- * on a strict improvement keeps ties at the earliest index for free.
- *
- * Each step's training time is costed once, up front, Booster-blind (a
- * Booster's bonus depends on when a step lands, which this reorder decides;
- * costing against it would be circular). A linear scan per pick is fine at
- * plan sizes (~200 steps); no heap is needed unless a test shows otherwise.
- */
 function sortShortestSegment(
   steps: readonly PlanStep[],
   skills: ReadonlyMap<number, EngineSkill>,
@@ -277,7 +219,6 @@ function sortShortestSegment(
   return result;
 }
 
-/** `sortShortestSegment` per milestone deadline segment (`options.milestones`). */
 export function sortShortestFirst(
   steps: readonly PlanStep[],
   skills: ReadonlyMap<number, EngineSkill>,

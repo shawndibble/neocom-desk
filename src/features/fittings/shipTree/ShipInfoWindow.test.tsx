@@ -23,7 +23,6 @@ vi.mock('@/engine/fittings/fittingShare', async (importOriginal) => {
   return { ...real, encodeFittingShare: vi.fn(real.encodeFittingShare) };
 });
 const { usePopularFitsMock } = vi.hoisted(() => ({ usePopularFitsMock: vi.fn() }));
-// The EVE Workbench rows read the losses too, for their "Seen on zKillboard" badge.
 vi.mock('../popularFits', () => ({
   usePopularFits: usePopularFitsMock,
   loadPopularFits: () => Promise.resolve({ ok: true, fits: [] }),
@@ -311,12 +310,9 @@ describe('Ship Info window', () => {
     target.targetPlanId = 'p1';
     const { user, dialog } = await openShip(/^Crow/);
     await user.click(within(dialog).getByRole('tab', { name: 'Skills & Mastery' }));
-    // The tier button itself says so before it's even selected.
     await user.click(within(dialog).getByRole('button', { name: 'Tier II, in plan' }));
-    // The row shows a "Planned" badge; the footer reads "In plan" for the tier as a whole.
     expect(within(dialog).getByText('Planned')).toBeVisible();
     expect(within(dialog).getByText('In plan')).toBeVisible();
-    // No button left to click that would silently no-op.
     expect(
       within(dialog).queryByRole('button', { name: 'Add tier II to plan' })
     ).not.toBeInTheDocument();
@@ -340,7 +336,6 @@ describe('Ship Info window', () => {
       'aria-pressed',
       'true'
     );
-    // Caldari Frigate IV is trained; Interceptors isn't, in the required list or tier I.
     expect(within(dialog).queryAllByText(/^Caldari Frigate [IV]+$/)).toHaveLength(0);
     expect(within(dialog).getAllByText(/^Interceptors/).length).toBeGreaterThan(0);
   });
@@ -365,9 +360,7 @@ describe('Ship Info window', () => {
     await user.click(within(dialog).getByRole('tab', { name: 'Skills & Mastery' }));
     await user.click(within(dialog).getByRole('button', { name: 'Tier II' }));
 
-    // Interceptors III, untrained, gets a real duration rather than staying blank.
     expect(within(dialog).getByText(/^\d+d \d+h \d+m$|^\d+h \d+m$|^\d+m$/)).toBeVisible();
-    // The footer totals the same training the tier's own row(s) still need.
     expect(within(dialog).getByText(/^Total /)).toBeVisible();
   });
 

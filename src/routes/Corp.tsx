@@ -1,27 +1,3 @@
-/**
- * `/corp` — the Corp Board: a grid of corp widgets the pilot chooses,
- * sizes, orders, renames and removes, like the Overview (`routes/Overview.tsx`).
- *
- * A corp manager does not browse, they triage, and the default layout says so:
- * Due soon and the structure and moon clocks lead, money and people follow.
- * Everything after that is the pilot's choice (`features/corp/grid`).
- *
- * Three rules shape it:
- *
- * - **Each widget is gated on its own capability.** A Station Manager who is
- *   not an Accountant gets clocks and no wallet widgets, with no error and no
- *   empty-state noise. The gate is `useCorpRouteGate()`'s resolved
- *   `capabilities`, never a role string, and it decides what is offered and
- *   drawn; each read is gated again in its loader before it fetches, since an
- *   ungated read buys a guaranteed 403.
- * - **`unknown` renders neutrally here, and nothing in the nav.** A nav item
- *   that flickers into existence is worse than one a beat late (GLOSSARY.md
- *   round 35), but bouncing a Director who deep-linked before their roles read
- *   landed is simply a bug.
- * - **Hour-stale data is stated, not hidden.** CCP caches these endpoints for
- *   about an hour. The data-age popover says so, and no widget prints a
- *   countdown shorter than that window.
- */
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PageHeader, Spinner } from '@/components/ui';
@@ -62,7 +38,6 @@ import { useAsyncLoad } from '@/lib/useAsyncLoad';
 import { corporationsReading, loadAccountCorpAccess } from '@/features/corp/corpReadAccess';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 
-// The corp kinds' builders load with this route, not with the Overview's startup graph.
 registerKindDefs(CORP_DEFS);
 
 const CustomizeBar = lazy(() =>
@@ -81,7 +56,6 @@ const PhoneCustomizeList = lazy(() =>
   }))
 );
 
-/** The header, edit bar and grid, below the providers. */
 function CorpGrid({ layout }: { layout: OverviewLayout }) {
   const { t } = useTranslation();
   const { editing } = useOverviewEdit();
@@ -93,11 +67,6 @@ function CorpGrid({ layout }: { layout: OverviewLayout }) {
 
   return (
     <div className="mx-auto max-w-page space-y-4">
-      {/*
-        Title, tabs, data age and Customize on one line. No Next deadline
-        button: it squeezed the five tabs off the line, and Due soon already
-        names the next clock.
-      */}
       <PageHeader
         title={t('nav.corpBoard')}
         meta={<OverviewDataAge summary={summary} note={t('corp.dataAgeNote')} />}
@@ -125,23 +94,12 @@ function CorpGrid({ layout }: { layout: OverviewLayout }) {
   );
 }
 
-/**
- * The grid, mounted only once Corp Access has resolved to `ready`.
- *
- * That split is load-bearing. On a cold load `useCorpAccess` reports `unknown`
- * with no capabilities for the first frames; a board built then would offer and
- * draw nothing. Mounting on `ready` means the first render already has the
- * real capability set, and a character switch returns to `unknown` while the
- * new character's roles read is in flight, so this unmounts and comes back
- * with that character's answer.
- */
 function CorpGridView({ capabilities }: { capabilities: CorpCapabilities }) {
   const { t } = useTranslation();
   const isPhone = useIsPhone();
   const stored = useCorpOverviewLayout((state) => state.value);
   const setLayout = useCorpOverviewLayout((state) => state.setValue);
   const hydrated = useHydratedStore(useCorpOverviewLayout);
-  // Which corporations the pilot's Characters can read: All is offered only for two or more.
   const accounts = useAsyncLoad(loadAccountCorpAccess).data;
   const board = useMemo(
     () =>
@@ -153,9 +111,6 @@ function CorpGridView({ capabilities }: { capabilities: CorpCapabilities }) {
   );
   const fallback = useMemo(() => corpDefaultLayout(), []);
 
-  // The default draws at once, but a first edit over it is only saved once this device's first
-  // pull has had its say: written earlier, it would overwrite the layout another device synced.
-  // Until then it is held here; if a synced layout lands meanwhile, that one wins.
   const firstRunReady = useFirstRunReady(hydrated, CORP_OVERVIEW_LAYOUT_KEY);
   const [pending, setPending] = useState<OverviewLayout | null>(null);
   const canSave = stored !== null || firstRunReady;
@@ -163,7 +118,6 @@ function CorpGridView({ capabilities }: { capabilities: CorpCapabilities }) {
   useEffect(() => {
     canSaveRef.current = canSave;
   }, [canSave]);
-  // Once stored, `stored` wins over `pending`, so `pending` never needs clearing.
   useEffect(() => {
     if (pending !== null && canSave && stored === null) void setLayout(pending);
   }, [pending, canSave, stored, setLayout]);
@@ -172,7 +126,6 @@ function CorpGridView({ capabilities }: { capabilities: CorpCapabilities }) {
     [setLayout]
   );
   const layout = stored ?? pending ?? fallback;
-  // The drawn widgets as they are read, not just their kinds: one scoped to All reads other feeds.
   const shown = useMemo(
     () =>
       visibleWidgets(layout.widgets, isPhone, board.canDraw).map((widget) => ({
@@ -206,16 +159,6 @@ export function Corp() {
   const { t } = useTranslation();
   const gate = useCorpRouteGate();
 
-  // `CorpRolesGate` holds the page while the roles resolve. This is the one
-  // place corp UI treats `unknown` as its own state rather than as `none`: the
-  // nav hides so it cannot flicker, but bouncing a Director who deep-linked
-  // before their roles read landed would simply be a bug. See `useCorpRouteGate`.
-  //
-  // Denied: reached the URL without the access for it. A bare explanation, not
-  // the section's shell drawn over nothing — that would be a lock, and corp UI
-  // hides rather than locks (GLOSSARY.md round 35). The copy says roles only
-  // change in game; a Character that holds a role but lacks the grant can fix
-  // that from Settings' Corporation Permission row.
   const content =
     gate.status === 'denied' ? (
       <div className="mx-auto max-w-page space-y-4">

@@ -18,8 +18,6 @@ import { is, shapeGuard } from '../snapshotShape';
 import { defineDomain } from './defineDomain';
 import { currentEveTypePrefs, resolveProjectionNames } from './shared';
 
-/* EVE's own notifications ---------------------------------------------------- */
-
 const isEveNotificationEntrySnapshot = shapeGuard<EveNotificationEntrySnapshot>({
   notificationId: is.number,
   type: is.string,
@@ -29,16 +27,6 @@ const isEveNotificationEntrySnapshot = shapeGuard<EveNotificationEntrySnapshot>(
   timestamp: is.string,
 });
 
-/**
- * The ninth domain (issue #274): EVE's own server-pushed notifications, a
- * different, non-overlapping set from every other domain here — those are
- * all synthesized by diffing; this one is fed to the app pre-formed. Single
- * `eveNotification` event covering roughly a hundred underlying `type`
- * strings, filtered individually at delivery time
- * (`foregroundPoller.ts`/`preferences.ts`) rather than modeled as one
- * `NotificationEventId` per type — CCP adds types without notice, so the
- * catalog cannot be a closed enum (esi/esi-issues#1380).
- */
 export const eveNotificationDomain = defineDomain<
   CharacterNotification,
   EveNotificationSnapshot,
@@ -65,25 +53,12 @@ export const eveNotificationDomain = defineDomain<
     })),
     nowMs,
   }),
-  // Structure reinforcement exits (issue #359): the only EVE Notification
-  // shape with a future, fixed-enough timestamp to project. Kept to the same
-  // gates the live browser channel already applies to this domain
-  // (`foregroundPoller.ts`'s `isEveTypeAllowed` + `eveTypeAllowsChannel`) —
-  // Scheduled Push is that channel's closed-app analog (see the comment on
-  // `projection` above), so a type the user has switched browser
-  // notifications off for, or that fell off the round-45 allow-list, must
-  // not reach the backend either.
   projection: async (characterId, characterName, snapshot, nowMs) => {
     const eveTypePrefs = await currentEveTypePrefs(characterId);
     const eligible = snapshot.entries.filter(
       (entry) =>
         isEveTypeAllowed(entry.type) && isEveTypeEnabledFor(eveTypePrefs, entry.type, 'browser')
     );
-    // Only ids the projector will actually put in a row's text (issue #359
-    // follow-up, Sentry N+1): most of `eligible` is outside the 72-hour
-    // horizon and produces no row at all, so resolving every one of their
-    // structure ids up front fanned `loadStructureName` out over names whose
-    // results were always going to be discarded.
     const structureIds = reinforcementExitStructureIds(eligible, nowMs);
     const structureNames = await resolveProjectionNames(structureIds, (id) =>
       loadStructureName(characterId, id)
@@ -97,8 +72,5 @@ export const eveNotificationDomain = defineDomain<
       nowMs
     );
   },
-  // Best-effort, time-boxed and never rejects (issue #300): whatever it could
-  // not look up in its budget renders as an id or a neutral phrase rather
-  // than holding the notification back.
   names: resolveEveNotificationNames,
 });

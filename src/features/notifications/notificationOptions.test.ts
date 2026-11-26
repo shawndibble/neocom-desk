@@ -116,19 +116,9 @@ describe('fallbackNotificationOptions', () => {
 });
 
 describe('NOTIFICATION_ROUTES against the real route table', () => {
-  // Hand-copied from App.tsx's route list, which `events.ts` deliberately
-  // avoids doing for scopes ("derived from ESI_REGISTRY, never hand-copied").
-  // A renamed route would still compile here and silently send every
-  // notification of that type to the fallback — a dead deep link that looks
-  // like a working one. This is the check that makes that fail loudly.
   it('routes every event to a path the app actually serves', () => {
     const realRoutes = new Set<string>(Object.keys(ROUTE_REQUIREMENTS));
     for (const [eventId, route] of Object.entries(NOTIFICATION_ROUTES)) {
-      // A route may carry a query string (e.g. Wallet's own tab, `?tab=`)
-      // that a route path never does — strip it before checking the path is
-      // real. A tab-as-path page's own tab segment (Market's `/history`,
-      // Contracts' `/search/items`, ADR 0015)
-      // collapses to the page's registered base via `pageKeyFor`.
       const [rawPath] = route.split('?');
       const path = pageKeyFor(rawPath);
       expect(realRoutes, `${eventId} -> ${route}`).toContain(path);

@@ -1,27 +1,13 @@
-/**
- * The client read seam for Shared Pops (issue #6223, ADR 0034): every moon pop another
- * corporation's Corp Tax Book shares with any of this device's Characters. The server checks each
- * Character's corporation, alliance and Communities live; the pops themselves are never readable
- * from Firestore. The Calendar's "Shared moon pop" kind and the Shared Moon Pop notification read
- * through here. A pop's `id` (`{corporationId}_{extractionId}`) is its deep-link id.
- */
 import { getValidAccessToken } from '@/auth/session';
 import { db } from '@/db';
 import type { SharedPopView } from '../../functions/src/sharedPops';
 import { callRouted } from './routedCallable';
 import { ensureSignedIn } from './syncAuth';
 
-/** The most other Characters one read proves (the server's `MAX_VIEWER_TOKENS`). */
 const MAX_OTHER_CHARACTERS = 50;
 
 export type { SharedPopView };
 
-/**
- * The Shared Pops this device's Characters may read now, soonest Pop Time first. The first
- * Character with a valid token signs the call; the others prove themselves with their access
- * token (used by the server, never stored). A Character whose token cannot refresh is skipped.
- * No Characters, or none with a token: no pops.
- */
 export async function fetchSharedPops(): Promise<SharedPopView[]> {
   const characters = await db.characters.toArray();
   const attempts = await Promise.allSettled(
@@ -42,10 +28,6 @@ export async function fetchSharedPops(): Promise<SharedPopView[]> {
   return result.pops ?? [];
 }
 
-/**
- * Links a Survey started from a pop's start link back to that pop, so everyone who sees the pop
- * can open it. Best effort for the caller: the Survey works without it.
- */
 export async function linkSharedPopSurvey(popId: string, surveyId: string): Promise<void> {
   const [character] = await db.characters.toArray();
   if (!character) return;
@@ -57,7 +39,6 @@ export async function linkSharedPopSurvey(popId: string, surveyId: string): Prom
   );
 }
 
-/** The pop a deep link names, if the viewer still sees it. */
 export function findSharedPop(
   pops: readonly SharedPopView[],
   id: string

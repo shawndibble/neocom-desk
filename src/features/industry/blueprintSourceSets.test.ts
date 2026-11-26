@@ -24,7 +24,6 @@ type Resolved<F extends (...args: never[]) => unknown> = Awaited<ReturnType<F>>;
 
 const CORP = 1000180;
 
-/** Blueprint 20 builds T1 product 120; 21 builds 121, which has no market group. */
 const BUILDABLE = [
   { blueprintTypeID: 10, productTypeID: 110 },
   { blueprintTypeID: 20, productTypeID: 120 },
@@ -117,12 +116,10 @@ describe('loadBlueprintSourceSets', () => {
         { blueprintTypeID: 24, productTypeID: 124 },
       ]
     );
-    // 24 is invented from 20, owned only as a copy.
     expect(sets.invention).toEqual(new Set([23]));
   });
 
   it('leaves a market-grouped blueprint off the NPC market when its product is not Tech I', async () => {
-    // e.g. the Vagabond Blueprint: market-grouped, but a T2 lottery BPO no NPC sells.
     const { sets } = await loadBlueprintSourceSets(
       [1],
       [...T1_ON_MARKET, { blueprintTypeID: 22, productTypeID: 122 }]

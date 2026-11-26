@@ -11,7 +11,6 @@ describe('throttledRanker', () => {
     expect(first).toEqual([3, 1]);
 
     clock = 499;
-    // Still inside the interval: the same array, so a table keyed on it doesn't re-sort.
     expect(progress([1, 3, 2])).toBe(first);
     expect(rank).toHaveBeenCalledTimes(1);
 

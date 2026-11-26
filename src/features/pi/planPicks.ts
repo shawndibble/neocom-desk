@@ -1,20 +1,3 @@
-/**
- * Plan's top picks (#1 to #3), as one selector so Plan and the Map read the
- * same list: the Map's "Your picks" strip is this function over the same
- * `buildPlanAdvice` output, never a second ranking.
- *
- * - With colonies: each colony whose rebuild is a change, grouped by the
- *   product it should make, the group's gains summed (a product two planets
- *   should make is one pick), biggest first. A gain is ISK a day against
- *   today after quick wins.
- * - With no colonies built: the best one-planet recipes, the figure being what
- *   one planet earns a day. A setup a higher Command Center hosts ranks below the
- *   ones that fit and carries `needsCcLevel`, as in Plan's Find best.
- * - With colonies that already make their best product: nothing to pick.
- *
- * Picks come from the pilot's own colonies and sell market only. A what-if
- * planet changes the recipe list's reference products, not the picks.
- */
 import type { PlanetType } from '@/engine/pi/goalTypes';
 import type { PiTier } from '@/engine/pi/types';
 import type { PlanAdvice } from './planAdviceModel';
@@ -25,17 +8,13 @@ export interface PlanPick {
   typeId: number;
   name: string;
   tier: PiTier;
-  /** ISK a day: the gain against today for a rebuild, what one planet earns for a recipe. */
   perDay: number;
-  /** The colonies that should make it; empty for a recipe. */
   planetIds: number[];
   planetTypes: PlanetType[];
-  /** The lowest Command Center level that hosts it, when the pilot's cannot yet. */
   needsCcLevel?: number;
 }
 
 export interface PlanPicks {
-  /** `rebuild`: gains over today. `recipes`: no colonies yet. `none`: already at their best. */
   kind: 'rebuild' | 'recipes' | 'none';
   picks: PlanPick[];
 }

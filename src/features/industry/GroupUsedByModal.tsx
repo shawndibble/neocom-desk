@@ -10,10 +10,8 @@ import type { GroupMaterialConsumer } from './groupMaterialConsumers';
 import { onPlanLinkClick, planHref } from './planLinkClick';
 
 interface GroupUsedByModalProps {
-  /** The material to list consuming plans of; `null` closes the dialog. */
   typeID: number | null;
   onClose: () => void;
-  /** The material's row quantity in the group table, for the reconciling footer. */
   tableTotal: number | null;
   consumers: readonly GroupMaterialConsumer[];
   nameFor: (typeID: number) => string;
@@ -22,11 +20,6 @@ interface GroupUsedByModalProps {
   itemActionsFor?: (typeId: number, bordered?: boolean) => ReactElement;
 }
 
-/**
- * Which plans of a Build Group need a material, and how much each takes: the
- * "where does this row come from" the merged Group Rollup gives up. The plan
- * level sibling of `UsedByModal` (a plan, not a job, is the consumer here).
- */
 export function GroupUsedByModal({
   typeID,
   onClose,

@@ -121,9 +121,6 @@ describe('schedulePlan', () => {
       inputs({ queueEntries: [queued(queueEnd)] }),
       NOW
     );
-    // The queue's head (skill 10 level 1) is training right now and finishes
-    // at queueEnd regardless of also being a plan entry — the plan is costed
-    // as already trained to level 1 as of then, not recomputed from `now`.
     expect(s.startDate.getTime()).toBe(queueEnd);
     expect(s.totalSeconds).toBeGreaterThan(0);
     expect(s.scheduled).toHaveLength(1);
@@ -136,7 +133,6 @@ describe('schedulePlan', () => {
     const s = schedulePlan(plan, inputs({ queueEntries: [queued(queueEnd)] }), NOW);
     const own = s.scheduled[s.scheduled.length - 1].cumulativeSeconds;
     expect(s.totalSeconds).toBeCloseTo(2 * 3600 + own, 5);
-    // The finish date was already right: lead + own steps.
     expect(s.finish?.getTime()).toBe(queueEnd + own * 1000);
   });
 
@@ -168,7 +164,6 @@ describe('schedulePlan', () => {
 });
 
 describe('schedulePlanWith', () => {
-  // The schedule carries non-structural members; compare what the UI reads.
   const view = (s: ReturnType<typeof schedulePlan>) =>
     JSON.parse(
       JSON.stringify({

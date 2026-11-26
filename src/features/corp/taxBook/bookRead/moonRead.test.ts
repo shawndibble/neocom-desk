@@ -1,4 +1,3 @@
-// readBook for one moon (issue #5716): which documents a moon page reads, cold and warm.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 type Data = Record<string, unknown>;
@@ -73,7 +72,6 @@ import { extractionId } from '@/engine/corpTaxBook/sync';
 const CORP = 98000001;
 const readMoon = async (extractionId: string) =>
   (await readBook(7, CORP, { parts: bookPartsFor('extractions', 'extraction'), extractionId }))!;
-/** A read whose moon docs stood in for the ledger. */
 const scopedMoon = async (extractionId: string) => {
   const read = await readMoon(extractionId);
   if (!read.moon) throw new Error('expected a scoped read');
@@ -91,8 +89,8 @@ const pull = (startDay: string, arriveDay: string, moonId = 31, structureId = ST
   laserFiredAt: `${arriveDay}T12:00:00Z`,
   oreLines: [{ typeId: 1, quantity: 1000 }],
 });
-const OLD = pull('2026-08-01', '2026-08-05'); // window 08-05 .. 08-07, billed
-const NEW = pull('2026-09-10', '2026-09-17'); // window 09-17 .. 09-19, open
+const OLD = pull('2026-08-01', '2026-08-05');
+const NEW = pull('2026-09-10', '2026-09-17');
 const ELSEWHERE = pull('2026-09-10', '2026-09-17', 77, 2002);
 const ID = { old: extractionId(OLD), new: extractionId(NEW), else: extractionId(ELSEWHERE) };
 
@@ -149,7 +147,6 @@ beforeEach(async () => {
   store.docs.set(`${BOOK}/meta/paid`, { ids: [] });
   for (const [i, x] of [OLD, NEW, ELSEWHERE].entries())
     store.docs.set(`${BOOK}/extractions/e${i}`, x);
-  // A legacy notice of Miner 1's: the moon page reads no notices.
   store.docs.set(`${BOOK}/statements/s1`, {
     id: 's1',
     minerId: 'solo:1',
@@ -161,12 +158,12 @@ beforeEach(async () => {
   moonDoc(ID.old, STRUCTURE, ['solo:1']);
   moonDoc(ID.new, STRUCTURE, ['solo:1', 'solo:2']);
   moonDoc(ID.else, 2002, ['solo:1']);
-  obs('a', 1, '2026-08-05'); // the billed cycle's window
+  obs('a', 1, '2026-08-05');
   obs('b', 1, '2026-09-17');
   obs('c', 2, '2026-09-18');
-  obs('d', 1, '2026-09-25'); // after the window
-  obs('e', 1, '2026-09-18', 2002); // another refinery, same days
-  obs('f', 1, '2026-08-20'); // between the cycles
+  obs('d', 1, '2026-09-25');
+  obs('e', 1, '2026-09-18', 2002);
+  obs('f', 1, '2026-08-20');
 });
 
 describe('readBook for one moon', () => {
@@ -177,14 +174,12 @@ describe('readBook for one moon', () => {
       '1:2026-09-17',
       '2:2026-09-18',
     ]);
-    // A moon doc carries no tax any more: even an old cycle's days are priced from its rows.
     expect([...read.fromDocs]).toEqual([]);
     expect(reads('observed')).toEqual([
       `${BOOK}/observed/a`,
       `${BOOK}/observed/b`,
       `${BOOK}/observed/c`,
     ]);
-    // This refinery's two docs; the other refinery's is not read.
     expect(reads('moonDocs')).toEqual(
       [`${BOOK}/moonDocs/${ID.new}`, `${BOOK}/moonDocs/${ID.old}`].sort()
     );
@@ -231,7 +226,6 @@ describe('readBook for one moon', () => {
     const read = await readMoon(ID.new);
     expect(read.moon).toBeUndefined();
     expect(read.forMoon).toBe(ID.new);
-    // Every ledger row, not the pull's window.
     expect(read.observed).toHaveLength(6);
     expect(read.parts).toEqual(bookPartsFor('extractions', 'extraction'));
   });
@@ -260,11 +254,9 @@ describe('readBook for one moon', () => {
         .filter((k) => !['moon', 'forMoon', 'docs', 'fromDocs', 'readModels'].includes(k))
         .sort();
     expect(fields(scoped)).toEqual(fields(whole));
-    // The moon page shows no grouping answers: it never claims them.
     expect(scoped.parts.has('answers')).toBe(false);
   });
 
-  // #6206/#6207: Needs you lists them on every page, so a moon read reads them as the whole book does.
   it('reads the disputes and the uncounted donations it claims', async () => {
     const book = store.docs.get(BOOK)!;
     store.docs.set(BOOK, {

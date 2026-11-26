@@ -1,8 +1,3 @@
-/**
- * Which faction an NPC corporation belongs to. ESI's corporation endpoint does
- * not say, so this reads the baked NPC-corporation file, which holds every NPC
- * corporation. Callers only use `loadCorporationFactions`.
- */
 import { loadNpcCorporationsFile } from '@/sde/loadSde';
 import type { NpcCorporationEntry } from '@/sde/types';
 import { memoizeAsync } from '@/lib/memoizeAsync';
@@ -17,11 +12,6 @@ export function corporationFactionMap(
   return map;
 }
 
-/**
- * Memoized for the session (a failure is not, so a later call retries); rejects
- * when the NPC-corporation file cannot be read, so a view can show
- * "unavailable" rather than guess.
- */
 export const loadCorporationFactions = memoizeAsync(async () =>
   corporationFactionMap((await loadNpcCorporationsFile()).corporations)
 );

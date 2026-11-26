@@ -1,10 +1,3 @@
-/**
- * The Miners table's row menu (right-click, touch-and-hold, ⋮): Show info for the main
- * character, then Record payment, Dismiss tax and Mark not tax. Open in new tab comes from the
- * row's `rowHref`, so it is not repeated here; Send reminder lives on the Miner's page header.
- * Mark not tax acts on the latest payment with tax in it, and the item names it. Officers only:
- * without edit rights the row has no actions, so no menu.
- */
 import { useTimeZone } from '@/lib/timeFormat';
 import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -24,10 +17,8 @@ export function MinerRowMenu({
   children,
 }: {
   miner: MinerRow;
-  /** Each opens its dialog after the menu closes (`useOpenAfterMenu`'s `run`, bound by the caller). */
   onRecord: (miner: MinerRow) => void;
   onDismiss: (miner: MinerRow) => void;
-  /** Given the payment to mark: the Miner's latest one that still has tax in it. */
   onNotTax: (miner: MinerRow, paymentId: string) => void;
   onCloseAutoFocus: (event: Event) => void;
   onOpenChange?: (open: boolean) => void;
@@ -60,7 +51,6 @@ export function MinerRowMenu({
             <MenuItem onSelect={() => onNotTax(miner, payment.id)}>
               <span>
                 {t('corpTaxBook.moons.payment.markNotTax')}
-                {/* The item acts on the latest payment with tax in it: say which, in view. */}
                 <span className="block text-xs text-text-dim">
                   {t('corpTaxBook.moons.payment.markNotTaxTarget', {
                     date: atDate(payment.at, zone),

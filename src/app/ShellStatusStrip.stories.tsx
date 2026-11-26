@@ -2,13 +2,6 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { Button } from '@/components/ui';
 import { ShellStatusStrip } from './ShellStatusStrip';
 
-/**
- * One hairline box for the shell's status rows (re-login, missing role, failed
- * sync) in place of a card each. Rows carry `data-status-item`; with none the
- * strip is hidden and takes no space.
- *
- * @summary The shell's single status strip above every route.
- */
 const meta = {
   title: 'app/ShellStatusStrip',
   component: ShellStatusStrip,
@@ -36,7 +29,6 @@ const relogin = (
   </div>
 );
 
-/** @summary Re-login prompt and sync error as two rows of one strip. */
 export const ReloginAndSyncError: Story = {
   args: {
     children: (
@@ -50,5 +42,4 @@ export const ReloginAndSyncError: Story = {
   },
 };
 
-/** @summary No rows: nothing renders. */
 export const Healthy: Story = { args: { children: null } };

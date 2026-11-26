@@ -7,41 +7,22 @@ import { beginAddCharacterLogin } from '@/app/loginFlow';
 import { buttonClassName, EveSsoButton, LogoMark, plainTextActionClassName } from '@/components/ui';
 import { CustomizePermissionsDialog } from '@/features/permissions/CustomizePermissionsDialog';
 
-/** Where "Open Neocom Desk" lands: the page the share came from, with its content filled in. */
 export interface OpenInApp {
-  /** Path plus query — survives a login round trip, so it is all a signed-out visitor keeps. */
   path: string;
-  /** Router state for a visitor already signed in; lost across a login. */
   state?: unknown;
 }
 
 interface ShareShellProps {
   title: string;
-  /** The page's own primary controls, e.g. a table's export menu. They sit at the right of the row under the header. */
   actions?: ReactNode;
-  /** Omitted while nothing is loaded yet, or the link is dead — the plain app root then. */
   openInApp?: OpenInApp;
-  /** A 896px frame instead of 768px, for a page that lays out two columns. */
   wide?: boolean;
-  /** A note for a signed-out visitor. It fills a strip beside the page's `actions`. */
   notice?: ReactNode;
-  /** The last thing on the page, a short chip rather than a sentence (a link's expiry). */
   footer?: ReactNode;
-  /** Beside the notice strip (the shared Fitting's ship and name). */
   lead?: ReactNode;
   children: ReactNode;
 }
 
-/**
- * The frame every Share Link page renders in: no navigation chrome (it sits
- * outside `RequireCharacter` and `ScopeGate`), the brand and one way into
- * the live app in one header row over a divider. The page's title is for
- * screen readers only; the page says what it is below. A visitor with no
- * Character gets "Log in" instead of the link,
- * which starts the EVE login right here with `setLoginReturnTo` carrying them
- * on to the same page after, and a small "Choose permissions" link under it
- * that opens the Customize permissions dialog first (#3075).
- */
 export function ShareShell({
   title,
   actions,
@@ -55,9 +36,6 @@ export function ShareShell({
   const { t } = useTranslation();
   const characterCount = useCharacterCountOrLoading();
   const signedOut = characterCount === 0;
-  // Until the count loads, the link goes straight to the target but still
-  // stashes it: a visitor who turns out to have no Character is bounced to
-  // login by `RequireCharacter`, and lands back on the target after.
   const loading = characterCount === undefined;
   const target = openInApp ?? { path: '/' };
   const [customizing, setCustomizing] = useState(false);
@@ -70,7 +48,6 @@ export function ShareShell({
   }
 
   function choosePermissions() {
-    // Stashed before the dialog opens: its submit leaves the page for EVE's.
     setLoginReturnTo(target.path);
     setCustomizing(true);
   }
@@ -100,7 +77,6 @@ export function ShareShell({
     </Link>
   );
 
-  // The login stays in the header; the page's own action rides in the notice strip.
   return (
     <div
       className={`safe-inset mx-auto flex min-h-dvh ${wide ? 'max-w-4xl' : 'max-w-3xl'} flex-col gap-4 bg-bg text-text [--safe-x:0.5rem] [--safe-y:0.5rem] sm:[--safe-x:1.5rem] sm:[--safe-y:1.5rem]`}
@@ -111,10 +87,8 @@ export function ShareShell({
           className="flex min-w-0 items-center gap-2 text-base font-semibold tracking-wide sm:text-lg"
         >
           <LogoMark className="size-6 shrink-0 sm:size-7" />
-          {/* The icon alone on the narrowest phones, so the login keeps its row. */}
           <span className="max-[369px]:sr-only">{t('share.brand')}</span>
         </Link>
-        {/* The page says what it is below; the title is for screen readers. */}
         <h1 className="sr-only">{title}</h1>
         <span className="ml-auto shrink-0">{signedOut ? loginControls : openInAppLink}</span>
       </header>

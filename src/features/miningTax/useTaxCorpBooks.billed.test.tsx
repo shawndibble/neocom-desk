@@ -7,6 +7,7 @@ import type { PayeeRecord } from '@/db';
 const hoisted = vi.hoisted(() => ({
   view: null as CorpBookView | null,
   shownBooks: [] as { corporationId: number; memberCharacterIds: number[] }[],
+  booksKnown: true,
 }));
 
 vi.mock('./useMadePayments', () => ({
@@ -18,6 +19,16 @@ vi.mock('@/features/miningTax/useMadePayments', () => ({
 vi.mock('@/features/miningTax/corpBook/useAutoClaimDonations', () => ({
   useAutoClaimDonations: () => ({ failed: [] }),
 }));
+vi.mock('@/features/miningTax/corpBook/useToleranceRecordChanges', () => ({
+  useToleranceRecordChanges: () => [],
+}));
+vi.mock('@/features/miningTax/corpBook/useBookAutoAssign', () => ({
+  useBookAutoAssign: () => undefined,
+}));
+vi.mock('@/features/miningTax/corpBook/useClosedDayFixes', () => ({
+  useClosedDayFixes: () => undefined,
+  closedDayPlans: () => [],
+}));
 vi.mock('@/features/miningTax/corpBook/useBookSystems', () => ({
   useBookSystems: () => ({ names: new Map(), security: new Map() }),
 }));
@@ -28,7 +39,7 @@ vi.mock('@/features/miningTax/corpBook/useCorpBookView', () => ({
   useCorpBookView: () => ({
     view: hoisted.view,
     booksRead: true,
-    booksKnown: true,
+    booksKnown: hoisted.booksKnown,
     reload: vi.fn(),
     shownBooks: hoisted.shownBooks,
     corpNameOf: (id: number) => (id === 5 ? 'Ashfall' : `Corp ${id}`),
@@ -61,7 +72,7 @@ const assignment = {
 describe('useTaxCorpBooks billed elsewhere', () => {
   beforeEach(() => {
     hoisted.shownBooks = [];
-    // A book that took the day whole; the stored copy has not seen it yet.
+    hoisted.booksKnown = true;
     hoisted.view = {
       overlay: {
         absorbed: new Map([['x', ['a1']]]),
@@ -85,12 +96,49 @@ describe('useTaxCorpBooks billed elsewhere', () => {
     expect(result.current.accounts.of('p1')?.owes?.amount ?? 0).toBe(0);
   });
 
+  it('keeps a stored book-owned Payee out of owed until the books have loaded', () => {
+    hoisted.booksKnown = false;
+    hoisted.view = null;
+    const data = {
+      entries: [{ assignments: [assignment] }],
+      payeesByCharacter: new Map([[1, [payee]]]),
+      paymentLinks: [],
+      billedElsewhere: new Map(),
+      bookOwned: new Set(['p1']),
+      systemNames: new Map(),
+      systemSecurity: new Map(),
+    } as unknown as TaxSnapshot;
+    const { result } = renderHook(() => useTaxCorpBooks(data, [], null));
+    expect(result.current.accounts.isBookOwned('p1')).toBe(true);
+    expect(result.current.accounts.of('p1')).toBeUndefined();
+  });
+
+  it('hands over to the live books once they are known, and never saves the stored set', () => {
+    hoisted.booksKnown = false;
+    hoisted.view = null;
+    saveBookOwned.mockClear();
+    const data = {
+      entries: [{ assignments: [assignment] }],
+      payeesByCharacter: new Map([[1, [payee]]]),
+      paymentLinks: [],
+      billedElsewhere: new Map(),
+      bookOwned: new Set(['p1']),
+      systemNames: new Map(),
+      systemSecurity: new Map(),
+    } as unknown as TaxSnapshot;
+    const { result, rerender } = renderHook(() => useTaxCorpBooks(data, [], null));
+    expect(saveBookOwned).not.toHaveBeenCalled();
+    hoisted.booksKnown = true;
+    rerender();
+    expect(result.current.accounts.of('p1')).toBeDefined();
+    expect(result.current.accounts.isBookOwned('p1')).toBe(false);
+  });
+
   it('stores the Payees a book owns, an unlinked one named as its corporation included', async () => {
     hoisted.view = {
       ...hoisted.view,
       books: [{ left: false, corpName: 'Ashfall', loaded: { corporationId: 5 } }],
     } as unknown as CorpBookView;
-    // Ownership reads the loaded books, not the priced view.
     hoisted.shownBooks = [{ corporationId: 5, memberCharacterIds: [1] }];
     const data = {
       entries: [{ assignments: [assignment] }],
@@ -104,13 +152,10 @@ describe('useTaxCorpBooks billed elsewhere', () => {
     const { result } = renderHook(() => useTaxCorpBooks(data, [], null, onOwnershipStored));
     expect(result.current.accounts.isBookOwned('p1')).toBe(true);
     expect(saveBookOwned).toHaveBeenCalledWith(new Set(['p1']));
-    // No Payee has Default Systems, so nothing was held back: no second read.
-    // Wait on the store itself settling (and its follow-up), not on a duration.
     await saveBookOwned.mock.results.at(-1)?.value;
     await Promise.resolve();
     expect(onOwnershipStored).not.toHaveBeenCalled();
 
-    // With Default Systems held back until ownership was stored, the snapshot is read again.
     const withDefaults = {
       ...data,
       payeesByCharacter: new Map([

@@ -4,15 +4,8 @@ import { Button } from '@/components/ui';
 
 interface Props {
   children: ReactNode;
-  /**
-   * Renders the error inside the app shell rather than as a full page — for
-   * the boundary around `Layout`'s outlet, where the rail must survive a page
-   * that failed (a render throw, or a route chunk that would not load).
-   */
   inline?: boolean;
-  /** A change clears the error: navigating away from a failed page recovers. */
   resetKey?: string;
-  /** Shown in place of the error screen, for a boundary around one widget such as a modal body. */
   fallback?: ReactNode;
 }
 
@@ -20,18 +13,10 @@ interface State {
   failed: boolean;
 }
 
-/**
- * `defaultValue` throughout: this renders when something has already gone
- * wrong, so a missing catalog must not turn a recoverable error into a blank
- * page.
- */
 function ErrorScreen({ inline }: { inline: boolean }) {
   const { t } = useTranslation();
   const headingRef = useRef<HTMLHeadingElement>(null);
-  // The failed page took the focused control with it; say what happened.
   useEffect(() => headingRef.current?.focus(), []);
-  // Offline, usually a route chunk that was never cached: reloading now would
-  // fail the same way, so say so and retry when the connection returns.
   const [offline, setOffline] = useState(() => navigator.onLine === false);
   const wasOffline = useRef(offline);
   useEffect(() => {
@@ -41,7 +26,6 @@ function ErrorScreen({ inline }: { inline: boolean }) {
     };
     const comeOnline = () => {
       setOffline(false);
-      // Reload, not a boundary reset: `lazy()` memoizes a rejected import.
       if (wasOffline.current) window.location.reload();
     };
     window.addEventListener('offline', goOffline);
@@ -51,7 +35,6 @@ function ErrorScreen({ inline }: { inline: boolean }) {
       window.removeEventListener('online', comeOnline);
     };
   }, []);
-  // Inside the shell the page already sits in `Layout`'s `<main>`.
   const Wrapper = inline ? 'section' : 'main';
   return (
     <Wrapper
@@ -84,17 +67,6 @@ function ErrorScreen({ inline }: { inline: boolean }) {
   );
 }
 
-/**
- * Last resort so a render throw shows something recoverable instead of a blank
- * page. `useLiveQuery` rethrows a Dexie failure during render and every feature
- * route sits behind one, so a broken IndexedDB would otherwise unmount the app.
- *
- * Never renders the error text: a message can carry data the user would not
- * expect on screen. It is reported rather than shown — React 19 routes
- * anything this boundary catches to the `onCaughtError` root hook, which
- * `main.tsx` wires to Sentry. Capturing here as well would file every one of
- * those errors twice.
- */
 export class ErrorBoundary extends Component<Props, State> {
   state: State = { failed: false };
 

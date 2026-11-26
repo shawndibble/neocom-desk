@@ -1,9 +1,3 @@
-/**
- * "Add from my Fittings" and "Paste EFT": a Director's way to a Doctrine Fit. Either source
- * becomes the engine's snapshot, shown as hull and counts before it is added; unresolved EFT lines
- * are listed, never dropped quietly. The corp keeps its own copy, so a later edit to the source
- * Fitting changes nothing. Mounted only while open, so each opening starts blank.
- */
 import { useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -36,10 +30,8 @@ interface Props {
 
 interface Parsed {
   snapshot: DoctrineFitSnapshot | null;
-  /** The whole fit, stored as its share code so members open it with charges and drones. */
   fitting: Fitting | null;
   unresolved: LoadWarning[];
-  /** The source could not be read at all (no hull, or a Fitting that no longer decodes). */
   failed: boolean;
 }
 
@@ -58,7 +50,6 @@ export function AddDoctrineDialog({ source, characterId, onAdd, onClose }: Props
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
 
-  // The latest source wins: a slow read of an earlier paste never overwrites a newer one.
   useEffect(() => {
     let cancelled = false;
     const apply = (next: Parsed) => !cancelled && setParsed(next);

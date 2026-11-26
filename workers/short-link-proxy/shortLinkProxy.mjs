@@ -1,18 +1,10 @@
-// The short link proxy's request handling, kept apart from the Worker entry so
-// vitest can run it. See README.md for why a Worker sits in front of the function.
-
-/** The Firebase function this fronts (functions/src/shortStartLink.ts). */
 export const FUNCTION_URL = 'https://us-central1-neocom-desk.cloudfunctions.net/shortStartLink';
-/** The one path served; the function takes the same fields by GET query or POST body. */
 export const SHORT_PATH = '/short';
-/** A start link's fields are a few hundred bytes; the function itself caps each one. */
 export const MAX_BODY_BYTES = 8 * 1024;
 
-/** Sent to the function so it limits by the caller's address, not Cloudflare's. */
 export const CLIENT_HEADER = 'x-short-link-client';
 export const PROXY_HEADER = 'x-short-link-proxy';
 
-// Public by design (a script has no origin): the function validates and limits.
 const CORS = {
   'access-control-allow-origin': '*',
   'access-control-allow-methods': 'GET, POST',
@@ -26,7 +18,6 @@ const json = (status, body, extra = {}) =>
     headers: { 'content-type': 'application/json', ...CORS, ...extra },
   });
 
-/** The body as text, or null once it passes the cap (stopped while streaming, not buffered whole). */
 async function readCapped(request, limit) {
   if (Number(request.headers.get('content-length')) > limit) return null;
   if (!request.body) return '';
@@ -61,8 +52,6 @@ export async function handleRequest(request, env, fetchFn = fetch) {
     if (body === null) return json(413, { error: 'too large' });
   }
 
-  // A fresh set of headers: whatever the caller sent under our two names is dropped,
-  // so only this Worker can say who the caller is.
   const headers = new Headers();
   const type = request.headers.get('content-type');
   if (type) headers.set('content-type', type);

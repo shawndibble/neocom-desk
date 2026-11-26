@@ -1,18 +1,3 @@
-/**
- * The LP Store corporation picker (issue #2321): a select box over every NPC
- * corporation that runs an LP Store, so a pilot can open — and compare — any
- * store, not only the ones they already hold LP with. The closed control is a
- * select-style button (the open store's name, or a prompt); opening it shows a
- * search field pinned above the full list, which the field narrows. Corps the active Character holds LP with are pinned first with their
- * balance (`lpStorePickerOptions`). Picking one navigates to
- * `/wallet/lp-store/:corporationId`, so the chosen store lives in the URL.
- *
- * Hand-built ARIA (decision 20260905-114550, reshaped by
- * 20260930-select-box-lp-store-picker): the button opens a dialog popover,
- * focus moves to its search input, Arrow/Home/End move a highlight via
- * `aria-activedescendant`, Enter or a click opens the store, Escape closes the
- * popover and returns focus to the button.
- */
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -42,9 +27,7 @@ const POPOVER_ID = `${ID_PREFIX}-popover`;
 const optionId = (corporationId: number) => `${ID_PREFIX}-option-${corporationId}`;
 
 interface LpStorePickerProps {
-  /** The open store's corp name, shown on the closed select; `null` shows the prompt. */
   corporationName: string | null;
-  /** `sm` for a panel's title bar, `md` (default) for a page header. */
   size?: 'sm' | 'md';
   className?: string;
 }
@@ -60,14 +43,10 @@ export function LpStorePicker({ corporationName, size = 'md', className }: LpSto
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
-  // Held by corporation, not list position: the balances landing re-pins
-  // the list, and an index would silently jump to a different corp.
   const [highlightedId, setHighlightedId] = useState<number | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    // A snapshot that fails to load leaves the picker empty rather than
-    // breaking the store page it sits on.
     void loadLpCorporations()
       .then((corps) => {
         if (!cancelled) setCorporations(corps);
@@ -78,8 +57,6 @@ export function LpStorePicker({ corporationName, size = 'md', className }: LpSto
     };
   }, []);
 
-  // Keyed on the Character, so a switch (or clearing it) never pins the
-  // previous Character's held corps — adjust-during-render, not an effect.
   const [balancesFor, setBalancesFor] = useState(characterId);
   if (balancesFor !== characterId) {
     setBalancesFor(characterId);
@@ -89,7 +66,6 @@ export function LpStorePicker({ corporationName, size = 'md', className }: LpSto
   useEffect(() => {
     if (characterId === null) return;
     let cancelled = false;
-    // A failed read just leaves nothing pinned; every store stays listed.
     void loadCharacterLoyaltyPoints(characterId)
       .then((result) => {
         if (!cancelled) setBalances(result.cached?.data ?? []);
@@ -112,8 +88,6 @@ export function LpStorePicker({ corporationName, size = 'md', className }: LpSto
     : -1;
   const highlighted = highlightedIndex >= 0 ? options[highlightedIndex] : null;
 
-  // Keyboard moves through ~180 stores in a scrolling list: keep the
-  // highlighted one in view (`aria-activedescendant` alone doesn't scroll).
   useEffect(() => {
     if (highlighted === null) return;
     document.getElementById(optionId(highlighted.corporationId))?.scrollIntoView?.({
@@ -151,8 +125,6 @@ export function LpStorePicker({ corporationName, size = 'md', className }: LpSto
         }
         break;
       case 'Enter': {
-        // With nothing highlighted, a typed name opens its best match — the
-        // top option — so "fed" + Enter goes straight to a store.
         const target = highlighted ?? (listOpen && trimmed !== '' ? options[0] : null);
         if (target) {
           e.preventDefault();
@@ -177,8 +149,6 @@ export function LpStorePicker({ corporationName, size = 'md', className }: LpSto
     <div
       ref={rootRef}
       className={cx('relative text-xs', className)}
-      // Focus leaving the whole control (trigger + popover) closes it; moving
-      // between the button and the search field does not.
       onBlur={(e) => {
         if (open && !rootRef.current?.contains(e.relatedTarget as Node | null)) close();
       }}
@@ -190,8 +160,6 @@ export function LpStorePicker({ corporationName, size = 'md', className }: LpSto
         aria-haspopup="dialog"
         aria-expanded={open}
         aria-controls={open ? POPOVER_ID : undefined}
-        // While open, keep focus in the search field: a blur here would close the
-        // popover and the click would reopen it (Safari/iOS don't focus buttons).
         onMouseDown={(e) => open && e.preventDefault()}
         onClick={() => (open ? close() : setOpen(true))}
         className={cx(
@@ -262,7 +230,6 @@ export function LpStorePicker({ corporationName, size = 'md', className }: LpSto
               role="listbox"
               aria-label={t('loyaltyStore.pickerLabel')}
               className="max-h-72 overflow-y-auto"
-              // The scrollbar/gutter must not steal focus, or the popover closes.
               onMouseDown={(e) => e.preventDefault()}
             >
               {options.map((option) => (

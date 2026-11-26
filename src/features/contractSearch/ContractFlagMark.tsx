@@ -1,9 +1,3 @@
-/**
- * The Items board's price flag (#4773), before the figure in the Price cell:
- * `BaitFlag`'s look (a warning glyph in `text-warning`) with contract wording.
- * The sentence is the tooltip and the glyph's description, and the short label
- * its accessible name, so it is never a colour alone.
- */
 import type { TFunction } from 'i18next';
 import type { TradeHub } from '@/market/hubs';
 import { Tooltip } from '@/components/ui';

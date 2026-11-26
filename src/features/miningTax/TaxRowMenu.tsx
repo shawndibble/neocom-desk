@@ -7,7 +7,6 @@ import { rowMenuActions, type RowMenuAction } from './rowMenu';
 interface TaxRowMenuProps {
   dr: DisplayRow;
   systemName: string;
-  /** Runs one action on this row — `useTaxDialogs`'s `runRowMenuAction`. */
   onAction: (action: RowMenuAction, dr: DisplayRow) => void;
   children: ReactElement;
 }
@@ -26,17 +25,9 @@ const LABEL_KEY: Record<Exclude<RowMenuAction['id'], 'takeOut'>, string> = {
   undismiss: 'miningTax.undismissAction',
   uncombine: 'miningTax.combined.uncombineAll',
   unassign: 'miningTax.detail.unassignAction',
-  // The same word as the Settle up button on the row: one key, so the two cannot drift apart.
   corpPay: 'miningTax.settleUpAction',
 };
 
-/**
- * A Tax row's right-click menu and its ⋮ button, from one list of actions
- * (`rowMenuActions`): the same ones its detail modal offers, View details
- * first. Each runs after the menu has closed, so a dialog it opens hands focus
- * back to the ⋮ when it closes. A row with only View details gets no menu —
- * clicking the row already does that (DESIGN.md §6c restraint).
- */
 export function TaxRowMenu({ dr, systemName, onAction, children }: TaxRowMenuProps) {
   const { t } = useTranslation();
   const openAfterMenu = useOpenAfterMenu();
@@ -47,7 +38,6 @@ export function TaxRowMenu({ dr, systemName, onAction, children }: TaxRowMenuPro
   const name = t('miningTax.rowMenu.name', { date: formatDateRange(dates), system: systemName });
 
   const items = groups.map((group, index) => (
-    // A group's first action identifies it; a take-out is keyed by its day.
     <Fragment key={group[0].id + index}>
       {index > 0 && <MenuSeparator />}
       {group.map((action) => (

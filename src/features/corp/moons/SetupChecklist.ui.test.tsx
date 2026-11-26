@@ -9,7 +9,6 @@ import { SetupChecklist } from './SetupChecklist';
 
 type Context = typeof BOOK_CONTEXT;
 
-/** The page's settings host, which the checklist opens rather than its own copy. */
 const openSettings = vi.fn();
 
 const render = (context: Context = BOOK_CONTEXT) =>

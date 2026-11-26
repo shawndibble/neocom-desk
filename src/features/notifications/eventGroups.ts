@@ -1,15 +1,3 @@
-/**
- * The named groups Settings > Notifications files the Notification Events
- * under: what a person is thinking about when they look for a row, not how
- * the catalog is ordered. Corp events keep their own "Corp notifications"
- * group (one permission line, one best-effort note), dropped when no Character
- * could ever use it (`corpEventsApply`), and EVE notifications
- * stay last, where their long list cannot push the rest off screen.
- *
- * Display only. The catalog's own order (`events.ts`) is what the poller and
- * the projection read. These are not Notification Families (GLOSSARY.md),
- * which only arrange EVE notification types.
- */
 import { type NotificationEventId } from './events';
 import { isNpcCorporationId } from '@/esi/entityIds';
 
@@ -22,7 +10,6 @@ export const EVENT_GROUP_KEYS = [
 ] as const;
 export type EventGroupKey = (typeof EVENT_GROUP_KEYS)[number];
 
-/** Exhaustive on purpose: a new catalog event does not typecheck until it is filed here. */
 const GROUP_OF: Record<NotificationEventId, EventGroupKey | 'corp' | 'eve'> = {
   skillLevelComplete: 'skills',
   characterNotTraining: 'skills',
@@ -37,8 +24,6 @@ const GROUP_OF: Record<NotificationEventId, EventGroupKey | 'corp' | 'eve'> = {
   planetaryExtractorExpiring: 'industryPi',
   mercenaryDenReinforced: 'industryPi',
   mercenaryDenAnarchy: 'industryPi',
-  // Moon mining: beside the den and PI clocks, not under Corporation, whose events ride the
-  // Corporation Permission. This one needs none.
   sharedMoonPop: 'industryPi',
   marketOrderFilled: 'market',
   marketOrderUndercut: 'market',
@@ -61,11 +46,7 @@ const GROUP_OF: Record<NotificationEventId, EventGroupKey | 'corp' | 'eve'> = {
   communityJoinRequest: 'world',
   communityMemberJoined: 'world',
   communityRequestPledged: 'world',
-  // Beside the community events, not under Corporation: that Topic is the events riding the
-  // Corporation Permission and only firing while the app is open. This one is pushed by the
-  // backend and needs no Permission.
   vettingShared: 'world',
-  // Beside vettingShared, for the same reason: pushed by the backend, no Permission.
   corpTaxBookSyncStopped: 'world',
   structureFuelLow: 'corp',
   skyhookRaidable: 'corp',
@@ -78,11 +59,6 @@ const GROUP_OF: Record<NotificationEventId, EventGroupKey | 'corp' | 'eve'> = {
 
 const PRICE_ALERT: NotificationEventId = 'priceAlertTriggered';
 
-/**
- * Whether the corp events belong in the list for these Characters' corporations: not when
- * every one is a known NPC corporation, whose members can never hold a Corp Role.
- * A corporation not learned yet (undefined) might be a player one, so it keeps them.
- */
 export function corpEventsApply(corporationIds: readonly (number | undefined)[]): boolean {
   return (
     corporationIds.length === 0 ||
@@ -93,17 +69,14 @@ export function corpEventsApply(corporationIds: readonly (number | undefined)[])
 export interface NotificationEventGroups {
   readonly groups: readonly { key: EventGroupKey; eventIds: readonly NotificationEventId[] }[];
   readonly corp: readonly NotificationEventId[];
-  /** The one EVE-notifications event, when it is among the ids given. */
   readonly eve: NotificationEventId | null;
 }
 
-/** Files `ids` (all of them, or a search's subset) into the on-screen groups, keeping their relative order. */
 export function groupNotificationEvents(
   ids: readonly NotificationEventId[]
 ): NotificationEventGroups {
   const groups = EVENT_GROUP_KEYS.map((key) => {
     const members = ids.filter((id) => GROUP_OF[id] === key);
-    // The price alert reads Quickbar rather than ESI, so it goes last in its group.
     return {
       key,
       eventIds: [

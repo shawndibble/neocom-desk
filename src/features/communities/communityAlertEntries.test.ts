@@ -137,7 +137,6 @@ describe('loadCommunityAlertEntries: Pledges on my Requests', () => {
     updatedAt,
   });
 
-  /** The Pledges on each Request, as `loadPledges` reads them one Request at a time. */
   const pledgesOn = (byRequest: Map<string, RequestPledge[]>) =>
     vi
       .mocked(loadPledges)
@@ -171,7 +170,6 @@ describe('loadCommunityAlertEntries: Pledges on my Requests', () => {
       { uid: 'u2', characterName: 'Bob', joinedAt: 1, libraryAsOf: null },
     ]);
     const entries = await loadCommunityAlertEntries(CHARACTER);
-    // Only the one open Request that wants the app: not r2 (mail only) nor r3 (closed).
     expect(loadPledges).toHaveBeenCalledTimes(1);
     expect(loadPledges).toHaveBeenCalledWith(CHARACTER, 'c1', 'r1');
     expect(entries).toEqual([

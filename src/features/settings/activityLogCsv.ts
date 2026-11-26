@@ -9,7 +9,6 @@ export const OUTCOME_LABEL_KEYS = {
   error: 'activityLog.outcomeError',
 } as const satisfies Record<ActivityOutcome, string>;
 
-/** Shared "Character" cell for the Activity log and Data age tables, and their exports. */
 export function characterCell(
   characterId: number | undefined,
   characterNames: ReadonlyMap<number, string>,
@@ -20,12 +19,10 @@ export function characterCell(
     : (characterNames.get(characterId) ?? `#${characterId}`);
 }
 
-/** An epoch-ms timestamp as ESI's ISO UTC form — which the exporters write as a real date. */
 function isoTime(entry: ActivityLogEntry): string {
   return new Date(entry.timestamp).toISOString();
 }
 
-/** Export columns for Settings' Activity log table. */
 export function activityLogCsvColumns(
   t: CsvTranslate,
   characterNames: ReadonlyMap<number, string>
@@ -41,10 +38,6 @@ export function activityLogCsvColumns(
   ];
 }
 
-/**
- * Export columns for Settings' Data age table. "Updated" exports the fetch
- * time itself: the table's "N min ago" is only true at the moment it's read.
- */
 export function dataAgeCsvColumns(
   t: CsvTranslate,
   characterNames: ReadonlyMap<number, string>

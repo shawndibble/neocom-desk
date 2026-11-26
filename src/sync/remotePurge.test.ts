@@ -10,8 +10,6 @@ interface FakeRef {
   id: string;
 }
 
-// In-memory Firestore double: collection path -> doc id -> data. No `where`:
-// the uid-only `list`/`delete` rules (firestore.rules) need no ownerHash filter.
 const fake = vi.hoisted(() => ({
   remoteStore: new Map<string, Map<string, Record<string, unknown>>>(),
 }));

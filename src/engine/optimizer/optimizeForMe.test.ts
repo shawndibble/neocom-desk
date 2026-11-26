@@ -95,9 +95,6 @@ describe('optimizeForMe', () => {
       skill(2, 'intelligence', 'memory'),
       skill(3, 'perception', 'willpower')
     );
-    // Mixed attribute pairs, interleaved: reordering groups them, and
-    // remapping on the grouped order should never cost more than remapping
-    // on the original (fragmented) order.
     const steps = [
       step(1, 1),
       step(2, 1),

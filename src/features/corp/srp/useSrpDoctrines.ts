@@ -1,7 +1,3 @@
-/**
- * The corp's Doctrine Fits for the settings page. Kept apart from `useSrpSettings`: a settings
- * reload remounts the form and drops unsaved edits, and adding or deleting a fit must not.
- */
 import { useCallback, useEffect, useState } from 'react';
 import { deleteSrpDoctrine, readSrpDoctrines, saveSrpDoctrine } from '../srpDoctrineClient';
 import type { DoctrineFit, SaveDoctrineInput } from '../srpTypes';

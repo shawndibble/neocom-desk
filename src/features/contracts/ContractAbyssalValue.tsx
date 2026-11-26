@@ -1,12 +1,3 @@
-/**
- * The abyssal-module line under a public contract's price check: the
- * MutaMarket estimate for the modules that have one, never added into the hub
- * figure, and why the rest have none. An estimate of each module's exact
- * rolls, not a sale price, so it says so and credits its source.
- *
- * Neutral type, like the rest of the check: the contract does not say which
- * side the reader is on.
- */
 import { useTranslation } from 'react-i18next';
 import { InfoTooltip } from '@/components/ui';
 import { ExternalLink } from '@/components/ui/ExternalLink';
@@ -21,7 +12,6 @@ export function ContractAbyssalValue({
   onToggleAbyssalOnly,
 }: {
   value: AbyssalContractValue;
-  /** With `onToggleAbyssalOnly`: whether the contents list is narrowed to abyssal modules. */
   abyssalOnly?: boolean;
   onToggleAbyssalOnly?: () => void;
 }) {

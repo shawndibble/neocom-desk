@@ -57,7 +57,6 @@ describe('loadSchematicName with bundled pi.json', () => {
     vi.mocked(loadPi).mockResolvedValue({
       schematics: { '3645': { schematicId: 65, name: 'Water' } },
     } as unknown as Awaited<ReturnType<typeof loadPi>>);
-    // No handler: onUnhandledRequest 'error' proves ESI was never reached.
     expect(await loadSchematicName(65)).toBe('Water');
     expect((await readCachedSchematicNames([65])).get(65)).toBe('Water');
   });
@@ -72,8 +71,6 @@ describe('readCachedSchematicNames', () => {
     );
     await loadSchematicName(65);
 
-    // No handler for 66 at all: onUnhandledRequest 'error' means reaching
-    // this line at all proves the miss below never fetched.
     const names = await readCachedSchematicNames([65, 66]);
 
     expect(names.get(65)).toBe('Water');

@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fetchJsonWithIdleTimeout, fetchWithIdleTimeout, IDLE_TIMEOUT_MS } from './idleTimeout';
 
-/** A body that emits one byte per `gapMs`, `count` times, and errors if the request is aborted. */
 function trickleFetch(count: number, gapMs: number, hangAfter = false) {
   return vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
     const stream = new ReadableStream<Uint8Array>({

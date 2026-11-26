@@ -1,19 +1,11 @@
-/**
- * Community Offers (issue #3602, ADR 0018): the Shared Blueprints of every
- * Community a Character is in, merged for BPC Sourcing. One row per sharer
- * and blueprint instance however many Communities show it; a stale library
- * is flagged, never dropped. Pure: loading is `useCommunityBlueprintOffers`.
- */
 import { isLibraryStale, type SharedBlueprint } from './sharedLibrary';
 
-/** One Community's Members, each with their library and its "as of" stamp. */
 export interface CommunityOfferSource {
   communityId: string;
   communityName: string;
   members: readonly {
     uid: string;
     characterName: string;
-    /** When the Member's library was last refreshed; null when it shares none. */
     asOf: number | null;
     items: readonly SharedBlueprint[];
   }[];
@@ -22,9 +14,7 @@ export interface CommunityOfferSource {
 export interface CommunityOffer extends SharedBlueprint {
   uid: string;
   memberName: string;
-  /** Identical copies the sharer holds (the most any one Community lists). */
   quantity: number;
-  /** Every Community that shows this instance (id and name), sorted by name; "ask to copy" posts to one. */
   communities: { id: string; name: string }[];
   asOf: number | null;
   stale: boolean;
@@ -32,7 +22,6 @@ export interface CommunityOffer extends SharedBlueprint {
 
 const finite = (n: unknown): n is number => typeof n === 'number' && Number.isFinite(n);
 
-/** Firestore data is Member-written: drop anything that isn't a well-formed Shared Blueprint. */
 function isSharedBlueprint(b: SharedBlueprint): boolean {
   return (
     !!b &&
@@ -84,7 +73,6 @@ export function buildCommunityOffers(
         if (!existing.communities.some((c) => c.id === communityId)) {
           existing.communities.push({ id: communityId, name: communityName });
         }
-        // The freshest stamp across Communities decides: one fresh view means it is current.
         if (member.asOf !== null && (existing.asOf === null || member.asOf > existing.asOf)) {
           existing.asOf = member.asOf;
           existing.stale = isLibraryStale(member.asOf, now);

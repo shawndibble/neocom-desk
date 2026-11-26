@@ -24,26 +24,14 @@ import type { ChainBasis } from '../chainEstimateModel';
 import { isScoredRecipe, iskPerHourOf, recipeOf, safeVolume } from './rebuild';
 import type { PlanAdviceInput, RankingBasis, RawRow } from './types';
 
-/**
- * The Command Center level a recipe ranking assumes when the pilot's skill
- * never loaded (or they have no colony to read one from). The ranking is an
- * estimate either way, and `rankingBasis.ccAssumed` says so; IV is the common
- * trained level, so the ranking shows P2s a typical pilot can really host.
- */
 export const ASSUMED_RANKING_CC_LEVEL = 4;
 
-/**
- * A pin's link on a planet the pilot has not colonised: roughly a 50 km hop
- * (15 + 0.2/km CPU, 10 + 0.15/km power, per `engine/pi/linkCost.ts`). Used only
- * for the recipe ranking when no colony of theirs has a hop to borrow.
- */
 export const ASSUMED_RANKING_LINK_COST: PinLoad = { cpu: 25, powergrid: 18 };
 
 function hostsTier2(advice: StopTierAdvice): boolean {
   return advice.entries.some((entry) => entry.tier === 2 && entry.status !== 'does-not-fit');
 }
 
-/** A ranking candidate and the heads per extractor it was fitted with. */
 interface FittedEntry {
   entry: StopTierEntry;
   heads: number;
@@ -57,17 +45,6 @@ function fitsBudget(used: PinLoad, budget: PinLoad): boolean {
   return used.cpu <= budget.cpu && used.powergrid <= budget.powergrid;
 }
 
-// --- Recipe ranking ------------------------------------------------------------
-
-/**
- * Every one-planet recipe on every planet type, valued the way a planet the
- * pilot has not built yet would be: at their own measured extraction rate
- * (else the typed fallback; per head kept, for a P2 stepped to fewer heads),
- * their Command Center level, and a link cost borrowed from their colonies
- * (else a stated default). `rankingBasis` carries which of those were assumed,
- * so the page can badge the figures as estimates. Each layout carries the fit
- * it was scored with.
- */
 export function rankingFor(args: {
   input: PlanAdviceInput;
   rows: readonly PlannerColonyRow[];
@@ -106,8 +83,6 @@ export function rankingFor(args: {
     withAdvice.flatMap((a) => (a.pinLoad.newLinkLoad ? [a.pinLoad.newLinkLoad] : []))
   );
 
-  // The storage the pilot's own colonies buffer through, typically: a layout
-  // fitted with none would be rejected for a weekly haul it would survive.
   const storageCounts = withAdvice.map((a) => a.pinLoad.counts.storage ?? 0).sort((a, b) => a - b);
   const storage =
     storageCounts.length > 0 ? storageCounts[Math.floor((storageCounts.length - 1) / 2)] : 0;
@@ -126,8 +101,6 @@ export function rankingFor(args: {
   const rawRows: RawRow[] = [];
   const rawUnpriced = new Set<number>();
   const maxLevel = Math.max(pi.infrastructure.commandCenterUpgrades.length - 1, 0);
-  // The lowest level whose budget carries `used`: what Show me how and its meter
-  // name for a layout that fits the pilot's own Command Center.
   const fitOf = (used: PinLoad, needsCcLevel: number | null): RecipeFit => {
     let level = needsCcLevel ?? 0;
     let { budget } = colonyBudget(level, pi);
@@ -157,11 +130,6 @@ export function rankingFor(args: {
         },
         pi
       );
-    // Heads must not decide whether a planet hosts a P2: a P0 colony's heads
-    // overdraw a P2's two extractors. An assumed count steps the whole layout
-    // down; then each P2 that still does not fit takes the most heads that do,
-    // its rate scaled by heads kept. P1 keeps a measured count. `skip`: P2s a
-    // lower level already hosts.
     const adviceFor = (budget: PinLoad, skip?: ReadonlySet<number>): FittedEntry[] => {
       let base = adviceAt(budget, heads, rate);
       let baseHeads = heads;
@@ -218,7 +186,6 @@ export function rankingFor(args: {
     const fitted = adviceFor(ceiling.budget);
     for (const { entry } of fitted) {
       if (entry.tier === 0) {
-        // Kept apart from the recipe rows: a raw is shown, never ranked.
         if (entry.status === 'needs-price') rawUnpriced.add(entry.typeId);
         const isk = entry.status === 'scored' ? iskPerHourOf(entry, books, taxRate) : null;
         if (isk !== null) {
@@ -235,8 +202,6 @@ export function rankingFor(args: {
       if (built) recipeRows.push(built);
       hosted.add(scored.entry.typeId);
     }
-    // What only a higher Command Center hosts still ranks, tagged with the
-    // lowest level that does, so an untrained pilot sees what training buys.
     for (let level = ceiling.level + 1; level <= maxLevel; level += 1) {
       for (const scored of adviceFor(colonyBudget(level, pi).budget, hosted).filter(
         isRecipeEntry
@@ -264,9 +229,7 @@ export function rankingFor(args: {
   return {
     rows: recipeRows,
     rawRows,
-    // Priced on any planet type = priced: the market prices the item, not the planet.
     rawUnpriced: [...rawUnpriced].filter((id) => !rawPriced.has(id)),
-    // With no colony every planet type is one the pilot could go and find, as in Find best.
     withTagged: rankRecipes({
       rows: recipeRows,
       haveTypes: have.length > 0 ? have : planetTypes,
@@ -274,7 +237,6 @@ export function rankingFor(args: {
       unpriced: unpricedIds,
     }),
     ranking: rankRecipes({
-      // Plan and Map stay within the trained skill; Find best re-ranks every row.
       rows: recipeRows.filter((row) => !row.needsCcLevel),
       haveTypes: have,
       filter: input.recipeFilter,

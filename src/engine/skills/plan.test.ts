@@ -69,7 +69,6 @@ describe('normalizePlan', () => {
   });
 
   it('handles diamond prerequisites without duplicates', () => {
-    // A needs B and C; B and C both need D II
     const skills = skillMap(
       skill(4, 'D'),
       skill(2, 'B', [{ typeID: 4, level: 2 }]),
@@ -127,7 +126,7 @@ describe('normalizePlan', () => {
       [
         { skillTypeID: 1, targetLevel: 2 },
         { skillTypeID: 2, targetLevel: 1 },
-        { skillTypeID: 1, targetLevel: 3 }, // extends earlier entry, no duplicate I/II
+        { skillTypeID: 1, targetLevel: 3 },
       ],
       skills,
       new Map()
@@ -188,7 +187,7 @@ describe('normalizePlanWithBoundaries', () => {
     const entries: PlanEntry[] = [
       { skillTypeID: 1, targetLevel: 2 },
       { skillTypeID: 2, targetLevel: 1 },
-      { skillTypeID: 1, targetLevel: 3 }, // extends entry 1's skill, no new prereq work
+      { skillTypeID: 1, targetLevel: 3 },
     ];
     const { steps, entryBoundaries } = normalizePlanWithBoundaries(entries, skills, new Map());
     expect(steps).toEqual([
@@ -218,8 +217,6 @@ describe('normalizePlanWithBoundaries', () => {
   });
 
   it("an entry whose prereq chain re-trains an earlier entry's skill to a higher level attributes those extra steps to itself, not the earlier entry", () => {
-    // A is entry 1's own skill (target I). B (entry 2) requires A III as a prereq,
-    // so entry 2's range should include A II/III as its own leading (prereq) steps.
     const skills = skillMap(skill(1, 'A'), skill(2, 'B', [{ typeID: 1, level: 3 }]));
     const entries: PlanEntry[] = [
       { skillTypeID: 1, targetLevel: 1 },
@@ -232,8 +229,6 @@ describe('normalizePlanWithBoundaries', () => {
       { skillTypeID: 1, level: 3 },
       { skillTypeID: 2, level: 1 },
     ]);
-    // Entry 1 only ever owned A:1 (boundary 1); the extra A:2/A:3 pushed while
-    // satisfying entry 2's prereq belong to entry 2's range (boundary 4).
     expect(entryBoundaries).toEqual([1, 4]);
   });
 
@@ -283,8 +278,6 @@ describe('findRemovalBlockers', () => {
   });
 
   it('flags every level of a cascade a later same-skill level still climbs through', () => {
-    // B needs A III; A II is also flagged, since A III alone re-creates it as a
-    // leading step the moment A II's own entry is removed.
     const skills = skillMap(skill(1, 'A'), skill(2, 'B', [{ typeID: 1, level: 3 }]));
     const entries: PlanEntry[] = [
       { skillTypeID: 1, targetLevel: 2 },

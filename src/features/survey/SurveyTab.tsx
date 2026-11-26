@@ -1,16 +1,3 @@
-/**
- * Mining › Survey: paste a Survey Scanner copy (here, or Ctrl+V anywhere in
- * the app, which `GlobalPasteRouter` sends here) and it tracks the field from
- * then on. The first scan stores a `survey` Share Link; a later paste that only
- * shrinks the field adds a scan to it, and the short link is what other pilots
- * open or paste into. A paste that is a different field starts a new survey, or
- * asks first when the pilot owns the one in view and it could still be that
- * field (it fits the first scan); one that doesn't even fit the first scan
- * starts a new survey without asking.
- *
- * Like the other mining tabs, this one owns its `PageHeader`; the shared tab
- * bar is handed down from `routes/MoonMiningTax.tsx`.
- */
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -61,13 +48,10 @@ import { useSurvey } from './useSurvey';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 
 interface SurveyTabProps {
-  /** The route's shared tab bar, rendered under this tab's own `PageHeader`. See `MoonMiningTax`. */
   tabBar: ReactNode;
-  /** The id base the tab bar was built with, so the body is its tab panel. */
   tabsId: string;
 }
 
-/** Where a scan goes when the pilot has chosen: a new survey, or the one in view. */
 type ScanTarget = 'new' | 'existing';
 
 export function SurveyTab({ tabBar, tabsId }: SurveyTabProps) {
@@ -79,7 +63,6 @@ export function SurveyTab({ tabBar, tabsId }: SurveyTabProps) {
   const setCurrentId = useCurrentSurveyId((state) => state.setValue);
   const hydrated = useHydratedStore(useCurrentSurveyId);
 
-  // `?survey=<id>` (from a shared page's "Open Neocom Desk") adopts that survey.
   const adopt = new URLSearchParams(location.search).get('survey');
   useEffect(() => {
     if (!hydrated || adopt === null) return;
@@ -89,15 +72,12 @@ export function SurveyTab({ tabBar, tabsId }: SurveyTabProps) {
 
   const { state, refresh } = useSurvey(hydrated ? currentId : null);
 
-  // The template picked on the empty page, filled into the survey the first scan starts.
   const templates = useSurveyTemplates((s) => s.value);
   useHydratedStore(useSurveyTemplates);
   const [startTemplateId, setStartTemplateId] = useState<string | null>(null);
   const startTemplate = templates.find((template) => template.id === startTemplateId);
-  // The Additional information typed (or taken from a template) before the first scan.
   const [startDraft, setStartDraft] = useState<StartDraft>(EMPTY_START_DRAFT);
 
-  // A survey started on this device with no account becomes this pilot's once they are signed in.
   const accountNames = useCharacters().map((c) => c.name);
   const accountKey = accountNames.join('|');
   useEffect(() => {
@@ -109,16 +89,11 @@ export function SurveyTab({ tabBar, tabsId }: SurveyTabProps) {
     })().catch(() => undefined);
   }, [characterId, accountKey, refresh]);
 
-  // A survey in view is one the pilot has now created or opened.
   useEffect(() => {
     if (currentId !== null && state.status === 'ready') void noteSurvey(currentId);
   }, [currentId, state.status]);
 
-  // A different field the survey's owner pasted, waiting for their choice. It
-  // belongs to the survey that was in view, so switching survey drops it.
   const [asking, setAsking] = useState<{ text: string; forId: string | null } | null>(null);
-  // A first scan that lacks an ore the survey shows, waiting for the pilot to
-  // confirm every section was expanded.
   const [checking, setChecking] = useState<{
     text: string;
     ores: string[];
@@ -135,7 +110,6 @@ export function SurveyTab({ tabBar, tabsId }: SurveyTabProps) {
         owner: { characterId, ownerName },
         prefill: draftToInfo(startDraft),
       });
-      // Scan first, so the new survey's first load already has it.
       await addSurveyScan({ id: started.id, text, expiresAt: started.expiresAt, by: ownerName });
       setStartTemplateId(null);
       setStartDraft(EMPTY_START_DRAFT);
@@ -149,16 +123,12 @@ export function SurveyTab({ tabBar, tabsId }: SurveyTabProps) {
 
   const add = useCallback(
     async (text: string, choice?: ScanTarget, confirmed = false): Promise<AddScanResult> => {
-      // Before anything is sent, so a wrong paste never starts a survey.
       const rejected = rejectScanText(text);
       if (rejected !== null) return rejected;
       try {
         if (choice === 'new') return await startWith(text);
-        // Read fresh, not from the polled state: another pilot may have added a
-        // scan since, and a paste is compared against the latest one.
         const found = currentId === null ? null : await loadSurvey(currentId, { fresh: true });
         if (found?.ok) {
-          // Against what the survey counts: a removed bad paste is no field to match.
           const counted = countedScans(found.scans, found.ignored);
           const latest = counted[counted.length - 1];
           const pasted = parseSurveyScan(text) ?? [];
@@ -168,15 +138,12 @@ export function SurveyTab({ tabBar, tabsId }: SurveyTabProps) {
             classifyScan(lastSeenField(counted.map((scan) => scan.rocks)), pasted) === 'update';
           if (!sameField) {
             const names = (await db.characters.toArray()).map((c) => c.name);
-            // Not even a subset of the first scan: clearly another field, so no question to ask.
             const clearlyNew = classifyScan(counted[0]!.rocks, pasted) === 'different';
             if (clearlyNew || !ownsSurvey(found.owner, names)) return await startWith(text);
             setAsking({ text, forId: currentId });
             return 'ok';
           }
           if (!confirmed && choice === undefined && !hasSubmittedScan()) {
-            // Against the latest scan only: an ore an earlier scan showed but the
-            // latest already lacks is mined out, not a collapsed section.
             const ores = missingOres(latest?.rocks ?? null, parseSurveyScan(text) ?? []);
             if (ores.length > 0) {
               setChecking({ text, ores, forId: currentId, choice });
@@ -194,7 +161,6 @@ export function SurveyTab({ tabBar, tabsId }: SurveyTabProps) {
           return 'ok';
         }
         if (found !== null && found.reason === 'failed') return 'failed';
-        // First scan, or the old survey has expired: start a new one.
         return await startWith(text);
       } catch (error) {
         return scanFailure(error);
@@ -222,11 +188,9 @@ export function SurveyTab({ tabBar, tabsId }: SurveyTabProps) {
     addRef.current = trackedAdd;
   });
 
-  // A scan the app-wide paste router carried here.
   const routed = (location.state as Partial<SurveyScanState> | null)?.surveyScanText;
   const handled = useRef<string | null>(null);
   useEffect(() => {
-    // Cleared with the router's state, so the same text pasted again is a new paste.
     if (routed === undefined) handled.current = null;
     if (!hydrated || routed === undefined || handled.current === routed) return;
     handled.current = routed;
@@ -235,15 +199,10 @@ export function SurveyTab({ tabBar, tabsId }: SurveyTabProps) {
     });
   }, [hydrated, routed, navigate, location.pathname, location.search]);
 
-  // A scan pasted on a shared page that was a different field, waiting here
-  // since the pilot logged in: it starts their own survey. Taken before the
-  // await, so a re-render cannot add it twice.
   useEffect(() => {
     if (!hydrated || characterId === null) return;
     const pending = takePendingScan();
     if (pending === null) return;
-    // Put back if it didn't land (no session yet right after login, offline):
-    // the pilot's next visit tries again instead of losing the paste.
     void addRef.current(pending, 'new').then((result) => {
       if (result !== 'ok') stashPendingScan(pending);
     });
@@ -252,7 +211,6 @@ export function SurveyTab({ tabBar, tabsId }: SurveyTabProps) {
   const characterNames = useCharacters().map((c) => c.name);
   const scans = useMemo(() => (state.status === 'ready' ? state.scans : []), [state]);
   const owned = state.status === 'ready' && ownsSurvey(state.owner, characterNames);
-  // What the start link shown in the help is built from: the Additional information as it stands.
   const helpFields: InfoFields =
     currentId !== null && state.status === 'ready'
       ? {
@@ -261,7 +219,6 @@ export function SurveyTab({ tabBar, tabsId }: SurveyTabProps) {
           notes: state.info?.notes ?? '',
         }
       : draftToInfo(startDraft);
-  // Only the owner sets a scan aside; the rules can't tell who that is, so this is the guard.
   const { setIgnored, failed: ignoreFailed } = useScanIgnore({
     id: currentId,
     expiresAt: state.status === 'ready' ? state.expiresAt : null,
@@ -333,15 +290,12 @@ export function SurveyTab({ tabBar, tabsId }: SurveyTabProps) {
               </p>
             )}
             <SurveyBoard
-              // Opening another Survey starts its chart back on Ore left.
               key={currentId ?? 'none'}
               scans={scans}
               ignored={state.status === 'ready' ? state.ignored : undefined}
               onSetIgnored={
                 owned ? (scanId, ignored) => void setIgnored(scanId, ignored) : undefined
               }
-              // Who may mark it cleared (owner any time, anyone once it is nearly done) is
-              // `canFinishSurvey`'s call, inside the board.
               onFinish={currentId !== null && state.status === 'ready' ? finish : undefined}
               owned={owned}
               location={state.status === 'ready' ? (state.info?.location?.name ?? null) : null}

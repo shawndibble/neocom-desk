@@ -1,19 +1,3 @@
-/**
- * `/survey`, the public place to start a **Survey** and to build a **Survey
- * start link**, with no login. The form holds the Additional information a new
- * Survey begins with (location, moon tax payee and rate, notes), filled from the
- * link's query when there is one; below it a link that always matches the form,
- * and the paste area. The first valid Survey Scan, pasted anywhere on the page,
- * starts the Survey with those details.
- *
- * A pilot with a Character logged in starts it as that Character and lands on
- * their own Survey tab; anyone else starts it anonymously and lands on its public
- * `/s/<id>` page. Each opener starts their own Survey.
- *
- * Logged out, systems and NPC stations are still searched (from local data) and an
- * ID can be typed for a place, corporation, alliance or character; ESI's public
- * lookup names it. Structures and the saved Payees need a Character.
- */
 import { useCallback, useEffect, useEffectEvent, useMemo, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useTranslation } from 'react-i18next';
@@ -62,7 +46,6 @@ import { useScanFeedback } from './useScanFeedback';
 import { nameIds } from './startLinkNames';
 import { useStartLinkNames, type NameStatus } from './useStartLinkNames';
 
-/** An ID typed into a box: digits only, else nothing. */
 function idOf(text: string): number | null {
   const value = Number(text);
   return /^\d+$/.test(text.trim()) && Number.isSafeInteger(value) && value > 0 ? value : null;
@@ -93,7 +76,6 @@ export function SurveyStartScreen() {
   const [rateText, setRateText] = useState(() => parseStartLink(search).rate?.toString() ?? '');
   const { copied, flash } = useCopyFeedback<'copied' | 'failed'>(2000);
   const [howTo, setHowTo] = useState(false);
-  // IDs are for link writers: shown only when asked for, even if the link carries one.
   const [ids, setIds] = useState(false);
   const names = useStartLinkNames(fields);
   const savedPayees = useLiveQuery(
@@ -117,13 +99,11 @@ export function SurveyStartScreen() {
   function setPayeeName(name: string) {
     setFields((prev) => ({
       ...prev,
-      // A typed name is its own answer: the ID that came with the old one no longer applies.
       payee: name === '' ? null : { id: null, name },
     }));
     fillSavedRate(name);
   }
 
-  /** A saved Payee brings its usual rate, unless one is already typed. */
   function fillSavedRate(name: string) {
     const saved = (savedPayees ?? []).find((payee) => samePayeeName(payee.name, name));
     if (saved !== undefined && rateText.trim() === '') {
@@ -139,7 +119,6 @@ export function SurveyStartScreen() {
       try {
         const ownerName =
           characterId === null ? undefined : (await db.characters.get(characterId))?.name;
-        // An ID the lookup hasn't named yet (a scan pasted straight after the link opened) is named now.
         const prefill = await nameIds(fields, info);
         const started = await startSurvey({
           owner:
@@ -148,7 +127,6 @@ export function SurveyStartScreen() {
               : undefined,
           prefill,
         });
-        // Scan first, so the new survey's first load already has it.
         await addSurveyScan({
           id: started.id,
           text,
@@ -157,7 +135,6 @@ export function SurveyStartScreen() {
         });
         noteSubmittedScan();
         noteStartedHere(started.id);
-        // Started from a pop's link: tell the app, so the pop opens this Survey. Never blocks the Survey.
         if (popId !== null && ownerName !== undefined)
           void linkSharedPopSurvey(popId, started.id).catch(() => undefined);
         if (ownerName !== undefined) {
@@ -175,8 +152,6 @@ export function SurveyStartScreen() {
   );
   const { trackedAdd, busy, error } = useScanFeedback(add);
 
-  // An effect event, so a scan pasted just after a name resolves (before passive effects run) still
-  // sees that name: a listener rebound per render would still hold the old form.
   const onPaste = useEffectEvent((event: ClipboardEvent) => {
     if (event.defaultPrevented || isTypingTarget(event.target)) return;
     const text = event.clipboardData?.getData('text/plain') ?? '';
@@ -188,7 +163,6 @@ export function SurveyStartScreen() {
     return () => document.removeEventListener('paste', listener);
   }, []);
 
-  // A payee ESI found by its typed name travels as its ID, which names it for whoever opens the link.
   const verifiedPayeeId =
     names.payeeByName && names.payee !== 'idle' && names.payee !== 'loading' && names.payee.ok
       ? names.payee.id
@@ -239,7 +213,6 @@ export function SurveyStartScreen() {
         <div className="flex flex-col gap-4">
           <p className="text-xs text-text-dim">{t('survey.start.detailsHint')}</p>
           <SurveyDetailsFields
-            // A link with only IDs shows the names ESI gave them; the IDs stay in the link.
             place={
               fields.place && fields.place.name === '' && resolvedPlace !== undefined
                 ? { ...fields.place, name: resolvedPlace }
@@ -290,9 +263,7 @@ export function SurveyStartScreen() {
                     const id = idOf(event.target.value);
                     setFields((prev) => ({
                       ...prev,
-                      place:
-                        // The name that went with the old ID is dropped; the lookup names the new one.
-                        id === null ? null : { id, name: '' },
+                      place: id === null ? null : { id, name: '' },
                     }));
                   }}
                   className="w-44"

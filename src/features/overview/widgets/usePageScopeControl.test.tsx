@@ -16,7 +16,6 @@ import type { OverviewLayout, Widget } from './layout';
 
 registerKindDefs(CORP_DEFS);
 
-// Without an active Character the picker reads This character as All.
 beforeEach(() => useActiveCharacter.setState({ activeCharacterId: 1 }));
 
 const characters = vi.hoisted(() => ({ value: [{ characterId: 1 }, { characterId: 2 }] }));
@@ -62,7 +61,6 @@ function setup(
 
 describe('the page scope control on the Overview', () => {
   it('reads the scope the widgets share and writes a choice onto every widget that can take it', async () => {
-    // `orders` sums across Characters; `training` does not.
     const onLayoutChange = setup([
       widget('a', 'orders', 'header'),
       widget('b', 'training', 'header'),

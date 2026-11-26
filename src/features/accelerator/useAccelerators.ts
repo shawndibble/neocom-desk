@@ -13,11 +13,6 @@ import { purgeExpiredAccelerators } from './characterAccelerators';
 
 const NONE: ReadonlyMap<number, CharacterAcceleratorRecord> = new Map();
 
-/**
- * Every Character's typed-in accelerator. Mounting also deletes the ones that
- * have run out, so the next time a pilot opens an editor it is back to
- * detection (GLOSSARY.md **Accelerator**); the live query then re-emits.
- */
 export function useCharacterAccelerators(): ReadonlyMap<number, CharacterAcceleratorRecord> {
   const rows = useLiveQuery(() => db.characterAccelerators.toArray(), []);
   useEffect(() => {
@@ -26,21 +21,10 @@ export function useCharacterAccelerators(): ReadonlyMap<number, CharacterAcceler
   return useMemo(() => (rows ? new Map(rows.map((row) => [row.characterId, row])) : NONE), [rows]);
 }
 
-/**
- * The accelerator bonus a Character's attribute sheet implies, read from the
- * cache alone (nothing is fetched for it), or `null` when the sheet or its
- * implants are not cached or the sheet is legal. Same recovery the Skill Plan
- * uses (`deriveAttributeBaseline`).
- */
 export async function detectAcceleratorBonus(characterId: number): Promise<number | null> {
   return (await readDetectedAccelerator(characterId))?.bonus ?? null;
 }
 
-/**
- * `detectAcceleratorBonus` that tells "no accelerator" (`{ bonus: null }`) from "cannot tell"
- * (`null`: the sheet or implants are not cached, or the read failed). The Accelerator ended
- * alert needs the difference, or an emptied cache would read as a removed accelerator.
- */
 export async function readDetectedAccelerator(
   characterId: number
 ): Promise<{ bonus: number | null } | null> {
@@ -61,7 +45,6 @@ export async function readDetectedAccelerator(
   }
 }
 
-/** `detectAcceleratorBonus` for a roster; a Character appears once its cached sheet has been read. */
 export function useDetectedAccelerators(
   characterIds: readonly number[]
 ): ReadonlyMap<number, number | null> {

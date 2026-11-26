@@ -17,7 +17,6 @@ import { SHIP_TREE } from '@/features/fittings/shipTree/__fixtures__/shipTreeFix
 import { stubViewport } from '@/test/viewport';
 import { loadPaletteContacts } from './contactsProvider';
 
-// The session catalogue is module-level; each test gets a fresh one behind it.
 const catalogueHolder = vi.hoisted(() => ({ current: null as MarketItemCatalogue | null }));
 vi.mock('./marketItems', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./marketItems')>();
@@ -44,8 +43,6 @@ function lateCatalogue() {
   return { load, resolve: (catalogue: MarketTypeEntry[]) => resolve(catalogue) };
 }
 
-// One Set, as the real hook memoises it: a fresh one per render would be a
-// fresh search per render, and a failing async group would never settle.
 const LOCKED = new Set(['/assets']);
 vi.mock('@/app/useGrantedScopes', () => ({
   useGrantedScopes: () => undefined,
@@ -166,7 +163,6 @@ describe('CommandPalette', () => {
       await screen.findByRole('combobox');
       expect(screen.getByText(HINT)).toBeInTheDocument();
       const recent = screen.getByRole('region', { name: 'Recent' });
-      // The page the pilot is on is left out, as in the More sheet.
       expect(
         within(recent)
           .getAllByRole('link')
@@ -283,12 +279,10 @@ describe('CommandPalette', () => {
     await user.type(await screen.findByRole('combobox'), 'opp');
     await user.keyboard('{Enter}');
     expect(screen.getByTestId('where')).toHaveTextContent('/industry/opportunities');
-    // The palette's own entry was replaced, not left behind.
     expect(window.history.state).not.toHaveProperty('__neocomOverlay');
 
     act(() => window.history.back());
     await vi.waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent('/overview'));
-    // Landed on the original entry, not a dead one the overlay left behind.
     expect(window.history.state).not.toHaveProperty('__neocomOverlay');
   });
 
@@ -296,7 +290,6 @@ describe('CommandPalette', () => {
     const user = userEvent.setup();
     renderShell();
     await user.keyboard('{Control>}k{/Control}');
-    // "settings" matches pages and a command, and no Character.
     await user.type(await screen.findByRole('combobox'), 'settings');
 
     const groups = screen
@@ -306,7 +299,6 @@ describe('CommandPalette', () => {
     expect(names).toEqual(['Pages', 'Commands']);
 
     const pagesGroup = () => within(screen.getByRole('group', { name: 'Pages' }));
-    // Two sections match, so Pages starts at three rows; arrowing past them opens the rest.
     expect(pagesGroup().getAllByRole('option')).toHaveLength(3);
     for (let i = 0; i < 3; i++) await user.keyboard('{ArrowDown}');
     const pageOptions = pagesGroup().getAllByRole('option');
@@ -317,7 +309,6 @@ describe('CommandPalette', () => {
       'option'
     )[0];
     expect(command).toHaveAttribute('aria-selected', 'true');
-    // Wraps back to the first page from the last command.
     await user.keyboard('{End}{ArrowDown}');
     expect(pageOptions[0]).toHaveAttribute('aria-selected', 'true');
   });
@@ -399,13 +390,11 @@ describe('CommandPalette', () => {
     );
     expect(within(items).queryByRole('option')).not.toBeInTheDocument();
     const pages = screen.getByRole('group', { name: 'Pages' });
-    // Announced too: the error row is not an option, so the count alone would miss it.
     await waitFor(() =>
       expect(screen.getByRole('status')).toHaveTextContent(
         /^\d+ results?\..*Couldn't load these results\.$/
       )
     );
-    // The error row is never highlighted; the best page still is.
     expect(within(pages).getAllByRole('option')[0]).toHaveAttribute('aria-selected', 'true');
     await user.keyboard('{Enter}');
     expect(screen.getByTestId('where')).toHaveTextContent('/settings');
@@ -525,7 +514,6 @@ describe('CommandPalette', () => {
       renderShell();
       await user.keyboard('{Control>}k{/Control}');
       await user.type(await screen.findByRole('combobox'), 'pirate');
-      // Let the cache read land; it answers nothing, so no group ever renders.
       await act(async () => {
         await loadPaletteContacts();
       });

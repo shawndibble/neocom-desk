@@ -1,6 +1,3 @@
-// Its own file because `hydrateActivityFacilityDefaults` runs the one-time
-// refinery adoption at most once per module instance: the race below needs
-// to be the first thing in the module to start it.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { db } from '@/db';
 import { EMPTY_RIG_FIT } from '@/engine/industry/types';
@@ -38,9 +35,6 @@ beforeEach(async () => {
 
 describe('rememberActivityLocations', () => {
   it('lands after the one-time refinery adoption, never under it', async () => {
-    // A pre-split refinery in the manufacturing key: the adoption moves it to
-    // the reaction key and resets this one. A plan-page write that raced it
-    // would be overwritten on disk by that reset.
     const tatara = { facility: 'tatara', rigFit: EMPTY_RIG_FIT, facilityTaxPct: 2 };
     await db.settings.put({ key: FACILITY_DEFAULTS_SETTING_KEY, value: tatara });
 
@@ -59,7 +53,6 @@ describe('rememberActivityLocations', () => {
   });
 
   it('skips a record equal to the one already remembered', async () => {
-    // Each write pushes to Firestore and reschedules sync for every Character.
     await db.settings.put({ key: FACILITY_DEFAULTS_SETTING_KEY, value: BADIVEFI_AZBEL });
     const put = vi.spyOn(db.settings, 'put');
     try {

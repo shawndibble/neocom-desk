@@ -1,43 +1,9 @@
-/**
- * Route code-splitting: one chunk per page, fetched on first visit.
- *
- * Before this, `App.tsx` imported every route statically, so the whole app —
- * Industry, Market, PI, Skills, Corp — was one entry chunk the
- * browser pulled and parsed before the login screen could paint. Each loader
- * here is a separate `import()`, which is what gives Rollup a chunk boundary.
- *
- * The eager routes are the ones a signed-out cold load can land on before any
- * choice is made — `Login`, `Callback` and `NotFound` — and stay static in
- * `App.tsx`; a lazy one would only add a fallback frame to the first paint.
- * The signed-in shell (`Layout`, and `Overview`, the index redirect's target)
- * is split too, so a first-time visitor on /login does not download it; a
- * returning user's boot preloads it instead (`preloadSignedInShell`, fired
- * from `bootShellPreload.ts`).
- *
- * `Layout`'s nav items call `preloadRouteChunk` on hover/focus, beside
- * `warmRoute`, so the chunk is usually in flight before the click. Every call
- * goes through the same loader function, and the module registry dedupes
- * repeat `import()`s, so a preload and the later `lazy()` render share one
- * request.
- */
 import type { ComponentType } from 'react';
 import type { AppRoutePath } from './routeScopes';
 import { staleBuildRecoveryOutcome } from './staleBuildState';
 
 type RouteModule = { default: ComponentType };
 
-/**
- * Route files use named exports, and `lazy()` wants `{ default }`: re-shape
- * the module here rather than giving every route file a default export. The
- * `import()` stays a literal at each call site — that is what Rollup splits on.
- *
- * A module of `undefined` means the chunk failed and `main.tsx`'s
- * `vite:preloadError` handler cancelled the failure to reload the page — Vite's
- * preload helper then resolves `undefined` instead of rejecting. Stay pending
- * while that recovery runs, so the route's Suspense fallback holds until the
- * reload lands; if that recovery gives up, or none is running, `guarded` rejects
- * into the route's error boundary instead.
- */
 export function named<M extends Record<K, unknown>, K extends keyof M & string>(
   importer: () => Promise<M>,
   key: K
@@ -45,11 +11,6 @@ export function named<M extends Record<K, unknown>, K extends keyof M & string>(
   return () => guarded(importer).then((m) => ({ default: m[key] }));
 }
 
-/**
- * A route chunk that would not load and could not be recovered by a reload:
- * the visitor's connection or a content blocker, as often as not. Its own class
- * so `main.tsx` can report a lone one as a warning, not an error.
- */
 class RouteChunkUnavailableError extends Error {
   constructor() {
     super('Route chunk unavailable');
@@ -57,19 +18,9 @@ class RouteChunkUnavailableError extends Error {
   }
 }
 
-/**
- * For a raw `lazy(() => import(...))` outside the route table: the same
- * undefined-module guard `named` has. Without it, `lazy()` reads `.default` off
- * `undefined` and throws a TypeError into the nearest boundary.
- */
 export function guarded<M>(importer: () => Promise<M | undefined>): Promise<M> {
   return importer().then((m) => {
     if (m) return m;
-    // Vite resolves `undefined` only for a failure `main.tsx` cancelled. While
-    // the stale-build recovery runs the page is about to reload, so wait for
-    // it; if it gives up (the network probe failed) or none is running,
-    // nothing will ever settle this and Suspense would stay pending forever —
-    // reject into the route's error boundary instead.
     const recovery = staleBuildRecoveryOutcome();
     return (recovery ?? Promise.resolve(false)).then((reloading) => {
       if (reloading) return new Promise<never>(() => {});
@@ -78,9 +29,6 @@ export function guarded<M>(importer: () => Promise<M | undefined>): Promise<M> {
   });
 }
 
-// A chunk `main.tsx` declined to recover (offline, purged this minute) rejects
-// with the browser's own TypeError, not `RouteChunkUnavailableError`; each
-// engine words it differently.
 const DYNAMIC_IMPORT_FAILURE = /dynamically imported module|importing a module script failed/i;
 
 export function isRouteChunkFailure(error: unknown): boolean {
@@ -88,20 +36,11 @@ export function isRouteChunkFailure(error: unknown): boolean {
   return error instanceof TypeError && DYNAMIC_IMPORT_FAILURE.test(error.message);
 }
 
-/** A loader that also hands back its component synchronously once loaded. */
 export interface RememberedLoader<P extends object = object> {
   (): Promise<{ default: ComponentType<P> }>;
-  /** The loaded component, or `undefined` until the chunk has arrived. */
   peek(): ComponentType<P> | undefined;
 }
 
-/**
- * Memoise a loader and keep its result, so a preload fired at boot and the
- * route's later render share one request — and so the render can use the
- * component outright if the preload already finished (`preloadedLazy.tsx`),
- * instead of suspending for a tick it does not need. A failed load is
- * forgotten, leaving the render free to retry it.
- */
 export function remembered<P extends object>(
   loader: () => Promise<{ default: ComponentType<P> }>
 ): RememberedLoader<P> {
@@ -121,8 +60,6 @@ export function remembered<P extends object>(
   return Object.assign(load, { peek: () => loaded });
 }
 
-// The signed-in shell: every route but the signed-out ones renders inside
-// `Layout`, and `/overview` is where the index redirect sends a returning user.
 export const loadLayout = remembered(named(() => import('./Layout'), 'Layout'));
 export const loadOverview = remembered(named(() => import('@/routes/Overview'), 'Overview'));
 export const loadCharacters = named(() => import('@/routes/Characters'), 'Characters');
@@ -194,11 +131,6 @@ export const loadCorpTaxBookRemoveNow = named(
 );
 export const loadErrorProbe = named(() => import('@/routes/ErrorProbe'), 'ErrorProbe');
 
-/**
- * Every feature route, keyed the way `Layout`'s links are. Exhaustive by type, so a route added to `routeScopes.ts` without
- * a chunk here is a compile error rather than a link that never preloads. The
- * redirect-only paths (`/alerts`, `/skills`, `/bpc-contracts`) preload their target.
- */
 const PRELOADERS: Record<AppRoutePath, () => Promise<RouteModule>> = {
   '/characters': loadCharacters,
   '/overview': loadOverview,
@@ -252,37 +184,20 @@ const PRELOADERS: Record<AppRoutePath, () => Promise<RouteModule>> = {
   '/help': loadHelp,
 };
 
-/**
- * Start fetching a route's chunk. Fire-and-forget and never rejects: a failed
- * preload (offline, a deploy swapped the hashes) is retried by the real
- * `lazy()` render, which is where an error belongs.
- */
 export function preloadRouteChunk(path: AppRoutePath): void {
   preloadChunk(PRELOADERS[path]);
 }
 
-/**
- * Start fetching any lazy chunk (a page's lazy tab) on the same fire-and-forget
- * contract as `preloadRouteChunk`. The module cache makes the later `lazy()`
- * render reuse the fetch.
- */
 export function preloadChunk(load: () => Promise<unknown>): void {
   void load().catch(() => {});
 }
 
-/** A `Tabs` `onPreload` for a page whose lazy tabs load through `loaders`, keyed by tab id. */
 export function preloadFrom(loaders: Record<string, () => Promise<unknown>>): (id: string) => void {
   return (id) => {
     if (Object.hasOwn(loaders, id)) preloadChunk(loaders[id]);
   };
 }
 
-/**
- * Start fetching the signed-in shell — `Layout` and the `Overview` the index
- * redirect lands on — so a returning user's chunks load alongside React's boot
- * and the Dexie read that gates the route, rather than after it. Same
- * fire-and-forget contract as `preloadRouteChunk`.
- */
 export function preloadSignedInShell(): void {
   void loadLayout().catch(() => {});
   preloadRouteChunk('/overview');

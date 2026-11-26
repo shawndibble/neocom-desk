@@ -4,9 +4,6 @@ import type { MergedRow } from './queueRows';
 import { buildRowAnnouncer } from './rowAnnouncer';
 
 const nameFor = (id: number) => `Skill ${id}`;
-// Real i18next `t`, like the component uses — this exercises the actual
-// English strings, not a stand-in. dnd-kit's own event shape is `{ active,
-// over }`, each a `{ id }` at minimum — the sub-shape this reads.
 const t = (key: string, options?: Record<string, unknown>) => i18next.t(key, options);
 
 const rows: MergedRow[] = [

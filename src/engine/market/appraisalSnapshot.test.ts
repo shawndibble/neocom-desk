@@ -50,14 +50,12 @@ describe('buildAppraisalSnapshot', () => {
           sell: 5.62,
           unitVolume: 0.01,
         },
-        // Firestore rejects `undefined`, so an unknown volume is stored as null.
         { typeId: 44992, name: 'PLEX', quantity: 12, buy: null, sell: 4_100_000, unitVolume: null },
       ],
     } satisfies AppraisalSnapshot);
   });
 
   it('rebuilds to the same buy, sell and volume totals the panel showed', () => {
-    // These fixtures carry no refine detail, so the snapshot has none to drop or keep.
     const items = [TRITANIUM, PLEX];
     const snapshot = snapshotOf(items);
     const { buy, sell, volume } = buildAppraisal(items, 90).totals;
@@ -201,7 +199,6 @@ describe('a snapshot that carries the refine figures', () => {
       ],
       efficiency: 0.9063,
     });
-    // Firestore refuses undefined: an item with nothing to refine has no key at all.
     expect('refine' in snapshot.items[1]).toBe(false);
   });
 
@@ -234,7 +231,6 @@ describe('a snapshot that carries the refine figures', () => {
 
   it('rebuilds the items with the same refine figure the sharer saw', () => {
     const items = appraisalItemsFromSnapshot(refinedSnapshot());
-    // 10 batches x floor(16,000 x 10 x 0.9063) Pyerite x 16.75 + the same for Mexallon, less 2% tax
     const pyerite = Math.floor(16_000 * 10 * 0.9063);
     const mexallon = Math.floor(800 * 10 * 0.9063);
     expect(items[0].refine?.valueAtFullPrice).toBeCloseTo(

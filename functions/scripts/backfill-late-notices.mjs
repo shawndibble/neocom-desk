@@ -1,14 +1,3 @@
-/**
- * One-time copy (decision 20261120-235011): copies every Late notice stored as a `statements` doc
- * (`kind: 'notice'`) into `lateNotices`, and every `statementLinks` doc into `lateNoticeLinks`,
- * where it has no copy yet, and deletes the retired `minerTotals` docs. No server read looks at
- * the legacy collections after it. Idempotent: a re-run copies nothing new. A book that fails is
- * reported and the run goes on. `--dry-run` only counts. Run it once the functions that write
- * `lateNotices` are deployed (docs/deploy/late-notices.md).
- *
- *   cd functions && npm run build
- *   GOOGLE_APPLICATION_CREDENTIALS=... node scripts/backfill-late-notices.mjs <projectId> [--dry-run] [corporationId ...]
- */
 import { initializeApp } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import {
@@ -44,7 +33,6 @@ for (const corporationId of corps) {
       totals += await retireMinerTotals(db, corporationId);
     }
   } catch (e) {
-    // One book's failure (a notice issued mid-run, a timeout) leaves the rest to go on; re-run it.
     failed.push(corporationId);
     console.error(corporationId, 'failed:', e instanceof Error ? e.message : e);
   }

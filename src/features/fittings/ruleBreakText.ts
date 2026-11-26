@@ -1,17 +1,10 @@
-/**
- * Plain-game-terms sentences for the fitting rules a fit breaks, and which
- * fitted modules each break points at (issue #5181). Pure: the caller supplies
- * names, so a test needs no catalogue.
- */
 import type { TFunction } from 'i18next';
 import type { HardpointKindOf } from '@/engine/fittings/hardpoints';
 import { moduleKey } from '@/engine/fittings/skillGaps';
 import type { Fitting, RuleBreak } from '@/engine/fittings/types';
 
 export interface RuleBreakNames {
-  /** A fitted type's name. */
   type: (typeId: number) => string;
-  /** A rule group's name, or undefined when none is known. */
   group: (groupId: number) => string | undefined;
 }
 
@@ -24,14 +17,12 @@ function rackOf(slot: string): string {
 const RACKS = new Set(['high', 'medium', 'low', 'rig', 'subsystem']);
 const HARDPOINTS = new Set(['turret', 'launcher']);
 
-/** The charge loaded in the module of `typeId`, for a charge rule's sentence. */
 function chargeOf(fitting: Fitting, typeId: number | null): number | undefined {
   if (typeId === null) return undefined;
   return fitting.modules.find((m) => m.typeId === typeId && m.chargeTypeId !== undefined)
     ?.chargeTypeId;
 }
 
-/** One sentence for a break. */
 export function ruleBreakLine(
   t: TFunction,
   fitting: Fitting,
@@ -86,7 +77,6 @@ export function ruleBreakLine(
   }
 }
 
-/** The sentences for every break, without repeats, in the order the engine gave them. */
 export function ruleBreakLines(
   t: TFunction,
   fitting: Fitting,
@@ -96,7 +86,6 @@ export function ruleBreakLines(
   return [...new Set(rules.map((rule) => ruleBreakLine(t, fitting, rule, names)))];
 }
 
-/** `moduleKey` of every fitted module a break points at. */
 export function ruleBreakModuleKeys(
   fitting: Fitting,
   rules: readonly RuleBreak[],

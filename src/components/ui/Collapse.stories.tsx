@@ -36,8 +36,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** @summary Shut: only the toggle shows; the body is not mounted. */
 export const Closed: Story = {};
 
-/** @summary Open: the body sits attached under its toggle. */
 export const Open: Story = { args: { open: true } };

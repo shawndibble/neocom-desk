@@ -1,17 +1,3 @@
-/**
- * Route Safety's Stops panel (issue #2475): where the trip starts, then up to
- * `MAX_STOPS` Stops in the order typed — added, removed, and reordered by
- * dragging the grip (Space + arrow keys from the keyboard).
- *
- * Optimize stop order flies the stops in the order with the lowest total
- * route cost under the Route rules; the list here keeps the typed order, and
- * a note says when the flown order differs. Its two options only mean
- * anything while it is on, so they sit under it and are off with it.
- *
- * On a phone the panel folds to one line — "Sabusi → 4 stops" — with Edit
- * to open it. With no stops yet there is nothing worth folding, so it stays
- * open: the start picker and Add stop are how a route begins (issue #2519).
- */
 import {
   DndContext,
   KeyboardSensor,
@@ -59,7 +45,6 @@ import { SolarSystemSearchField } from '@/features/route/SolarSystemSearchField'
 import { useSolarSystemIndex } from '@/features/route/useSolarSystems';
 import { useIsPhone } from '@/lib/useIsPhone';
 
-/** What the pilot set, kept in the link; the page decides when it applies. */
 export type StopOrderSettings = Required<TripOptions>;
 
 function Badge({ children }: { children: ReactNode }) {
@@ -86,11 +71,9 @@ function StopRow({
   systemId: number;
   index: number;
   name: string;
-  /** Set for a station stop: the system it sits in, beside the station's name. */
   systemName: string | null;
   security: number | null;
   onRemove: (index: number) => void;
-  /** The drag's single-pointer alternative (WCAG 2.5.7): swap with a neighbour. */
   onMove: (from: number, to: number) => void;
   count: number;
 }) {
@@ -98,7 +81,6 @@ function StopRow({
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: systemId,
   });
-  // With neighbours the row's menu carries Move and Remove (no ✕, as Quickbar); alone, a ✕.
   const hasMenu = count > 1;
   const li = (
     <li
@@ -182,26 +164,17 @@ export function StopsPanel({
   quickPicks,
 }: {
   fromId: number | null;
-  /** The start's name alone, for the folded phone summary. */
   fromName: string;
-  /** The start's trigger text: its name, marked when it is the Current System. */
   fromTrigger: string;
   onFromChange: (systemId: number) => void;
-  /** Set when the start is not the game location: puts it back. */
   onFromReset?: () => void;
-  /** In the order typed. */
   stops: readonly StopRef[];
-  /** `picked` is the station just added, so the page can name it before the link round-trips. */
   onStopsChange: (next: StopRef[], picked?: PickedStation) => void;
   settings: StopOrderSettings;
   onSettingsChange: (patch: Partial<StopOrderSettings>) => void;
-  /** A stop no stargate route reaches: there is no order to optimize. */
   optimizeBlocked: boolean;
-  /** Set when the flown order differs from the typed one. */
   orderNote: string | null;
-  /** A stop's label: its station's name when it has one, else its system's. */
   nameOf: (systemId: number) => string;
-  /** Shown under the destination field while the trip has no stops. */
   quickPicks?: ReactNode;
 }) {
   const { t } = useTranslation();
@@ -209,7 +182,6 @@ export function StopsPanel({
   const [expanded, setExpanded] = useState(false);
   const systems = useSolarSystemIndex();
   const sensors = useSensors(
-    // A 4px travel before a drag starts, so a tap on the grip is not a drag (as EntryList).
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
@@ -285,7 +257,6 @@ export function StopsPanel({
                 <span aria-hidden="true" className="text-text-dim">
                   →
                 </span>
-                {/* No stops yet: the destination is the one thing to do, so it is a field, not a button. */}
                 <SolarSystemSearchField
                   autoFocus
                   className="min-w-[12rem] flex-1 md:max-w-sm"

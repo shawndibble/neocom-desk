@@ -35,7 +35,6 @@ const SNAPSHOT: OrderDetailSnapshot = {
   skillsByCharacter: new Map(),
 };
 
-/** Every cache empty — nothing fetched yet. */
 const NOTHING_LOADED: OrderDetailCacheContents = {
   regionBooks: new Map(),
   regionBooksLoading: new Set(),
@@ -231,7 +230,6 @@ describe('assembleOrderDetailView', () => {
           jobFee: 1000,
         },
       });
-      // 7.5% base, less 11% a level: 3.375% of 1,000 ISK.
       const fees = assembleOrderDetailView(row, snapshotWith(skills), caches()).relistFees;
       expect(fees?.salesTax).toBeCloseTo(33.75, 6);
       expect(fees?.brokerFee).toBeCloseTo(16.25, 6);
@@ -251,8 +249,6 @@ describe('assembleOrderDetailView', () => {
     });
 
     it('spreads the broker fee minimum across a large remaining quantity, not re-applied per unit', () => {
-      // Regression pin for #1224: re-deriving the fee at quantity 1 would
-      // re-apply its 100 ISK minimum to a single unit.
       const skills: CharacterSkills = {
         accountingLevel: 5,
         brokerRelationsLevel: 5,
@@ -364,18 +360,14 @@ describe('verdictFigures', () => {
   };
 
   it('copies the undercut price and keeps the margin after undercutting when the call is to match them', () => {
-    // undercutPrice(450) = 449.90; 449.90 - 400 relist = 49.90 kept a unit.
     const row = openOrderRow({ ...UNDERCUT, floor: { relist: 400, fill: 390 } });
     const { copyPrice, keepPerUnit } = call(row);
     expect(copyPrice).toBe(449.9);
     expect(keepPerUnit).toBeCloseTo(49.9, 2);
-    // The same figure the verdict sentence states.
     expect(keepPerUnit).toBeCloseTo(adviseOrder(row).verdict!.amount!, 6);
   });
 
   it('copies the rounded-up floor when the call is to put the price up, and keeps the loss the verdict states', () => {
-    // Between fill and relist: holding nets a little, but the verdict judges
-    // against relist, so the fact must not read as a green gain beside it.
     const row = openOrderRow({
       problem: 'belowFloor',
       problems: ['belowFloor'],
@@ -387,7 +379,6 @@ describe('verdictFigures', () => {
   });
 
   it('copies nothing when the call is to hold: "let it go" and "leave it alone" keep your own price', () => {
-    // Undercutting to 449.90 against a 480 relist floor loses money: let it go.
     const letGo = openOrderRow({ ...UNDERCUT, floor: { relist: 480, fill: 470 } });
     expect(call(letGo)).toEqual({ copyPrice: null, keepPerUnit: 30 });
     const healthy = openOrderRow({ floor: { relist: 400, fill: 390 } });
@@ -410,9 +401,7 @@ describe('verdictFigures', () => {
   });
 
   it('copies nothing for a price-up verdict whose price is null, never a price its sentence lacks', () => {
-    // A degenerate floor `roundPriceUp` rejects leaves the verdict priceless.
     const row = openOrderRow({ ...UNDERCUT, floor: { relist: 400, fill: 390 } });
-    // Without the override this row copies 449.90 (the matchThem case above).
     const advice = {
       ...adviseOrder(row),
       verdict: { kind: 'raisePrice' as const, amount: 200, price: null },

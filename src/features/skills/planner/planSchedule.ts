@@ -1,13 +1,3 @@
-/**
- * The one place a Skill Plan is costed.
- *
- * The plan editor and the Calendar both quote "when does this step land", and
- * they must agree to the minute — so the input assembly (What-If Implants, the
- * Booster and its detected-accelerator prefill, Remap Markers, the queue-end
- * start, Clone State) lives here rather than inline in either. `schedulePlan`
- * is pure; `loadPlanScheduleInputs` is the fetch side for callers with no
- * hook to lean on.
- */
 import { db, type CharacterAcceleratorRecord, type SkillPlanRecord } from '@/db';
 import {
   computeSkillPlanSchedule,
@@ -37,7 +27,6 @@ import { isAcceleratorLive } from '@/engine/accelerator';
 import { acceleratorId } from '@/features/accelerator/characterAccelerators';
 import { acceleratorBoosters } from './planBooster';
 
-/** What the scheduler costs against when ESI's attribute sheet cannot be read or explained. */
 export const DEFAULT_ATTRIBUTES: Attributes = {
   intelligence: 20,
   memory: 20,
@@ -46,7 +35,6 @@ export const DEFAULT_ATTRIBUTES: Attributes = {
   charisma: 19,
 };
 
-/** The persisted fields of a plan that change its schedule. */
 export type SchedulablePlan = Pick<
   SkillPlanRecord,
   'entries' | 'markers' | 'markerAttributes' | 'whatIfImplants'
@@ -54,20 +42,15 @@ export type SchedulablePlan = Pick<
 
 export interface PlanScheduleInputs {
   catalog: SkillCatalog;
-  /** Trained skills as of the load — before the live queue is applied. */
   trained: ReadonlyMap<number, TrainedSkill>;
-  /** The live in-game queue: the plan starts where it ends. */
   queueEntries: readonly SkillQueueEntry[];
-  /** Base attributes (implant bonuses removed). */
   attributes: Attributes;
   attributeBaseline: AttributeBaseline | null;
   implants: Implants;
   cloneState: CloneState;
-  /** The Character's typed-in accelerator, shared by every plan (`features/accelerator`). */
   accelerator?: CharacterAcceleratorRecord | null;
 }
 
-/** The plan's schedule, started when the live queue's lead ends (`nowMs` if there is none). */
 export function schedulePlan(
   plan: SchedulablePlan,
   inputs: PlanScheduleInputs,
@@ -93,14 +76,8 @@ export function schedulePlan(
     cloneState: inputs.cloneState,
     startDate: new Date(queue.startMs),
   });
-  // The level training right now, when the plan also lists it, is the plan's
-  // own time: the queue pins it as lead (so the steps start after it), but a
-  // plan copied from the queue must still total what the game shows. The
-  // finish date already includes the lead; only the total needs it.
   const pinned = pinnedInProgressEntry(plan.entries, queue, nowMs);
   if (!pinned) return schedule;
-  // The marker result's totals share the total's basis, so a "saved" figure
-  // (total minus the remap total) is not inflated by the lead.
   const { markersResult } = schedule;
   return {
     ...schedule,
@@ -113,11 +90,6 @@ export function schedulePlan(
   };
 }
 
-/**
- * `schedulePlan` for a variant of `plan`: `override` replaces only the named
- * plan fields (candidate entries/markers, a forced What-If lens), so callers
- * costing a hypothetical share one inputs object and cannot drift from it.
- */
 export function schedulePlanWith(
   plan: SchedulablePlan,
   inputs: PlanScheduleInputs,
@@ -127,7 +99,6 @@ export function schedulePlanWith(
   return schedulePlan({ ...plan, ...override }, inputs, nowMs);
 }
 
-/** Everything `schedulePlan` needs for one Character, read from ESI's cache and Dexie. */
 export async function loadPlanScheduleInputs(
   characterId: number,
   nowMs: number

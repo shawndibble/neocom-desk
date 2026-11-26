@@ -1,10 +1,3 @@
-/**
- * Build Plan Compare on a phone (issue #4786): plans as columns, one metric per
- * row, so two or three plans read side by side instead of one scrolling table.
- * It draws the same `DataTable` column definitions the desktop table does: the
- * `primary` column heads each plan, every other shown column is a row, and the
- * Columns picker still decides which rows there are.
- */
 import type { DataTableColumn } from '@/components/ui';
 import { cx } from '@/lib/cx';
 
@@ -12,9 +5,7 @@ interface CompareMatrixProps<T> {
   columns: readonly DataTableColumn<T>[];
   rows: readonly T[];
   rowKey: (row: T) => string;
-  /** Accessible name for the table. */
   label: string;
-  /** The row set apart as the answer: bolder and on the panel fill. */
   emphasisColumnId?: string;
 }
 

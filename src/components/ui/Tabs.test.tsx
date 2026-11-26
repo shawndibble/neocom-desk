@@ -41,13 +41,6 @@ describe('Tabs', () => {
     expect(onChange).toHaveBeenCalledWith('history');
   });
 
-  /**
-   * The bar scrolls sideways once it outgrows its frame, so a tab selected
-   * from outside this component — a deep link opening a specific tab — can
-   * start off-screen. Bringing it back must only slide the bar: a bar below
-   * the fold (the landing page's feature tabs) once dragged the whole page
-   * down to it on load. jsdom does no layout, so the rects are stubbed.
-   */
   describe('keeping the selected tab in view', () => {
     afterEach(() => vi.restoreAllMocks());
 
@@ -65,14 +58,11 @@ describe('Tabs', () => {
       });
     }
 
-    /** Lays the bar out at 0–100px with 24px edge padding, then selects `to` at the given rect. */
     function selectOffscreen(to: string, left: number, right: number, scrollLeft = 0) {
       const { rerender } = render(
         <Tabs tabsId="t" label="Orders" tabs={tabs} value="open" onChange={() => undefined} />
       );
       const scroller = screen.getByRole('tablist').parentElement!;
-      // The edge fade's clearance (`.tab-scroller` in index.css); jsdom
-      // computes only the longhands.
       scroller.style.scrollPaddingLeft = '24px';
       scroller.style.scrollPaddingRight = '24px';
       scroller.scrollLeft = scrollLeft;
@@ -96,7 +86,6 @@ describe('Tabs', () => {
 
       const scroller = selectOffscreen('History', 120, 180);
 
-      // 180 − (100 − 24): the tab's right edge stops clear of the fade.
       expect(scroller.scrollLeft).toBe(104);
       expect(scrollIntoView).not.toHaveBeenCalled();
       expect(scrollTo).not.toHaveBeenCalled();
@@ -104,7 +93,6 @@ describe('Tabs', () => {
 
     it('slides the bar back to a tab past its left edge', () => {
       const scroller = selectOffscreen('History', -50, 10, 200);
-      // 200 − (24 − (−50)).
       expect(scroller.scrollLeft).toBe(126);
     });
   });
@@ -129,13 +117,6 @@ describe('Tabs', () => {
     expect(onChange).toHaveBeenLastCalledWith(tabs[0].id);
   });
 
-  /**
-   * `activation="manual"` is for a caller whose `onChange` navigates to
-   * another route (Industry's plan/group pages) rather than swapping content
-   * this component keeps mounted. An arrow key there must only move the
-   * roving tab stop — calling `onChange` on every arrow press would unmount
-   * this whole tablist mid-keypress and strand focus on `document.body`.
-   */
   describe('activation="manual"', () => {
     it('moves focus without selecting on arrow keys, then selects on Enter', async () => {
       const onChange = vi.fn();
@@ -289,11 +270,6 @@ describe('Tabs', () => {
     });
   });
 
-  /**
-   * A pointer user has no swipe: a vertical wheel travels the bar and a
-   * chevron appears at whichever end still has tabs beyond it. jsdom does no
-   * layout, so the bar's widths are stubbed on the prototype.
-   */
   describe('travelling an overflowing bar with a pointer', () => {
     afterEach(() => {
       delete (HTMLElement.prototype as { clientWidth?: number }).clientWidth;
@@ -315,7 +291,6 @@ describe('Tabs', () => {
       return screen.getByRole('tablist').parentElement!;
     }
 
-    // The chevrons are aria-hidden and out of the tab order, so they are found by their glyph's button.
     const chevrons = () => document.querySelectorAll<HTMLButtonElement>('button[aria-hidden]');
 
     it('draws no chevron for a bar that fits', () => {

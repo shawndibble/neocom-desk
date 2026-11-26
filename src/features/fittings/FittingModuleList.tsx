@@ -7,17 +7,10 @@ import { FITTING_SLOT_KINDS, type Fitting } from '@/engine/fittings/types';
 interface FittingModuleListProps {
   fitting: Fitting;
   typeName: (typeId: number) => string;
-  /** Given: the list sits in a titled Panel. Absent: bare, for a caller that frames it itself. */
   title?: string;
-  /** Names link to the Market browser. Needs a Router; off for the logged-out share page. */
   linkNames?: boolean;
 }
 
-/**
- * Plain-text module/drone/cargo list by rack — nothing editable. The Share
- * Link's read-only view shows it beside `FittingRing`'s icons; Pilot Lookup
- * shows a killmail victim's fit with it. Null for an empty Fitting.
- */
 export function FittingModuleList({
   fitting,
   typeName,

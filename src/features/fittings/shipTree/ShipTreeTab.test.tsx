@@ -41,7 +41,6 @@ vi.mock('@/features/skills/skillMap', async (importOriginal) => {
 });
 const ATTRIBUTES = { intelligence: 20, memory: 20, perception: 20, willpower: 20, charisma: 19 };
 const NO_TRAINED = new Map();
-/** Whether the mocked /skills read has answered yet (usePlanEditorData's `trainedSkillsKnown`). */
 const skills = vi.hoisted(() => ({ known: true }));
 vi.mock('@/features/skills/planner/usePlanEditorData', async () => {
   const f = await import('./__fixtures__/shipTreeFixture');
@@ -85,7 +84,6 @@ function renderTab(path = '/ships/tree') {
   );
 }
 
-/** The fly-state tabs, behind the funnel: opens the filter box if it's shut. */
 async function flyGroup(user: ReturnType<typeof userEvent.setup>) {
   if (!screen.queryByRole('group', { name: 'Can you fly it?' }))
     await user.click(screen.getByRole('button', { name: /^Filters/ }));
@@ -107,9 +105,7 @@ describe('ShipTreeTab — map', () => {
     renderTab();
     const map = await screen.findByRole('region', { name: 'Caldari State ship tree' });
     expect(map).toBeVisible();
-    // 100% on open, not shrunk to fit the viewport.
     expect(screen.getByTestId('ship-tree-map')).toHaveAttribute('data-zoom', '1.00');
-    // The faction panel and the legend sit inside the canvas, as in game.
     const bar = within(map).getByRole('group', { name: 'Factions' });
     expect(
       within(within(map).getByTestId('ship-tree-legend')).getByText('Mastery V')
@@ -141,7 +137,6 @@ describe('ShipTreeTab — map', () => {
     expect(tile(container, TENGU).querySelector('[data-tech]')?.textContent).toBe('III');
     expect(tile(container, HOOKBILL).querySelector('[data-tech]')?.textContent).toBe('◇');
     expect(tile(container, IBIS).querySelector('[data-tech]')).toBeNull();
-    // Merlin's badge reads V; a hull with no Mastery keeps an empty ring.
     expect(tile(container, MERLIN).querySelector('.ring')?.textContent).toBe('V');
     expect(tile(container, IBIS).querySelector('.ring')?.textContent).toBe('');
   });
@@ -171,7 +166,6 @@ describe('ShipTreeTab — map', () => {
     fireEvent.mouseLeave(merlin);
     const card = screen.getByTestId('ship-tree-hover-card');
     fireEvent.mouseEnter(card);
-    // Past the close delay the card is still there: the card cancelled it.
     act(() => {
       vi.advanceTimersByTime(300);
     });
@@ -255,7 +249,6 @@ describe('ShipTreeTab — map', () => {
     await user.click(await screen.findByRole('button', { name: /Guristas Pirates/ }));
     expect(await screen.findByRole('region', { name: 'Guristas Pirates ship tree' })).toBeVisible();
     expect(screen.getByTestId('location')).toHaveTextContent('/ships/tree?faction=500010');
-    // Pirate classes link to both parent empires.
     expect(screen.getByRole('button', { name: 'Switch to Caldari State' })).toBeInTheDocument();
   });
 
@@ -312,7 +305,6 @@ describe('ShipTreeTab — loading', () => {
     skills.known = false;
     const { container } = renderTab();
     await screen.findByRole('region', { name: 'Caldari State ship tree' });
-    // Not even the Corvette, which needs no skills: no status yet, not "can fly".
     for (const id of [MERLIN, IBIS, CROW]) expect(tile(container, id).dataset.tone).toBe('locked');
     expect(screen.queryByRole('button', { name: /Can fly|to fly/ })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Merlin' })).toBeInTheDocument();
@@ -461,7 +453,6 @@ describe('ShipTreeTab — ladder', () => {
     expect(
       search.compareDocumentPosition(factions) & Node.DOCUMENT_POSITION_FOLLOWING
     ).toBeTruthy();
-    // The funnel sits right after the search box.
     const funnel = screen.getByRole('button', { name: /^Filters/ });
     expect(
       funnel.compareDocumentPosition(screen.getByRole('button', { name: 'Expand all' })) &
@@ -575,7 +566,6 @@ describe('ShipTreeTab — ladder', () => {
     const user = userEvent.setup();
     renderTab('/ships/tree?mastery=4');
     expect(await screen.findByText(/Mastery badges need data/)).toBeVisible();
-    // Not an empty ladder: every hull would read None until the data loads.
     expect(screen.getByRole('button', { name: /Merlin/ })).toBeVisible();
     expect(screen.getByTestId('location')).toHaveTextContent('mastery=4');
     await user.click(screen.getByRole('button', { name: /^Filters/ }));
@@ -602,7 +592,6 @@ describe('ShipTreeTab — ladder', () => {
     expect(
       within(factions).getByRole('button', { name: /^Caldari State\s*1 matching hull$/ })
     ).toBeVisible();
-    // A faction with no matches dims but keeps its place; the current one never dims.
     expect(within(factions).getByRole('button', { name: /Gallente/ })).toHaveClass('opacity-50');
     expect(within(factions).getByRole('button', { name: /Guristas/ })).not.toHaveClass(
       'opacity-50'
@@ -611,7 +600,6 @@ describe('ShipTreeTab — ladder', () => {
       .getAllByRole('button', { name: /^Caldari State\s*1 matching hull$/ })
       .find((b) => !factions.contains(b))!;
     await user.click(suggestion);
-    // Caldari is the default, so the URL drops the key.
     expect(screen.getByTestId('location')).not.toHaveTextContent('faction=');
     expect(screen.getByTestId('location')).toHaveTextContent('fly=cantFly');
     expect(await screen.findByRole('button', { name: /Crow/ })).toBeVisible();
@@ -653,11 +641,9 @@ describe('ShipTreeTab — no character', () => {
     for (const id of [MERLIN, HOOKBILL, CROW, TENGU]) {
       expect(tile(container, id).dataset.tone).toBe('locked');
     }
-    // The Corvette asks for no skills at all, so it stays flyable.
     expect(tile(container, IBIS).dataset.tone).toBe('canFly');
     expect(screen.getByText('1 / 5 hulls flyable')).toBeVisible();
     expect(container.querySelectorAll('[data-omega]')).toHaveLength(1);
-    // Nothing on the map is lit.
     expect(container.querySelector('[data-lit="true"]')).toBeNull();
     expect(tile(container, WORM)).toBeNull();
   });

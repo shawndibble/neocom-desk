@@ -46,7 +46,6 @@ describe('useSettleUpRecheck', () => {
         useSettleUpRecheck({ dates, refresh, loading: false }),
       { initialProps: { dates: [TODAY] as string[] | null } }
     );
-    // A new array with the same dates — every Tax tab render makes one — keeps the interval.
     rerender({ dates: [TODAY] });
     act(() => vi.advanceTimersByTime(RECHECK_INTERVAL_MS));
     expect(refresh).toHaveBeenCalledTimes(2);

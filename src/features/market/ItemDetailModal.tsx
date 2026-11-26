@@ -1,27 +1,3 @@
-/**
- * Item Detail (GLOSSARY.md round 6): fitting cost, volume, bonuses and
- * description for one item — the things a shopper checks before deciding
- * whether a price is worth paying. The item's own description, volume and
- * attribute values come from the baked typeInfo shards, falling back to
- * cached ESI (`skills/typeDetail.ts`); only order-book prices need the network.
- * The market snapshot carries the small attribute dictionary that turns
- * attribute ids into names/units/categories.
- * Rows whose value is an id rather than a measurement — a required skill, a
- * Group a module can be fitted to — resolve to names through
- * `attributeReferenceNames.ts`, which starts from `skills.json` (public/data,
- * PWA-precached — not the market snapshot vite.config.ts excludes from
- * precache) and only reaches for ESI for ids no local payload covers. A
- * planetary commodity also gets its schematic (pi.json, precached the same
- * way): for those, "how is this made" is the question the modal is opened to
- * answer, and no dogma attribute carries it. Anything a blueprint or
- * reaction consumes gets "Used in" (`UsedInSection`), off the blueprint
- * catalog — the same SDE files Build Plan reads, not ESI.
- *
- * An Abyssal type or Mutaplasmid gets `AbyssalItemDetail`. No market order
- * exists for an Abyssal type: its price line is MutaMarket's estimate on a
- * Mutated module (`itemId`), else nothing. On a Mutated module the attributes
- * are its own, from ESI's dynamic item.
- */
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { cx } from '@/lib/cx';
 import { inlineLinkClassName } from '@/components/ui/controlStyles';
@@ -105,58 +81,27 @@ import { formatCount } from '@/lib/formatCount';
 
 export interface ItemDetailModalProps {
   typeId: number;
-  /** A Mutated module's item id: its own Rolls and MutaMarket estimate. Ignored unless an Abyssal type. */
   itemId?: number;
   itemName: string;
   onClose: () => void;
-  /**
-   * The location to price at. The Market Browser passes its own effective
-   * one (a shared link's hub/region can differ from the saved preference);
-   * every other page leaves it out and gets the saved Location Mode and
-   * Trade Hub — the same answer the Market Browser and its Compare Drawer
-   * give for the item there.
-   */
   location?: OrderBookLocation;
-  /**
-   * An "Open in Market Browser" link at the top of the Market tab, for an Item
-   * Detail opened away from the Market Browser (Show info on any page, the
-   * Command Palette). Opt-in: on the Market Browser itself it would link to
-   * the page already open.
-   */
   showOpenInMarket?: boolean;
-  /**
-   * Set by the URL-backed host (`ItemInfoModal`): a link that leaves the modal
-   * replaces its history entry and calls this instead of `onClose`, which would
-   * navigate back and race the link.
-   */
   onLeave?: () => void;
 }
 
 interface DetailData {
   type: TypeDetail;
-  /** Skill-requirement rows already excluded — the Required Skills section below owns those instead. */
   sections: AttributeSection[];
-  /** Orders the sections; a Mutated module's own attributes are grouped by its type's. */
   kind: ItemKind;
   requiredSkills: RequiredSkill[];
-  /** typeID -> name, reused from the same resolution the generic rows already paid for. */
   skillNames: Readonly<Record<number, string>>;
-  /** Every skill's name — the popover surfaces skills the item doesn't require, so `skillNames` above isn't enough. */
   allSkillNames: Readonly<Record<number, string>>;
   skillAttributeModifiers: SkillAttributeModifierMap;
   dictionary: AttributeDictionary;
 }
 
-/**
- * Distinct from a plain `OrderBookSummary | null`: a region with truly no
- * orders is a valid `'ready'` result (both sides null), which must render
- * differently from `'error'` (the fetch itself failed) — nullability alone
- * can't tell those apart.
- */
 type PriceState =
   { status: 'loading' } | { status: 'ready'; summary: OrderBookSummary } | { status: 'error' };
-
-/** Mounted only while open (ImportClipboardDialog's pattern) — mounting is the open signal. */
 
 export function ItemDetailModal({
   typeId,
@@ -172,10 +117,6 @@ export function ItemDetailModal({
   const [data, setData] = useState<DetailData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
-  /**
-   * Its own state, not part of `data`. Null when pi.json couldn't be read —
-   * the rest of the modal is unaffected.
-   */
   const [pi, setPi] = useState<PiData | null>(null);
   const [tab, setTab] = useState<'info' | 'market'>('info');
   const tabsId = useTabsId();
@@ -187,7 +128,6 @@ export function ItemDetailModal({
   const priceLocation = location ?? savedLocation;
   const [priceState, setPriceState] = useState<PriceState>({ status: 'loading' });
   const priceMarket = priceLocation ? priceMarketOf(typeId, priceLocation) : null;
-  /** A Region-mode market no hub sits in, named off the bundled region list. */
   const regionToLookUp =
     priceMarket?.kind === 'region' && priceMarket.name === null ? priceMarket.regionId : null;
   const loadPriceRegionName = useCallback(
@@ -199,11 +139,6 @@ export function ItemDetailModal({
     loadPriceRegionName
   );
   const priceMarketName = priceMarket?.name ?? lookedUpRegionName ?? null;
-  /**
-   * Where "Made from" prices its inputs: the Trade Hub (hub prices are per
-   * station, so a Region-mode location still prices inputs at its hub). The
-   * line names it.
-   */
   const inputPriceHub = priceLocation
     ? (TRADE_HUBS.find((hub) => hub.stationId === priceLocation.hubStationId) ?? DEFAULT_TRADE_HUB)
     : null;
@@ -212,21 +147,15 @@ export function ItemDetailModal({
   const loadCategory = useCallback(() => loadItemCategoryId(typeId), [typeId]);
   const category = useKeyedLoad(String(typeId), loadCategory);
 
-  // Null until known, so the market line and link don't flash in on an Abyssal type.
   const abyssal = useIsAbyssalType(typeId);
   const dynamic = useDynamicItem(typeId, abyssal ? itemId : undefined);
-  /** Names for the Mutated module's own attributes' ids, for the record they were resolved for. */
   const [dynamicNames, setDynamicNames] = useState<{
     record: DynamicItemRecord;
     names: AttributeReferenceNames;
   } | null>(null);
-  // Its rolls show in "This module's rolls", so its groups leave them out.
   const mutation = useDynamicItemMutation(typeId, dynamic);
   const skilled = useSkilledAttributes(typeId, mutation ?? undefined);
 
-  // Queue-corrected, like every other trained-level read (usePlanEditorData) —
-  // a level the queue just finished but /skills hasn't caught up to would
-  // otherwise show wrong here while everywhere else shows it trained.
   const loadTrainedSkills = useCallback(
     () =>
       loadCorrectedSkills(activeCharacterId ?? 0, Date.now(), {
@@ -239,13 +168,10 @@ export function ItemDetailModal({
       .data ?? NO_TRAINED_SKILLS;
 
   useEffect(() => {
-    // No order book for an Abyssal type: skip the fetch.
     if (!priceLocation || abyssal !== false) return;
     let cancelled = false;
     void (async () => {
       setPriceState({ status: 'loading' });
-      // Never rejects: a failure is its own status. A nice-to-have fetch, same
-      // as the PI schematic below — it costs the price row, never the modal.
       const view = await loadOrderBookView(typeId, priceLocation);
       if (cancelled) return;
       setPriceState(
@@ -264,8 +190,6 @@ export function ItemDetailModal({
       setData(null);
       setError(false);
       setPi(null);
-      // Off the shared handler and `loading`: only planetary commodities lose
-      // anything if it's missing, and it shouldn't hold up the rest.
       void loadPi()
         .catch(() => null)
         .then((loaded) => {
@@ -275,17 +199,11 @@ export function ItemDetailModal({
         const [type, dictionary, skillAttributeModifiers, skills] = await Promise.all([
           loadTypeDetail(typeId),
           loadAttributeDictionary(),
-          // Caught here, not by the shared handler below: the
-          // attribute-modifier popover is a bonus, not core item detail, so
-          // its data failing to load degrades to no popovers rather than
-          // blanking the modal.
           loadSkillAttributeModifiers().catch(() => ({})),
           loadSkills().catch(() => []),
         ]);
         if (cancelled) return;
         if (!type) throw new Error(`No type data for ${typeId}`);
-        // Needs the dictionary to know which values are ids, so it can't join
-        // the fetch above; it never rejects, so it can't blank the modal.
         const names = await loadAttributeReferenceNames([type.dogma_attributes], dictionary);
         if (cancelled) return;
         const allSkillNames: Record<number, string> = {};
@@ -348,27 +266,19 @@ export function ItemDetailModal({
       skilled.status === 'ready' ? withSkilledValues(baseSections, skilled.values) : baseSections,
     [baseSections, skilled]
   );
-  /** The skills that change an attribute of this item ("which skill changes this"); none without a pilot. */
   const modifiersOf = (attributeId: number) =>
     activeCharacterId && data
       ? findModifyingSkills(attributeId, requiredSkillTypeIds, data.skillAttributeModifiers)
       : [];
 
-  // Gates which attribute-modifier popovers can apply (empty while `data`
-  // hasn't loaded yet).
   const requiredSkillTypeIds = new Set((data?.requiredSkills ?? []).map((r) => r.skillTypeID));
-  // Implies Open in EVE too: an abyssal type gets neither.
   const showMarketLink = showOpenInMarket && abyssal === false;
 
   return (
     <Modal
       open
       onClose={onClose}
-      // The URL-backed host already owns the history entry (`?info`).
       closeOnBack={onLeave === undefined}
-      // One width for every tab and item kind (40rem), so switching tabs never
-      // jumps the box and a name stays close to its value. An abyssal roll
-      // table wider than that scrolls sideways in its own box.
       placement="detail"
       title={
         <span className="text-sm font-semibold tracking-normal text-text normal-case">
@@ -376,10 +286,6 @@ export function ItemDetailModal({
         </span>
       }
       titleActions={
-        // One header action, so a plain button at every width. The Market
-        // Browser link lives in the Market tab: the tab is this modal's one
-        // market entry point, and the best prices below link there too.
-        // An abyssal type has no market group, so no in-game market window either.
         abyssal !== true && <OpenInEveButton kind="marketDetails" id={typeId} name={itemName} />
       }
     >
@@ -392,7 +298,6 @@ export function ItemDetailModal({
             hint={t('market.itemDetail.errorHint')}
             className="py-8"
           />
-          {/* Local SDE data, so they outlive a type-info failure. */}
           <AbyssalItemDetail
             typeId={typeId}
             dynamic={dynamic}
@@ -507,11 +412,9 @@ export function ItemDetailModal({
                 </div>
               </div>
 
-              {/* Held until the category is known (it never fails), so an implant never flashes clamped. */}
               {data.type.description && category.status === 'ready' && (
                 <ItemDescription
                   markup={data.type.description}
-                  // An implant's, combat booster's or accelerator's bonuses are in its description.
                   full={category.data === IMPLANT_CATEGORY_ID}
                 />
               )}
@@ -557,7 +460,6 @@ export function ItemDetailModal({
               )}
 
               {attributeSections.length === 0 ? (
-                // A Mutated module whose every attribute is a roll has them all above.
                 !mutation && (
                   <p className="text-xs text-text-dim">{t('market.itemDetail.noAttributes')}</p>
                 )
@@ -575,7 +477,6 @@ export function ItemDetailModal({
                         target={targetPlan}
                         itemName={itemName}
                         figure={
-                          // A resolved name ("Medium") has no number to preview.
                           attribute.displayValue === undefined
                             ? {
                                 value: attribute.skilledValue ?? attribute.value,
@@ -597,10 +498,6 @@ export function ItemDetailModal({
   );
 }
 
-/**
- * Its own component so the router read happens only when asked for: the
- * Market Browser's modal (and its router-less tests) never render it.
- */
 function OpenInMarketLink({
   typeId,
   onNavigate,
@@ -624,11 +521,6 @@ function OpenInMarketLink({
   );
 }
 
-/**
- * The volume a pilot hauls: packaged where the item has a distinct packaged
- * volume (a ship: 10,000 m3 packaged, 118,000 m3 assembled), with the
- * assembled figure second; otherwise the one volume.
- */
 function VolumeLine({ type }: { type: TypeDetail }) {
   const { t } = useTranslation();
   const volume = type.volume ?? 0;
@@ -648,14 +540,6 @@ function VolumeLine({ type }: { type: TypeDetail }) {
   );
 }
 
-/**
- * One best-price figure. A real price is a link into the Market browser on
- * this item, keeping the page's hub or region (`marketItemUrl`) — the one
- * place in Item Detail where the number itself says "show me the market". It
- * is a figure, not an entity name, so it takes the in-sentence recipe (accent,
- * solid underline; §6c). Without a router (a router-less unit render) or a
- * price it is plain text.
- */
 function PriceFigure({
   label,
   side,
@@ -667,7 +551,6 @@ function PriceFigure({
   label: string;
   side: 'sell' | 'buy';
   typeId: number;
-  /** Undefined while loading; null for a side with no orders. */
   price: number | null | undefined;
   onNavigate: () => void;
   replace: boolean;
@@ -712,9 +595,6 @@ function PriceLink({
   const { t } = useTranslation();
   const { search } = useLocation();
   const exact = exactPrice(price);
-  // The Link itself is the tooltip trigger (one tab stop). The visible figure is
-  // the compact text and the accessible name is built from content, so it leads
-  // with what is on screen (WCAG 2.5.3).
   return (
     <Tooltip content={t('common.iskExact', { amount: formatIsk(price, marketIskDecimals(price)) })}>
       <Link
@@ -734,17 +614,10 @@ function PriceLink({
   );
 }
 
-/**
- * A side of the order book with no orders renders as '—', matching
- * CompareDrawer/VariationsTable — and so does the shorthand a real price gets,
- * so the same figure reads the same way wherever the Market area shows it.
- * The line is inert, so a tap is free to be the reveal.
- */
 function priceCell(price: number | null): ReactNode {
   return price != null ? <IskAmount value={price} decimals={marketIskDecimals(price)} /> : '—';
 }
 
-/** Each skill's effect on one attribute, what its next levels would make the figure, and its Add button: the popover of every skill-affected figure. */
 function AttributeModifierList({
   modifiers,
   skillNames,
@@ -758,7 +631,6 @@ function AttributeModifierList({
   trainedSkills: ReadonlyMap<number, TrainedSkill>;
   target: TargetPlan;
   itemName: string;
-  /** The figure as shown, which each skill's next levels scale; null where it is not a number. */
   figure: AttributeFigure | null;
 }) {
   return modifiers.map((modifier) => (
@@ -774,23 +646,18 @@ function AttributeModifierList({
   ));
 }
 
-/** An attribute's figure as Item Detail shows it, for previewing a skill's next levels. */
 interface AttributeFigure {
   value: number;
   unit: string | null;
-  /** Whether the pilot's skills are already in `value` (else it is the base figure). */
   skillsApplied: boolean;
 }
 
-/** How many levels past the trained one a skill's popover previews. */
 const NEXT_LEVELS_SHOWN = 3;
 
-/** A per-level effect with its own sign: "+5", "-5" (the strings no longer hard-code "+"). */
 function signed(value: number): string {
   return value > 0 ? `+${value}` : String(value);
 }
 
-/** One skill's effect inside a figure's popover — `modifier.perLevelValue` is already static SDE data, no fetch needed. */
 function AttributeModifierRow({
   modifier,
   skillName,
@@ -829,7 +696,6 @@ function AttributeModifierRow({
           modifier.perLevelValue,
           trainedLevel,
           NEXT_LEVELS_SHOWN,
-          // A base figure has none of this skill in it yet, even when it is trained.
           figure.skillsApplied ? trainedLevel : 0
         ).map((next) => (
           <p key={next.level} className="tabular-nums text-text-dim">
@@ -839,7 +705,6 @@ function AttributeModifierRow({
             })}
           </p>
         ))}
-      {/* Nothing left to train at V. */}
       {trainedLevel < 5 && (
         <Button
           size="sm"
@@ -860,12 +725,6 @@ function AttributeModifierRow({
   );
 }
 
-/**
- * How a planetary commodity is produced: the schematic's inputs, its cycle
- * time and what one cycle yields. A P0 resource has no schematic — an
- * extractor pulls it off the planet — so it gets the one line that says so,
- * and everything else in New Eden renders nothing here.
- */
 function PlanetaryProduction({ pi, typeId }: { pi: PiData | null; typeId: number }) {
   const { t } = useTranslation();
   if (!pi) return null;

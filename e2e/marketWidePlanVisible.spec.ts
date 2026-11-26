@@ -1,16 +1,3 @@
-/**
- * Market-wide "What's profitable" panel on /industry/opportunities (desktop,
- * issue #3071): after a scan, the row's Plan button — the row's main action —
- * must stay on screen at 1024 and 1280, the table must not scroll sideways,
- * and no column header may overlap another.
- *
- * Invariants only, no pixel numbers: CI's fonts differ from a Mac's.
- *
- * The shared mock prices only type 34, so the scan would say "Nothing to build
- * here". This spec answers Fuzzwork for any requested type — every product in
- * `marketWideTrees.json` deep enough to clear the 50M ISK sell-depth floor,
- * every other type (a material) cheap — so several ranked rows come back.
- */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { Locator, Page } from '@playwright/test';
@@ -28,7 +15,6 @@ for (const tree of Object.values(TREES)) {
 
 const CORS = { 'Access-Control-Allow-Origin': '*' };
 
-/** Products: 10M ISK x 50 units = 500M sell depth. Materials: 10 ISK each, so margins are healthy. */
 function aggregateFor(typeId: string) {
   const isProduct = PRODUCT_IDS.has(typeId);
   const price = isProduct ? 10_000_000 : 10;
@@ -40,8 +26,6 @@ function aggregateFor(typeId: string) {
 }
 
 async function mockMarketWide(page: Page): Promise<void> {
-  // The scan drops a product with no CCP average price (it can't tell a troll
-  // sell order from a real one), so every type needs one here.
   await page.route('https://esi.evetech.net/markets/prices**', (route) =>
     route.fulfill({
       status: 200,
@@ -68,12 +52,10 @@ async function mockMarketWide(page: Page): Promise<void> {
     });
   });
 
-  // Order books some other panel on the page reads (Ranked builds' depth): none.
   await page.route(/^https:\/\/esi\.evetech\.net\/(?:[^/]+\/)?markets\/\d+\/orders/, (route) =>
     route.fulfill({ status: 200, contentType: 'application/json', headers: CORS, body: '[]' })
   );
 
-  // Region price history, for ISK/day: a steady month of sales.
   await page.route(
     /^https:\/\/esi\.evetech\.net\/(?:[^/]+\/)?markets\/\d+\/history(?:[/?]|$)/,
     (route) => {
@@ -109,7 +91,6 @@ async function headerBoxes(headers: Locator): Promise<Array<{ name: string; box:
   const out: Array<{ name: string; box: Box }> = [];
   for (const header of await headers.all()) {
     const box = await header.boundingBox();
-    // An icon-only column (the row ⋮ menu, Plan) has an empty header; it still occupies a cell.
     if (box) out.push({ name: ((await header.innerText()) || '(blank)').trim(), box });
   }
   return out;
@@ -130,7 +111,6 @@ test.describe('Market-wide opportunities fit the viewport (issue #3071)', () => 
       await page.setViewportSize({ width, height: 800 });
       await page.goto('./industry/opportunities');
 
-      // The pilot owns no blueprint here, so the panel starts open; unfold it if that ever changes.
       const scan = page.getByRole('button', { name: 'Scan', exact: true });
       const unfold = page.getByRole('button', { name: 'Show details' });
       await expect(scan.or(unfold.last())).toBeVisible();
@@ -141,16 +121,13 @@ test.describe('Market-wide opportunities fit the viewport (issue #3071)', () => 
       await expect(table).toBeVisible({ timeout: 30_000 });
       const planButtons = table.getByRole('button', { name: 'Plan', exact: true });
       await expect.poll(() => planButtons.count()).toBeGreaterThanOrEqual(3);
-      // Let ISK/day settle: its cells widen once the sales reads land.
       await expect(page.getByText(/Checking sales/)).toHaveCount(0);
 
-      // (a) The first row's Plan button is inside the viewport horizontally.
       const planBox = await planButtons.first().boundingBox();
       expect(planBox, 'first Plan button has a box').not.toBeNull();
       expect(planBox!.x + planBox!.width).toBeLessThanOrEqual(width);
       expect(planBox!.x).toBeGreaterThanOrEqual(0);
 
-      // (b) The table's scroll wrapper has nothing to scroll.
       const metrics = await table.evaluate((el) => {
         const wrapper = el.closest('.overflow-x-auto') as HTMLElement | null;
         const target = wrapper ?? el.parentElement!;
@@ -166,7 +143,6 @@ test.describe('Market-wide opportunities fit the viewport (issue #3071)', () => 
         `table wrapper scrolls sideways (scrollWidth ${metrics.scrollWidth} > clientWidth ${metrics.clientWidth})`
       ).toBeLessThanOrEqual(metrics.clientWidth);
 
-      // (c) No column header overlaps another (1px tolerance).
       const boxes = await headerBoxes(table.getByRole('columnheader'));
       expect(boxes.length).toBeGreaterThan(3);
       for (let i = 0; i < boxes.length; i++) {

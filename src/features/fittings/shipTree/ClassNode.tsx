@@ -1,8 +1,3 @@
-/**
- * One class on the map: its uppercase label over a double rule, the ISIS
- * class icon (dim while locked) with one skill bar per displayed class
- * skill under it, and its hulls in up to three columns of 96px tiles.
- */
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Tooltip } from '@/components/ui';

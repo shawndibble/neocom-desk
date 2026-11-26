@@ -11,7 +11,6 @@ import { doneByText } from './doneBy';
 import { yearlyRemapAfterNote } from './optimizeHelpers';
 import i18n from '@/i18n';
 
-// 02:00Z is the evening of the 9th in Los Angeles but already the 10th on the EVE clock.
 const INSTANT = '2026-10-10T02:00:00Z';
 const originalTz = process.env.TZ;
 

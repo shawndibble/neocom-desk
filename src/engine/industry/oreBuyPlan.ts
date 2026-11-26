@@ -1,9 +1,3 @@
-/**
- * "Buy ore instead": which compressed ore to buy and refine to cover a mineral
- * shortfall. A small integer program, solved greedily plus a repair pass that
- * trims redundant batches: cheapest (or lightest) route found, not proven optimal.
- * Ore is bought in whole portions; leftover minerals are valued at the hub buy price.
- */
 import { reprocessingYield, type ReprocessingMaterial } from './reprocessing';
 
 export type OreOrdering = 'cost' | 'volume';
@@ -12,33 +6,24 @@ export interface BuyableOre {
   typeId: number;
   portionSize: number;
   materials: readonly ReprocessingMaterial[];
-  /** From `refiningEfficiency`. */
   efficiency: number;
-  /** Hub sell price per unit; null when none is listed, which skips the ore. */
   unitPrice: number | null;
-  /** m³ per unit. */
   unitVolume: number;
 }
 
 export interface OrePurchase {
   typeId: number;
   batches: number;
-  /** Units to buy: whole portions only. */
   units: number;
-  /** At the candidate's flat unit price; the caller may re-price from the order book. */
   cost: number;
   volume: number;
-  /** Minerals this purchase refines into. */
   outputs: Record<number, number>;
 }
 
 export interface OreRoute {
   purchases: OrePurchase[];
-  /** Total minerals refined per type id. */
   refined: Record<number, number>;
-  /** Refined beyond the shortfall. */
   leftovers: Record<number, number>;
-  /** Shortfall minerals no candidate ore yields. */
   uncovered: number[];
   cost: number;
   volume: number;
@@ -56,13 +41,11 @@ export function planOreBuy(input: {
   needs: Readonly<Record<number, number>>;
   ores: readonly BuyableOre[];
   ordering: OreOrdering;
-  /** Weights minerals when ranking ores; unpriced minerals weigh 1. */
   mineralPrices?: Readonly<Record<number, number>>;
 }): OreRoute {
   const { ordering, mineralPrices = {} } = input;
   const need: Record<number, number> = {};
   for (const [id, qty] of Object.entries(input.needs)) if (qty > 0) need[Number(id)] = qty;
-  // An ore with no known volume would read as free to haul, so it cannot be ranked by weight.
   const ores = input.ores.filter(
     (o) =>
       o.portionSize > 0 &&
@@ -86,7 +69,6 @@ export function planOreBuy(input: {
     if (!uncovered.includes(id)) remaining[id] = need[id]!;
   const batchesOf = new Map<number, number>();
 
-  // ISK weights rank ores by cost; hauling is per unit of mineral, so volume weighs all alike.
   const weight = (id: number) =>
     ordering === 'cost' && (mineralPrices[id] ?? 0) > 0 ? mineralPrices[id]! : 1;
   for (;;) {
@@ -108,7 +90,6 @@ export function planOreBuy(input: {
     if (!best) break;
     const total = (batchesOf.get(best.ore.typeId) ?? 0) + best.k;
     batchesOf.set(best.ore.typeId, total);
-    // Credit exactly what the whole purchase now refines, not a per-batch estimate.
     const before = outputsOf(best.ore, total - best.k);
     const after = outputsOf(best.ore, total);
     for (const id of Object.keys(remaining).map(Number)) {
@@ -132,7 +113,6 @@ export function planOreBuy(input: {
       return uncovered.includes(id) || (got[id] ?? 0) >= need[id]!;
     });
 
-  // Repair: dearest purchase first, binary-search the fewest batches that still cover.
   const oreById = new Map(ores.map((o) => [o.typeId, o]));
   const byMetric = [...batchesOf.keys()].sort(
     (a, b) => metricPerBatch(oreById.get(b)!) - metricPerBatch(oreById.get(a)!)
@@ -181,24 +161,18 @@ export function planOreBuy(input: {
 
 export interface OreRouteComparison {
   oreCost: number;
-  /** Leftover minerals at the hub buy price. */
   leftoverValue: number;
-  /** Leftover mineral type ids with no buy price: counted as 0, never as free value. */
   leftoverUnpriced: number[];
-  /** `oreCost` less `leftoverValue`. */
   oreNet: number;
   mineralsTotal: number;
-  /** Positive when the ore route is cheaper. */
   saving: number;
   recommendOre: boolean;
 }
 
 export function compareOreRoute(input: {
   route: OreRoute;
-  /** What buying the shortfall minerals costs, as the plan prices them. */
   mineralsTotal: number;
   mineralBuyPrices: Readonly<Record<number, number>>;
-  /** Ore cost re-priced from the order book; defaults to the route's flat cost. */
   oreCost?: number;
 }): OreRouteComparison {
   const { route, mineralsTotal, mineralBuyPrices } = input;
@@ -223,7 +197,6 @@ export function compareOreRoute(input: {
   };
 }
 
-/** The in-game multibuy format: `name<TAB>units` per line. */
 export function oreBuyListText(
   purchases: readonly Pick<OrePurchase, 'typeId' | 'units'>[],
   nameFor: (typeId: number) => string
@@ -231,17 +204,13 @@ export function oreBuyListText(
   return purchases.map((p) => `${nameFor(p.typeId)}\t${p.units}`).join('\n');
 }
 
-/** Tritanium through Megacyte, and Morphite: the minerals compressed ore refines into. */
 export const MINERAL_TYPE_IDS: ReadonlySet<number> = new Set([34, 35, 36, 37, 38, 39, 40, 11399]);
 
 export interface MineralShortfall {
-  /** Units still to buy, per mineral type id. */
   needs: Record<number, number>;
-  /** What buying them costs as the plan prices them; null when any is unpriced. */
   total: number | null;
 }
 
-/** The mineral rows a plan still has to buy; empty when it has none. Built rows are never bought. */
 export function mineralShortfall(
   rows: readonly {
     typeID: number;

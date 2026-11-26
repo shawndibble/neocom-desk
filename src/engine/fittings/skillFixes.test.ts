@@ -14,10 +14,6 @@ function stats(cpuUsed: number, powergridUsed = 0): FittingStats {
   } as unknown as FittingStats;
 }
 
-/**
- * Each skill frees `perLevel[skill]` CPU per level trained above `from`.
- * The pilot's own levels are `from`; `trained` raises them.
- */
 function cpuModel(base: number, perLevel: Record<number, number>, from: Record<number, number>) {
   return vi.fn(async (trained: readonly PlanEntry[]) => {
     let cpu = base;
@@ -41,7 +37,6 @@ describe('findSkillFixes', () => {
   });
 
   it('offers the lowest level of one skill that brings the fit under', async () => {
-    // 148 CPU of 100: skill 1 frees 12/level from I → needs IV (−48).
     const calc = cpuModel(148, { 1: 12 }, { 1: 0 });
     const fixes = await findSkillFixes({
       before: stats(148),
@@ -50,6 +45,27 @@ describe('findSkillFixes', () => {
     });
     expect(fixes.map((fix) => fix.entries)).toEqual([[{ skillTypeID: 1, targetLevel: 4 }]]);
     expect(fixes[0]!.after.cpuUsed).toBe(100);
+  });
+
+  it('hands back the stats it started from beside each fix, single or bundled', async () => {
+    const before = stats(148);
+    const single = await findSkillFixes({
+      before,
+      candidates: [{ skillTypeId: 1, fromLevel: 0 }],
+      stats: cpuModel(148, { 1: 12 }, { 1: 0 }),
+    });
+    expect(single[0]!.before).toBe(before);
+
+    const bundled = await findSkillFixes({
+      before: stats(120),
+      candidates: [
+        { skillTypeId: 1, fromLevel: 0 },
+        { skillTypeId: 2, fromLevel: 0 },
+      ],
+      stats: cpuModel(120, { 1: 2, 2: 2 }, { 1: 0, 2: 0 }),
+    });
+    expect(bundled).toHaveLength(1);
+    expect(bundled[0]!.before.cpuUsed).toBe(120);
   });
 
   it('builds on the level the pilot already has', async () => {
@@ -73,12 +89,10 @@ describe('findSkillFixes', () => {
       ],
       stats: calc,
     });
-    // 1 at V frees 60 → fits; 3 frees nothing; 4 is already V.
     expect(fixes.map((fix) => fix.entries)).toEqual([[{ skillTypeID: 1, targetLevel: 5 }]]);
   });
 
   it('combines skills when none fixes it alone, at the lowest levels that still fit', async () => {
-    // 160 CPU: 1 frees 8/level (40 at V), 2 frees 5/level (25 at V) — 60 needed.
     const calc = cpuModel(160, { 1: 8, 2: 5 }, {});
     const fixes = await findSkillFixes({
       before: stats(160),
@@ -89,7 +103,6 @@ describe('findSkillFixes', () => {
       stats: calc,
     });
     expect(fixes).toHaveLength(1);
-    // 1 lowered first while 2 sits at V: 25 + 8×5 = 65 ≥ 60, 8×4 = 57 short → 1 stays V; then 2: 40 + 5×4 = 60 → IV.
     expect(fixes[0]!.entries).toEqual([
       { skillTypeID: 1, targetLevel: 5 },
       { skillTypeID: 2, targetLevel: 4 },

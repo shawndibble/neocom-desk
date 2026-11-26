@@ -9,7 +9,6 @@ const ashfall = {
   characterIds: [1],
 };
 
-/** A corporation the member has left, on the Tax tab (mockup: `left-the-corp-1440`). */
 const meta = {
   title: 'Mining Tax/LeftCorpNotice',
   component: LeftCorpNotice,

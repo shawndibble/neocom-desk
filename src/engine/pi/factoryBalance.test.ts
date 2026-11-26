@@ -4,33 +4,21 @@ import { resolve } from 'node:path';
 import type { PiData } from '@/sde/types';
 import { factoryBalance } from './factoryBalance';
 
-// The shipped payload, same reasoning as the sibling engine tests: these
-// numbers are claims about the real schematic set, so a stub would pin nothing.
 const pi = JSON.parse(
   readFileSync(resolve(process.cwd(), 'public/data/pi.json'), 'utf8')
 ) as PiData;
 
-/** P0 */
 const MICROORGANISMS = 2073;
 const AQUEOUS_LIQUIDS = 2268;
 const BASE_METALS = 2267;
-/** P1 */
 const BACTERIA = 2393;
 const WATER = 3645;
 const REACTIVE_METALS = 2398;
-/** P2, made from Bacteria and Water. */
 const TEST_CULTURES = 2319;
-/** P2, made from Reactive Metals and Water — so it competes with Test Cultures for one input. */
 const WATER_COOLED_CPU = 2328;
 
 describe('factoryBalance', () => {
   it('measures a colony whose factories outnumber what its extractor can feed', () => {
-    // The reported colony: eight Basic Industry Facilities on Bacteria, fed by
-    // one Extractor Control Unit sustaining 21,201 Microorganisms an hour off
-    // its own decay curve. One factory eats 3,000 per 1,800 s cycle — 6,000 an
-    // hour — so the extractor keeps 3.53 of them fed and the other four run
-    // dry. Nothing on the tab said so, and those four hold 3,200 MW on a
-    // colony whose powergrid is the reason nothing else fits.
     const balance = factoryBalance(
       {
         running: [{ typeId: BACTERIA, pins: 8 }],
@@ -48,10 +36,6 @@ describe('factoryBalance', () => {
       { typeId: MICROORGANISMS, name: 'Microorganisms', unitsPerHour: 48_000 },
     ]);
     expect(bacteria.feedablePins).toBeCloseTo(3.5335, 4);
-    // Four pins, not three: 3.53 rounds up to the count that clears the whole
-    // program, and simulating CCP's curve against this colony's own buffer
-    // confirms four process 100% of what is extracted where three leave
-    // 153,635 units behind.
     expect(bacteria.fedPins).toBe(4);
     expect(bacteria.surplusPins).toBe(4);
   });
@@ -70,9 +54,6 @@ describe('factoryBalance', () => {
   });
 
   it('never reports a negative surplus on a colony that is short of factories', () => {
-    // Two pins against enough ore for three and a half is a colony leaving
-    // material in the ground — a real state, and the opposite of this
-    // function's subject. It must read as zero to remove, not as minus two.
     const [balance] = factoryBalance(
       {
         running: [{ typeId: BACTERIA, pins: 2 }],
@@ -86,10 +67,6 @@ describe('factoryBalance', () => {
   });
 
   it('feeds a higher tier from the factories below it on the same colony', () => {
-    // A two-tier colony: four Basic making Bacteria and four making Water,
-    // both feeding two Advanced making Test Cultures. The P2's supply is not
-    // extracted, it is made here — 4 x 40/hr of each P1 — and one Advanced
-    // eats 40 of each an hour, so four are feedable and two are built.
     const balance = factoryBalance(
       {
         running: [
@@ -111,10 +88,6 @@ describe('factoryBalance', () => {
   });
 
   it('says a factory’s input is imported rather than calling the colony starved', () => {
-    // Test Cultures with no Water made or extracted here is a colony routing
-    // Water in from a sibling planet — which is the whole point of a network —
-    // not a colony running dry. Claiming a surplus here would tell a pilot to
-    // delete the factories their imports feed.
     const balance = factoryBalance(
       {
         running: [
@@ -132,10 +105,6 @@ describe('factoryBalance', () => {
   });
 
   it('says so when a colony has factories but no measured extraction at all', () => {
-    // An extractor whose program carries no install-time baseline reports no
-    // rate (`systemPlanetModel`'s `ratePerHour: null`), so its resource is absent
-    // from the map rather than zero. Zero would read as "these factories are
-    // all surplus" and advise deleting a working colony.
     const [balance] = factoryBalance(
       { running: [{ typeId: BACTERIA, pins: 8 }], extractedPerHour: new Map() },
       pi
@@ -158,11 +127,6 @@ describe('factoryBalance', () => {
   });
 
   it('splits one input between two schematics that both eat it', () => {
-    // Test Cultures and Water-Cooled CPU both want Water, and this colony
-    // makes 80/hr of it against 160/hr of demand. Letting each schematic see
-    // the whole supply would call both fully fed and the colony would starve;
-    // the supply is shared in proportion to what each asked for, so each gets
-    // 40/hr and keeps one of its two Advanced pins running.
     const balance = factoryBalance(
       {
         running: [

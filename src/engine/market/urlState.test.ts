@@ -179,10 +179,6 @@ describe('resolveMarketLocation', () => {
 });
 
 describe('marketLinkParams', () => {
-  // Shared by ItemContextMenu's "View in Market" and MarketItemLink:
-  // preserve whatever region/hub the current page is already
-  // scoped to, so a link from inside /market carries that scope over rather
-  // than resetting to the device's Location Mode default.
   it('preserves an existing region param', () => {
     expect(marketLinkParams(587, '?region=10000002')).toEqual({
       type: '587',
@@ -209,7 +205,6 @@ describe('marketLinkParams', () => {
     expect(marketLinkParams(587, '')).toEqual({ type: '587' });
   });
 
-  // The forced hub wins over both region and hub params — see marketLinkParams' own doc.
   it('prefers a forced hub over an existing region param', () => {
     expect(marketLinkParams(587, '?region=10000002', 'amarr')).toEqual({
       type: '587',

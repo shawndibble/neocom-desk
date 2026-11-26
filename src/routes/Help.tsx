@@ -6,20 +6,12 @@ import { FaqPanel } from '@/features/faq/FaqPanel';
 import { HelpPanel } from '@/features/help/HelpPanel';
 import { ShortcutsPanel } from '@/features/help/ShortcutsPanel';
 
-/**
- * Help & FAQ, a footer page of its own rather than two Settings sections
- * (scope decision `20261002-145653-lp-store-under-market-pilot-lookup-its-own`):
- * help is not a setting. `/help/faq` is the link to hand someone who asks what
- * the app stores; `/help/support` the one for someone who needs support.
- */
 export function Help() {
   const { t } = useTranslation();
   const [tab, setTab] = usePageTab(HELP_TABS);
   const tabsId = useTabsId();
 
   return (
-    // Prose, so narrower than the app-wide `max-w-page` data width: the cards
-    // sit at a readable line length and the text fills them edge to edge.
     <div className="mx-auto max-w-3xl space-y-4">
       <PageHeader title={t('nav.help')} />
       <Tabs

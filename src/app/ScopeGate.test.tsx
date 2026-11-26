@@ -16,16 +16,10 @@ vi.mock('./loginFlow', () => ({ beginEveLogin: vi.fn().mockResolvedValue(undefin
 
 const CHARACTER_ID = 42;
 
-/** Stand-in for a view's content: if this shows, the gate let the route through. */
 function ViewContent() {
   return <p>Mail from Aura</p>;
 }
 
-/**
- * The gate passes children through while the Dexie read is in flight, so "no
- * banner" is only meaningful once it resolves. This probe makes that
- * observable, keeping the negative assertions honest.
- */
 function GrantProbe() {
   const granted = useGrantedScopes();
   return (
@@ -44,7 +38,6 @@ function renderGate(path: AppRoutePath = '/mail') {
   );
 }
 
-/** Resolves once the granted-scope read has landed. */
 async function grantResolved(): Promise<void> {
   await screen.findByText(/^resolved:/);
 }
@@ -70,8 +63,6 @@ describe('ScopeGate', () => {
 
     expect(await screen.findByText(/: grant Mail$/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Grant in EVE' })).toBeInTheDocument();
-    // The point of gating before the fetch: no spinner-then-empty-table to
-    // misread.
     expect(screen.queryByText('Mail from Aura')).not.toBeInTheDocument();
   });
 
@@ -87,9 +78,6 @@ describe('ScopeGate', () => {
     renderGate();
 
     const login = await screen.findByRole('button', { name: 'Grant in EVE' });
-    // The gate replaces the whole view, so this button is the only thing on the
-    // page to tap: DESIGN.md §3's 44px tier, not the 36px one a banner sitting
-    // beside a view's own controls gets.
     expect(login).toHaveClass(...controlHeightClassName.md.split(' '));
   });
 
@@ -122,10 +110,6 @@ describe('ScopeGate', () => {
 
   it('never gates an ungated route, even on an empty grant', async () => {
     await seedGrant(CHARACTER_ID, []);
-    // /contracts is in this list rather than the gated one above: its History
-    // tab does need read_character_contracts, but it raises its own banner for
-    // that, and the Search tab the page lands on reads a shared public
-    // snapshot. A page gate would wall off the tab that works.
     for (const path of [
       '/market',
       '/overview',

@@ -1,8 +1,3 @@
-/**
- * Open Orders' optional-column catalog + device-local pref (`columnVisibility.ts`).
- * New key: picks saved under `openOrdersVisibleColumns` share these ids and
- * would switch columns on unasked.
- */
 import { createColumnVisibilitySetting } from '@/lib/columnVisibility';
 
 export const OPEN_ORDER_COLUMN_IDS = [

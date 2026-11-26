@@ -32,103 +32,48 @@ import { PayeeOpenInEveButton } from './PayeeOpenInEveButton';
 import { payerOptions } from './settlePayer';
 import type { SettleUpRecheck } from './useSettleUpRecheck';
 import { DividedList } from '@/components/ui/DividedList';
+import { DialogFooter } from '@/components/ui/DialogFooter';
 import { UnlinkedSentNote, type UnlinkedSent } from './UnlinkedSentNote';
 
-/** One Outstanding entry of the Payee being paid, and who mined it. */
 export interface SettleUpRow {
   assignment: MiningTaxAssignmentRecord;
   characterName: string;
   payeeName: string;
   payeeId?: string;
-  /** The Payee's EVE entity id, when it has one — Settle up opens it in EVE from here. */
   payeeEntityId?: number;
 }
 
-/** What Settle up records for a personal Payee: one payment, linked to it. */
 export interface SettlePayment {
-  /** Whole ISK, as the in-game transfer field takes it. */
   amount: number;
-  /** The pilot's own calendar date. */
   paidOn: string;
   method: MiningTaxPaymentMethod;
-  /** A payment in kind's contract, when the pilot gave its id. */
   contractId?: number;
-  /** The Character sending it: the link's owner. */
   payerId: number | null;
 }
 
 interface SettleUpDialogProps {
   open: boolean;
   onClose: () => void;
-  /**
-   * The Payee's Outstanding entries in view: who can pay, and the entries the "Ore still
-   * arriving" line watches. Never ticked: a payment pays the Payee's oldest unpaid days.
-   */
   rows: readonly SettleUpRow[];
   onPaid: () => void;
-  /**
-   * What the Payee's account owes now, for the paying Character (a Corp Tax Book's: the payer's
-   * Miner's account).
-   */
   owedFor: (payerId: number | null) => number;
-  /**
-   * What sending `amount` would do, read off the account (`previewPayment`): the days it pays,
-   * oldest first, and the credit it leaves. Undefined while there is nothing to preview.
-   */
   preview: (amount: number, paidOn: string, payerId: number | null) => PaymentOutcome | undefined;
-  /**
-   * Records the payment as a link to the Payee. Absent for a Corp Tax Book, which credits the
-   * donation from its own wallet: the dialog then only says how to send it.
-   */
   record?: (payment: SettlePayment) => Promise<LedgerActionResult>;
-  /**
-   * "Already in my wallet? Pick it" — hands off to the wallet-payment picker for when the transfer
-   * already shows in the journal. The button shows only when this is given.
-   */
   onPickFromWallet?: () => void;
-  /**
-   * Payments the pilot already sent this Payee that nothing here accounts for yet. The owed figure
-   * is overstated until they are linked, so the dialog warns, as the Payee card does, and
-   * `onPickFromWallet` (when given) is the way to link them first.
-   */
   unlinked?: UnlinkedSent;
-  /**
-   * "Dismiss balance": the pilot won't pay what this personal Payee is owed, so every entry in
-   * `rows` becomes a dismissal (no tax owed). Absent for a Corp Tax Book, whose own officers
-   * waive what is owed. Asks to confirm first, since it changes what the pilot owes.
-   */
   onDismissBalance?: () => Promise<LedgerActionResult>;
-  /** The fresh ledger pull behind the "Ore still arriving" line. */
   arrivalCheck?: SettleUpRecheck;
-  /** The Character paying; absent, the Character owing most. */
   payerId?: number;
-  /**
-   * The Reason to copy. A function follows the paying Character and what the amount about to be
-   * sent pays (`outcome`, undefined while there is nothing to pay), so the Reason can name the
-   * days it covers.
-   */
   reason:
     string | ((payerId: number | null, outcome: PaymentOutcome | undefined) => string | undefined);
-  /** A note on the Reason, shown as an info tooltip beside it. */
   reasonHint?: string;
-  /** The ways the payment may have been made; absent, a donation or a contract. */
   methods?: readonly MiningTaxPaymentMethod[];
-  /** Payee-specific lines under the To / Amount / Reason box (where a corp's book wants it sent). */
   notice?: ReactNode | ((payerId: number | null, amount: number) => ReactNode);
+  toAccount?: ReactNode;
 }
 
-/** More Characters than this pick from a list instead of a segmented row (DESIGN §4). */
 const MAX_SEGMENTED_PAYERS = 4;
 
-/**
- * Settle up (issue #523), on one screen and on the Payee's Running account (decision
- * 20261120-235011): the whole-ISK figure the account owes, the Payee and a Reason, each copyable
- * since the app cannot move ISK, and what the amount pays, oldest day first, with any credit it
- * leaves. Nothing is ticked: money pays the oldest unpaid days, whichever entries the pilot has in
- * mind. A personal Payee's payment is recorded as a link (`record`), which the matcher later
- * swaps for its wallet transaction; a Corp Tax Book records nothing, since it credits the
- * donation from its own wallet.
- */
 export function SettleUpDialog({
   open,
   onClose,
@@ -146,6 +91,7 @@ export function SettleUpDialog({
   reasonHint,
   methods,
   notice,
+  toAccount,
 }: SettleUpDialogProps) {
   const { t } = useTranslation();
   const payers = useMemo(() => payerOptions(rows), [rows]);
@@ -154,7 +100,6 @@ export function SettleUpDialog({
   );
   const fromId = useId();
   const payerName = payers.find((p) => p.characterId === payer)?.characterName;
-  // The date the pilot paid, in their own calendar — a local date, not an EVE one.
   const [paidOn, setPaidOn] = useState(() => formatLocalDate(new Date()));
   const [method, setMethod] = useState<MiningTaxPaymentMethod>('donation');
   const [contractId, setContractId] = useState('');
@@ -166,7 +111,6 @@ export function SettleUpDialog({
 
   const owed = owedFor(payer);
   const sentAmount = different ? unmaskNumber(sentText) : undefined;
-  // Whole ISK: the in-game transfer field takes no fractions.
   const amountToSend = Math.round(sentAmount ?? owed);
   const outcome = amountToSend > 0 ? preview(amountToSend, paidOn, payer) : undefined;
 
@@ -232,12 +176,107 @@ export function SettleUpDialog({
     />
   );
 
+  const footer = (
+    <div className="space-y-2">
+      <LedgerActionError error={saveError} />
+      {confirmingDismiss && onDismissBalance && (
+        <div
+          role="group"
+          aria-label={t('miningTax.settleUp.dismiss.title')}
+          className="space-y-2 rounded-xs border border-line bg-panel-2 p-2 text-xs"
+        >
+          <p>
+            {t('miningTax.settleUp.dismiss.intro', {
+              amount: formatIsk(owed, 0),
+              payee: payeeName,
+            })}
+          </p>
+          <p className="text-text-dim">{t('miningTax.settleUp.dismiss.effect')}</p>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              size="sm"
+              variant="danger"
+              loading={saving}
+              onClick={() => void dismissBalance()}
+            >
+              {t('miningTax.settleUp.dismiss.confirm', { count: rows.length })}
+            </Button>
+            <Button
+              size="sm"
+              aria-disabled={saving || undefined}
+              onClick={() => setConfirmingDismiss(false)}
+            >
+              {t('common.cancel')}
+            </Button>
+          </div>
+        </div>
+      )}
+      <div className="flex flex-wrap items-end gap-x-3 gap-y-2">
+        {record && (
+          <div className="min-w-0 flex-1 basis-36">
+            <SettleSentOnAndMethod
+              paidOn={paidOn}
+              onPaidOn={setPaidOn}
+              method={method}
+              onMethod={setMethod}
+              {...(methods ? { methods } : {})}
+              extra={
+                method === 'contract' ? (
+                  <div className="space-y-1 sm:w-32 sm:shrink-0">
+                    <p className={SETTLE_FIELD_LABEL}>{t('miningTax.settleUpContractIdLabel')}</p>
+                    <TextInput
+                      type="text"
+                      inputMode="numeric"
+                      value={contractId}
+                      onChange={(e) => setContractId(e.target.value)}
+                      placeholder={t('miningTax.settleUpContractIdPlaceholder')}
+                      aria-label={t('miningTax.settleUpContractIdLabel')}
+                      className="w-full"
+                    />
+                  </div>
+                ) : null
+              }
+            />
+          </div>
+        )}
+        <DialogFooter className="ml-auto">
+          {onDismissBalance && !confirmingDismiss && (
+            <Button
+              variant="danger"
+              aria-disabled={saving || undefined}
+              onClick={() => setConfirmingDismiss(true)}
+            >
+              {t('miningTax.settleUp.dismiss.action')}
+            </Button>
+          )}
+          {record ? (
+            <Tooltip content={amountToSend <= 0 || paidOn === '' ? t('common.needsInput') : null}>
+              <Button
+                variant="primary"
+                loading={saving}
+                aria-disabled={amountToSend <= 0 || paidOn === '' || undefined}
+                onClick={() => void commit()}
+              >
+                {t('miningTax.settleUp.recordAction')}
+              </Button>
+            </Tooltip>
+          ) : (
+            <Button variant="primary" onClick={onClose}>
+              {t('common.close')}
+            </Button>
+          )}
+        </DialogFooter>
+      </div>
+    </div>
+  );
+
   return (
     <Modal
       open={open}
       onClose={onClose}
       dismissOnOutsidePress={false}
       title={t('miningTax.settleUpTitle', { payee: payeeName })}
+      footer={footer}
     >
       <div className="space-y-3 text-sm">
         <OreArrivalNotice
@@ -284,7 +323,6 @@ export function SettleUpDialog({
           </div>
         )}
 
-        {/* Right-aligned: the label names the paying Character, too long to share the To row. */}
         <div className="flex justify-end empty:hidden">
           <PayeeOpenInEveButton
             name={payeeName}
@@ -297,6 +335,7 @@ export function SettleUpDialog({
         </div>
         <DividedList>
           {copyRow('to', t('miningTax.settleUp.toLabel'), payeeName, payeeName)}
+          {toAccount}
           {copyRow(
             'amount',
             t('miningTax.settleUp.amountLabel'),
@@ -352,32 +391,6 @@ export function SettleUpDialog({
         </div>
 
         {record && (
-          <SettleSentOnAndMethod
-            paidOn={paidOn}
-            onPaidOn={setPaidOn}
-            method={method}
-            onMethod={setMethod}
-            {...(methods ? { methods } : {})}
-            extra={
-              method === 'contract' ? (
-                <div className="space-y-1 sm:w-32 sm:shrink-0">
-                  <p className={SETTLE_FIELD_LABEL}>{t('miningTax.settleUpContractIdLabel')}</p>
-                  <TextInput
-                    type="text"
-                    inputMode="numeric"
-                    value={contractId}
-                    onChange={(e) => setContractId(e.target.value)}
-                    placeholder={t('miningTax.settleUpContractIdPlaceholder')}
-                    aria-label={t('miningTax.settleUpContractIdLabel')}
-                    className="w-full"
-                  />
-                </div>
-              ) : null
-            }
-          />
-        )}
-
-        {record && (
           <p className="text-xs text-text-dim">
             {t('miningTax.settleUp.hint')}
             {onPickFromWallet && (
@@ -390,107 +403,70 @@ export function SettleUpDialog({
             )}
           </p>
         )}
-
-        <LedgerActionError error={saveError} />
-        {confirmingDismiss && onDismissBalance && (
-          <div
-            role="group"
-            aria-label={t('miningTax.settleUp.dismiss.title')}
-            className="space-y-2 rounded-xs border border-line bg-panel-2 p-2 text-xs"
-          >
-            <p>
-              {t('miningTax.settleUp.dismiss.intro', {
-                amount: formatIsk(owed, 0),
-                payee: payeeName,
-              })}
-            </p>
-            <p className="text-text-dim">{t('miningTax.settleUp.dismiss.effect')}</p>
-            <div className="flex flex-wrap gap-2">
-              <Button
-                size="sm"
-                variant="danger"
-                loading={saving}
-                onClick={() => void dismissBalance()}
-              >
-                {t('miningTax.settleUp.dismiss.confirm', { count: rows.length })}
-              </Button>
-              <Button
-                size="sm"
-                aria-disabled={saving || undefined}
-                onClick={() => setConfirmingDismiss(false)}
-              >
-                {t('common.cancel')}
-              </Button>
-            </div>
-          </div>
-        )}
-        <div className="flex flex-wrap gap-2 pt-1">
-          {record ? (
-            <Tooltip content={amountToSend <= 0 || paidOn === '' ? t('common.needsInput') : null}>
-              <Button
-                variant="primary"
-                loading={saving}
-                aria-disabled={amountToSend <= 0 || paidOn === '' || undefined}
-                onClick={() => void commit()}
-              >
-                {t('miningTax.settleUp.recordAction')}
-              </Button>
-            </Tooltip>
-          ) : (
-            <Button variant="primary" onClick={onClose}>
-              {t('common.close')}
-            </Button>
-          )}
-          {onDismissBalance && !confirmingDismiss && (
-            <Button
-              variant="danger"
-              aria-disabled={saving || undefined}
-              onClick={() => setConfirmingDismiss(true)}
-            >
-              {t('miningTax.settleUp.dismiss.action')}
-            </Button>
-          )}
-        </div>
       </div>
     </Modal>
   );
 }
 
-/** What the amount pays off the account, oldest day first, and the credit it leaves. */
+const PREVIEW_TONE = { default: '', success: 'text-success', warning: 'text-warning' } as const;
+
+function PreviewRow({
+  label,
+  note,
+  amount,
+  tone = 'default',
+}: {
+  label: string;
+  note?: string;
+  amount: number;
+  tone?: keyof typeof PREVIEW_TONE;
+}) {
+  return (
+    <li className="flex items-baseline justify-between gap-3 px-2 py-1.5">
+      <span className="min-w-0">
+        {label}
+        {note && (
+          <span className="ml-2 text-text-dim">
+            <span className="sr-only">, </span>
+            {note}
+          </span>
+        )}
+      </span>
+      <span className={cx('shrink-0 tabular-nums', PREVIEW_TONE[tone])}>
+        {formatIsk(amount, 0)} ISK
+      </span>
+    </li>
+  );
+}
+
 export function PaymentPreview({ outcome }: { outcome: PaymentOutcome }) {
   const { t } = useTranslation();
-  const k = (key: string, opts?: Record<string, unknown>) =>
-    t(`miningTax.settleUp.preview.${key}`, opts);
+  const k = (key: string) => t(`miningTax.settleUp.preview.${key}`);
+  const open = outcome.openLines;
+  const pays = outcome.lines.length > 0 || open.length > 0;
+  const credit = outcome.creditAdded >= 1;
+  const owedAfter = outcome.owedAfter >= 1;
+  if (!pays && !credit && !owedAfter) return null;
   return (
     <div role="status" className="space-y-1 text-xs">
-      {outcome.lines.length > 0 && (
-        <>
-          <p className="text-text-dim">{k('pays')}</p>
-          <ul className="space-y-0.5">
-            {outcome.lines.map((line) => (
-              <li key={line.date} className="flex justify-between gap-2 tabular-nums">
-                <span>{line.date}</span>
-                <span className={cx(!line.settled && 'text-warning')}>
-                  {line.settled
-                    ? k('paidDay', { amount: formatIsk(line.applied, 0) })
-                    : k('partDay', {
-                        amount: formatIsk(line.applied, 0),
-                        left: formatIsk(line.remainingAfter, 0),
-                      })}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </>
-      )}
-      {outcome.creditAdded >= 1 && (
-        <p className="text-success">{k('credit', { amount: formatIsk(outcome.creditAdded, 0) })}</p>
-      )}
-      {outcome.owedAfter >= 1 && (
-        <p className="text-text-dim">
-          {k('owedAfter', { amount: formatIsk(outcome.owedAfter, 0) })}
-        </p>
-      )}
+      {pays && <p className="text-text-dim">{k('pays')}</p>}
+      <DividedList as="ul">
+        {outcome.lines.map((line) => (
+          <PreviewRow key={line.date} label={line.date} amount={line.applied} />
+        ))}
+        {open.map((line) => (
+          <PreviewRow
+            key={`open:${line.date}`}
+            label={line.date}
+            note={k('estimateNote')}
+            amount={line.applied}
+          />
+        ))}
+        {credit && <PreviewRow label={k('credit')} amount={outcome.creditAdded} tone="success" />}
+        {owedAfter && (
+          <PreviewRow label={k('owedAfter')} amount={outcome.owedAfter} tone="warning" />
+        )}
+      </DividedList>
     </div>
   );
 }

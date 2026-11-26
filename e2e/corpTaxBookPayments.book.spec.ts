@@ -1,9 +1,3 @@
-/**
- * Money on the Running account (decision 20261120-235011, GLOSSARY "Running account"): a
- * payment pays the Miner's oldest unpaid day first; a day short by no more than the book's
- * per-day tolerance closes and the gap is written off; a bigger shortfall part-pays the day; what
- * is over is credit. Read on the Miner's page (its figures and account ledger) and the Miners list.
- */
 import { expect, minerFact, openMiner, signInAsOfficer, test } from './support/taxBook/bookTest';
 import { DAY_TOLERANCE, paymentBook, twoRefineriesBook } from './support/taxBook/bookScenarios';
 import { DAY_TAX, day, isk, shortDay } from './support/taxBook/bookSeed';
@@ -19,7 +13,6 @@ import type { Page } from '@playwright/test';
 
 const ledgerRow = (page: Page, name: RegExp) =>
   page.getByRole('table', { name: 'Ledger', exact: true }).getByRole('row', { name });
-/** Opens a payment row in the Ledger: its detail lists the days it paid, as ISO dates. */
 const openPayment = async (page: Page, name: RegExp) => {
   await ledgerRow(page, name).click();
   return page.getByRole('table', { name: 'Ledger', exact: true });

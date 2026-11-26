@@ -1,33 +1,3 @@
-/**
- * The Colonies tab's model: what is stopped, running out or full, what to do
- * about it, and when to log in next.
- *
- * ## No second set of figures
- *
- * Every ISK figure here is read off a `PlanAdvice` (`planAdviceModel.ts`), the
- * same object Plan reads: a row's fixes and the primary action's gain are that
- * advice's own `QuickWin`s, never re-priced. A colony with no advice (another
- * Character's, read cache-only, with no prices behind it) gets the same status
- * and the same meters, and its money figures are null.
- *
- * ## Status needs no ISK
- *
- * `checkStatus` reads only what ESI keeps current and what the storage and
- * factory checks already say, so an alt's row ranks the same way the active
- * Character's does.
- *
- * - **Stopped**: an extractor program has expired.
- * - **Expiring soon**: one expires inside the pilot's window.
- * - **Needs a look**: storage fills before the pilot's haul, a factory has no
- *   input, or every program is past its efficient window. None of these is
- *   broken today, all of them cost output.
- * - **Unknown**: no detail, or an extractor pin dropped for missing data.
- *   Saying "healthy" there would claim a check that never ran.
- *
- * One clock: everything takes `nowMs` from the caller (the advice snapshot's),
- * so a status chip and a quick win can never disagree about whether a program
- * has expired.
- */
 import type { CharacterPlanet, CharacterPlanetDetail, PlanetPin } from '@/esi/endpoints';
 import type { PiData } from '@/sde/types';
 import { colonyAttention } from '@/engine/pi/colonyStatus';
@@ -49,14 +19,11 @@ import { colonyStorage } from '../colonyThroughput';
 import { fillsBeforeHaul } from '../colonyFillModel';
 import { HOUR_MS } from '@/lib/age';
 
-/** "Today": the window "expiring today" and one login's worth of work both cover. */
 export const DAY_HOURS = 24;
-/** A colony list older than this reads as stale on its own row. */
 export const STALE_AFTER_HOURS = 24;
 
 export type CheckStatus = 'stopped' | 'expiring' | 'needs-look' | 'unknown' | 'healthy';
 
-/** Worst first. Unknown sits above healthy: not knowing is not the same as fine. */
 export const STATUS_RANK: Record<CheckStatus, number> = {
   stopped: 0,
   expiring: 1,
@@ -66,12 +33,10 @@ export const STATUS_RANK: Record<CheckStatus, number> = {
 };
 
 export interface StatusFacts {
-  /** False for a colony with no cached detail, or an extractor pin that had to be dropped. */
   verified: boolean;
   status: ColonyStatus;
   nowMs: number;
   windowMs: number;
-  /** Hours until storage fills at the extractors' peak; null when unreadable. */
   hoursToFull: number | null;
   haulHours: number;
   idleFactories: number;
@@ -92,8 +57,6 @@ export function checkStatus(facts: StatusFacts): CheckStatus {
   return 'healthy';
 }
 
-// --- Fault tags and the primary action ------------------------------------------
-
 export type FaultTag =
   | { kind: 'slowed'; fraction: number }
   | { kind: 'storage'; hoursToFull: number; urgent: boolean }
@@ -102,7 +65,6 @@ export type FaultTag =
   | { kind: 'room-factories'; productTypeId: number; count: number; gainPerDay: number | null }
   | { kind: 'stale'; hours: number };
 
-/** React key for a tag: one per kind, except room-factories, one per product. */
 export function faultTagKey(tag: FaultTag): string {
   return tag.kind === 'room-factories' ? `${tag.kind}:${tag.productTypeId}` : tag.kind;
 }
@@ -116,12 +78,6 @@ export type PrimaryAction =
   | { kind: 'add-factories'; count: number; gainPerDay: number | null; minutes: number }
   | { kind: 'details'; perDay: number | null };
 
-/**
- * The one thing to do here. A stopped or slowed extractor outranks everything
- * (it is the biggest loss and the quickest fix); an expiring program with
- * nothing yet to restart still gets "restart by"; then the storage, idle
- * factory and spare-room wins in the order Plan ranks their kinds.
- */
 export function primaryAction(args: {
   status: CheckStatus;
   quickWins: readonly QuickWin[];
@@ -196,14 +152,9 @@ export function primaryAction(args: {
   return { kind: 'details', perDay: status === 'unknown' ? null : args.todayPerDay };
 }
 
-// --- One row ----------------------------------------------------------------------
-
 export interface ExtractorFacts {
-  /** The soonest-expiring extractor; null when the colony has none with a readable expiry. */
   expiryMs: number | null;
-  /** Share of that program still to run (1 = just installed); null without an install time. */
   remainingFraction: number | null;
-  /** Extractors expired, or expiring within a day of the soonest one: the restart's size. */
   due: number;
   total: number;
 }
@@ -212,34 +163,23 @@ export interface StorageFacts {
   hoursToFull: number | null;
   haulHours: number;
   fillsBeforeHaul: boolean;
-  /** Hours extraction would stall before the haul; 0 when it does not. */
   stallHours: number;
-  /** m3 the launchpad and storage hold; null when unmeasured. */
   capacityM3: number | null;
-  /** m3 stored as of the colony last being opened in game. */
   usedM3: number | null;
 }
 
 export interface LoadFacts {
-  /** Used over budget, 0..1+; null when the colony's draw cannot be read. */
   cpu: number | null;
   power: number | null;
   ccLevel: number;
-  /** The figures behind the fractions: tf and MW drawn, and this colony's own Command Center supply. */
   cpuUsed: number | null;
   cpuBudget: number | null;
   powerUsed: number | null;
   powerBudget: number | null;
-  /**
-   * The colony has links but its planet's radius was unavailable (the lazy
-   * `pi-planet-radius.json` not downloaded yet), so their CPU/PG draw is left
-   * out of the figures above: they read lower than the truth, never zero.
-   */
   linkLoadUnknown: boolean;
 }
 
 export interface ColonyCheckRow {
-  /** `${characterId}:${planetId}`. */
   key: string;
   characterId: number;
   planetId: number;
@@ -247,21 +187,17 @@ export interface ColonyCheckRow {
   planetType: CharacterPlanet['planet_type'];
   status: CheckStatus;
   extractor: ExtractorFacts;
-  /** Past `EFFICIENT_WINDOW_FRACTION` of its first day's rate, the worst program's; else null. */
   slowedToFraction: number | null;
   storage: StorageFacts;
   load: LoadFacts;
   idleFactories: number;
   tags: FaultTag[];
   action: PrimaryAction;
-  /** The colony's own quick wins, as Plan lists them; empty for a colony with no advice. */
   quickWins: readonly QuickWin[];
   todayPerDay: number | null;
-  /** Hours since this colony's list was read; null for the live, active Character. */
   dataAgeHours: number | null;
 }
 
-/** The slice of `PlanColonyAdvice` a row reads. */
 export interface RowAdvice {
   quickWins: readonly QuickWin[];
   todayPerDay: number | null;
@@ -277,7 +213,6 @@ export interface RowInput {
   windowMs: number;
   haulHours: number;
   advice: RowAdvice | null;
-  /** Hours since an alt's cached list was fetched; null for the live Character. */
   dataAgeHours?: number | null;
 }
 
@@ -327,7 +262,6 @@ function usedVolume(pins: readonly PlanetPin[], pi: PiData): number | null {
         total += item.amount * volumeOf(item.type_id, pi);
         any = true;
       } catch {
-        // An unpriced volume leaves the figure out rather than undercounting it.
         return null;
       }
     }
@@ -444,10 +378,6 @@ export function colonyCheckRow(input: RowInput): ColonyCheckRow {
   };
 }
 
-/**
- * Worst first: status rank, then the sooner deadline, then the shorter fill
- * time, then the planet id so a refresh never reshuffles equal rows.
- */
 export function compareRows(a: ColonyCheckRow, b: ColonyCheckRow): number {
   return (
     STATUS_RANK[a.status] - STATUS_RANK[b.status] ||
@@ -461,24 +391,18 @@ export function sortRows(rows: readonly ColonyCheckRow[]): ColonyCheckRow[] {
   return [...rows].sort(compareRows);
 }
 
-// --- Today ------------------------------------------------------------------------
-
 export interface DueItem {
   key: string;
   characterId: number;
   planetId: number;
   kind: 'restart' | 'haul';
-  /** When it falls due; at or before `nowMs` means now. */
   atMs: number;
-  /** In-game minutes, the same estimate Plan's quick wins use. */
   minutes: number;
-  /** For a restart: it has already stopped. */
   stopped: boolean;
 }
 
 export interface TodayCounts {
   stopped: number;
-  /** Not yet stopped, expiring within a day. */
   expiringToday: number;
   fullBeforeHaul: number;
   needsLook: number;
@@ -488,16 +412,11 @@ export interface TodayCounts {
 
 export interface TodayCheck {
   counts: TodayCounts;
-  /** Everything with a deadline, soonest first. */
   due: DueItem[];
-  /** The first one: the next thing to do. */
   next: DueItem | null;
-  /** The first deadline, i.e. when to log in next; null when nothing has one. */
   loginAtMs: number | null;
-  /** What one login covers: everything due within a day of `loginAtMs`. */
   trip: DueItem[];
   tripMinutes: number;
-  /** Characters the trip needs a login on, in the order it visits them. */
   tripCharacterIds: number[];
 }
 
@@ -564,8 +483,6 @@ export function todayCheck(rows: readonly ColonyCheckRow[], nowMs: number): Toda
 
   const next = due[0] ?? null;
   const loginAtMs = next ? next.atMs : null;
-  // Anything already stopped is part of this login whatever its age, so the
-  // window starts at now, not at the oldest stop.
   const tripEnd = next ? Math.max(next.atMs, nowMs) + DAY_HOURS * HOUR_MS : 0;
   const trip = next ? due.filter((item) => item.atMs <= tripEnd) : [];
   const tripCharacterIds: number[] = [];

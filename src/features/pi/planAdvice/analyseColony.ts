@@ -37,7 +37,6 @@ export function analyseColony(args: {
   haulHours: number;
   preference: RebuildPreference;
   ccSkill: number | null;
-  /** The pilot's saved richness pick for this planet (`richnessOverride.ts`). */
   picked: readonly number[] | undefined;
   factoryWins: readonly QuickWin[];
 }): ColonyWork {
@@ -51,8 +50,6 @@ export function analyseColony(args: {
     salesTaxPct: books.salesTaxPct,
   };
 
-  // Every extractor stopped is a colony earning nothing, which is a
-  // measurement, not an unknown.
   const allStopped =
     colony.extractors.length > 0 &&
     colony.stoppedExtraction !== null &&
@@ -61,8 +58,6 @@ export function analyseColony(args: {
   const earningsOf = (a: BuiltColonyAdvice) => builtColonyEarnings(a, pi, earnOpts);
   const baseEarnings = earningsOf(colony);
   const nominalPerHour: number | null = allStopped ? 0 : baseEarnings.iskPerHour;
-  // A figure that leaves a product out because the hub does not price it is not
-  // today's income, it is part of it.
   const unknownReason =
     nominalPerHour === null
       ? 'no-measured-extraction'
@@ -71,7 +66,6 @@ export function analyseColony(args: {
         : null;
   const nominal = unknownReason === null ? nominalPerHour : null;
 
-  /** What the colony would earn per hour with extra P0 an hour of each type. */
   const earnWith = (extra: ReadonlyMap<number, number>): number | null => {
     if (extra.size === 0) return nominal;
     const merged = new Map(colony.extractedPerHour.map((l) => [l.typeId, l.unitsPerHour]));
@@ -89,7 +83,6 @@ export function analyseColony(args: {
 
   const wins: QuickWin[] = [];
 
-  // Restart: stopped extractors first, then decayed ones, each priced on top of the last.
   const programs = new Map(extractorProgramsFromPins(pins).map((p) => [p.pinId, p]));
   const stoppedAdd = new Map<number, number>();
   const decayedAdd = new Map<number, number>();
@@ -155,7 +148,6 @@ export function analyseColony(args: {
     }
   }
 
-  // Storage that fills before the pilot's haul: extraction stalls for the rest of the window.
   const hoursToFull = colonyHoursToFull(colony, pins, pi, haulHours);
   const stall =
     hoursToFull !== null && hoursToFull < haulHours ? 1 - Math.max(0, hoursToFull) / haulHours : 0;
@@ -166,7 +158,6 @@ export function analyseColony(args: {
     }
   }
 
-  // Idle factories, and the heads that would feed them.
   const plan = colonyPlan(colony, pi);
   if (plan.idle) {
     const { idle } = plan;
@@ -184,7 +175,6 @@ export function analyseColony(args: {
       idle.upgrade.heads > 0 &&
       idle.wouldFeed > 0 &&
       shortfall !== null;
-    // Only a P0 the colony already extracts can be topped up by more heads.
     const extractsIt =
       shortfall !== null && colony.extractedPerHour.some((l) => l.typeId === shortfall.typeId);
     const gain =
@@ -209,10 +199,6 @@ export function analyseColony(args: {
     }
   }
 
-  // Raw P0 sold as it comes out of the ground: basic factories refine it to P1.
-  // Priced against what the raw earns today (never against zero), so a refinement
-  // that would pay less than the ore is not offered, and a colony is never
-  // steered towards selling raw.
   let basicRoom = plan.headroom.basic ?? 0;
   let refined = colony;
   let refinedEarnings = nominal;
@@ -264,17 +250,13 @@ export function analyseColony(args: {
     refinedEarnings = after.iskPerHour;
   }
 
-  // Spare room for more extractors. Priced only for a colony on one resource:
-  // with two, no figure says which one a new ECU would pull.
   const ecus = colony.pinLoad.counts.extractorControlUnit ?? 0;
   const room = plan.headroom.extractorControlUnit ?? 0;
   const maxEcus = plannerPolicy({ maxP0Types: 1, buyTiers: [] }).maxEcusPerColony;
   const extraEcus = Math.min(room, Math.max(0, maxEcus - ecus));
-  // Competes for the same room as the heads and factories: `spendRoomOnce` below picks one.
   if (extraEcus > 0 && ecus > 0 && colony.extractedPerHour.length === 1) {
     const only = colony.extractedPerHour[0];
     const perEcu = only.unitsPerHour / ecus;
-    // The same flat falloff the rebuild scorer applies to every ECU after the first.
     const extra =
       perEcu * extraEcus * plannerPolicy({ maxP0Types: 1, buyTiers: [] }).extraEcuFactor;
     const gain = gainPerDay(earnWith(new Map([[only.typeId, extra]])), nominal);
@@ -289,7 +271,6 @@ export function analyseColony(args: {
     }
   }
 
-  // A network factory win for a product this colony already refines locally is the same gain.
   const localProducts = new Set(
     wins.flatMap((win) =>
       win.detail.kind === 'spare-room' && win.detail.what === 'factories'
@@ -309,10 +290,8 @@ export function analyseColony(args: {
   );
   const counted = spendRoomOnce(wins);
 
-  // Today is what the colony actually delivers: nominal less the stalled share.
   const todayPerDay = nominal === null ? null : nominal * (1 - stall) * HOURS_PER_DAY;
 
-  // Today's m3 a day: what the colony ships out as it runs now.
   const outputUnits = saleableOutputPerHour(colony, pi);
   let todayM3PerDay: number | null = null;
   if (nominal !== null) {

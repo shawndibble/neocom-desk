@@ -1,8 +1,3 @@
-/**
- * The format bar's sheets: colour, size, link and table. Each is a `Modal`
- * (a bottom sheet on a phone, centred on a wide screen) that applies on
- * choosing and closes; none of them knows which surface is behind the bar.
- */
 import { useRef, useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, FieldError, IconButton, Modal, TextInput } from '@/components/ui';
@@ -25,18 +20,13 @@ import { DialogFooter } from '@/components/ui/DialogFooter';
 interface SheetProps {
   open: boolean;
   onClose: () => void;
-  /** Phone layout: a bottom sheet. Wide screens: a centred dialog. */
   phone: boolean;
-  /** Whether "back to default" is offered as a live control (not in Source). */
   canReset: boolean;
 }
 
 const placement = (phone: boolean) => (phone ? 'sheet' : 'center');
 
-// --- Colour ----------------------------------------------------------------
-
 interface ColorDialogProps extends SheetProps {
-  /** Current colour at the caret: `#aarrggbb`, `null` for the default, or `mixed`. */
   current: string | 'mixed' | null;
   onPick: (color: string | null) => void;
 }
@@ -68,7 +58,6 @@ export function ColorDialog({ open, onClose, phone, canReset, current, onPick }:
       placement={placement(phone)}
     >
       <div className="space-y-4">
-        {/* Swatches sit on the EVE mail surface so a colour looks as it will in game. */}
         <div className={cx(EVE_MAIL_SURFACE_CLASS, 'grid grid-cols-6 gap-2')}>
           {MAIL_COLOR_SWATCHES.map((color) => (
             <button
@@ -126,8 +115,6 @@ export function ColorDialog({ open, onClose, phone, canReset, current, onPick }:
   );
 }
 
-// --- Size ------------------------------------------------------------------
-
 interface SizeDialogProps extends SheetProps {
   current: number | 'mixed' | null;
   onPick: (px: number | null) => void;
@@ -173,17 +160,13 @@ export function SizeDialog({ open, onClose, phone, canReset, current, onPick }: 
   );
 }
 
-// --- Link ------------------------------------------------------------------
-
 interface LinkDialogProps extends SheetProps {
-  /** What the link edit would replace; read once, when the sheet opens. */
   getTarget: () => LinkTarget;
   onApply: (target: LinkTarget, edit: { text: string; href: string }) => void;
   onRemove?: (target: LinkTarget) => void;
 }
 
 export function LinkDialog(props: LinkDialogProps) {
-  // Remounted per open so the fields start from the selection / link under the caret.
   return props.open ? <LinkDialogBody {...props} /> : null;
 }
 
@@ -303,8 +286,6 @@ function LinkDialogBody({
     </Modal>
   );
 }
-
-// --- Table -----------------------------------------------------------------
 
 const TABLE_LIMITS = { minRows: 2, maxRows: 10, minCols: 2, maxCols: 6 } as const;
 

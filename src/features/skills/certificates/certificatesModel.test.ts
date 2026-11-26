@@ -122,7 +122,6 @@ describe('certificateTimes', () => {
       prereqs,
     }) as EngineSkill;
   const ctx = {
-    // 200 needs 100 at II — a prerequisite the certificate itself never names.
     skills: new Map([
       [100, skill(100)],
       [200, skill(200, [{ typeID: 100, level: 2 }])],

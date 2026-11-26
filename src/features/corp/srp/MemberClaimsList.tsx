@@ -41,7 +41,6 @@ export function ClaimStatePill({ state }: { state: SrpClaimState }) {
   return <Pill tone={STATE_TONE[state]}>{t(STATE_KEY[state])}</Pill>;
 }
 
-/** The ISK, or "Officer sets amount" while nobody has typed one. */
 export function ClaimAmount({ claim }: { claim: MemberClaim }) {
   const { t } = useTranslation();
   return claim.amount === null ? (
@@ -51,7 +50,6 @@ export function ClaimAmount({ claim }: { claim: MemberClaim }) {
   );
 }
 
-/** The My claims column picker, for the panel's actions. Reads the store `MemberClaimsList` does. */
 export function MemberClaimsColumnPicker() {
   const { t } = useTranslation();
   const { visible, toggle, reset } = useColumnVisibility(
@@ -84,15 +82,10 @@ interface MemberClaimsListProps {
   claims: readonly MemberClaim[];
   hullName: (typeId: number) => string;
   systemName: (systemId: number) => string;
-  /** A row tap or click opens the claim's detail. */
   onOpen: (claim: MemberClaim) => void;
   onRefile: (claim: MemberClaim) => void;
 }
 
-/**
- * The pilot's claims, open ones first. One `DataTable`: columns on desktop, dense two-line cards
- * on a phone. A Rejected claim carries its reason and, once, a Re-file (full width on a phone).
- */
 export function MemberClaimsList({
   claims,
   hullName,
@@ -139,7 +132,6 @@ export function MemberClaimsList({
         id: 'filed',
         header: t('srpMember.claims.filed'),
         sortValue: (c) => c.filedAt,
-        // The phone card's line carries the loss date; the filed date is in the detail sheet.
         render: (c) => (
           <span data-dense-omit className="whitespace-nowrap tabular-nums">
             {formatDateOnly(new Date(c.filedAt), timeZone)}

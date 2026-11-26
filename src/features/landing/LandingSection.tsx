@@ -5,10 +5,8 @@ import { landingAnchor } from './landingAnchors';
 import { cx } from '@/lib/cx';
 import { Reveal } from './Reveal';
 
-/** Background tone of a landing band: the page tone, a lighter panel wash, or deep space (stars and a nebula). */
 export type LandingTone = 'plain' | 'panel' | 'space';
 
-/** The CCP ship renders kept under public/landing (credited on /data-credit.html). */
 export type LandingShip = 'hulk' | 'orca' | 'venture' | 'megathron';
 
 export type LandingShipPlacement = { ship: LandingShip; side: 'left' | 'right' };
@@ -18,11 +16,6 @@ const SHIP_CLASS: Record<LandingShipPlacement['side'], string> = {
   right: 'lp-ship-right',
 };
 
-/**
- * Full-bleed backdrop of a landing band: a tone layer (soft-faded at the top
- * and bottom edge rather than cut by a rule) and an optional ship render
- * bleeding off one edge. All of it is decorative and sits behind the content.
- */
 export function LandingBackdrop({
   tone,
   ship,
@@ -30,7 +23,6 @@ export function LandingBackdrop({
 }: {
   tone: LandingTone;
   ship?: LandingShipPlacement;
-  /** Above the fold: skip lazy loading. */
   eager?: boolean;
 }) {
   return (
@@ -46,9 +38,7 @@ export function LandingBackdrop({
           width={512}
           height={512}
           loading={eager ? 'eager' : 'lazy'}
-          // The hero's ship is the landing page's largest paint (#3926).
           fetchPriority={eager ? 'high' : undefined}
-          // The eager ship is the largest paint: decode it with the frame, not after (#3950).
           decoding={eager ? undefined : 'async'}
           className={cx('lp-ship', SHIP_CLASS[ship.side])}
         />
@@ -57,16 +47,6 @@ export function LandingBackdrop({
   );
 }
 
-/**
- * One titled band of the landing page, on a full-bleed backdrop with its
- * numbered eyebrow (the header link's label), a HUD-style heading and an optional lead,
- * content held in the page's single `max-w-6xl` column. Named as a landmark
- * rather than left an anonymous `<section>`: on a page this long, "skip to what
- * it does" and "skip to what it asks for" are real navigation, and the name
- * doubles as the handle a test grabs a section by — several labels here
- * (Clones, Market) also appear in the hero's preview panel, so an unscoped
- * query would be ambiguous.
- */
 export function LandingSection({
   id,
   heading,
@@ -75,7 +55,6 @@ export function LandingSection({
   ship,
   children,
 }: {
-  /** One of `LANDING_ANCHORS`: it sets the band's "01"-style number and its eyebrow, the header link's own label. */
   id: string;
   heading: string;
   lead?: string;
@@ -92,7 +71,7 @@ export function LandingSection({
       className="relative isolate scroll-mt-16 overflow-hidden"
     >
       <LandingBackdrop tone={tone} ship={ship} />
-      <Reveal className="relative mx-auto max-w-6xl px-6 py-16">
+      <Reveal className="relative mx-auto max-w-page px-4 py-16 sm:px-6">
         <p className={cx(hudLabelClassName, 'text-xs text-accent')}>
           {index} · {t(`login.header.${key}`)}
         </p>

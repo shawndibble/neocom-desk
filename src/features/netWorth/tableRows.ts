@@ -1,19 +1,10 @@
-/**
- * Rows of the Wallet "Balance by character" table (issue #2935): each
- * Character's latest layers, with the live wallet balance standing in for the
- * snapshot's ISK when it is fresher. A Character short of a needed permission
- * has no layers and is left out of every total.
- */
 import type { LayerValues } from '@/engine/netWorth/series';
 
 export interface NetWorthTableRow {
   characterId: number;
   characterName: string;
-  /** `null` = not covered by the needed permissions. */
   layers: LayerValues | null;
-  /** Holds the wallet, assets and orders permissions. */
   covered: boolean;
-  /** Has the permissions but the live wallet read asked for a new login. */
   needsReauth: boolean;
 }
 
@@ -23,7 +14,6 @@ export function buildTableRows(input: {
   characters: readonly { characterId: number; name: string }[];
   latest: ReadonlyMap<number, LayerValues>;
   covered: ReadonlySet<number>;
-  /** Live wallet balance per Character; absent = not loaded. */
   liveWallet: ReadonlyMap<number, { balance: number | null; needsReauth: boolean }>;
 }): NetWorthTableRow[] {
   return input.characters.map(({ characterId, name }) => {

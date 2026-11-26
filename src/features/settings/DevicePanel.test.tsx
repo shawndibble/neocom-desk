@@ -107,7 +107,6 @@ describe('DevicePanel delete all character data', () => {
       await within(dialog).findByText(/Bravo could not be deleted from the sync server/)
     ).toBeInTheDocument();
     expect(deleteMock.deleteAllLocalData).not.toHaveBeenCalled();
-    // The other Characters' remote data is already gone; backing out is not offered.
     expect(within(dialog).queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument();
 
     await user.click(within(dialog).getByRole('button', { name: 'Finish deleting' }));

@@ -7,10 +7,6 @@ const TONE_BORDER = {
   neutral: 'border-line-bright',
 } as const;
 
-/**
- * A one-line state strip on a moon owner's page, on either side: a bold title, a quiet
- * sentence, and the actions that end or answer the state (Cancel removal, End it now).
- */
 export function OwnerStatusStrip({
   title,
   body,
@@ -19,7 +15,6 @@ export function OwnerStatusStrip({
 }: {
   title: string;
   body: string;
-  /** `neutral`: news, not a problem (a payee the other side changed). */
   tone?: 'danger' | 'warning' | 'neutral';
   actions?: ReactNode;
 }) {

@@ -1,14 +1,12 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import type { BookRowView } from '@/engine/corpTaxBook/personal';
 import type { DisplayRow } from '../groupRows';
+import type { ClosedDayPlan } from '@/engine/corpTaxBook/closedDayFix';
+import { ClosedDayConflictNotice } from './ClosedDayConflict';
 import { ConflictNotice } from './ConflictNotice';
 import { CorpRowDetailModal } from './CorpRowDetailModal';
 import type { CorpRowInfo } from './corpRows';
 
-/**
- * A Corp Tax Book day's detail: the book's side as a few labelled facts, and on a
- * Conflict day the notice naming the clashing entry ahead of everything else.
- */
 const ZEO = 45490;
 const CORP_NAME = 'Brass Meridian Logistics';
 
@@ -33,14 +31,53 @@ const base: BookRowView = {
   oreForm: 'compressed',
 };
 
+const PAID_DAY: ClosedDayPlan = {
+  characterId: 1,
+  date: '2026-10-28',
+  solarSystemId: 30003838,
+  state: 'conflict',
+  books: [
+    {
+      corporationId: 98000001,
+      minerId: 'solo:1',
+      ownPayeeIds: ['own'],
+      share: [{ typeId: ZEO, quantity: 43_050 }],
+      taxPct: 5,
+      unitPrices: { [ZEO]: 148.2 },
+      oreForm: 'compressed',
+      moneyApplied: true,
+    },
+  ],
+  fixes: [
+    {
+      assignmentId: 'c',
+      payeeId: 'own',
+      corporationId: 98000001,
+      before: { oreLines: [{ typeId: ZEO, quantity: 30_000 }], taxPct: 5 },
+      after: { oreLines: [{ typeId: ZEO, quantity: 43_050 }], taxPct: 5 },
+      releasedTypeIds: [ZEO],
+    },
+    {
+      assignmentId: 'x',
+      payeeId: 'ashfall',
+      before: { oreLines: [{ typeId: ZEO, quantity: 20_000 }], taxPct: 8 },
+      after: { oreLines: [{ typeId: ZEO, quantity: 6_950 }], taxPct: 8 },
+      releasedTypeIds: [ZEO],
+    },
+  ],
+  blockers: [{ kind: 'bookPayment', corporationId: 98000001 }],
+};
+
 function Story({
   view,
   conflict = false,
   twoBooks = false,
+  closed = false,
 }: {
   view: BookRowView;
   conflict?: boolean;
   twoBooks?: boolean;
+  closed?: boolean;
 }) {
   const corp: Extract<CorpRowInfo, { kind: 'row' }> = { kind: 'row', view, corpName: CORP_NAME };
   const dr = {
@@ -52,7 +89,6 @@ function Story({
   } as unknown as DisplayRow;
   return (
     <>
-      {/* The modal portals out; this keeps the story root non-empty for screenshots. */}
       <div className="min-h-screen" />
       <CorpRowDetailModal
         open
@@ -64,7 +100,18 @@ function Story({
         systemSecurity={0.5}
         typeNames={new Map([[ZEO, 'Compressed Zeolites']])}
         notice={
-          conflict ? (
+          closed ? (
+            <ClosedDayConflictNotice
+              plan={PAID_DAY}
+              names={{
+                payee: (id) => (id === 'own' ? CORP_NAME : 'Ashfall Mining'),
+                corp: () => CORP_NAME,
+                typeNames: new Map([[ZEO, 'Compressed Zeolites']]),
+              }}
+              onFix={() => {}}
+              onResolve={() => {}}
+            />
+          ) : conflict ? (
             <ConflictNotice
               corpName={CORP_NAME}
               cause="otherPayee"
@@ -74,9 +121,6 @@ function Story({
               recordedAt="Talidal - Ishimura Heavy Industries"
               resolvesOn="2026-11-12"
               others={twoBooks ? [{ corpName: 'Ashfall Prospecting', billAmount: 120_000 }] : []}
-              previews={[]}
-              typeNames={new Map()}
-              onTakeOver={() => {}}
             />
           ) : undefined
         }
@@ -93,7 +137,6 @@ const meta = {
 export default meta;
 type S = StoryObj<typeof meta>;
 
-/** @summary A Conflict day: which entry clashes, when it resolves, and the two ways to fix it. */
 export const Conflict: S = {
   args: {
     view: {
@@ -107,24 +150,22 @@ export const Conflict: S = {
   },
 };
 
-/** @summary A Billable day no Late notice asked for yet: what bills it and when the book last synced. */
 export const Billed: S = { args: { view: base } };
 
-/** @summary A dismissed day: what was originally billed and the corporation's reason. */
+export const PaidDayDiffers: S = { args: { view: { ...base, state: 'paid' }, closed: true } };
+
 export const Dismissed: S = {
   args: {
     view: { ...base, state: 'dismissed', taxOwed: 0, dismissalReason: 'Fleet op, corp-sanctioned' },
   },
 };
 
-/** @summary A paid day: its payments are in the Payee ledger, not on the day. */
 export const Paid: S = {
   args: {
     view: { ...base, state: 'paid', taxOwed: 0 },
   },
 };
 
-/** @summary A day two corporations' books both contest: one take-over does the split for both. */
 export const ConflictTwoBooks: S = {
   args: {
     view: {

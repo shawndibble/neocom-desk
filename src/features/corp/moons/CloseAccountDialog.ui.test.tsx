@@ -129,7 +129,6 @@ describe('CloseAccountDialog', () => {
 
   it('can dismiss the tax instead of sending a final notice', async () => {
     renderDialog();
-    // Each option is named once: the group's caption is not read into its first button.
     expect(screen.getByRole('button', { name: 'Send a final notice' })).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Dismiss the tax' }));
     await userEvent.type(screen.getByLabelText(/Reason/), 'Left the area');

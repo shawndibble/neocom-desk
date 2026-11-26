@@ -11,7 +11,6 @@ import { TRADE_HUBS } from '@/market/hubs';
 import { useOreNames } from './useOreNames';
 import { isk, shortDate } from './noticeFormat';
 
-/** What the lines panel prints: a late notice as the verify page reads it, or the book holds it. */
 export interface NoticeLinesSource {
   lines: readonly VerifyPayloadLine[];
   hubId: string;
@@ -20,10 +19,8 @@ export interface NoticeLinesSource {
   refineryNames?: Record<string, string>;
 }
 
-/** Formats a date for the page it sits on; the verify page's own is the default. */
 type DateFormat = (value: string) => string;
 
-/** The mined days of one late notice with every ore's price, and the total asked (shared by the verify page and the officer's notice panel). */
 export function NoticeLines({
   notice: statement,
   formatDate,
@@ -31,7 +28,6 @@ export function NoticeLines({
 }: {
   notice: NoticeLinesSource;
   formatDate?: DateFormat;
-  /** The section's title; the Miner's own page says "What you mined". */
   title?: string;
 }) {
   const { t, i18n } = useTranslation();
@@ -49,8 +45,6 @@ export function NoticeLines({
     hub,
     form: t(`corpTaxBook.verify.oreForm.${statement.oreForm}`),
   });
-  // The panel is narrow at any viewport width: the meta moves under the title by the
-  // container's width, not the viewport's.
   return (
     <div className="@container">
       <Panel
@@ -87,7 +81,6 @@ interface DayGroup {
   tax: number;
 }
 
-/** Consecutive rows of the same day, so a day is named once however many lines it bills. */
 function groupByDay(rows: readonly VerifyRow[]): DayGroup[] {
   const days: DayGroup[] = [];
   for (const r of rows) {
@@ -102,17 +95,10 @@ function groupByDay(rows: readonly VerifyRow[]): DayGroup[] {
   return days;
 }
 
-/** The segments of a line's meta, with empty ones (an unnamed refinery, no rate) dropped. */
 function metaSegments(parts: readonly (string | undefined | false)[]): string[] {
   return parts.filter((p): p is string => typeof p === 'string' && p.trim() !== '');
 }
 
-/**
- * One mined day: the day and its tax once, then for each line the refinery (named
- * on the line under the day, again only when it changes) and the rate, and one
- * sub-row per ore (ore × quantity, its unit price, the price's source) so every
- * price sits beside its own ore.
- */
 function MinedDay({
   day,
   oreNames,
@@ -125,8 +111,6 @@ function MinedDay({
   formatDate: DateFormat;
 }) {
   const { t } = useTranslation();
-  // The day header already says the day, and the panel header says prices are the day's own:
-  // an ore line only speaks up when its price came from somewhere else.
   const priceSource = (source: VerifyRow['ores'][number]['source']) =>
     source && source !== 'saved' && source !== 'historical'
       ? t(`miningTax.detail.breakdown.source.${source}`)

@@ -63,8 +63,6 @@ describe('parseAppraisalPaste', () => {
   });
 
   it('keeps only name and quantity from a wide inventory copy', () => {
-    // "Name<tab>Qty<tab>Group<tab>Volume" — the shape EVE gives when the
-    // inventory is in details mode.
     const text = 'Tritanium\t124,500\tMineral\t1,245 m3';
     expect(parseAppraisalPaste(text)).toEqual([
       { name: 'Tritanium', quantity: 124500, lines: [1] },
@@ -97,10 +95,6 @@ describe('parseAppraisalPaste', () => {
     ]);
   });
 
-  /**
-   * The trap a naive `/(.+)\s+(\d+)$/` falls into: plenty of real type names
-   * end in a number, and eating it leaves a name that resolves to nothing.
-   */
   it('does not mistake a trailing model number for a quantity', () => {
     expect(parseAppraisalPaste("Zainou 'Gnome' Shield Management SM-703")).toEqual([
       { name: "Zainou 'Gnome' Shield Management SM-703", quantity: 1, lines: [1] },
@@ -280,9 +274,6 @@ describe('parseAppraisalPaste — EFT fits', () => {
 
   it('reports a malformed header as its own line, rather than dropping it', () => {
     const entries = parseAppraisalPaste('[ , Max Hacker]\n\nDamage Control II');
-    // The header text is not an item name, so it resolves to nothing and the
-    // panel lists it as an unmatched line — the same way a typo'd item name is
-    // reported, never silently dropped.
     expect(entries).toEqual([
       { name: '[ , Max Hacker]', quantity: 1, lines: [1] },
       { name: 'Damage Control II', quantity: 1, lines: [3] },
@@ -303,8 +294,6 @@ describe('parseAppraisalPaste — EFT fits', () => {
   });
 
   it('reads an unusable xN count as one, keeping the "always >= 1" promise', () => {
-    // A zero would ride out into a Shared Appraisal, whose stored snapshot
-    // refuses a non-positive count.
     const entries = parseAppraisalPaste('[Rifter, Kite Fit]\n\nNanite Repair Paste x0');
     expect(entries).toEqual([
       { name: 'Rifter', quantity: 1, lines: [1] },
@@ -313,7 +302,6 @@ describe('parseAppraisalPaste — EFT fits', () => {
   });
 
   it('leaves every non-EFT paste shape on the existing parser', () => {
-    // A bracket only counts as a fit header on the first non-blank line.
     expect(parseAppraisalPaste('Tritanium\t100\n[Empty High slot]')).toEqual([
       { name: 'Tritanium', quantity: 100, lines: [1] },
       { name: '[Empty High slot]', quantity: 1, lines: [2] },

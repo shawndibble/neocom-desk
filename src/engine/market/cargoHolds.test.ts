@@ -1,25 +1,24 @@
 import { describe, expect, it } from 'vitest';
 import { holdAccepts, holdsFromStats, type HoldKind } from './cargoHolds';
 
-/** An item by its SDE group and category. */
 const item = (groupId: number, categoryId: number | null) => ({ groupId, categoryId });
 
-const AMMO = item(85, 8); // Hybrid Charge
-const SCRIPT = item(907, 8); // Tracking Script
+const AMMO = item(85, 8);
+const SCRIPT = item(907, 8);
 const CAP_BOOSTER = item(87, 8);
-const MISSILE = item(384, 8); // Light Missile
+const MISSILE = item(384, 8);
 const NANITE_PASTE = item(916, 8);
-const PROBE = item(479, 8); // Scanner Probe
-const P0 = item(1032, 42); // Planet Solid - Raw Resource
-const P1 = item(1042, 43); // Basic Commodities
-const P4 = item(1041, 43); // Advanced Commodities
+const PROBE = item(479, 8);
+const P0 = item(1032, 42);
+const P1 = item(1042, 43);
+const P4 = item(1041, 43);
 const COMMAND_CENTER = item(1027, 41);
 const MINERAL = item(18, 4);
 const GAS_CLOUD = item(711, 2);
 const COMPRESSED_GAS = item(4168, 2);
-const ORE = item(460, 25); // Pyroxeres
-const MOON_ORE = item(1884, 25); // Ubiquitous Moon Asteroids
-const COMPRESSED_ORE = item(4029, 25); // Compressed Veldspar group
+const ORE = item(460, 25);
+const MOON_ORE = item(1884, 25);
+const COMPRESSED_ORE = item(4029, 25);
 const ICE = item(465, 25);
 const ICE_PRODUCT = item(423, 4);
 const FUEL_BLOCK = item(1136, 4);
@@ -32,15 +31,15 @@ const SKYHOOK = item(4736, 46);
 const GANTRY = item(1106, 46);
 const MOBILE_DEPOT = item(1246, 22);
 const MOBILE_TRACTOR = item(1250, 22);
-const UPWELL_STRUCTURE = item(1657, 65); // Citadel
-const STRUCTURE_MODULE = item(1321, 66); // Structure Rig
-const SOV_39 = item(1012, 39); // Infrastructure Hub
+const UPWELL_STRUCTURE = item(1657, 65);
+const STRUCTURE_MODULE = item(1321, 66);
+const SOV_39 = item(1012, 39);
 const SOV_40 = item(838, 40);
-const DRONE = item(100, 18); // Combat Drone
+const DRONE = item(100, 18);
 const CONTROL_TOWER = item(365, 23);
-const CONTAINER = item(448, 2); // Audit Log Secure Container
-const FIGHTER = item(1652, 87); // Light Fighter
-const MODULE = item(55, 7); // Projectile Weapon
+const CONTAINER = item(448, 2);
+const FIGHTER = item(1652, 87);
+const MODULE = item(55, 7);
 
 function accepted(kind: HoldKind, items: readonly ReturnType<typeof item>[]): boolean[] {
   return items.map((i) => holdAccepts(kind, i));
@@ -152,7 +151,6 @@ describe('holdsFromStats', () => {
   };
 
   it('folds cargo and fleet hangar into the general hold and lists each specialised hold it has', () => {
-    // A Hoarder: cargo, an ammo hold and a gas hold.
     expect(holdsFromStats({ ...NONE, cargo: 300, ammoHold: 41_000, gasHold: 5_000 })).toEqual([
       { kind: 'general', capacityM3: 300 },
       { kind: 'gas', capacityM3: 5_000 },

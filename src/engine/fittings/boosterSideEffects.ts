@@ -1,29 +1,10 @@
-/**
- * Combat booster side effects: each booster's own (four apiece), by the
- * dogma effect id the engine switches on (`FitItem.booster_side_effects`),
- * with the penalty the booster carries for it — which the engine then
- * scales by the pilot's Neurotoxin skills, so the shown figure is the
- * booster's base.
- *
- * Read out of the pinned `@eveshipfit/sde` `sde.dat` (2026-09-25): every
- * published booster with a `boosterEffectChance` attribute, and of its
- * effects the `booster…Penalty…` ones (its other effect is the benefit);
- * the penalty is the value of the attribute the effect's modifier reads.
- * Bump with the SDE if CCP adds a booster.
- */
 import type { FittingImplantSet } from './types';
 
 export interface BoosterSideEffect {
   effectId: number;
-  /** The booster's base penalty, percent (negative: a reduction). */
   penaltyPct: number;
 }
 
-// Effect ids: 2735 armor HP, 2736 armor repair amount, 2737 shield capacity,
-// 2739 turret optimal range, 2741 turret falloff, 2745 capacitor capacity,
-// 2746 max velocity, 2747 turret tracking, 2748 missile velocity, 2749
-// missile explosion velocity, 2791 missile explosion radius, 4970 shield
-// boost amount.
 const FAMILIES: Readonly<Record<string, readonly number[]>> = {
   crash: [2735, 2746, 2748, 4970],
   bluePill: [2737, 2739, 2745, 2749],
@@ -35,7 +16,6 @@ const FAMILIES: Readonly<Record<string, readonly number[]>> = {
   exile: [2735, 2745, 2747, 2791],
 };
 
-/** Standard / Improved / Strong: a 20 / 25 / 30% penalty. */
 const BOOSTERS: Readonly<Record<number, { family: keyof typeof FAMILIES; pct: number }>> = {
   9947: { family: 'crash', pct: 20 },
   10151: { family: 'crash', pct: 25 },
@@ -63,7 +43,6 @@ const BOOSTERS: Readonly<Record<number, { family: keyof typeof FAMILIES; pct: nu
   25349: { family: 'exile', pct: 30 },
 };
 
-/** The one side effect that grows a figure rather than shrinking it: a bigger explosion radius. */
 const GROWS: ReadonlySet<number> = new Set([2791]);
 
 export function boosterSideEffects(boosterTypeId: number): BoosterSideEffect[] {
@@ -75,7 +54,6 @@ export function boosterSideEffects(boosterTypeId: number): BoosterSideEffect[] {
   }));
 }
 
-/** Of the side effects the pilot switched on, those that are this booster's own. */
 export function sideEffectsSwitchedOn(
   boosterTypeId: number,
   switchedOn: readonly number[] | undefined
@@ -85,11 +63,6 @@ export function sideEffectsSwitchedOn(
   return switchedOn.filter((effectId) => own.has(effectId));
 }
 
-/**
- * `set` with `boosters` in place of its own, keeping only the switched-on
- * side effects that belong to a booster still in it — a side effect whose
- * booster is gone goes with it.
- */
 export function withBoosters(
   set: FittingImplantSet,
   boosters: readonly number[]

@@ -67,11 +67,6 @@ import { useTurnInOffers } from '@/features/campaigns/useTurnIns';
 import { useHubFor } from '@/features/market/hub';
 import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
 
-/**
- * Query-string view state (ADR 0015), beside the drill-down path. The
- * cross-character filter's codec joins these in the component, since its
- * default is the synced Settings value.
- */
 const SEARCH_PARAM = textParam();
 const ALL_ITEMS_PARAM = boolParam();
 const MIN_VALUE_PARAM = textParam();
@@ -85,14 +80,12 @@ const ASSETS_VIEW_PARAMS = {
   chars: characterFilterParam('current'),
 };
 
-/** Stable identity, so the fallback doesn't invalidate the grouping memo every render. */
 const EMPTY_ITEM_OWNERS: ReadonlyMap<number, number> = new Map();
 const EMPTY_CHARACTER_NAMES: ReadonlyMap<number, string> = new Map();
 export const LOCATION_ENDPOINTS: readonly EsiEndpointId[] = ['getCharacterLocation'];
 const NO_BUILD_PLANS: readonly BuildPlanRecord[] = [];
 const NO_PLACE_REFS: readonly PlaceRef[] = [];
 
-/** The Items page's funnel filters: Category, Blueprints and min value (search and sort sit outside). */
 export interface AssetsFilterValue {
   cat: CategoryPick;
   bp: BlueprintKind;
@@ -109,17 +102,10 @@ export function useAssetsData() {
     { cacheKey: 'assets' }
   );
 
-  // Cross-character search (issue #746, replacing issue #85's binary toggle):
-  // `'current'` (today's old off-state, no extra fan-out) or `'all'` once the
-  // pilot asks via `CharacterFilterControl`. The URL wins; absent, this page's
-  // remembered pick, then the synced Settings default. A link's value is never
-  // remembered; only a change to the control is.
   const rememberedCharacterFilter = useRememberedCharacterFilter<typeof ASSETS_VIEW_PARAMS>(
     'assets',
     'chars'
   );
-  // The Category and Blueprints picks are remembered per device as well
-  // (issue #5601); the min-value box stays per-visit, as before.
   const kindPreference = useAssetKindPreference((state) => state.value);
   const kindPreferenceHydrated = useAssetKindPreference((state) => state.hydrated);
   const setKindPreference = useAssetKindPreference((state) => state.setValue);
@@ -147,22 +133,13 @@ export function useAssetsData() {
   const search = view.q;
   const setSearch = (q: string) => setView({ q });
   const searchActive = search.trim().length > 0;
-  // Debounced separately from `search` (issue #415): the input stays
-  // instantly responsive, only the matching/grouping memos below — which
-  // scan every asset — wait out the debounce.
   const [debouncedSearch, setDebouncedSearch] = useDebouncedValue(search);
 
-  // Permanent "all items across all locations" flat view (issue #414): off by
-  // default (unpruned tree browsing, as before), and — like search — flattens
-  // every location into one sortable list rather than replacing the tree.
   const allItemsView = view.all;
   const minValueInput = view.min;
   const flatModeActive = searchActive || allItemsView;
-  // Held off while prices are still loading: every asset values 0 until then.
   const minValueThreshold = data?.pricesReady === false ? 0 : (parseIskAmount(minValueInput) ?? 0);
 
-  // Category and Blueprints (issue #5601): `kindFilter` is null until the
-  // market tree has loaded, so a not-yet-known type is never hidden.
   const categoryIndex = useAssetCategoryIndex(data !== undefined && data !== null);
   const catKey = CATEGORY_PARAM.serialize(view.cat);
 
@@ -171,8 +148,6 @@ export function useAssetsData() {
 
   const resetFilters = () => setView({ cat: 'all', bp: 'any', min: '' });
 
-  // Viewing a named Character is a fixed scope: the cross-Character filter
-  // (and its legacy `chars` value, which here named the Character) stands down.
   const crossCharacterFilter: CharacterFilterValue =
     viewedCharacterId === undefined ? view.chars : 'current';
   const resolvedCrossCharacterFilter = useResolvedCharacterFilter(
@@ -189,14 +164,10 @@ export function useAssetsData() {
       })),
     [allCharactersQuery]
   );
-  // The Character a `?char=<id>` link names: the page's fixed subject, so the
-  // header names them instead of offering the Character picker.
   const viewedCharacter =
     viewedCharacterId === undefined
       ? undefined
       : allCharactersQuery.find((c) => c.characterId === viewedCharacterId);
-  // The active Character's own assets already come from `assetsResult` —
-  // this is only ever the *other* Characters the resolved filter names.
   const otherCharacterIds = useMemo(() => {
     const ids =
       resolvedCrossCharacterFilter === 'all'
@@ -205,7 +176,6 @@ export function useAssetsData() {
     return ids.filter((id) => id !== activeCharacterId);
   }, [resolvedCrossCharacterFilter, crossCharacterCandidates, activeCharacterId]);
 
-  // My ships follows the same Character filter, the active Character included.
   const shipCharacterIds = useMemo(() => {
     const ids =
       resolvedCrossCharacterFilter === 'all'
@@ -220,12 +190,6 @@ export function useAssetsData() {
 
   const [crossCharacterData, setCrossCharacterData] = useState<CrossCharacterData | null>(null);
   const [crossCharacterLoading, setCrossCharacterLoading] = useState(false);
-  // Cached per resolved id set (issue #415's per-Character caching, widened to
-  // a set): switching the filter away and back to the same set reuses this
-  // instead of refetching. A ref, not state — it must survive the resolved
-  // set becoming empty (which intentionally leaves `crossCharacterData`
-  // itself alone, per the comment below) without itself being a render
-  // dependency.
   const crossCharacterCacheRef = useRef<{ key: string; data: CrossCharacterData } | null>(null);
   useEffect(() => {
     if (otherCharacterIds.length === 0 || activeCharacterId === null) return;
@@ -251,23 +215,11 @@ export function useAssetsData() {
       cancelled = true;
     };
   }, [otherCharacterIds, activeCharacterId]);
-  // Only reaches beyond the active Character while an actual search is
-  // active — resolving the filter to more than "current" alone doesn't
-  // change browsing. Narrowed (not a plain boolean) so every memo below gets
-  // a non-null value for free.
   const activeCrossCharacterData =
     otherCharacterIds.length > 0 && searchActive ? crossCharacterData : null;
 
-  // Quickbar (GLOSSARY.md), the blueprint catalog for Build Plan, and Show
-  // info's modal — the page's shared Item Actions (issue #2041), loaded
-  // lazily on the first menu open (same trade-off as the Market Browser: it
-  // pulls the full SDE types.json and most page visits never open a menu).
   const itemActions = usePageItemActions({ activeCharacterId, lazyBlueprints: true });
 
-  // Station Pins (issue #84): also Editable Data, synced the same way as the
-  // Quickbar. Loaded whole (every Character's pin rows, not just the active
-  // one) because an account-wide pin from ANY Character elevates a station
-  // regardless of who's active — see pinStateForStation.
   const pinsQuery = useLiveQuery(() => db.stationPins.toArray(), []);
   const pins = pinsQuery ?? [];
 
@@ -285,11 +237,6 @@ export function useAssetsData() {
     else await clearStationPin(locationId);
   }
 
-  // "View in Industry as material" (issue #414): the character's own plans,
-  // reverse-indexed by the materials their blueprints consume, once the
-  // (lazily loaded) blueprint catalog is in hand. Null while unknown, same
-  // as the catalog itself, so the menu action stays absent rather than
-  // flashing in once the catalog lands.
   const buildPlansQuery = useLiveQuery(async () => {
     if (activeCharacterId === null) return undefined;
     return db.buildPlans.where('characterId').equals(activeCharacterId).toArray();
@@ -317,18 +264,11 @@ export function useAssetsData() {
   const volumeByTypeId = data?.volumeByTypeId ?? NO_NUMBERS;
   const assetNames = data?.assetNames ?? NO_ASSET_NAMES;
 
-  // On-screen matching: the active Character's own assets, plus every other
-  // Character's when the cross-character toggle is on and a search is active
-  // (see `activeCrossCharacterData` above) — merging is safe because asset
-  // item_ids are globally unique across the whole game, not scoped to one
-  // Character.
   const mergedAssets = useMemo(() => {
     const own = assetsResult?.data ?? [];
     if (!activeCrossCharacterData) return own;
     return [...own, ...activeCrossCharacterData.entries.flatMap((entry) => entry.assets)];
   }, [assetsResult, activeCrossCharacterData]);
-  // Stock Cost Basis (issue #6381): the active Character's own holdings only,
-  // so it is withheld while the list spans Characters. Read once per asset list.
   const ownAssets = assetsResult?.data;
   const [stockCosts, setStockCosts] = useState<{
     key: string;
@@ -352,7 +292,6 @@ export function useAssetsData() {
     activeCrossCharacterData || stockCosts?.key !== stockCostKey || stockCosts.costs.size === 0
       ? null
       : stockCosts.costs;
-  // Abyssal types leave the price map; their estimates join the per-item values.
   const abyssal = useAbyssalAssetEstimates(
     mergedAssets,
     (itemId) => activeCrossCharacterData?.characterIdByItemId.get(itemId) ?? activeCharacterId,
@@ -391,8 +330,6 @@ export function useAssetsData() {
   }, [typeNames, activeCrossCharacterData]);
   const blueprintTypeIds = useBlueprintTypeIds(mergedTypeNames);
 
-  // The picker lists only categories the shown assets fall under.
-  // Null while there is nothing to list, so the picker never shows empty.
   const pickerIndex = useMemo(() => {
     if (!categoryIndex) return null;
     const pruned = pruneCategoryIndex(
@@ -404,7 +341,6 @@ export function useAssetsData() {
   }, [categoryIndex, mergedAssets, categoryPick]);
 
   const showBlueprintSelect = pickerIndex ? blueprintsTicked(pickerIndex, categoryPick) : false;
-  // The filters the funnel holds, as one value, so each pill's `clear` stays pure.
   const filterValue = useMemo<AssetsFilterValue>(
     () => ({ cat: categoryPick, bp: blueprintKind, min: minValueInput }),
     [categoryPick, blueprintKind, minValueInput]
@@ -414,9 +350,7 @@ export function useAssetsData() {
       filterValue,
       { index: pickerIndex, showBlueprintSelect, categoryLabel: t('assets.category.label') },
       t
-    ).map((filter) => ({ ...filter, inline: true })); // Category and Blueprints are in the row
-    // The typed amount, not the threshold: while prices load the threshold is
-    // held at 0, but the box still holds the pilot's setting.
+    ).map((filter) => ({ ...filter, inline: true }));
     const min = parseIskAmount(filterValue.min) ?? 0;
     if (min > 0)
       active.push({
@@ -433,7 +367,6 @@ export function useAssetsData() {
     const filter = {
       index: categoryIndex,
       pick: categoryPick,
-      // A hidden Blueprints select must not keep filtering.
       blueprints: showBlueprintSelect ? blueprintKind : 'any',
       blueprintTypeIds,
     };
@@ -457,7 +390,6 @@ export function useAssetsData() {
     () => new Map(mergedAssets.map((asset) => [asset.item_id, asset])),
     [mergedAssets]
   );
-  // The export's System column is read once an export menu opens (any entry point).
   const [exportArmed, setExportArmed] = useState(false);
   const systemRefs = useMemo(
     () =>
@@ -472,11 +404,6 @@ export function useAssetsData() {
   );
   const systemNames = useExportSystemNames(exportArmed, systemRefs);
 
-  // The export follows the page: what the search, Category, Blueprints and min value leave on
-  // screen, including other Characters' assets while a search runs (a Character column says whose).
-  //
-  // Built only when an export runs (`assetsExport.getRows` below): matching and
-  // locale-sorting every asset is costly and the menu is rarely opened.
   function buildCsvGroups() {
     const searched = matchAssets(mergedAssets, mergedTypeNames, debouncedSearch, assetNames);
     const matches =
@@ -510,8 +437,6 @@ export function useAssetsData() {
       .sort((a, b) => a.label.localeCompare(b.label));
   }
 
-  // Not `useTableExport`: this list isn't a DataTable, and `getRows` builds
-  // the grouped rows lazily, only when an export actually runs.
   const placeNicknames = usePlaceNicknameMap();
   const assetsCsvColumnList = useMemo(() => assetsCsvColumns(t), [t]);
   const assetsExport: TableExport<AssetCsvRow> = {
@@ -542,7 +467,6 @@ export function useAssetsData() {
     },
   };
 
-  // Turn-ins price their LP at the Assets page hub, the one its hauls price at.
   const { hubId: assetsHubId } = useHubFor('assets');
   const turnIns = useTurnInOffers(getTradeHub(assetsHubId) ?? DEFAULT_TRADE_HUB);
   const turnInOffers = turnIns.data;
@@ -582,7 +506,6 @@ export function useAssetsData() {
     data,
     error,
     loading,
-    // Held until the remembered Category pick is read, so the list never flashes unfiltered.
     hydrated: hydrated && kindPreferenceHydrated,
     activeCharacterId,
     refresh,
@@ -644,7 +567,6 @@ export function useAssetsData() {
     abyssal,
     askEstimateByTypeId,
     priceByTypeId,
-    /** False only while the snapshot's market prices are still loading. */
     pricesReady: data?.pricesReady !== false,
     itemValueByItemId,
     mergedTypeNames,

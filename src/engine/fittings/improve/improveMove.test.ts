@@ -137,7 +137,6 @@ describe('Align and warp faster goal', () => {
       4: { agility: 3, warpSpeed: 3.6 },
       5: { agility: 4, warpSpeed: 2.5 },
     };
-    // 4 gains align 25% + warp 20%; 3 gains align 25%; 2 gains warp 20%.
     expect(await run('warp', figures)).toEqual([4, 3, 2]);
   });
 });

@@ -28,7 +28,6 @@ const SNAPSHOT: AppraisalSnapshot = {
   ],
 };
 
-/** Where a redirect landed. */
 function Landed() {
   const location = useLocation();
   return <p data-testid="landed">{`${location.pathname}${location.search}`}</p>;
@@ -77,7 +76,6 @@ describe('SharedLink', () => {
     expect(await screen.findByText('Tritanium')).toBeInTheDocument();
     expect(loadShare).toHaveBeenCalledWith('k7m2xq');
     expect(screen.getByText('Amarr')).toBeInTheDocument();
-    // 1e9 × 6 × 90%: the full figure, its shorthand right after.
     expect(screen.getByText('5,400,000,000 ISK (5.4B)')).toBeInTheDocument();
     expect(screen.getByText('4,500,000,000 ISK (4.5B)')).toBeInTheDocument();
     expect(screen.queryByText(/Unverified/)).not.toBeInTheDocument();

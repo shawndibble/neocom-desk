@@ -11,10 +11,6 @@ import { MAX_SUB_BUILD_DEPTH } from '@/engine/industry/materialResolution';
 import { FACILITY_PRESETS } from '@/engine/industry/types';
 import type { HubPrices, IndustryBlueprint } from '@/engine/industry/types';
 
-// A four-level chain, cheapest to build at every level: product (600) <-
-// gearA (502) <- gearB (501) <- gearC (500) <- gearD (499) <- Tritanium (34,
-// unbuildable). Each recipe eats 4 of its input to make 5 of its output, so
-// building always massively undercuts the inflated buy prices below.
 const productBlueprint: IndustryBlueprint = {
   name: 'Product',
   time: 100,
@@ -87,17 +83,11 @@ describe('autoBuildHere', () => {
 
   it('walks past the old Build Opportunities 0-3 UI range once that control is removed', () => {
     const result = autoBuildHere(productBlueprint, 0, { recipeFor, ctx, depth: 99, runs: 1 });
-    // gearD (499) is a 4th level, reachable now that the walk's only ceiling
-    // is MAX_SUB_BUILD_DEPTH — the removed Opportunities picker used to stop
-    // a caller from ever requesting past 3.
     expect(result).toEqual(new Set([502, 501, 500, 499]));
   });
 
   it('bounds an unbounded requested depth at MAX_SUB_BUILD_DEPTH', () => {
     const chainLength = MAX_SUB_BUILD_DEPTH + 2;
-    // A uniform manufacturing chain typeID[i] <- typeID[i+1] <- ... <- Tritanium
-    // (raw, unbuildable), each step wildly cheaper to build than to buy so a
-    // real ceiling — not a cost verdict — is what stops the walk.
     const ids = Array.from({ length: chainLength }, (_, i) => 9000 + i);
     const chainRecipes: Record<number, MaterialRecipe> = {};
     const materialPrices: HubPrices = { 34: 1 };
@@ -112,11 +102,6 @@ describe('autoBuildHere', () => {
         products: [{ typeID: id, quantity: 1 }],
       };
       chainRecipes[id] = { method: 'manufacturing', blueprint: bp, me: 0 };
-      // Strictly decreasing buy prices going down the chain, with a gap
-      // (1e9) far larger than any plausible job fee: each level's build cost
-      // is dominated by the next level's (lower) buy price, so build
-      // strictly beats buy at every level. Job-fee inputs (`adjustedPrices`)
-      // stay a flat, tiny constant so the fee itself can't erode that gap.
       materialPrices[id] = (chainLength - i) * 1_000_000_000;
       adjustedPrices[id] = 1;
     }
@@ -162,9 +147,6 @@ describe('autoBuildHere', () => {
   });
 
   it('never auto-builds a reaction or planetary material, even when cheaper, within the default manufacturing-only Craft Scope', () => {
-    // resolveMaterial only ever honours a manufacturing buildHere entry — an
-    // auto-picked reaction/planetary typeID would silently do nothing in the
-    // real plan, so it must never be offered here either.
     const reactionRecipes: Record<number, MaterialRecipe> = {
       502: { method: 'reaction', blueprint: gearABlueprint },
     };
@@ -178,9 +160,6 @@ describe('autoBuildHere', () => {
   });
 
   it("does not dead-end on a reaction material outside Craft Scope — it keeps walking into that recipe's own inputs", () => {
-    // 502 is a reaction (out of scope, never buildable), but its own recipe
-    // (reused from gearABlueprint) consumes 501, which manufacturing can
-    // still pick up beneath it — this is exactly what previously dead-ended.
     const reactionRecipes: Record<number, MaterialRecipe> = {
       502: { method: 'reaction', blueprint: gearABlueprint },
       501: { method: 'manufacturing', blueprint: gearBBlueprint, me: 0 },
@@ -195,8 +174,6 @@ describe('autoBuildHere', () => {
   });
 
   it("does not dead-end on a planetary material outside Craft Scope — it keeps walking into that schematic's own inputs", () => {
-    // 502 is planetary (out of scope), with no blueprint — its own inputs
-    // list feeds directly into the walk instead of via effectiveMaterials.
     const planetaryRecipes: Record<number, MaterialRecipe> = {
       502: { method: 'planetary', outputQuantity: 5, inputs: [{ typeID: 501, quantity: 4 }] },
       501: { method: 'manufacturing', blueprint: gearBBlueprint, me: 0 },
@@ -321,11 +298,6 @@ describe('autoBuildHere', () => {
   });
 
   it("sizes the root job to the plan's real runs, not always 1 — a verdict decided at the wrong scale would disagree with what the recursive engine later bills", () => {
-    // Per-job rounding (materials.ts) happens once per job regardless of run
-    // count, so a bigger job amortizes the rounding waste better and prices
-    // cheaper per unit — the same effect makeOrBuy.test.ts's "sizes the job
-    // to what is left to buy, not to a single run" case demonstrates. A
-    // rigged Raitaru at ME10 is a real, if modest, instance of it.
     const partsBlueprint: IndustryBlueprint = {
       name: 'Mechanical Parts Blueprint',
       time: 300,
@@ -349,10 +321,6 @@ describe('autoBuildHere', () => {
       modifiers: NO_CHARACTER_MODIFIERS,
     };
 
-    // Reference per-unit build costs at the two scales `autoBuildHere` could
-    // see for this same material: root run once, or three times. Computed
-    // from the real engine functions rather than hand-derived, so the test
-    // doesn't depend on independently-verified arithmetic.
     const neededAt = (runs: number) => effectiveMaterials(root, runs, 0, riggedCtx)[0]!.quantity;
     const referenceLine = (needed: number) => ({
       typeID: 9840,
@@ -368,9 +336,6 @@ describe('autoBuildHere', () => {
     const at3Runs = makeOrBuy(referenceLine(neededAt(3)), recipe, riggedCtx)!.makeUnitPrice;
     expect(at3Runs).toBeLessThan(at1Run);
 
-    // A buy price strictly between the two only reads as "build" once the
-    // real 3-run scale is used — the old hardcoded-to-1-run behavior would
-    // have missed it.
     const ctx: MakeOrBuyContext = {
       ...riggedCtx,
       materialPrices: { ...riggedCtx.materialPrices, 9840: (at1Run + at3Runs) / 2 },
@@ -391,8 +356,6 @@ describe('maxAutoBuildDepth', () => {
   });
 
   it("reaches the full depth of the product's real material chain", () => {
-    // product(600) <- 502 <- 501 <- 500 <- 499 <- Tritanium(34, unbuildable):
-    // four levels have a recipe, so the tree bottoms out at depth 4.
     expect(maxAutoBuildDepth(productBlueprint, 0, { recipeFor, ctx, runs: 1 })).toBe(4);
   });
 
@@ -426,9 +389,6 @@ describe('maxAutoBuildDepth', () => {
   });
 
   it('does not dead-end on a material outside Craft Scope — depth-discovery ignores scope entirely', () => {
-    // 502 is a reaction (would be out of Craft Scope at apply-time), but
-    // depth discovery isn't scope-aware: it only asks whether a recipe
-    // exists, so it still walks into 502's own inputs (501).
     const reactionRecipes: Record<number, MaterialRecipe> = {
       502: { method: 'reaction', blueprint: gearABlueprint },
       501: { method: 'manufacturing', blueprint: gearBBlueprint, me: 0 },

@@ -5,12 +5,6 @@ import * as Icon from '@/components/ui/icons';
 import type { GroupOwnedDifference } from './planMaterialsView';
 import { formatCount } from '@/lib/formatCount';
 
-/**
- * One line under a member plan's Owned Material Source row when its owned
- * counts and the Build Group's ledger disagree: the group page counts only the
- * group's own ledger, so the two totals can differ by design (the Group Owned
- * Overlay decision). Renders nothing when they agree or the plan has no group.
- */
 export function GroupOwnedDiffersHint({
   difference,
   group,

@@ -1,22 +1,6 @@
-// militaryCampaigns.json (issue #6703): CCP's Military Campaigns and their
-// Campaign Objectives, from the static data export's
-// militaryCampaignObjectives.jsonl and militaryCampaigns.jsonl. Every objective
-// type is kept (the Overview widget lists any objective a Character
-// Participates in); an `ItemTraded` one also carries its turn-in: the traded
-// item, the Item Trader and the trader's solar system. Live state (Active,
-// progress) is ESI's, read at run time.
-//
-// The trader's system is in neither table as a field. Each turn-in
-// objective's own English subtitle names it as a show-info link
-// ("trade it at the Item Trader outside the Federation Navy Anchorage in
-// <url=showinfo:5//30003788>Intaki</url>"), so that link is the source — the
-// traded item's description carries the same link, but the subtitle is the
-// objective's own text.
-
 export const TRADER_SYSTEM_SOURCE =
   'objective subtitle (en): the one showinfo:5//<solarSystemID> link it holds';
 
-/** The one solar system id `text` links to; null when it links none, or more than one. */
 export function traderSystemId(text) {
   if (typeof text !== 'string') return null;
   const ids = new Set([...text.matchAll(/showinfo:5\/\/(\d+)/g)].map((m) => Number(m[1])));
@@ -25,7 +9,6 @@ export function traderSystemId(text) {
 
 const idOf = (record, field) => record?.[field] ?? record?._key;
 
-/** The first item_type id a contribution parameter matches, or null. */
 function paramTypeId(config, key) {
   const param = config?.parameters?.find((p) => p?.key === key);
   const value = param?.matcher?.values?.find((v) => v?.valueType === 'item_type')?.values?.[0];
@@ -47,12 +30,6 @@ function lpReward(r) {
 
 const byId = (a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
 
-/**
- * `{ traderSystemSource, campaigns, objectives }`, each list sorted by id.
- * `types` is CCP's types.jsonl (for the Item Trader's name: the trader types
- * are unpublished, so `types.json` does not have them). Throws on an
- * `ItemTraded` objective whose item or trader cannot be read.
- */
 export function bakeMilitaryCampaigns(objectiveRecords, campaignRecords, types) {
   const typeName = new Map(types.map((t) => [Number(t._key), t?.name?.en]));
   const campaigns = campaignRecords

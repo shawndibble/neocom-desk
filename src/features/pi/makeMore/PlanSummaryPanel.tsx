@@ -12,8 +12,6 @@ import type { PlanView } from '../planView';
 const SM_UP = '(min-width: 40rem)';
 const MD_UP = '(min-width: 48rem)';
 
-// --- Your planets ----------------------------------------------------------------
-
 function Hero({ value, caption }: { value: number; caption: ReactNode }) {
   return (
     <div className="flex items-center gap-3">
@@ -31,7 +29,6 @@ function Hero({ value, caption }: { value: number; caption: ReactNode }) {
   );
 }
 
-/** One figure of the summary grid: a micro-label over a large value, no box (it cannot be clicked). */
 function StatBlock({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div className="min-w-0 px-3 py-2.5">
@@ -41,11 +38,6 @@ function StatBlock({ label, value }: { label: string; value: ReactNode }) {
   );
 }
 
-/**
- * The plan in one glance: what the quick wins and a rebuild would add, the
- * before/after figures, and the "What matters more?" switch that reshapes the
- * rebuilds.
- */
 export function PlanSummaryPanel({
   view,
   preference,
@@ -61,8 +53,6 @@ export function PlanSummaryPanel({
   const mdUp = useMediaQuery(MD_UP);
   const smUp = useMediaQuery(SM_UP);
   const { headline, stats } = view;
-  // Beside the title from `sm`; own row below that, where the header has no room
-  // and the label would overlap the title.
   const mattersToggle = (
     <span className="flex flex-wrap items-center justify-end gap-2">
       <span className={eyebrowClassName}>{t('piPlan.make.matters')}</span>
@@ -118,7 +108,6 @@ export function PlanSummaryPanel({
               )}
             />
           ) : null}
-          {/* With no rebuild, the Rebuild panel says so. */}
         </div>
         <dl className="grid grid-cols-2 divide-line border-t border-line max-md:divide-y md:grid-cols-4 md:divide-x [&>div:nth-child(even)]:max-md:border-l [&>div:nth-child(even)]:max-md:border-line">
           <StatBlock

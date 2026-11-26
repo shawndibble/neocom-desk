@@ -1,16 +1,3 @@
-/**
- * A Corp Tax Book as the server stores it, built for one test: the settings doc, Observed Mining
- * Entries, Tax Payments, Late notices, groupings, disputes, declarations,
- * checkpoints. Layout: `functions/src/corpTaxBookStore.ts`, as `scripts/dev/seed-corp-tax-book.mjs`
- * writes it for the manual sandbox.
- *
- * The figures are chosen to be read off the screen. Prices are flat (`prices.ts`), the rate is
- * `RATE_PCT`, and a mined day is one ore row of `DAY_QTY` units at one refinery unless a test
- * says otherwise, so every such day owes exactly `DAY_TAX` ISK.
- *
- * Dates are UTC days counted back from today (`day(n)`): a test reads "the day 5 days ago",
- * never a calendar date, so it reads the same whenever it runs.
- */
 import {
   LATE_NOTICES,
   LATE_NOTICE_LINKS,
@@ -31,12 +18,9 @@ import { UNIT_PRICE } from './prices';
 
 export const RATE_PCT = 10;
 export const DAY_QTY = 10_000;
-/** What one ordinary mined day owes: 10,000 units x 1,000 ISK x 10%. */
 export const DAY_TAX = (DAY_QTY * UNIT_PRICE * RATE_PCT) / 100;
-/** The one code a Miner puts on a donation; a notice's own code is `paymentCode(noticeId)`. */
 export { minerPaymentCode };
 
-/** Zeolites (R4): the one ore every seeded day mines. */
 export const ORE_TYPE = 45490;
 
 export const REFINERY = {
@@ -57,32 +41,23 @@ export const REFINERY = {
 } as const;
 export type RefineryKey = keyof typeof REFINERY;
 
-/** The UTC day `back` days before today, as the book keys it. */
 export const day = (back: number, now = Date.now()): string => utcDay(now - back * DAY_MS);
-/** That day as the book's tables print it ("13 Nov", `shortDate` in moonsFormat.ts). */
 export const shortDay = (back: number, now = Date.now()): string => {
   const [, m, d] = day(back, now).split('-').map(Number);
   return `${d} ${MONTHS[m - 1]}`;
 };
-/** ISK as the book prints it: whole, grouped ("1,000,000"). */
 export const isk = (amount: number): string => Math.round(amount).toLocaleString('en-US');
-/**
- * A verify token for a seeded notice: the server takes only 43 base64url characters
- * (`parseToken`, functions/src/corpTaxBook.ts), as `randomBytes(32)` makes them.
- */
 export const verifyToken = (label: string): string =>
   `e2e-${label}`
     .replace(/[^A-Za-z0-9_-]/g, '-')
     .padEnd(43, 'x')
     .slice(0, 43);
 
-/** Noon UTC of that day, for a payment or a note made on it. */
 export const noonOf = (back: number, now = Date.now()): string => `${day(back, now)}T12:00:00.000Z`;
 
 export interface MinedDay {
   back: number;
   refinery?: RefineryKey;
-  /** Units of `ORE_TYPE`; `DAY_QTY` by default. */
   qty?: number;
 }
 
@@ -91,12 +66,10 @@ export interface Donation {
   characterId: number;
   amount: number;
   back: number;
-  /** The Miner the server already placed it on; omitted, it waits Unmatched. */
   minerId?: string;
   reason?: string;
   reviewReason?: 'ambiguous' | 'account-closed';
   ambiguousMinerIds?: string[];
-  /** A wallet journal ref id, for a donation the journal also holds (`j1_<ref>`). */
   refId?: number;
 }
 
@@ -104,25 +77,18 @@ interface NoticeInput {
   id: string;
   characterId: number;
   minerId?: string;
-  /** The days it listed (days back), each one an ordinary mined day of `refinery`. */
   days: readonly number[];
   issuedBack: number;
   refinery?: RefineryKey;
   final?: boolean;
   remindersStopped?: boolean;
-  /** The verify token its link carries. */
   token: string;
 }
 
-/**
- * The builder. Each method adds docs; `docs()` returns them for `book.seed`. One instance per
- * test, made from the scenario functions in `bookScenarios.ts`.
- */
 export class BookSeed {
   readonly now = Date.now();
   private readonly out = new Map<string, Record<string, unknown>>();
   private readonly mined = new Map<number, MinedDay[]>();
-  /** The book's corporation. */
   readonly corp: number;
 
   constructor(
@@ -130,7 +96,6 @@ export class BookSeed {
       startBack: number;
       lastSyncBack?: number;
       tolerancePct?: number;
-      /** The book's corporation; `CORP` (the officer's) by default. A second book for a pilot in two. */
       corporationId?: number;
     }
   ) {
@@ -150,7 +115,6 @@ export class BookSeed {
       ownerCharacterId: OFFICER.id,
       createdAt: this.now - options.startBack * DAY_MS,
       createdBy: OFFICER.id,
-      // Synced just now: a visit does not sync again by itself (AUTO_SYNC_MIN_AGE_MS).
       lastSync: {
         at: this.now - (options.lastSyncBack ?? 0) * DAY_MS - MINUTE_MS,
         byCharacterId: OFFICER.id,
@@ -171,7 +135,6 @@ export class BookSeed {
     return this.put(`corps/${this.corp}/${name}/${id}`, data);
   }
 
-  /** Observed Mining Entries: one row per mined day. */
   mine(characterId: number, days: readonly (number | MinedDay)[]): this {
     for (const entry of days) {
       const d: MinedDay = typeof entry === 'number' ? { back: entry } : entry;
@@ -194,7 +157,6 @@ export class BookSeed {
     return this;
   }
 
-  /** A donation as the server stored it (`source: 'donation'`). */
   donation(p: Donation): this {
     const id = p.refId !== undefined ? `j1_${p.refId}` : p.id;
     return this.sub('payments', id, {
@@ -212,7 +174,6 @@ export class BookSeed {
     });
   }
 
-  /** A Miner grouping several Characters (`miners/{id}`), the first the main. */
   group(id: string, characterIds: readonly number[], createdBack = 60): this {
     return this.sub('miners', id, {
       id,
@@ -251,7 +212,6 @@ export class BookSeed {
       });
   }
 
-  /** The verify token's doc: what a verify link resolves (`corpTaxBookTokens/{token}`). */
   private token(input: NoticeInput, minerId: string): void {
     this.put(`${TOKENS_COLLECTION}/${input.token}`, {
       corporationId: this.corp,
@@ -262,7 +222,6 @@ export class BookSeed {
     });
   }
 
-  /** The `LateNotice` an officer's tab issues for `input` (`issueLateNoticeDocs`' input). */
   private notice(input: NoticeInput): LateNotice {
     const lines = this.noticeLines(input);
     return {
@@ -288,7 +247,6 @@ export class BookSeed {
     };
   }
 
-  /** A Late notice as `issueLateNoticeDocs` writes it: its doc, its link and the verify token. */
   lateNotice(input: NoticeInput): this {
     const notice = this.notice(input);
     this.sub(LATE_NOTICES, input.id, { ...notice });
@@ -297,7 +255,6 @@ export class BookSeed {
     return this;
   }
 
-  /** A Miner's word that they paid a notice another way, waiting on an officer. */
   declaration(p: {
     id: string;
     noticeId: string;
@@ -319,16 +276,11 @@ export class BookSeed {
     });
   }
 
-  /**
-   * A Miner's open dispute of one mined day (`disputes/{minerId_date}`), as the member's
-   * `disputeCorpTaxBookConflictCallable` stores it: it holds the day for 14 days.
-   */
   dispute(p: {
     characterId: number;
     back: number;
     kind: 'quantity' | 'notPaying';
     reason: string;
-    /** Units of the day's ore disputed. */
     qty: number;
     filedBack?: number;
     refinery?: RefineryKey;
@@ -356,17 +308,10 @@ export class BookSeed {
     });
   }
 
-  /** Any other doc under the book, in the server's layout. */
   raw(collection: string, id: string, data: Record<string, unknown>): this {
     return this.sub(collection, id, data);
   }
 
-  /**
-   * The docs to write. The settings doc carries the version stamps every server write leaves
-   * (`bookVersion`, and `collectionVersions` naming each collection written): a reader skips a
-   * collection the stamps never name, so a seed without them would read as a book whose first
-   * real write hid every seeded collection but the one it touched.
-   */
   docs(): SeedDoc[] {
     const root = `corps/${this.corp}`;
     const stamp = `seed-${this.now}`;

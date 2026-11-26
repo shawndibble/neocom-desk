@@ -310,7 +310,6 @@ describe('RowDetailModal — price breakdown', () => {
       pricesFor: () => new Map([[VELDSPAR, 10]]),
       priceSourcesFor: () => new Map([[VELDSPAR, 'saved' as const]]),
     });
-    // The day's own saved snapshot is the norm, so it is not repeated on every ore line.
     expect(screen.queryByText('Saved snapshot')).not.toBeInTheDocument();
     expect(screen.getByText(/× 10/)).toBeInTheDocument();
     expect(screen.getByText(/buy · .* ore$/)).toBeInTheDocument();

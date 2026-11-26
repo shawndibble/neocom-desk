@@ -2,12 +2,6 @@ import { Tooltip } from '@/components/ui/Tooltip';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 import { usePlaceNicknames } from './placeNicknames';
 
-/**
- * A station or structure name as the Assets page draws it: the pilot's Place
- * Nickname with the real name as a dim second line and in the tooltip, or the
- * real name alone when there is no nickname. Display only: never feed this
- * text to resolution, shares, URLs or plan data.
- */
 export function NicknamedName({
   name,
   nickname,
@@ -17,7 +11,6 @@ export function NicknamedName({
   name: string;
   nickname: string | undefined;
   className?: string;
-  /** One line each, ellipsised, for a row that must not grow. */
   truncate?: boolean;
 }) {
   if (nickname === undefined)
@@ -33,7 +26,6 @@ export function NicknamedName({
   );
 }
 
-/** `NicknamedName` for a place known by id, reading the synced nicknames itself. */
 export function PlaceName({
   locationId,
   name,

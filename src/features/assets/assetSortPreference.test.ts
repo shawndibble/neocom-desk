@@ -24,11 +24,6 @@ describe('useAssetSort', () => {
     expect(useAssetSort.getState().value).toBe('value');
   });
 
-  /**
-   * The station list sorts by fields this one does not offer. A stored
-   * 'jumpsAway' is a plausible string that would leave the Select showing
-   * nothing, so it has to fail the check rather than pass the typeof default.
-   */
   it('falls back to the default for a field this list does not offer', async () => {
     await db.settings.put({ key: ASSET_SORT_SETTING_KEY, value: 'jumpsAway' });
     await useAssetSort.getState().hydrate();

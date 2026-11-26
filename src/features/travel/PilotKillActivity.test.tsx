@@ -38,8 +38,6 @@ function renderSection() {
 
 describe('PilotKillActivity', () => {
   beforeEach(() => {
-    // Mid-month, so "2 and 3 days ago" are always in this month's bar; on the 1st to 3rd
-    // of a month the real clock puts them in last month's and the label assertion fails.
     vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-06-15T12:00:00Z') });
     vi.resetAllMocks();
     mocks.fetchPilotKillHistory.mockResolvedValue({
@@ -71,7 +69,6 @@ describe('PilotKillActivity', () => {
     const section = await screen.findByRole('region', { name: 'Where they kill' });
     const chart = within(section).getByRole('img', { name: /Kills per month by space/ });
     expect(chart.getAttribute('aria-label')).toMatch(/[A-Z][a-z]{2}: \d/);
-    // Two nullsec kills this month, so the label names the space, not just the total.
     expect(chart.getAttribute('aria-label')).toMatch(/: 2 \(2 nullsec\)/);
   });
 
@@ -83,7 +80,6 @@ describe('PilotKillActivity', () => {
     expect(nullsec).toHaveClass('border-t-space-nullsec');
     expect(within(nullsec).getByText('2')).toHaveClass('text-space-nullsec');
     expect(section.innerHTML).not.toMatch(/danger/);
-    // A space with no kills in 30 days has no hue.
     expect(within(tiles).getByText('Highsec').closest('li')).toHaveClass('border-t-line');
   });
 
@@ -92,7 +88,6 @@ describe('PilotKillActivity', () => {
     await screen.findByRole('region', { name: 'Where they kill' });
     expect(screen.queryByText('Flew on their kills')).toBeNull();
     expect(screen.queryByText('Latest kills')).toBeNull();
-    // The hulls they kill moved to the ships row, beside the ones they fly.
     expect(screen.queryByText('Ships they killed')).toBeNull();
     expect(screen.queryByText('Kills most')).toBeNull();
   });

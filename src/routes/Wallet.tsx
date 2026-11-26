@@ -42,13 +42,6 @@ import { loadWalletSnapshot } from '@/features/character/walletSnapshot';
 const WALLET_CHARACTER_PARAMS = { char: characterFilterParam('current') };
 const NO_PILOTS: readonly { characterId: number; name: string }[] = [];
 
-/**
- * Wallet: the pilot's own ISK — balance and journal, for the active Character
- * or every Character (`?char=`). Read-only, cached for offline. Recent
- * transactions live on Market's History tab, and the corporation's wallet
- * lives on `/corp/wallet` (it was a Personal /
- * Corporation switch here once — see `routes/CorpWallet.tsx`).
- */
 export function Wallet() {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -57,26 +50,9 @@ export function Wallet() {
   const { data, error, loading, hydrated, activeCharacterId, refreshCount, refresh } =
     useRouteSnapshot(loadWalletSnapshot, viewedCharacterId, { cacheKey: 'wallet' });
 
-  // A notification's `walletBalanceChanged` deep link (`notificationOptions.ts`)
-  // names the tab as a path segment (`/wallet/journal`) — the `Tabs`
-  // control's own switch is a history push the same way any other tab
-  // switch is (ADR 0015, issue #1302).
   const [tab, setTab] = usePageTab(WALLET_TABS);
   const tabsId = useTabsId();
 
-  /**
-   * The cross-character Balance view (issue #607): `'current'` by default —
-   * today's exact behavior, no extra fan-out, and it keeps following the
-   * active Character across a switch with no resync logic of its own
-   * (`useResolvedCharacterFilter` re-resolves it whenever the active
-   * Character changes) — or `'all'` once the pilot asks via
-   * `CharacterFilterControl`.
-   *
-   * Lives in the `?char=` query param (issue #1302), so it survives a reload
-   * and a pasted link. Absent, it reads this page's remembered pick, then the
-   * synced Settings default (`characterFilterPicks.ts`). A link's value is
-   * never remembered; only a change to the control is.
-   */
   const rememberedCharacterFilter = useRememberedCharacterFilter<typeof WALLET_CHARACTER_PARAMS>(
     'wallet',
     'char'
@@ -87,8 +63,6 @@ export function Wallet() {
   );
   const walletCharacterFilter = walletParams.char;
 
-  // A Character named in the URL is the one page subject: the balance panel
-  // follows it rather than a stored "all" default.
   const resolvedWalletFilter = useResolvedCharacterFilter(
     viewedCharacterId === undefined ? walletCharacterFilter : 'current',
     activeCharacterId
@@ -99,8 +73,6 @@ export function Wallet() {
     !resolvedWalletFilter.has(activeCharacterId ?? -1);
 
   const drill = useWalletDrill();
-  // A new pick from the header picker ends a drill: the drilled panel would
-  // otherwise keep showing one Character the picker no longer describes.
   const setWalletCharacterFilter = (char: CharacterFilterValue) => {
     setWalletParams({ char });
     if (drill.drilledId !== 0) drill.clearDrill();
@@ -120,21 +92,9 @@ export function Wallet() {
     () => allCharacters.map((c) => ({ characterId: c.characterId, characterName: c.name })),
     [allCharacters]
   );
-  // Who the Balance tab's net worth leaves out (no snapshot permissions): the
-  // picker's warning dot and menu note, only while it lists every picked Character.
   const netWorthMissingNames = useNetWorthMissingNames(
     tab === 'balance' && showingBeyondActive && !drilledCharacter ? multiCharacters : NO_PILOTS
   );
-  /**
-   * The page's one Character picker, in the `PageHeader`'s `scope` slot for
-   * both tabs (decision 20261022-123837), so it no longer has to ride along
-   * between the Balance tab's two `Panel`s. A Character named in the URL is
-   * the page subject, so the picker reads "This character" then.
-   *
-   * Absent for a one-Character account: "This character" and "All characters"
-   * then resolve to the same pilot, leaving a control that cannot change
-   * anything (`OpenOrdersPanel`'s `showCharacterStrip` precedent).
-   */
   const walletScopePicker =
     walletFilterCandidates.length > 1 ? (
       <CharacterFilterControl
@@ -143,7 +103,6 @@ export function Wallet() {
         onChange={setWalletCharacterFilter}
         characterCount={walletFilterCandidates.length}
         missingNames={netWorthMissingNames}
-        // The body shows its spinner for the same first load.
         loading={loading && !data}
       />
     ) : undefined;
@@ -155,12 +114,6 @@ export function Wallet() {
   const journalResult = data?.journalResult ?? null;
   const journalNeedsReauth = data?.journalNeedsReauth ?? false;
   const journalTruncated = data?.journalTruncated ?? false;
-  /**
-   * Loyalty points follow the same picker as the balance (issue #4694),
-   * summed per corporation across the picked Characters. There is never a
-   * Corporation scope: ESI has no corporation LP endpoint. A list behind a
-   * revoked grant is dropped from the figures and gets a banner instead.
-   */
   const pickedLoyalty = usePickedLoyalty(showingBeyondActive, multiCharacters);
   const activeLoyaltyNeedsReauth = data?.loyaltyNeedsReauth ?? false;
   const loyaltyResult = showingBeyondActive
@@ -181,7 +134,6 @@ export function Wallet() {
     journalTruncated,
   });
   const loyalty = useWalletLoyalty(loyaltyResult);
-  // "Where the ISK went" side panel; the page shifts aside while it is open.
   const [iskPanelOpen, setIskPanelOpen] = useState(false);
   const handlePersonalRefresh = () => {
     refresh();
@@ -189,7 +141,6 @@ export function Wallet() {
     pickedLoyalty.refresh();
   };
 
-  // One age for the page: the stalest of the two feeds it shows.
   const oldestFetchedAt = useMemo(() => {
     const dates = [balanceResult?.fetchedAt, loyaltyResult?.fetchedAt].filter(
       (d): d is Date => d != null
@@ -201,25 +152,18 @@ export function Wallet() {
     return <Spinner block="page" label={t('common.loading')} />;
   }
   if (activeCharacterId === null) return <Navigate to="/characters" replace />;
-  // The corporation wallet was this page's Corporation side until it moved to
-  // `/corp/wallet`. A bookmark or alert from then (`?owner=corporation`, with
-  // its `?division=`) still lands on the same division there; its old
-  // Transactions tab lands on that page's journal.
   if (new URLSearchParams(location.search).get('owner') === 'corporation') {
     const search = new URLSearchParams(location.search);
     search.delete('owner');
     const query = search.toString();
     return <Navigate to={`/corp/wallet${query ? `?${query}` : ''}`} replace />;
   }
-  // Personal transactions live under Market › History.
   if (tab === 'transactions') return <Navigate to="/market/history" replace />;
 
   return (
     <div
       className={cx(
         'mx-auto max-w-page space-y-4',
-        // The side panel is non-modal: the page shifts aside so no column is covered.
-        // 26rem = SlideOver's 25rem max width plus a 1rem gutter; change them together.
         tab === 'journal' && iskPanelOpen && 'md:mr-[26rem] md:ml-0'
       )}
     >
@@ -241,24 +185,16 @@ export function Wallet() {
         }
       />
 
-      {/*
-        No Transactions entry: the Character's fills are Market's tab, and the
-        corporation's are on `/corp/wallet` — an entry that switched pages
-        would not be a tab.
-      */}
       <Tabs
         tabsId={tabsId}
         label={t('wallet.title')}
         value={tab}
-        // LP Store is its own route: Wallet's query (`?char=`, journal filters) stays behind,
-        // as it does on the way back.
         onChange={(id) =>
           id === 'lp-store' ? navigate(tabPath(WALLET_TABS, 'lp-store')) : setTab(id as typeof tab)
         }
         tabs={[
           { id: 'balance', label: t('wallet.balanceTab') },
           { id: 'journal', label: t('wallet.journalTab') },
-          // Its own route draws this same bar (`LoyaltyStore`).
           { id: 'lp-store', label: t('loyaltyStore.title') },
         ]}
       />

@@ -1,12 +1,3 @@
-/**
- * Pieces of the mining-tax "resolve" mockups (docs/design/mockups/mining-tax-resolve).
- *
- * The idea under test: every problem the Tax tab reports has the same five possible
- * outcomes, split by who has to agree —
- *   Settle it yourself: Pay it · Fix my records · Not paying (hide it)
- *   Ask the corporation: I already paid (send proof) · I don't owe this (ask them to change it)
- * — and the tab offers only the ones that apply, self-service first.
- */
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   Button,
@@ -54,9 +45,6 @@ import {
 const noop = () => {};
 const textAction = plainTextActionClassName('min-h-9 md:min-h-6');
 
-// --- The page -----------------------------------------------------------------
-
-/** The Mining page's Tax tab: the real header primitives and tab bar, then the body. */
 export function TaxTabFrame({ children }: { children: ReactNode }) {
   const tabsId = useTabsId();
   return (
@@ -82,7 +70,6 @@ export function TaxTabFrame({ children }: { children: ReactNode }) {
   );
 }
 
-/** The real `AttentionStrip`, opened on mount so the screenshot shows its rows. */
 export function OpenedStrip({ items }: { items: AttentionItem[] }) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -95,7 +82,6 @@ export function OpenedStrip({ items }: { items: AttentionItem[] }) {
   );
 }
 
-/** The real `OwedBalances`; Rock Hound's card carries the unlinked payment this branch warns about. */
 export function Balances({ conflicts }: { conflicts: ConflictSummary }) {
   return (
     <OwedBalances
@@ -122,9 +108,6 @@ export function Balances({ conflicts }: { conflicts: ConflictSummary }) {
   );
 }
 
-// --- Today --------------------------------------------------------------------
-
-/** Today's "Compare with the book": a table, a sentence, and a close button. */
 export function TodayCompareDialog() {
   return (
     <Modal open onClose={noop} title={`Compare with the book · ${RATE_DAY.date}`}>
@@ -162,9 +145,6 @@ export function TodayCompareDialog() {
   );
 }
 
-// --- Proposed: one entry point per problem --------------------------------------
-
-/** Proposal A: the likeliest outcome as the button, the rest one menu away. */
 export function InlineChoices() {
   return (
     <NewComponent name="ResolveOptions">
@@ -191,9 +171,6 @@ export function InlineChoices() {
   );
 }
 
-// --- Proposed: the Resolve dialog -----------------------------------------------
-
-/** One outcome: a radio card that opens its own inputs when chosen. */
 export function Choice({
   checked,
   title,
@@ -237,7 +214,6 @@ function Facts({ children }: { children: ReactNode }) {
   return <div className="space-y-1 rounded-xs bg-panel-2 p-2.5 text-xs">{children}</div>;
 }
 
-/** Who an "ask the corp" outcome reaches: the book's queue always, plus the contact setting's mail. */
 export function SendsTo() {
   return (
     <p className="text-xs text-text-dim">
@@ -277,7 +253,6 @@ const footer = (label: string) => (
   </div>
 );
 
-/** Uncredited donations: the pilot did pay, so sending the proof is preselected. */
 export function ResolveUncredited() {
   return (
     <ResolveDialog
@@ -328,7 +303,6 @@ export function ResolveUncredited() {
   );
 }
 
-/** A Conflict: the book recorded ore the pilot gave Rock Hound. Fixing their own records is one click. */
 export function ResolveConflict() {
   return (
     <ResolveDialog
@@ -378,7 +352,6 @@ export function ResolveConflict() {
   );
 }
 
-/** A billed day at a higher rate, where the pilot opts out and says why. */
 export function ResolveNotPaying() {
   return (
     <ResolveDialog
@@ -426,9 +399,6 @@ export function ResolveNotPaying() {
   );
 }
 
-// --- Proposed: after the pilot has answered ------------------------------------
-
-/** Everything the pilot has dealt with: out of the strip, one quiet line, never gone. */
 export function QuietStatusLine() {
   return (
     <NewComponent name="QuietStatusLine">
@@ -546,8 +516,6 @@ export function AfterLedger() {
   );
 }
 
-// --- Proposed: a corporation the pilot has left ---------------------------------
-
 export function LeftCorpNotice() {
   return (
     <NewComponent name="LeftCorpNotice">
@@ -572,9 +540,6 @@ export function LeftCorpNotice() {
   );
 }
 
-// --- Proposed: the officer's side ----------------------------------------------
-
-/** The look of `NeedsYouQueue`'s `QueueCard` (feature-private, so mirrored here). */
 export function QueueCard({
   tone,
   title,
@@ -586,12 +551,10 @@ export function QueueCard({
 }: {
   tone: 'danger' | 'warning' | 'neutral';
   title: string;
-  /** What the wallet check found, beside the title. */
   status?: ReactNode;
   body: ReactNode;
   primary: string;
   secondary: string;
-  /** Marks the card as a new component, under this name. */
   newName?: string;
 }) {
   const card = (
@@ -676,7 +639,6 @@ export function OfficerNeedsYou() {
   );
 }
 
-/** Keeping a bill now has to say what the member should do next — they read it word for word. */
 export function OfficerKeepBillDialog() {
   return (
     <Modal
@@ -707,7 +669,6 @@ export function OfficerKeepBillDialog() {
   );
 }
 
-/** Book settings › Access: who gets the EVE mail when a member asks something. */
 export function TaxContactSetting() {
   const [who] = useState<'ceo' | 'list' | 'officers'>('list');
   return (

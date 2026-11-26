@@ -14,24 +14,22 @@ import { buildVariationIndex } from '../../market/variations';
 import type { Fitting, FittingSlotKind, FittingStats } from '../types';
 import { baseFittingStats } from '../__fixtures__/fittingStats';
 
-// Groups used here: 38 shield extender, 329 armor plate, 46 propulsion, 211 tracking
-// enhancer (a Reach group), 60 damage control, 99999 a group no goal moves.
 const GROUP: Record<number, number> = {
   1: 38,
   2: 38,
-  3: 38, // shield extenders (mid)
+  3: 38,
   4: 329,
-  5: 329, // armor plates (low)
+  5: 329,
   6: 46,
   7: 46,
-  8: 46, // propulsion (mid)
+  8: 46,
   9: 211,
-  10: 211, // tracking enhancers (low)
-  11: 60, // damage control (low)
-  12: 99999, // a sensor-ish module nothing scores (mid)
-  30: 770, // a shield flux coil (low)
+  10: 211,
+  11: 60,
+  12: 99999,
+  30: 770,
   20: 773,
-  21: 773, // armor rigs
+  21: 773,
 };
 const RACK: Record<number, FittingSlotKind> = {
   1: 'medium',
@@ -138,14 +136,12 @@ describe('Improve Reach', () => {
   });
 
   it('Rework never removes the last module doing a job the goal does not score', () => {
-    // The only propulsion module (6): Longer reach does not score propulsion.
     const f = fit([
       ['medium', 0, 6],
       ['low', 0, 11],
     ]);
     const options = { ...base, goal: 'reach' as ImproveGoal, reach: 'rework' as const };
     const list = improveCandidates(f.modules, index, rackOf, options);
-    // Only modules of its own group (still propulsion) replace 6; no Reach group does.
     expect(list.filter((c) => c.fromTypeId === 6).map((c) => c.toTypeId)).toEqual([7, 8]);
   });
 
@@ -159,9 +155,7 @@ describe('Improve Reach', () => {
       goal: 'reach',
       reach: 'rework',
     });
-    // 8 is a lone copy of its own type, but 6 still does propulsion, so 8 can go to a Reach group.
     expect(list.some((c) => c.fromTypeId === 8 && GROUP[c.toTypeId] === 211)).toBe(false);
-    // (Reach groups are low-rack; the mid rack has none, so nothing to try, never a removal.)
     expect(list.filter((c) => c.fromTypeId === 8 && GROUP[c.toTypeId] !== 46)).toEqual([]);
   });
 
@@ -178,7 +172,6 @@ describe('Improve Reach', () => {
 
 describe('candidate budgets', () => {
   it('a large same-group list does not starve Rework’s other groups', () => {
-    // 40 extra types in group 38 would use a shared 20-target budget before the Reach groups.
     const many = Object.fromEntries(Array.from({ length: 40 }, (_, i) => [100 + i, 38]));
     const rack = Object.fromEntries(Array.from({ length: 40 }, (_, i) => [100 + i, 'low']));
     const groupOf = (id: number) => (many as Record<number, number>)[id] ?? GROUP[id];
@@ -275,7 +268,6 @@ describe('empty slots', () => {
       reach: 'upgrade',
     });
     const fills = list.filter((c) => c.fromTypeId === null);
-    // Reach groups only exist in the low rack: slot 1 is its first empty one.
     expect(targets(fills)).toEqual(['->9@1', '->10@1']);
   });
 
@@ -305,7 +297,6 @@ describe('empty slots', () => {
 });
 
 describe('Defense Choice', () => {
-  // A shield-tanked hull: a shield extender in the mids, a damage control and a tracking enhancer in the lows.
   const f = fit([
     ['medium', 0, 1],
     ['low', 0, 11],
@@ -325,13 +316,10 @@ describe('Defense Choice', () => {
       defense: 'armor',
       slotCounts: { high: 0, medium: 1, low: 4, rig: 0, subsystem: 0 },
     });
-    // The empty low slot (3) takes plates.
     expect(targets(list.filter((c) => c.fromTypeId === null))).toEqual(['->4@3', '->5@3']);
-    // The shield flux coil is freed for armor; the tracking enhancer and damage control are not.
     expect(list.some((c) => c.fromTypeId === 30 && GROUP[c.toTypeId] === 329)).toBe(true);
     expect(list.some((c) => c.fromTypeId === 9 && GROUP[c.toTypeId] === 329)).toBe(false);
     expect(list.some((c) => c.fromTypeId === 11 && GROUP[c.toTypeId] === 329)).toBe(false);
-    // The mid shield extender is freed too, but armor does not go in a mid slot: nothing to offer.
     expect(list.some((c) => c.fromTypeId === 1 && GROUP[c.toTypeId] === 329)).toBe(false);
   });
 
@@ -345,12 +333,10 @@ describe('Defense Choice', () => {
     });
     const groups = new Set(list.map((c) => GROUP[c.toTypeId]));
     expect(groups.has(329)).toBe(false);
-    // Mid fills are shield extenders (the fitted side).
     expect(list.some((c) => c.fromTypeId === null && GROUP[c.toTypeId] === 38)).toBe(true);
   });
 });
 
-// A tiny stat model: each module type adds to EHP and CPU; priced by type.
 const EHP: Record<number, number> = {
   4: 500,
   5: 800,
@@ -426,13 +412,11 @@ describe('fills and pair moves', () => {
   });
 
   it('pairs a downgrade with an add when no single add fits the CPU', async () => {
-    // 11 (20) + 1... fit uses 90 of 100 CPU; plates (60) do not fit alone.
     const f = fit([
       ['low', 0, 11],
       ['low', 1, 5],
       ['low', 2, 9],
     ]);
-    // Base: 11 (20) + 5 (60) + 9 (10) = 90. Add plate 4 (30): 120 over. Swap 5 -> 4 frees 30: 90.
     const candidates = [fill(4, 3), swap(5, 4, 1)];
     const result = await run('tank', f, candidates, { 4: 100, 5: 200 });
     const paired = [...result.noDownside, ...result.tradeOffs].filter(
@@ -441,7 +425,6 @@ describe('fills and pair moves', () => {
     expect(paired).toHaveLength(1);
     expect(paired[0].candidate.toTypeId).toBe(4);
     expect(paired[0].candidate.pairedWith?.toTypeId).toBe(4);
-    // Cost is the add minus the saving of the downgrade: 100 + (100 - 200).
     expect(paired[0].iskDelta).toBe(0);
     expect(applyImproveCandidate(f, paired[0].candidate).modules).toHaveLength(4);
   });
@@ -467,7 +450,6 @@ describe('buy accounting', () => {
       fitTotal: 150,
       iskBudget: 400,
     });
-    // The fit costs 150 now; the swap makes it 350, under the 400 budget.
     expect(result.noDownside[0].iskDelta).toBe(200);
     const over = await run('tank', f, [swap(4, 5, 0)], prices, {
       fitTotal: 150,
@@ -488,7 +470,6 @@ describe('buy accounting', () => {
         iskBudget: 50,
       }
     );
-    // 5 costs 100 extra: over the 50 cap. Fill 9 has no price, and gains no EHP either.
     expect(result.rejected[0].guardrail).toBe('spend');
   });
 });

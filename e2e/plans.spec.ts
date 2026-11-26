@@ -4,7 +4,6 @@ import { addCaldariCruiserToNewPlan } from './support/planHelpers';
 
 test.beforeEach(async ({ page }) => {
   await signInAndGoto(page);
-  // The rail's Skills link lands on the plan list directly: /skills redirects.
   await page.getByRole('link', { name: 'Skills' }).click();
   await page.waitForURL(/\/skills\/plans$/);
 });
@@ -14,14 +13,10 @@ test('create a plan, add a skill, see the computed queue with prereqs and times'
 }) => {
   await addCaldariCruiserToNewPlan(page);
 
-  // Computed queue: prereq chain inserted ahead of the entry the user actually asked for.
   const queue = page.locator('ul', { hasText: 'Caldari Cruiser I' });
-  // Row text is "<name> <roman>Prereq" with no space before "Prereq", so
-  // "Spaceship Command I" alone would also match the "...II" row; exclude it.
   await expect(queue.getByText(/Spaceship Command I(?!I)/)).toBeVisible();
   await expect(queue.getByText('Caldari Destroyer III')).toBeVisible();
   await expect(queue.getByText('Prereq').first()).toBeVisible();
-  // Non-zero training time rendered per row and as a running total.
   await expect(queue.getByText(/\d+[dhm]/).first()).toBeVisible();
 });
 
@@ -34,11 +29,6 @@ test('exports the computed queue to the clipboard', async ({ page, context }) =>
   await page.getByRole('menuitem', { name: 'Export to clipboard' }).click();
   await expect(page.getByText('Copied to clipboard')).toBeVisible();
 
-  // Chromium rewrites the LF the app writes as CRLF on the Windows
-  // system-clipboard round trip, so readText() hands back CRLF-separated text
-  // there and LF-separated text on the Linux CI runner. Normalize here rather
-  // than in the app: the export engine emits LF by contract, pinned by
-  // src/engine/clipboardExport.test.ts.
   const rawClipboardText = await page.evaluate(() => navigator.clipboard.readText());
   const clipboardText = rawClipboardText.replace(/\r\n/g, '\n');
 
@@ -57,14 +47,9 @@ test('exports the computed queue to the clipboard', async ({ page, context }) =>
 test('optimize remaps shows attribute segments and savings', async ({ page }) => {
   await addCaldariCruiserToNewPlan(page);
 
-  // No manual remap count any more — CHARACTER_ATTRIBUTES has no bonus
-  // remaps and no cooldown, so the live budget already reads 1 (the yearly
-  // remap, ready).
   await page.getByRole('button', { name: 'Optimize' }).click();
   await page.getByRole('menuitem', { name: 'Place remaps only' }).click();
 
-  // The verdict opens its own Accept/Reject Modal, mirroring "Suggest
-  // reorder" — no longer inline in the tools pane's Actions section.
   const dialog = page.getByRole('dialog', { name: 'Optimize remaps' });
   await expect(dialog.getByText(/Remapping saves (?:\d+[dhm]\s*)+/)).toBeVisible();
   await expect(dialog.getByText('Segment 1')).toBeVisible();
@@ -76,9 +61,6 @@ test('"Optimize for me" reorders and places remaps in one preview; Accept applie
 }) => {
   await addCaldariCruiserToNewPlan(page);
 
-  // No manual remap count any more — CHARACTER_ATTRIBUTES has no bonus
-  // remaps and no cooldown, so the live budget already reads 1 (the yearly
-  // remap, ready).
   await page.getByRole('button', { name: 'Optimize' }).click();
   await page.getByRole('menuitem', { name: 'Optimize for me' }).click();
 
@@ -96,9 +78,6 @@ test('"Shortest first" pulls a quick standalone skill ahead of the slow Caldari 
 }) => {
   await addCaldariCruiserToNewPlan(page);
 
-  // "Social" (rank 1, no prereqs) trains far faster than the rest of the
-  // Caldari Cruiser chain still to come (Spaceship Command II, Caldari
-  // Destroyer I-III, Caldari Cruiser I), so it should surface ahead of them.
   await page.getByPlaceholder('Search skills…').fill('Social');
   await page.getByRole('button', { name: /^Social/ }).click();
   await page.getByRole('button', { name: 'Level I', exact: true }).click();
@@ -121,10 +100,6 @@ test('"Shortest first" pulls a quick standalone skill ahead of the slow Caldari 
 });
 
 test('a long plan scrolls the page, with the summary strip pinned above it', async ({ page }) => {
-  // The entry list used to carry its own viewport-measured cap (#237), which
-  // beside a sidebar taller than the viewport put two scrollbars on screen.
-  // Now the page is the only scroller and the summary strip (`lg:sticky`)
-  // is what stays put.
   await addCaldariCruiserToNewPlan(page);
   await page.getByRole('button', { name: 'Import' }).click();
   await page.getByRole('menuitem', { name: 'From text or file' }).click();
@@ -151,11 +126,9 @@ test('a long plan scrolls the page, with the summary strip pinned above it', asy
       ].join('\n')
     );
   await dialog.getByRole('button', { name: 'Append to plan' }).click();
-  // The e2e catalog doesn't know two of those names, so the preview comes up first.
   await dialog.getByRole('button', { name: 'Append to plan' }).click();
   await expect(dialog).toBeHidden();
 
-  // No nested scroller: the entries grow the page instead.
   await expect(page.locator('div[class="lg:overflow-y-auto"]')).toHaveCount(0);
 
   const summaryPanel = page
@@ -164,8 +137,6 @@ test('a long plan scrolls the page, with the summary strip pinned above it', asy
     .locator('xpath=ancestor::section[1]');
   await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
 
-  // Guard against a vacuous pass: if the page cannot actually scroll, the
-  // assertions below hold whether or not the strip is sticky at all.
   await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
 
   await expect(summaryPanel).toBeInViewport();

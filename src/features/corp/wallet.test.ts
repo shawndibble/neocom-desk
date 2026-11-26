@@ -126,7 +126,6 @@ describe('loadCorporationWalletJournal', () => {
     ).toEqual([entry(2)]);
   });
 
-  /** The division is part of the key, so an offline read of a division never seen misses. */
   it('never serves one division journal under another', async () => {
     await db.esiCache.put({
       characterId: CHAR_ID,

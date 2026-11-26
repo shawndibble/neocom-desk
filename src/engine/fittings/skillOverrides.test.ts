@@ -42,7 +42,6 @@ describe('applySkillOverrides', () => {
       ALL
     );
     expect([...custom.skillLevels]).toEqual([[3301, 5]]);
-    // The Character's own map is never written to.
     expect(pilot.skillLevels.get(3300)).toBe(4);
   });
 

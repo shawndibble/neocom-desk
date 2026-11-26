@@ -18,11 +18,6 @@ import { atDate } from './moonsFormat';
 
 const k = (key: string) => `corpTaxBook.moons.moonOwners.dialogs.invite.${key}`;
 
-/**
- * Invite a moon owner: make a link (optionally offering a rate), copy it, and
- * revoke open links. Only its id is stored for an older link, never the code,
- * so only a link made in this dialog can be copied.
- */
 export function InviteMoonOwnerDialog({
   characterId,
   corporationId,
@@ -97,7 +92,6 @@ export function InviteMoonOwnerDialog({
     setRevoking(inviteId);
     try {
       await revokeFeederInvite(characterId, corporationId, inviteId);
-      // A revoked link is dead: stop offering it for copying.
       if (link?.inviteId === inviteId) setLink(null);
       await refresh();
     } catch (e) {

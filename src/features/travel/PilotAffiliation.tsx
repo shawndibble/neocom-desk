@@ -1,9 +1,3 @@
-/**
- * A pilot's corporation and alliance on one line, " · "-joined, each name a
- * link to its info (DESIGN.md §6c "Entities"). A name without an id stays
- * plain text; a missing name renders nothing. Each part truncates on its own
- * so a long affiliation still clips to the single line.
- */
 import { AllianceLink, CorporationLink } from '@/features/entities';
 import type { PilotListRow } from './pilotListData';
 

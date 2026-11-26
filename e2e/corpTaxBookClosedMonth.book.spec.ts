@@ -1,8 +1,3 @@
-/**
- * The lock date (decision 20261120-235011, "a lock date"): history before the 1st of the month two
- * months back is read-only, and an officer's tab records each Miner's snapshot of it once per lock
- * date. A later load reads the snapshot and only the days after it, with the same totals.
- */
 import type { Page } from '@playwright/test';
 import { expect, minerFact, openMiner, signInAsOfficer, test } from './support/taxBook/bookTest';
 import { closedMonthBook } from './support/taxBook/bookScenarios';
@@ -22,8 +17,6 @@ test('an edit before the lock date is refused or hidden', async ({ page, book: e
   await emulator.seed(book.seed.docs());
   await openMiner(page, book.minerId, MINER.ada.name);
   const ledger = page.getByRole('table', { name: 'Ledger', exact: true });
-  // Her two recent owed days can be re-rated or dismissed; the old owed day, before the lock
-  // date, cannot, and nor can the old payment.
   await expect(ledger.getByRole('button', { name: /^More actions for .* Charge$/ })).toHaveCount(2);
   await expect(ledger.getByRole('button', { name: /^More actions for .* Payment$/ })).toHaveCount(
     0
@@ -37,7 +30,6 @@ test('a snapshot is recorded once per lock date', async ({ page, book: emulator 
   const snapshot = async () =>
     (await readDoc(path))?.snapshot as Record<string, unknown> | undefined;
   const minersRow = page.getByRole('row', { name: new RegExp(MINER.ada.name) });
-  // Only a whole-book read records snapshots (a Miner page reads one Miner's slice).
   await signInAsOfficer(page, './corp/moons/miners');
   await expect(minersRow).toBeVisible();
   await expect
@@ -58,7 +50,6 @@ test('a snapshot is recorded once per lock date', async ({ page, book: emulator 
     .toEqual(book.checkpoint);
   const first = (await snapshot())!.at;
 
-  // The next visit finds this lock date's snapshot and records none.
   await page.reload();
   await expect(minersRow).toBeVisible();
   await page.waitForLoadState('networkidle');
@@ -69,7 +60,6 @@ test('a Miner read from their snapshot reads the same totals', async ({ page, bo
   const book = closedMonthBook({ checkpointed: true });
   await emulator.seed(book.seed.docs());
   await openMiner(page, book.minerId, MINER.ada.name);
-  // The one Payee ledger opens on the snapshot: "Balance through <day>".
   await expect(page.getByRole('table', { name: 'Ledger', exact: true })).toContainText(
     'Balance through'
   );

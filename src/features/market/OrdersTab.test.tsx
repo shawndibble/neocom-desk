@@ -9,8 +9,6 @@ import { OrdersTab } from './OrdersTab';
 import type { PageHeaderSlots } from './pageHeaderSlots';
 
 vi.mock('@/features/corp/useCorpAccess', () => ({ useCorpAccess: vi.fn() }));
-// The panel owns the picker; the stand-in drives its options the way the real
-// `CharacterFilterControl` does, through the callbacks OrdersTab hands it.
 vi.mock('./OpenOrdersPanel', () => ({
   OpenOrdersPanel: ({
     corporation,
@@ -89,8 +87,6 @@ describe('OrdersTab', () => {
   });
 
   it('offers Corporation to a role holder whose grant predates the orders scope, and asks for it', async () => {
-    // A Director (or Accountant/Trader) who granted corp access before corp
-    // orders shipped: the additive capability is off, the scope is missing.
     access('ready', false, [ORDERS_SCOPE]);
     renderTab('/market/orders');
     await userEvent.click(screen.getByRole('button', { name: 'Corporation' }));

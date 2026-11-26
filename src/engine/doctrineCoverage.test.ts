@@ -38,7 +38,7 @@ describe('doctrineCoverage', () => {
       fit,
       books({
         1: [sell(100, 9)],
-        10: [sell(10, 7)], // 3 ships' worth at 2 each
+        10: [sell(10, 7)],
         11: [sell(5, 50)],
         20: [sell(1, 4)],
       }),
@@ -53,7 +53,7 @@ describe('doctrineCoverage', () => {
       fit,
       books({
         1: [sell(100, 9)],
-        10: [sell(10, 70, 1234)], // another station
+        10: [sell(10, 70, 1234)],
         11: [sell(5, 50)],
         20: [sell(1, 4)],
       }),
@@ -70,9 +70,8 @@ describe('doctrineCoverage', () => {
       books({ 1: [sell(100, 1), sell(150, 5)] }),
       STATION
     );
-    // Six units listed, one per ship: all six are complete ships.
     expect(result?.ships).toBe(6);
-    expect(result?.nextShipListedCost).toBe(0); // the book is spent: nothing left to price
+    expect(result?.nextShipListedCost).toBe(0);
     expect(result?.shortOn).toBe(1);
   });
 
@@ -83,12 +82,11 @@ describe('doctrineCoverage', () => {
         1: [sell(100, 5)],
         10: [sell(10, 4), sell(20, 100)],
         11: [sell(5, 1), sell(8, 100)],
-        20: [sell(1, 1)], // the limit: one ship, the next has none
+        20: [sell(1, 1)],
       }),
       STATION
     );
     expect(result?.ships).toBe(1);
-    // ship 2: hull 100; 2 x module 10 from the 10 level (units 3-4); module 11 at 8; rig has none left
     expect(result?.nextShipListedCost).toBe(100 + 10 + 10 + 8);
     expect(result?.shortOn).toBe(20);
     expect(result?.unlisted).toEqual([]);

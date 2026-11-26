@@ -18,11 +18,6 @@ import type {
 import type { OpenOrderRow } from '@/features/market/openOrdersModel';
 import type { IndustryJob } from '@/esi/endpoints';
 
-/**
- * Echoes the key and its interpolations rather than resolving them: what these
- * functions decide is *which* line to print and with what count, and asserting
- * on English would make every copy edit a failing test.
- */
 function t(key: string, options?: Record<string, unknown>): string {
   if (options === undefined) return key;
   const args = Object.entries(options)
@@ -105,7 +100,6 @@ function planetaryData(overrides: Partial<PlanetaryBoardData> = {}): PlanetaryBo
   };
 }
 
-/** `planetarySummary` reads a batch's severity and how many colonies are in it, never a colony's own state. */
 function colony(planetId: number, name: string): BoardColony {
   return { planetId, name, status: { idle: false, soonestExpiryMs: null } };
 }
@@ -120,13 +114,6 @@ function industryData(overrides: Partial<IndustryBoardData> = {}): IndustryBoard
   };
 }
 
-/*
- * The three states every one of these has to tell apart. A collapsed row is
- * the only thing its domain says on a phone, so "not read yet" printing the
- * same words as "read, nothing to do" is the silence this board was rebuilt to
- * remove — and it is the state a summary is most likely to get wrong, because
- * an unlanded load and an idle character both arrive as an empty list.
- */
 describe('the unloaded and unreadable states', () => {
   it('says it is still checking before the read lands', () => {
     expect(ordersSummary(t, null, false)).toBe('overview.board.checking');
@@ -155,8 +142,6 @@ describe('ordersSummary', () => {
   });
 
   it('counts each order once when nothing is below the floor', () => {
-    // Both problems on one row: two facts about one order, still one order to
-    // go and fix — `needsAttentionCount` is what says so.
     const rows = [
       makeRow({
         orderId: 1,
@@ -227,8 +212,6 @@ describe('planetarySummary', () => {
         },
       ],
     });
-    // The expired batch is the worse one, and it is not first in the list —
-    // the summary ranks by severity, it does not read off the top.
     expect(planetarySummary(t, data)).toBe('overview.board.batch.expired(count=1)');
   });
 

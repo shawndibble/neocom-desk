@@ -4,9 +4,6 @@ import { FACILITY_PRESETS, SKILL_IDS } from '@/engine/industry/types';
 import type { FacilityContext, SkillLevels } from '@/engine/industry/types';
 import { characterModifiers, NO_CHARACTER_MODIFIERS } from '@/engine/industry/characterModifiers';
 
-// Skill- and implant-scoping cases live in characterModifiers.test.ts; these
-// pin TE/facility/rig terms and that the Character's share stacks onto them.
-
 const npc: FacilityContext = {
   facility: FACILITY_PRESETS.npcStation,
   rigFit: ['none', 'none', 'none'],
@@ -39,7 +36,6 @@ describe('timeModifier', () => {
   });
 
   it('stacks TE, skills, structure and rig multiplicatively', () => {
-    // 0.8 (TE20) * 0.8 (Industry V) * 0.88 (Adv IV) * 0.85 (Raitaru) * 0.8 (T1 TE rig hisec)
     expect(timeModifier(20, industryVAdvIV, raitaruT1Hi)).toBeCloseTo(
       0.8 * 0.8 * 0.88 * 0.85 * 0.8,
       12
@@ -52,7 +48,6 @@ describe('timeModifier', () => {
   });
 
   it('scales rig time bonus by security band', () => {
-    // T2 TE rig nullsec: 24% * 2.1 = 50.4% -> 0.496
     const ctx: FacilityContext = {
       facility: FACILITY_PRESETS.sotiyo,
       rigFit: ['teT2', 'none', 'none'],
@@ -75,9 +70,6 @@ describe('timeModifier', () => {
   });
 
   it('scales reactor rig time bonus by the reaction security table, not the manufacturing one', () => {
-    // Tatara T2 TE rig nullsec: 24% * 1.1 (reaction table) = 26.4% -> 0.736,
-    // vs. manufacturing's 24% * 2.1 = 50.4% -> 0.496 for the same rig level.
-    // Tatara also carries its own -25% structure time bonus (0.75).
     const tataraT2Null: FacilityContext = {
       facility: FACILITY_PRESETS.tatara,
       rigFit: ['teT2', 'none', 'none'],
@@ -87,7 +79,6 @@ describe('timeModifier', () => {
   });
 
   it('scopes the Character share by the facility activity', () => {
-    // Manufacturing skills + BX-80x never touch a reaction job (issue #513).
     const m = mods({ [SKILL_IDS.industry]: 5, [SKILL_IDS.advancedIndustry]: 5 }, [BX_804]);
     expect(timeModifier(0, m, athanor)).toBe(1);
     expect(timeModifier(0, mods({ [SKILL_IDS.reactions]: 5 }), athanor)).toBeCloseTo(0.8, 12);
@@ -95,8 +86,6 @@ describe('timeModifier', () => {
   });
 
   it('stacks Reactions with the reaction facility and reactor rig terms', () => {
-    // Tatara -25% (0.75) * T2 TE rig 24% * 1.1 nullsec = 26.4% (0.736)
-    // * Reactions V (0.8).
     const tataraT2Null: FacilityContext = {
       facility: FACILITY_PRESETS.tatara,
       rigFit: ['teT2', 'none', 'none'],
@@ -131,7 +120,6 @@ describe('jobDurationSeconds', () => {
   });
 
   it('matches the hand-computed full-stack example', () => {
-    // 600 * 10 * 0.8 * 0.8 * 0.88 * 0.85 * 0.8 = 2297.856
     expect(jobDurationSeconds(600, 10, 20, industryVAdvIV, raitaruT1Hi)).toBeCloseTo(2297.856, 6);
   });
 
@@ -141,7 +129,6 @@ describe('jobDurationSeconds', () => {
 
   it('applies qualifying blueprint science skills (issue #1228)', () => {
     const blueprintSkills = [{ typeID: 11452, level: 1 }];
-    // 600 * 10 * 0.96 (Mech Eng IV)
     expect(jobDurationSeconds(600, 10, 0, mods({ 11452: 4 }), npc, blueprintSkills)).toBeCloseTo(
       5760,
       6
@@ -149,7 +136,6 @@ describe('jobDurationSeconds', () => {
   });
 
   it('applies a BX-80x manufacturing implant bonus (issue #1229)', () => {
-    // 600 * 10 * 0.96 (BX-804)
     expect(jobDurationSeconds(600, 10, 0, mods({}, [BX_804]), npc)).toBeCloseTo(5760, 6);
   });
 });

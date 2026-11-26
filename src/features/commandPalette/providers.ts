@@ -1,9 +1,3 @@
-/**
- * The three groups the Command Palette ships with (#2318): Pages, Commands
- * and Characters, in that order. Pure factories — the live reads they need
- * (nav locks, the Character list, `navigate`) are passed in by
- * `CommandPalette`, so each is testable without a router or Dexie.
- */
 import { rankedSearch } from '@/lib/rankedSearch';
 import type { NavDestination } from '@/app/navDestinations';
 import { GROUP_LIMIT, type PaletteProvider, type PaletteResult } from './types';
@@ -11,17 +5,10 @@ import { GROUP_LIMIT, type PaletteProvider, type PaletteResult } from './types';
 type Navigate = (path: string) => void;
 
 export interface PagesProviderOptions {
-  /** `listNavDestinations(...)`: already filtered for corp visibility and marked for locks. */
   readonly destinations: readonly NavDestination[];
   readonly navigate: Navigate;
 }
 
-/**
- * Every page and tab from the shared nav descriptor (#2317). A tab matches on
- * its own name ("opp" → "Industry › Opportunities") and, below that, on its
- * breadcrumb, so typing a page's name also offers its tabs. An empty query
- * lists nothing: the empty state shows a hint and Recent instead.
- */
 export function createPagesProvider({
   destinations,
   navigate,
@@ -37,9 +24,6 @@ export function createPagesProvider({
     labelKey: 'commandPalette.groups.pages',
     order: 0,
     search: (query) => {
-      // Nothing typed: the rail and the More sheet are the page navigation, so
-      // the empty state shows a hint and Recent. Pages stay searchable,
-      // hidden-from-rail ones included.
       if (!query) return [];
       return rankedSearch(destinations, query, {
         primary: (destination) => destination.label,
@@ -55,18 +39,15 @@ export function createPagesProvider({
 
 export interface CommandContext {
   readonly navigate: Navigate;
-  /** The add-a-Character login (`beginAddCharacterLogin`). */
   readonly addCharacter: () => void;
 }
 
 export interface PaletteCommand {
   readonly id: string;
-  /** Literal keys, so the locale split's source scan finds them. */
   readonly labelKey: string;
   readonly run: (context: CommandContext) => void;
 }
 
-/** The starter commands. Adding one is a row here. */
 export const PALETTE_COMMANDS: readonly PaletteCommand[] = [
   {
     id: 'open-settings',
@@ -84,7 +65,6 @@ export const PALETTE_COMMANDS: readonly PaletteCommand[] = [
     run: ({ addCharacter }) => addCharacter(),
   },
   {
-    // The Notification Feed is the bell panel's list.
     id: 'notification-feed',
     labelKey: 'commandPalette.commands.notificationFeed',
     run: ({ navigate }) => navigate('/alerts'),
@@ -115,7 +95,6 @@ export function createCommandsProvider({
 export interface CharactersProviderOptions {
   readonly characters: readonly { readonly characterId: number; readonly name: string }[];
   readonly activeCharacterId: number | null;
-  /** Shown beside the Character already active. */
   readonly activeHint: string;
   readonly onSelect: (characterId: number) => void;
 }

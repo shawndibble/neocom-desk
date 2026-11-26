@@ -1,7 +1,3 @@
-/**
- * `?debug=1` on the Moons page: one console line a corp mate can paste back when a moon owner
- * shows Gone quiet. Corp ids, statuses, timestamps and reason codes only: no tokens, no names.
- */
 import { useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import type { MoonOwnerRow } from '@/engine/corpTaxBook/moonOwners';
@@ -13,7 +9,6 @@ const DEBUG_PARAM = 'debug';
 
 const iso = (ms: number | undefined) => (ms === undefined ? null : new Date(ms).toISOString());
 
-/** The facts that say why a moon owner is not being read, one object per moon owner. */
 export function moonOwnerDebugDump(
   bookCorporationId: number,
   feeders: readonly BookFeeder[],
@@ -28,7 +23,6 @@ export function moonOwnerDebugDump(
       return {
         corporationId: f.corporationId,
         status: f.status,
-        /** What the page shows: a stale `active` record reads `cant-read`. */
         shownAs: row?.status ?? null,
         goneQuiet: row !== undefined && isGoneQuiet(row),
         sameOwner: f.sameOwner === true,
@@ -46,7 +40,6 @@ export function moonOwnerDebugDump(
   };
 }
 
-/** Logs the dump once per load of the book when the URL carries `?debug=1`. */
 export function useMoonOwnerDebugDump(rows: readonly MoonOwnerRow[]): void {
   const [params] = useSearchParams();
   const { corporationId, data } = useBook();

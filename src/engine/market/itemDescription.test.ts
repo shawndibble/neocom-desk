@@ -86,7 +86,6 @@ Activation of an Expert System is automatic upon redemption of the item by the s
     expect(
       runs.some((r) => r.italic && r.text.startsWith('Expert Systems are a product developed'))
     ).toBe(true);
-    // No raw tag text ever leaks into a run.
     for (const run of runs) {
       expect(run.text).not.toMatch(/<[a-zA-Z/][^>]*>/);
     }

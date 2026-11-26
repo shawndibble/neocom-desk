@@ -55,10 +55,8 @@ describe('loadLoyaltyStoreOffers', () => {
     server.use(
       http.get(`${ESI_BASE_URL}/loyalty/stores/${CORP_ID}/offers/`, () => HttpResponse.error())
     );
-    // A lapsed game constant is served at once while the refresh runs behind it…
     const result = await loadLoyaltyStoreOffers(CORP_ID);
     expect(result?.data).toEqual(payload);
-    // …and once that refresh has failed, the next read says it is a fallback.
     await vi.waitFor(async () => {
       const reread = await loadLoyaltyStoreOffers(CORP_ID);
       expect(reread?.data).toEqual(payload);

@@ -1,9 +1,3 @@
-/**
- * The Survey's headline numbers as a row of large tiles under the chart: what
- * is left, how fast it is going, when it will be gone and how long that is.
- * Bigger than a `StatChip` on purpose: these are what the pilot reads at a
- * glance and says in fleet chat, not small counts beside a title.
- */
 import { type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { formatDuration, formatEveClock } from '@/engine/survey/chatMessage';
@@ -17,8 +11,6 @@ import { formatLocalClock } from './localClock';
 import { useDoneAtClock, useDoneAtOverride } from './surveyPref';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 
-// Accent says it's pressable; no underline, since that reads as a link to
-// somewhere. The tooltip names what a press does.
 const toggleClassName = `text-accent text-left whitespace-normal rounded-xs ${interactiveClassName} ${focusRingClassName}`;
 
 function Tile({
@@ -45,7 +37,6 @@ function Tile({
   );
 }
 
-/** "11.0M": one fixed decimal, like the ISK tile beside it, so a big field's volume isn't cropped. */
 function shortVolume(value: number): string {
   // eslint-disable-next-line no-restricted-syntax -- English K/M/B; the mark is swapped below.
   const text = value.toLocaleString('en', {
@@ -53,7 +44,6 @@ function shortVolume(value: number): string {
     minimumFractionDigits: 1,
     maximumFractionDigits: 1,
   });
-  // The K/M/B suffixes are EVE's shorthand in every locale, so only the mark moves.
   return getDecimalMark() === ',' ? text.replace('.', ',') : text;
 }
 
@@ -66,10 +56,7 @@ export function SurveyStats({ summary }: { summary: SurveySummary }) {
   const local = clock === 'local';
   useHydratedStore(useDoneAtOverride);
   const setClock = useDoneAtOverride((state) => state.setValue);
-  // Once the field is cleared, the time it was marked cleared; until then, the estimate.
   const doneAt = summary.finished ? summary.finishedAt : summary.etaAt;
-  // One row when the board is wide enough, else rows of three: never 4 + 2 or
-  // 5 + 1. A finished survey has three tiles, so it is a single row at any width.
   const tileCount = summary.finished ? 3 : summary.iskLeft === null ? 5 : 6;
   const wideColumns =
     tileCount === 6 ? '@4xl:grid-cols-6' : tileCount === 5 ? '@4xl:grid-cols-5' : '';
@@ -100,7 +87,6 @@ export function SurveyStats({ summary }: { summary: SurveySummary }) {
           )}
         </Tile>
         {summary.finished ? (
-          // "1d 14h 36m", "12h 5m" or "55m": a unit shows only once it took that long.
           <Tile label={t('survey.statTotalTime')}>{formatTotalTime(summary.elapsedMs / 1000)}</Tile>
         ) : (
           <>

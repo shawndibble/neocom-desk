@@ -11,17 +11,10 @@ import type { LostRow } from './useMemberSrp';
 interface LostShipsListProps {
   rows: readonly LostRow[];
   onFile: (row: LostRow) => void;
-  /** A ship name or the row was chosen: its killmail opens. */
   onOpen: (row: LostRow) => void;
-  /** The killmail being filed right now; its button waits. */
   busyKillmailId?: number | null;
 }
 
-/**
- * The pilot's own losses, each with its outcome: a one-tap File, or Claimed or Not covered (a Hull Rule); a loss past
- * the corp's window is not listed. A ship name, or a tap on the row, opens its killmail. One `DataTable`: columns on desktop, dense
- * two-line cards on a phone (DESIGN.md §4a), the File button at the card's right.
- */
 export function LostShipsList({ rows, onFile, onOpen, busyKillmailId = null }: LostShipsListProps) {
   const { t } = useTranslation();
   const timeZone = useTimeZone();

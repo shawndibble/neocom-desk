@@ -18,8 +18,6 @@ import {
 import { loadBlueprints } from '@/sde/loadSde';
 import type { BlueprintMap, TypeMap } from '@/sde/types';
 
-// Same small fixture the other Industry route tests use: Rifter (638) needs
-// Tritanium/Pyerite/Mechanical Parts; 9841 builds Mechanical Parts.
 const BLUEPRINTS: BlueprintMap = {
   '638': {
     name: 'Rifter Blueprint',
@@ -54,10 +52,7 @@ vi.mock('@/sde/loadSde', () => ({
   loadTypes: vi.fn(async () => TYPES),
   loadBlueprints: vi.fn(async () => BLUEPRINTS),
   loadPi: vi.fn(async () => ({ schematics: {}, raw: [] })),
-  // A stale group id redirects to `/industry`, which loads this
-  // unconditionally for its Opportunities tab.
   loadMarketWideTrees: vi.fn(async () => ({})),
-  // The plan page's Materials panel reads this to offer the compressed-gas toggle.
   loadCompressedGasTypeIds: vi.fn(async () => ({})),
 }));
 
@@ -150,9 +145,6 @@ async function resetSession() {
   await db.buildPlans.clear();
   await db.quickbars.clear();
   useActiveCharacter.setState({ activeCharacterId: null, hydrated: false });
-  // Module-scope store, so a group seeded by one test outlives it in memory
-  // unless it is put back — the same reset `Industry.test.tsx` used to do
-  // for `useLastOpenedPlan`.
   useBuildGroups.setState({ value: {}, hydrated: false });
   usePublicInfo.setState({ byCharacterId: {} });
   useAuthFailure.setState({ failure: null });
@@ -172,9 +164,6 @@ async function resetSession() {
 
 beforeAll(async () => {
   server.listen({ onUnhandledRequest: 'error' });
-  // One throwaway render of the group page, so no test pays for a worker's
-  // first cold render (module graph, jsdom and React warm-up), done here under
-  // the hook's own budget, as IndustryPlanPage.test.tsx does.
   await resetSession();
   await seedGroup('g1', 'Rifter fit');
   await db.buildPlans.add(seedPlan({ id: 'bp-1', name: 'Rifter run', buildGroupId: 'g1' }));

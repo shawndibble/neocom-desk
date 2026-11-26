@@ -1,12 +1,3 @@
-/**
- * The open Thera / Turnur holes a Route Safety route may cross (issue #2476):
- * EVE-Scout's list, cut to the pilot's hubs, ship size and minimum life.
- *
- * Asks EVE-Scout only while the switch is on — a page that never routes
- * through a hole never makes the request. Three states besides off, each said
- * on the page: the list is loading (the gate route shows meanwhile), EVE-Scout
- * could not be reached (gates only, and the page says so), or the holes.
- */
 import { useEffect, useMemo, useState } from 'react';
 import { routeHoles } from '@/engine/route/routeHoles';
 import type { TheraConnection } from '@/engine/route/theraConnections';
@@ -25,21 +16,17 @@ export type RouteHolesState =
   | { kind: 'unavailable' }
   | {
       kind: 'ready';
-      /** The holes a route may cross: the hubs, ship size and life asked for. */
       holes: TheraConnection[];
-      /** Every hole EVE-Scout lists open, filters aside: where a pinned hole is looked up. */
       listed: TheraConnection[];
       fetchedAt: Date;
       now: number;
     };
 
-/** Remaining life counts down in minutes, so the clock ticks once a minute. */
 const TICK_MS = MINUTE_MS;
 
 export function useRouteHoles(query: RouteHoleQuery): RouteHolesState {
   const now = useTicker(TICK_MS);
   const active = query.enabled && query.hydrated;
-  // Asks again once per cache window; inside it the answer is a memory read.
   const cacheWindow = Math.floor(now / EVE_SCOUT_CACHE_MS);
   const [result, setResult] = useState<TheraConnectionsResult | null>(null);
 

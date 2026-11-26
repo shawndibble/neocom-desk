@@ -1,8 +1,3 @@
-/**
- * One jump over an Ansiblex on a Route Safety route (issue #2478), drawn
- * between its two systems: "Ansiblex · SYS1 → SYS2 · <gate name>". A fact
- * about the step, never a judgement of it (decision `20260912-172628`).
- */
 import { useTranslation } from 'react-i18next';
 import * as Icon from '@/components/ui/icons';
 import type { AnsiblexGate } from '@/engine/route/ansiblex';
@@ -10,7 +5,6 @@ import type { RouteSafetyRow } from '@/engine/route/routeSafety';
 import { MassNote } from './MassNote';
 import { routeSystemName } from './routeSystemName';
 
-/** A jump over a bridge, between the two route systems it joins. */
 export interface BridgeStep {
   from: RouteSafetyRow;
   to: RouteSafetyRow;

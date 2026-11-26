@@ -1,17 +1,4 @@
 #!/usr/bin/env node
-// Local gate mirroring CI. Runs format:check/lint/typecheck/test:run
-// concurrently (they're independent) instead of the sequential
-// `&&`-chain in next-ticket.md step 6 — same checks, less wall time.
-// `build` is deferred behind --build since it's the slowest check and
-// only needs to run once the rest is already green (final round before
-// opening/updating the PR), not on every fix-and-retry loop.
-//
-// Usage: node scripts/next-ticket/gate.mjs [--build]
-//
-// Prints one line of JSON to stdout:
-//   {"status":"pass"}
-//   {"status":"fail","failed":["lint","test:run"],"output":{"lint":"...tail...","test:run":"...tail..."}}
-// Exits 0 on pass, 1 on fail.
 
 import { spawn } from 'node:child_process';
 import { printResult } from './lib.mjs';

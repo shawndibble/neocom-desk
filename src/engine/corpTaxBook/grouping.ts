@@ -1,11 +1,3 @@
-/**
- * Miner grouping (D18, D26/D26b, issue #4194): the `setMiner` / `unlink` / `regroupMiner` edits
- * that put characters into one Miner, planned as pure data so the screen and
- * the sync run the same rules. Pure: no fetch/DOM/Dexie imports.
- *
- * A group keeps the id of the Miner it grows from (`solo:<id>` included), so
- * its late notices, payments and dismissals stay with it.
- */
 import { standingOf, type MinerRow } from './bookView';
 import { latestRecordedCorp } from './bookDocs';
 import type { Miner } from './charges';
@@ -17,12 +9,6 @@ export type GroupingEdit =
 
 const isSolo = (id: string) => id.startsWith('solo:');
 
-/**
- * The one edit that folds `absorb` into the target Miner. A character sits in
- * one stored Miner only, so the server dissolves each absorbed stored group
- * and sets the target in a single transaction: a partial failure cannot leave
- * characters unlinked. A `solo:` Miner is not stored and is not listed.
- */
 export type RegroupEdit = {
   action: 'regroupMiner';
   minerId: string;
@@ -54,13 +40,6 @@ export function planRegroup(input: {
   };
 }
 
-/**
- * D26: the characters on one app account that are in the book's corporation
- * group automatically, so one payment covers them. Only ungrouped characters
- * move, and never one an officer unlinked (`declined`). Characters outside the
- * corp are never linked here (D26b) — the caller passes only what the account
- * itself holds.
- */
 export function planAutoGroups(input: {
   corporationId: number;
   accountCharacters: readonly { characterId: number; corporationId: number }[];
@@ -91,7 +70,6 @@ export function planAutoGroups(input: {
   ];
 }
 
-/** Mirror of the server's regroup cap (`regroup-too-large` in functions/src/corpTaxBookStore.ts). */
 export const REGROUP_WRITE_CAP = 450;
 
 export type MergePrompt = {
@@ -100,15 +78,6 @@ export type MergePrompt = {
   reason: 'too-large' | 'conflict';
 };
 
-/**
- * Sign-in grouping: the player's own (proven) characters group in this
- * corporation's book. Free corp members group via setMiner; Miners the player
- * touches merge by regroup while the records moved fit one transaction, else an
- * officer gets a prompt. A character in two groups is a conflict prompt, a
- * declined one is flagged and never added, and an outsider is never the main of
- * a group that has a corp member. Only characters in `corporationId`, plus
- * outsiders a group here already holds, are acted on.
- */
 export function planSignInGroups(i: {
   corporationId: number;
   proven: readonly { characterId: number; corporationId: number | null }[];
@@ -129,7 +98,6 @@ export function planSignInGroups(i: {
     i.proven.some((c) => c.characterId === id && c.corporationId !== i.corporationId);
   const minersOf = (id: number) => i.miners.filter((m) => m.characterIds.includes(id));
 
-  // A character in two groups is a conflict; those groups are left alone.
   const blocked = new Set<string>();
   for (const id of live) {
     const held = minersOf(id);
@@ -203,14 +171,8 @@ export function planSignInGroups(i: {
   return { edits, prompts, flagged };
 }
 
-/** A Miner the group dialog can fold in: who it is, and whether it is outside the corp (D26b). */
 export type MinerChoice = Pick<MinerRow, 'id' | 'mainCharacterId' | 'characterIds' | 'standing'>;
 
-/**
- * Every Miner the book knows, without the ledger maths (#5704): each stored group, then a
- * `solo:` Miner for every ungrouped character with a ledger row on or after the start date.
- * The Miner page reads one Miner only, so its group dialog builds the list from this.
- */
 export function minerChoices(input: {
   corporationId: number;
   startDate?: string;

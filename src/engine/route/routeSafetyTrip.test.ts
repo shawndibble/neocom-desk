@@ -19,16 +19,6 @@ import {
   type RouteSafetyTripInput,
 } from './routeSafetyTrip';
 
-/**
- * The graph `legWays.test.ts` draws:
- *
- *   START ─ W1 ─ W2 ─ W3 ─ W4 ─ END          the gate way, five jumps
- *   START ─ ENTRY ⤳ THERA ⤳ EXIT ─ END       four jumps through Thera
- *   START ─ F1 ─ F2 ─ FAR ⤳ THERA            a third, far-off Thera hole
- *   W2 ─ TURNUR ⤳ TEXIT ─ END                Turnur is gated lowsec
- *
- * ISLAND has no gates and no hole: nothing reaches it.
- */
 const START = 30000001;
 const W1 = 30000002;
 const W2 = 30000003;
@@ -85,7 +75,6 @@ const VIA_ENTRY = hole({ id: '1', exitSystemId: ENTRY });
 const VIA_EXIT = hole({ id: '2', exitSystemId: EXIT });
 const VIA_FAR = hole({ id: '3', exitSystemId: FAR });
 const VIA_TURNUR = hole({ id: '4', hub: 'turnur', exitSystemId: TEXIT });
-/** An exit Turnur's own gate already joins: the gate is the jump. */
 const VIA_W2 = hole({ id: '5', hub: 'turnur', exitSystemId: W2 });
 const THERA_HOLES = [VIA_ENTRY, VIA_EXIT];
 
@@ -96,7 +85,6 @@ const THROUGH_FAR = [START, F1, F2, FAR, THERA, EXIT, END];
 
 const BRIDGE: AnsiblexGate = { fromId: W1, toId: W4, name: 'W1 » W4 - Shortcut' };
 
-/** Only what a pin names of a hole: the key carries no more. */
 const ends = ({ id, exitSystemId, hub }: TheraConnection): PinnableHole => ({
   id,
   exitSystemId,
@@ -116,16 +104,13 @@ const ACTIVITY: RouteSafetyActivity = {
 interface Scenario {
   stops?: number[];
   returnToStart?: boolean;
-  /** The qualifying holes, which the trip is planned with. */
   holes?: TheraConnection[];
-  /** Every open hole; `null` while there is no list. */
   listed?: TheraConnection[] | null;
   bridges?: AnsiblexGate[] | null;
   pins?: string[];
   activity?: RouteSafetyActivity | null;
 }
 
-/** Plans the trip as the adapter does, with the network's nameless ends, then assembles it. */
 function plan({
   stops = [END],
   returnToStart = false,
@@ -192,7 +177,6 @@ function route(state: RouteSafetyAssembly) {
 const systemsOf = (rows: readonly { systemId: number }[] | null) =>
   rows?.map((row) => row.systemId) ?? null;
 
-/** How the route entered `to` from `from`: the row's tag, or `undefined` for no such step. */
 function entryOf(rows: readonly RouteSafetyTripRow[] | null, from: number, to: number) {
   const at = rows?.findIndex(
     (row, index) => index > 0 && rows[index - 1].systemId === from && row.systemId === to
@@ -321,7 +305,6 @@ describe('planLegAlternatives', () => {
 
 describe('assembleRouteSafety', () => {
   it('lists a pinned hub as the way in use, even one longer than the gates', () => {
-    // Through FAR is six jumps to the gates' five: Thera is no way of its own.
     const state = route(plan({ holes: [VIA_FAR, VIA_EXIT], pins: ['thera'] }).state);
     expect(systemsOf(state.legs[0].rows)).toEqual(THROUGH_FAR);
     expect(state.legs[0].ways.map((way) => [way.kind, way.pin, way.inUse])).toEqual([
@@ -489,7 +472,6 @@ describe('assembleRouteSafety', () => {
   });
 
   it('reads a step nothing known joins as a gate', () => {
-    // Planned through Thera, then read against no holes at all.
     const { tripPlan, alternatives } = plan({ holes: THERA_HOLES });
     const state = route(
       assembleRouteSafety(input({ planned: { plan: tripPlan, graph: GRAPH }, alternatives }))

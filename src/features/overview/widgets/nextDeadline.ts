@@ -1,12 +1,6 @@
-/**
- * The header's Next deadline chip: which clock is soonest, and how loud the
- * chip is. The chip's tone is its own ladder (amber under 3 h, red under
- * 30 min), separate from the per-card `severityForRemaining`.
- */
 import type { DeadlineSeverity } from '@/engine/character/severity';
 import { MINUTE_MS, HOUR_MS } from '@/lib/age';
 
-/** One clock a widget offers the header chip: when, what it is, how loud, and where it leads (absent when no page owns the clock). */
 export interface BoardDeadline {
   at: number;
   note: string;
@@ -19,7 +13,6 @@ export type ChipTone = 'neutral' | 'warning' | 'danger';
 export const CHIP_WARNING_MS = 3 * HOUR_MS;
 export const CHIP_DANGER_MS = 30 * MINUTE_MS;
 
-/** The soonest candidate still ahead of `now`; null when none is. */
 export function nextDeadline(
   candidates: readonly BoardDeadline[],
   now: number

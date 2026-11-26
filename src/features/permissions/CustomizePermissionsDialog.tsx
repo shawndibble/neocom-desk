@@ -1,21 +1,3 @@
-/**
- * "Customize permissions" (issue #1522): the Add Character login, but with a
- * hand-picked set of Permissions instead of the whole Base Grant. Opened from
- * the login page's "Customize permissions" link, directly under the plain
- * "Log in" button, which is unchanged and still asks for everything.
- *
- * The Core Grant sits at the top, checked and locked — hand-written as its two
- * user-facing rows (skills & skill queue, structure lookup) rather than
- * `CORE_GRANT`'s four raw scope names, which this dialog never shows
- * (docs/context/decisions/20260924-143410-customize-permissions-at-sign-in-core-grant-plus.md).
- * Below it, every Permission in a two-column checklist that collapses to one
- * at phone width, every read one ticked by default (#6102). The "Write to
- * EVE" Permissions sit under their own heading, derived from the registry's
- * `section`, tagged opt-in and unticked by default.
- *
- * The selection persists device-locally only on submit — Cancel discards a
- * half-made change rather than remembering it (`customizeSelection.ts`).
- */
 import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 import { useState, type ReactNode } from 'react';
@@ -30,14 +12,11 @@ import { DividedList } from '@/components/ui/DividedList';
 interface CustomizePermissionsDialogProps {
   open: boolean;
   onClose: () => void;
-  /** The dialog reads differently at each entry point (Login's "log in", Characters' "add"); defaults to Login's own wording. */
   title?: string;
 }
 
-/** The Core Grant's two user-facing rows — see the module doc for why these are hand-written rather than derived from `CORE_GRANT`. */
 const CORE_ROWS = ['skills', 'structures'] as const;
 
-/** Every Permission outside the Write to EVE section, in catalogue order. */
 const READ_GROUPS = SCOPE_GROUPS.filter((group) => !WRITE_GROUPS.includes(group));
 
 export function CustomizePermissionsDialog({
@@ -50,20 +29,6 @@ export function CustomizePermissionsDialog({
   const hydrated = useHydratedStore(useCustomizePermissionsSelection);
   const persist = useCustomizePermissionsSelection((state) => state.setValue);
 
-  // `null` means "no edit this open" — the draft follows the stored choice,
-  // including once hydration lands, the same reasoning
-  // `MobileTabsPanel` (Settings.tsx) uses for its own store-backed draft. A
-  // reset-on-open effect would need to call `setState` from inside itself,
-  // which this avoids entirely: `handleClose` (Escape, backdrop, Cancel, and
-  // a successful submit) clears it back to null, so the *next* open computes
-  // `selected` fresh from whatever is stored then.
-  //
-  // Every checkbox and Select all/none/submit stay `disabled` until
-  // `hydrated`: without that gate a toggle pressed in the async Dexie read's
-  // window would fork `pending` from the store's pre-hydration
-  // `DEFAULT_ON_GROUPS`, not the real stored choice, and silently submit over
-  // it — the exact bug `customizeSelection.ts`'s own doc warns a stored `[]`
-  // must survive.
   const [pending, setPending] = useState<ReadonlySet<ScopeGroup> | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [loginFailed, setLoginFailed] = useState(false);
@@ -88,13 +53,9 @@ export function CustomizePermissionsDialog({
     setLoginFailed(false);
     try {
       const groups = [...selected];
-      // Best-effort: a device-local preference-save failure (quota, private
-      // browsing) must never block the login it is attached to.
       try {
         await persist({ groups });
-      } catch {
-        // Intentionally swallowed — see comment above.
-      }
+      } catch {}
       await beginCustomizedAddCharacterLogin(groups);
       setPending(null);
     } catch {
@@ -226,7 +187,6 @@ interface CaptionedCheckboxProps {
   tag?: ReactNode;
 }
 
-/** The checkbox + label + "unlocks" caption shape both the Core rows and the Permission rows share — the only part of the two lists that was actually identical. */
 function CaptionedCheckbox({
   domId,
   label,

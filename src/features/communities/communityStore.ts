@@ -1,11 +1,3 @@
-/**
- * Communities client (issue #3597, ADR 0018): reads through Firestore under
- * the membership rules, every write through the Community callables
- * (functions/src/communities*.ts), which enforce the caps and the
- * delete-on-leave. The list of a Character's Communities comes from its own
- * membership index, because `communities` itself cannot be listed. Firestore
- * here is the `lite` build (no listeners), so callers refetch after a change.
- */
 import type { CallableAction } from '../../../functions/src/callableManifest';
 import { collection, doc, getDoc, getDocs, limit, orderBy, query } from 'firebase/firestore/lite';
 import type { MemberLibrary } from '@/engine/communities/libraryMatrix';
@@ -33,14 +25,11 @@ export interface CommunitySummary {
   id: string;
   name: string;
   adminUid: string;
-  /** Null once the admin has revoked the link. */
   inviteCode: string | null;
   memberCount: number;
-  /** The admin lets each new Member in by hand, even one holding the link. Absent means off. */
   requireApproval?: boolean;
 }
 
-/** A Character waiting for the admin to let it in. */
 export interface JoinRequest {
   uid: string;
   characterName: string;
@@ -51,25 +40,21 @@ export interface CommunityMember {
   uid: string;
   characterName: string;
   joinedAt: number;
-  /** When the Member's Shared Blueprints were last refreshed; null when it shares none. */
   libraryAsOf: number | null;
 }
 
 export { setCommunityBackendOverride, type CommunityBackendOverride };
 
-/** Where an invite link lands. The join page is its own ticket; this is its one address. */
 export function communityInviteUrl(inviteCode: string): string {
   const base = import.meta.env.BASE_URL.replace(/\/$/, '');
   return `${window.location.origin}${base}/communities/join/${inviteCode}`;
 }
 
-/** Where a Pledge mail sends the requester: the Community's Requests tab (a Member signs in first, as for any page). */
 export function communityRequestsUrl(communityId: string): string {
   const base = import.meta.env.BASE_URL.replace(/\/$/, '');
   return `${window.location.origin}${base}/communities?community=${encodeURIComponent(communityId)}&tab=requests`;
 }
 
-/** The in-app path to one Request on a Community's board: the Requests tab with its panel open. */
 export function communityRequestPath(communityId: string, requestId: string): string {
   return `/communities?community=${encodeURIComponent(communityId)}&tab=requests&request=${encodeURIComponent(requestId)}`;
 }
@@ -78,7 +63,6 @@ export function isCommunityAdmin(community: CommunitySummary, characterId: numbe
   return community.adminUid === uidForCharacter(characterId);
 }
 
-/** The Communities a Character belongs to, from its own membership index. */
 export async function listCommunityIds(characterId: number): Promise<string[]> {
   const uid = await ensureSignedIn(characterId);
   const index = await getDocs(
@@ -87,42 +71,21 @@ export async function listCommunityIds(characterId: number): Promise<string[]> {
   return index.docs.map((entry) => entry.id);
 }
 
-/**
- * How long `loadMyCommunitiesCached` reuses a Character's list. Reading it is one
- * query plus one read per Community, and the background readers (the request
- * badge, the Community alerts) would otherwise pay that on every tick. This
- * device's own joins, leaves and admin changes invalidate it at once; what
- * changes elsewhere (an admin letting this Character in, another Member joining)
- * shows within this window.
- */
 export const MY_COMMUNITIES_TTL_MS = 15 * MINUTE_MS;
 
 const mineCache = createReadCache<CommunitySummary[]>();
 
-/**
- * How long `loadCommunityMembersCached` reuses a Community's roster. A roster changes when
- * someone joins or leaves, or pushes a library (its `pushedAt`); the libraries themselves are
- * re-read only when that stamp moves (`loadMemberLibrariesFor`).
- */
-/** Most documents one roster or join-request read takes. */
 export const COMMUNITY_LIST_CAP = 1000;
 
 export const ROSTER_TTL_MS = 20 * MINUTE_MS;
 
 const rosterCache = createReadCache<CommunityMember[]>();
-/** Stamped with the Member's `libraryAsOf`: the same stamp is the same library. */
 const libraryCache = createReadCache<SharedBlueprint[]>();
 
-/**
- * Forget what is cached for one Character, or for all: its list of Communities and every
- * roster, library and shared Fitting list read through it (every `createReadCache`). After a change to its memberships, and whenever a
- * Community refused it (`withMyCommunities`).
- */
 export function invalidateMyCommunities(characterId?: number): void {
   dropCached(characterId);
 }
 
-/** Forget one Community's roster for a Character: after it pushed its own library there. */
 export function invalidateCommunityRoster(characterId: number, communityId: string): void {
   rosterCache.drop(`${characterId}:${communityId}:`);
 }
@@ -130,11 +93,6 @@ export function invalidateCommunityRoster(characterId: number, communityId: stri
 const remember = (characterId: number, value: Promise<CommunitySummary[]>, at: number) =>
   mineCache.set(`${characterId}:`, at, value);
 
-/**
- * The Character's Communities, reused for `MY_COMMUNITIES_TTL_MS`. Concurrent
- * callers share one read. For readers that can show a list up to that old;
- * the Communities page reads `loadMyCommunities`, which refreshes this too.
- */
 export async function loadMyCommunitiesCached(
   characterId: number,
   now = Date.now()
@@ -146,20 +104,12 @@ export async function loadMyCommunitiesCached(
   return remember(characterId, readMyCommunities(characterId), now);
 }
 
-/** Firestore refused a Member read: the Character is not (or no longer) a Member. */
 export function isRefused(err: unknown): boolean {
   return (err as { code?: string } | null)?.code === 'permission-denied';
 }
 
-/**
- * Runs `read` over the cached list. A Community this Character was removed from, or that was
- * deleted, elsewhere (no call on this device dropped the cache) refuses its Member reads: then
- * the cache is dropped and `read` runs once more over a fresh list, so one gone Community never
- * fails the whole read for the rest of the TTL.
- */
 export async function withMyCommunities<T>(
   characterId: number,
-  /** `retried`: this run is over the fresh list, after a refusal; a reader can stop rethrowing. */
   read: (communities: CommunitySummary[], attempt: { retried: boolean }) => Promise<T>,
   now = Date.now()
 ): Promise<T> {
@@ -173,7 +123,6 @@ export async function withMyCommunities<T>(
   }
 }
 
-/** The Character's Communities, read now (and remembered for `loadMyCommunitiesCached`). */
 export async function loadMyCommunities(characterId: number): Promise<CommunitySummary[]> {
   const override = communityBackendOverride();
   if (override) return override.loadMine();
@@ -187,7 +136,6 @@ async function readMyCommunities(characterId: number): Promise<CommunitySummary[
   const loaded = await Promise.all(
     index.docs.map(async (entry): Promise<CommunitySummary | null> => {
       const path = `communities/${entry.id}`;
-      // A deleted Community stays gone: one miss prunes it from this device's list.
       if (await isKnownMissing(path)) return null;
       const snap = await getDoc(doc(db, 'communities', entry.id));
       if (!snap.exists()) {
@@ -210,7 +158,6 @@ async function readMyCommunities(characterId: number): Promise<CommunitySummary[
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
-/** A Community's roster, read now (and remembered for `loadCommunityMembersCached`). */
 export async function loadCommunityMembers(
   characterId: number,
   communityId: string
@@ -224,10 +171,6 @@ export async function loadCommunityMembers(
   );
 }
 
-/**
- * A Community's roster, reused for `ROSTER_TTL_MS`. Read it inside `withMyCommunities`, so a
- * Community that refuses this Character drops it along with the list.
- */
 export async function loadCommunityMembersCached(
   characterId: number,
   communityId: string,
@@ -263,7 +206,6 @@ async function readCommunityMembers(
     .sort((a, b) => a.characterName.localeCompare(b.characterName));
 }
 
-/** The Characters waiting to be let in. Readable by the admin only. */
 export async function loadJoinRequests(
   characterId: number,
   communityId: string
@@ -286,24 +228,16 @@ export async function loadJoinRequests(
     .sort((a, b) => a.requestedAt - b.requestedAt);
 }
 
-/** Every listed Member's shared blueprints, for the Community Library. A Member with none yields an empty list. */
 export async function loadMemberLibraries(
   characterId: number,
   communityId: string,
   memberUids: readonly string[],
-  /** `strict`: an unreadable library throws instead of reading as empty (a caller that must tell "none" from "could not read"). */
   { strict = false }: { strict?: boolean } = {}
 ): Promise<MemberLibrary[]> {
   const { libraries } = await readMemberLibraries(characterId, communityId, memberUids, strict);
   return libraries;
 }
 
-/**
- * The listed Members' shared blueprints, from their roster entries: a Member whose
- * `libraryAsOf` is null shares nothing and is not read at all, and one whose stamp is the
- * one already read comes from memory. An unreadable Member reads empty and is named in
- * `failedUids`; with `strict`, its failure throws instead.
- */
 export async function loadMemberLibrariesFor(
   characterId: number,
   communityId: string,
@@ -334,8 +268,6 @@ export async function loadMemberLibrariesFor(
           );
         return { uid, items: await items };
       } catch (err) {
-        // Refused: this Character is no longer a Member, so nothing it holds for it is current,
-        // and the caller (inside `withMyCommunities`) reads its list again.
         if (isRefused(err)) {
           invalidateMyCommunities(characterId);
           throw err;
@@ -384,7 +316,6 @@ async function readMemberLibraries(
   const failedUids: string[] = [];
   const libraries = await Promise.all(
     memberUids.map(async (uid) => {
-      // One unreadable Member (just removed, say) must not blank everyone else's column.
       try {
         return { uid, items: await readLibrary(db, communityId, uid) };
       } catch (err) {
@@ -397,7 +328,6 @@ async function readMemberLibraries(
   return { libraries, failedUids };
 }
 
-/** The pushed-at stamp, only while the Member shares anything (a cleared library has chunkCount 0). */
 function libraryAsOf(data: Record<string, unknown>): number | null {
   const stamp = data.pushedAt as { toMillis?: () => number } | undefined;
   if (!stamp?.toMillis || !Number(data.chunkCount ?? 0)) return null;
@@ -415,12 +345,10 @@ export async function callCommunity<In, Out>(
   try {
     return await callRouted<In, Out>(name, data, characterId);
   } finally {
-    // Even a failed call may have landed (a timeout after the write).
     if (CHANGES_MY_COMMUNITIES.has(name)) invalidateMyCommunities(characterId);
   }
 }
 
-/** The calls that change a Character's Communities or what their summaries show. */
 const CHANGES_MY_COMMUNITIES: ReadonlySet<CallableAction> = new Set<CallableAction>([
   'createCommunityCallable',
   'joinCommunityCallable',
@@ -440,7 +368,6 @@ export interface InvitePreview {
   memberCount: number;
 }
 
-/** The invite page's preview. Needs no session: a visitor has not signed in yet. */
 export async function previewInvite(inviteCode: string): Promise<InvitePreview> {
   return callRouted<{ inviteCode: string }, InvitePreview>(
     'previewCommunityCallable',
@@ -475,15 +402,12 @@ export async function setRequireApproval(
   });
 }
 
-/** A corporation sharing moon pops into a Community (#6223), as its admin sees it. */
 export interface CommunityPopSharer {
   corporationId: number;
-  /** Whether it shares pops into the Community now. */
   sharing: boolean;
   blocked: boolean;
 }
 
-/** The admin's list of corporations that share moon pops into the Community, blocked ones too. */
 export async function listCommunityPopSharers(
   characterId: number,
   communityId: string
@@ -496,7 +420,6 @@ export async function listCommunityPopSharers(
   return result.sharers ?? [];
 }
 
-/** The admin blocks (or unblocks) a corporation's moon pops in the Community. */
 export async function setCommunityPopSharingBlock(
   characterId: number,
   communityId: string,
@@ -530,7 +453,6 @@ export interface MailInviteReservation {
   remaining: number;
 }
 
-/** Claims a daily mail invite and the one-per-target slot; the server holds the cap. */
 export function reserveMailInvite(
   characterId: number,
   communityId: string,
@@ -560,7 +482,6 @@ export async function confirmMailInvite(
   });
 }
 
-/** Gives the reserved slot back after a failed send. */
 export async function releaseMailInvite(
   characterId: number,
   communityId: string,
@@ -575,7 +496,6 @@ export async function releaseMailInvite(
 }
 
 export const MAX_MAIL_INVITES_PER_DAY = 20;
-/** How many sent mail invites the panel lists, newest first. */
 export const MAIL_INVITES_SHOWN = 50;
 
 export interface SentMailInvite {
@@ -584,7 +504,6 @@ export interface SentMailInvite {
   sentAt: number;
 }
 
-/** Mail invites left today (UTC) and the ones already sent from this Community, newest first. */
 export async function loadMailInviteStatus(
   characterId: number,
   communityId: string,
@@ -596,7 +515,6 @@ export async function loadMailInviteStatus(
   const day = utcDay(now);
   const [quota, invites] = await Promise.all([
     getDoc(doc(db, 'characters', uid, 'mailInviteQuota', day)),
-    // The newest sent ones only: the list shows recent invites, and the daily cap is 20.
     getDocs(
       query(
         collection(db, 'communities', communityId, 'mailInvites'),

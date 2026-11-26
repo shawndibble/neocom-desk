@@ -1,13 +1,3 @@
-/**
- * Parity tests: `functions/src` hand-mirrors a few remaining pieces of `src/`
- * (the rest live once in `functions/src` and `src` re-exports them; it is a
- * separate package with its own tsconfig and no `@/` alias, so it cannot
- * import them). Each test imports BOTH copies and asserts equal behaviour, so
- * a change to one side that skips the other fails here instead of drifting
- * silently. Only modules free of `functions/`-only dependencies (`jose`,
- * `firebase-admin`, `csv-parse`) can be imported here, since root has no copy of them. The test lives at the root because root resolution can reach
- * `functions/src`; the reverse (`functions/` importing `src/`) cannot.
- */
 import { readFileSync } from 'node:fs';
 import { resolveRate, type TaxRate } from '@/engine/corpTaxBook/rates';
 import { bookRatePctFor } from '../functions/src/sharedPops';
@@ -135,9 +125,6 @@ describe('Notification Feed retention', () => {
 
 describe('Scheduled Push rows', () => {
   it('a client ProjectionRow is a valid upload row, and the stored row adds only the Character and device', () => {
-    // The client narrows `eventId` to its ProjectableEventId union; the
-    // server accepts any string, so compare every other field and require
-    // the client row to be assignable.
     expectTypeOf<Omit<ProjectionRow, 'characterId' | 'eventId'>>().toEqualTypeOf<
       Readonly<Omit<ProjectionRowInput, 'eventId'>>
     >();
@@ -153,8 +140,6 @@ describe('Scheduled Push rows', () => {
 
 describe('contracts and Workbench fits', () => {
   it('PLEX_TYPE_ID is the same type id', () => {
-    // publicContracts.ts pulls in `csv-parse`, which root cannot resolve, so
-    // read its (unexported) constant from the source instead of importing it.
     const source = readFileSync(
       new URL('../functions/src/publicContracts.ts', import.meta.url),
       'utf-8'

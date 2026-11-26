@@ -14,7 +14,6 @@ export const marketOrderCopy: DomainCopy<MarketOrderNotificationFire, ItemNames>
     const item = names.item ?? `#${fire.typeId}`;
     return {
       title: fired('marketOrderFilled', 'title', { character }),
-      // "1 x Tritanium" is noise; a bare item name is not.
       body:
         fire.quantity > 1
           ? fired('marketOrderFilled', 'bodyWithQuantity', {
@@ -24,9 +23,6 @@ export const marketOrderCopy: DomainCopy<MarketOrderNotificationFire, ItemNames>
           : fired('marketOrderFilled', 'body', { item }),
     };
   },
-  // The fill itself — what sold, how many, to whom. ESI's transactions carry
-  // no order id, so the panel resolves the item to its newest sell; every
-  // other subject is an exact row id.
   subjectOf: (fire) => fire.typeId,
 };
 
@@ -44,8 +40,6 @@ export const marketOrderUndercutCopy: DomainCopy<MarketOrderUndercutFire, ItemNa
       body: fired('marketOrderUndercut', fire.isBuyOrder ? 'buyBody' : 'sellBody', vars),
     };
   },
-  // The beaten order's own row on Market Orders (`notificationOptions.ts`'s
-  // `highlightRow`).
   subjectOf: (fire) => fire.orderId,
 };
 
@@ -60,7 +54,6 @@ export const ordersLapsingCopy: DomainCopy<OrdersLapsingFire, NoNames> & {
       hours: Math.round(fire.thresholdMs / HOUR_MS),
     }),
   }),
-  // Hedged: relisting the orders — what the warning prompts — falsifies it.
   push: (fire, character) => {
     assertProjectionWording('ordersLapsing', 'hedge');
     const hours = Math.round(fire.thresholdMs / HOUR_MS);

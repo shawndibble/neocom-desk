@@ -1,62 +1,3 @@
-/**
- * Travel › Route Safety (issue #2328): every system on a stargate route, with
- * its security, region, and the last hour of jumps and kills ESI reports.
- *
- * Conditions, never verdicts (decision `20260912-172628`): the page says "12
- * ship kills in the last hour" and marks a Gank Chokepoint by name. It never
- * calls a system or a route safe, unsafe or anything else — the pilot decides.
- *
- * From, the Stops and the Route Preference live in the URL so a route can be
- * shared. The picker saves the pilot's default Route Preference (the one
- * Settings → Travel shows) and drops the link's override; a link that names
- * `pref` still wins until the picker is used. From falls back to the Current
- * System when the link does not name one.
- *
- * Planner layout (issue #2472): a left column with the Route rules panel —
- * the Route Preference for this route, and the pilot's Travel Settings edited
- * in place — and the route on the right. Every middle row can Avoid its
- * system, previewing the whole trip with it avoided before it saves.
- *
- * Itinerary (issue #2474): one panel holds the route's facts as a chip strip,
- * the route strip (`RouteStrip`), and one-line rows with quiet stretches
- * folded (`RouteSystemsTable`).
- *
- * Several Stops (issue #2475): the Stops panel sits above Route rules, and a
- * trip of more than one stop lists its Legs, each with its own header and
- * rows (`TripLegs`); the facts line and strip cover the whole trip. The stops
- * live in the link as `stops`, in the order typed; a legacy `to` link still
- * opens as a single stop. One stop is the page exactly as it was.
- *
- * Thera / Turnur (issue #2476): with "Route through Thera / Turnur" on, the
- * open holes EVE-Scout lists join the route's graph (`useRouteHoles`), and a
- * hole jump is its own row, a hatched strip cell, and a count on the facts
- * line. The four settings are this page's synced defaults, each overridable
- * in the link (`wh`, `whsize`, `whlife`, `whhub`). While the list loads the
- * gate route shows and says so; if EVE-Scout cannot be reached the route is
- * gates only, and says that too.
- *
- * Set waypoints in game (issue #2479) closes the facts line (`SetWaypoints`).
- *
- * Ansiblex (issue #2478): with Use jump bridges on (a device-local default,
- * overridable in the link as `jb`), the gates in this device's Ansiblex list
- * join the route as one-jump connections, each crossing its own row, and
- * each leg may list Via Ansiblex. The list is found with a character's
- * structure search or pasted (`AnsiblexGatesDialog`).
- *
- * Ways to fly each leg (issue #2477): beside each leg's rows, gates only and
- * the way through each hub with a qualifying hole, with facts side by side
- * (`LegWays`). Clicking a way pins it in the link (`pin`), and Use in route on
- * a hole in the Thera / Turnur modal pins that hole for the first leg
- * (`pinFirstLeg`). Editing the stops or their order drops the pins, which
- * belong to legs by position — except the first stop added while a pin
- * waits, which is the leg its pin was made for.
- *
- * Layout (the Briefing redesign): the Stops panel and the three preference
- * cards (`PreferenceCards`, the trip planned under each Route Preference) run
- * full width; the route sits beside a right column of Route rules and
- * Incursions near you from `xl`. With no stops the destination is a search
- * field on the page, with quick picks, and the route area is `RouteSkeleton`.
- */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SecurityStatus } from '@/components/SecurityStatus';
@@ -123,7 +64,6 @@ import { useRouteSafety, type RouteSafetyLeg } from './useRouteSafety';
 import type { TravelTabProps } from './travelTab';
 import { formatNumber } from '@/lib/numberLocale';
 
-/** The link parameter overriding each wormhole setting. */
 const HOLE_PARAM = {
   enabled: 'wh',
   shipSize: 'whsize',
@@ -133,7 +73,6 @@ const HOLE_PARAM = {
 
 const NO_HOLES: readonly TheraConnection[] = [];
 
-/** The stops a link names: `stops`, else a legacy `to`, each system once (its first station), at most `MAX_STOPS`. */
 function stopsFromLink(stops: readonly StopRef[], to: number | null): StopRef[] {
   const named = stops.length > 0 ? stops : to === null ? [] : [{ systemId: to, stationId: null }];
   const seen = new Set<number>();
@@ -146,12 +85,6 @@ function stopsFromLink(stops: readonly StopRef[], to: number | null): StopRef[] 
   return unique.slice(0, MAX_STOPS);
 }
 
-/**
- * The route's facts as a `StatChips` strip: jumps (by gate · through
- * wormholes · over Ansiblex, when a hole or bridge is flown) · bands · lowest
- * · last hour's kills · chokepoints. Each is a labelled figure rather than
- * prose, so a wrapped line still reads as separate facts.
- */
 function RouteFacts({
   summary,
   holeJumps,
@@ -164,12 +97,9 @@ function RouteFacts({
   summary: RouteSafetySummary;
   holeJumps: number;
   bridgeJumps: number;
-  /** Jumps by jump drive, and the trip's fuel and time when there are any (issue #3147). */
   driveJumps: number;
   jump: JumpWayFacts | null;
-  /** Hole and bridge hops the chosen ship may not pass; the chip shows only when above 0. */
   massBlocked: number;
-  /** The hull the mass check runs for; shown only when the route flies a hole or bridge. */
   shipName: string | null;
 }) {
   const { t } = useTranslation();
@@ -253,15 +183,12 @@ export function RouteSafetyTab({ tabBar, tabsId }: TravelTabProps) {
   const [params, setParams] = useUrlParams(ROUTE_PARAMS);
   const current = useCurrentSystem();
   const fromId = params.from ?? current.systemId;
-  // Only the game's own location is "current": a system the pilot picked is
-  // marked as picked, so it is not mistaken for where the pilot is.
   const fromIsGame = params.from === null && current.source === 'game';
   const fromIsPicked = params.from === null && current.source === 'picked';
   const fromName = useSystemName(fromId);
   const systems = useSolarSystemIndex();
   const refsKey = serializeStopRefs(stopsFromLink(params.stops, params.to)) ?? '';
   const stopRefs = useMemo(() => parseStopRefs(refsKey), [refsKey]);
-  // Routing sees systems only: a station is a label on its stop.
   const stopsKey = stopRefs.map((stop) => stop.systemId).join(',');
   const stops = useMemo(() => (stopsKey === '' ? [] : stopsKey.split(',').map(Number)), [stopsKey]);
   const stationIds = useMemo(
@@ -274,7 +201,6 @@ export function RouteSafetyTab({ tabBar, tabsId }: TravelTabProps) {
     returnToStart: params.ret,
     keepLastStopLast: params.keep,
   };
-  // The two options are the optimizer's own: with it off, the typed order is flown as typed.
   const optimizing = settings.optimize && stops.length > 1;
   const routeQuery = useRouteQuery(params.pref);
   const holeQuery = useRouteHoleQuery({
@@ -288,7 +214,6 @@ export function RouteSafetyTab({ tabBar, tabsId }: TravelTabProps) {
   const listed = holesState.kind === 'ready' ? holesState.listed : null;
   const bridgeQuery = useRouteBridgeQuery(params.jb);
   const gateRecords = useAnsiblexGates();
-  // `null` while the switch is off; held off too until the switch and the list are read.
   const bridges =
     bridgeQuery.enabled && bridgeQuery.hydrated && gateRecords !== undefined ? gateRecords : null;
   const [bridgeDialog, setBridgeDialog] = useState<AnsiblexDialogMode | null>(null);
@@ -304,7 +229,6 @@ export function RouteSafetyTab({ tabBar, tabsId }: TravelTabProps) {
       returnToStart: optimizing && settings.returnToStart,
       keepLastStopLast: optimizing && settings.keepLastStopLast,
     },
-    // Held until Use jump bridges and the list are read, so the route is not drawn once without them.
     route: {
       ...routeQuery,
       hydrated:
@@ -327,7 +251,6 @@ export function RouteSafetyTab({ tabBar, tabsId }: TravelTabProps) {
     next[index] = pin ?? '';
     setParams({ pin: next }, { push: true });
   };
-  // Each system once, in flight order: a trip can cross one twice.
   const routeSystems = useMemo(() => {
     if (state.kind !== 'route') return null;
     const seen = new Map<number, RouteSafetyRow>();
@@ -337,7 +260,6 @@ export function RouteSafetyTab({ tabBar, tabsId }: TravelTabProps) {
     return [...seen.values()].map((row) => ({ systemId: row.systemId, band: row.band }));
   }, [state]);
   const killsOf = useRouteKills(routeSystems);
-  // The drawn route is what the Overview's Route safety widget reads: kept so it never plans a trip itself.
   useEffect(() => {
     if (routeSystems === null || fromId === null || stops.length === 0) return;
     const next = { fromId, stops, systems: routeSystems.map((system) => system.systemId) };
@@ -351,9 +273,6 @@ export function RouteSafetyTab({ tabBar, tabsId }: TravelTabProps) {
   const avoided = useAvoidedSystems((s) => s.value);
   const avoidedEnabled = useAvoidedSystemsEnabled((s) => s.value);
   const [avoidTarget, setAvoidTarget] = useState<AvoidTarget | null>(null);
-  // The trip's own start and stops cannot be avoided; a system already on an
-  // active list has nothing to add. The preview covers the whole trip, so the
-  // leg it was asked from does not matter.
   const avoidAction = (_leg: RouteSafetyLeg, row: RouteSafetyRow) =>
     row.systemId === fromId ||
     stops.includes(row.systemId) ||
@@ -361,7 +280,6 @@ export function RouteSafetyTab({ tabBar, tabsId }: TravelTabProps) {
       ? null
       : () => setAvoidTarget({ systemId: row.systemId, name: routeSystemName(row) });
 
-  // "Incursions near you": its Route adds the staging system as the trip's next stop.
   const focusAfterCommit = useFocusAfterCommit();
   const focusStopsOnChange = useRef(false);
   const incursionRouteAction = (systemId: number): RouteAction =>
@@ -382,8 +300,6 @@ export function RouteSafetyTab({ tabBar, tabsId }: TravelTabProps) {
     );
     focusStopsOnChange.current = true;
   };
-  // Focus follows the stop to where it landed (§7), once the link's new stops
-  // have rendered; a folded phone panel falls back to the panel itself.
   useEffect(() => {
     if (!focusStopsOnChange.current) return;
     focusStopsOnChange.current = false;
@@ -433,9 +349,7 @@ export function RouteSafetyTab({ tabBar, tabsId }: TravelTabProps) {
             fromId={fromId}
             fromName={fromId === null ? fromTrigger : nameOf(fromId)}
             fromTrigger={fromTrigger}
-            // A new start is a new first leg: its pin no longer applies.
             onFromChange={(systemId) => setParams({ from: systemId, pin: [] }, { push: true })}
-            // Back to the game location: drop the link's start and any pick.
             onFromReset={
               params.from !== null || current.source === 'picked'
                 ? () => {
@@ -448,12 +362,9 @@ export function RouteSafetyTab({ tabBar, tabsId }: TravelTabProps) {
             onStopsChange={(next, picked) => {
               if (picked) rememberStation(picked.id, picked.name);
               setParams(
-                // Pins belong to legs by position: a new stop list drops them,
-                // but the first stop keeps the pin a hole's Use in route made for it.
                 { stops: next, to: null, ...(stops.length > 0 ? { pin: [] } : {}) },
                 { push: true }
               );
-              // The destination field this stop came from unmounts with it: focus follows to the list (§7).
               if (stops.length === 0 && next.length > 0) focusStopsOnChange.current = true;
             }}
             settings={settings}
@@ -487,8 +398,6 @@ export function RouteSafetyTab({ tabBar, tabsId }: TravelTabProps) {
             setParams({ pref: null });
           }}
         />
-        {/* The route needs ~612px, so the rules rail sits beside it only from `xl` (#2591);
-          below it the rail stacks under the route. */}
         <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
           <div className="min-w-0 space-y-4">
             <RouteBody
@@ -554,7 +463,6 @@ export function RouteSafetyTab({ tabBar, tabsId }: TravelTabProps) {
           originId={fromId}
           routeQuery={routeQuery}
           onUse={(holeId) => {
-            // Hole jumps are switched on in the link alone (never saved): a hole is only known while they are on.
             setParams({ wh: true, pin: pinFirstLeg(params.pin, holeId) }, { push: true });
             setTheraOpen(false);
           }}
@@ -585,14 +493,12 @@ function RouteBody({
   jumpUnavailable,
 }: {
   state: ReturnType<typeof useRouteSafety>;
-  /** Jump legs are on but the system map could not be read: say the route has none. */
   jumpUnavailable: boolean;
   multiStop: boolean;
   nameOf: (systemId: number) => string;
   killsOf: (systemId: number) => RouteKillsCell;
   avoidAction: (leg: RouteSafetyLeg, row: RouteSafetyRow) => (() => void) | null;
   holesState: RouteHolesState;
-  /** A leg is pinned: an incomplete route asks for the stop a Use in route pin left open. */
   pinned: boolean;
   onUse: (index: number, pin: string | null) => void;
 } & Pick<LegWaysProps, 'bridges' | 'onSetUpBridges'>) {
@@ -692,7 +598,6 @@ function RouteBody({
               </LegBody>
             ) : (
               <TripLegs
-                // A new order is a new itinerary: it opens on its own first leg.
                 key={state.legs.map((leg) => `${leg.from}-${leg.to}`).join(',')}
                 legs={state.legs}
                 nameOf={nameOf}

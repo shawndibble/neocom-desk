@@ -7,7 +7,6 @@ import { IskFlowChart } from './IskFlowChart';
 import { useJournalFlowChartHidden } from './journalFlowChartPref';
 import { EMPTY_WALLET_JOURNAL_FILTER } from './walletJournalFilter';
 
-// recharts has no layout in jsdom: swap the bars for a stub that exposes the click.
 vi.mock('./IskFlowChartBars', () => ({
   default: ({
     days,

@@ -1,17 +1,8 @@
-/**
- * The Firestore emulator as the specs reach it: wipe it, write a seeded book, read a doc back.
- *
- * Plain REST with the emulator's owner token (`Bearer owner`), which bypasses the rules the
- * browser reads through: a seed writes what the server would have stored, and nothing in the
- * app's own write path. The value encoding is Firestore's REST wire format, as
- * `appraisalSharedNarrow.spec.ts` builds it for a mocked read.
- */
 import { FIRESTORE, PROJECT_ID } from './runEnv';
 
 const ROOT = `projects/${PROJECT_ID}/databases/(default)/documents`;
 const OWNER = { Authorization: 'Bearer owner', 'content-type': 'application/json' };
 
-/** One stored document: its path under the database root and its fields. */
 export interface SeedDoc {
   path: string;
   data: Record<string, unknown>;
@@ -61,7 +52,6 @@ async function ok(response: Response, what: string): Promise<Response> {
   return response;
 }
 
-/** Deletes every document in the emulator: each test starts from an empty database. */
 export async function wipeFirestore(): Promise<void> {
   await ok(
     await fetch(`${FIRESTORE}/emulator/v1/${ROOT}`, { method: 'DELETE' }),
@@ -69,7 +59,6 @@ export async function wipeFirestore(): Promise<void> {
   );
 }
 
-/** Writes the docs as one batch per 400 (the emulator takes 500 writes a commit). */
 export async function writeDocs(docs: readonly SeedDoc[]): Promise<void> {
   for (let i = 0; i < docs.length; i += 400) {
     const writes = docs.slice(i, i + 400).map((doc) => ({
@@ -86,7 +75,6 @@ export async function writeDocs(docs: readonly SeedDoc[]): Promise<void> {
   }
 }
 
-/** A stored document's fields, or null when there is none. */
 export async function readDoc(path: string): Promise<Record<string, unknown> | null> {
   const response = await fetch(`${FIRESTORE}/v1/${ROOT}/${path}`, { headers: OWNER });
   if (response.status === 404) return null;
@@ -96,7 +84,6 @@ export async function readDoc(path: string): Promise<Record<string, unknown> | n
   return fromWire({ mapValue: { fields: body.fields ?? {} } }) as Record<string, unknown>;
 }
 
-/** Every document of a collection, by id. */
 export async function readCollection(path: string): Promise<Map<string, Record<string, unknown>>> {
   const out = new Map<string, Record<string, unknown>>();
   let pageToken = '';

@@ -1,10 +1,3 @@
-/**
- * "What to train": each +1 skill level that changes the open Fitting, with
- * its whole-Fitting delta (`engine/fittings/skillGains.ts`). The candidates
- * come from one sources pass; each is then worked out on its own, handing
- * off the main thread, and the run is keyed on the evaluator
- * so a Fitting or Character change mid-way never shows the old fit's rows.
- */
 import { useEffect, useState } from 'react';
 import {
   evaluateSkillGains,
@@ -14,10 +7,8 @@ import {
 import type { SkillGainEvaluator } from './useFittingEvaluation';
 
 export interface SkillGainsState {
-  /** Null while working out (or with no evaluator); in candidate order — the panel ranks them. */
   gains: SkillGain[] | null;
   loading: boolean;
-  /** The sources pass itself failed, so there is nothing to rank. */
   failed: boolean;
 }
 
@@ -40,7 +31,6 @@ export function useSkillGains(evaluator: SkillGainEvaluator | null): SkillGainsS
         return;
       }
       const candidates = skillGainCandidates(sourceIds, evaluator.profile.skillLevels);
-      // One +1 level at a time, as Variations does; each `compare` runs in the worker.
       const gains = await evaluateSkillGains(
         candidates,
         (skillTypeId, level) => evaluator.compare(skillTypeId, level, controller.signal),

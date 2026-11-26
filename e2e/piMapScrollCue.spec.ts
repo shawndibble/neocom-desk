@@ -1,7 +1,3 @@
-/**
- * PI Map: a board wider than its panel shows an edge chevron so the clipped
- * columns are discoverable; nothing changes when it fits or on a phone.
- */
 import type { Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';

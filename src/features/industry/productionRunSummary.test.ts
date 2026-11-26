@@ -77,21 +77,19 @@ describe('summarizeProductionRun with losses', () => {
     expect(s.profit.profit).toBe(-550_000);
   });
 
-  it('writes lost units off open inventory and counts insurance as proceeds', () => {
-    const s = summarizeProductionRun(run(), [], [], {}, undefined, [
-      loss({ quantity: 4, insurancePayout: 100_000 }),
-    ]);
+  it('writes lost units off open inventory and keeps the full run cost in profit', () => {
+    const s = summarizeProductionRun(run(), [], [], {}, undefined, [loss({ quantity: 4 })]);
     expect(s.quantityLost).toBe(4);
     expect(s.remaining).toBe(6);
     expect(s.openInventoryValue).toBe(330_000);
-    expect(s.profit.profit).toBe(-450_000);
+    expect(s.profit.profit).toBe(-550_000);
     expect(s.status).toBe('open');
   });
 
   it('sums several loss records and closes the run once sold plus lost covers it', () => {
     const s = summarizeProductionRun(run(), [saleLink({ quantity: 3 })], [], {}, undefined, [
       loss({ quantity: 4 }),
-      loss({ id: '1:loss:2', quantity: 3, insurancePayout: 50_000 }),
+      loss({ id: '1:loss:2', quantity: 3 }),
     ]);
     expect(s.quantityLost).toBe(7);
     expect(s.remaining).toBe(0);
@@ -111,7 +109,7 @@ describe('summarizeProductionRun', () => {
     expect(summary.status).toBe('new');
     expect(summary.quantitySold).toBe(0);
     expect(summary.remaining).toBe(10);
-    expect(summary.openInventoryValue).toBe(550_000); // 10 units @ 55,000/unit
+    expect(summary.openInventoryValue).toBe(550_000);
   });
 
   it('is "open" once partially sold, with open inventory valued at cost basis for the rest', () => {
@@ -133,7 +131,7 @@ describe('summarizeProductionRun', () => {
     const summary = summarizeProductionRun(
       run(),
       [saleLink({ quantity: 3 })],
-      [orderWatch({ initialVolumeRemain: 5, lastKnownVolumeRemain: 2 })], // filled 3
+      [orderWatch({ initialVolumeRemain: 5, lastKnownVolumeRemain: 2 })],
       {}
     );
     expect(summary.quantitySold).toBe(6);
@@ -160,7 +158,6 @@ describe('summarizeProductionRun', () => {
         [SKILL_IDS.accounting]: 5,
       }
     );
-    // salesTaxPct(5) = 3.375%, so tax on 1,000,000 = 33,750
     expect(summary.profit.salesTax).toBeCloseTo(33_750, 5);
   });
 

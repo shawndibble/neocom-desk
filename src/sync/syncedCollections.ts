@@ -1,25 +1,3 @@
-// The synced collection registry (issue #2043): one declaration per
-// collection that leaves this device for Firestore under
-// /characters/{uid}/{remoteName}, in the style of `esi/registry.ts`'s
-// ESI_REGISTRY and the Notification Event Entries.
-//
-// Every per-collection list the app used to keep by hand derives from here:
-// the sync pass and the ownerHash-change wipe (planSync.ts), the tombstone
-// keys and their cleanup (localBookkeeping.ts), the local delete on Character removal
-// (features/character/removeCharacter.ts), the tables an encrypted device
-// backup carries (backup/io.ts), and the "What We Store" commitment
-// (features/faq/whatWeStore.ts).
-//
-// Pure declaration: no Firebase and no Dexie *runtime* import, so every one of
-// those — including the Firebase-free ones kept off the ~160 KB Firebase
-// chunk (see index.ts) — can import it synchronously. Consumers reach a
-// declaration's Dexie table through `db.table(collection.table)`.
-//
-// Adding a collection here is not the whole job. `firestore.rules` and
-// `firestore.indexes.json` stay hand-written and deployed by hand;
-// `syncedCollections.test.ts` fails until both cover the new collection.
-// A new Dexie table still needs its own new `db.version()` block.
-
 import type { Table } from 'dexie';
 import type {
   BuildPlanRecord,
@@ -28,6 +6,7 @@ import type {
   FittingRecord,
   MiningTaxAssignmentRecord,
   MiningTaxPaymentLinkRecord,
+  MiningTaxRecordChangeRecord,
   NetWorthSnapshotRecord,
   PayeeRecord,
   PlanetRichnessRecord,
@@ -47,6 +26,7 @@ import type {
   RemoteFittingDoc,
   RemoteMiningTaxAssignmentDoc,
   RemoteMiningTaxPaymentLinkDoc,
+  RemoteMiningTaxRecordChangeDoc,
   RemotePayeeDoc,
   RemotePlanDoc,
   RemotePlanetRichnessDoc,
@@ -61,12 +41,6 @@ import type {
   SyncRecord,
 } from './merge';
 
-/**
- * The "What We Store" line (features/faq/whatWeStore.ts) that tells the pilot
- * about a collection. Several collections share one line on purpose — a
- * reader wants "Production Runs, and the sales and orders you linked to
- * them", not three bullets.
- */
 export type SyncedFaqItemId =
   | 'skillPlans'
   | 'buildPlans'
@@ -81,12 +55,6 @@ export type SyncedFaqItemId =
   | 'notificationFeed'
   | 'settings';
 
-/**
- * Every collection's `remoteName`, spelled out so a mutation site can name the
- * one it touched (`scheduleSync(id, { collections: [...] })`, issue #4896)
- * and a typo fails to compile. `syncedCollections.test.ts` pins it to
- * {@link REMOTE_COLLECTION_NAMES}.
- */
 export type SyncedCollectionName =
   | 'plans'
   | 'buildPlans'
@@ -103,89 +71,50 @@ export type SyncedCollectionName =
   | 'fittings'
   | 'miningTaxAssignments'
   | 'miningTaxPaymentLinks'
+  | 'miningTaxRecordChanges'
   | 'notificationFeed'
   | 'settings';
 
-/** Minimum shape of a row in an editable collection's Dexie table. */
 export interface EditableRecord extends SyncRecord {
   characterId: number;
 }
 
 type Db = typeof db;
 
-/** Dexie tables whose rows are `L` — so a declaration cannot name the wrong table. */
 type TableOf<L> = {
   [K in keyof Db]: Db[K] extends Table<L, string, unknown> ? K : never;
 }[keyof Db];
 
 interface RemoteCollectionBase {
-  /**
-   * Firestore subcollection under /characters/{uid}. Byte-identical to what
-   * is already stored and to its `firestore.rules` block — never rename.
-   */
   remoteName: SyncedCollectionName;
   faqItem: SyncedFaqItemId;
 }
 
-/**
- * One piece of Editable Data (GLOSSARY.md) synced record-by-record:
- * last-write-wins per id, deletions carried by tombstones (merge.ts).
- *
- * Mappings are method signatures on purpose, so a typed declaration can sit
- * in the erased {@link EDITABLE_COLLECTIONS} list.
- */
 export interface EditableCollection<
   L extends EditableRecord = EditableRecord,
   R extends RemoteDoc = RemoteDoc,
 > extends RemoteCollectionBase {
   kind: 'editable';
-  /** Dexie table holding this collection's rows. */
   table: TableOf<L> & string;
-  /**
-   * Device-local tombstone list key segment: `sync.__<segment>.<characterId>`
-   * (`localBookkeeping.tombstoneKey`). Pinned verbatim — tombstones already
-   * on a device are read back under exactly this key, and the older ones do
-   * not follow a pattern (`plans` is plain `tombstones`).
-   */
   tombstoneSegment: string;
-  /**
-   * A collection newer than the deployed rules may be: a pull or push the rules refuse
-   * (`permission-denied`) reads as "not ready yet", never as a sync error. Its rows stay in
-   * Dexie and the next pass tries again.
-   */
   rulesMayLag?: true;
-  /**
-   * What removing a Character (features/character/removeCharacter.ts) does
-   * to this table's local rows. A change of owner (planSync's
-   * handleOwnerHashChange) always wipes every editable collection.
-   */
   onRemoval: 'delete' | 'keep';
-  /** Full remote doc payload for a local record (explicit field list — never spread). */
   toRemoteDoc(local: L, ownerHash: string): Record<string, unknown>;
-  /** Local record from a remote doc, stripping remote-only fields. */
   toLocalRecord(remote: R): L;
 }
 
-/** A remote collection that does not sync through the editable-record merge. */
 export interface FeedOrSettingsCollection extends RemoteCollectionBase {
-  /**
-   * `feed`: the Notification Feed — no tombstones, merged on dismissal
-   * (feedSync's syncFeed). `settings`: the synced settings allow-list, one
-   * global set with its own tombstones (planSync's syncCharacter).
-   */
   kind: 'feed' | 'settings';
 }
 
 export type SyncedCollection = EditableCollection | FeedOrSettingsCollection;
 
-/** Identity helper: exists only to check a declaration against its record type. */
 function defineEditableCollection<L extends EditableRecord, R extends RemoteDoc>(
   collection: EditableCollection<L, R>
 ): EditableCollection<L, R> {
   return collection;
 }
 
-/** Skill Plans. */
 export const SKILL_PLANS = defineEditableCollection<SkillPlanRecord, RemotePlanDoc>({
   kind: 'editable',
   remoteName: 'plans',
@@ -199,22 +128,12 @@ export const SKILL_PLANS = defineEditableCollection<SkillPlanRecord, RemotePlanD
     name: p.name,
     entries: p.entries,
     remapCount: p.remapCount,
-    // Firestore rejects undefined values, so optional fields are omitted.
     ...(p.markers !== undefined ? { markers: p.markers } : {}),
     ...(p.markerAttributes !== undefined ? { markerAttributes: p.markerAttributes } : {}),
-    // The lenses the plan is costed under (What-If Implants, Booster) are
-    // part of the plan, not a per-device view preference, so they travel
-    // with it. Same omit-when-absent rule; a Booster's own `expiresAt` is
-    // `number | null`, and null is a value Firestore stores happily.
     ...(p.whatIfImplants !== undefined ? { whatIfImplants: p.whatIfImplants } : {}),
     ...(p.boosters !== undefined
       ? {
           boosters: p.boosters,
-          // Legacy compat for one release (#1407): a device still on the
-          // single-Booster build reads only `booster`. An empty list is
-          // itself an answer ("no accelerators"), so it writes a disabled
-          // row rather than omitting the key — omitting it would let an
-          // older build's own prefill logic re-arm.
           booster: p.boosters[0] ?? { enabled: false, bonus: 0, startsAt: null, expiresAt: null },
         }
       : p.booster !== undefined
@@ -241,7 +160,6 @@ export const SKILL_PLANS = defineEditableCollection<SkillPlanRecord, RemotePlanD
   }),
 });
 
-/** Build Plans. */
 export const BUILD_PLANS = defineEditableCollection<BuildPlanRecord, RemoteBuildPlanDoc>({
   kind: 'editable',
   remoteName: 'buildPlans',
@@ -250,8 +168,6 @@ export const BUILD_PLANS = defineEditableCollection<BuildPlanRecord, RemoteBuild
   onRemoval: 'delete',
   faqItem: 'buildPlans',
   toRemoteDoc: (p, ownerHash) => {
-    // Firestore rejects undefined at any depth, so the map is normalized (empty
-    // and undefined-valued entries dropped) before it can reach a setDoc.
     const materialSourcing = normalizeMaterialSourcingMap(p.materialSourcing);
     return {
       id: p.id,
@@ -262,22 +178,12 @@ export const BUILD_PLANS = defineEditableCollection<BuildPlanRecord, RemoteBuild
       me: p.me,
       te: p.te,
       facility: p.facility,
-      // Always the normalized fit, never the legacy `rigLevel` — a self-heal
-      // that means a record pushed by this build is never behind a device
-      // still reading the pre-#609 shape only, and repeated pushes converge
-      // on one shape even if the local record still carries stale `rigLevel`.
       rigFit: resolveRigFit(p),
       security: p.security,
       hubId: p.hubId,
-      // One fact, routed as one pair: the id is what the fee is charged at and
-      // the name is what labels it, so a half-pair would label the cost index
-      // with a system it was not charged at. A half-pair syncs as neither,
-      // which falls the plan back to its hub — wrong, but not lying.
       ...(p.buildSystemId !== undefined && p.buildSystemName !== undefined
         ? { buildSystemId: p.buildSystemId, buildSystemName: p.buildSystemName }
         : {}),
-      // Independent, unlike the system pair above: an id whose name ESI
-      // withheld still travels, and the picker composes the stand-in label.
       ...(p.buildLocationId !== undefined ? { buildLocationId: p.buildLocationId } : {}),
       ...(p.buildLocationName !== undefined ? { buildLocationName: p.buildLocationName } : {}),
       ...(p.facilityTaxPct !== undefined ? { facilityTaxPct: p.facilityTaxPct } : {}),
@@ -289,22 +195,8 @@ export const BUILD_PLANS = defineEditableCollection<BuildPlanRecord, RemoteBuild
       ...(materialSourcing !== undefined ? { materialSourcing } : {}),
       ...(p.ownedStockScope !== undefined ? { ownedStockScope: p.ownedStockScope } : {}),
       ...(p.includeCorpAssets !== undefined ? { includeCorpAssets: p.includeCorpAssets } : {}),
-      // An empty selection is omitted rather than pushed as [], so a plan that
-      // expanded a row and collapsed it again is byte-identical to one that
-      // never did — the same rule materialSourcing follows above.
       ...(p.buildHere !== undefined && p.buildHere.length > 0 ? { buildHere: p.buildHere } : {}),
-      // Build Group membership (issue #626). Easy to forget and impossible to
-      // notice: `RemoteBuildPlanDoc` derives from `BuildPlanRecord`, so a new
-      // field appears on the remote type for free and omitting it here
-      // compiles clean — while being silently dropped on push *and* pull.
-      // planSync.test.ts's `fullBuildPlan` is `Required<BuildPlanRecord>` and
-      // its key list is pinned, so a new field fails there until it is routed
-      // here deliberately.
       ...(p.buildGroupId !== undefined ? { buildGroupId: p.buildGroupId } : {}),
-      // Include Reactions / Reaction Location (issue #698) — same
-      // present-or-omitted convention as the plan's own location fields
-      // above, and the same buildSystemId/Name pairing rule, since the
-      // Reaction Location mirrors the primary location one-for-one.
       ...(p.includeReactions !== undefined ? { includeReactions: p.includeReactions } : {}),
       ...(p.reactionFacility !== undefined ? { reactionFacility: p.reactionFacility } : {}),
       ...(p.reactionRigFit !== undefined ? { reactionRigFit: p.reactionRigFit } : {}),
@@ -338,8 +230,6 @@ export const BUILD_PLANS = defineEditableCollection<BuildPlanRecord, RemoteBuild
     me: r.me,
     te: r.te,
     facility: r.facility,
-    // Migrates a remote doc from an older device that still only carries the
-    // legacy `rigLevel` (see the analogous note in `toRemoteDoc` above).
     rigFit: resolveRigFit(r),
     security: r.security,
     hubId: r.hubId,
@@ -382,7 +272,6 @@ export const BUILD_PLANS = defineEditableCollection<BuildPlanRecord, RemoteBuild
   }),
 });
 
-/** The Quickbar: one record per Character, never deleted (only emptied), so its tombstone list stays empty in practice — kept because every editable collection syncs through the same tombstone-aware merge. */
 const QUICKBARS = defineEditableCollection<QuickbarRecord, RemoteQuickbarDoc>({
   kind: 'editable',
   remoteName: 'quickbars',
@@ -406,7 +295,6 @@ const QUICKBARS = defineEditableCollection<QuickbarRecord, RemoteQuickbarDoc>({
   }),
 });
 
-/** Station Pins (issue #84). Account-wide rows fan out one per Character — see `planSync.setAccountStationPin`. */
 export const STATION_PINS = defineEditableCollection<StationPinRecord, RemoteStationPinDoc>({
   kind: 'editable',
   remoteName: 'stationPins',
@@ -432,7 +320,6 @@ export const STATION_PINS = defineEditableCollection<StationPinRecord, RemoteSta
   }),
 });
 
-/** A planet's resource ranking (issue #425), account-wide by fan-out. */
 export const PLANET_RICHNESS = defineEditableCollection<
   PlanetRichnessRecord,
   RemotePlanetRichnessDoc
@@ -461,7 +348,6 @@ export const PLANET_RICHNESS = defineEditableCollection<
   }),
 });
 
-/** A logged Production Run (issue #525): a locked financial snapshot. */
 export const PRODUCTION_RUNS = defineEditableCollection<
   ProductionRunRecord,
   RemoteProductionRunDoc
@@ -502,7 +388,6 @@ export const PRODUCTION_RUNS = defineEditableCollection<
   }),
 });
 
-/** One past sale linked to a Production Run (issue #525) — its own document, so two devices linking different sales never collide. */
 export const PRODUCTION_SALE_LINKS = defineEditableCollection<
   ProductionSaleLinkRecord,
   RemoteProductionSaleLinkDoc
@@ -517,8 +402,6 @@ export const PRODUCTION_SALE_LINKS = defineEditableCollection<
     id: r.id,
     characterId: r.characterId,
     runId: r.runId,
-    // Firestore rejects undefined values, so a manual entry's absent
-    // transactionId is omitted rather than sent as null.
     ...(r.transactionId !== undefined ? { transactionId: r.transactionId } : {}),
     quantity: r.quantity,
     unitPrice: r.unitPrice,
@@ -539,7 +422,6 @@ export const PRODUCTION_SALE_LINKS = defineEditableCollection<
   }),
 });
 
-/** One open sell order watched for a Production Run (issue #525) — its own document, like a sale link. */
 export const PRODUCTION_ORDER_WATCHES = defineEditableCollection<
   ProductionOrderWatchRecord,
   RemoteProductionOrderWatchDoc
@@ -578,7 +460,6 @@ export const PRODUCTION_ORDER_WATCHES = defineEditableCollection<
   }),
 });
 
-/** One Run Loss for a Production Run (issue #2851) — its own document, like a sale link. */
 export const PRODUCTION_LOSSES = defineEditableCollection<
   ProductionLossRecord,
   RemoteProductionLossDoc
@@ -596,7 +477,6 @@ export const PRODUCTION_LOSSES = defineEditableCollection<
     quantity: r.quantity,
     lostAt: r.lostAt,
     insurancePayout: r.insurancePayout,
-    // Firestore rejects undefined, so the optional fields are only written when set.
     ...(r.journalEntryId !== undefined ? { journalEntryId: r.journalEntryId } : {}),
     ...(r.note !== undefined ? { note: r.note } : {}),
     createdAt: r.createdAt,
@@ -618,7 +498,6 @@ export const PRODUCTION_LOSSES = defineEditableCollection<
   }),
 });
 
-/** Moon Mining Tax Payees (issue #523). */
 export const PAYEES = defineEditableCollection<PayeeRecord, RemotePayeeDoc>({
   kind: 'editable',
   remoteName: 'payees',
@@ -656,7 +535,6 @@ export const PAYEES = defineEditableCollection<PayeeRecord, RemotePayeeDoc>({
   }),
 });
 
-/** My Fittings (issue #1538). */
 export const FITTINGS = defineEditableCollection<FittingRecord, RemoteFittingDoc>({
   kind: 'editable',
   remoteName: 'fittings',
@@ -669,7 +547,6 @@ export const FITTINGS = defineEditableCollection<FittingRecord, RemoteFittingDoc
     characterId: f.characterId,
     name: f.name,
     code: f.code,
-    // Firestore rejects `undefined`, so "no notes" travels as an empty string.
     notes: f.notes ?? '',
     updatedAt: f.updatedAt,
     ownerHash,
@@ -685,7 +562,6 @@ export const FITTINGS = defineEditableCollection<FittingRecord, RemoteFittingDoc
   }),
 });
 
-/** Moon Mining Tax Assignments (issue #523). */
 export const MINING_TAX_ASSIGNMENTS = defineEditableCollection<
   MiningTaxAssignmentRecord,
   RemoteMiningTaxAssignmentDoc
@@ -746,7 +622,6 @@ export const MINING_TAX_ASSIGNMENTS = defineEditableCollection<
   }),
 });
 
-/** Made Payments linked to a Payee (decision 20261120-235011). */
 export const MINING_TAX_PAYMENT_LINKS = defineEditableCollection<
   MiningTaxPaymentLinkRecord,
   RemoteMiningTaxPaymentLinkDoc
@@ -786,7 +661,36 @@ export const MINING_TAX_PAYMENT_LINKS = defineEditableCollection<
   }),
 });
 
-/** One Character's net worth on one UTC day (issue #2865) — numbers only, one document per day. */
+function recordChangeFields(r: MiningTaxRecordChangeRecord) {
+  return {
+    id: r.id,
+    characterId: r.characterId,
+    reason: r.reason,
+    at: r.at,
+    date: r.date,
+    ...(r.corporationId !== undefined ? { corporationId: r.corporationId } : {}),
+    ...(r.minerId !== undefined ? { minerId: r.minerId } : {}),
+    ...(r.closeOut !== undefined ? { closeOut: r.closeOut } : {}),
+    ...(r.assignments !== undefined ? { assignments: r.assignments } : {}),
+    updatedAt: r.updatedAt,
+  };
+}
+
+export const MINING_TAX_RECORD_CHANGES = defineEditableCollection<
+  MiningTaxRecordChangeRecord,
+  RemoteMiningTaxRecordChangeDoc
+>({
+  kind: 'editable',
+  remoteName: 'miningTaxRecordChanges',
+  table: 'miningTaxRecordChanges',
+  tombstoneSegment: 'miningTaxRecordChangeTombstones',
+  rulesMayLag: true,
+  onRemoval: 'delete',
+  faqItem: 'miningTax',
+  toRemoteDoc: (r, ownerHash) => ({ ...recordChangeFields(r), ownerHash, deleted: false }),
+  toLocalRecord: (r) => recordChangeFields(r),
+});
+
 const NET_WORTH_SNAPSHOTS = defineEditableCollection<
   NetWorthSnapshotRecord,
   RemoteNetWorthSnapshotDoc
@@ -827,7 +731,6 @@ const NET_WORTH_SNAPSHOTS = defineEditableCollection<
   }),
 });
 
-/** One Character's running cerebral accelerator: bonus and expiry, one document per Character. */
 export const CHARACTER_ACCELERATORS = defineEditableCollection<
   CharacterAcceleratorRecord,
   RemoteCharacterAcceleratorDoc
@@ -856,11 +759,6 @@ export const CHARACTER_ACCELERATORS = defineEditableCollection<
   }),
 });
 
-/**
- * Every editable collection, **in sync order**: syncCharacter walks this list
- * one collection at a time and a throw stops the pass, so the order is
- * behavior.
- */
 export const EDITABLE_COLLECTIONS: readonly EditableCollection[] = [
   SKILL_PLANS,
   BUILD_PLANS,
@@ -877,27 +775,21 @@ export const EDITABLE_COLLECTIONS: readonly EditableCollection[] = [
   FITTINGS,
   MINING_TAX_ASSIGNMENTS,
   MINING_TAX_PAYMENT_LINKS,
+  MINING_TAX_RECORD_CHANGES,
 ];
 
-/** The Notification Feed's remote copy (issue #362). Device-local archive, synced window only. */
 export const NOTIFICATION_FEED: FeedOrSettingsCollection = {
   kind: 'feed',
   remoteName: 'notificationFeed',
   faqItem: 'notificationFeed',
 };
 
-/** Synced settings: the `sync.`-prefixed keys on `syncedSettings.ts`'s allow-list. */
 export const SYNCED_SETTINGS: FeedOrSettingsCollection = {
   kind: 'settings',
   remoteName: 'settings',
   faqItem: 'settings',
 };
 
-/**
- * Every collection a Character owns remotely — the authoritative answer to
- * "what leaves this device" (the "What We Store" section is a promise to the
- * pilot about exactly this set).
- */
 export const REMOTE_COLLECTIONS: readonly SyncedCollection[] = [
   ...EDITABLE_COLLECTIONS,
   NOTIFICATION_FEED,

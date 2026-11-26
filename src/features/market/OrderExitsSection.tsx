@@ -20,7 +20,6 @@ import { computeSellThrough } from './orderScopeState';
 import { CopyablePrice } from './CopyablePrice';
 import { marketIskTone, signedMarketIsk } from '@/lib/signedIsk';
 
-/** Short label for an exit's kind in the "Other ways out" disclosure's trailing read — distinct from the exit's own full sentence, which states the price rather than the net. */
 const EXIT_SHORT_KEY: Record<OrderExitKind, string> = {
   hold: 'exitShortHold',
   undercutStation: 'exitShortUndercutStation',
@@ -28,7 +27,6 @@ const EXIT_SHORT_KEY: Record<OrderExitKind, string> = {
   reprocess: 'exitShortReprocess',
 };
 
-/** "Other ways out" (sell orders only): hold, undercut, dump, reprocess and the hub haul gaps. */
 export function OrderExitsSection({
   row,
   deep,
@@ -57,7 +55,6 @@ export function OrderExitsSection({
     buyJumps,
     reprocessing: reprocessing && { ...reprocessing, refining: refiningSetup },
   });
-  // Named only when it moved the number: never on scrap (f4b5a3f5).
   const refineImplantPct = reprocessing
     ? appliedRefiningImplantPct(reprocessing.modifiers, reprocessing.entry.specialisationSkillID)
     : 0;
@@ -111,11 +108,6 @@ export function OrderExitsSection({
               return (
                 <p key={exit.kind} className="flex items-baseline justify-between gap-3">
                   <span className="text-text-dim">
-                    {/*
-                              Only the undercut exit is a price to TYPE somewhere —
-                              hold, dump and reprocess are all facts already true,
-                              not suggestions — so only its label is click-to-copy.
-                            */}
                     {exit.kind === 'undercutStation' ? (
                       <CopyablePrice price={exit.price}>{exitLabel}</CopyablePrice>
                     ) : (
@@ -131,12 +123,6 @@ export function OrderExitsSection({
               );
             })
           )}
-          {/*
-                    Hauling is a gap and a distance, never a net: what a hub pays
-                    is knowable, what a courier charges is not. The rows survive a
-                    missing Order Floor for the same reason — "Amarr bids more
-                    than anyone here" needs no cost basis behind it.
-                  */}
           <div className="border-t border-line pt-1.5">
             <p className={eyebrowClassName}>{t('market.orders.exitHaulTitle')}</p>
             {hubs === undefined ? (
@@ -178,12 +164,6 @@ export function OrderExitsSection({
           )}
           {refine && (
             <>
-              {/*
-                        The assumption, stated rather than folded into the number:
-                        a structure's own reprocessing rate, its rigs and the
-                        standings-based station tax are not readable from ESI, so
-                        this prices a plain NPC station with no tax deducted.
-                      */}
               <p className="text-text-dim">
                 {t('market.orders.exitReprocessAssumption', {
                   rate: formatPercent(refiningSetup.stationRate, false),

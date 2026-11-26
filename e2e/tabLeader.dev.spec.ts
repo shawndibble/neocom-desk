@@ -1,31 +1,9 @@
-/**
- * Tab Leader election (`src/lib/tabLeader.ts`, GLOSSARY.md) against real Web
- * Locks, which its unit tests fake. Every page in one BrowserContext shares
- * the origin's lock manager, so two pages here are two tabs of the app.
- *
- * Two probes, read together:
- * - `navigator.locks.query()` is the browser's own account of who holds and
- *   who waits for `neocom:leader:<job>` — the ground truth, but it names
- *   holders only by an opaque client id.
- * - `isLeader()` of a seat joined on the page's own election singleton, via
- *   the dev server's copy of the module (the one the app imported), says
- *   which page that holder is.
- *
- * The sweep's election is joined by hand. The app only stands for it when
- * cloud sync is configured (`isSyncConfigured`), and E2E blanks Firebase, so
- * without this `neocom:leader:sweep` would never be requested at all.
- *
- * Poller requests are not counted: the first poll waits 10s after mount and
- * then reads nothing unless notifications are switched on, so a count would
- * need both a fake clock and a notification setup this spec does not own.
- */
 import type { BrowserContext, CDPSession, Page } from '@playwright/test';
 import { signInAndGoto } from './support/authSeed';
 import { expect, installMockedNetwork, test } from './support/testBase';
 
 const POLLER_LOCK = 'neocom:leader:poller';
 const SWEEP_LOCK = 'neocom:leader:sweep';
-/** The URL the dev server serves the module at — the same instance the app holds. */
 const TAB_LEADER_MODULE = '/src/lib/tabLeader.ts';
 
 interface Leadership {
@@ -38,13 +16,8 @@ interface LockCounts {
   pending: Record<string, number>;
 }
 
-/**
- * What each second tab let escape to a real host, checked in `afterEach` —
- * the `page` fixture's own guard only covers `page`.
- */
 let secondTabEscapes: string[][] = [];
 
-/** A second tab of the same app, with the same network guard as `page`. */
 async function openTab(context: BrowserContext, baseURL: string): Promise<Page> {
   const tab = await context.newPage();
   secondTabEscapes.push(await installMockedNetwork(tab, baseURL));
@@ -53,36 +26,23 @@ async function openTab(context: BrowserContext, baseURL: string): Promise<Page> 
   return tab;
 }
 
-/**
- * The app shell is up, so the Foreground Poller has already joined its
- * election — a probe before that would start the election itself — and the
- * boot's module and data requests have drained. Without the second half the
- * spec's timings are the dev server's: under parallel workers a page still
- * fetching its modules can take seconds to run a lock callback, and one busy
- * when navigated away from misses the back/forward cache
- * (`TimeoutPuttingInCache`).
- */
 async function layoutMounted(page: Page): Promise<void> {
   await expect(page.getByRole('navigation').first()).toBeVisible({ timeout: 15_000 });
   await page.waitForLoadState('networkidle');
 }
 
-/** Stand this page for the sweep, as `useBackgroundSync` does when sync is configured. */
 async function joinSweep(page: Page): Promise<void> {
   await page.evaluate(async (moduleUrl) => {
-    const tabLeader = await import(/* @vite-ignore */ moduleUrl);
+    const tabLeader = await import(moduleUrl);
     const w = window as unknown as { __e2eSweepSeat?: unknown };
     w.__e2eSweepSeat ??= tabLeader.joinTabElection('sweep', () => {});
   }, TAB_LEADER_MODULE);
 }
 
-/** Whether this page is currently the Tab Leader for each job. */
 async function leadership(page: Page): Promise<Leadership> {
   return page.evaluate(async (moduleUrl) => {
-    const tabLeader = await import(/* @vite-ignore */ moduleUrl);
+    const tabLeader = await import(moduleUrl);
     const w = window as unknown as { __e2eSweepSeat?: { isLeader(): boolean } };
-    // A second seat on the poller's election, left again at once: the
-    // Foreground Poller's own seat keeps that election running regardless.
     const pollerSeat = tabLeader.joinTabElection('poller', () => {});
     const poller: boolean = pollerSeat.isLeader();
     pollerSeat.leave();
@@ -90,16 +50,6 @@ async function leadership(page: Page): Promise<Leadership> {
   }, TAB_LEADER_MODULE);
 }
 
-/**
- * How many clients (tabs) hold, and how many wait for, each leader lock.
- *
- * Clients, not queue entries. Chromium keeps a request aborted in the same
- * task that made it in `query().pending`, and StrictMode's dev-only
- * mount-unmount-mount of the Foreground Poller does exactly that, so each
- * tab's poller queue can carry one dead entry beside its live one. The module
- * already copes (a request granted after its tab gave up releases at once);
- * counting entries would only be counting that browser quirk.
- */
 async function lockCounts(page: Page): Promise<LockCounts> {
   return page.evaluate(
     async (names) => {
@@ -124,11 +74,6 @@ const POLLER_ONLY: Leadership = { poller: true, sweep: false };
 const ONE_EACH = { [POLLER_LOCK]: 1, [SWEEP_LOCK]: 1 };
 const NONE = { [POLLER_LOCK]: 0, [SWEEP_LOCK]: 0 };
 
-/**
- * Lets the spec hide a page: headless Chromium reports every page visible,
- * and nothing Playwright offers changes that. Installed before any app code,
- * so the app's `visibilityState` reads always go through it.
- */
 function controllableVisibility() {
   let hidden = false;
   Object.defineProperty(document, 'visibilityState', {
@@ -148,7 +93,6 @@ async function setHidden(page: Page, hidden: boolean): Promise<void> {
   }, hidden);
 }
 
-/** Two tabs, the first signed in and leading both jobs before the second opens. */
 async function twoTabs(page: Page, baseURL: string) {
   await signInAndGoto(page, './help');
   await layoutMounted(page);
@@ -160,25 +104,11 @@ async function twoTabs(page: Page, baseURL: string) {
   return tab;
 }
 
-// The last test needs the back/forward cache, which Playwright's default
-// launch refuses twice over: it passes `--disable-back-forward-cache`, and the
-// headless shell it runs by default has no cache at all (Chrome reports
-// `BackForwardCacheDisabledForDelegate`). `channel: 'chromium'` runs the full
-// build's new headless mode instead, which CI's `playwright install chromium`
-// already downloads. Both force their own worker, so they can only be set
-// file-wide; the other tests never navigate back, so it is inert for them.
 test.use({
   channel: 'chromium',
   launchOptions: { ignoreDefaultArgs: ['--disable-back-forward-cache'] },
 });
 
-// Slowness note: these stay on the dev server (`import()` of `/src/lib/tabLeader.ts`
-// names which tab holds a lock, which a production bundle cannot offer), and each
-// test cold-boots two app tabs there, so it may run past 10s on a CI shard. They
-// load the light `/help` route to keep that boot short. Do not move them to the
-// built project without another way to read `isLeader()`.
-// Each test boots the app twice and waits for both to settle, and the close
-// handoff alone may take 15s: the default 30s is too tight on a loaded shard.
 test.describe.configure({ timeout: 60_000 });
 
 test.afterEach(() => {
@@ -191,8 +121,6 @@ test.describe('Tab Leader election (real Web Locks)', () => {
   test('exactly one of two visible tabs leads each job', async ({ page, baseURL }) => {
     const tab = await twoTabs(page, baseURL!);
 
-    // The sweep's newcomer queues behind the first tab; the poller's newest
-    // shown tab steals it, and the first tab queues instead (issue #5120).
     await expect.poll(() => lockCounts(tab)).toEqual({ held: ONE_EACH, pending: ONE_EACH });
     expect(await leadership(page)).toEqual(SWEEP_ONLY);
     expect(await leadership(tab)).toEqual(POLLER_ONLY);
@@ -205,10 +133,8 @@ test.describe('Tab Leader election (real Web Locks)', () => {
     await setHidden(page, true);
     await expect.poll(() => leadership(tab)).toEqual(LEADS);
     expect(await leadership(page)).toEqual(FOLLOWS);
-    // The hidden tab dropped its requests rather than queueing behind.
     await expect.poll(() => lockCounts(tab)).toEqual({ held: ONE_EACH, pending: NONE });
 
-    // Visible again, it waits its turn for the sweep but takes the poller back.
     await setHidden(page, false);
     await expect.poll(() => lockCounts(tab)).toEqual({ held: ONE_EACH, pending: ONE_EACH });
     expect(await leadership(tab)).toEqual(SWEEP_ONLY);
@@ -220,9 +146,6 @@ test.describe('Tab Leader election (real Web Locks)', () => {
     await expect.poll(() => lockCounts(tab)).toEqual({ held: ONE_EACH, pending: ONE_EACH });
 
     await page.close();
-    // The browser frees a closed tab's locks when it tears the tab down, which
-    // is usually tens of milliseconds but was seen at 3s under parallel
-    // workers — hence more than the default 5s of headroom.
     await expect.poll(() => leadership(tab), { timeout: 15_000 }).toEqual(LEADS);
     await expect.poll(() => lockCounts(tab)).toEqual({ held: ONE_EACH, pending: NONE });
   });
@@ -240,10 +163,6 @@ test.describe('Tab Leader election (real Web Locks)', () => {
 });
 
 test.describe('Tab Leader across the back/forward cache', () => {
-  // Re-acquisition on restore, not specifically the `pageshow` handler: Chrome
-  // also fires `visibilitychange` to visible on a restore, and with the
-  // module's `pageshow` listener removed this still passes (checked by hand).
-  // The `pageshow` path itself is covered by `src/lib/tabLeader.test.ts`.
   test('a page re-acquires leadership after a back/forward cache restore', async ({ page }) => {
     await page.addInitScript(() => {
       const w = window as unknown as { __e2ePageShows: boolean[] };
@@ -263,12 +182,8 @@ test.describe('Tab Leader across the back/forward cache', () => {
     );
 
     await page.goto('about:blank');
-    // A restore fires no `load`, which is what `goBack` waits for by default.
     await page.goBack({ waitUntil: 'commit' });
 
-    // A restored page keeps its window, so it has seen a second, persisted
-    // `pageshow`; a fresh load would show only its own first one. Polled with
-    // Chrome's reasons alongside, so a miss fails naming why it wasn't cached.
     const pageShows = () =>
       page.evaluate(() => (window as unknown as { __e2ePageShows?: boolean[] }).__e2ePageShows);
     await expect

@@ -47,7 +47,6 @@ describe('employment row flags', () => {
       NOW
     );
 
-    // 300 ran 86d -> now (86d); 200 ran 100d -> 86d (14d); 100 ran 400d -> 100d.
     expect(rows.map((r) => r.shortStay)).toEqual([false, false, false]);
     const tight = deriveEmploymentHistoryRows(
       [ENTRY(1, 100, daysAgo(400)), ENTRY(2, 200, daysAgo(100)), ENTRY(3, 300, daysAgo(87))],
@@ -75,7 +74,6 @@ describe('employment row flags', () => {
   });
 });
 
-// 1_000_125 sits in CCP's NPC corporation id block; 100/200/300 stand in for player corps.
 const NPC = 1_000_125;
 
 describe('NPC corporation stints', () => {
@@ -101,7 +99,6 @@ describe('NPC corporation stints', () => {
       NOW
     );
 
-    // 200: 50d, NPC: 850d, 100: 100d.
     expect(rows.map((r) => r.tenureRatio)).toEqual([0.5, 1, 1]);
   });
 

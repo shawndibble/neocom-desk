@@ -1,8 +1,3 @@
-/**
- * Route Safety › Thera / Turnur modal at 1024px: every column header stays on one line
- * (issue #2605), so the header row is one height and the table still fits its
- * panel with nowrap on.
- */
 import { test, expect } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 import { openTheraModal } from './support/theraModal';
@@ -62,8 +57,6 @@ test('Thera table headers share one line and the table fits its panel at 1024px 
   }
   expect(heights.size).toBe(1);
 
-  // The squeeze that wraps "Life left" needs live route data to reproduce, so
-  // also pin the cause: no header (or its sort button) is allowed to wrap.
   const wraps = await headers.evaluateAll((cells) =>
     cells
       .filter((cell) => cell.textContent?.trim())

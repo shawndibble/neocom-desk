@@ -21,18 +21,9 @@ function readDismissed(characterId: number): CharacterBoardItemKind[] {
 
 interface CalendarReauthNoticeProps {
   characterId: number;
-  /** Sources whose last read came back refused. */
   kinds: readonly CharacterBoardItemKind[];
 }
 
-/**
- * The line above the calendar panes naming sources that need a new login, with
- * the two things a pilot can do about it: log in again, or dismiss it for good.
- *
- * A dismissal is per Character and per source, remembered on this device
- * (storage blocked: it comes back next load). A different source being
- * refused later still shows, since the pilot never dismissed that one.
- */
 export function CalendarReauthNotice({ characterId, kinds }: CalendarReauthNoticeProps) {
   const [dismissed, setDismissed] = useState(() => readDismissed(characterId));
   const [forCharacter, setForCharacter] = useState(characterId);
@@ -53,10 +44,6 @@ export function CalendarReauthNotice({ characterId, kinds }: CalendarReauthNotic
   return <ShownNotice characterId={characterId} shown={shown} onDismiss={dismiss} />;
 }
 
-/**
- * Claims the Character's one re-login slot while it is on screen, so the
- * shell's "Log in again" card stands down instead of stacking above it.
- */
 function ShownNotice({
   characterId,
   shown,

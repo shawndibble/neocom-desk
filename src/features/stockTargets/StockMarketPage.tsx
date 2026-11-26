@@ -1,14 +1,3 @@
-/**
- * One market's **Stock List**: each **Stock Target** against what the pilot
- * has listed there and what waits in their hangar at the same station, worst
- * first (issue #3521).
- *
- * Two views of one list. Manager reads every Stock Target with its Shortfall
- * and how to close it (list from the hangar, then buy or build the rest);
- * Builder keeps only what is left to source and splits it by whether the
- * active Character holds a blueprint, so an industry pilot sees what to build
- * and can hand the lot to a Build Group.
- */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
@@ -74,14 +63,11 @@ import {
 
 type View = 'manager' | 'builder';
 type Dialog = 'rename' | 'change' | 'delete' | 'add' | 'paste' | null;
-/** The status chips plus one for items the hangar can restock. */
 type Filter = StockStatus | 'ready' | null;
 
-/** The group select's "no group" value: Radix Select items cannot hold an empty string. */
 const ALL_GROUPS = '__all__';
 
 export const STOCK_PATH = '/market/stock';
-/** The Stock tab's query param carrying a shared market's code. */
 export const SHARE_PARAM = 'list';
 
 export function StockMarketPage({
@@ -98,7 +84,6 @@ export function StockMarketPage({
   lists: readonly StockList[];
   hub: TradeHub;
   activeCharacterId: number | null;
-  /** "All markets" shows only when there is more than one to go back to. */
   showBack: boolean;
   onSave: (next: StockList[]) => void;
   onDeleted: () => void;
@@ -112,17 +97,14 @@ export function StockMarketPage({
   const [refreshKey, setRefreshKey] = useState(0);
   const [toast, setToast] = useState<string | null>(null);
   const [undoToast, setUndoToast] = useState<{ message: string; onUndo: () => void } | null>(null);
-  // Undo runs after later edits: it must add to the lists as they are then, not as they were.
   const latestLists = useRef(lists);
   useEffect(() => {
     latestLists.current = lists;
   }, [lists]);
-  // A menu item that opens a dialog hands focus back to the ⋮, not to an unmounted item (§6c).
   const menu = useOpenAfterMenu();
 
   const [loaded, setLoaded] = useState<{ key: string; data: StockTargetsData } | null>(null);
   const [failedKey, setFailedKey] = useState<string | null>(null);
-  // Re-read whenever the list's contents, its market or the hub change.
   const loadKey = `${list.id}|${JSON.stringify(list.items)}|${list.locationId}|${hub.id}|${refreshKey}`;
   useEffect(() => {
     let cancelled = false;
@@ -139,19 +121,15 @@ export function StockMarketPage({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `list` and `hub` are captured through `loadKey`, which names everything that changes the result
   }, [loadKey]);
 
-  // Last good rows stay up while a refresh after an edit runs, so the table doesn't flash —
-  // but never another market's rows.
   const data = loaded?.key.startsWith(`${list.id}|`) ? loaded.data : null;
   const loading = loaded?.key !== loadKey && failedKey !== loadKey;
   const failed = failedKey === loadKey && loaded?.key !== loadKey;
   const summary = useMemo(() => (data ? summarizeStock(data.rows) : null), [data]);
-  // Stable between renders: the Manager table's export columns are built from them.
   const groupOf = useCallback((typeId: number) => data?.groups.get(typeId), [data]);
   const nameOf = useCallback(
     (typeId: number) => data?.names.get(typeId) ?? t('common.unknownType', { id: typeId }),
     [data, t]
   );
-  // With one Character the holder is always them: naming them says nothing.
   const characterName = useMemo(
     () =>
       data && data.characterNames.size > 1
@@ -159,13 +137,11 @@ export function StockMarketPage({
         : undefined,
     [data]
   );
-  // Retry unmounts into a spinner: focus waits on the results wrapper instead of the page body.
   const [resultsRef, , holdRetryFocus] = useRetryFocus(
     loading ? 'busy' : failed ? 'failed' : 'ok',
     list.id
   );
 
-  /** Bulk remove acts at once; the toast's Undo puts every removed row back with its own target. */
   function removeMany(typeIds: number[]) {
     const gone = new Set(typeIds);
     const removed = list.items.filter((item) => gone.has(item.typeId));
@@ -270,7 +246,6 @@ export function StockMarketPage({
   const groupNames = [
     ...new Set(rows.map((row) => groupOf(row.typeId)).filter((g): g is string => !!g)),
   ].sort((a, b) => a.localeCompare(b));
-  // An edit can empty the picked group: the filter then lets go rather than hide every row.
   const activeGroup = groupFilter !== null && groupNames.includes(groupFilter) ? groupFilter : null;
   const inGroup = (typeId: number) => activeGroup === null || groupOf(typeId) === activeGroup;
   const matches = (row: (typeof rows)[number], f: Filter) =>
@@ -304,7 +279,6 @@ export function StockMarketPage({
           ‹ {t('stockTargets.markets.back')}
         </Link>
       )}
-      {/* Name wraps in its own column, never under the actions. */}
       <div className="flex items-start gap-2">
         <div className="min-w-0 flex-1">
           <h2
@@ -328,7 +302,6 @@ export function StockMarketPage({
         <Button variant="primary" onClick={() => setDialog('add')}>
           {t('stockTargets.add.open')}
         </Button>
-        {/* Rare actions share one ⋮ (§6c header tier 3). */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <IconButton
@@ -371,7 +344,6 @@ export function StockMarketPage({
         </DropdownMenu>
       </div>
 
-      {/* Manager counts Out, Low and Ready to list on its filter chips; Builder, with no chips, here. */}
       {summary && (
         <StatChips>
           <StatChip
@@ -412,11 +384,9 @@ export function StockMarketPage({
         </p>
       )}
 
-      {/* The switch stays mounted in one place across views, so it keeps focus (§7). */}
       <div className="flex flex-wrap items-center gap-2">
         {viewSwitch}
         {view === 'manager' && rows.length > 0 && (
-          // A phone keeps the status chips to one row that scrolls sideways (§4b), under the switch.
           <div
             role="group"
             aria-label={t('stockTargets.filterLabel')}
@@ -571,7 +541,6 @@ export function StockMarketPage({
   );
 }
 
-/** What the bar's two fills mean: the bar itself is hidden from assistive tech, the numbers say it. */
 function BarLegend({ showJobs }: { showJobs: boolean }) {
   const { t } = useTranslation();
   return (

@@ -1,16 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-/**
- * The state behind a My sharing tab: what the Community and this device hold
- * now (`loaded`), and changes to it that run one after another.
- *
- * - Only the newest load may write: one for another Community, or one a
- *   failed change asked for later, never gets overwritten by an older answer.
- * - `run` starts each change from the state the one before left. A failure
- *   shows `failedKey` as the notice and reloads the truth instead of guessing
- *   how to undo.
- */
 export function useSerialShareState<Loaded>(fetchAll: () => Promise<Loaded>, failedKey: string) {
   const { t } = useTranslation();
   const [loaded, setLoaded] = useState<Loaded | null>(null);

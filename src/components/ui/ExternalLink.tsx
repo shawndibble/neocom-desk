@@ -4,13 +4,6 @@ import { cx } from '@/lib/cx';
 import { focusRingClassName, inlineLinkClassName, interactiveClassName } from './controlStyles';
 import { External } from './icons';
 
-/**
- * The trailing mark for anything that leaves Neocom Desk (DESIGN.md §6c): the
- * `Icon.External` glyph at about 0.85em, hidden from assistive tech, followed by
- * a visually hidden "(opens in a new tab)" so a screen reader hears what the
- * glyph shows. `ExternalLink` ends with it; a `Button` that calls `window.open`
- * puts it after its label so the two read the same.
- */
 export function ExternalMark({ className }: { className?: string }) {
   const { t } = useTranslation();
   return (
@@ -25,11 +18,6 @@ export function ExternalMark({ className }: { className?: string }) {
   );
 }
 
-/**
- * `inline` sits in a sentence (solid underline); `quiet` is a footer link (text
- * colour, underline on hover); `bare` brings no look of its own, for a link
- * dressed as a button or icon button by the caller's `className`.
- */
 export type ExternalLinkVariant = 'inline' | 'quiet' | 'bare';
 
 const VARIANT_CLASS: Record<ExternalLinkVariant, string> = {
@@ -48,21 +36,10 @@ interface ExternalLinkProps extends Omit<
 > {
   href: string;
   variant?: ExternalLinkVariant;
-  /**
-   * `glyph` (default) ends with the external mark. `text` keeps only the
-   * screen-reader "(opens in a new tab)", for an icon-only link whose own icon
-   * is the whole visible label.
-   */
   mark?: 'glyph' | 'text';
   children?: ReactNode;
 }
 
-/**
- * A link to another site: always a new tab (`noopener noreferrer`) and always
- * marked with the trailing external glyph. The one place `target="_blank"` is
- * written in the app. A same-origin page (the privacy page) is a plain
- * same-tab `<a>`, not this.
- */
 export function ExternalLink({
   href,
   variant = 'inline',

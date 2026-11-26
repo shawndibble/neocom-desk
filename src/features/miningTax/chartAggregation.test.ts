@@ -12,8 +12,6 @@ function row(date: string, oreLines: { typeId: number; quantity: number }[]): Mi
     characterId: 1,
     characterName: 'Pilot',
     entry: { characterId: 1, date, solarSystemId: 30000142, oreLines },
-    // The aggregation functions only read `entry`, so the rest of `MiningYieldRow`
-    // is irrelevant here.
   } as unknown as MiningYieldRow;
 }
 
@@ -31,8 +29,8 @@ describe('dailyVolumePoints', () => {
   it('never turns an unknown-volume line into a false zero when the day also has known volume', () => {
     const rows = [
       row('2026-09-01', [
-        { typeId: 1, quantity: 100 }, // known: 10 m3/unit
-        { typeId: 2, quantity: 999 }, // unknown volume — must not zero out the day
+        { typeId: 1, quantity: 100 },
+        { typeId: 2, quantity: 999 },
       ]),
     ];
     const typeVolumes = new Map([[1, 10]]);

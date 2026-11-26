@@ -1,17 +1,3 @@
-/**
- * Boot warm-up for the lookups a page resolves *beside* its own list: entity
- * names (mail parties, contract parties, LP corporations), citadel names,
- * LP Store offers and the implant types behind the Clones view. A device that
- * never opened those pages online has none of them cached, so the first
- * offline visit showed raw `#id`s. See
- * docs/context/decisions/20260902-174203-cache-everything-warm-it-at-boot.md.
- *
- * Runs after the list tasks (`app/prefetch.ts`'s second phase) and reads the
- * ids out of the lists those already cached, never fetching a list itself.
- * Each warm calls the same loader the page calls, so cache keys cannot drift,
- * and goes through `prefetchDetails`' low-concurrency, gated, background-lane
- * fetch. Every warm is bounded and never rejects.
- */
 import type {
   CharacterAsset,
   CharacterClones,
@@ -38,21 +24,13 @@ import { detailPrefetchAllowed, prefetchDetails } from './detailPrefetch';
 import { resolveNames } from './names';
 import { loadStructureName } from './structures';
 
-/** Most structures (citadels) resolved per Character per boot. Low on purpose: each one the Character is not on the ACL of is a 403, which counts against ESI's error limit. */
 export const STRUCTURE_PREFETCH_LIMIT = 30;
-/** Most LP Stores warmed per Character: the corporations they hold the most LP with. */
 export const LP_STORE_PREFETCH_LIMIT = 15;
 
 function positive(ids: readonly (number | undefined)[]): number[] {
   return [...new Set(ids.filter((id): id is number => id !== undefined && id > 0))];
 }
 
-/**
- * Sender and recipient ids of mail headers, contract parties, and LP
- * corporations: what Mail, Contracts and the Wallet's Loyalty Points view pass
- * to `resolveNames`. Mailing-list recipients are left out, as Mail leaves them
- * out: `/universe/names` fails the whole batch on an id it cannot resolve.
- */
 export function nameIdsFor(input: {
   characterId: number;
   headers: readonly MailHeader[];
@@ -75,17 +53,10 @@ export function nameIdsFor(input: {
 }
 
 export interface StructureIds {
-  /** Resolved by `loadStructureName`: Assets, Orders, Clones. */
   structures: number[];
-  /** Resolved by `loadContractLocationName`, which also fills the structure row. */
   contractLocations: number[];
 }
 
-/**
- * Structure ids found in cached assets, orders, clones and contracts, capped at
- * {@link STRUCTURE_PREFETCH_LIMIT} between the two kinds (contract locations
- * reserved first, then orders, clones and assets).
- */
 export function structureIdsFor(input: {
   assets: readonly CharacterAsset[];
   orders: readonly MarketOrder[];
@@ -117,7 +88,6 @@ export function structureIdsFor(input: {
   };
 }
 
-/** Implant typeIDs worn now and sitting in jump clones. */
 export function implantTypeIdsFor(
   worn: readonly number[],
   clones: CharacterClones | undefined
@@ -125,7 +95,6 @@ export function implantTypeIdsFor(
   return positive([...worn, ...(clones?.jump_clones ?? []).flatMap((clone) => clone.implants)]);
 }
 
-/** Corporations to warm an LP Store for: biggest balances first, bounded. */
 export function lpStoreCorporationsFor(loyalty: readonly CharacterLoyaltyPoints[]): number[] {
   return positive(
     [...loyalty]
@@ -135,7 +104,6 @@ export function lpStoreCorporationsFor(loyalty: readonly CharacterLoyaltyPoints[
   );
 }
 
-/** Names for the parties on the Character's cached mail, contracts and LP list. */
 export async function warmNames(characterId: number): Promise<void> {
   if (!detailPrefetchAllowed()) return;
   const [headers, contracts, loyalty] = await Promise.all([
@@ -149,11 +117,9 @@ export async function warmNames(characterId: number): Promise<void> {
     contracts: contracts ?? [],
     loyalty: loyalty ?? [],
   });
-  // One bulk POST per 1000 ids, inside `resolveNames`; a cached name costs no request.
   await inBackgroundLane(() => resolveNames(ids));
 }
 
-/** Citadel names (and each forbidden one's refusal memo) for the Character's cached rows. */
 export async function warmStructureNames(characterId: number): Promise<void> {
   const [assets, orders, clones, contracts] = await Promise.all([
     readCached<CharacterAsset[]>(characterId, ASSETS_KEY),
@@ -171,7 +137,6 @@ export async function warmStructureNames(characterId: number): Promise<void> {
   await prefetchDetails(ids.structures, (id) => loadStructureName(characterId, id));
 }
 
-/** LP Store offers (and the corporation's name for the store header) for the Character's LP corporations. */
 export async function warmLoyaltyStores(characterId: number): Promise<void> {
   const loyalty = await readCached<CharacterLoyaltyPoints[]>(characterId, LOYALTY_KEY);
   const corporations = lpStoreCorporationsFor(loyalty ?? []);
@@ -179,7 +144,6 @@ export async function warmLoyaltyStores(characterId: number): Promise<void> {
   await prefetchDetails(corporations, (id) => loadCorporationName(id));
 }
 
-/** Worn and jump-clone implant types as their readers read them: the baked shard, else cached ESI. */
 export async function warmImplantTypes(characterId: number): Promise<void> {
   const [worn, clones] = await Promise.all([
     readCached<number[]>(characterId, SKILL_KEYS.implants),

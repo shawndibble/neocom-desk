@@ -37,9 +37,6 @@ describe('rememberedLocationsFromEdit — the primary location', () => {
       AZBEL_PICK,
       'manufacturing'
     );
-    // The whole place, not just the facility: the new plan should start where
-    // this one now builds, and its rig and tax carry with it (they are the
-    // same structure's).
     expect(remembered).toEqual({
       manufacturing: {
         facility: 'azbel',
@@ -70,8 +67,6 @@ describe('rememberedLocationsFromEdit — the primary location', () => {
   });
 
   it('leaves out a field the edit cleared, rather than storing it as undefined', () => {
-    // Firestore rejects `undefined` at any depth, and the synced write
-    // swallows the error — the default would quietly never leave the device.
     const remembered = rememberedLocationsFromEdit(
       plan({ ...AZBEL_PICK, facilityTaxPct: 4 }),
       { facility: 'raitaru', buildLocationId: undefined, buildLocationName: undefined },
@@ -107,8 +102,6 @@ describe('rememberedLocationsFromEdit — the primary location', () => {
   });
 
   it('remembers a reaction-activity plan’s location as the reaction default', () => {
-    // A reaction plan has no separate Reaction Location — its own facility is
-    // where its reactions run, which is the one fact the reaction default holds.
     const remembered = rememberedLocationsFromEdit(
       plan({ facility: 'athanor' }),
       { facility: 'tatara', buildSystemId: 30003888, buildSystemName: 'Badivefi' },
@@ -128,8 +121,6 @@ describe('rememberedLocationsFromEdit — the primary location', () => {
   });
 
   it('remembers nothing when the result names a facility the activity cannot host', () => {
-    // Not reachable from the picker, which filters by activity — but a
-    // remembered Raitaru would seed reaction plans at a place that cannot run them.
     expect(
       rememberedLocationsFromEdit(
         plan({ facility: 'athanor' }),

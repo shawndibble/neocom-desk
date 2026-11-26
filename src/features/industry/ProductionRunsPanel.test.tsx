@@ -107,13 +107,11 @@ function renderPanel(
   );
 }
 
-/** Opens the row's "Sold" split button's dropdown and clicks one of its extra items. */
 async function chooseSoldMenuItem(user: ReturnType<typeof userEvent.setup>, itemName: string) {
   await user.click(screen.getByRole('button', { name: 'More sale options' }));
   await user.click(await screen.findByRole('menuitem', { name: itemName }));
 }
 
-/** Unfolds the runs table, once its caret has arrived (rows load via useLiveQuery). */
 async function expandRuns(user: ReturnType<typeof userEvent.setup>) {
   await user.click(await screen.findByRole('button', { name: 'Show production runs' }));
 }
@@ -188,7 +186,6 @@ describe('ProductionRunsPanel', () => {
 
     expect(screen.queryByRole('columnheader', { name: /total cost/i })).toBeNull();
 
-    // The choice is stored on the device, so put it back for the tests after this one.
     await user.click(screen.getByRole('button', { name: 'Columns' }));
     await user.click(await screen.findByRole('menuitem', { name: /reset to default/i }));
     await user.keyboard('{Escape}');
@@ -343,7 +340,6 @@ describe('ProductionRunsPanel', () => {
       unitPrice: 100_000,
     });
 
-    // 5 * 100_000 = 500_000 gross revenue, shown once the link lands.
     await waitFor(() => {
       expect(screen.getByText(/500,000|500000/)).toBeInTheDocument();
     });
@@ -357,6 +353,45 @@ describe('ProductionRunsPanel', () => {
     await screen.findByRole('cell', { name: /^320,000$/ });
 
     expect(screen.queryByRole('button', { name: 'Calculations?' })).not.toBeInTheDocument();
+  });
+
+  it('shows the cost of lost units on its own line in the breakdown', async () => {
+    await addRun();
+    const now = Date.now();
+    await db.productionSaleLinks.add({
+      id: `${CHARACTER_ID}:txn:9002`,
+      characterId: CHARACTER_ID,
+      runId: 'run-1',
+      transactionId: 9002,
+      quantity: 3,
+      unitPrice: 100_000,
+      linkedAt: now,
+      updatedAt: now,
+    });
+    await db.productionLosses.add({
+      id: `${CHARACTER_ID}:loss:a`,
+      characterId: CHARACTER_ID,
+      runId: 'run-1',
+      quantity: 2,
+      lostAt: now,
+      insurancePayout: 0,
+      createdAt: now,
+      updatedAt: now,
+    });
+    const user = userEvent.setup();
+    renderPanel(null);
+    await expandRuns(user);
+
+    await user.click(await screen.findByRole('button', { name: 'Calculations?' }));
+    const dialog = await screen.findByRole('dialog', {
+      name: "How this run's realized profit is calculated",
+    });
+
+    expect(
+      within(dialog).getByText('Cost of lost units').closest('div')?.querySelector('dd')
+        ?.textContent
+    ).toBe('128,000');
+    expect(within(dialog).queryByText(/insurance/i)).toBeNull();
   });
 
   it('opens a realized-profit breakdown with the confirmed sale figures once sold', async () => {
@@ -381,20 +416,15 @@ describe('ProductionRunsPanel', () => {
       name: "How this run's realized profit is calculated",
     });
 
-    // grossRevenue 500,000; salesTax 7.5% (Accounting 0) = 37,500; no watched
-    // order so brokerFeeableRevenue is 0 and broker fee is 0; netRevenue
-    // 462,500; totalCost 320,000 (300,000 material + 20,000 job fee); profit
-    // 142,500; margin 142,500 / 500,000 = 28.5%.
-    expect(within(dialog).getByText('Gross revenue = 500,000')).toBeInTheDocument();
-    expect(within(dialog).getByText('Sales tax = 37,500')).toBeInTheDocument();
-    expect(within(dialog).getByText('Broker fee = 0')).toBeInTheDocument();
-    expect(
-      within(dialog).getByText('Net revenue = 500,000 − sales tax 37,500 − broker fee 0 = 462,500')
-    ).toBeInTheDocument();
-    expect(
-      within(dialog).getByText('Profit = net revenue 462,500 − total cost 320,000 = 142,500')
-    ).toBeInTheDocument();
-    expect(within(dialog).getByText('Margin: 28.5% of gross revenue.')).toBeInTheDocument();
+    const value = (label: string) =>
+      within(dialog).getByText(label).closest('div')?.querySelector('dd')?.textContent;
+    expect(value('Gross revenue')).toBe('500,000');
+    expect(value('Sales tax')).toBe('-37,500');
+    expect(value('Broker fee')).toBe('0');
+    expect(value('Net revenue')).toBe('462,500');
+    expect(value('Total cost')).toBe('-320,000');
+    expect(value('Profit')).toBe('142,500');
+    expect(value('Margin')).toBe('28.5%');
   });
 
   it('rejects linking the same transaction twice, even across runs', async () => {
@@ -423,7 +453,6 @@ describe('ProductionRunsPanel', () => {
 
     await user.click(await screen.findByRole('button', { name: 'Sold' }));
 
-    // Already linked to another run — the picker must not offer it again.
     await waitFor(() => {
       expect(
         screen.getByText('No unlinked past sales of this item found in your saved wallet history.')
@@ -460,7 +489,6 @@ describe('ProductionRunsPanel', () => {
       closed: false,
     });
 
-    // Simulate a partial fill, then refresh.
     loadOrders.mockResolvedValue({
       cached: {
         data: [order({ volume_remain: 6 })],
@@ -523,7 +551,7 @@ describe('ProductionRunsPanel', () => {
     expect(screen.getByRole('dialog', { name: 'Manual / Private Sale' })).toBeTruthy();
   });
 
-  it('marks units as lost with typed insurance, shows the badge, and writes them off open inventory', async () => {
+  it('marks units as lost, shows the badge, and writes them off open inventory', async () => {
     await addRun();
     const user = userEvent.setup();
     renderPanel(null);
@@ -535,16 +563,14 @@ describe('ProductionRunsPanel', () => {
     const units = within(dialog).getByLabelText('Units lost');
     await user.clear(units);
     await user.type(units, '2');
-    await user.click(within(dialog).getByRole('button', { name: 'Type ISK' }));
-    await user.type(within(dialog).getByLabelText('Insurance payout (ISK)'), '50000');
-    await user.tab();
+    expect(within(dialog).queryByText(/insurance/i)).toBeNull();
     await user.click(within(dialog).getByRole('button', { name: 'Mark as lost' }));
 
     await waitFor(async () => {
       expect(await db.productionLosses.count()).toBe(1);
     });
     const saved = (await db.productionLosses.toArray())[0];
-    expect(saved).toMatchObject({ runId: 'run-1', quantity: 2, insurancePayout: 50_000 });
+    expect(saved).toMatchObject({ runId: 'run-1', quantity: 2, insurancePayout: 0 });
     expect(await screen.findByText('2 lost')).toBeTruthy();
   });
 

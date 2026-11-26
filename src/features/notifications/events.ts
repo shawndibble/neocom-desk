@@ -1,13 +1,3 @@
-/**
- * The fixed catalog of Notification Events (GLOSSARY.md round 20): every
- * character-state change a user can be notified about, each independently
- * toggleable per Character. This is the service-worker-safe half of an event
- * — id, label, gates, channel default — and the id union is derived from it.
- * The other half (diff, copy, projectability, thresholds) is the event's
- * Event Entry in `eventEntries.ts`, which the service worker never imports. Scopes are derived from `ESI_REGISTRY`, never
- * hand-copied, so an endpoint that changes scope upstream updates this table
- * for free (same rule `app/routeScopes.ts` follows).
- */
 import {
   ESI_REGISTRY,
   isScopeRequired,
@@ -18,36 +8,10 @@ import {
 import { permissionForScope } from '@/esi/scopes';
 import type { CorpCapability } from '@/engine/corpRoles';
 
-/** Everything a catalog row says about its event besides its id. */
 interface NotificationEventTraits {
-  /**
-   * Which channels an untouched preference has on: `'both'` for nearly every
-   * event, `'feedOnly'` for the few worth a Feed row but not an interruption
-   * (GLOSSARY.md round 45; `contractCompleted`/`contractFailed` by issue
-   * #1091's explicit decision — a forfeited courier is irreversible by the
-   * time you hear about it, so the value is the durable feed record, not a
-   * popup). Read by `eventSelection.ts`'s absence-means-default idiom.
-   */
   readonly defaultChannels: 'both' | 'feedOnly';
-  /** i18next key under the `settings.notifications.event.*` namespace. */
   readonly labelKey: string;
-  /**
-   * Absent for `priceAlertTriggered` (issue #680) and `shipLost` (issue
-   * #4772): every other event reads ESI data (or a synced backend) and so needs a
-   * real OAuth grant to fetch at all, but ship losses come from public
-   * zKillboard, and price alerts poll Quickbar (local Dexie) and the public Fuzzwork
-   * aggregate path, neither of which is behind any scope. `enabledEventsFor`
-   * (`foregroundPoller.ts`) treats an absent scope as always-satisfied,
-   * rather than this catalog borrowing an unrelated scope as a fake gate.
-   */
   readonly scope?: Scope;
-  /**
-   * The second, role-shaped gate a corp event needs on top of `scope` (issue
-   * #299): CCP role-gates the corporation endpoints server-side, so a granted
-   * scope alone does not mean the Character can read the data
-   * (`engine/corpRoles.ts`). Absent for every personal event — those answer
-   * to `scope` alone.
-   */
   readonly corpCapability?: CorpCapability;
 }
 
@@ -63,12 +27,6 @@ function requiredScope(endpoint: EsiEndpointId): Scope {
   return scope;
 }
 
-/**
- * A catalog row as written: `id` is any string here, because the id union is
- * derived *from* this list (below) — so adding a Notification Event is one row
- * in this array, and the compiler then demands its entry in
- * `eventEntries.ts`.
- */
 type CatalogRow = NotificationEventTraits & { readonly id: string };
 
 const CATALOG = [
@@ -85,28 +43,18 @@ const CATALOG = [
     scope: requiredScope('getCharacterSkillQueue'),
   },
   {
-    // A lead-time warning (issue #1410), so a pilot can top up the queue
-    // before it goes idle — ESI has no write endpoint, so a paused or
-    // already-empty queue is `characterNotTraining`'s to report, not this
-    // event's.
     id: 'skillQueueEnding',
     labelKey: 'settings.notifications.event.skillQueueEnding',
     defaultChannels: 'both',
     scope: requiredScope('getCharacterSkillQueue'),
   },
   {
-    // Inferred from the skill queue's own re-projected finish date (no ESI field says Omega or
-    // Alpha), so it needs the queue read and is only seen while the app is open.
     id: 'omegaLapsed',
     labelKey: 'settings.notifications.event.omegaLapsed',
     defaultChannels: 'both',
     scope: requiredScope('getCharacterSkillQueue'),
   },
   {
-    // Opt-in behind sync.spExtractionMonitoringEnabled — the scope below
-    // just gates whether the event can fire at all once a pilot turns
-    // monitoring on; `pollDomains/`'s spExtractionDomain checks the
-    // setting itself before ever fetching skills for this reason.
     id: 'spExtractionReady',
     labelKey: 'settings.notifications.event.spExtractionReady',
     defaultChannels: 'both',
@@ -143,22 +91,16 @@ const CATALOG = [
     scope: requiredScope('getCharacterPlanets'),
   },
   {
-    // Local data, no ESI: the pilot's typed-in cerebral accelerator
-    // (`characterAccelerators`), so no scope gates it, as for
-    // `priceAlertTriggered`.
     id: 'acceleratorExpiring',
     labelKey: 'settings.notifications.event.acceleratorExpiring',
     defaultChannels: 'both',
   },
   {
-    // Local data, no ESI, like the one above; only seen while the app is open.
     id: 'acceleratorEnded',
     labelKey: 'settings.notifications.event.acceleratorEnded',
     defaultChannels: 'both',
   },
   {
-    // Per Character: ESI has no corporation den route (issue #4782). The den
-    // scope sits in the opt-in `mercenaryDens` Permission.
     id: 'mercenaryDenReinforced',
     labelKey: 'settings.notifications.event.mercenaryDenReinforced',
     defaultChannels: 'both',
@@ -171,8 +113,6 @@ const CATALOG = [
     scope: requiredScope('getCharacterMercenaryDens'),
   },
   {
-    // Shared Pops another corporation's Corp Tax Book shares (issue #6225). Read through the
-    // backend with the Characters' own sign-in, so no Permission gates it.
     id: 'sharedMoonPop',
     labelKey: 'settings.notifications.event.sharedMoonPop',
     defaultChannels: 'both',
@@ -184,10 +124,6 @@ const CATALOG = [
     scope: requiredScope('getCharacterOrders'),
   },
   {
-    // Undercut for a sell order, outbid for a buy order, at the order's own
-    // NPC station only (issue #1423, owner decisions #2/#3). 'both' — unlike
-    // its marketOrderFilled sibling above — because the point of this one is
-    // to be told promptly, not merely logged (owner decision #3).
     id: 'marketOrderUndercut',
     labelKey: 'settings.notifications.event.marketOrderUndercut',
     defaultChannels: 'both',
@@ -224,23 +160,18 @@ const CATALOG = [
     scope: requiredScope('getCharacterContracts'),
   },
   {
-    // A lead-time warning (issue #1713) for an accepted courier's deliver-by
-    // deadline — `contractFailed` only arrives once the collateral is gone.
     id: 'courierDeliveryDue',
     labelKey: 'settings.notifications.event.courierDeliveryDue',
     defaultChannels: 'both',
     scope: requiredScope('getCharacterContracts'),
   },
   {
-    // A lead-time warning (issue #3797) for a contract the Character issued
-    // that is still unaccepted — relist before it lapses.
     id: 'contractExpiring',
     labelKey: 'settings.notifications.event.contractExpiring',
     defaultChannels: 'both',
     scope: requiredScope('getCharacterContracts'),
   },
   {
-    // One batched warning (issue #3797) for open market orders about to lapse.
     id: 'ordersLapsing',
     labelKey: 'settings.notifications.event.ordersLapsing',
     defaultChannels: 'both',
@@ -258,12 +189,6 @@ const CATALOG = [
     defaultChannels: 'both',
     scope: requiredScope('getCharacterNotifications'),
   },
-  // The five corp events below (issue #299) deliberately take the ordinary
-  // `isEventEnabledFor` default-both-channels-on path (`eventSelection.ts`'s
-  // "absence means enabled" idiom), never `eveTypeEnabledFor`'s
-  // feed-on/browser-off default the ~100 `eveNotification` types use — they
-  // are rare and high-stakes, not numerous and informational. GLOSSARY.md
-  // round 43 records this as a scope decision.
   {
     id: 'structureFuelLow',
     labelKey: 'settings.notifications.event.structureFuelLow',
@@ -272,7 +197,6 @@ const CATALOG = [
     corpCapability: 'canReadStructures',
   },
   {
-    // Station_Manager reads the skyhook routes (issue #4784); one scope, shared with the Sovereignty widget.
     id: 'skyhookRaidable',
     labelKey: 'settings.notifications.event.skyhookRaidable',
     defaultChannels: 'both',
@@ -307,89 +231,59 @@ const CATALOG = [
     scope: requiredScope('getCorporationWallets'),
     corpCapability: 'canReadWallet',
   },
-  // No ESI scope (see `NotificationEventDef.scope`'s doc) — pricing and the
-  // Quickbar list are both scope-free.
   {
     id: 'priceAlertTriggered',
     labelKey: 'settings.notifications.event.priceAlertTriggered',
     defaultChannels: 'both',
   },
-  // A Stock List item dropping to Low or Out (issue #3521). Counted from the
-  // cached asset lists, so it needs the assets scope to have anything to count.
   {
     id: 'stockBelowTarget',
     labelKey: 'settings.notifications.event.stockBelowTarget',
     defaultChannels: 'both',
-    // Listed counts are the alert: they come from the pilot's own orders.
     scope: requiredScope('getCharacterOrders'),
   },
-  // An Incursion within the pilot's N jumps of their Current System (issue
-  // #3542), counted under Route Safety's route rules. The feed is public;
-  // the location is the one scope it needs, as the Current System does.
   {
     id: 'incursionNearby',
     labelKey: 'settings.notifications.event.incursionNearby',
     defaultChannels: 'both',
     scope: requiredScope('getCharacterLocation'),
   },
-  // A skyhook raid window within the pilot's N jumps of their Current System
-  // (issue #4784, raider half). The raidable list is public; the location is
-  // the one scope it needs, as `incursionNearby` does.
   {
     id: 'skyhookRaidableNearby',
     labelKey: 'settings.notifications.event.skyhookRaidableNearby',
     defaultChannels: 'both',
     scope: requiredScope('getCharacterLocation'),
   },
-  // A loss killmail of a tracked Character, read from public zKillboard (the
-  // Overview's Kills widget read), so it needs no ESI scope (issue #4772).
   {
     id: 'shipLost',
     labelKey: 'settings.notifications.event.shipLost',
     defaultChannels: 'both',
   },
-  // A Character whose login EVE refused (issue #6091): read from this device's
-  // needs-sign-in mark, so it needs no scope — the grant is what is gone.
   {
     id: 'characterNeedsLogin',
     labelKey: 'settings.notifications.event.characterNeedsLogin',
     defaultChannels: 'both',
   },
-  // A Character asking to join a Community the pilot administers. Read from the
-  // sync backend, so it needs no ESI scope. In the bell and as a notification:
-  // someone is waiting on the admin.
   {
     id: 'communityJoinRequest',
     labelKey: 'settings.notifications.event.communityJoinRequest',
     defaultChannels: 'both',
   },
-  // A new Member in a Community the pilot administers. Worth a Feed row, not an
-  // interruption: it needs nothing from the admin.
   {
     id: 'communityMemberJoined',
     labelKey: 'settings.notifications.event.communityMemberJoined',
     defaultChannels: 'feedOnly',
   },
-  // A Member Pledged on one of the pilot's own open Requests (and the Request
-  // asked for the app). Read from the sync backend, so no ESI scope. In the
-  // bell only: it is good news, not an interruption.
   {
     id: 'communityRequestPledged',
     labelKey: 'settings.notifications.event.communityRequestPledged',
     defaultChannels: 'feedOnly',
   },
-  // A pilot shared a vetting report with the corp this Character reviews for. The backend raises
-  // it when it writes the report (ADR 0027), so it needs no ESI scope. No `corpCapability`: that
-  // gate belongs to the Corporation Topic's open-app events and their Permission. Every
-  // Character is offered the row, whose hint says it only reaches reviewers; the server decides.
   {
     id: 'vettingShared',
     labelKey: 'settings.notifications.event.vettingShared',
     defaultChannels: 'both',
   },
-  // The scheduled server sync stopped a Corp Tax Book's Automatic sync (issue #6208). Raised by
-  // the backend as it stops it (ADR 0027), so no ESI scope; like `vettingShared`, every Character
-  // is offered the row, whose hint says it only reaches the book's editors.
   {
     id: 'corpTaxBookSyncStopped',
     labelKey: 'settings.notifications.event.corpTaxBookSyncStopped',
@@ -407,27 +301,17 @@ export const NOTIFICATION_EVENT_IDS: readonly NotificationEventId[] = NOTIFICATI
 
 const EVENT_BY_ID = new Map(NOTIFICATION_EVENTS.map((event) => [event.id, event]));
 
-/** One event's i18n label key — a shared lookup so callers don't each build their own copy of this catalog map. */
 const SCOPE_BY_EVENT = new Map(NOTIFICATION_EVENTS.map((event) => [event.id, event.scope]));
 
-/** The ESI scope an event reads, or `undefined` for one that reads only public data. */
 export function eventScope(eventId: NotificationEventId): string | undefined {
   return SCOPE_BY_EVENT.get(eventId);
 }
 
-/** Whether `scopes` covers this event; a scope-less event (`priceAlertTriggered`) always passes. */
 export function hasEventScope(eventId: NotificationEventId, scopes: ReadonlySet<string>): boolean {
   const scope = SCOPE_BY_EVENT.get(eventId);
   return scope === undefined || scopes.has(scope);
 }
 
-/**
- * The Permission this event needs and `scopes` lacks, so Notification
- * settings can say "Needs the <Permission> permission" with a Grant link
- * (issue #1525). `null` when the scope is held, the event reads only public
- * data (`priceAlertTriggered`), or its scope is in the Core Grant — a missing
- * Core Grant scope has no Permission to ask for, so it stays a plain reauth.
- */
 export function missingEventPermission(
   eventId: NotificationEventId,
   scopes: ReadonlySet<string>
@@ -443,14 +327,6 @@ export function eventLabelKey(eventId: NotificationEventId): string {
   return def.labelKey;
 }
 
-/**
- * Every corp event (issue #299) — the ones that get the best-effort
- * disclosure row. Derived from `corpCapability` rather than hand-listed, so
- * a future corp event picks up the disclosure by virtue of carrying that
- * field, not by also being added here — the one source both
- * `NotificationsPanel.tsx` and `notificationRows.ts` read, so they can't
- * drift apart (issue #740).
- */
 const CORP_EVENT_ID_SET: ReadonlySet<NotificationEventId> = new Set(
   NOTIFICATION_EVENTS.filter((event) => event.corpCapability !== undefined).map((event) => event.id)
 );

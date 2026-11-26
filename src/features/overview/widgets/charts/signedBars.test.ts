@@ -12,7 +12,6 @@ describe('signedBarGeometry', () => {
   });
 
   it('lifts the baseline to make room for a loss and draws it below', () => {
-    // 30 up, 10 down: the axis sits a quarter of the way up the plot.
     const g = signedBarGeometry([30, -10]);
     expect(g.baseline).toBe(25);
     expect(g.bars[0]).toMatchObject({ from: 25, size: 75, negative: false });

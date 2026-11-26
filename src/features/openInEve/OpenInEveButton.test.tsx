@@ -16,7 +16,6 @@ vi.mock('@/esi/endpoints', () => ({
 import { OpenInEveButton } from './OpenInEveButton';
 import { useCharacterIdsWithScopes } from '@/app/useGrantedScopes';
 
-/** Who holds the permission, as the button reads it: once this has answered, the button's read has too. */
 function HoldersProbe() {
   const holders = useCharacterIdsWithScopes(['esi-ui.open_window.v1']);
   return <output data-testid="holders">{holders === undefined ? 'loading' : holders.size}</output>;
@@ -87,8 +86,6 @@ describe('OpenInEveButton', () => {
         <OpenInEveButton kind="information" id={1} />
       </MemoryRouter>
     );
-    // The button renders before the stored grants load, enabled until they say otherwise:
-    // wait for the disabled state, not just the button (it flaked on a busy CI runner).
     const button = await screen.findByRole('button', { name: 'Open in EVE' });
     await vi.waitFor(() => expect(button).toHaveAttribute('aria-disabled', 'true'));
     expect(button).toHaveAccessibleDescription(/Pilot hasn't allowed Open in EVE\./);
@@ -178,7 +175,6 @@ describe('OpenInEveButton from a fixed Character', () => {
       </MemoryRouter>
     );
     const button = await screen.findByRole('button', { name: 'Open in EVE' });
-    // Enabled until the stored grants load, as above.
     await vi.waitFor(() => expect(button).toHaveAttribute('aria-disabled', 'true'));
     expect(await screen.findByText(/Payer hasn't allowed Open in EVE/)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Switch to/ })).not.toBeInTheDocument();
@@ -197,7 +193,6 @@ describe('OpenInEveButton from a fixed Character', () => {
     );
     await vi.waitFor(() => expect(screen.getByTestId('holders')).toHaveTextContent('0'));
     expect(screen.queryByRole('button', { name: 'Open in EVE' })).not.toBeInTheDocument();
-    // The same render shows it, still blocked for the payer, once another Character grants it.
     await db.tokens.update(ONE, { scopes: ['esi-ui.open_window.v1'] });
     expect(await screen.findByRole('button', { name: 'Open in EVE' })).toHaveAttribute(
       'aria-disabled',

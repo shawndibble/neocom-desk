@@ -1,13 +1,4 @@
 #!/usr/bin/env node
-/**
- * The backend of the Corp Tax Book browser tests (`playwright.book.config.ts`): the Auth,
- * Firestore and Functions emulators under the `demo-` project, running the real callables.
- *
- * Before starting them it makes a fresh EC signing key for fake EVE access tokens and writes it
- * to E2E_BOOK_KEY_DIR: the public half as the JWKS that `ccpStub.mjs` serves to the Functions
- * emulator, the private half for the specs (`e2e/support/taxBook/eveToken.ts`) to sign with.
- * Nothing is committed, and the key dies with the run.
- */
 import { spawn, spawnSync } from 'node:child_process';
 import { generateKeyPairSync } from 'node:crypto';
 import { mkdirSync, writeFileSync } from 'node:fs';

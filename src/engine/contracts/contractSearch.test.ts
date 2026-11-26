@@ -56,24 +56,16 @@ describe('filterContractOffers', () => {
     const noBuyout = offer({ isAuction: true, price: 1 });
     const exchange = offer({ isAuction: false, price: 9_000_000 });
     const rows = [cheapStart, noBuyout, exchange];
-    // The auction that could sell for 9M is excluded by a 1M ceiling even
-    // though its starting bid clears it; the one with no buyout at all has no
-    // knowable eventual price, so a ceiling cannot disqualify it.
     expect(filterContractOffers(rows, { maxPrice: 1_000_000 })).toEqual([noBuyout]);
   });
 
   it('ignores a zero buyout on an auction too — nobody set a buyout of nothing', () => {
-    // The sync only treats a *blank* buyout column as absent, so an auction
-    // with no buyout arrives here as `buyout: 0`. Read as a real ceiling it
-    // would slip under every maxPrice and price the row at nothing.
     const rows = [offer({ isAuction: true, price: 5_000_000, buyout: 0 })];
     expect(offerAskingPrice(rows[0])).toBe(5_000_000);
     expect(filterContractOffers(rows, { maxPrice: 1_000_000 })).toEqual(rows);
   });
 
   it('ignores a zero buyout on a non-auction row', () => {
-    // EVE Ref emits `buyout: 0` on plain item_exchange rows; reading it as a
-    // real ceiling would make every such row look free.
     const rows = [offer({ isAuction: false, price: 5_000_000, buyout: 0 })];
     expect(filterContractOffers(rows, { maxPrice: 1_000_000 })).toEqual([]);
     expect(offerAskingPrice(rows[0])).toBe(5_000_000);

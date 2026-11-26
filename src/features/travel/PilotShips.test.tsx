@@ -47,7 +47,6 @@ describe('PilotShips', () => {
     expect(within(flies).getByText('47')).toBeTruthy();
     const killed = screen.getByRole('region', { name: 'Kills most' });
     expect(await within(killed).findByText('Capsule')).toBeTruthy();
-    // Most kills first, with the count.
     const rows = within(killed).getAllByRole('listitem');
     expect(rows[0].textContent).toContain('Capsule');
     expect(rows[0].textContent).toContain('3');

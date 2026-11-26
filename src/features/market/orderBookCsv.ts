@@ -16,7 +16,6 @@ import { memoByRow } from '@/lib/memoByRow';
 import { exportFlag } from '@/lib/exportFlag';
 import { formatOrderLocationText } from './format';
 
-/** "station" / "region" / "solarsystem" / a jump count, translated for display and export alike. */
 export function rangeLabel(range: string, t: CsvTranslate): string {
   if (range === 'station') return t('market.rangeStation');
   if (range === 'region') return t('market.rangeRegion');
@@ -28,34 +27,17 @@ export function rangeLabel(range: string, t: CsvTranslate): string {
 interface OrderBookCsvOptions {
   npcStations: ReadonlyMap<number, NpcStationLookup>;
   solarSystems: ReadonlyMap<number, SolarSystemLookup>;
-  /** Buy orders add range + min volume columns; sell orders don't carry a meaningful min volume. */
   isBuy: boolean;
-  /** A row's jump count from the Current System; null when unmeasurable or not yet known. */
   jumpsFor: (systemId: number) => number | null;
-  /** What the fee columns price with; null until the active Character's skills are known (the fee cells are then blank). */
   feeContext: OrderFeeContext | null;
   myOrderIds: ReadonlySet<number>;
-  /** The side's best price, which "vs best" and the bait flag measure against. */
   best: number | null;
 }
 
-/**
- * CSV columns for the Market Browser's order book: price, quantity,
- * location, expiry, and — for buy orders — range and min volume. `price`
- * and `quantity` are raw numbers, not `formatIsk`/`formatVolume` strings.
- * `expiry` is the computed expiry as a raw ISO string, not the
- * `toLocaleDateString()` display rendering. `location` reuses the same
- * resolved station/system text the location column renders, since a raw
- * `location_id` alone isn't meaningful outside the app. Every column the
- * table can show is here, whichever the column picker has ticked (security,
- * jumps, the fee pair), plus the marks and row-expand facts: your order, bait,
- * total volume, issue date, order value and distance from the best price.
- */
 export function orderBookCsvColumns(
   t: CsvTranslate,
   { npcStations, solarSystems, isBuy, jumpsFor, feeContext, myOrderIds, best }: OrderBookCsvOptions
 ): CsvColumn<RegionOrder>[] {
-  // Two columns read each of these per order: work them out once.
   const feesOf = memoByRow((order: RegionOrder) =>
     feeContext === null ? null : orderFees(order, feeContext)
   );

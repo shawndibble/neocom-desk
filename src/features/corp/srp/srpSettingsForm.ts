@@ -1,12 +1,3 @@
-/**
- * The SRP settings form as plain data: saved settings in, the
- * strings the inputs edit, the problems that block Save, and the patch
- * `saveSrpSettingsCallable` takes. Pure: no fetch, DOM or Dexie.
- *
- * Percents are valid 1-100 or blank (blank = that step of the pricing chain is off, the
- * same rule as `engine/srpPricing.ts`). A `pay-percent` Hull Rule means "follow the corp's
- * percent chain" (killmail percent, then Appraisal percent) and carries no figure of its own.
- */
 import {
   MAX_CLAIM_WINDOW_DAYS,
   type HullRule,
@@ -20,9 +11,7 @@ export type RuleChoice = 'none' | HullRuleKind;
 
 export interface RuleDraft {
   kind: RuleChoice;
-  /** Plain digit string for `pay-fixed`; blank is a problem. */
   isk: string;
-  /** Doctrine Fit ids a claim on this hull must match (hull scope only); empty: not checked. */
   doctrineIds: string[];
 }
 
@@ -32,7 +21,6 @@ export interface SrpSettingsForm {
   appraisalPct: string;
   windowDays: string;
   requireFleetOrFc: boolean;
-  /** Keyed by `ruleKey`; a missing entry is `none`. */
   rules: Record<string, RuleDraft>;
 }
 
@@ -51,16 +39,10 @@ export function setRule(
   id: number,
   rule: RuleDraft
 ): SrpSettingsForm {
-  // No rule holds no Doctrine Fits: they would not be saved, so they are not kept in the form.
   const next = rule.kind === 'none' ? { ...rule, doctrineIds: [] } : rule;
   return { ...form, rules: { ...form.rules, [ruleKey(scope, id)]: next } };
 }
 
-/**
- * Attaches the Doctrine Fits a hull's claims are checked against. A hull with no rule of its own
- * cannot hold them (a rule needs a kind, and picking one for the Director could change what the
- * hull pays), so this is inert there until the Director picks a rule.
- */
 export function setDoctrineIds(
   form: SrpSettingsForm,
   hullId: number,
@@ -111,9 +93,7 @@ export interface FormProblems {
   killmailPct: boolean;
   appraisalPct: boolean;
   windowDays: boolean;
-  /** Rule keys of Pay: fixed ISK rows with no usable amount. */
   fixedIsk: string[];
-  /** A Pay: corp percent rule exists but both corp percents are blank. */
   percentRuleWithoutPercent: boolean;
   count: number;
 }
@@ -143,7 +123,6 @@ export function formProblems(form: SrpSettingsForm): FormProblems {
   return { ...problems, count };
 }
 
-/** `live`: ids of the Doctrine Fits that still exist; a deleted one is not sent. */
 function rulesOf(form: SrpSettingsForm, live?: ReadonlySet<string>): HullRule[] {
   const out: HullRule[] = [];
   for (const [key, draft] of Object.entries(form.rules)) {
@@ -163,13 +142,11 @@ function rulesOf(form: SrpSettingsForm, live?: ReadonlySet<string>): HullRule[] 
       out.push({ ...base, kind: draft.kind });
     }
   }
-  // Classes first, then hulls, each by id: a stable list, so an unchanged form compares equal.
   return out.sort((a, b) => (a.scope === b.scope ? a.id - b.id : a.scope === 'class' ? -1 : 1));
 }
 
 const sameRules = (a: HullRule[], b: HullRule[]) => JSON.stringify(a) === JSON.stringify(b);
 
-/** Only what changed; the rules go as the whole list. Enabled is a separate callable, not here. */
 export function formToPatch(
   form: SrpSettingsForm,
   saved: SrpSettings,
@@ -184,8 +161,6 @@ export function formToPatch(
   if (days !== null && days !== saved.windowDays) patch.windowDays = days;
   if (form.requireFleetOrFc !== saved.requireFleetOrFc)
     patch.requireFleetOrFc = form.requireFleetOrFc;
-  // Compared as the saved form would send them, so stale legacy pcts and list order never read
-  // as edits.
   const rules = rulesOf(form, liveDoctrineIds);
   if (!sameRules(rules, rulesOf(formFromSettings(saved), liveDoctrineIds))) patch.hullRules = rules;
   return patch;

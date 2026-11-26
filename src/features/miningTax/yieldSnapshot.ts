@@ -1,18 +1,3 @@
-/**
- * Composes the Mining Yield Overview tab's data (issue #671): every tracked
- * character's unfiltered ore/ice and harvested-gas mining output (issue
- * #880), valued raw-vs-refined at each entry's own mined-date price.
- * Fetch/Dexie/SDE layer only — the pure arithmetic lives in
- * `src/engine/miningTax` (`valueMiningYield`).
- *
- * Raw ore is priced via its Compressed counterpart when one exists, the same
- * convention `pricing.ts` already uses for the Tax tab
- * (`docs/context/decisions/20260906-081307-…`) — not a new choice, reused for
- * consistency. Reprocessing output materials (minerals) have no compressed
- * form and price directly. Gas is deliberately absent from
- * `compressedOreTypeIds` and so prices as itself through `pricingTypeId`'s
- * fallback — raw Fullerites and serocins are what Reactions consume.
- */
 import { loadAllCharacterYields } from './ledger';
 import type { MiningYieldEntry } from '@/engine/miningTax/yieldGrouping';
 import {
@@ -53,15 +38,8 @@ export interface TrackedCharacter {
   characterName: string;
 }
 
-/** One row valued on one price basis (issue #1279). */
 export interface BasisValuation {
   valuation: EntryValuation;
-  /**
-   * Price of each material the row's ore reprocesses into, for the detail
-   * modal's refined-output list. The same prices `valuation` was built from,
-   * kept rather than recomputed so the list and the total can never disagree;
-   * a material with no price on this basis is simply absent.
-   */
   materialUnitPrices: ReadonlyMap<number, number>;
 }
 
@@ -69,11 +47,6 @@ export interface MiningYieldRow extends BasisValuation {
   characterId: number;
   characterName: string;
   entry: MiningYieldEntry;
-  /**
-   * The row valued on every basis, so switching basis on the page never
-   * refetches. The row's own `valuation`/`materialUnitPrices`
-   * are the default `buy` basis; the page swaps in the chosen one.
-   */
   byBasis: Record<PriceBasis, BasisValuation>;
 }
 
@@ -83,21 +56,10 @@ export interface MiningYieldSnapshot {
   reauthCharacters: TrackedCharacter[];
   systemNames: Map<number, string>;
   systemSecurity: Map<number, number>;
-  /** Ore/ice/gas types AND the materials they reprocess into — the detail modal names both. */
   typeNames: Map<number, string>;
-  /**
-   * m³ of one unit, from the SDE bake, falling back to a live ESI lookup for
-   * a type the bake doesn't carry (issue #1283). Missing only for a type ESI
-   * itself has no volume for, or one a fetch failure left unresolved.
-   */
   typeVolumes: Map<number, number>;
   fetchedAt: Date | null;
   fromCache: boolean;
-  /**
-   * Refining was on but the reprocessing recipes (a lazy download) could not
-   * load, so `rows` carry no refined side. The raw values and the ledger are
-   * unaffected; the page says the refined figures are unavailable.
-   */
   refiningUnavailable: boolean;
 }
 
@@ -105,18 +67,6 @@ function volumeCacheKey(typeId: number): string {
   return `type-volume:${typeId}`;
 }
 
-/**
- * Volumes for types the SDE bake has no entry for (issue #1283) — mainly the
- * hand-tagged overrides in `typeOverrides.ts`, which add ore/ice variants the
- * bake never carried a row for. Cached under `STALE_AFTER.static`, same as
- * `typeNames.ts`'s name cache: a type's volume is as immutable as its name.
- * A cached `null` means ESI itself confirmed the type has no volume — cached
- * rather than re-asked every load, the same way a real volume is. Only a
- * type with NO cache entry at all blocks the caller; a merely stale one is
- * served as-is with a background refresh fired, same tradeoff `typeNames.ts`
- * makes for exactly the reason its header explains: a page holding one of
- * these types must not block on live ESI on every render.
- */
 async function resolveMissingVolumes(typeIds: readonly number[]): Promise<Map<number, number>> {
   const resolved = new Map<number, number>();
   if (typeIds.length === 0) return resolved;
@@ -138,7 +88,6 @@ async function resolveMissingVolumes(typeIds: readonly number[]): Promise<Map<nu
     if (now - row.fetchedAt >= STALE_AFTER.static) lapsed.push(typeId);
   }
   if (unknown.length === 0) {
-    // Never awaited: the caller already has everything it needs from cache.
     if (lapsed.length > 0) void fetchVolumesFromEsi(lapsed).catch(() => {});
     return resolved;
   }
@@ -148,33 +97,21 @@ async function resolveMissingVolumes(typeIds: readonly number[]): Promise<Map<nu
   return resolved;
 }
 
-/** The network half: per-id GET, caching both a real volume and a confirmed "no volume" as `null`. Never rejects. */
 async function fetchVolumesFromEsi(typeIds: number[]): Promise<Map<number, number | null>> {
   const map = new Map<number, number | null>();
   const now = Date.now();
   await mapWithConcurrencyLimit(typeIds, ESI_FANOUT_CONCURRENCY, async (typeId) => {
     try {
       const { data } = await getUniverseType(typeId);
-      if (!data) return; // 304 Not Modified: unreachable, no etag is ever sent here.
+      if (!data) return;
       const volume = typeof data.volume === 'number' ? data.volume : null;
       map.set(typeId, volume);
       await writeCached(GLOBAL_CACHE_CHARACTER_ID, volumeCacheKey(typeId), volume, now);
-    } catch {
-      // Genuinely unresolvable, or offline mid-fallback: leave it uncached —
-      // the caller's own stale cached value (if any) already stands.
-    }
+    } catch {}
   });
   return map;
 }
 
-/**
- * `showRefining` false (issue #1281's page switch, default on) skips
- * everything only refining needs — the reprocessing recipe bake, material
- * prices, and character skills/implants — for a pilot who
- * never refines. `valueMiningYield`'s `includeRefining` flag keeps the
- * resulting rows from reading as "Partial" for refine data that was never
- * fetched on purpose.
- */
 export async function loadMiningYieldSnapshot(
   showRefining = true,
   compressed = true,
@@ -224,9 +161,6 @@ export async function loadMiningYieldSnapshot(
   ];
   const systemIds = [...new Set(allEntries.map(({ entry }) => entry.solarSystemId))];
 
-  // Refining needs the recipes, which are a lazy download; offline they can be
-  // missing. The ledger and raw values don't depend on them, so a miss costs
-  // only the refined side.
   let refiningUnavailable = false;
   const [compressedByRaw, reprocessingMap] = await Promise.all([
     loadCompressedOreTypeIds(),
@@ -264,10 +198,6 @@ export async function loadMiningYieldSnapshot(
   const pricingTypeIds = [...new Set(rawTypeIds.map(pricingTypeId))];
   const priceTypeIds = [...new Set([...pricingTypeIds, ...materialTypeIds])];
 
-  // Each mined day's hub prices (`hubSnapshot.ts`, read from R2) and today's
-  // live book, for today and yesterday before the day is published and for
-  // the now bases. Neither read throws: `getHubPrices` returns a null price
-  // per type when its source is down.
   const entryDates = allEntries.map(({ entry }) => entry.date);
   const today = eveToday(new Date());
   const [hubSnapshot, hubPrices] = await Promise.all([
@@ -349,13 +279,10 @@ export async function loadMiningYieldSnapshot(
 
   const [systemRows, materialNames, oreNames, sdeTypes] = await Promise.all([
     Promise.all(systemIds.map(async (id) => ({ id, ...(await loadSystemNameAndSecurity(id)) }))),
-    // Materials as well as ore: the detail modal lists what each day refines
-    // into, and an unnamed "#34" there is no use to a miner.
     loadTypeNames(materialTypeIds),
     loadOreFormNames(rawTypeIds, compressed),
     loadTypes(),
   ]);
-  // Ore last: a type that is both ore and a refine output reads as ore.
   const typeNames = new Map([...materialNames, ...oreNames]);
   const typeVolumes = new Map<number, number>();
   const typeIdsMissingVolume: number[] = [];

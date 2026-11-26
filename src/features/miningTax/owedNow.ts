@@ -1,10 +1,3 @@
-/**
- * What the pilot owes each Payee right now — the Tax tab's "You owe" cards and the Overview's
- * Mining tax card read the same figure from here: each Payee's Running account, oldest day first
- * (`PayeeRunningAccounts`). A Corp Tax Book overlays the personal ledger (`buildDisplayRows`): a row the
- * book says it hasn't credited is owed again (#6219), and ore a book bills is owed to the
- * corporation, not to the member's own Payee too (#6204).
- */
 import type { PayeeRecord } from '@/db';
 import type { PersonalOverlay } from '@/engine/corpTaxBook/personal';
 import i18n from '@/i18n';
@@ -27,13 +20,6 @@ import { loadMadePaymentsWithStatus } from './madePayments';
 import { groupPayees, payeeDuplicateAliases } from './payeeGroups';
 import type { MoonMiningTaxSnapshot } from './snapshot';
 
-/**
- * By Assignment id, the share (0–1) of its tax the Payee is not owed because a Corp Tax Book bills
- * it: what a book took whole (`absorbed`: the book's row stands for it), what a book took part of
- * (`trimmed`: the Payee keeps `valueShare`), and what another Payee's book bills too
- * (`alsoBilled`, a share of what stays after that trim). A Conflict day is held back the same way
- * (`conflicted`): the corporation's row is its one bill until the pilot resolves it.
- */
 export function billedElsewhereOf(
   overlay:
     | (Pick<PersonalOverlay, 'alsoBilled' | 'trimmed' | 'absorbed'> &
@@ -56,21 +42,14 @@ export function billedElsewhereOf(
   return out;
 }
 
-/**
- * The Payee records a Corp Tax Book the pilot is in is the authority for, each with that
- * corporation's name: the ones verified as its corporation (`bookOwnedPayeeIds`). Their account
- * counts nowhere (`PayeeRunningAccounts.bookOwned`).
- */
 export function bookOwnersOf(
   payees: readonly PayeeRecord[],
   books: readonly Pick<LoadedCorpBook, 'corporationId' | 'memberCharacterIds'>[],
   corpNameOf: (corporationId: number) => string
 ): Map<string, string> {
   const out = new Map<string, string>();
-  // From the loaded books, never the priced view: a book whose prices are loading or failed still
-  // owns its Payee.
   for (const b of books) {
-    if (b.memberCharacterIds.length === 0) continue; // left
+    if (b.memberCharacterIds.length === 0) continue;
     const name = corpNameOf(b.corporationId);
     for (const id of bookOwnedPayeeIds(payees, [{ corporationId: b.corporationId, name }]))
       out.set(id, name);
@@ -78,28 +57,20 @@ export function bookOwnersOf(
   return out;
 }
 
-/** The ids alone of `bookOwnersOf`. */
 export const bookOwnedPayees = (
   payees: readonly PayeeRecord[],
   books: readonly Pick<LoadedCorpBook, 'corporationId' | 'memberCharacterIds'>[],
   corpNameOf: (corporationId: number) => string
 ): Set<string> => new Set(bookOwnersOf(payees, books, corpNameOf).keys());
 
-/** The Characters in view: the Tax tab's selector (`'all'` is no filter). */
 export type CharactersInView = ReadonlySet<number> | 'all';
 
-/**
- * The books the selector shows: one with at least one selected Character in it. A book's figures
- * are its whole account for the Miner whatever the selector says, but a book none of the selected
- * Characters is in is not shown, so it counts nowhere.
- */
 function booksInView(corpView: CorpBookView | null | undefined, inView: CharactersInView) {
   return (corpView?.books ?? []).filter(
     (b) => inView === 'all' || b.loaded.characterIds.some((id) => inView.has(id))
   );
 }
 
-/** Each shown Corp Tax Book Payee's credit, by its id: what its Miners' accounts hold over what they bill. */
 export function bookCreditsOf(
   corpView: CorpBookView | null | undefined,
   inView: CharactersInView = 'all'
@@ -107,7 +78,6 @@ export function bookCreditsOf(
   return new Map(booksInView(corpView, inView).map((b) => [b.payee.id, b.summary.credit]));
 }
 
-/** Each shown Corp Tax Book Payee's owed, by its id: the book's account total over the whole Miner. */
 export function bookOwesOf(
   corpView: CorpBookView | null | undefined,
   inView: CharactersInView = 'all'
@@ -120,7 +90,6 @@ export function bookOwesOf(
   );
 }
 
-/** Each shown Corp Tax Book Payee's owed days and oldest unpaid day, by its id, off the book's account. */
 export function bookDaysOf(
   corpView: CorpBookView | null | undefined,
   inView: CharactersInView = 'all'
@@ -133,10 +102,6 @@ export function bookDaysOf(
   );
 }
 
-/**
- * Entries still needing a Payee. A row a Corp Tax Book has labelled (Pending corp record,
- * Unattributed) is not waiting on the member, so it stays out.
- */
 export function unassignedSummary(
   rows: readonly DisplayRow[],
   estimatedValueOf: (dr: DisplayRow) => number
@@ -149,15 +114,9 @@ export function unassignedSummary(
 
 export interface OwedNow {
   balances: PayeeBalance[];
-  /** `unassignedSummary`'s entry count. */
   unassignedCount: number;
 }
 
-/**
- * `computePayeeBalances` (and the Unassigned count) over every tracked Character, loading the Corp Tax Books the Tax tab overlays:
- * the books, their corporations' names and prices, and (only when a book exists) the wallet's
- * payments the book's in-flight donations read. Without a book it is the personal ledger alone.
- */
 export async function loadOwedBalances(
   snapshot: Pick<
     MoonMiningTaxSnapshot,
@@ -168,8 +127,6 @@ export async function loadOwedBalances(
   const seen = new Map<string, PayeeRecord>();
   for (const list of snapshot.payeesByCharacter.values()) for (const p of list) seen.set(p.id, p);
   const payees = [...seen.values()];
-  // The books read each Assignment as its Payee's account stands before any book takes ore off it
-  // (see `useTaxCorpBooks`).
   const bookEntries = withPaidStatus(
     snapshot.rows,
     PayeeRunningAccounts.build({
@@ -210,8 +167,6 @@ export async function loadOwedBalances(
           );
         });
 
-  // Paid read off each Payee's account, the one build the Tax tab reads too: a Payee a book is the
-  // authority for counts nowhere.
   const accounts = PayeeRunningAccounts.build({
     assignments: snapshot.rows.flatMap((row) => row.assignments),
     payees,

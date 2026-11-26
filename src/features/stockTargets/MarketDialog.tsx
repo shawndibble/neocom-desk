@@ -1,13 +1,3 @@
-/**
- * "New market" and "Change market": pick the station or structure the pilot
- * sells at, name the market, and (new only) start the list from what they
- * already sell there.
- *
- * The places the pilot has sell orders come first and need no typing. Any NPC
- * station matches off the local snapshot; a structure needs ESI's name search
- * (three letters, debounced, and only with the search scope), like the
- * Survey's location box.
- */
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -32,14 +22,12 @@ interface PlaceOption {
   id: number;
   name: string;
   kind: 'station' | 'structure';
-  /** Set for a place the pilot sells at now. */
   orderCount?: number;
 }
 
 export interface MarketChoice {
   locationId: number;
   name: string;
-  /** Starting Stock Targets: what the pilot sells there now, when they asked for it. */
   items: StockTarget[];
 }
 
@@ -123,7 +111,6 @@ function MarketPlacePicker({
         orderCount: place.orderCount,
       }));
     const sellingNow = known.filter((place) => (place.orderCount ?? 0) > 0);
-    // Structures the pilot keeps items at lead the other places, even before typing.
     const itemsHere = known.filter((place) => place.orderCount === 0);
     const taken = new Set(known.map((place) => place.id));
     const searched: PlaceOption[] =
@@ -140,7 +127,6 @@ function MarketPlacePicker({
   }, [selling, stations, typed, structureHits, searchKey]);
   const options = [...sellingNow, ...others];
   const showList = open && options.length > 0;
-  // Enter picks what is highlighted, so something always is while the list shows.
   const combo = useCombobox({ count: options.length, open: showList, fallback: 0 });
   const active = combo.activeIndex;
   const listId = combo.listboxProps.id;
@@ -159,7 +145,6 @@ function MarketPlacePicker({
       event.preventDefault();
       choose(options[active]);
     } else if (event.key === 'Escape' && open) {
-      // Closes the list, not the dialog.
       event.preventDefault();
       event.stopPropagation();
       setOpen(false);
@@ -240,7 +225,6 @@ function MarketPlacePicker({
         {...combo.listboxProps}
         aria-label={t('stockTargets.list.locationOptions')}
         hidden={!showList}
-        // In flow, not a popover: the Modal body scrolls and would clip an absolute list.
         className="mt-1 max-h-60 overflow-auto rounded-xs border border-line-bright bg-panel py-1"
       >
         {sellingNow.length > 0 &&
@@ -263,11 +247,8 @@ export function MarketDialog({
 }: {
   mode: 'new' | 'change';
   characterId: number | null;
-  /** The market being changed: its place and its own name. */
   initial?: { locationId: number; placeName: string; name: string };
-  /** Where focus goes when the button that opened this is gone after Create. */
   returnFocusFallback?: () => HTMLElement | null;
-  /** The name of another market already kept at a place: one market per place. */
   takenBy: (locationId: number) => string | undefined;
   onSubmit: (choice: MarketChoice) => void;
   onClose: () => void;
@@ -279,7 +260,6 @@ export function MarketDialog({
   const [picked, setPicked] = useState<PlaceOption | null>(
     initial ? { id: initial.locationId, name: initial.placeName, kind: 'station' } : null
   );
-  // Null follows the picked place's name until the pilot types one of their own.
   const [name, setName] = useState<string | null>(initial ? initial.name : null);
   const [seed, setSeed] = useState(true);
   const [listed, setListed] = useState<{ locationId: number; items: StockTarget[] } | null>(null);
@@ -348,7 +328,6 @@ export function MarketDialog({
             invalid={error === 'location' || error === 'taken'}
             describedBy={error === 'location' || error === 'taken' ? `${id}-error` : undefined}
             onPick={(place) => {
-              // A rename the pilot typed survives a change of place; the default follows it.
               if (mode === 'change' && name === initial?.placeName) setName(null);
               setPicked(place);
               setError(null);

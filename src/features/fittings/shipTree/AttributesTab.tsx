@@ -15,10 +15,8 @@ import type { ShipTreeShip } from '@/sde/types';
 import { TraitList } from './TraitList';
 import type { ShipTreeSource } from './useShipTreeData';
 
-// Plain static text: a box here would read as a control (DESIGN.md §6c).
 const tag = 'px-1 py-0.5 text-xs text-text-dim';
 
-/** Ship Info › Attributes: class and faction, the bonuses, CCP's description (collapsed), then the hull's attributes. */
 export function AttributesTab({ ship, source }: { ship: ShipTreeShip; source: ShipTreeSource }) {
   const { t } = useTranslation();
   const [flavorOpen, setFlavorOpen] = useState(false);
@@ -59,7 +57,6 @@ export function AttributesTab({ ship, source }: { ship: ShipTreeShip; source: Sh
   );
 }
 
-/** The hull's dogma attributes as Show info prints them, "base → skilled" where the pilot's skills change one. */
 function HullAttributes({ typeId }: { typeId: number }) {
   const { t } = useTranslation();
   const load = useCallback(async () => {

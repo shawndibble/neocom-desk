@@ -13,7 +13,7 @@ describe('packHauls', () => {
     const { hauls, unfit } = packHauls(
       [
         { typeId: 47466, quantity: 1, unitM3: 50_000 },
-        { typeId: 34, quantity: 400_000, unitM3: 0.01 }, // 4,000 m3
+        { typeId: 34, quantity: 400_000, unitM3: 0.01 },
       ],
       MASTODON
     );
@@ -38,11 +38,7 @@ describe('packHauls', () => {
   });
 
   it('splits a stack by whole units across holds and hauls', () => {
-    const { hauls } = packHauls(
-      [{ typeId: 35, quantity: 100, unitM3: 1_000 }], // 100,000 m3
-      MASTODON
-    );
-    // 54 units fit per haul (4 in cargo, 50 in hangar); 100 units -> 2 hauls.
+    const { hauls } = packHauls([{ typeId: 35, quantity: 100, unitM3: 1_000 }], MASTODON);
     expect(hauls).toHaveLength(2);
     const units = hauls.map((h) =>
       h.holds.flatMap((x) => x.lines).reduce((s, l) => s + l.quantity, 0)
@@ -58,7 +54,6 @@ describe('packHauls', () => {
       ],
       MASTODON
     );
-    // 2 ships = 2 hauls (hangar each). Tritanium-like filler: 4,000 m3 fits the first cargo hold.
     expect(hauls).toHaveLength(2);
     const filler = hauls
       .flatMap((h) => h.holds.flatMap((x) => x.lines))

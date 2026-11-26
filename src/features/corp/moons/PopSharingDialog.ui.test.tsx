@@ -1,4 +1,3 @@
-/** The Pop Sharing dialog's audience choices: Alliance needs the book's corporation in one. */
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen } from '@testing-library/react';
 import '@/i18n';

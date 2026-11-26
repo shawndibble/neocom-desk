@@ -1,23 +1,12 @@
-/**
- * Row-name/position lookups for dnd-kit's drag announcements (#1493, WCAG
- * 4.1.3), naming the skill/marker and its new position rather than dnd-kit's
- * default raw sortable id in hardcoded English ("Picked up draggable item
- * 3300-4"). Pure and its own file (not EntryList.tsx, which may only export
- * components — `react-refresh/only-export-components`) so the announcement
- * text is unit-testable without simulating a dnd-kit drag, which needs real
- * layout measurement jsdom doesn't provide.
- */
 import { romanLevel } from '@/engine/projection';
 import type { Announcements } from '@dnd-kit/core';
 import type { MergedRow } from './queueRows';
 
-/** "{name} {level}" in Roman numerals — shared with EntryList.tsx's `EntryRow`/`PrereqRow` labels so a row's on-screen name and its announced name can't drift apart. */
 export function formatLevelLabel(name: string, level: number): string {
   return `${name} ${romanLevel(level)}`;
 }
 
 interface RowAnnouncer {
-  /** A row's display name — the skill/level for an entry or prereq row, the fixed marker label for a marker row. Also used for a marker row's Move-menu label. `id` may not resolve to a row (a stale id mid-unmount); falls back to the id itself rather than throwing. */
   describeRow: (id: string) => string;
   announcements: Announcements;
 }
@@ -44,7 +33,6 @@ export function buildRowAnnouncer(
     return formatLevelLabel(nameFor(skillTypeID), level);
   }
 
-  /** 1-based position in the sortable list, or the last position for an id dnd-kit somehow didn't report (should not happen — `over` only ever names a row inside this same `SortableContext`). */
   function positionOf(id: string): number {
     return positions.get(id) ?? total;
   }

@@ -1,10 +1,3 @@
-/**
- * Improve's "Implants" line: how many of the Implant Finder's implants would
- * raise the active Improve Goal's stat, the best of them, and a link into the
- * Finder to pick. They cost the fit nothing, so they stay out of its total.
- * Shown only when something helps; Best overall and Cheaper have no one stat
- * to chase, so no line.
- */
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { textActionClassName } from '@/components/ui';
@@ -44,7 +37,6 @@ function Implants({ goalId, open, implants }: Omit<Props, 'goal'> & { goalId: Im
     () => cloneSeedSet(basis, fitting.implantSet, profile.implantTypeIds),
     [basis, fitting.implantSet, profile.implantTypeIds]
   );
-  // Stable per Fitting and seed: the finder re-screens every family whenever this changes.
   const planned = useMemo(
     () => (seed ? { ...fitting, implantSet: seed } : fitting),
     [fitting, seed]
@@ -61,12 +53,10 @@ function Implants({ goalId, open, implants }: Omit<Props, 'goal'> & { goalId: Im
   const names = useMemo(() => implantNames(finder.catalog?.families ?? []), [finder.catalog]);
   const goalDef = goalById(goalId);
   const { baseline, context } = finder;
-  // Local state, not the URL: this panel sits in the Improve drawer, which a URL can't reopen on its own.
   const [picking, setPicking] = useState(false);
 
   const rows = useMemo(() => {
     if (!baseline || finder.updating || !finder.results) return [];
-    // One row per family: the grade that moves the goal most.
     return finder.results
       .flatMap((result) => {
         const graded = result.grades

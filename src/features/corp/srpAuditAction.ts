@@ -1,4 +1,3 @@
-/** Every `action` the SRP audit log writes (mirrors `functions/src/srp*.ts`); a feed line is worded per action. */
 export const SRP_AUDIT_ACTIONS = [
   'fileClaim',
   'refileClaim',

@@ -5,11 +5,9 @@ import { MakeItFitSection } from './MakeItFitSection';
 
 interface Props {
   resources: readonly Resource[];
-  /** Opens Make it fit on that budget. */
   onFixFirst: (resource: Resource) => void;
 }
 
-/** A fit that doesn't fit has nothing to improve yet: hand over to Make it fit (`20261019-144736`). */
 export function ImproveFixFirst({ resources, onFixFirst }: Props) {
   const { t } = useTranslation();
   return (

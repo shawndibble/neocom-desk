@@ -1,11 +1,3 @@
-// Community Fleet Payouts (issue #4779): the admin-SDK half of the create,
-// set-paid and remove callables. Layout (see firestore.rules):
-//   communities/{id}/fleetPayouts/{payoutId}          a Fleet Payout (this file)
-//   communities/{id}/fleetPayouts/{payoutId}/shares/{index}  one pilot's Fleet Share
-// The boss's name is read from the Member doc, never trusted from the client;
-// the open cap is counted in the same transaction as the write. A share's
-// memberUid is set only when the pilot's Character is a current Member.
-
 import type { Caller } from './actorAuth.js';
 import { type Firestore } from 'firebase-admin/firestore';
 import { HttpsError } from 'firebase-functions/v2/https';
@@ -52,7 +44,6 @@ function failCreate(decision: Exclude<CreateDecision, 'ok'>): never {
   }
 }
 
-/** Opens a Fleet Payout with its Shares. Returns its id; the client refetches. */
 export async function createFleetPayout(
   db: Firestore,
   caller: Caller,
@@ -71,7 +62,6 @@ export async function createFleetPayout(
     const decision = decideCreate(input, openCount);
     if (decision !== 'ok') failCreate(decision);
 
-    // Link each pilot to a Member: char:<id> that is a current Member, else null.
     const memberRefs = input.shares.map((s) =>
       s.characterId === null ? null : memberRef(db, input.communityId, `char:${s.characterId}`)
     );
@@ -111,7 +101,6 @@ export async function createFleetPayout(
   return { payoutId: ref.id };
 }
 
-/** The boss marks one Share paid or unpaid. Keeps `paidCount` in step; no change is a no-op. */
 export async function setFleetShareDone(
   db: Firestore,
   caller: Caller,
@@ -144,7 +133,6 @@ export async function setFleetShareDone(
   });
 }
 
-/** The boss or the Community's admin removes a Fleet Payout with its Shares. Already gone is not an error. */
 export async function removeFleetPayout(
   db: Firestore,
   caller: Caller,

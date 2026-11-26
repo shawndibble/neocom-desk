@@ -1,15 +1,8 @@
 import type { CsvColumn, CsvTranslate } from '@/lib/csv';
 import type { CompareRow } from './useCompareRows';
 
-/**
- * CSV columns for the Compare Drawer. Prices and spread are raw numbers (`summary.*`), not
- * `formatIsk` strings — same convention as `orderBookCsvColumns`/`variationsCsvColumns`.
- * A row still loading, or whose fetch failed, exports its price cells empty
- * rather than the drawer's `…`/`—` display placeholders.
- */
 export function compareCsvColumns(
   t: CsvTranslate,
-  /** The drawer's spread % and after-fees figure (null without the Character's skills, never a base-rate guess). */
   marginFor: (row: CompareRow) => { spreadPct: number | null; afterFees: number | null }
 ): CsvColumn<CompareRow>[] {
   return [

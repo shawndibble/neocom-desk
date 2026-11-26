@@ -28,7 +28,6 @@ const STATE: Record<
   hidden: { label: 'Hidden', tone: 'neutral' },
 };
 
-/** One line of plain-language help under a status, with the fix button it names. */
 const FIX: Partial<Record<CorpState, { text: string; action: string }>> = {
   'needs-sign-in': { text: 'The EVE sign-in did not finish.', action: 'Sign in again' },
   'needs-role': {
@@ -49,7 +48,6 @@ function StatePill({ state }: { state: CorpState }) {
   return <Pill tone={STATE[state].tone}>{STATE[state].label}</Pill>;
 }
 
-/** Page chrome the new pieces sit in: header with the entry button, then the tabs line. */
 export function MoonsHeader({ onAdd = noop }: { onAdd?: () => void }) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-2">
@@ -67,7 +65,6 @@ export function MoonsHeader({ onAdd = noop }: { onAdd?: () => void }) {
   );
 }
 
-/** The one-time prompt for a corp that appeared since the last visit. */
 export function NewCorpBanner({ corp }: { corp: MyCorp }) {
   return (
     <div
@@ -89,7 +86,6 @@ export function NewCorpBanner({ corp }: { corp: MyCorp }) {
   );
 }
 
-/** Moon owners list as the book shows it afterwards: his own corps carry a Yours pill. */
 function MoonOwnersAfter({ corps }: { corps: MyCorp[] }) {
   const rows = corps.filter((c) => c.state === 'connected');
   return (
@@ -138,7 +134,6 @@ function CorpRow({
   );
 }
 
-/** Step 1: tick the corps that own moons. Nothing is ticked: the app cannot see moons yet. */
 export function PickCorps({ corps, selected }: { corps: MyCorp[]; selected: number[] }) {
   const [sel, setSel] = useState(selected);
   const shown = corps.filter((c) => c.state !== 'hidden');
@@ -191,7 +186,6 @@ export function PickCorps({ corps, selected }: { corps: MyCorp[]; selected: numb
   );
 }
 
-/** Step 2: one confirm for the whole batch, with how far back to read. */
 export function ConfirmBatch({ corps }: { corps: MyCorp[] }) {
   return (
     <Modal
@@ -257,15 +251,9 @@ export function ConfirmBatch({ corps }: { corps: MyCorp[] }) {
   );
 }
 
-/** What happened on the last return from EVE, shown above the next sign-in. */
 export type SignInOutcome =
   { kind: 'connected'; corp: string } | { kind: 'wrong-character'; signedInAs: string };
 
-/**
- * Step 3: the guided sign-in sequence. `done` corps are finished and the next is
- * current. The run lives in the browser, so EVE's redirect back reopens this
- * dialog on the next corp (or the same one after a wrong character).
- */
 export function SignInSequence({
   corps,
   done,
@@ -345,7 +333,6 @@ export function SignInSequence({
   );
 }
 
-/** After the run: every corp with its status and, where there is one, the one-line fix. */
 export function CorpStatusList({ corps }: { corps: MyCorp[] }) {
   const attention = corps.flatMap((c) => {
     const fix = FIX[c.state];
@@ -385,11 +372,6 @@ export function CorpStatusList({ corps }: { corps: MyCorp[] }) {
   );
 }
 
-/**
- * Opened from the picker's "Hidden corps (N)" button, never shown on the page: a
- * corp dismissed with "Don't ask again" stays out of the banner and the picker
- * until it is added back here.
- */
 export function HiddenCorps({ corps }: { corps: MyCorp[] }) {
   const hidden = corps.filter((c) => c.state === 'hidden');
   return (

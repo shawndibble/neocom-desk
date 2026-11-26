@@ -46,7 +46,6 @@ describe('addDays / addMonths / addWeeks', () => {
 
 describe('startOfWeek', () => {
   it('rewinds to Monday for a mid-week date', () => {
-    // 2026-09-03 is a Thursday.
     expect(dayKey(startOfWeek(new Date(2026, 8, 3)))).toBe('2026-08-31');
   });
 
@@ -65,7 +64,6 @@ describe('startOfWeek', () => {
   });
 
   it('rewinds to Sunday for a mid-week date when weekStart is sunday', () => {
-    // 2026-09-03 is a Thursday; the Sunday of that week is 2026-08-30.
     expect(dayKey(startOfWeek(new Date(2026, 8, 3), 'sunday'))).toBe('2026-08-30');
   });
 
@@ -82,12 +80,12 @@ describe('buildMonthGrid', () => {
   it('always returns 42 cells (6 Monday-first weeks)', () => {
     const grid = buildMonthGrid(new Date(2026, 8, 1));
     expect(grid).toHaveLength(42);
-    expect(grid[0].date.getDay()).toBe(1); // Monday
+    expect(grid[0].date.getDay()).toBe(1);
   });
 
   it('flags leading/trailing days outside the anchor month', () => {
     const grid = buildMonthGrid(new Date(2026, 8, 1));
-    expect(grid[0].inCurrentMonth).toBe(false); // 2026-08-31
+    expect(grid[0].inCurrentMonth).toBe(false);
     const first = grid.find((day) => day.key === '2026-09-01');
     expect(first?.inCurrentMonth).toBe(true);
     const last = grid[grid.length - 1];
@@ -110,7 +108,7 @@ describe('buildMonthGrid', () => {
   it('uses Sunday-first weeks when weekStart is sunday', () => {
     const grid = buildMonthGrid(new Date(2026, 8, 1), new Date(), 'sunday');
     expect(grid).toHaveLength(42);
-    expect(grid[0].date.getDay()).toBe(0); // Sunday
+    expect(grid[0].date.getDay()).toBe(0);
     expect(grid[0].key).toBe('2026-08-30');
   });
 });
@@ -126,8 +124,6 @@ describe('weekdayLabels', () => {
     const monday = weekdayLabels('monday');
     const sunday = weekdayLabels('sunday');
     expect(sunday).toHaveLength(7);
-    // Sunday sits last in the Monday-first ordering and first in the
-    // Sunday-first one; every other day just shifts forward by one slot.
     expect(sunday[0]).toBe(monday[6]);
     expect(sunday[1]).toBe(monday[0]);
     expect(sunday[7 - 1]).toBe(monday[5]);
@@ -140,11 +136,6 @@ describe('formatMonthLabel / formatFortnightLabel', () => {
     expect(formatMonthLabel(new Date(2026, 8, 3))).toMatch(/2026/);
   });
 
-  /**
-   * The label has to span the grid it captions. `formatWeekLabel` spanned six
-   * days from the Monday, which read as a seven-day range over a fourteen-day
-   * grid — a caption quietly disagreeing with the thing it captions.
-   */
   it("spans fourteen days from the anchor week's Monday", () => {
     const label = formatFortnightLabel(new Date(2026, 8, 3));
     expect(label).toMatch(/Aug 31/);

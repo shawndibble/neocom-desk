@@ -1,13 +1,3 @@
-/**
- * Fetch + cache layer for the corporation role audit (issue #4613): the role
- * change history, the titles and who holds them. Same shape as `members.ts`:
- * corp-keyed cache, corp-aware 403 handling. The roles read itself is
- * `loadCorporationMemberRoles` in `members.ts`.
- *
- * All three are Director-only and cached an hour by ESI. History holds about a
- * month and is paginated (X-Pages); titles are the only reads on
- * `esi-corporations.read_titles.v1`, the additive scope.
- */
 import { conditionalFetch, conditionalPagedFetch } from '@/esi/cache';
 import type { StatusResult } from '@/esi/cache';
 import {
@@ -33,7 +23,6 @@ const KEYS = {
   memberTitles: 'memberTitles',
 } as const;
 
-/** Role changes, about the last month. */
 export function loadCorporationRoleHistory(
   characterId: number,
   corporationId: number
@@ -46,7 +35,6 @@ export function loadCorporationRoleHistory(
   });
 }
 
-/** The corporation's titles. */
 export function loadCorporationTitles(
   characterId: number,
   corporationId: number
@@ -59,7 +47,6 @@ export function loadCorporationTitles(
   });
 }
 
-/** The title ids each member holds. */
 export function loadCorporationMemberTitles(
   characterId: number,
   corporationId: number
@@ -72,7 +59,6 @@ export function loadCorporationMemberTitles(
   });
 }
 
-/** Title names by member. An unnamed title is dropped; a member with none gets `[]`. */
 export function toMemberTitleNames(
   titles: readonly CorporationTitle[],
   memberTitles: readonly CorporationMemberTitles[]
@@ -86,23 +72,17 @@ export function toMemberTitleNames(
   );
 }
 
-/** A member holding at least one sensitive role. */
 export interface RoleHolder {
   characterId: number;
-  /** Sensitive roles only, `SENSITIVE_ROLES` order. */
   roles: string[];
-  /** Title names; empty when none, or when titles were not read. */
   titles: string[];
 }
 
 export interface RoleAuditData {
   holders: RoleHolder[];
-  /** Sensitive changes, newest first; null when the history read failed (not "no changes"). */
   changes: RoleChange[] | null;
-  /** Whether the titles reads landed (a hidden titles column otherwise). */
   titlesKnown: boolean;
   names: ReadonlyMap<number, string>;
-  /** The corporation's CEO; null when its public record could not be read. */
   ceoId: number | null;
   fetchedAt: Date | null;
   fromCache: boolean;
@@ -110,11 +90,6 @@ export interface RoleAuditData {
 
 export type RoleAuditResult = { data: RoleAuditData } | { needsReauth: true };
 
-/**
- * The audit's reads, joined. Roles are the data: without them nothing can be
- * said, so that read throws (or asks for a grant). History and titles degrade
- * one part each. Titles are read only when `withTitles` (the Roles tab).
- */
 export async function loadRoleAudit(
   characterId: number,
   corporationId: number,

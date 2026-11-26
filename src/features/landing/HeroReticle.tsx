@@ -2,16 +2,8 @@ import { useTranslation } from 'react-i18next';
 import { hudLabelClassName } from './hudLabel';
 import { cx } from '@/lib/cx';
 
-/** One lock bracket at a corner of the reticle. */
 const BRACKET = 'absolute size-6 border-warning sm:size-10';
 
-/**
- * The hero's targeting reticle: the Megathron render locked inside range
- * rings, with two HUD read-outs naming what the app does with it (lg up).
- * Decorative and hidden from assistive tech: the heading and tagline beside it
- * say the same in words. The ship is the page's largest paint, so it loads
- * eagerly at high priority (#3926) and decodes with the frame (#3950).
- */
 export function HeroReticle({ className }: { className?: string }) {
   const { t } = useTranslation();
   return (
@@ -39,6 +31,12 @@ export function HeroReticle({ className }: { className?: string }) {
       <span className={cx(BRACKET, 'bottom-[12%] left-[12%] border-b-2 border-l-2')} />
       <span className={cx(BRACKET, 'right-[12%] bottom-[12%] border-r-2 border-b-2')} />
       <ReadOut
+        className="top-[6%] -left-2 border-success/50"
+        titleClassName="text-success"
+        title={t('login.reticle.industry.title')}
+        lines={[t('login.reticle.industry.line1'), t('login.reticle.industry.line2')]}
+      />
+      <ReadOut
         className="top-[6%] -right-2 border-accent/40"
         titleClassName="text-accent"
         title={t('login.reticle.market.title')}
@@ -49,6 +47,12 @@ export function HeroReticle({ className }: { className?: string }) {
         titleClassName="text-warning"
         title={t('login.reticle.fit.title')}
         lines={[t('login.reticle.fit.line1'), t('login.reticle.fit.line2')]}
+      />
+      <ReadOut
+        className="right-[-0.5rem] bottom-[8%] border-accent/40"
+        titleClassName="text-accent"
+        title={t('login.reticle.alerts.title')}
+        lines={[t('login.reticle.alerts.line1'), t('login.reticle.alerts.line2')]}
       />
       <p
         className={cx(
@@ -62,7 +66,6 @@ export function HeroReticle({ className }: { className?: string }) {
   );
 }
 
-/** A HUD read-out box pinned beside the reticle; only from lg, where there is room. */
 function ReadOut({
   className,
   titleClassName,

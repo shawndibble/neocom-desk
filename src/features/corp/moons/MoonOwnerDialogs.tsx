@@ -6,10 +6,6 @@ import { parseRequestedRate } from '../taxBook/feederViewModel';
 import { MAX_AS_OF_DAYS_BACK } from '@/engine/corpTaxBook/ownerRate';
 import { DialogShell, Label } from './BookDialogs';
 
-/**
- * Set the rate a moon owner is owed (the agreed rate); it wins over the one they asked for. It
- * counts from the as-of day, today by default, and never reaches back before it (#6347).
- */
 export function SetRateDialog({
   initial,
   today,
@@ -18,12 +14,9 @@ export function SetRateDialog({
   onSave,
 }: {
   initial: number | null;
-  /** Latest as-of day, and the default: the current EVE (UTC) day. */
   today: string;
-  /** Earliest as-of day: 30 days back, or the moon owner's first day if later. */
   earliest: string;
   onClose: () => void;
-  /** `asOf` is undefined for today, so the server dates it by its own clock. */
   onSave: (pct: number, asOf: string | undefined) => Promise<void>;
 }) {
   const { t } = useTranslation();
@@ -62,7 +55,6 @@ export function SetRateDialog({
   );
 }
 
-/** Compensate a moon owner another way (fuel, rock access): a toggle and an optional note. */
 export function SettledOtherwiseDialog({
   initialOn,
   initialNote,
@@ -106,7 +98,6 @@ export function SettledOtherwiseDialog({
   );
 }
 
-/** Start a removal: the 24-hour wait, who is mailed, and what stays. */
 export function RemoveMoonOwnerDialog({
   ownerName,
   accountingName,
@@ -116,7 +107,6 @@ export function RemoveMoonOwnerDialog({
 }: {
   ownerName: string;
   accountingName: string;
-  /** Whether a payee is on record, so the list says they are mailed. */
   hasPayee: boolean;
   onClose: () => void;
   onStart: () => Promise<void>;

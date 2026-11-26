@@ -1,14 +1,3 @@
-/**
- * Groups an item's ESI dogma attribute values by SDE category, resolving
- * each to its display name and unit via the attribute dictionary
- * (scripts/build-sde.mjs, GLOSSARY.md round 6 "Item Detail"). Pure — callers
- * adapt ESI/SDE shapes at the boundary. An attribute id with no dictionary
- * entry (unpublished, or published but nameless) is skipped rather than
- * shown as a raw identifier — a curated allow-list was rejected for the same
- * reason: it would silently drop whatever mattered for an item class nobody
- * thought about. Each value is converted to what the game prints by its unit
- * id (`fittings/attributeUnits`: ms as s, a resonance as its resistance).
- */
 import { romanLevel } from '../projection';
 import { displayAttributeValue } from '../fittings/attributeUnits';
 import {
@@ -29,7 +18,6 @@ export interface AttributeDictionaryEntry {
   name: string;
   unit: string | null;
   category: string;
-  /** The SDE unit id behind `unit`: how to read the raw value (`displayAttributeValue`). */
   unitId?: number;
 }
 
@@ -38,30 +26,10 @@ export type AttributeDictionary = Readonly<Record<number, AttributeDictionaryEnt
 export interface DisplayAttribute {
   attributeId: number;
   name: string;
-  /**
-   * Null once the "unit" is not a suffix to append (`attributeUnits`): always
-   * for an enum legend, so a value it doesn't name shows as a bare number;
-   * for an id reference only once something has actually named the id, so an
-   * unresolved one keeps rendering as it does today.
-   */
   unit: string | null;
-  /** As the game shows it: converted from the raw dogma value by `unitId`. */
   value: number;
-  /**
-   * The SDE unit id the value was converted by, so another raw value of this
-   * attribute (a skilled one) can be shown the same way.
-   */
   unitId?: number;
-  /**
-   * The same attribute with the pilot's skills and implants, converted like
-   * `value`; set (`withSkilledValues`) only when it differs from `value`.
-   */
   skilledValue?: number;
-  /**
-   * Overrides value/unit in display: a required-skill row's
-   * "<Skill name> <roman level>", an enum legend's member ("True", "Large"),
-   * or the name an id reference points at — see `attributeUnits`.
-   */
   displayValue?: string;
 }
 
@@ -70,33 +38,16 @@ export interface AttributeGroup {
   attributes: DisplayAttribute[];
 }
 
-/**
- * Names for the ids dogma attributes reference (`attributeUnits`). Both maps
- * are optional and partial: an id with no name simply keeps rendering as the
- * raw value it does today. `attributeID` references need no map — the
- * dictionary already names every attribute.
- */
 export interface AttributeReferenceNames {
-  /** typeID -> name. Skill names are type names, so one map serves both. */
   types?: Readonly<Record<number, string>>;
-  /** groupID -> item **Group** name (`invGroups`), never a Market Group. */
   groups?: Readonly<Record<number, string>>;
 }
 
-/** The ids an item's attributes reference, for a caller to resolve names for. */
 export interface AttributeIdReferences {
   typeIds: number[];
   groupIds: number[];
 }
 
-/**
- * Which ids `dogmaAttributes` points at, de-duplicated and split by kind, so
- * a caller can resolve them in one round trip per kind instead of one per
- * row. Includes the required-skill typeIDs: they are ordinary type
- * references, and folding them in here means one lookup covers the lot.
- * `attributeID` references are omitted — `groupItemAttributes` resolves those
- * from the dictionary it is already given.
- */
 export function collectAttributeIdReferences(
   dogmaAttributes: readonly RawDogmaAttribute[] | undefined,
   dictionary: AttributeDictionary
@@ -113,26 +64,6 @@ export function collectAttributeIdReferences(
   return { typeIds: [...typeIds], groupIds: [...groupIds] };
 }
 
-/**
- * requiredSkillN -> requiredSkillNLevel dogma attribute id pairs, N = 1..6.
- * Verified 2026-08 against https://everef.net/dogma-attributes and a live
- * ESI response (Rifter, type 587: attributes 182/277 = 3329/1, i.e. requires
- * Minmatar Frigate I). The requiredSkill5/6 pairing is 1289 with 1287 and
- * 1290 with 1288, not the more obvious-looking 1289→1288/1290→1287 —
- * everef.net names 1287 "requiredSkill5Level" and 1288
- * "requiredSkill6Level", settling it.
- *
- * The level half of each pair is unpublished in dgmAttributeTypes.csv, so it
- * never reaches `dictionary` — these must be read from the raw dogma
- * attributes before the generic per-attribute loop below, or the level is
- * silently lost. ESI omits a level attribute entirely when the item requires
- * level 1 (dogma's own default), so a missing level pairs to 1 rather than
- * being dropped.
- *
- * Also the source of truth for `dogma.ts`'s `extractRequiredSkills` (Skill
- * Plan clipboard import, Fit Check, Industry/Market Fit Import) — one list,
- * imported both places, so the two paths can't drift onto different pairs.
- */
 export const SKILL_REQUIREMENT_PAIRS: ReadonlyArray<readonly [number, number]> = [
   [182, 277],
   [183, 278],
@@ -142,12 +73,6 @@ export const SKILL_REQUIREMENT_PAIRS: ReadonlyArray<readonly [number, number]> =
   [1290, 1288],
 ];
 
-/**
- * The name `value` references, or null to leave the row as the raw value plus
- * its unit. Null is deliberately not a `#id` placeholder: unlike an enum
- * legend, "1,201 typeID" is not noise — it says the number is a type id — so
- * an unresolved reference is left exactly as it renders today.
- */
 function idReferenceName(
   kind: IdReferenceKind,
   value: number,
@@ -161,27 +86,17 @@ function idReferenceName(
 }
 
 export interface GroupItemAttributesOptions {
-  /** Skip the curated "<Skill name> <roman level>" rows — for a caller (Market's Required Skills section) rendering trained-status/Add-to-Plan rows of its own instead. */
   omitSkillRequirementRows?: boolean;
-  /** Attribute ids to leave out: ones another part of the view already shows (a Mutated module's rolls, the resist grid). */
   omitAttributeIds?: ReadonlySet<number>;
 }
 
-/** Damage types in the order the game and the fittings page read them. */
 const DAMAGE_TYPE_WORDS = ['EM', 'Thermal', 'Kinetic', 'Explosive'] as const;
 const DAMAGE_TYPE_WORD = /\b(EM|Thermal|Kinetic|Explosive)\b/i;
 
-/**
- * Row order inside a group: by name, except that rows differing only in their
- * damage type sit together as EM, Thermal, Kinetic, Explosive — alphabetical
- * would put Explosive second. The damage word sorts as "EM" would, so the
- * four stay where the first of them falls among the other rows.
- */
 export function compareAttributeNames(a: string, b: string): number {
   const keyOf = (name: string) => {
     const match = DAMAGE_TYPE_WORD.exec(name);
     if (!match) return { stem: name, rank: -1 };
-    // Case-blind: the SDE names a few "Em" ("Armor Em Damage Resistance").
     const word = match[1].toLowerCase();
     const rank = DAMAGE_TYPE_WORDS.findIndex((w) => w.toLowerCase() === word);
     return { stem: name.replace(DAMAGE_TYPE_WORD, 'EM'), rank };
@@ -191,10 +106,6 @@ export function compareAttributeNames(a: string, b: string): number {
   return ka.stem.localeCompare(kb.stem) || ka.rank - kb.rank || a.localeCompare(b);
 }
 
-/**
- * Groups by category, sorted alphabetically (`itemAttributeSections` orders
- * them for an item's kind); rows within a group by `compareAttributeNames`.
- */
 export function groupItemAttributes(
   dogmaAttributes: readonly RawDogmaAttribute[] | undefined,
   dictionary: AttributeDictionary,
@@ -248,9 +159,6 @@ export function groupItemAttributes(
       kind === null
         ? enumUnitLabel(entry.unit, value)
         : idReferenceName(kind, value, dictionary, names);
-    // An enum legend is never a suffix worth keeping, resolved or not; an id
-    // reference keeps its unit until something actually resolves it.
-    // So is a unit that only repeats the name ("Meta Level 5 Level").
     const dropUnit =
       kind === null
         ? isEnumUnit(entry.unit) || unitRepeatsName(entry.name, entry.unit)

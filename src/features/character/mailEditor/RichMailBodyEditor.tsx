@@ -1,16 +1,3 @@
-/**
- * The rich mail body editor: Tiptap (ProseMirror) over a schema that can only
- * say what EVE markup can, and one card: format bar on top (with the Source
- * toggle), the writing surface, the character counter in the corner.
- * Loaded lazily (`MailBodyEditor.tsx`) so the Mail page pays nothing for it
- * until a composer opens. docs/adr/0022-tiptap-for-the-mail-body-editor.md.
- *
- * `value` and `onChange` are EVE markup. Every value this component emits has
- * gone through `sanitizeMarkup`/`docToMarkup`, i.e. `eveMarkup.ts`, so the
- * composer, the draft and the wire only ever see the safe subset. Mobile soft
- * keyboards and IME composition are ProseMirror's own; nothing here touches
- * composition events.
- */
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { EditorContent, useEditor, useEditorState } from '@tiptap/react';
 import type { Editor } from '@tiptap/core';
@@ -67,7 +54,6 @@ export default function RichMailBodyEditor({
   const [dropped, setDropped] = useState(false);
   const sourceRef = useRef<HTMLTextAreaElement>(null);
   const pendingSelection = useRef<[number, number] | null>(null);
-  // What this editor last handed up; a different `value` came from outside (a draft loaded).
   const lastEmitted = useRef(value);
   const onChangeRef = useRef(onChange);
   useEffect(() => {
@@ -94,8 +80,6 @@ export default function RichMailBodyEditor({
         ...(invalid ? { 'aria-invalid': 'true' } : {}),
         class: 'flex-1 outline-none',
       },
-      // Pasted HTML is parsed through the schema above (only the safe subset
-      // exists in it). A markdown pipe table is the one markdown we read.
       handlePaste: (_view, event) => {
         const ed = editorRef.current;
         const text = event.clipboardData?.getData('text/plain') ?? '';
@@ -111,9 +95,6 @@ export default function RichMailBodyEditor({
   useEffect(() => {
     editorRef.current = editor;
   }, [editor]);
-  // The composer's <label for> must land on whichever control is showing: the editor
-  // surface in Preview (a div cannot be labelled natively, so a click on the label
-  // focuses it), the textarea in Source. Exactly one element carries the id.
   useEffect(() => {
     if (!editor || editor.isDestroyed || mode !== 'preview') return;
     const dom = editor.view.dom;
@@ -130,7 +111,6 @@ export default function RichMailBodyEditor({
     if (editor && !editor.isDestroyed) editor.setEditable(!disabled);
   }, [editor, disabled]);
 
-  // A value the editor did not produce replaces what it shows.
   useEffect(() => {
     if (value === lastEmitted.current) return;
     lastEmitted.current = value;
@@ -158,9 +138,6 @@ export default function RichMailBodyEditor({
     }),
   });
 
-  // Switching moves focus into the new surface, so the focus-gated bar (and the toggle) stays.
-  // Compared against the mode last seen, not a "first run" flag: StrictMode runs effects twice on
-  // mount, and mount must not steal focus (the editor may even be mid-recreate then).
   const seenMode = useRef(mode);
   useEffect(() => {
     if (seenMode.current === mode) return;
@@ -223,7 +200,6 @@ export default function RichMailBodyEditor({
     setLink: (target, edit) => {
       if (!editor || editor.isDestroyed) return;
       if (target.markOnly) {
-        // Spans blocks or cells: add the mark, leave the text and structure alone.
         const link = editor.schema.marks.link.create({ href: edit.href });
         const { tr } = editor.state;
         for (const [from, to] of target.ranges ?? [[target.from, target.to]]) {
@@ -233,7 +209,6 @@ export default function RichMailBodyEditor({
         editor.commands.focus();
         return;
       }
-      // Keep the other marks (bold, colour, size) of the first character replaced.
       const marks = [
         ...linkCarryMarks(editor, target.from),
         { type: 'link', attrs: { href: edit.href } },
@@ -306,12 +281,10 @@ export default function RichMailBodyEditor({
       {inSource && droppedMarkup(source) && (
         <LiveNote className="text-xs text-text-dim">{t('mail.format.sourceWillDrop')}</LiveNote>
       )}
-      {/* One card: the bar is its top strip, then the surface. */}
       <div
         data-mail-card
         className={cx(
           EVE_MAIL_SURFACE_FRAME_CLASS,
-          // The editable has no outline of its own, so the card carries the focus ring.
           'flex min-h-0 flex-1 flex-col focus-within:outline-2 focus-within:outline-accent',
           className
         )}
@@ -328,8 +301,6 @@ export default function RichMailBodyEditor({
             'min-h-0 flex-1 overflow-y-auto p-3 text-xs leading-normal break-words whitespace-pre-wrap',
             inSource ? 'hidden' : 'flex flex-col'
           )}
-          // Editable fills the box via flex, not `min-h-full` (Reply's card has no
-          // definite height), so a tap lands in it natively and the keyboard opens.
           onClick={(e) => {
             if (!editor || editor.isDestroyed || !(e.target instanceof Node)) return;
             if (editor.view.dom.contains(e.target)) return;

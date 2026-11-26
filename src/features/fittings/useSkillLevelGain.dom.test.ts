@@ -5,7 +5,6 @@ import type { SkillGain } from '@/engine/fittings/skillGains';
 import type { SkillGainEvaluator } from './useFittingEvaluation';
 import { useSkillLevelGain } from './useSkillLevelGain';
 
-// The scoring itself is `skillGains.test.ts`'s; here it only has to be told apart by level.
 vi.mock('@/engine/fittings/skillGains', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/engine/fittings/skillGains')>()),
   levelGain: (before: { ehp: number }, after: { ehp: number }) => ({

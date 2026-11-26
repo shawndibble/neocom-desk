@@ -42,7 +42,6 @@ interface PlanCostsPanelProps {
   totalVolume: ReturnType<typeof usePlanMaterials>['materialVolume'];
 }
 
-/** The Costs & revenue ledger: folded, the verdict in three numbers; open, the full `ResultsSummary`. */
 export function PlanCostsPanel({
   result,
   expanded,
@@ -75,22 +74,6 @@ export function PlanCostsPanel({
   return (
     <CollapsiblePanel
       title={t('industry.costsAndRevenue')}
-      /*
-       * Folded, this panel is the whole verdict in three numbers: what
-       * the job costs, what it brings in, and the difference. In the
-       * body rather than beside the title — three figures crowd a title
-       * that already sits next to two header buttons, and wrapped under
-       * them. Total cost alone, which the header used to carry open or
-       * closed, answered half the question and repeated a number the
-       * open table states anyway.
-       */
-      /*
-       * These three figures stay on `formatIsk` at full precision,
-       * deliberately (issue #948): collapsed or open, this panel is the
-       * Costs & revenue ledger, and the same number must not read
-       * "1.3B" folded and "1,284,500,000" unfolded. The shorthand read
-       * of profit lives in `PlanVerdictHero` above.
-       */
       collapsedSummary={
         pricesReady ? (
           <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-xs">
@@ -104,19 +87,6 @@ export function PlanCostsPanel({
             )}
             {heroFigures?.profit != null && (
               <>
-                {/*
-                  The rule is on the row itself rather than an element
-                  between the rows: a bare separator child of a `<dl>` is
-                  neither a term nor a definition, and a border-top on
-                  both cells of the last pair draws the same line across
-                  the full width without inventing one.
-
-                  Green or red on the figure, and it is the only coloured
-                  thing here: sign is what a reader is actually scanning
-                  for, and the `-` in front of it carries the same meaning
-                  for anyone who cannot see the difference
-                  (docs/DESIGN.md §7).
-                */}
                 <dt className="border-t border-line pt-1 text-text-dim">{t('industry.profit')}</dt>
                 <dd
                   className={cx(

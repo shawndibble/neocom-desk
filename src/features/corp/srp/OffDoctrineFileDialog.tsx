@@ -8,7 +8,6 @@ import { DoctrineCheckView } from './DoctrineCheckView';
 interface Props {
   hullName: string;
   check: DoctrineCheckRecord;
-  /** The Fleet or FC text, shared with the paste form so a note typed in either carries over. */
   fleet: string;
   onFleet: (value: string) => void;
   fleetRequired: boolean;
@@ -16,10 +15,6 @@ interface Props {
   onClose: () => void;
 }
 
-/**
- * What a lost ship's File asks first when its fit is off doctrine: the check's detail, an
- * optional (or required) Fleet or FC, then File anyway or Cancel. An on-doctrine loss never opens it.
- */
 export function OffDoctrineFileDialog({
   hullName,
   check,

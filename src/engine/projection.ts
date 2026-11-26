@@ -1,49 +1,3 @@
-/**
- * The Projection engine (ADR 0010, GLOSSARY.md round 44, issue #355): turns
- * what a Character's already-fetched snapshot data says about the future
- * into Projection rows the Scheduled Push backend can fire later without an
- * EVE token or an ESI call of its own.
- *
- * Each row carries the Occurrence Key (`occurrenceKey.ts` — the identical
- * function the Foreground Poller keys its own fires with), a `fireAt`, and
- * already-rendered title/body text. For every event but `characterNotTraining`
- * the key derives from a fixed natural id (a finish time, a job id, an expiry),
- * so a device and the backend always agree. `characterNotTraining` alone has
- * no natural id and buckets on `nowMs` at day granularity instead
- * (`occurrenceKey.ts`); this module passes the projected `fireAt` as that
- * bucket source — the closest available proxy for "the day this actually
- * happens" — but a live poll that only observes the transition after the
- * next UTC midnight still lands in a different bucket. That gap is inherent
- * to `occurrenceKey.ts`'s existing day-bucket design (#348), not something
- * this module can close on its own; `projection.test.ts` documents it rather
- * than papering over it.
- *
- * Rendering happens here, not in a later view: nothing else will ever render
- * this text, and the backend holds no SDE or i18n catalog to render it from
- * structured data (round 44 scope decision: "Projection rows carry rendered
- * text, not structured data"). That is also why this module takes
- * already-resolved names as plain values rather than looking them up itself
- * — `src/engine` stays free of Dexie/fetch/DOM (and, since Cloud Functions
- * import this module directly per ADR 0010, free of `src/i18n`'s React
- * coupling too) — the caller resolves names at the feature-layer boundary
- * (ARCHITECTURE.md) and hands them in.
- *
- * The wording itself is not written here either: each `project*` takes the
- * owning domain's push renderer (`PushCopy`, declared beside that domain's
- * live wording in `features/notifications/domainCopy.ts`, issue #1249, and
- * named on each event's Event Entry, issue #1285), so an
- * event's poll and push copy sit side by side. Those renderers are plain
- * functions of their arguments — no i18next, no lookups — which keeps this
- * module as pure as before.
- *
- * 12 of the 25 Notification Events carry a timestamp fixed far enough in
- * advance to be worth projecting; the rest are inherently "as it happens"
- * (new mail, a filled order, a wallet change) and have no seat here. EVE's
- * own notifications are mostly the same "as it happens" case — except a
- * structure reinforcement's `timeLeft` payload field, whose derived exit
- * instant (round 36) is exactly the kind of future timestamp this module
- * projects (issue #359).
- */
 import {
   type SkillQueueEntrySnapshot,
   type IndustryJobEntrySnapshot,
@@ -83,22 +37,9 @@ import { occurrenceKey, type OccurrenceFire } from './occurrenceKey';
 import type { NotificationCopy } from './notificationWording';
 import { HOUR_MS } from '@/lib/age';
 
-/** Matches the Roman-numeral formatting every skill-level display in the app uses. */
 const ROMAN = ['I', 'II', 'III', 'IV', 'V'] as const;
 export const romanLevel = (level: number): string => ROMAN[level - 1] ?? String(level);
 
-/**
- * Every Notification Event a Projection can be built for — the ones whose
- * occurrence has a knowable future timestamp, so the backend can schedule the
- * push ahead of time and the alert arrives with the app closed. Everything
- * else is only observable by polling, which needs the app open.
- *
- * The union below is derived from this array rather than written twice. The
- * feature layer's Event Entry catalog (`features/notifications/eventEntries.ts`,
- * issue #1285) is typed against it per event: an id listed here must declare a
- * push renderer there, and any other must declare none — so the two cannot
- * drift, and Settings' Scheduled Push badge reads the entries.
- */
 export const PROJECTABLE_EVENT_IDS = [
   'skillLevelComplete',
   'characterNotTraining',
@@ -124,37 +65,6 @@ export type ProjectableEventId = (typeof PROJECTABLE_EVENT_IDS)[number];
 
 export type ProjectionWording = 'assert' | 'hedge';
 
-/**
- * A Projection is a prediction nothing re-checks before it fires (ADR 0010:
- * "the backend cannot verify a Projection before firing it"). An event
- * hedges when an ordinary in-game action, taken while the app is closed,
- * routinely falsifies that prediction before it lands.
- *
- * Nine do. `courierDeliveryDue` (issue #1713) is falsified by delivering the
- * haul — the very thing it prompts. `contractExpiring` and `ordersLapsing`
- * (issue #3797) are falsified by relisting or accepting — likewise the very
- * thing they prompt. `structureFuelLow` is falsified by a refuel.
- * `mercenaryDenReinforced` is falsified by the den leaving reinforcement early. Both planetary
- * events are falsified by the move a pilot makes on every reset run —
- * stopping an extractor program and installing a new one. `skillQueueEnding`
- * (issue #1410) is falsified the same way by topping up the skill queue in
- * the EVE client — the app itself cannot write to the queue, but the game
- * client always can, with the app closed or open. That is not an edge case
- * for any of the four; it is the whole activity each event exists to prompt,
- * so a pilot who acts on the warning with the app closed is precisely the
- * one who then gets told their queue was about to run dry.
- *
- * Everything else rarely changes once its timestamp is fixed — a queued
- * skill about to *complete* (as opposed to the queue running dry behind it),
- * a started job, a scheduled calendar event — so it asserts.
- *
- * This governs the **push** path only. The Foreground Poller has genuinely
- * observed what it reports, so its copy stays assertive
- * (`notificationWording.ts`'s `SHARED_NOTIFICATION_WORDING`, spliced into
- * `notifications.fired.*` by `src/i18n/index.ts`). That split is why the
- * hedged push text (`features/notifications/domainCopy.ts`) is written out
- * inline rather than rendered from a shared template.
- */
 export function projectionWording(eventId: ProjectableEventId): ProjectionWording {
   switch (eventId) {
     case 'structureFuelLow':
@@ -175,8 +85,6 @@ export function projectionWording(eventId: ProjectableEventId): ProjectionWordin
     case 'cloneJumpReady':
     case 'calendarEventStarting':
     case 'eveNotification':
-    // A started Extraction's times do not change; an early fracture is a new occurrence.
-    // falls through
     case 'sharedMoonPop':
       return 'assert';
     default: {
@@ -186,7 +94,6 @@ export function projectionWording(eventId: ProjectableEventId): ProjectionWordin
   }
 }
 
-/** How far ahead a Projection reaches (round 44: the Projection Horizon). */
 export const PROJECTION_HORIZON_MS = 72 * HOUR_MS;
 
 export interface ProjectionRow {
@@ -196,45 +103,19 @@ export interface ProjectionRow {
   readonly fireAt: number;
   readonly title: string;
   readonly body: string;
-  /**
-   * The raw ESI type underneath an `eveNotification` row (issue #274's
-   * per-type opt-out), carried through so a push-delivered occurrence can be
-   * muted per-type exactly like the Foreground Poller's own feed write
-   * (`foregroundPoller.ts`'s `recordFeedEntry` call) — absent for every other
-   * `ProjectableEventId`, which has no type underneath it to carry.
-   */
   readonly eveType?: string;
 }
 
-/**
- * Strictly future and within the horizon. `fireAt === nowMs` is excluded —
- * that occurrence is the live Foreground Poller's to report, not a future
- * one to project — and `fireAt === nowMs + horizonMs` is included, matching
- * "covering the next 72 hours" inclusively at the far edge.
- */
 function inHorizon(fireAt: number, nowMs: number, horizonMs: number): boolean {
   return fireAt > nowMs && fireAt <= nowMs + horizonMs;
 }
 
-/**
- * A domain's push renderer: the rendered text for one projected fire. `names`
- * carries whatever display names the text needs, already resolved by the
- * caller (this module never looks anything up); a name that failed to resolve
- * is simply absent, and the renderer owns the fallback.
- */
 export type PushCopy<TFire, TNames> = (
   fire: TFire,
   characterName: string,
   names: TNames
 ) => NotificationCopy;
 
-/**
- * Every push renderer calls this with the wording its template actually
- * makes, so a future change to `projectionWording`'s mapping that a template
- * wasn't updated to match throws under test, rather than two
- * independently-maintained switches silently drifting apart (AC4: wording
- * must actually be *applied*, not just computed and unused).
- */
 export function assertProjectionWording(
   eventId: ProjectableEventId,
   expected: ProjectionWording
@@ -272,17 +153,6 @@ function sortedByQueuePosition(
   return [...entries].sort((a, b) => a.queuePosition - b.queuePosition);
 }
 
-/**
- * Every entry but the last that finishes inside the horizon projects
- * `skillLevelComplete` — the game auto-advances to the next queued entry, so
- * only the *last* entry's finish is the point training actually stops
- * (`characterNotTraining`), matching `notificationDiffs.ts`'s live
- * `hasMoreBehind` distinction without needing a previous poll to compare
- * against. That same last entry also projects `skillQueueEnding` (issue
- * #1410) at its own, earlier `finishMs - endingLeadMs` instant — a distinct
- * warning ahead of the queue actually running dry, not a duplicate of
- * `characterNotTraining`.
- */
 export function projectSkillQueue(
   characterId: number,
   characterName: string,
@@ -329,13 +199,6 @@ export function projectSkillQueue(
         buildRow(characterId, 'characterNotTraining', fire, finishMs, copy(fire, characterName, {}))
       );
     }
-    // The tail's own warning (issue #1410) — a distinct fire from
-    // `characterNotTraining` above: this one still has queue behind it to
-    // point to (`skillId`/`level`), and fires at `finishMs - endingLeadMs`
-    // rather than at `finishMs` itself. `endingLeadMs` is absent when the
-    // Character has none baked onto this entry (`pollDomains/`'s
-    // `skillQueueDomain.projection` always bakes the current one in before
-    // calling this, so absence here only ever means "not yet observed").
     if (last.endingLeadMs !== undefined) {
       const fireAt = finishMs - last.endingLeadMs;
       if (inHorizon(fireAt, nowMs, horizonMs)) {
@@ -397,11 +260,6 @@ export function projectIndustryJobs(
   return rows;
 }
 
-/**
- * The corp analogue of `projectIndustryJobs`: same horizon rule, keyed on the
- * job id exactly as the poller's `corpIndustryJobReady` is, so a foreground
- * poll and the scheduled push dedupe. The caller gates on `canReadIndustry`.
- */
 export function projectCorpIndustryJobs(
   characterId: number,
   characterName: string,
@@ -437,14 +295,6 @@ export function projectCorpIndustryJobs(
   return rows;
 }
 
-/**
- * `planetaryExtractionDone` keys on the colony's soonest extractor expiry
- * (`notificationDiffs.ts:274`'s `Math.min`, matching `colonyStatus.ts`'s idle
- * read) — one row per colony. `planetaryExtractorExpiring` is the opposite
- * granularity: one row per extractor, at that extractor's own baked-in
- * `thresholdMs` (the Character's configured lead time), if that fire lands
- * inside the horizon.
- */
 export function projectColonies(
   characterId: number,
   characterName: string,
@@ -501,13 +351,6 @@ export function projectColonies(
   return rows;
 }
 
-/**
- * `courierDeliveryDue` (issue #1713): one row per accepted courier the
- * Character holds, at `deliveryDeadlineMs - dueLeadMs`. Both are already
- * baked into the entry (`pollDomains/`'s `contractDomain`), so this is pure
- * snapshot arithmetic. A contract without a derivable deadline projects
- * nothing — `courierDeliveryDeadlineMs` returned `null` for it upstream.
- */
 export function projectContracts(
   characterId: number,
   characterName: string,
@@ -558,12 +401,6 @@ export function projectContracts(
   return rows;
 }
 
-/**
- * `ordersLapsing` (issue #3797): one batched row per batch of open orders
- * lapsing within `ORDER_BATCH_WINDOW_MS` of each other, at the batch's
- * soonest expiry minus the lead. Pure snapshot arithmetic: expiry and lead
- * are baked into the entries by `pollDomains/`'s `orderExpiryDomain`.
- */
 export function projectOrdersLapsing(
   characterId: number,
   characterName: string,
@@ -597,11 +434,6 @@ export function projectOrdersLapsing(
   return rows;
 }
 
-/**
- * `cloneJumpReady` (issue #2316): one row at the jump-clone cooldown's end,
- * already baked into the entry (`pollDomains/`'s `cloneJumpDomain`). A
- * Character who has never jumped has no entry, so projects nothing.
- */
 export function projectCloneJump(
   characterId: number,
   characterName: string,
@@ -657,11 +489,6 @@ export function projectCalendar(
   return rows;
 }
 
-/**
- * `entry.thresholdMs` is already baked in per entry at `pollDomains/`'s
- * `load()` time (the Character's current fuel lead time, read fresh every
- * poll) — pure snapshot arithmetic here, no preference lookup needed.
- */
 export function projectStructureFuel(
   characterId: number,
   characterName: string,
@@ -690,12 +517,6 @@ export function projectStructureFuel(
   return rows;
 }
 
-/**
- * `acceleratorExpiring` (hedged: the pilot can swap a fresh accelerator in
- * with the app closed). One row a lead time before the typed-in expiry; an
- * expiry already inside its lead window, or already past, projects nothing —
- * the foreground poll reports the former, the latter is gone.
- */
 export function projectAccelerators(
   characterId: number,
   characterName: string,
@@ -722,15 +543,11 @@ export function projectAccelerators(
   return rows;
 }
 
-/** What a Shared Moon Pop row names, resolved by the caller. */
 export interface SharedMoonPopProjectionNames {
-  /** Sharing corporations' names by id; an absent one leaves the renderer's fallback. */
   readonly corporations: ReadonlyMap<number, string>;
-  /** The Pop Time in the pilot's chosen clock. */
   readonly when: (ms: number) => string;
 }
 
-/** What `projectSharedMoonPops` reads. */
 export interface SharedMoonPopProjectionOptions {
   readonly characterId: number;
   readonly characterName: string;
@@ -742,10 +559,6 @@ export interface SharedMoonPopProjectionOptions {
   readonly horizonMs?: number;
 }
 
-/**
- * `sharedMoonPop` (issue #6225): one row per Shared Pop at its Pop Time less the Character's lead
- * time. A muted sharing corporation projects nothing; so does a pop already past its fire time.
- */
 export function projectSharedMoonPops({
   characterId,
   characterName,
@@ -771,13 +584,6 @@ export function projectSharedMoonPops({
   return rows;
 }
 
-/**
- * A Mercenary Den's reinforcement exit (issue #4782): the lead-time warning at
- * `exit - leadMs` and the "out now" push at the exit itself, each when it
- * falls inside the horizon. `entry.leadMs` is baked in at `load()` time, as
- * for `projectStructureFuel`. The two rows of one exit carry different
- * Occurrence Keys (`phase`).
- */
 export function projectMercenaryDens(
   characterId: number,
   characterName: string,
@@ -821,14 +627,6 @@ export function projectMercenaryDens(
   return rows;
 }
 
-/**
- * A skyhook's theft window (issue #4784): the lead-time warning at
- * `start - leadMs` and the "raidable now" push at the opening itself, each when
- * it falls inside the horizon. The second is a danger Alert when the silo, as
- * the snapshot last read it, is at or above the Character's minimum. A window
- * already open projects nothing: the poll that saw it fired it. `entry.leadMs`
- * is baked in at `load()` time, as for `projectStructureFuel`.
- */
 export function projectSkyhookRaids(
   characterId: number,
   characterName: string,
@@ -868,37 +666,6 @@ export function projectSkyhookRaids(
   return rows;
 }
 
-/**
- * A structure reinforcement's exit instant (round 36: the notification's own
- * timestamp plus the payload's `timeLeft` duration), for every
- * EVE Notification entry whose payload has one and whose exit falls inside
- * the horizon (issue #359). Parsing is type-agnostic — `timeLeft` means the
- * same thing wherever it appears, and CCP's own catalog of which types carry
- * it is not this module's to hardcode — so any entry lacking a usable one is
- * silently skipped rather than filtered by `type` first.
- *
- * The row's `eventId` stays `'eveNotification'` (matching this domain's only
- * `NotificationEventId`, so `foregroundPoller.ts`'s `enabledEvents` filter
- * lets it through), but its Occurrence Key derives from a distinct synthetic
- * `StructureReinforcementExitFire` rather than `EveNotificationFire` — see
- * that type's doc comment in `notificationDiffs.ts` for why reusing the
- * plain fire would collide with the live "lost shields/armor" fire sharing
- * the same `notificationId`.
- */
-/**
- * The structure ids `projectEveNotificationReinforcementExit` will actually
- * put in a row's text, for a caller that has to resolve display names first
- * (`features/notifications/pollDomains/`'s `eveNotificationDomain`
- * projection — `src/engine` stays free of the ESI call that resolves a name,
- * per this module's own header). Runs the identical `reinforcementExitMs` +
- * `inHorizon` gate `projectEveNotificationReinforcementExit` runs, so an
- * entry excluded here is exactly an entry that function would have produced
- * no row for — there is no ESI call this skips that a name would have
- * appeared in. Callers must pass the same `nowMs` to both functions: an
- * entry that passes this gate and fails the projector's (or vice versa) would
- * fall back to rendering `#id` for a lookup that either wasn't attempted or
- * was wasted.
- */
 export function reinforcementExitStructureIds(
   entries: readonly EveNotificationEntrySnapshot[],
   nowMs: number,
@@ -915,7 +682,6 @@ export function reinforcementExitStructureIds(
   return ids;
 }
 
-/** What a reinforcement-exit push can name its structure by, best first. */
 export interface ReinforcementExitNames {
   readonly payloadStructureName?: string;
   readonly resolvedStructureName?: string;

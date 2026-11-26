@@ -19,7 +19,6 @@ function stats(overrides: Partial<FittingStats> = {}): FittingStats {
   } as FittingStats;
 }
 
-/** A Facts pair's value, by its label. */
 const fact = (label: string) => screen.getByText(label).nextElementSibling?.textContent ?? '';
 
 describe('TankFacts', () => {

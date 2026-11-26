@@ -1,24 +1,6 @@
-/**
- * The corp asset inventory ledger (issue #4671): every corp asset classified
- * by where its container chain's ROOT sits (the in-game Corporation Assets
- * window's tabs), then aggregated by item type or by location, with stock
- * targets evaluated against what the corporation can actually use.
- *
- * Pure (CLAUDE.md): no `fetch`/DOM/Dexie import. It consumes `CorpAssetInput`
- * (`features/corp/assets.ts` adapts ESI at the boundary) and reuses
- * `assetStackValue` for valuation, so a blueprint copy is valued per item
- * (`copyValueByItemId`) exactly as the tree engine does.
- *
- * Office mapping matches `assetDivisions.ts`: an `OfficeFolder` asset sits at
- * a station (`locationId`), and its contents have `location_id` = the
- * OfficeFolder's item id with a `CorpSAGn` flag. A container's own contents
- * point at the container and carry no division of their own, so they inherit
- * the root's.
- */
 import { assetStackValue } from '../assetTree';
 import { HANGAR_DIVISIONS, type CorpAssetInput, type HangarDivisionNumber } from './assetDivisions';
 
-/** The in-game tabs, minus All. `other` is the never-dropped fallback, visible under All only. */
 export type LedgerState =
   | 'offices'
   | 'deliveries'
@@ -42,35 +24,23 @@ export const LEDGER_STATES: readonly LedgerState[] = [
   'other',
 ];
 
-/** A tab: one state, or `all`. */
 export type LedgerTab = LedgerState | 'all';
 
-/** An ancestor container between an item's root placement and the item. */
 export interface LedgerPathEntry {
   itemId: number;
   typeId: number;
 }
 
-/** One corp asset stack with its root placement. */
 export interface ClassifiedAsset {
   input: CorpAssetInput;
   state: LedgerState;
-  /**
-   * Station/structure of the root's office (Offices, Corp deliveries inside an
-   * office), else the root's own `location_id` (station, structure or solar
-   * system). Null when the chain is cyclic and no location is derivable.
-   */
   locationId: number | null;
-  /** 1–7 for Offices, else null. */
   division: HangarDivisionNumber | null;
-  /** Ancestors from the root placement down to the direct parent; empty for a root. */
   path: LedgerPathEntry[];
 }
 
 export interface ClassifiedCorpAssets {
-  /** Every non-`OfficeFolder` asset. */
   items: ClassifiedAsset[];
-  /** Location ids (station/structure) of every `OfficeFolder`, so an empty office can still be listed. */
   officeLocationIds: ReadonlySet<number>;
 }
 
@@ -100,7 +70,6 @@ function rootState(root: CorpAssetInput): {
   return { state: 'other', division: null };
 }
 
-/** Classifies every corp asset by its root; see the module header. Cycles in `location_id` terminate and land in `other`. */
 export function classifyCorpAssets(inputs: readonly CorpAssetInput[]): ClassifiedCorpAssets {
   const byItemId = new Map<number, CorpAssetInput>();
   const officeLocationIds = new Set<number>();
@@ -146,7 +115,6 @@ export function classifyCorpAssets(inputs: readonly CorpAssetInput[]): Classifie
   return { items, officeLocationIds };
 }
 
-/** Asset stacks (one per item row, not summed quantity) per tab, for the tab badges; `all` is the grand total. */
 export function countLedgerByState(items: readonly ClassifiedAsset[]): Record<LedgerTab, number> {
   const counts = { all: 0 } as Record<LedgerTab, number>;
   for (const state of LEDGER_STATES) counts[state] = 0;
@@ -157,12 +125,9 @@ export function countLedgerByState(items: readonly ClassifiedAsset[]): Record<Le
   return counts;
 }
 
-/** Valuation/volume inputs shared by both ledgers. */
 export interface LedgerValuation {
   prices: ReadonlyMap<number, number>;
-  /** Per-item value overrides: blueprint copies, abyssal modules (`assetStackValue`). */
   copyValues?: ReadonlyMap<number, number>;
-  /** Packaged volume per unit by type id; when absent, volumes are null. */
   volumes?: ReadonlyMap<number, number>;
 }
 
@@ -185,7 +150,6 @@ function stackVolume(item: ClassifiedAsset, v: LedgerValuation): number | null {
   return item.input.quantity * (v.volumes.get(item.input.typeId) ?? 0);
 }
 
-/** One asset stack in a ledger row. */
 export interface LedgerStack {
   itemId: number;
   typeId: number;
@@ -193,12 +157,10 @@ export interface LedgerStack {
   quantity: number;
   estimatedValue: number;
   volume: number | null;
-  /** True assembled, false packaged, null when unknown. */
   isSingleton: boolean | null;
   state: LedgerState;
   locationId: number | null;
   division: HangarDivisionNumber | null;
-  /** Ancestors between the root placement and this stack (office › division is the caller's to print). */
   path: LedgerPathEntry[];
 }
 
@@ -230,17 +192,11 @@ export type StockStatus = 'met' | 'short' | 'none-owned';
 
 export interface StockTargetStatus {
   target: number;
-  /** Units in Offices + Corp deliveries, originals only. */
   owned: number;
   shortBy: number;
   status: StockStatus;
 }
 
-/**
- * Evaluates every target against usable stock: Offices + Corp deliveries,
- * non-copy only (a BPC does not count toward its type's target). Always
- * computed from the unfiltered items so a filtered view cannot change a status.
- */
 export function evaluateStockTargets(
   targets: ReadonlyMap<number, number>,
   items: readonly ClassifiedAsset[]
@@ -267,7 +223,6 @@ export function evaluateStockTargets(
 }
 
 export interface LedgerFilter {
-  /** Tab; default `all`. */
   state?: LedgerTab;
   locationId?: number;
   division?: HangarDivisionNumber;
@@ -283,25 +238,18 @@ function matches(item: ClassifiedAsset, filter: LedgerFilter | undefined): boole
 
 export interface ItemLedgerRow {
   typeId: number;
-  /** A copy is its own row, distinct from its original. */
   isBlueprintCopy: boolean;
   quantity: number;
   estimatedValue: number;
   volume: number | null;
-  /** Aggregated by (state, location, division). */
   placements: LedgerPlacement[];
   stacks: LedgerStack[];
-  /** Target + owned for an original with a target; null for copies and untargeted types. */
   stock: StockTargetStatus | null;
 }
 
 export interface ItemLedgerOptions extends LedgerValuation {
   filter?: LedgerFilter;
   targets?: ReadonlyMap<number, number>;
-  /**
-   * `evaluateStockTargets(targets, items)` already computed by the caller (the
-   * page also needs it for the Below target filter); computed here when absent.
-   */
   stock?: ReadonlyMap<number, StockTargetStatus>;
 }
 
@@ -309,12 +257,6 @@ function placementKey(s: LedgerStack): string {
   return `${s.state}|${s.locationId ?? ''}|${s.division ?? ''}`;
 }
 
-/**
- * By-item ledger: one row per (type, isBlueprintCopy) over the items passing
- * `filter`. A targeted type nothing passes still yields a qty-0 row, but only
- * when the filter would not exclude it by nature (tab all/offices
- * and no location/division filter).
- */
 export function buildItemLedger(
   items: readonly ClassifiedAsset[],
   options: ItemLedgerOptions
@@ -390,14 +332,11 @@ export function buildItemLedger(
   return [...rows.values()];
 }
 
-/** Totals for one office division, one office's Corp deliveries, or one non-office place. `itemCount` counts asset stacks. */
 export interface LedgerCell {
   itemCount: number;
   estimatedValue: number;
   volume: number | null;
-  /** Up to three stacks, highest value first. */
   topStacks: LedgerStack[];
-  /** Every stack in the cell, containers and their contents alike (`buildContentsTree` nests them). */
   stacks: LedgerStack[];
 }
 
@@ -407,10 +346,8 @@ export interface OfficeDivisionCell extends LedgerCell {
 
 export interface OfficeGroup {
   locationId: number;
-  /** Seven entries, divisions 1–7, always present so empty ones can render dim. */
   divisions: OfficeDivisionCell[];
   deliveries: LedgerCell;
-  /** Nothing in any division (Corp deliveries do not count). */
   isEmpty: boolean;
 }
 
@@ -420,9 +357,7 @@ export interface PlaceGroup extends LedgerCell {
 }
 
 export interface LocationLedger {
-  /** Sorted by location id; includes offices holding nothing. */
   offices: OfficeGroup[];
-  /** One group per (state, location) outside a known office, in `LEDGER_STATES` order. */
   others: PlaceGroup[];
 }
 
@@ -444,7 +379,6 @@ function buildCell(stacks: readonly LedgerStack[], hasVolumes: boolean): LedgerC
   return { itemCount, estimatedValue, volume, topStacks, stacks: [...stacks] };
 }
 
-/** By-location ledger over the whole classification (not tab-filtered: the page picks `offices` / `others`). */
 export function buildLocationLedger(
   classified: ClassifiedCorpAssets,
   valuation: LedgerValuation
@@ -508,27 +442,15 @@ export function buildLocationLedger(
   return { offices, others };
 }
 
-/** One stack in a place's contents, with whatever sits inside it. */
 export interface LedgerContentsNode {
   itemId: number;
   typeId: number;
-  /** Null for a container a filter left out, kept because something it holds passed. */
   stack: LedgerStack | null;
   children: LedgerContentsNode[];
-  /** Stacks anywhere beneath this one. */
   itemCount: number;
-  /** This stack's value plus everything beneath it. */
   estimatedValue: number;
 }
 
-/**
- * Nests one place's stacks (a `LedgerCell`'s) by their container paths, the
- * way the in-game hangar shows them: containers first, then by value. A
- * container missing from `stacks` (filtered out) is rebuilt from the path of
- * what it holds, so a search still shows where a hit sits. Not
- * `engine/assetTree.ts`: that walks raw assets with bays and ship rules; this
- * only follows the paths the ledger already recorded.
- */
 export function buildContentsTree(stacks: readonly LedgerStack[]): LedgerContentsNode[] {
   const nodes = new Map<number, LedgerContentsNode>();
   const roots: LedgerContentsNode[] = [];

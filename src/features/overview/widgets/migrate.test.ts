@@ -93,11 +93,6 @@ describe('parseHiddenCards', () => {
     expect(parseHiddenCards(['mining', 'alerts'])).toEqual(['mining', 'alerts']);
   });
 
-  /*
-   * The value is last-write-wins as a whole. A build that dropped a key it
-   * did not recognise would write the shortened list back on its next toggle
-   * and un-hide a newer build's card on every device.
-   */
   it('keeps keys this build has no card for', () => {
     expect(parseHiddenCards(['mining', 'someFutureCard'])).toEqual(['mining', 'someFutureCard']);
   });

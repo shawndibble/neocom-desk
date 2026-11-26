@@ -1,12 +1,6 @@
-/**
- * Which insurance payout's loss the Wallet journal is showing. Held above the
- * table, not in the row: a virtualized row unmounts as it scrolls out of
- * range, which would close the modal under the reader.
- */
 import { create } from 'zustand';
 
 export interface InsuranceLossRequest {
-  /** The journal line's `date`. */
   payoutDate: string;
   characterId: number;
 }

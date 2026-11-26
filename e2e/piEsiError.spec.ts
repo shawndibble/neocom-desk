@@ -1,9 +1,3 @@
-/**
- * PI ESI error state (#2691): a /planets 5xx on a cold cache reads as "ESI
- * didn't answer" with a Retry on Plan, Map and Colonies, never "no colonies".
- * A warm cache keeps its data when a refresh fails. `PI_SHOTS=<dir>` also
- * writes screenshots.
- */
 import type { Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
@@ -18,7 +12,6 @@ const VIEWPORTS = [
 const TABS = ['plan', 'map', 'colonies'] as const;
 const NOTICE = "ESI didn't answer";
 
-/** Fails the colony list read with a 503 while `state.down`; everything else falls through to the colony mocks. */
 async function openWithPlanetsDown(page: Page, tab: string, startDown: boolean) {
   const state = { down: startDown };
   await signInAndGoto(page, `./planetary-industry/${tab}`);
@@ -54,7 +47,6 @@ for (const [label, viewport] of VIEWPORTS) {
       ).toHaveCount(0);
       const box = await alert.boundingBox();
       expect(box!.x + box!.width).toBeLessThanOrEqual(viewport.width);
-      // The notice owns the colony slot only: Plan keeps Find best, Map keeps its board (#2760).
       if (tab === 'plan') {
         await expect(page.getByRole('group', { name: 'What do you want to do?' })).toBeVisible();
       }
@@ -69,7 +61,6 @@ for (const [label, viewport] of VIEWPORTS) {
       await alert.getByRole('button', { name: 'Retry' }).click();
       await expect(alert).toHaveCount(0, { timeout: 30_000 });
       if (tab !== 'colonies') {
-        // Focus lands on the result, never on <body>.
         await expect
           .poll(() => page.evaluate(() => document.activeElement?.tagName))
           .not.toBe('BODY');

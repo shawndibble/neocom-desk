@@ -97,7 +97,6 @@ describe('walkSellIntoBuys', () => {
       [buy({ price: 9, volumeRemain: 20, minVolume: 15 }), buy({ price: 5, volumeRemain: 100 })],
       25
     );
-    // 20 at 9, then 5 left: the 5-ISK order takes them.
     expect(walk.revenue).toBe(20 * 9 + 5 * 5);
   });
 

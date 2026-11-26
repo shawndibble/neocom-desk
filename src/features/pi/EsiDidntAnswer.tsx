@@ -1,12 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui';
 
-/**
- * The one "ESI did not answer" notice, shared by Plan, Map and Colonies. The
- * colony list could not be read and nothing is cached: that is not "you have no
- * colonies" and not a login problem (`needsReauth` has its own banner), so a
- * tab shows this with a Retry instead of an empty state.
- */
 export function EsiDidntAnswer({
   onRetry,
   retrying = false,

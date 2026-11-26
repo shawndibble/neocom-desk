@@ -1,8 +1,3 @@
-/**
- * The member's whole Corp Tax Book picture for the Tax tab (#4065), built from
- * what was loaded: the books' own lines, the prices at each book's hub, and the
- * member's ledger and wallet. Pure; `useCorpBookView` does the loading.
- */
 import {
   inFlightDonations,
   overlayCorpBooks,
@@ -24,7 +19,6 @@ import type { ClaimablePayment, LoadedCorpBook } from './corpBookStore';
 import { payeesOfBookCorporation } from '@/engine/miningTax/payeeCorporation';
 import { corpPayee, corpPayeeId, personalEntriesOf } from './corpRows';
 
-/** A payment the member made, as the book's overlay reads it; only a journal entry carries a `refId`. */
 export function madeDonationOf(m: MadePayment): MadeDonation {
   return {
     characterId: m.characterId,
@@ -39,16 +33,12 @@ export function madeDonationOf(m: MadePayment): MadeDonation {
 export interface CorpBookViewBook {
   loaded: LoadedCorpBook;
   corpName: string;
-  /** None of the tracked Characters is in the corporation any more (Leavers keep read access). */
   left: boolean;
   summary: BookSummary;
   payee: PayeeRecord;
-  /** The earliest day whose corp record is still pending, when any is. */
   pendingFrom?: string;
-  /** The earliest day with ore still Settling (the refinery log catching up), when any is. */
-  settlingFrom?: string;
-  /** The earliest open day owed at an estimate, when any is. */
   estimateFrom?: string;
+  finalThrough?: string;
 }
 
 export interface CorpClaim {
@@ -58,10 +48,6 @@ export interface CorpClaim {
   payment: ClaimablePayment;
 }
 
-/**
- * The payments a member recorded by hand in a book's Settle up (`recorded` links to the book's own
- * Payee), as the donations they said they sent: each dated to the end of its day, never a wallet's minute.
- */
 export function statedDonationsOf(
   links: readonly PayeePaymentLink[],
   corporationId: number
@@ -73,7 +59,6 @@ export function statedDonationsOf(
             characterId: l.characterId,
             counterpartyId: corporationId,
             amount: l.amount,
-            // The end of the day it names: a book read earlier that day cannot have seen it yet.
             date: `${l.paidOn}T23:59:59.000Z`,
             method: 'donation',
             stated: true as const,
@@ -86,7 +71,6 @@ export function statedDonationsOf(
 export interface CorpBookView {
   overlay: PersonalOverlay;
   books: CorpBookViewBook[];
-  /** The virtual Payees, named for the corporation, for balances and the Payee filter only. */
   payees: PayeeRecord[];
   claims: CorpClaim[];
 }
@@ -94,18 +78,11 @@ export interface CorpBookView {
 export interface CorpBookViewInput {
   rows: readonly MoonMiningTaxRow[];
   loaded: readonly LoadedCorpBook[];
-  /** Prices at each book's hub and Ore Form, per corporation. */
   pricesByCorp: ReadonlyMap<number, DatedUnitPrices>;
   corpNames: ReadonlyMap<number, string>;
-  /** The member's stored Payees: one verified as a book's corporation is that book's own Payee. */
   payees: readonly PayeeRecord[];
   made: readonly MadePayment[];
-  /**
-   * The Made Payments links hold (`heldPaymentKeys`): each pays the personal Payee it is linked
-   * to, so none counts as a donation in flight to a book as well.
-   */
   linked?: ReadonlySet<string>;
-  /** Every stored payment link: the ones recorded to a book's Payee are donations the member sent. */
   recorded?: readonly PayeePaymentLink[];
   characterNames: ReadonlyMap<number, string>;
   now: string;
@@ -121,7 +98,6 @@ export function buildCorpBookView(
   const nameOf = (corporationId: number) =>
     input.corpNames.get(corporationId) ?? `#${corporationId}`;
 
-  // Payees verified as a corporation: a moon owner's among them names a Collector's conflict.
   const payeeCorporations = Object.fromEntries(
     input.payees.flatMap((p) =>
       p.entityKind === 'corporation' && p.entityId !== undefined ? [[p.id, p.entityId]] : []
@@ -149,6 +125,7 @@ export function buildCorpBookView(
       ...(book.feeders ? { feeders: book.feeders } : {}),
       ...(book.adjustments ? { adjustments: book.adjustments } : {}),
       ...(book.toleranceExemptions ? { toleranceExemptions: book.toleranceExemptions } : {}),
+      ...(book.dayTolerancePct !== undefined ? { dayTolerancePct: book.dayTolerancePct } : {}),
       ...(book.minerPaidThrough ? { minerPaidThrough: book.minerPaidThrough } : {}),
       ...(book.writeOffs ? { writeOffs: book.writeOffs } : {}),
       ...(book.declarations ? { declarations: book.declarations } : {}),
@@ -156,8 +133,6 @@ export function buildCorpBookView(
       ...(book.structureNames ? { structureNames: book.structureNames } : {}),
       hubId: book.hubId,
       oreForm: book.oreForm,
-      // Linked, or named exactly as the corporation (`payeesOfBookCorporation`): a Payee missing
-      // its link on this device is still the corporation's own, never a second Payee.
       ownPayeeIds: payeesOfBookCorporation(input.payees, {
         corporationId: book.corporationId,
         name: nameOf(book.corporationId),
@@ -194,14 +169,18 @@ export function buildCorpBookView(
       )
       .map(([key]) => key.split(':')[1])
       .sort();
-    const settlingFrom = overlay.rows
-      .filter((r) => r.state === 'settling' && r.corporationId === loadedBook.corporationId)
+    const estimates = overlay.rows.filter(
+      (r) => r.state === 'estimate' && r.corporationId === loadedBook.corporationId
+    );
+    const estimateFrom = estimates
+      .filter((r) => !r.final)
       .map((r) => r.date)
       .sort()[0];
-    const estimateFrom = overlay.rows
-      .filter((r) => r.state === 'estimate' && r.corporationId === loadedBook.corporationId)
+    const finalThrough = estimates
+      .filter((r) => r.final)
       .map((r) => r.date)
-      .sort()[0];
+      .sort()
+      .at(-1);
     const ownRate = overlay.rows.find((r) => r.corporationId === loadedBook.corporationId)?.taxPct;
     const firstChar = loadedBook.characterIds[0];
     return {
@@ -217,8 +196,8 @@ export function buildCorpBookView(
         loadedBook.hubId
       ),
       ...(pendingDates[0] !== undefined ? { pendingFrom: pendingDates[0] } : {}),
-      ...(settlingFrom !== undefined ? { settlingFrom } : {}),
       ...(estimateFrom !== undefined ? { estimateFrom } : {}),
+      ...(finalThrough !== undefined ? { finalThrough } : {}),
     };
   });
   const claims: CorpClaim[] = ready.flatMap((book) =>

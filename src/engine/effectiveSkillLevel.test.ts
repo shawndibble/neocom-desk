@@ -3,9 +3,6 @@ import { effectiveSkillLevel } from './effectiveSkillLevel';
 
 describe('effectiveSkillLevel', () => {
   it('picks the trained level when a just-finished queue entry has raised both trained and active', () => {
-    // A queue entry completing raises both the corrected trained level and
-    // the corrected active level together, so once both read 5 there is no
-    // cap to apply.
     expect(effectiveSkillLevel(5, 5)).toBe(5);
   });
 

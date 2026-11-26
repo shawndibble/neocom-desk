@@ -1,10 +1,3 @@
-/**
- * When a pilot's newest losses happened, for the Threat verdict of a pilot with
- * no recent kill: a recent loss means they are flying, so they are not
- * "inactive". Read from the newest kills and losses `Recent kills and losses`
- * already loads (`fetchPilotKillmails`, one request shared between them), and
- * asked for only when `enabled`.
- */
 import { useCallback } from 'react';
 import { useKeyedLoad } from '@/lib/useAsyncLoad';
 import { fetchPilotKillmails } from '@/lib/zkillboard';
@@ -14,7 +7,6 @@ export type PilotLossTimesState =
   | { kind: 'idle' }
   | { kind: 'loading' }
   | { kind: 'failed' }
-  /** `timesMs` is null when a loss came without a date, so the losses cannot be told. */
   | { kind: 'ready'; timesMs: number[] | null };
 
 export function usePilotLossTimes(characterId: number, enabled: boolean): PilotLossTimesState {

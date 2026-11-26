@@ -1,15 +1,9 @@
-/**
- * Composes `suggestReorder` + `placeRemaps`: reorder first, then place
- * remaps on the new order — one-step "fastest plan, respecting priorities".
- */
 import { placeRemaps, type PlaceRemapsOptions, type PlaceRemapsResult } from './placeRemaps';
 import { suggestReorder } from './reorderSuggestion';
 import type { EngineSkill, PlanMilestone, PlanPriority, PlanStep } from '@/engine/types';
 
 export interface OptimizeForMeResult {
-  /** The priority-respecting reorder — `suggestReorder`'s output. */
   order: PlanStep[];
-  /** Remap placement on `order`, not on the plan's original order. */
   remaps: PlaceRemapsResult;
 }
 

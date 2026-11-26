@@ -1,15 +1,3 @@
-/**
- * Phone rendering of What's profitable: one ranked card per product in place
- * of `DataTable`'s stacked label/value rows, in the same family as the Ranked
- * (`MobileOpportunityList`) and All owned (`MobileOwnedBlueprintList`) cards.
- * Each card leads with the product's icon and its rank in the scan, names it
- * with where its blueprint comes from and how deep its sell orders are, and
- * parks the sorted field on the right like a price tag — the other figures
- * fold into one quiet line beneath the name.
- *
- * The rows arrive already filtered, sorted and cut to the page the panel is
- * showing, so the rank is just a card's position.
- */
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -29,22 +17,17 @@ import { StartPlanButton } from './StartPlanButton';
 import { isCardOwnClick, useRowStartPlan } from './rowStartPlan';
 
 interface MobileMarketWideListProps {
-  /** The page being shown: filtered, sorted and cut. */
   rows: readonly MarketWideDayRow[];
-  /** The daily-sales share (percent) ISK/day assumes; named in its tooltip. */
   salesShare: string;
-  /** Every row the filters let through, of which `rows` is the top. */
   total: number;
   sort: DataTableSort;
   onSortChange: (next: DataTableSort) => void;
   skillGateFor: (productTypeID: number) => SkillGateVerdict | undefined;
   nameForSkill: (typeID: number) => string;
   nameForCharacter: (characterId: number) => string;
-  /** Resolves true once it has opened the new plan (see `StartPlanButton`). */
   onStartPlan: (row: MarketWideResultRow) => Promise<boolean>;
 }
 
-/** The desktop table's sortable column ids, so the two share one URL sort. */
 type SortFieldId =
   | 'iskPerHour'
   | 'iskPerDay'
@@ -67,10 +50,8 @@ const SORT_FIELD_ORDER: readonly SortFieldId[] = [
   'orderDepth',
 ];
 
-/** The text field: A-Z on first tap, like the desktop table's text column; the rest are numbers, biggest first. */
 const TEXT_SORT_FIELDS: ReadonlySet<SortFieldId> = new Set(['product']);
 
-/** The fields with a figure to show; a sort by any other leads with ISK/hour. */
 type FigureId = 'iskPerHour' | 'iskPerDay' | 'margin' | 'vs90d' | 'duration' | 'buildCost';
 const FIGURE_ORDER: readonly FigureId[] = [
   'iskPerHour',
@@ -82,7 +63,6 @@ const FIGURE_ORDER: readonly FigureId[] = [
 ];
 
 interface Figure {
-  /** Null: blank — left out as a secondary readout, "Unknown" as the hero. */
   node: ReactNode | null;
   toneClassName?: string;
 }
@@ -160,7 +140,6 @@ export function MobileMarketWideList({
     : 'iskPerHour';
 
   return (
-    // Flush to the panel's edges: the cards carry their own inset.
     <div className="-mx-3 flex flex-col">
       <MobileSortToolbar
         count={rows.length}
@@ -188,7 +167,6 @@ export function MobileMarketWideList({
           return (
             <li
               key={row.productTypeID}
-              // A tap on the card is Start plan's action; its controls are exempt.
               onClick={(event) => {
                 if (isCardOwnClick(event)) startPlanFromRow(row);
               }}

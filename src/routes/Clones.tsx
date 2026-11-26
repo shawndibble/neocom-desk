@@ -43,14 +43,12 @@ import { loadClonesSnapshot } from '@/features/character/clonesSnapshot';
 import { PlaceLink, SystemLink } from '@/features/entities';
 import { CloneCard, TOUCH_LINK } from '@/features/character/CloneCard';
 
-/** Stable identity, so the fallback doesn't invalidate the column memo every render. */
 const NO_DETAILS: ReadonlyMap<number, ImplantDetail> = new Map();
 const NO_CLONES: readonly JumpClone[] = [];
 const NO_SYSTEMS: ReadonlyMap<number, number | null> = new Map();
 const NO_SECURITIES: ReadonlyMap<number, number> = new Map();
 const NO_IDS: readonly number[] = [];
 
-/** Clones: jump clones, their locations and implants, plus the current jump cooldown. */
 export function Clones() {
   const { t } = useTranslation();
   const timeZone = useTimeZone();
@@ -62,8 +60,6 @@ export function Clones() {
 
   const clonesResult = data?.clonesResult ?? null;
   const clonesNeedsReauth = data?.clonesNeedsReauth ?? false;
-  // The full banner is for a lapsed grant with nothing saved to show; with a
-  // saved copy the clones stay and a small note sits above them.
   const clonesBlocked = clonesNeedsReauth && clonesResult === null;
   const infomorphLevel = data?.infomorphLevel ?? 0;
   const implantNames = data?.implantNames ?? NO_NAMES;
@@ -75,15 +71,10 @@ export function Clones() {
   const securities = data?.securities ?? NO_SECURITIES;
   const characterSystemName = data?.characterSystemName ?? null;
   const wornIds = data?.wornImplants?.data ?? NO_IDS;
-  // Falls back to the last SP another tab already loaded for this character,
-  // not straight to "—": this tab's own read is still in flight the instant
-  // it mounts, and the shared header must not blank out a number the user
-  // just saw on Overview or Employment History a moment ago.
   const sp = data?.sp ?? getLastKnownSpSummary(activeCharacterId);
   const loadedAt = data?.loadedAt ?? 0;
 
   const clones = useMemo(() => clonesResult?.data.jump_clones ?? NO_CLONES, [clonesResult]);
-  // An Overview row's `?highlight=<jump_clone_id>`: the worn clone has no id, so its row stays plain.
   const highlightedCloneId = useHighlightParam();
   const cloneListRef = useRef<HTMLUListElement>(null);
   useScrollToRowKey(cloneListRef, highlightedCloneId, clones);
@@ -127,7 +118,6 @@ export function Clones() {
   };
   const homeSecurity = securityOf(homeLocation?.location_id);
   const hasWorn = data?.wornImplants != null;
-  // The summary cards need loaded clones data; every other state lives in the list panel.
   const showSummary = !(loading && !data) && !clonesBlocked && !error && clonesResult !== null;
 
   const {
@@ -166,7 +156,6 @@ export function Clones() {
   );
   const clonesExport = useTableExport({
     surface: 'clones',
-    // No table is mounted, so `rows` carries the reader's sort.
     source: 'rows',
     rows: () =>
       clonesBlocked
@@ -224,7 +213,6 @@ export function Clones() {
             homeJumps={homeJumps}
             lastStationChangeDate={lastStationChangeDate}
           />
-          {/* One DOM: below md the answer leads, from md up the order is as before. */}
           {verdictCard && (
             <div className="order-first md:order-none">
               <CloneVerdictCard
@@ -237,12 +225,6 @@ export function Clones() {
         </div>
       )}
 
-      {/*
-        The summary cards above the list carry no title or toolbar of their
-        own. Data age, Refresh and Export ride on the clone list's toolbar
-        below, and that one panel wraps every branch so the toolbar — the only
-        way back from a failed or empty load — is there in all of them.
-      */}
       <Panel
         title={t('clones.title')}
         actions={
@@ -298,7 +280,6 @@ export function Clones() {
                   options={CLONES_SORTS.map((value) => ({
                     value,
                     label: t(`clones.sort.${value}`),
-                    // Only a note card means "no verdict"; null is still loading.
                     ...(value === 'training' && verdictCard?.kind === 'note'
                       ? { disabled: true, disabledReason: verdictCard.message }
                       : {}),
@@ -367,7 +348,6 @@ export function Clones() {
                                   ? t('clones.renamePlace', { place })
                                   : t('clones.renameNamed', { name }),
                               value: nicknames[clone.jump_clone_id] ?? '',
-                              // What an empty field falls back to: ESI's name, else the place.
                               placeholder: cloneOwnName(clone, {}) ?? place,
                               onSave: (next) => void saveCloneNickname(clone.jump_clone_id, next),
                             }

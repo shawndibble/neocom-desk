@@ -1,16 +1,3 @@
-/**
- * Test-only: one record per synced Dexie table with **every** field set.
- * Imported by test files only — nothing in the app references this module
- * (`statusFixtures.ts`'s shape, same reasoning).
- *
- * Each value is typed `Required<...Record>` (Build Plans less the legacy
- * `rigLevel`, explained below), so a field added to a record
- * fails typecheck here until the fixture sets it. The round-trip test
- * (`syncedCollections.test.ts`) then pushes and pulls each one field by field,
- * so a field the collection's remote mapping forgets fails there instead of
- * silently never leaving the device. The backup restore fixture was generated
- * from these same rows.
- */
 import type {
   BuildPlanRecord,
   FittingRecord,
@@ -18,6 +5,7 @@ import type {
   CharacterAcceleratorRecord,
   MiningTaxAssignmentRecord,
   MiningTaxPaymentLinkRecord,
+  MiningTaxRecordChangeRecord,
   PayeeRecord,
   PlanetRichnessRecord,
   ProductionLossRecord,
@@ -40,18 +28,12 @@ export const FULL_SKILL_PLAN: Required<SkillPlanRecord> = {
   markers: [1],
   markerAttributes: [{ intelligence: 17, memory: 17, perception: 27, willpower: 21, charisma: 17 }],
   whatIfImplants: { kind: 'preset', preset: '+4' },
-  // Identical content on purpose: pushing derives the legacy mirror from
-  // boosters[0], so a field-by-field round trip only holds if the fixture
-  // already agrees with itself the way a real write would.
   booster: { enabled: true, bonus: 6, startsAt: null, expiresAt: 4_102_444_800_000 },
   boosters: [{ enabled: true, bonus: 6, startsAt: null, expiresAt: 4_102_444_800_000 }],
   milestones: [{ id: 'm1', name: 'Fly Loki', skillTypeID: 3327, level: 5 }],
   updatedAt: UPDATED_AT,
 };
 
-// `rigLevel` is the pre-#609 legacy field: this app never writes it any more
-// (`rigFit` is what reaches the remote doc — see `resolveRigFit`), so a round
-// trip for it no longer happens and it is left out.
 export const FULL_BUILD_PLAN: Required<Omit<BuildPlanRecord, 'rigLevel'>> = {
   id: 'b1',
   characterId: 1,
@@ -185,7 +167,6 @@ export const FULL_FITTING: Required<FittingRecord> = {
   characterId: 1,
   name: 'Brawler Rifter',
   code: 'eyJ2IjoxfQ',
-  // Non-empty on purpose: "no notes" travels as '' and comes back absent.
   notes: 'Overheat the guns',
   updatedAt: UPDATED_AT,
 };
@@ -256,7 +237,33 @@ export const FULL_MINING_TAX_PAYMENT_LINK: Required<MiningTaxPaymentLinkRecord> 
   updatedAt: UPDATED_AT,
 };
 
-/** One full record per synced Dexie table, keyed by table name. */
+export const FULL_MINING_TAX_RECORD_CHANGE: Required<MiningTaxRecordChangeRecord> = {
+  id: 'tolerance:98000001:m1:2026-10-02',
+  characterId: 1,
+  reason: 'tolerance',
+  at: '2026-10-04T12:00:00Z',
+  date: '2026-10-02',
+  corporationId: 98000001,
+  minerId: 'm1',
+  closeOut: {
+    billed: 2_000_000,
+    paid: 1_995_000,
+    writtenOff: 5_000,
+    tolerancePct: 0.5,
+    tolerance: 10_000,
+    exempt: true,
+    paymentId: 'p2',
+  },
+  assignments: [
+    {
+      assignmentId: 'a1',
+      before: { payeeId: 'payee-1', taxPct: 10, taxOwed: 1_000, oreLines: [] },
+      after: null,
+    },
+  ],
+  updatedAt: UPDATED_AT,
+};
+
 export const FULL_RECORDS = {
   skillPlans: FULL_SKILL_PLAN,
   buildPlans: FULL_BUILD_PLAN,
@@ -273,4 +280,5 @@ export const FULL_RECORDS = {
   fittings: FULL_FITTING,
   miningTaxAssignments: FULL_MINING_TAX_ASSIGNMENT,
   miningTaxPaymentLinks: FULL_MINING_TAX_PAYMENT_LINK,
+  miningTaxRecordChanges: FULL_MINING_TAX_RECORD_CHANGE,
 } as const;

@@ -27,7 +27,6 @@ function headers(entries: Record<string, string>): Headers {
   return new Headers(entries);
 }
 
-/** The state after one healthy response carrying a full budget. */
 function healthy(now = NOW): BudgetState {
   return observeBudget(INITIAL_BUDGET, {
     status: 200,
@@ -80,8 +79,6 @@ describe('observeBudget — reading the headers off every response', () => {
 
   it('does not let a stale reading survive its own window', () => {
     const state = healthy();
-    // 61s later the window named by the header has rolled over, so "1 error
-    // left" is no longer a statement about now.
     const { plan } = planRequest({ ...state, errorRemain: 1 }, NOW + 61_000);
     expect(plan).toEqual({ kind: 'go', waitMs: 0 });
   });
@@ -162,10 +159,6 @@ describe('observeBudget — the circuit', () => {
   });
 
   it('is NOT reopened by a straggler that was already on the wire when it shut', () => {
-    // Up to `ESI_MAX_IN_FLIGHT - 1` peers are mid-flight when a 420 lands. One
-    // of them answering 200 only says ESI was fine when *it* was sent — a
-    // moment the 420 has since contradicted. Believing it hands the whole
-    // fan-out back its open door immediately.
     const shut = observeBudget(INITIAL_BUDGET, {
       status: 420,
       headers: headers({ 'x-esi-error-limit-reset': '45' }),
@@ -214,8 +207,6 @@ describe('planRequest — a healthy budget', () => {
   });
 
   it('leaves no trace at all when the budget is healthy', () => {
-    // A cursor moved on the healthy path is a cursor a wall-clock move can
-    // strand, holding back requests nothing was ever holding back.
     const before = healthy();
     const { state, plan } = planRequest(before, NOW);
     expect(plan).toEqual({ kind: 'go', waitMs: 0 });
@@ -238,8 +229,6 @@ describe('planRequest — braking before the budget is gone', () => {
     const first = planRequest(low, NOW);
     expect(first.plan).toEqual({ kind: 'go', waitMs: 0 });
 
-    // The next request in the same instant is held off, so the residual
-    // budget is spread across the rest of the window instead of burned now.
     const second = planRequest(first.state, NOW);
     expect(second.plan.kind).toBe('go');
     expect(second.plan.kind === 'go' && second.plan.waitMs).toBeGreaterThan(0);
@@ -253,7 +242,6 @@ describe('planRequest — braking before the budget is gone', () => {
     });
     const first = planRequest(low, NOW);
     const second = planRequest(first.state, NOW);
-    // 20 errors left, 20 seconds to go -> one per second.
     expect(second.plan).toEqual({ kind: 'go', waitMs: 1000 });
   });
 
@@ -289,7 +277,6 @@ describe('planRequest — braking before the budget is gone', () => {
       headers: headers({ 'x-esi-error-limit-remain': '10', 'x-esi-error-limit-reset': '20' }),
       now: NOW,
     });
-    // 10 left over 20s = 2s apart, so the fourth request is past the 5s bound.
     const plans = [];
     for (let i = 0; i < 5; i += 1) {
       const next = planRequest(state, NOW);
@@ -304,9 +291,6 @@ describe('planRequest — braking before the budget is gone', () => {
   });
 
   it('calls a queue refusal pacing — no circuit shut, so no 420 to claim', () => {
-    // The alternative is inventing a status ESI never sent, which
-    // `features/character/typeNames.ts` would read as a real throttle and
-    // answer by fanning out a thousand per-id lookups.
     let state = observeBudget(INITIAL_BUDGET, {
       status: 403,
       headers: headers({ 'x-esi-error-limit-remain': '10', 'x-esi-error-limit-reset': '20' }),
@@ -320,16 +304,11 @@ describe('planRequest — braking before the budget is gone', () => {
   });
 
   it('keeps trickling rather than clamping to zero, so a refusal never starves what a 403 teaches', () => {
-    // `features/character/structures.ts` (PR #653) only memoizes a *real* 403;
-    // a request the gate refuses teaches it nothing. So the brake must always
-    // still admit — it spreads the residual budget out, it does not stop it.
     const low = observeBudget(INITIAL_BUDGET, {
       status: 403,
       headers: headers({ 'x-esi-error-limit-remain': '5', 'x-esi-error-limit-reset': '30' }),
       now: NOW,
     });
-    // Even with the queue already refusing, a caller arriving after the last
-    // admission's spacing has elapsed is admitted with no wait at all.
     let state = low;
     for (let i = 0; i < 20; i += 1) state = planRequest(state, NOW).state;
     const { plan } = planRequest(state, NOW + MAX_REQUEST_SPACING_MS * 20);
@@ -381,9 +360,6 @@ describe('planRequest — a shut circuit', () => {
   });
 
   it('discards a stored instant that a backwards clock jump left in the far future', () => {
-    // NTP, a laptop waking, a user changing the time. Every instant this module
-    // stores is "some earlier now plus a bounded offset", so a day-long wait is
-    // never a real one — obeying it would wedge every ESI call for that day.
     const shut = observeBudget(INITIAL_BUDGET, {
       status: 420,
       headers: headers({ 'x-esi-error-limit-reset': '45' }),
@@ -405,15 +381,9 @@ describe('planRequest — a shut circuit', () => {
 });
 
 describe('a refusal is not mistaken for something ESI said', () => {
-  // The statuses other modules branch on. A refusal must match none of them:
-  // nothing was sent, so it is not an answer and must not read as one.
   const refusal = new EsiBudgetError('errorLimit', 45_000);
 
   it('is not the 403 that memoizes a citadel as forbidden for 24h', () => {
-    // `features/character/structures.ts` (issue #655 item A, PR #653) writes
-    // its forbidden memo on `err instanceof EsiError && err.status === 403`.
-    // A throttle is not an ACL answer; treating it as one would teach the app
-    // that structures it never asked about are off-limits, for a day.
     expect(refusal.status).not.toBe(403);
   });
 
@@ -423,16 +393,12 @@ describe('a refusal is not mistaken for something ESI said', () => {
   });
 
   it('is not the 404 that fans a name batch out per id', () => {
-    // `features/character/typeNames.ts` routes *around* a 404 with up to a
-    // thousand per-id lookups. Answering a spent budget that way is the exact
-    // amplification item D (#657) removed.
     expect(refusal.status).not.toBe(404);
   });
 
   it('is not the 429/420 a real throttle response carries', () => {
     expect(refusal.status).not.toBe(429);
     expect(refusal.status).not.toBe(420);
-    // What it carries instead, and what callers should read.
     expect(refusal.reason).toBe('errorLimit');
     expect(refusal.retryAfterMs).toBe(45_000);
   });
@@ -440,15 +406,7 @@ describe('a refusal is not mistaken for something ESI said', () => {
 
 describe('the bounds hold together', () => {
   it('caps a whole call well inside the token expiry buffer', () => {
-    // The access token is fetched *before* the gate, and
-    // `auth/session.ts`'s `getValidAccessToken` only guarantees it is good for
-    // `EXPIRY_BUFFER_MS` (60s) from that moment. `REQUEST_TIMEOUT_MS` bounds
-    // everything after it — gate wait, permit queue, fetch, body — so a request
-    // that queued behind a fan-out can never go out with an expired token. It
-    // would 401, and a 401 paints the shell-wide re-auth banner over what is
-    // really congestion.
     expect(REQUEST_TIMEOUT_MS).toBeLessThan(60_000);
-    // And a policy wait is a fraction of the call it sits inside.
     expect(MAX_BUDGET_WAIT_MS).toBeLessThan(REQUEST_TIMEOUT_MS);
   });
 });
@@ -493,7 +451,6 @@ describe('the app-wide gate', () => {
     await expect(queued).rejects.toThrow();
 
     for (const release of releases) release();
-    // The aborted waiter must not have kept the permit it never received.
     const after = await passEsiGate();
     after();
   });
@@ -501,7 +458,6 @@ describe('the app-wide gate', () => {
   it('refuses a fresh call while the circuit is shut, without touching the network', async () => {
     observeEsiResponse(420, headers({ 'x-esi-error-limit-reset': '60' }));
     await expect(passEsiGate()).rejects.toBeInstanceOf(EsiBudgetError);
-    // Status 0, not 420: no request was made, so ESI said nothing.
     await expect(passEsiGate()).rejects.toMatchObject({ status: 0, reason: 'errorLimit' });
   });
 
@@ -526,7 +482,6 @@ describe('the app-wide gate', () => {
     expect(backgroundAdmitted).toBe(false);
     expect(esiInFlight()).toBe(backgroundCap);
 
-    // Every reserved permit goes to foreground at once.
     for (let i = 0; i < ESI_FOREGROUND_RESERVE; i += 1) releases.push(await passEsiGate());
     expect(esiInFlight()).toBe(ESI_MAX_IN_FLIGHT);
     for (const release of releases) release();

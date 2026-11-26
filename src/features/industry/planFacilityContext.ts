@@ -1,10 +1,3 @@
-/**
- * The "where and how this plan's job runs" half of a make-or-buy context —
- * facility, rig fit, security, structure tax — independent of pricing, which
- * each caller layers its own fields on top of (`resolveBuildPlan.ts`'s
- * `makeOrBuyContext`, and `resolveMakeOrBuy` for Auto Build). Pulled out
- * once both needed the exact same four-field shape.
- */
 import type { BuildPlanRecord } from '@/db';
 import type { CharacterModifiers } from '@/engine/industry/characterModifiers';
 import {
@@ -35,14 +28,6 @@ export function facilityContextFor(
   };
 }
 
-/**
- * The Reaction Location's own "where and how" half (issue #698) — `null`
- * when none is configured, which is how every plan behaves before Include
- * Reactions is ever turned on. Missing `systemCostIndex` on purpose: that
- * comes from a live ESI call the caller makes separately (mirroring how the
- * plan's own `systemCostIndex` is layered on top of `facilityContextFor`'s
- * result rather than being part of it), keyed by `reactionBuildSystemId`.
- */
 export function reactionPlanFacilityContextFor(
   plan: Pick<
     BuildPlanRecord,
@@ -59,17 +44,6 @@ export function reactionPlanFacilityContextFor(
   };
 }
 
-/**
- * Auto Build's depth context (issues #695/#696): a `MakeOrBuyContext`
- * with every pricing field zeroed, since `maxAutoBuildDepth` never prices
- * anything — only walks the tree. Built from the plan-level
- * `reactionPlanFacilityContextFor` result, never the price-resolved
- * `reactionFacilityFor` one a rendered plan also carries: that one stays
- * `undefined` until its own market snapshot lands, which would gate depth
- * discovery on a fetch it does not need for any plan with a Reaction
- * Location configured. The single seam `BuildPlanDetail.tsx`'s solo control
- * and `autoBuildGroup.ts`'s per-member walk both build this from.
- */
 export function autoBuildDepthContext(
   facilityContext: PlanFacilityContext,
   reactionPlanFacilityContext: PlanFacilityContext | null,

@@ -1,12 +1,4 @@
 #!/usr/bin/env node
-// Create the isolated worktree for a ticket and install deps. Replaces
-// next-ticket.md step 3's sequence of separate Bash calls with one.
-//
-// Usage: node scripts/next-ticket/setup-worktree.mjs <issue-number> <slug>
-//
-// Prints one line of JSON to stdout:
-//   {"status":"ready","worktreePath":"...","branch":"claude/83-item-tooltip"}
-//   {"status":"error","step":"fetch|worktree-add|npm-ci","message":"..."}
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -32,8 +24,6 @@ if (fs.existsSync(worktreePath)) {
 
 fs.mkdirSync(worktreeRoot, { recursive: true });
 
-// Off the remote ref, not a local branch that may be stale (it never moves
-// while the main checkout sits on another branch).
 const fetch = tryRun('git', ['fetch', 'origin', INTEGRATION_BRANCH], { cwd: repoRoot });
 if (!fetch.ok) {
   printResult({ status: 'error', step: 'fetch', message: fetch.stderr.trim() });
@@ -61,10 +51,6 @@ if (!ci.ok) {
   process.exit(1);
 }
 
-// `npm ci`'s `prepare` lifecycle script (which installs the husky
-// pre-commit hook) is silently skipped whenever `ignore-scripts` is set —
-// true in this agent's sandboxed shell. Install it explicitly so the hook
-// is live regardless of that setting.
 const npxCmd = process.platform === 'win32' ? 'npx.cmd' : 'npx';
 const husky = tryRun(npxCmd, ['husky'], { cwd: worktreePath, shell: process.platform === 'win32' });
 if (!husky.ok) {
@@ -76,12 +62,6 @@ if (!husky.ok) {
   process.exit(1);
 }
 
-// husky v9's CLI exits 0 unconditionally, even when it silently did
-// nothing (e.g. couldn't find `.git`, or the `git config core.hooksPath`
-// write itself failed) — so `husky.ok` above is not proof the hook is
-// actually live. Check the on-disk result directly and fail loudly if it
-// isn't there, rather than reporting `ready` on a worktree with no working
-// hook (see scripts/verify-husky.mjs for why, and #310/#318).
 const verify = verifyHuskyHook(worktreePath);
 if (!verify.ok) {
   printResult({ status: 'error', step: 'husky-verify', message: verify.message });

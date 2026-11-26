@@ -44,7 +44,6 @@ vi.mock('@/app/useGrantedScopes', async () =>
 installBuildPlanDetailHarness();
 
 describe('BuildPlanDetail material price basis', () => {
-  /** Tritanium at 5 sell / 4 buy, so the two bases are told apart by the price cell. */
   function pricedSnapshot() {
     loadMarketSnapshot.mockResolvedValue({
       hubPrices: { 34: 5, 587: 100_000 },
@@ -55,7 +54,6 @@ describe('BuildPlanDetail material price basis', () => {
   }
 
   const basisSelect = () => screen.getByRole('combobox', { name: 'Material prices' });
-  // The price is edited in place, so at rest it is the value's text.
   const tritaniumPrice = () => ({
     value: (screen.getByRole('button', { name: /^Edit price for Tritanium,/ }).textContent ?? '')
       .replace('Edit price for Tritanium,', '')
@@ -106,9 +104,7 @@ describe('BuildPlanDetail material price basis', () => {
     await user.click(basisSelect());
     await user.click(await screen.findByRole('option', { name: /Buy order/ }));
 
-    // The highest buy order (4) plus an untrained Character's 3% placement fee (#6167).
     await waitFor(() => expect(tritaniumPrice().value).toBe('4.12'));
-    // One snapshot, both sides: switching basis must never spend a request.
     expect(loadMarketSnapshot.mock.calls.length).toBe(fetchesBefore);
   });
 
@@ -125,7 +121,6 @@ describe('BuildPlanDetail material price basis', () => {
 });
 
 describe('BuildPlanDetail Corp Assets (issue #798)', () => {
-  // Corp Assets lives in the Owned materials popover.
   const corpAssetsToggle = () => screen.getByRole('button', { name: 'Corp Assets' });
   async function openOwned() {
     fireEvent.click(await screen.findByRole('button', { name: /^Owned materials/ }));
@@ -218,11 +213,6 @@ describe('BuildPlanDetail Character details implant note (issue #1588)', () => {
   });
 });
 
-/**
- * "Use all" is every row's own "Use assets" at once. It used to skip any row
- * with a number in it — a 0 from "Use none" included — and said nothing, so
- * after "Use none" it looked like a dead button while rows still offered stock.
- */
 describe('BuildPlanDetail Use all / Use none', () => {
   const TRITANIUM_IN_JITA: OwnedStockSnapshot = {
     sources: [
@@ -326,7 +316,6 @@ describe('BuildPlanDetail Use all / Use none', () => {
 });
 
 describe('BuildPlanDetail Break Even button', () => {
-  // Rifter at 100 ISK is a loss; the plan also carries the fixture's 150M blueprint cost.
   function priceRifter(rifterPrice: number) {
     loadMarketSnapshot.mockResolvedValue({
       hubPrices: { 34: 5, 587: rifterPrice },
@@ -364,8 +353,6 @@ describe('BuildPlanDetail Break Even button', () => {
 
   it('follows the hero: offered when selling the owned stock beats building, though the build pays', async () => {
     const user = userEvent.setup();
-    // Profitable with owned Tritanium counted free, a loss once it is
-    // charged at what it would sell for (a buy order at 1M a unit).
     loadMarketSnapshot.mockResolvedValue({
       hubPrices: { 34: 5, 587: 100_000_000 },
       hubBuyPrices: { 34: 1_000_000, 587: 100_000_000 },
@@ -377,14 +364,13 @@ describe('BuildPlanDetail Break Even button', () => {
 
     await user.click(await breakEvenButton());
 
-    // The search probes profit on the sell-value basis: still a loss at 10 runs.
     const profitAt = breakEvenRuns.mock.calls[0][0] as (runs: number) => number | null;
     expect(profitAt(10)).toBeLessThan(0);
   });
 
   it('is absent when the plan already makes a profit', async () => {
     const user = userEvent.setup();
-    priceRifter(100_000_000); // clears the fixture's 150M blueprint cost over 10 runs
+    priceRifter(100_000_000);
     render(<Harness plan={{ runs: 10 }} />);
     await openSetup(user);
 

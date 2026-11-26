@@ -6,7 +6,6 @@ import { BookProvider } from './BookContext';
 import { CORP_ID, NOTICE_BOOK_CONTEXT } from './corpBookFixture';
 import { LateNoticeRun } from './LateNoticeRun';
 
-/** The corporation's name the mail is signed with, so the preview renders instead of "Loading…". */
 function SeededRun() {
   useState(() => {
     useActiveCharacter.setState({ activeCharacterId: NOTICE_BOOK_CONTEXT.characterId });
@@ -30,11 +29,6 @@ function SeededRun() {
   );
 }
 
-/**
- * The late notice run on the sample book. On a desktop the chosen Miner's mail sits
- * beside the step, picked by a labelled "Preview for"; on a phone "Preview mail"
- * opens it in a dialog.
- */
 const meta = {
   title: 'corp/LateNoticeRunPreview',
   component: SeededRun,
@@ -44,10 +38,8 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** @summary Check step: desktop shows the mail inline; a phone keeps the Preview mail button. */
 export const Check: Story = {};
 
-/** @summary Send step: the same inline mail beside the mail-limit notice and Send. */
 export const Send: Story = {
   play: async ({ canvasElement }) => {
     await new Promise((r) => setTimeout(r, 300));
@@ -57,7 +49,6 @@ export const Send: Story = {
   },
 };
 
-/** @summary Phone: Preview mail opened, the dialog steps between Miners. */
 export const PhoneDialog: Story = {
   globals: { viewport: { value: 'mobile1', isRotated: false } },
   play: async ({ canvasElement }) => {

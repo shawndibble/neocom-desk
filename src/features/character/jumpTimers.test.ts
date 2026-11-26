@@ -59,7 +59,6 @@ describe('loadJumpTimersWidget', () => {
       cached({ jump_fatigue_expire_date: new Date(NOW + 5 * HOUR_MS).toISOString() })
     );
     const data = await loadJumpTimersWidget(7);
-    // 24h - level 4 = 20h cooldown, 2h already spent.
     expect(data.clone).toEqual({ state: 'read', endsAt: NOW + 18 * HOUR_MS });
     expect(data.fatigue).toEqual({ state: 'read', endsAt: NOW + 5 * HOUR_MS });
   });

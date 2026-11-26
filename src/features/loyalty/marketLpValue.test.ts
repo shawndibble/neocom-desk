@@ -7,7 +7,6 @@ import { loadHaulingDemand } from '@/features/market/haulingDemand';
 vi.mock('./store', () => ({ loadLoyaltyStoreOffers: vi.fn() }));
 vi.mock('@/features/industry/marketData', () => ({ loadMarketSnapshots: vi.fn() }));
 vi.mock('@/features/market/haulingDemand', () => ({ loadHaulingDemand: vi.fn(async () => null) }));
-// One blueprint: BPC 900 builds 100 units of product 901 from mineral 34.
 vi.mock('@/features/industry/blueprintCatalog', async (importOriginal) => ({
   ...(await importOriginal<object>()),
   loadBlueprintCatalog: async () => ({
@@ -33,7 +32,6 @@ vi.mock('@/features/industry/blueprintCatalog', async (importOriginal) => ({
 const { loadMarketLpValue, loadMarketLpValues } = await import('./marketLpValue');
 const JITA = getTradeHub('jita')!;
 
-/** An item offer: `quantity` of `typeId` for `lp` LP and no ISK. */
 const itemOffer = (offerId: number, typeId: number, lp: number, quantity = 1) => ({
   offer_id: offerId,
   type_id: typeId,
@@ -85,7 +83,6 @@ describe('loadMarketLpValues', () => {
     const values = await loadMarketLpValues([10, 20], JITA);
     expect(loadMarketSnapshots).toHaveBeenCalledTimes(1);
     expect(vi.mocked(loadMarketSnapshots).mock.calls[0]![0]).toHaveLength(2);
-    // Corp 10's middle offer sells for 150k on 100 LP, less full fees.
     expect(values.get(10)).toBeGreaterThan(1_300);
     expect(values.get(10)).toBeLessThan(1_500);
     expect(values.get(20)!).toBeGreaterThan(values.get(10)!);
@@ -101,7 +98,6 @@ describe('loadMarketLpValues', () => {
     const offers = new Map([
       [60, [itemOffer(1, 61, 100), itemOffer(2, 62, 100), itemOffer(3, 63, 100)]],
     ]);
-    // Recent trades known, so the value is remembered.
     vi.mocked(loadHaulingDemand).mockResolvedValueOnce({
       asOf: '2026-10-29',
       lastSyncedAt: 1,
@@ -121,7 +117,6 @@ describe('loadMarketLpValues', () => {
     const values = await loadMarketLpValues([60], JITA, { held: offers });
     expect(loadLoyaltyStoreOffers).not.toHaveBeenCalled();
     expect(values.get(60)).toBeGreaterThan(1_300);
-    // Remembered like any other read: the ESI path answers it next.
     expect(await loadMarketLpValue(60, JITA)).toBe(values.get(60));
     expect(loadLoyaltyStoreOffers).not.toHaveBeenCalled();
   });
@@ -156,7 +151,6 @@ describe('loadMarketLpValues against recent trades', () => {
       [70, [itemOffer(1, 71, 100), itemOffer(2, 72, 100), itemOffer(3, 73, 100)]],
     ]);
     const values = await loadMarketLpValues([70], JITA, { held: offers });
-    // Two of three listings far above their trades: counted at the trades, not 50M and 40M.
     expect(values.get(70)).toBeGreaterThan(1_300);
     expect(values.get(70)).toBeLessThan(1_500);
   });
@@ -171,7 +165,6 @@ describe('loadMarketLpValues against thin markets', () => {
     itemOffer(3, 83, 100),
     itemOffer(4, 84, 100),
   ];
-  // Each test its own corporation: a priced store is remembered.
   const offers = (corporationId: number) => new Map([[corporationId, storeOffers]]);
   const demandOf = (perMonth: Record<number, number>) => ({
     asOf: '2026-10-29',
@@ -200,7 +193,6 @@ describe('loadMarketLpValues against thin markets', () => {
   });
 
   it('leaves out an offer whose item barely trades, however high its price', async () => {
-    // 81 trades 3 units a month: its 9M listing is a real price nobody buys at.
     vi.mocked(loadHaulingDemand).mockResolvedValue(demandOf({ 81: 3, 82: 300, 83: 300, 84: 300 }));
     const values = await loadMarketLpValues([80], JITA, { held: offers(80) });
     expect(values.get(80)).toBeLessThan(1_500);
@@ -223,7 +215,6 @@ describe('loadMarketLpValue', () => {
       fetchedAt: new Date(),
       fromCache: true,
     } as never);
-    // 300 units for sale is 3 runs of 100: too thin, so only two offers count — no rate.
     vi.mocked(loadMarketSnapshots).mockImplementation((requests) =>
       requests.map(() =>
         Promise.resolve(
@@ -267,7 +258,6 @@ describe('loadMarketLpValues on the instant basis', () => {
       requests.map(() =>
         Promise.resolve({
           ...snapshot({ 91: 200_000, 92: 150_000, 93: 100_000 }, { 91: 50, 92: 50, 93: 50 }),
-          // Bids at half the listings: selling now earns about half.
           hubBuyPrices: { 91: 100_000, 92: 75_000, 93: 50_000 },
         })
       )

@@ -33,7 +33,6 @@ interface RowProps {
   nowMs: number;
 }
 
-/** One queued level: its skill and group, how long it adds, and when it finishes. */
 function QueueRow({ row, catalog, nowMs }: RowProps) {
   const { t } = useTranslation();
   const timeZone = useTimeZone();
@@ -76,8 +75,6 @@ function QueueRow({ row, catalog, nowMs }: RowProps) {
 function periodLabel(t: TFunction, group: Group, nowMs: number, timeZone?: 'UTC'): string {
   if (group.id === 'week') return t('plans.periodWeek');
   if (group.id === 'month' || !group.monthStart) return t('plans.periodMonth');
-  // `monthStart` is UTC midnight of the month's first, so name it in UTC; the
-  // current year is read on the chosen clock to match how the group was filed.
   const currentYear = Number(formatLocalDate(new Date(nowMs), timeZone).slice(0, 4));
   const sameYear = group.monthStart.getUTCFullYear() === currentYear;
   return group.monthStart.toLocaleDateString(i18n.language || 'en', {
@@ -93,7 +90,6 @@ interface QueuePeriodGroupProps {
   nowMs: number;
 }
 
-/** Levels finishing in one stretch of the queue, headed by how many and how long. */
 export function QueuePeriodGroup({ group, catalog, nowMs }: QueuePeriodGroupProps) {
   const { t } = useTranslation();
   const timeZone = useTimeZone();
@@ -119,7 +115,6 @@ export function QueuePeriodGroup({ group, catalog, nowMs }: QueuePeriodGroupProp
   );
 }
 
-/** Paused levels, which have no place on the clock. */
 export function QueueLooseRows({
   title,
   rows,
@@ -146,7 +141,6 @@ export function QueueLooseRows({
   );
 }
 
-/** Finished-but-unapplied levels: one narrow line each, clumped, no header. */
 export function QueueFinishedRows({
   rows,
   catalog,

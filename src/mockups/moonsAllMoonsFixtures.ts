@@ -1,10 +1,7 @@
-/** Sample data for the all-moons mockup. Names invented; "today" is 16 Nov 2026 14:00 EVE. */
-
 export type PopState = 'extracting' | 'ready' | 'fractured' | 'expired' | 'cancelled';
 
 export interface OreShare {
   ore: string;
-  /** Chunk units; 0 when the make-up is unknown. */
   units: number;
   mined: number;
 }
@@ -13,7 +10,6 @@ export interface Pop {
   id: string;
   state: PopState;
   started: string;
-  /** Chunk arrival: when it can be fractured. */
   pop: string;
   fractured?: string;
   by?: 'laser' | 'auto';
@@ -32,17 +28,13 @@ export interface MoonRow {
   id: string;
   moon: string;
   refinery: string;
-  /** The corporation whose refinery it is. */
   owner: string;
-  /** A station the corp no longer uses; kept because its pops are history. */
   archived?: boolean;
-  /** No Extraction synced yet, so the moon itself is not known (#6240). */
   unknownMoon?: boolean;
   newest: PopState | null;
   nextPop?: string;
   lastPop?: string;
   pops: number;
-  /** Estimated ISK mined across every pop the book kept. */
   minedIsk: number;
   tax: number;
 }
@@ -204,7 +196,6 @@ export const MOONS: MoonRow[] = [
 
 const R4 = (ore: string, units: number, mined: number): OreShare => ({ ore, units, mined });
 
-/** One moon's full history, newest first: the page the list opens. */
 export const OPEN_MOON = {
   ...MOONS[0],
   system: 'Efa',
@@ -328,7 +319,6 @@ export const OPEN_MOON = {
   ] satisfies Pop[],
 };
 
-/** A moon whose book started last week: one live Extraction, nothing earlier kept. */
 export const EMPTY_MOON = {
   id: 'm14',
   moon: 'Neyra III - Moon 3',

@@ -1,14 +1,3 @@
-/**
- * The Plan tab's "Make more from my planets" view model: `PlanAdvice` shaped
- * for drawing, and nothing more.
- *
- * Every figure here is read straight off `buildPlanAdvice` (or a sum of its
- * figures); the only arithmetic is presentation: a gain split into what the
- * quick wins add and what the rebuild adds on top, an alternative compared
- * with the pick, a meter as a percentage. Components format and translate;
- * they never compute.
- */
-
 import { isP0 } from '@/engine/pi/chain';
 import type { PlanetType } from '@/engine/pi/goalTypes';
 import {
@@ -21,7 +10,6 @@ import type { ShipClass } from '@/engine/pi/planHaul';
 import type { PiData, PiPinKind } from '@/sde/types';
 import type { PlanAdvice, PlanColonyAdvice } from './planAdviceModel';
 
-/** A commodity's name from the SDE payload: a P1+ schematic's product, else a raw resource. */
 export function piItemName(typeId: number, pi: PiData): string {
   return (
     pi.schematics[String(typeId)]?.name ??
@@ -33,18 +21,14 @@ export function piItemName(typeId: number, pi: PiData): string {
 export type QuickWinAction = 'restart' | 'storage' | 'idle' | 'extractors' | 'factories';
 
 export interface QuickWinRow {
-  /** Stable per colony and win; the tick key. */
   id: string;
   planetId: number;
   planetName: string;
   planetType: PlanetType;
   action: QuickWinAction;
   detail: QuickWinDetail;
-  /** The item the row is about, for its icon. */
   iconTypeId: number | null;
-  /** The raw or product the sentence names. */
   subject: string | null;
-  /** Storage wins save stalled income ("saves", in no total); the others add to today. */
   gainKind: 'adds' | 'saves';
   gainPerDay: number | null;
   minutes: number;
@@ -54,7 +38,6 @@ export interface PlanetStrip {
   planetId: number;
   name: string;
   planetType: PlanetType;
-  /** Null when the colony has no quick win that adds. */
   quickWinGainPerDay: number | null;
   rebuild:
     | { kind: 'change'; gainPerDay: number }
@@ -71,17 +54,10 @@ export interface AlternativeView {
   typeId: number;
   name: string;
   tier: number;
-  /** Against the card's own recommendation; negative earns less. */
   iskPerDayDelta: number;
-  /** How many times less (>1) or more (<1) it hauls than the recommendation; null when either is zero. */
   haulRatio: number | null;
 }
 
-/**
- * Why a colony gets no rebuild advice. `link-cost`: the planet's size is not
- * on file, so a new layout's links cannot be costed, while what it earns today
- * is still real (and counted). `other`: the colony itself could not be measured.
- */
 export type RebuildRefusal = 'link-cost' | 'other';
 
 function refusalOf(reason: string): RebuildRefusal {
@@ -92,43 +68,30 @@ export interface RebuildCardView {
   planetId: number;
   name: string;
   planetType: PlanetType;
-  /** The element id deep links (`#plan-hek-vi`) scroll to. */
   anchor: string;
   status: 'change' | 'keep' | 'unknown';
-  /** What the colony sells today. */
   sells: NamedItem[];
-  /** Everything it sells is raw P0: a keep card must not endorse that (scope decision 20261005-114103). */
   sellsRaw: boolean;
-  /** A basic-factory quick win refines what it sells. */
   hasRefineWin: boolean;
-  /** The recommended product; for a keep, the model's best. */
   target: NamedItem | null;
-  /** Today after its quick wins, the figure the rebuild is measured against. */
   fromPerDay: number | null;
-  /** What the rebuilt colony earns; for a keep, the same as `fromPerDay`. */
   toPerDay: number | null;
   gainPerDay: number | null;
   minutes: number | null;
   hasQuickWin: boolean;
   keepReason: 'already-best' | 'gain-too-small' | 'no-candidates' | 'no-haul-saving' | null;
-  /** Set only when `status` is 'unknown'. */
   refusal: RebuildRefusal | null;
   alternative: AlternativeView | null;
 }
 
 export interface ChecklistStep {
-  /** Stable per colony, recommendation and position; the tick key. */
   id: string;
   verb: 'upgrade' | 'remove' | 'place' | 'set' | 'route';
-  /** The pin kind the step is about; null for an upgrade or a route. */
   pin: PiPinKind | null;
   typeId: number | null;
-  /** The product or raw a set step names. */
   subject: string | null;
   count: number | null;
-  /** An upgrade's target level. */
   toLevel: number | null;
-  /** What a route step sends. */
   carries: string | null;
   minutes: number;
 }
@@ -142,7 +105,6 @@ export interface ChecklistColumn {
     level: number;
     cpuPercent: number;
     powerPercent: number;
-    /** Set when the pilot must upgrade first: the colony's own level. */
     upgradeFromLevel: number | null;
   } | null;
 }
@@ -165,7 +127,6 @@ export interface HaulView {
 }
 
 export interface PlanView {
-  /** There is nothing to recommend yet: no colony has a figure. */
   empty: boolean;
   headline: {
     quickWinPerDay: number;
@@ -282,9 +243,6 @@ function stepView(step: BuildStep, id: string, pi: PiData, carries: string | nul
   }
 }
 
-/**
- * @param fallbackName Names a colony the planet-name lookup has not resolved.
- */
 export function buildPlanView(
   advice: PlanAdvice,
   pi: PiData,
@@ -382,7 +340,6 @@ export function buildPlanView(
       status: 'unknown',
       target: null,
       fromPerDay: colony.afterQuickWinsPerDay,
-      // Only the rebuild is unknown: the colony runs as it is, at today's figure.
       toPerDay: refusal === 'link-cost' ? colony.afterQuickWinsPerDay : null,
       gainPerDay: null,
       minutes: null,
@@ -472,13 +429,6 @@ export function buildPlanView(
   };
 }
 
-/**
- * Tick state that survives only while its row does. A quick win that
- * disappears (the pilot fixed it, so the colony no longer has it) takes its
- * tick with it, and one that comes back starts unticked. Only colonies the
- * view covers are pruned: ticks are per device, so another character's rows
- * are not this view's to drop.
- */
 export function pruneTicks(
   ticked: readonly string[],
   liveIds: ReadonlySet<string>,
@@ -487,7 +437,6 @@ export function pruneTicks(
   return ticked.filter((id) => liveIds.has(id) || !coveredPlanetIds.has(Number.parseInt(id, 10)));
 }
 
-/** Every tickable id in the view: each quick win and each checklist step. */
 export function tickableIds(view: PlanView): Set<string> {
   return new Set([
     ...view.quickWins.map((win) => win.id),
@@ -495,7 +444,6 @@ export function tickableIds(view: PlanView): Set<string> {
   ]);
 }
 
-/** The colonies the view has a figure for: the ones whose ticks it may prune. */
 export function coveredPlanets(view: PlanView): Set<number> {
   return new Set(view.strips.map((strip) => strip.planetId));
 }

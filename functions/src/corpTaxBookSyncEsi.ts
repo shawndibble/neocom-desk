@@ -1,11 +1,3 @@
-// The ESI reads the scheduled Corp Tax Book sync makes with the grant holder's
-// access token (issue #4068, ADR 0025): the same five reads an officer's visit
-// feeds into the book. Same identification headers as every server ESI call
-// (esiClient.ts); 401/403 are a refusal of this token (the run stops the
-// schedule), 420/429 stop the whole run (the error budget is shared by every
-// user of the client id), anything else is "try again next run". Nothing here
-// logs or returns a token.
-
 import { ESI_BASE, esiGet } from './esiClient.js';
 import type {
   EsiExtractionLike,
@@ -13,7 +5,6 @@ import type {
   LedgerRowLike,
 } from './corpTaxBookSyncEngine.js';
 
-/** A paginated read gives up after this many pages and says it is incomplete. */
 export const MAX_PAGES = 60;
 const TIMEOUT_MS = 20_000;
 
@@ -23,7 +14,6 @@ export type EsiRead<T> =
   | { kind: 'backoff' }
   | { kind: 'unavailable' };
 
-/** A refinery's name and system (#4654); `denied` is ESI's 403 or 404: no docking access, or gone. */
 export type StructureLookup =
   | { kind: 'ok'; name: string; solarSystemId: number }
   | { kind: 'denied' }
@@ -37,7 +27,6 @@ export interface EsiNotificationLike {
 }
 
 export interface SyncEsi {
-  /** Every refinery that keeps a ledger (`observer_id`s). */
   observers(corporationId: number, accessToken: string): Promise<EsiRead<number[]>>;
   ledger(
     corporationId: number,
@@ -51,11 +40,8 @@ export interface SyncEsi {
     division: number,
     accessToken: string
   ): Promise<EsiRead<JournalEntryLike[]>>;
-  /** The refinery's solar system, or `unavailable` when this Character is not on its ACL. */
   structureSystem(structureId: number, accessToken: string): Promise<EsiRead<number>>;
-  /** A moon owner refinery's name and system, read with the moon owner's own token. */
   structure(structureId: number, accessToken: string): Promise<StructureLookup>;
-  /** True once ESI's headers say the next call risks the shared budget. */
   budgetLow(): boolean;
 }
 
@@ -177,7 +163,6 @@ export function esiSyncReader(fetchImpl: typeof fetch = fetch): SyncEsi {
     async structureSystem(structureId, accessToken) {
       const res = await get(`/universe/structures/${structureId}/`, accessToken);
       if (res.kind === 'fail') {
-        // An ACL refusal is a normal outcome here, not a dead token.
         return res.read.kind === 'forbidden' ? { kind: 'unavailable' } : res.read;
       }
       const system = (res.body as { solar_system_id?: unknown } | null)?.solar_system_id;

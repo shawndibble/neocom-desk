@@ -1,14 +1,7 @@
-/**
- * Pure Quickbar list editing helpers (GLOSSARY.md): a flat, drag-ordered list
- * of saved item shortcuts, deduped by typeId. Reordering moves the active
- * item to sit at the target item's position, matching @dnd-kit's arrayMove.
- */
 import type { QuickbarItem } from '@/db';
 
-/** A Quickbar item's price alert target, or `null` to clear one (issue #680). */
 export type QuickbarTarget = { price: number; direction: 'above' | 'below' } | null;
 
-/** Whether a Quickbar item carries a price alert target — the one check every reader shares, rather than each re-deriving it from the pair of optional fields. */
 export function hasQuickbarTarget(item: QuickbarItem): boolean {
   return item.targetPrice !== undefined && item.targetDirection !== undefined;
 }
@@ -25,7 +18,6 @@ export function removeQuickbarItem(items: readonly QuickbarItem[], typeId: numbe
   return items.filter((i) => i.typeId !== typeId);
 }
 
-/** Puts a removed item back at `index` (clamped), keeping its target; a no-op if it is already there. */
 export function restoreQuickbarItem(
   items: readonly QuickbarItem[],
   item: QuickbarItem,
@@ -51,22 +43,10 @@ export function reorderQuickbarItems(
   return next;
 }
 
-/**
- * Formats the Quickbar's contents the same way a manual multibuy paste would
- * (issue #726), for handoff into Appraisal's paste box. `QuickbarItem` carries
- * no quantity, so each line is a bare name — `parseAppraisalPaste` already
- * treats a bare name as a stack of one.
- */
 export function quickbarToPasteText(items: readonly QuickbarItem[]): string {
   return items.map((item) => item.name).join('\n');
 }
 
-/**
- * Sets or clears a Quickbar item's price alert target (issue #680). `null`
- * clears both fields rather than leaving a stale price behind — the only way
- * to stop a target's alerts is to remove it or replace it outright, never to
- * edit one field independently of the other.
- */
 export function setQuickbarItemTarget(
   items: readonly QuickbarItem[],
   typeId: number,
@@ -81,14 +61,6 @@ export function setQuickbarItemTarget(
   });
 }
 
-/**
- * Pins an item (if it isn't already) and sets its price alert target in one
- * list edit (issue #1427). Composing `add` then `setTarget` through
- * `useQuickbar` would have the second write put back a list without the new
- * item, since both compute from the same stale `items` closure. A `null`
- * target clears a pinned item's alert but keeps it pinned, and does nothing to
- * an unpinned one.
- */
 export function pinWithTarget(
   items: readonly QuickbarItem[],
   typeId: number,

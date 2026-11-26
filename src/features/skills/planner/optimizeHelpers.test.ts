@@ -26,9 +26,9 @@ describe('appendedCountMessage', () => {
 
   it('counts only entries above the trained level', () => {
     const imported: PlanEntry[] = [
-      { skillTypeID: 1, targetLevel: 3 }, // already trained
-      { skillTypeID: 2, targetLevel: 4 }, // new
-      { skillTypeID: 9, targetLevel: 1 }, // untrained skill
+      { skillTypeID: 1, targetLevel: 3 },
+      { skillTypeID: 2, targetLevel: 4 },
+      { skillTypeID: 9, targetLevel: 1 },
     ];
     expect(appendedCountMessage(t, trained, imported)).toBe('plans.importAddedCount:{"count":2}');
   });

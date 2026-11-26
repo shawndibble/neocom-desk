@@ -5,7 +5,6 @@ import { describe, expect, it, vi } from 'vitest';
 import '@/i18n';
 import RichMailBodyEditor from './RichMailBodyEditor';
 
-// jsdom has no layout: ProseMirror's scroll-into-view asks a Range for its rects.
 if (!Range.prototype.getClientRects) {
   Range.prototype.getClientRects = () =>
     ({
@@ -16,7 +15,6 @@ if (!Range.prototype.getClientRects) {
   Range.prototype.getBoundingClientRect = () => new DOMRect();
 }
 
-// ...and no hit testing: ProseMirror's mousedown handler calls posAtCoords.
 if (!document.elementFromPoint) {
   document.elementFromPoint = () => null;
 }
@@ -310,7 +308,6 @@ describe('RichMailBodyEditor', () => {
     expect(screen.queryByRole('button', { name: 'Preview' })).not.toBeInTheDocument();
     const toggle = screen.getByRole('button', { name: 'Edit source' });
     expect(toggle).toHaveAttribute('aria-pressed', 'false');
-    // The bar is inside the one card, with the writing surface.
     const card = document.querySelector('[data-mail-card]') as HTMLElement;
     expect(within(card).getByRole('toolbar')).toBeInTheDocument();
     await user.click(toggle);

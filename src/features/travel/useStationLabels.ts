@@ -1,11 +1,3 @@
-/**
- * The names of the stations a Route Safety link tags its stops with (issue
- * #4964). The link carries ids only. An NPC station's name is a snapshot read;
- * a structure's is the Character's own ACL-checked lookup, so a structure the
- * pilot cannot see stays unnamed — the stop then shows its system, never a
- * guessed name. A station picked this session is `remember`ed, so its label is
- * there on the same render the stop is.
- */
 import { useCallback, useEffect, useState } from 'react';
 import { loadVisibleStructure } from '@/features/character/structures';
 import { lookupNpcStation } from '@/sde/npcStations';
@@ -33,7 +25,6 @@ export function useStationLabels(stationIds: readonly number[]): {
     characterId,
     labels: new Map(),
   });
-  // A name resolved under another Character is that Character's to see.
   const labels = named.characterId === characterId ? named.labels : EMPTY;
   const key = stationIds.join(',');
   useEffect(() => {
@@ -54,7 +45,6 @@ export function useStationLabels(stationIds: readonly number[]): {
     return () => {
       cancelled = true;
     };
-    // `labels` is read only to skip ids already named; a new name must not restart the lookup.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, characterId]);
   const remember = useCallback(

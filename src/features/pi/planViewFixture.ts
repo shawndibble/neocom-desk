@@ -1,8 +1,3 @@
-/**
- * A small hand-built `PlanAdvice` for the Plan view tests: one colony to
- * rebuild (with an alternative and a Command Center fit), one to keep, and two
- * quick wins. Only the fields the view model reads are real.
- */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { PiData } from '@/sde/types';
@@ -109,7 +104,6 @@ const keeping = colony({
   planetId: 2,
   name: 'Uttindar II',
   sells: [P2_B],
-  // A storage win saves; it adds nothing to the colony's figures.
   quickWins: [win(2, 'storage', 120)],
   quickWinGainPerDay: 0,
   afterQuickWinsPerDay: 1000,

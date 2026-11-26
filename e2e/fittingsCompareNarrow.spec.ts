@@ -1,20 +1,8 @@
-/**
- * Fitting Compare tracer: adding Fittings, the phone paging window, and the
- * differences-only toggle at a phone width, without waiting on the dogma
- * engine's own WASM+SDE stats compute — `fittingsLoadNarrow`'s own precedent
- * is to assert on structure only, never a stat figure, since that download
- * is genuinely slow on a cold CI runner. The new Price rows and per-column
- * "Fits" status read off that same slow compute, so their values are left
- * to `fittingCompare.test.ts`'s engine-level coverage rather than asserted
- * on here.
- */
 import type { Page } from '@playwright/test';
 import { test, expect, PHONE } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 import { answerAnyType } from './support/universeTypes';
 
-// A compare column's header shows the fit's own name — a Fitting Share Code carries it since
-// version 2 (#1718), so the name typed into the EFT header survives the round trip.
 const FIT_A = ['[Rifter, Fit A]', '125mm Gatling AutoCannon I'].join('\n');
 const FIT_B = ['[Merlin, Fit B]', '125mm Gatling AutoCannon I'].join('\n');
 const FIT_C = ['[Punisher, Fit C]', '125mm Gatling AutoCannon I'].join('\n');
@@ -36,9 +24,6 @@ test.describe('Fitting Compare at 390px', () => {
     await answerAnyType(page);
     await page.setViewportSize(PHONE);
 
-    // The compared Fittings' names only render once `FittingCompare`'s own `statsReady` gate
-    // opens (the same dogma WASM+SDE compute `fittingsLoadNarrow` avoids waiting on elsewhere) —
-    // give it the same cold-runner headroom the other narrow specs already use for that gate.
     const STATS_TIMEOUT = { timeout: 20_000 };
 
     await addFitting(page, FIT_A);
@@ -49,7 +34,6 @@ test.describe('Fitting Compare at 390px', () => {
     await expect(page.getByText('Fit B')).toBeVisible(STATS_TIMEOUT);
     await expect(page.getByText('Show differences only')).toBeVisible();
 
-    // A third slot brings phone paging into play (2 of 3 columns shown at a time).
     await addFitting(page, FIT_C);
     const prev = page.getByRole('button', { name: 'Previous' });
     const next = page.getByRole('button', { name: 'Next' });
@@ -66,7 +50,6 @@ test.describe('Fitting Compare at 390px', () => {
     await expect(page.getByText('Fit A')).not.toBeVisible();
     expect(await prev.isDisabled()).toBe(false);
 
-    // No sideways scroll at 390px — the usual narrow-width regression.
     const doc = await page.evaluate(() => ({
       scrollWidth: document.documentElement.scrollWidth,
       clientWidth: document.documentElement.clientWidth,
@@ -105,7 +88,6 @@ test.describe('Fitting Compare long names at 390px', () => {
 test.describe('Fitting Compare control toolbar', () => {
   const LABELS = ['Damage profile', 'Abyssal weather', 'Target profile'];
 
-  // The pickers only show once a Fitting is in the comparison (#6012).
   async function gotoWithOneFit(page: Page) {
     await signInAndGoto(page, './ships/fittings/compare');
     await answerAnyType(page);
@@ -185,7 +167,6 @@ test.describe('Fitting Compare column alignment', () => {
         await page.setViewportSize(size);
         await signInAndGoto(page, './ships/fittings/compare');
         await answerAnyType(page);
-        // Every later fit carries one more gun, so the "Modules that differ" table renders.
         for (const [i, eft] of fits.entries()) {
           await addFitting(
             page,
@@ -232,7 +213,6 @@ test.describe('Fitting Compare pinned names row', () => {
     const pinned = table.getByTestId('compare-pinned-names');
     await expect(pinned).toBeVisible({ timeout: 20_000 });
 
-    // Scroll until the table's first stat row has left the viewport.
     const firstRow = table.locator('tbody tr').first();
     await firstRow.evaluate((el) => {
       const bottom = el.getBoundingClientRect().bottom + window.scrollY;
@@ -243,17 +223,15 @@ test.describe('Fitting Compare pinned names row', () => {
       expect(row!.y + row!.height).toBeLessThan(0);
     }).toPass();
 
-    // The cells carry the sticky offset (a `tr`'s own box doesn't move with them), so measure one.
     const box = (await pinned.locator('th').first().boundingBox())!;
     expect(Math.abs(box.y)).toBeLessThanOrEqual(1);
     expect(box.height).toBeLessThan(40);
 
-    // Each pinned name sits over its own column: same right edge as that column's cells.
     const names = pinned.locator('th');
     const cells = table.locator('tbody tr').first().locator('td');
     for (const i of [1, 2]) {
       const nameBox = (await names.nth(i).boundingBox())!;
-      const cellBox = (await cells.nth(i - 1).boundingBox())!; // the stat name is a row header (th), so td 0 is column 1
+      const cellBox = (await cells.nth(i - 1).boundingBox())!;
       expect(Math.abs(nameBox.x + nameBox.width - (cellBox.x + cellBox.width))).toBeLessThanOrEqual(
         1
       );

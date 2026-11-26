@@ -13,7 +13,6 @@ import { deletionLine, statusStateLabel } from './vettingText';
 
 const STATE_TONE: Partial<Record<VettingState, PillTone>> = { accepted: 'success' };
 
-/** Who opened the report and when it is deleted: the pilot sees the same list the reviewers do. */
 function VettingOpenedBy({ status }: { status: VettingStatus }) {
   const { t } = useTranslation();
   const timeZone = useTimeZone();
@@ -52,17 +51,10 @@ function VettingOpenedBy({ status }: { status: VettingStatus }) {
 
 interface VettingStatusViewProps {
   status: VettingStatus;
-  /** Withdraws and deletes the report; rejects to keep the confirm open. Absent hides the action. */
   onWithdraw?: () => Promise<void>;
-  /** The optional offer to sign in to the app; absent for a pilot who already uses it. */
   onOpenApp?: () => void;
 }
 
-/**
- * A pilot's review after it is sent: where Send lands and what they come back to. Status (a no
- * in the corp's own wording, with its reasons when the corp shows them), what happens next and
- * who to talk to, the pilot's own answers, who opened the report, when it is deleted, Withdraw.
- */
 export function VettingStatusView({ status, onWithdraw, onOpenApp }: VettingStatusViewProps) {
   const { t } = useTranslation();
   const timeZone = useTimeZone();

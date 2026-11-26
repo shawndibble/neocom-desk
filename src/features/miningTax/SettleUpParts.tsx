@@ -1,20 +1,15 @@
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, FilterChip, InfoTooltip, Tooltip, TextInput } from '@/components/ui';
+import { tappableRowClassName } from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
 import type { MiningTaxPaymentMethod } from '@/db';
 import { SETTLE_FIELD_LABEL, SETTLE_METHODS } from './settleUpFields';
 import { cx } from '@/lib/cx';
 import { PayeeOpenInEveButton } from './PayeeOpenInEveButton';
 
-/**
- * The parts of Settle up that do not depend on what is being settled: the
- * copyable To / Amount / Reason rows, and the sent-on date with the method.
- * `SettleUpDialog` (Mining Tax entries) and the moon owner payout dialog both
- * compose these, so the shell reads and behaves the same in both.
- */
+const SETTLE_ROW_LABEL = cx(SETTLE_FIELD_LABEL, 'w-18 shrink-0');
 
-/** One labelled line the app cannot send for the pilot: shown, with Copy (and Open in EVE for a payee). */
 export function SettleCopyRow({
   label,
   value,
@@ -30,13 +25,12 @@ export function SettleCopyRow({
   onCopy: () => void;
   dim?: boolean;
   openInEve?: { name: string; entityId?: number; payeeId?: string };
-  /** A note on the value, as an info tooltip rather than text on the page. */
   hint?: string;
 }) {
   const { t } = useTranslation();
   return (
     <div className="flex min-w-0 items-center gap-2 px-2 py-1.5">
-      <span className={cx(SETTLE_FIELD_LABEL, 'w-14 shrink-0')}>{label}</span>
+      <span className={SETTLE_ROW_LABEL}>{label}</span>
       <Tooltip content={value}>
         <span
           className={cx(
@@ -68,7 +62,31 @@ export function SettleCopyRow({
   );
 }
 
-/** The date the pilot paid and how; `extra` adds a field after them (a contract id). */
+export function SettleInfoRow({
+  label,
+  value,
+  note,
+}: {
+  label: string;
+  value: string;
+  note?: string;
+}) {
+  return (
+    <div className="flex min-w-0 items-center gap-2 px-2 py-1.5">
+      <span className={SETTLE_ROW_LABEL}>{label}</span>
+      <span
+        className={cx(
+          'flex min-w-0 flex-1 flex-wrap items-center gap-x-2 text-xs break-words',
+          tappableRowClassName
+        )}
+      >
+        <span className="font-semibold">{value}</span>
+        {note && <span className="text-text-dim">{note}</span>}
+      </span>
+    </div>
+  );
+}
+
 export function SettleSentOnAndMethod({
   paidOn,
   onPaidOn,
@@ -82,7 +100,6 @@ export function SettleSentOnAndMethod({
   method: MiningTaxPaymentMethod;
   onMethod: (value: MiningTaxPaymentMethod) => void;
   extra?: ReactNode;
-  /** The ways it may have been paid; a lone one is not asked. */
   methods?: readonly MiningTaxPaymentMethod[];
 }) {
   const { t } = useTranslation();

@@ -1,10 +1,3 @@
-/**
- * The Corp Tax Book's stored documents read back in one place: the book's settings doc
- * (`corps/{id}`) and its rates, for the officer's client and the member's alike, and the one
- * rule for which corporation a character was last recorded in. Pure: callers fetch, this parses.
- * The functions copy of `latestRecordedCorp` lives in `functions/src/corpTaxBookEngine.ts`
- * (ADR 0025: functions cannot import src), kept honest by `functionsMirror.test.ts`.
- */
 import { isFiniteNumber, isId, isRecord } from '../guards';
 import { DEFAULT_GRACE_HOURS } from './billable';
 import { readDivisionNames, type DivisionNames } from './divisionNames';
@@ -17,14 +10,11 @@ import { DAY_SETTLE_TOLERANCE_PCT } from './minerRunningAccount';
 
 type Data = Record<string, unknown>;
 
-/** Who gets the EVE mail when a member asks about tax: a mailing list, or up to five characters. */
 export type TaxContact =
   { kind: 'mailingList'; id: number; name: string } | { kind: 'characters'; ids: number[] };
 
-/** The most characters a `TaxContact` can name. */
 export const TAX_CONTACT_MAX_CHARACTERS = 5;
 
-/** A stored `taxContact`, or undefined when absent or malformed (then the CEO is mailed). */
 export function parseTaxContact(v: unknown): TaxContact | undefined {
   if (!isRecord(v)) return undefined;
   if (v.kind === 'mailingList') {
@@ -41,18 +31,11 @@ export function parseTaxContact(v: unknown): TaxContact | undefined {
   return undefined;
 }
 
-/** Every setting the book document stores, every default filled in. */
 export interface BookSettings {
   active: boolean;
-  /** Empty when the doc has none. */
   startDate: string;
   divisions: number[];
-  /**
-   * The division members are asked to pay into first (`primaryDivisionOf`); the book still reads
-   * donations from every division in `divisions`. Absent on a book that never chose one.
-   */
   primaryDivision?: number;
-  /** The corp's own names for those divisions (#6161); `parseBookSettings` always fills it. */
   divisionNames?: DivisionNames;
   lastSync: LastSync | null;
   structureExpiryHours: Record<string, number>;
@@ -62,28 +45,20 @@ export interface BookSettings {
   overdueDays: number;
   chunkM3PerHour: number | null;
   rates: TaxRate[];
-  /** Above this a dismissal needs a Director (D6); null when there is no limit. */
   dismissApprovalAboveIsk: number | null;
   ownerCharacterId: number | null;
-  /** Who turned the book on; the owner changes when the CEO reclaims it. */
   createdBy: number | null;
-  /** Epoch ms: until then members' own Mining Tax pages ignore the book (setup window). */
   membersSeeFrom?: number;
-  /** Who gets the EVE mail when a member asks about tax. Absent → the corporation's CEO. */
   taxContact?: TaxContact;
-  /** A running account's late notices. */
   noticeRules: NoticeRules;
-  /** A running account's per-day tolerance, in percent. */
   dayTolerancePct: number;
 }
 
-/** Every scope a stored rate can have — the engine's own list, so a new scope is never dropped. */
 export const RATE_SCOPES: ReadonlySet<RateScope> = new Set(SCOPE_ORDER);
 
 export const num = (v: unknown): number | undefined => (isFiniteNumber(v) ? v : undefined);
 export const str = (v: unknown): string | undefined => (typeof v === 'string' ? v : undefined);
 
-/** The field naming what a scoped rate targets, and whether it is a number or a string. */
 const TARGET: Partial<Record<RateScope, [field: string, kind: 'number' | 'string']>> = {
   feeder: ['feederId', 'number'],
   'feeder-member': ['feederId', 'number'],
@@ -93,7 +68,6 @@ const TARGET: Partial<Record<RateScope, [field: string, kind: 'number' | 'string
   record: ['recordKey', 'string'],
 };
 
-/** One stored rate, or null when it is not one the engine can resolve. */
 export function parseRate(v: unknown): TaxRate | null {
   if (!isRecord(v) || num(v.pct) === undefined) return null;
   const scope = v.scope as RateScope;
@@ -107,10 +81,6 @@ export function parseRate(v: unknown): TaxRate | null {
   return v as unknown as TaxRate;
 }
 
-/**
- * The settings doc as `BookSettings`, validated, with the engine's defaults for anything absent
- * or malformed. Whether a member may see the book yet (active, setup window) is the caller's.
- */
 export function parseBookSettings(d: Data): BookSettings {
   const expiry = isRecord(d.structureExpiryHours) ? d.structureExpiryHours : {};
   const membersSeeFrom = num(d.membersSeeFrom);
@@ -144,15 +114,6 @@ export function parseBookSettings(d: Data): BookSettings {
   };
 }
 
-/**
- * Each character's latest recorded corporation — the one the player's standing (member, left,
- * guest) and the Close account guard go by. Of a character's ledger rows (or Observed Mining
- * Entries, which carry their freshest read), the one `recordedLater` ranks first: the newest
- * day, then the freshest ESI read, then the higher refinery id, then the higher corporation
- * id. So a character who mined as a member and then as a guest on the same day reads as a
- * guest once a later read saw them as one, and every reader agrees whatever its row order.
- * Mirrored by hand in `functions/src/corpTaxBookEngine.ts`.
- */
 export function latestRecordedCorp(
   rows: readonly (CorpRecord & { characterId: number })[]
 ): Map<number, { date: string; corp: number }> {

@@ -12,7 +12,6 @@ const skills = (connections: number, criminalConnections: number, diplomacy: num
 
 describe('effectiveStanding', () => {
   it.each([
-    // [base, criminal, skills, expected, why]
     [5, false, skills(0, 0, 0), 5, 'no skills change nothing'],
     [5, false, skills(5, 0, 0), 6, 'Connections V: 5 + 5 * 0.2'],
     [0.9, false, skills(2, 0, 0), 1.628, 'Connections II on 0.9 (EVE Uni worked example)'],

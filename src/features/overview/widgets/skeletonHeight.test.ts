@@ -9,11 +9,6 @@ import {
   WRITE_DELAY_MS,
 } from './skeletonHeight';
 
-/**
- * The settled body heights below were measured in Chromium on the default board (1350px and
- * 390px wide) with a full set of data; the estimate is pinned to within a pixel of them, since
- * every pixel it is off moves the widgets under it when the data lands.
- */
 function expectNear(actual: number, settled: number) {
   expect(Math.abs(actual - settled), `${actual} vs settled ${settled}`).toBeLessThanOrEqual(1);
 }
@@ -33,7 +28,6 @@ describe('estimatedBodyHeight', () => {
   });
 
   it('reserves the header row and the size rows for the Table view, plain rows taller on a phone', () => {
-    // Calendar at Medium: the headline, a labelled header row and five rows.
     expectNear(est('comingUp', 'table', 'M', false), 216);
     expectNear(est('comingUp', 'table', 'M', true), 236);
     expect(est('comingUp', 'table', 'L', false)).toBeGreaterThan(
@@ -47,7 +41,6 @@ describe('estimatedBodyHeight', () => {
   });
 
   it("reserves Open orders' sortable header, its default page of ten, the pager and slots footer", () => {
-    // Measured with twelve orders: ten rows on the first page.
     expectNear(est('orders', 'table', 'L', false), 430.8);
     expectNear(est('orders', 'table', 'L', true), 494);
   });
@@ -74,17 +67,13 @@ describe('estimatedBodyHeight', () => {
 
   it("reserves the headline, the size's plot and its axis line for the Chart view", () => {
     expectNear(est('wallet', 'chart', 'S', false), 148);
-    // A Small tile on a phone is narrow enough that the axis labels take two lines.
     expectNear(est('wallet', 'chart', 'S', true), 164.5);
     expect(est('wallet', 'chart', 'L', false)).toBeGreaterThan(est('wallet', 'chart', 'S', false));
   });
 
   it("reserves a kind's own drawing when it is not a plotted series", () => {
-    // LP: horizontal bars with a caption.
     expectNear(est('lp', 'chart', 'M', false), 166);
-    // Net worth on a device's first load: one day recorded, so the single stacked bar.
     expectNear(est('netWorth', 'chart', 'M', false), 142.5);
-    // Build profit: labelled bars, an axis line and a caption.
     expectNear(est('profit', 'chart', 'M', false), 197);
   });
 });

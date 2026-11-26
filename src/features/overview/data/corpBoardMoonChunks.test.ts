@@ -89,7 +89,6 @@ describe("moon owners' pops from a Corp Tax Book (#6116)", () => {
   it('All characters: adds the book’s moon owners beside the corporations ESI reads', async () => {
     characters.push(1, 2);
     access.set(1, { corporationId: 10, can: only('canReadMoonExtractions') });
-    // The CEO of the accounting corporation: views its book, no refinery of its own.
     access.set(2, { corporationId: 20, can: only('canViewTaxBook') });
     esiChunks.set(10, esiRead('own'));
     feederChunkReads.mockReturnValue(new Map([[30, bookRead('moon-owner')]]));

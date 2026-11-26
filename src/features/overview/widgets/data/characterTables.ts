@@ -1,10 +1,3 @@
-/**
- * The Table views of the character-facing kinds (training, skill points,
- * calendar, contracts, mail): real columns, ordered name first, then the one
- * "key" figure, then the rest, each with the priority `visibleColumns` uses to
- * decide what survives a narrow widget. Pure: figures and a translate function
- * in, a `TableModel` out.
- */
 import { fixed1 } from '@/lib/fixedFormat';
 import type { DeadlineSeverity } from '@/engine/character/severity';
 import { extractableSp, extractorCount } from '@/engine/skills/spExtraction';
@@ -24,42 +17,27 @@ import type { Translate } from '@/lib/translate';
 import { highlightHref } from '@/lib/highlightParam';
 import { createNumberFormat, formatNumber } from '@/lib/numberLocale';
 
-// Part-trained levels bank fractional SP; the old default printed up to 3 decimals.
 const formatSp = createNumberFormat({ maximumFractionDigits: 3 });
 
 const W = 'overview.widgets';
-/** The Contracts History table, where `?open=` finds a contract of the Character's own. */
 const CONTRACTS_PATH = '/contracts/history';
 
-/** `finish_date` as an instant, null when ESI gave none (a paused queue). */
 function instant(date: string | undefined): number | null {
   if (!date) return null;
   const ms = Date.parse(date);
   return Number.isNaN(ms) ? null : ms;
 }
 
-// --- Training ------------------------------------------------------------------------
-
-/** The accelerator line a Training table carries, in time-left order: what it is, when it runs out, how loud. */
 export interface TrainingAcceleratorRow {
   label: string;
   expiresAt: number;
   severity: DeadlineSeverity;
 }
 
-/**
- * Where the accelerator sits among the queue's rows: after every skill that ends before it runs
- * out, so the list reads by time left. A skill with no end (a paused queue) sorts after it.
- */
 export function acceleratorSlot(finishes: readonly (number | null)[], expiresAt: number): number {
   return finishes.filter((finish) => finish !== null && finish <= expiresAt).length;
 }
 
-/**
- * The unfinished queue: skill, when it ends, how long it trains in all, the
- * level it reaches and SP per hour. SP per hour needs the entry's declared
- * start and SP figures, so a skill queued behind another shows no rate.
- */
 export function trainingTable(
   t: Translate,
   entries: readonly SkillQueueEntry[],
@@ -69,7 +47,6 @@ export function trainingTable(
 ): TableModel {
   let previousFinish: number | null = null;
   const rows: TableRowModel[] = [];
-  // Each row's end, so the accelerator can take its place among them by time left.
   const finishes: (number | null)[] = [];
   for (const entry of entries) {
     const finish = instant(entry.finish_date);
@@ -123,20 +100,12 @@ export function trainingTable(
   };
 }
 
-// --- Skill points ----------------------------------------------------------------------
-
 export interface SpTableInput {
   totalSp: number;
-  /** Null when the skills read did not carry it. */
   unallocatedSp: number | null;
   extras: SpExtras;
 }
 
-/**
- * Total, unallocated and extractable SP as records. With extraction
- * monitoring on, a bar shows how far the extractable SP is toward the pilot's
- * threshold; with a priced hub, what the extractors are worth.
- */
 export function spTable(t: Translate, input: SpTableInput): TableModel {
   const { totalSp, unallocatedSp, extras } = input;
   const extractable = extractableSp(totalSp);
@@ -171,7 +140,6 @@ export function spTable(t: Translate, input: SpTableInput): TableModel {
       key: 'threshold',
       cells: [
         t(`${W}.sp.threshold`),
-        // The bar and percentage sit in the key column so Small keeps them.
         { text: `${Math.floor(share * 100)}%`, bar: share },
         t(`${W}.sp.ofThreshold`, { sp: formatCompactNumber(extras.thresholdSp) }),
       ],
@@ -200,9 +168,6 @@ export function spTable(t: Translate, input: SpTableInput): TableModel {
   };
 }
 
-// --- Calendar ------------------------------------------------------------------------
-
-/** One Calendar agenda row, already worded: what, when (a countdown or its past label), which kind. */
 export interface CalendarTableRow {
   key: string;
   subject: string;
@@ -228,12 +193,9 @@ export function calendarTable(t: Translate, rows: readonly CalendarTableRow[]): 
   };
 }
 
-// --- Contracts -----------------------------------------------------------------------
-
 const isk = (amount: number | null): TableCell =>
   amount === null || amount <= 0 ? UNKNOWN : { text: formatIskCompact(amount), iskAmount: amount };
 
-/** Each haul in progress and outstanding contract: where it goes (or what it is), when it lapses, what it pays. */
 export function contractsTable(
   t: Translate,
   items: readonly ContractTableRow[],
@@ -260,7 +222,6 @@ export function contractsTable(
         isk(courier ? item.reward : item.price),
         isk(courier ? item.collateral : null),
       ],
-      // Overdue is the only red; anything due within a day is an amber heads-up.
       tone: item.overdue
         ? 'critical'
         : item.state === 'in_progress' && left <= DAY_MS
@@ -287,13 +248,6 @@ export function contractsTable(
   };
 }
 
-// --- Mail ---------------------------------------------------------------------------
-
-/**
- * The newest mail: who, how long ago, what. Unread rows carry the watch tone.
- * A row opens that mail in the reader (`?open=`), for the mailbox's owner
- * (`owner`): the mail id alone repeats across mailboxes.
- */
 export function mailTable(
   t: Translate,
   mails: readonly BoardMail[],
@@ -319,8 +273,6 @@ export function mailTable(
   };
 }
 
-// --- Clones --------------------------------------------------------------------------
-
 export interface CloneTableRow {
   id: string | number;
   label: string;
@@ -332,7 +284,6 @@ export interface CloneTableRow {
 
 const D = 'overview.widgets.data';
 
-/** Each clone against the one being worn: how long the queue takes in it, the saving, implants, where. */
 export function clonesTable(t: Translate, rows: readonly CloneTableRow[]): TableModel {
   return {
     columns: [
@@ -358,7 +309,6 @@ export function clonesTable(t: Translate, rows: readonly CloneTableRow[]): Table
       return {
         key: String(row.id),
         cells: [
-          // A clone named only by where it sits does not repeat the owner and moon in its name.
           row.label === row.location ? placeHead(row.label) : row.label,
           vs,
           row.totalSeconds === null ? UNKNOWN : formatCountdown(row.totalSeconds),
@@ -366,16 +316,12 @@ export function clonesTable(t: Translate, rows: readonly CloneTableRow[]): Table
           row.location === null ? UNKNOWN : placeHead(row.location),
         ],
         tone: 'clear',
-        // The worn clone has no card id to flash.
         to: row.id === 'worn' ? undefined : highlightHref('/clones', row.id),
       };
     }),
   };
 }
 
-// --- Location ------------------------------------------------------------------------
-
-/** High-sec reads green, low-sec amber, null-sec and below red, by the one-decimal figure the client shows. */
 function securityTone(security: number): 'good' | 'caution' | 'bad' {
   const shown = Math.round(security * 10) / 10;
   return shown >= 0.5 ? 'good' : shown >= 0.1 ? 'caution' : 'bad';

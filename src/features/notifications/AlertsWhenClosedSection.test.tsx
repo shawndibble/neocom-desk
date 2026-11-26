@@ -23,7 +23,6 @@ const characters = [
   { characterId: 2, name: 'Beta' },
 ];
 
-/** The grant screen starts closed (a dialog off Delivery's summary); most tests need the rows, so they open it. */
 async function renderSection(state?: unknown, { open = true } = {}) {
   const result = render(
     <MemoryRouter initialEntries={[{ pathname: '/settings/notifications', state }]}>
@@ -36,7 +35,6 @@ async function renderSection(state?: unknown, { open = true } = {}) {
   return result;
 }
 
-/** Device sign-ins holding the mail and location scopes, so those events count as ticked-and-usable. */
 async function seedTokens(...ids: number[]) {
   for (const characterId of ids) {
     await db.tokens.put({
@@ -142,7 +140,6 @@ describe('AlertsWhenClosedSection', () => {
       await screen.findByText(/Every Character that is on has the logins its Device alerts need/)
     ).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Log in \d+ characters?/ })).toBeNull();
-    // Beta's own row still offers the login.
     expect(
       screen.getByRole('button', { name: 'Log Beta in to EVE for alerts when closed' })
     ).toBeInTheDocument();
@@ -204,7 +201,6 @@ describe('AlertsWhenClosedSection', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Continue to EVE' }));
     expect(login.begin).toHaveBeenCalledTimes(1);
     expect(login.begin).toHaveBeenCalledWith(1, { nearby: true, mail: true });
-    // The next step waits for the return from EVE and is already decided.
     expect(JSON.parse(sessionStorage.getItem('neocom.alerts.queue')!).remaining).toEqual([
       { characterId: 2, nearby: true, mail: false },
     ]);

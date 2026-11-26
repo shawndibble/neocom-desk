@@ -238,7 +238,6 @@ describe('FindBestPlan', () => {
     expect(panel.closest('li')).toBe(button.closest('li'));
     expect(within(panel).getByRole('link', { name: 'Perimeter' })).toBeInTheDocument();
     expect(panel).toHaveTextContent('Command Center');
-    // The ranking's fit: its level, its meter and the heads it assumed.
     expect(panel).toHaveTextContent('Needs a Command Center at upgrade level 2 or higher');
     expect(panel).toHaveTextContent('Extractor with 6 heads:');
     expect(panel).toHaveTextContent('Reset the extractors every');

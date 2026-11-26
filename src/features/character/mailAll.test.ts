@@ -62,7 +62,6 @@ describe('loadMailForCharacters', () => {
     invalidateFreshness();
     const again = await loadMailForCharacters(characters, 1_000 + MAIL_REFRESH_MIN_GAP_MS - 1);
     expect(headerFetches).toHaveLength(2);
-    // Still shown, from cache.
     expect(again.owners.map((o) => o.headers?.data.length)).toEqual([1, 1]);
   });
 

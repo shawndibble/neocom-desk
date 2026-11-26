@@ -206,7 +206,6 @@ describe('loadOtherCharactersAssetsDetailed', () => {
       fetchedAt: savedAt,
     });
     server.use(
-      // ESI is down for the Character whose list is saved; the other answers live.
       http.get(`${ESI_BASE_URL}/characters/${OTHER_ID}/assets`, () => HttpResponse.error()),
       http.get(`${ESI_BASE_URL}/characters/${THIRD_ID}/assets`, () =>
         HttpResponse.json([ASSET(3)], { headers: { 'X-Pages': '1' } })
@@ -269,9 +268,6 @@ describe('loadAllCharactersAssets (issue #181)', () => {
   });
 
   it('skips a Character that never granted the assets scope without calling ESI', async () => {
-    // This fan-out runs on every Build Plan open, and a live 403 raises the
-    // app-wide re-auth banner for an alt the player never asked about — with
-    // nothing cached to stop it happening again on the next plan.
     await db.tokens.put(tokenWith(THIRD_ID, ['esi-skills.read_skills.v1']));
     server.use(
       http.get(`${ESI_BASE_URL}/characters/${THIRD_ID}/assets`, () => {

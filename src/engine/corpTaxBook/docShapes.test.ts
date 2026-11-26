@@ -130,7 +130,6 @@ describe('the small doc readers', () => {
       owed: [{ date: '2026-09-12', remaining: 100, tax: 150, credited: 50 }],
       characterIds: [5],
     });
-    // One recorded before the day's whole figures were kept does not add up any more.
     expect(
       readCheckpoint('solo:5', { ...stored, owed: [{ date: '2026-09-12', remaining: 100 }] })
     ).toBeNull();
@@ -163,7 +162,6 @@ describe('the small doc readers', () => {
       at: '',
     });
     expect(readWriteOff('w', { minerId: 'm', amount: 1 })).toBeNull();
-    // A legacy write-off's notice id is not read: money names no day.
     expect(readWriteOff('w', { minerId: 'm', amount: 1, at: 't', statementId: 's' })).toEqual({
       id: 'w',
       minerId: 'm',

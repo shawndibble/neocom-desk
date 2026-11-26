@@ -1,15 +1,5 @@
-/**
- * Fixtures for the Moon mining at scale mockup. One heavy Miner (Varro Kestane,
- * two characters) mining on 68 of 79 days since 1 Aug 2026 across 20 corp
- * moons and 57 pops, built from a seeded generator so the Miner and Miner x pop
- * figures are sums of the same lines. The Pop page's other Miners and the
- * Miners list are synthesized or asserted (see UNLISTED).
- *
- * Today is 18 Oct 2026 14:00 EVE; every day through 17 Oct is Billable. The
- * Aug Late notice went out 1 Sep, the Sep Late notice 1 Oct (due 15 Oct).
- */
-export const TODAY_DAY = 78; // 18 Oct, counted from 1 Aug = 0
-export const BILLABLE_THROUGH_DAY = 77; // 17 Oct
+export const TODAY_DAY = 78;
+export const BILLABLE_THROUGH_DAY = 77;
 export const MEMBER_RATE = 10;
 
 const MONTHS = ['Aug', 'Sep', 'Oct'] as const;
@@ -73,7 +63,6 @@ export interface Pop {
   moon: string;
   system: string;
   refinery: string;
-  /** Day the laser fired; the field is mined for the next two days. */
   fracture: number;
   ore: string;
   price: number;
@@ -88,7 +77,6 @@ export interface Line {
   character: string;
   units: number;
   value: number;
-  /** Tax at the pop's rate before any dismissal. */
   gross: number;
   tax: number;
 }
@@ -111,9 +99,7 @@ export interface PopRow {
   units: number;
   value: number;
   tax: number;
-  /** Tax a dismissal removed (0 when none). */
   waived: number;
-  /** Tax a lower pop rate removed against the book default. */
   rateCut: number;
   paid: number;
   owed: number;
@@ -128,7 +114,7 @@ MOON_NAMES.forEach((m, moonIndex) => {
   while (fracture < TODAY_DAY - 1) {
     let day = fracture;
     const dom = day - MONTH_START[day >= 61 ? 2 : day >= 31 ? 1 : 0];
-    if (dom >= 28 && day < 61) day -= 3; // no pop straddles a month end
+    if (dom >= 28 && day < 61) day -= 3;
     const ore = ORES[(moonIndex + POPS.length) % ORES.length];
     POPS.push({
       id: POPS.length + 1,
@@ -144,7 +130,6 @@ MOON_NAMES.forEach((m, moonIndex) => {
   }
 });
 
-/** One-off exceptions the CEO made: a hauling op dismissed, one pop at a lower rate. */
 export const dismissedPop = POPS.find(
   (p) => p.moon === 'Kamela II - Moon 2' && monthOf(p.fracture) === 'Sep'
 );
@@ -190,12 +175,10 @@ export interface Payment {
   date: string;
   from: string;
   amount: number;
-  /** Which Late notice it settles, and the pops it reaches (oldest debt first). */
   statement: 'Aug Late notice' | 'Sep Late notice';
   covers: string;
   partial: boolean;
   popIds: number[];
-  /** ISK of this payment applied to each pop it reached. */
   applied: Record<number, number>;
 }
 
@@ -221,7 +204,6 @@ const taxOfPops = (pops: Pop[]) => pops.reduce((t, p) => t + popTotals.get(p.id)
 const sepBilled = billedPopsOldestFirst.filter((p) => monthOf(p.fracture) === 'Sep');
 const aug40 = round4(AUG_BILLED * 0.4);
 
-/** Payments land on whole pops, except the last, which is part paid. */
 const PAYMENT_PLAN: Omit<Payment, 'covers' | 'partial' | 'popIds' | 'applied'>[] = [
   { id: 1, date: '2 Sep', from: 'Lysa Kestane', amount: aug40, statement: 'Aug Late notice' },
   {
@@ -344,12 +326,9 @@ export const MONTH_STATEMENT: Record<Month, string> = {
   Oct: 'Not on a Late notice yet',
 };
 
-/** A pop that Varro mined a lot of, for the Miner x Pop page. */
 export const FOCUS_ROW = POP_ROWS.find(
   (r) => r.pop.moon === 'Efa V - Moon 3' && r.month === 'Sep'
 )!;
-
-// ------------------------------------------------------------------ Moon page
 
 export interface PopMiner {
   miner: string;
@@ -371,7 +350,6 @@ const OTHER = [
   'Hakon Strand',
 ];
 
-/** Everyone who mined the focus pop: Varro from his lines, the rest generated. */
 export const FOCUS_MINERS: PopMiner[] = [
   {
     miner: 'Varro Kestane',
@@ -415,7 +393,6 @@ export interface MoonPop {
   status: PopStatus;
 }
 
-/** All pops of the focus moon, newest first; the focus pop's figures are the table above. */
 export const MOON_POPS: MoonPop[] = POPS.filter((p) => p.moonIndex === FOCUS_ROW.pop.moonIndex)
   .sort((a, b) => b.fracture - a.fracture)
   .map((pop) => {
@@ -463,8 +440,6 @@ export const MOON_TOTALS = {
   ),
 };
 
-// ------------------------------------------------------------------ Miners list
-
 export interface ListMiner {
   main: string;
   standing: 'Member' | 'Guest';
@@ -473,7 +448,6 @@ export interface ListMiner {
   overdueDays: number | null;
   nextStatement: number;
   lastPaid: string;
-  /** Last reminder mailed; Never when none was sent. */
   lastReminder: string;
   pops: number;
 }
@@ -521,7 +495,6 @@ export const LIST_MINERS: ListMiner[] = NAMES.map((main, i) => {
     standing: i % 5 === 0 ? ('Guest' as const) : ('Member' as const),
     corp: i % 5 === 0 ? 'Ashfall Prospecting' : 'Brass Meridian Logistics',
     owed,
-    // Overdue counts from the oldest unpaid Late notice: Sep (due 15 Oct) is 3 days, Aug (due 15 Sep) is 33.
     overdueDays: owed > 0 && i % 2 === 0 ? (i % 4 === 0 ? 33 : 3) : null,
     nextStatement,
     lastPaid:
@@ -535,11 +508,6 @@ export const LIST_MINERS: ListMiner[] = NAMES.map((main, i) => {
   };
 }).sort((a, b) => b.owed - a.owed);
 
-/**
- * The list shows 13 of 61 Miners. The other 48 are asserted, not generated, so
- * the chips and Select all on the Miners page are the only figures in this
- * mockup that are not a sum of the visible lines.
- */
 const UNLISTED = { count: 48, willBill: 20, below: 14, owed: 214_300_000, next: 380_100_000 };
 
 export const LIST_TOTALS = {

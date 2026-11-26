@@ -1,16 +1,3 @@
-/**
- * The Appraisal's campaign turn-ins (issue #6706): which pasted rows an Active
- * Campaign Objective takes, what each pays against selling it now, and the
- * pile whose Turn-in Reward beats Sell now (the facts row's Turn in total and
- * `TurnInBreakdown`).
- *
- * The LP in a reward is counted at the Appraisal's hub, the same hub its LP
- * Value is read at. The active Character's own contribution counts against an
- * objective's per-Character cap once its Participate read answers.
- *
- * A Turn-in Reward is never a price: nothing here feeds the Buy/Sell totals
- * (scope decision 20261123-164921).
- */
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { AppraisalRow, RefineBasis } from '@/engine/market/appraisal';
@@ -32,15 +19,10 @@ import type { TradeHub } from '@/market/hubs';
 export type RowTurnIn = AppraisalRowTurnIn<TurnInOfferDetail>;
 
 export interface AppraisalTurnIns {
-  /** For the copy lists' `turnIn` group; null until the offers load (or when none can be read). */
   lookup: AppraisalTurnInLookup<TurnInOfferDetail> | null;
-  /** The row's turn-in against Sell now; null without an Active offer. */
   rowTurnIn: (row: AppraisalRow) => RowTurnIn | null;
-  /** Some pasted row has an Active offer: the Turn in column earns its place. */
   any: boolean;
-  /** The rows turning in beats selling, for `TurnInBreakdown`. */
   pile: TurnInBreakdownItem[];
-  /** The pile's Turn-in Reward; 0 when nothing beats selling. */
   total: number;
 }
 
@@ -58,11 +40,9 @@ export function useAppraisalTurnIns({
   refineBasis: RefineBasis;
 }): AppraisalTurnIns {
   const { t } = useTranslation();
-  // No campaign request until something is appraised.
   const offers = useTurnInOffers(hub, rows.length > 0);
   const offerFor = offers.status === 'ready' ? offers.data.offerFor : null;
   const any = offerFor !== null && rows.some((row) => offerFor(row.typeId) !== null);
-  // Read only once something pasted can be turned in.
   const participation = useParticipation(any ? characterId : null);
   const contributedTo =
     participation.status === 'ready' ? participation.data.contributedTo : undefined;

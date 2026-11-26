@@ -37,7 +37,6 @@ const item: ContractItemRecord = {
   contract_id: '1',
 };
 
-/** An in-memory R2: `get` reads what `put` stored, as JSON. */
 function fakeR2() {
   const objects = new Map<string, string>();
   return {

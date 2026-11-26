@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { loadMoonOreTypeIds, loadTypes } from '@/sde/loadSde';
 
-/** Whether any of these scanner ore names is a moon ore (raw form, as the scanner prints it). */
 export function useHasMoonOre(oreNames: readonly string[]): boolean {
   const key = [...new Set(oreNames)].sort().join('\n');
   const [found, setFound] = useState<{ key: string; moon: boolean } | null>(null);

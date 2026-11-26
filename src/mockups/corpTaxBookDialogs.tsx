@@ -1,9 +1,3 @@
-/**
- * The Corp Tax Book's officer dialogs (#4056): Dismiss, Record payment, Mark
- * not tax, Reject declaration and Assign a donation. Each is a `Modal`
- * (a bottom sheet on a phone) built from the shared form primitives; every
- * one says who it is logged as and that the role is checked again on confirm.
- */
 import type { ReactNode } from 'react';
 import {
   Button,
@@ -49,7 +43,6 @@ export function Footer({ cancel = 'Cancel', confirm }: { cancel?: string; confir
 export const LOGGED =
   'Logged as Kestrel Vane, now, with your reason. Your role is checked again when you confirm.';
 
-/** A before → after line, so the officer sees what the action does to the balance. */
 export function Effect({ children }: { children: ReactNode }) {
   return (
     <p className="rounded-xs border border-line bg-panel-2 p-2 text-xs tabular-nums">{children}</p>
@@ -82,7 +75,6 @@ export function DismissDialog({ open }: { open: boolean }) {
   );
 }
 
-/** Record payment / Mark paid: ISK that reached the corporation outside the wallet journal. */
 export function RecordPaymentDialog({ open }: { open: boolean }) {
   const phone = useIsPhone();
   return (
@@ -126,7 +118,6 @@ export function RecordPaymentDialog({ open }: { open: boolean }) {
   );
 }
 
-/** Mark not tax: all or part of a donation was not a tax payment (e.g. a buyback). */
 export function MarkNotTaxDialog({ open }: { open: boolean }) {
   const phone = useIsPhone();
   const before = VARRO_BEFORE_NOT_TAX.owed;
@@ -173,7 +164,6 @@ export function MarkNotTaxDialog({ open }: { open: boolean }) {
   );
 }
 
-/** Needs-you: reject a Miner's "I paid by contract / other division / wrong corp" declaration. */
 export function RejectDeclarationDialog({ open }: { open: boolean }) {
   const phone = useIsPhone();
   return (
@@ -206,7 +196,6 @@ export function RejectDeclarationDialog({ open }: { open: boolean }) {
   );
 }
 
-/** Needs-you: link an Unmatched donation to a Miner. */
 export function AssignDonationDialog({ open }: { open: boolean }) {
   const phone = useIsPhone();
   return (

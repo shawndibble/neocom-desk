@@ -4,7 +4,6 @@ import { useIsPhone } from '@/lib/useIsPhone';
 import type { RequestMailPreview } from './useVettingRequestMail';
 import { DialogFooter } from '@/components/ui/DialogFooter';
 
-/** The request mail as the member will read it, in the Statement mail preview's style. */
 export function ReviewMailPreview({
   mail,
   onClose,

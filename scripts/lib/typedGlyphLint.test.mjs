@@ -1,12 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { ESLint } from 'eslint';
 
-/**
- * Pins the `no-restricted-syntax` selector that keeps typed "−" / "+" / "Aa"
- * out of icon-only controls (issue #2278). esquery's regex attribute parsing
- * is easy to get silently wrong — a selector that never fires lints clean —
- * so this runs the real config against small fixtures.
- */
 const eslint = new ESLint();
 
 async function typedGlyphErrors(source, filePath = 'src/features/fixture.tsx') {

@@ -1,22 +1,3 @@
-/**
- * Clickable entity names (DESIGN.md §6c "Entities"). Each is a real
- * react-router `<Link>` with its own URL, so a plain click navigates in-app
- * and middle-click / Ctrl+click open a new tab with no extra code:
- *
- * - `CharacterLink`, `CorporationLink`, `AllianceLink`, `FactionLink`, `SkillLink` point at
- *   the *current* page plus `?info=<kind>-<id>`; `EntityInfoRoute` opens the
- *   Show Info / Skill modal from that param.
- * - `ItemInfoLink` opens an item's Item Detail (Show info) the same way
- *   (`?info=type-<typeId>`). It is the default for an item name; the Market
- *   browser link (`MarketItemLink`) is for pages whose context is market.
- * - `PlaceLink` opens a region's, station's or structure's Place Info
- *   (`?info=place-<id>`).
- * - `SystemLink` goes to Route Safety with the system as the destination.
- *
- * Every one forwards its ref and spreads extra anchor props, so a `Tooltip`
- * `asChild` or `RowActionsMenu` trigger can wrap it. Layout (`truncate`,
- * `flex-1`, a text colour for a quiet column) comes in through `className`.
- */
 import { forwardRef, type AnchorHTMLAttributes, type MouseEvent, type ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
@@ -46,7 +27,6 @@ function isPlainPrimaryClick(event: MouseEvent<HTMLAnchorElement>): boolean {
 const InfoLink = forwardRef<HTMLAnchorElement, EntityLinkProps & { entity: EntityInfoTarget }>(
   function InfoLink({ entity, className, children, ...rest }, ref) {
     const location = useLocation();
-    // From inside an open modal (a drill-down) the entry is replaced, not stacked.
     const drillDown = parseEntityInfo(location.search) !== null;
     return (
       <Link
@@ -81,7 +61,6 @@ export const AllianceLink = forwardRef<HTMLAnchorElement, EntityLinkProps & { id
   }
 );
 
-/** An NPC faction's name, opening its Show Info (the standings, its corporations and stations). */
 export const FactionLink = forwardRef<HTMLAnchorElement, EntityLinkProps & { id: number }>(
   function FactionLink({ id, ...rest }, ref) {
     return <InfoLink {...rest} ref={ref} entity={{ kind: 'faction', id }} />;
@@ -92,7 +71,6 @@ export const SkillLink = forwardRef<
   HTMLAnchorElement,
   EntityLinkProps & {
     typeId: number;
-    /** The open Skill Plan's entries, so prerequisites it already trains read "Planned". */
     planEntries?: readonly PlanEntry[];
   }
 >(function SkillLink({ typeId, planEntries, onClick, ...rest }, ref) {
@@ -104,22 +82,17 @@ export const SkillLink = forwardRef<
       entity={{ kind: 'skill', id: typeId }}
       onClick={(event: MouseEvent<HTMLAnchorElement>) => {
         onClick?.(event);
-        // Only the click react-router handles in-app opens the modal here; a
-        // Ctrl/middle click opens a new tab and must not leave entries staged.
         if (isPlainPrimaryClick(event)) stage(typeId, planEntries);
       }}
     />
   );
 });
 
-/** An item name that opens its Item Detail (Show info) over the current page. */
 export const ItemInfoLink = forwardRef<
   HTMLAnchorElement,
   EntityLinkProps & {
     typeId: number;
-    /** The item's name for the modal title; looked up from the type when omitted. */
     itemName?: string;
-    /** A Mutated module's item id: Item Detail then shows its own Rolls. */
     itemId?: number;
   }
 >(function ItemInfoLink({ typeId, itemName, itemId, onClick, ...rest }, ref) {
@@ -139,7 +112,6 @@ export const ItemInfoLink = forwardRef<
   );
 });
 
-/** A region, station or structure name that opens its Place Info over the current page. */
 export const PlaceLink = forwardRef<HTMLAnchorElement, EntityLinkProps & { id: number }>(
   function PlaceLink({ id, ...rest }, ref) {
     return <InfoLink {...rest} ref={ref} entity={{ kind: 'place', id }} />;

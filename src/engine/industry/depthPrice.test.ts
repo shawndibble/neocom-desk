@@ -127,7 +127,6 @@ describe('summedDepthNeeds', () => {
   });
 
   it('tests the threshold on the group total, once per hub and type', () => {
-    // 6 + 6 = 12 units: neither member alone reaches 1% of 1,000, the group does.
     const needs = summedDepthNeeds([member('jita', [line(34, 6)]), member('jita', [line(34, 6)])]);
     expect([...needs.get('jita')!]).toEqual([[34, 12]]);
   });

@@ -19,15 +19,11 @@ import { useFittingExport, type FittingExport } from './useFittingExport';
 
 interface Props {
   fitting: Fitting;
-  /** The Fitting's price at the Fittings hub (`fittingPrice.ts`); null while it loads. */
   price: Appraisal | null;
-  /** The pilot's active clone, left off the multibuy list (`useFittingExport`). */
   cloneImplants?: readonly number[];
-  /** "Share to Community" and its notice, for a saved Fitting (`useEditorShare`). */
   share?: EditorShare;
 }
 
-/** The notice a copy leaves, announced politely. */
 export function FittingExportNotice({ notice }: { notice: string | null }) {
   if (notice === null) return null;
   return (
@@ -37,7 +33,6 @@ export function FittingExportNotice({ notice }: { notice: string | null }) {
   );
 }
 
-/** Export's menu items, for whichever menu holds them. */
 export function FittingExportItems({
   actions: {
     canSubtractOwned,
@@ -101,11 +96,6 @@ export function FittingExportItems({
   );
 }
 
-/**
- * The Fittings page's one Export menu (issue #1543): copy the Share Link or permanent link, EFT,
- * an in-game chat link or a multibuy list, and see the Fitting's price
- * with a way into Appraisal for the same list.
- */
 export function FittingExportMenu({ fitting, price, cloneImplants, share }: Props) {
   const { t } = useTranslation();
   const actions = useFittingExport(fitting, cloneImplants);

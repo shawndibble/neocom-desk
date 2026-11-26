@@ -10,7 +10,6 @@ import {
   orderBookWidthsRem,
 } from './marketOrderColumns';
 
-/** "5.50" at one unit: every figure narrower than its column's header. */
 const SHORT = { priceChars: 4, quantityChars: 1, baitFlag: false, myOrder: false };
 
 describe('orderBookWidthsRem', () => {
@@ -22,14 +21,12 @@ describe('orderBookWidthsRem', () => {
 
   it('widens Price and Quantity only as far as the longest figure on screen', () => {
     const short = orderBookWidthsRem(DEFAULT_VISIBLE_MARKET_ORDER_COLUMNS, SHORT);
-    // "1,234,567,891" and "12,345,678".
     const long = orderBookWidthsRem(DEFAULT_VISIBLE_MARKET_ORDER_COLUMNS, {
       priceChars: 13,
       quantityChars: 10,
       baitFlag: false,
       myOrder: false,
     });
-    // Price 4.75 -> 7.18rem, Quantity 4.125 -> 6.1rem.
     expect(long.cards - short.cards).toBeCloseTo(4.405);
   });
 
@@ -102,7 +99,6 @@ describe('orderBookFigureChars', () => {
 
   it('notes a bait-priced sell order, whose flag sits beside its price', () => {
     expect(orderBookFigureChars([order({ price: 100 })], 1).baitFlag).toBe(true);
-    // A buy order is never flagged, however far it sits from the best sell.
     expect(orderBookFigureChars([order({ price: 100, is_buy_order: true })], 1).baitFlag).toBe(
       false
     );

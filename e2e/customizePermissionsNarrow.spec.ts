@@ -1,10 +1,3 @@
-/**
- * The Customize permissions dialog's Submit/Cancel stay reachable on a phone
- * (issue #1774). The dialog is 13 Permission checkboxes long, so at 390×844 its
- * scroll region overflows; the action bar is the Modal `footer`, pinned below
- * that region, so it must sit inside the viewport without scrolling and be a
- * 36px touch target.
- */
 import { test, expect, PHONE } from './support/testBase';
 
 test('Customize permissions footer is reachable without scrolling at 390px', async ({ page }) => {

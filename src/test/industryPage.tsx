@@ -19,10 +19,6 @@ import {
   useReactionFacilityDefaults,
 } from '@/features/industry/reactionFacilityDefaults';
 
-// Shared harness for the Industry route tests (src/routes/Industry*.test.tsx), one
-// file per concern so CI runs them in parallel. The `vi.mock` calls stay in each
-// test file; their factories live in industryMocks.tsx.
-
 export const CHAR_ID = 91;
 export const emptySkillsPayload = { skills: [], total_sp: 0, unallocated_sp: 0 };
 
@@ -78,8 +74,6 @@ export const server = setupServer(
     );
   }),
   fuzzworkHandler(),
-  // Reads this suite does not assert on, answered with a network error: the same
-  // failure an unhandled request gives, without MSW logging each one.
   http.get('https://esi.evetech.net/characters/:id', () => HttpResponse.error()),
   http.get('https://esi.evetech.net/characters/:id/implants', () => HttpResponse.error()),
   http.get('https://esi.evetech.net/characters/:id/loyalty/points', () => HttpResponse.error()),
@@ -115,10 +109,7 @@ export async function resetSession() {
   await db.productionRuns.clear();
   await db.quickbars.clear();
   useActiveCharacter.setState({ activeCharacterId: null, hydrated: false });
-  // Module-scope store, so it outlives a test unless it is put back — same
-  // reason `useLastOpenedPlan` used to need this.
   useBuildGroups.setState({ value: {}, hydrated: false });
-  // Plan-page location edits write these, so they must not carry between tests.
   useFacilityDefaults.setState({ value: DEFAULT_FACILITY_DEFAULTS, hydrated: false });
   useReactionFacilityDefaults.setState({
     value: DEFAULT_REACTION_FACILITY_DEFAULTS,
@@ -155,11 +146,6 @@ export async function seedRun() {
   });
 }
 
-/**
- * Registers the MSW lifecycle, the warm-up render and the per-test reset. Call once at module scope.
- * The warm-up renders the industry routes alone (`renderIndustryRoutes`); a file that renders the
- * whole `App` passes its own, so its first `App` render is the one paid here.
- */
 export function installIndustryHarness(
   warmUp: () => RenderResult | Promise<RenderResult> = renderIndustryRoutes
 ): void {
@@ -170,10 +156,6 @@ export function installIndustryHarness(
   });
   beforeAll(async () => {
     server.listen({ onUnhandledRequest: 'error' });
-    // One throwaway render, so no test pays for the first one: a worker's first
-    // render (lazy chunks, jsdom and React warm-up) took over the 5s `findBy*`
-    // budget on its own and failed whichever test ran first. Same fix as
-    // `IndustryPlanPage.test.tsx`, paid under this hook's budget.
     await resetSession();
     const { unmount } = await warmUp();
     await screen.findByRole('searchbox', { name: 'Add Build Plan' }, { timeout: 25_000 });

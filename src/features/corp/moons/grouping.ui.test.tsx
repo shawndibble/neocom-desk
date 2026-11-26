@@ -118,7 +118,6 @@ beforeEach(() => {
   searchPayeeEntities.mockReset().mockResolvedValue([]);
 });
 
-/** The characters are behind the "N characters" link (#5247). */
 const openCharacters = () => userEvent.click(screen.getByRole('button', { name: /characters?$/ }));
 
 describe('MinerCharacters', () => {
@@ -164,7 +163,6 @@ describe('MinerCharacters', () => {
       mainCharacterId: 2,
     });
     await userEvent.click(screen.getAllByRole('button', { name: 'Unlink' })[1]);
-    // It asks the day the character left (today unless changed) before it unlinks.
     const confirm = await screen.findByRole('dialog');
     await userEvent.click(within(confirm).getByRole('button', { name: 'Unlink' }));
     await waitFor(() =>
@@ -205,7 +203,6 @@ describe('MinerCharacters', () => {
       miners: [{ id: 'g2', characterIds: [2, 4], mainCharacterId: 2 }],
       observed: [row(1), row(2), row(4), row(3, 555)],
     });
-    // The page's own read: this Miner only.
     renderPanel([], 'solo:1', (r) => <MinerCharacters miner={r} />, [], {
       entries: [entry(1)],
       data: { scopedMiner: 'solo:1' },

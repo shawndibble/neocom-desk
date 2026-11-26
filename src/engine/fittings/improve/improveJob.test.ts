@@ -30,7 +30,6 @@ import { buildVariationIndex } from '../../market/variations';
 import type { Fitting, FittingModule, FittingStats } from '../types';
 import { baseFittingStats } from '../__fixtures__/fittingStats';
 
-/** Base stats with the figures a job weighs set explicitly. */
 function statsWith(
   edit: { dps?: number; ehp?: number; sustained?: number; speed?: number } = {}
 ): FittingStats {
@@ -245,7 +244,6 @@ describe('brokenGuardrail with a job', () => {
 });
 
 describe('improveCandidates with a job', () => {
-  // group 52 scram, 46 propulsion; a Tech I and a Tech II of each rack medium.
   const groups: Record<number, number> = { 1: 52, 2: 52, 3: 46, 4: 46 };
   const index = buildVariationIndex(
     {
@@ -282,7 +280,6 @@ describe('improveCandidates with a job', () => {
 });
 
 describe('findMakeover with a job', () => {
-  // Two low slots; each swap 1 -> 2 adds EHP and costs 6% damage, so both together cost 12%.
   const stats = async (f: Fitting): Promise<FittingStats> => {
     const swapped = f.modules.filter((m) => m.typeId > 1 && m.typeId % 2 === 0).length;
     const base = statsWith({ ehp: 1000 + 300 * swapped, dps: 100 - 6 * swapped });
@@ -328,8 +325,6 @@ describe('findMakeover with a job', () => {
 });
 
 describe('Explore holds the explorer kit and, in dangerous space, the tank modules', () => {
-  // 5 and 6 are two different analyzers (group 538, job analyzer); 7 a shield extender (tank group 38);
-  // 3 and 4 are propulsion (46), which the overall goal reworks into.
   const groups: Record<number, number> = { 3: 46, 4: 46, 5: 538, 6: 538, 7: 38 };
   const index = buildVariationIndex(
     Object.fromEntries(

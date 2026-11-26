@@ -77,13 +77,34 @@ describe('liveRunningAccount with the days still owed', () => {
   });
 
   it('reads a day short by no more than the book tolerance of its tax as paid', () => {
-    // Day one is 1,000,000 owed of a 2,000,000 tax: 0.5% of the tax is 10,000.
     const live = liveRunningAccount(recorded, [{ amount: 990_000 }]);
     expect(live).toMatchObject({ days: 2, oldest: '2026-11-09' });
     expect(live.unpaidDays?.map((d) => d.date)).toEqual(['2026-11-09', '2026-11-10']);
     expect(liveRunningAccount(recorded, [{ amount: 989_999 }]).days).toBe(3);
-    // A book's own tolerance applies.
     expect(liveRunningAccount(recorded, [{ amount: 989_999 }], 1).days).toBe(2);
+  });
+
+  it('keeps a day one payment closed within the tolerance closed when the next payment arrives', () => {
+    const tight = {
+      owed: 11_000,
+      paid: 0,
+      days: 2,
+      oldest: '2026-11-08',
+      at: '2026-11-19T10:00:00.000Z',
+      unpaidDays: [
+        { date: '2026-11-08', owed: 10_000, tax: 10_000 },
+        { date: '2026-11-09', owed: 1_000, tax: 1_000 },
+      ],
+    };
+    const payments = [
+      { amount: 1_000, at: '2026-11-21T10:00:00.000Z' },
+      { amount: 9_960, at: '2026-11-20T10:00:00.000Z' },
+    ];
+    expect(liveRunningAccount(tight, payments).unpaidDays).toEqual([]);
+    expect(liveRunningAccount({ ...tight, paid: 9_960 }, payments).unpaidDays).toEqual([
+      { date: '2026-11-08', owed: 9_000, tax: 10_000 },
+      { date: '2026-11-09', owed: 1_000, tax: 1_000 },
+    ]);
   });
 
   it('pays the oldest day first, part of the next, and moves the oldest date on', () => {

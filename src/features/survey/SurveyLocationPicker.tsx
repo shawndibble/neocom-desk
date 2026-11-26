@@ -1,21 +1,3 @@
-/**
- * The Survey's location box: type a system, an NPC station or a structure and
- * pick it from the list under the box. Emptying the box clears the location, and
- * a name no result carries can be kept as typed: the last row offers it as a manual
- * location (free text, no id, so no waypoint).
- *
- * Systems, stations and the structures this device already knows are matched
- * locally while typing; any other structure needs ESI's name search (three
- * letters, debounced), and only for a Character whose token carries the search
- * scope, so everyone else still gets the rest without a request that would 403.
- * The box shows the picked place's name until the pilot types.
- *
- * A place named exactly what was typed (case and punctuation aside) leads the
- * list highlighted, so Enter takes it, and a pasted name that matches one is
- * picked outright. While a structure search is out, its row says so, the
- * earlier structures that still match stay listed, and Enter waits for the
- * answer rather than settling for the typed text as a manual location.
- */
 import { useEffect, useEffectEvent, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useGrantedScopes } from '@/app/useGrantedScopes';
@@ -51,14 +33,11 @@ export function SurveyLocationPicker({
   onPick,
 }: {
   value: { id: number | null; name: string } | null;
-  /** Null when nobody is logged in: systems and NPC stations still search, structures need a Character. */
   characterId: number | null;
-  /** A place, or `null` when the pilot emptied the box. */
   onPick: (place: SurveyPlace | null) => void;
 }) {
   const { t } = useTranslation();
   const granted = useGrantedScopes();
-  // `null` shows the picked place's name; a typed string (even empty) is a search in progress.
   const [query, setQuery] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const [stations, setStations] = useState<readonly NpcStationEntry[]>([]);
@@ -68,13 +47,10 @@ export function SurveyLocationPicker({
   const [structureHits, setStructureHits] = useState<{ key: string; places: SurveyPlace[] } | null>(
     null
   );
-  // The text Enter was pressed on while a structure search was out, answered once it lands.
   const [heldEnter, setHeldEnter] = useState<string | null>(null);
-  // The text a paste put in the box, picked outright when a place carries exactly that name.
   const [pasted, setPasted] = useState<string | null>(null);
   const pasting = useRef(false);
   const { systems, failed: systemsFailed, retry: retrySystems } = useSolarSystemList(open);
-  // Retry's note unmounts when the read restarts: focus waits on the field wrapper.
   const [wrapRef, , holdRetryFocus] = useRetryFocus(
     systemsFailed ? 'failed' : systems === null ? 'busy' : 'ok',
     'systems'
@@ -101,7 +77,6 @@ export function SurveyLocationPicker({
   const typed = query?.trim() ?? '';
   const canSearch = characterId !== null && granted !== undefined && granted.includes(SEARCH_SCOPE);
   const searchText = canSearch && typed.length >= MIN_STRUCTURE_SEARCH_LENGTH ? typed : '';
-  // Hits belong to the Character that searched, so another one's never pass for current.
   const searchKey = searchText === '' ? '' : `${characterId}:${searchText}`;
   useEffect(() => {
     if (searchKey === '' || characterId === null) return;
@@ -123,7 +98,6 @@ export function SurveyLocationPicker({
 
   const places = useMemo(() => {
     const local = searchLocalPlaces(systems ?? [], stations, typed);
-    // Until the search for this text lands, the last one's hits that still match stand in.
     const found =
       searchKey === '' || structureHits === null
         ? []
@@ -138,11 +112,9 @@ export function SurveyLocationPicker({
     return manual === null ? results : [...results, manual];
   }, [systems, stations, knownStructures, typed, structureHits, searchKey]);
 
-  // The manual row carries the typed text too, so it never counts as the match.
   const lead = places[0];
   const exact =
     lead !== undefined && lead.kind !== 'manual' && isExactPlace(lead, typed) ? lead : undefined;
-  // The keyboard's choice, else the exact match: the option Enter takes.
   const showList = open && (places.length > 0 || searching);
   const combo = useCombobox({
     count: places.length,
@@ -151,7 +123,6 @@ export function SurveyLocationPicker({
   });
   const active = combo.activeIndex;
 
-  /** What Enter takes: the active option, or typed text nothing matched as a manual location. */
   function enterPick(): SurveyPlace | undefined {
     if (active !== null) return places[active];
     return places.length === 1 ? places.find((place) => place.kind === 'manual') : undefined;
@@ -166,13 +137,11 @@ export function SurveyLocationPicker({
     setPasted(null);
   }
 
-  // A paste naming a place picks it; an Enter held for the search is answered once it lands.
   const pastedPick = pasted !== null && pasted === query ? exact : undefined;
   const heldAnswered = heldEnter !== null && heldEnter === query && !searching;
   const autoPick = useEffectEvent(() => {
     const place = pastedPick ?? (heldAnswered ? enterPick() : undefined);
     if (place !== undefined) choose(place);
-    // Nothing to take (several hits, no exact one): the pilot picks from the list.
     else if (heldAnswered) setHeldEnter(null);
   });
   useEffect(() => {
@@ -183,12 +152,10 @@ export function SurveyLocationPicker({
   function onKeyDown(event: KeyboardEvent<HTMLInputElement>) {
     if (combo.handleNavKey(event)) {
       setOpen(true);
-      // Moving the highlight takes back a held Enter: the pilot is choosing again.
       setHeldEnter(null);
     } else if (event.key === 'Enter') {
       const place = enterPick();
       if (active === null && searching && query !== null) {
-        // A structure may yet carry this name: answer Enter once the search lands.
         event.preventDefault();
         setHeldEnter(query);
       } else if (place !== undefined) {
@@ -231,14 +198,12 @@ export function SurveyLocationPicker({
         onFocus={() => setOpen(true)}
         onBlur={() => {
           setOpen(false);
-          // Emptying the box is how a location is cleared.
           if (query !== null && query.trim() === '' && value !== null) onPick(null);
           setQuery(null);
         }}
         onKeyDown={onKeyDown}
       />
       {open && systemsFailed && (
-        // System names can't be searched without the list; stations and typed text still work.
         <div
           onMouseDown={(event) => event.preventDefault()}
           className="mt-1 flex flex-wrap items-center gap-2 text-xs text-warning"

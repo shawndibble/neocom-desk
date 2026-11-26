@@ -40,7 +40,6 @@ const iso = (ms: number) => new Date(ms).toISOString();
 describe('feeds for the later kinds', () => {
   it('reads each kind from its own feed, and wallet from the journal as well', () => {
     expect(feedsOf('netWorth')).toEqual(['netWorth']);
-    // Its Flow reads the journal only, its Balance the wallet too: the kind reads both.
     expect(feedsOf('wallet')).toEqual(['wallet', 'journal']);
     expect(feedsFor(['wallet', 'netWorth']).sort()).toEqual(['journal', 'netWorth', 'wallet']);
   });
@@ -82,11 +81,9 @@ describe('wallet, Show Flow', () => {
     expect(view.number.iskAmount).toBe(200);
     expect(view.chart?.kind).toBe('bars');
     if (view.chart?.kind !== 'bars') return;
-    // Seven daily bars of net: 300 came in yesterday, 100 went out the day before.
     expect(view.chart.values).toEqual([0, 0, 0, 0, -100, 300, 0]);
     expect(view.chart.gains).toBe(true);
     expect(view.chart.tips).toHaveLength(7);
-    // The 20-day-old entry is outside a 7-day range.
     expect(view.table?.rows.map((r) => r.key)).toEqual(['bounty_prize', 'market_fee']);
     expect(view.rows).toEqual([]);
   });
@@ -150,7 +147,6 @@ describe('wallet chart', () => {
     const view = buildView('wallet', feeds, ctx({ range: 7 }));
     expect(view.chart?.kind).toBe('area');
     if (view.chart?.kind !== 'area') return;
-    // Days before the first entry are unknown, not zero.
     expect(view.chart.values).toEqual([100, 100, 500, 500]);
   });
 
@@ -217,7 +213,6 @@ describe('netWorth', () => {
     expect(view.number.iskAmount).toBe(12_000);
     expect(view.chart?.kind).toBe('stack');
     if (view.chart?.kind !== 'stack') return;
-    // Empty escrow is left out; the rest keep the Net Worth page's hues.
     expect(view.chart.parts.map((p) => [p.key, p.color])).toEqual([
       ['assets', 's1'],
       ['sellOrders', 's4'],
@@ -772,7 +767,6 @@ describe('survey', () => {
     at,
     rocks: rocks.map(([ore, volume]) => ({ ore, volume })),
   });
-  // 1,500 m³ mined in the hour between the scans, 1,500 left: another hour from the last scan, 30 minutes ago.
   const summary = () =>
     summarizeSurvey([
       scan(NOW - 1.5 * HOUR_MS, [
@@ -930,7 +924,6 @@ describe('routeSafety', () => {
     expect(stateOf(view)).toBe('ok');
     expect(view.number.value).toBe('1');
     expect(view.number.unit).toContain('"count":1');
-    // 7 kills over the three systems that were read, one system unread.
     expect(view.number.secondary?.text).toContain('"count":7');
     expect(view.number.secondary?.text).toContain('"unread":1');
   });
@@ -1380,7 +1373,6 @@ describe('omega coverage', () => {
     const week = build(data(), { range: 7 });
     expect(week.number.secondary?.text).toContain('"days":7');
     if (week.chart?.kind !== 'omega') throw new Error('omega');
-    // one account is 7/30 of 1B = 233.3M: 1.2B covers 5, lines step above it.
     expect(week.number.value).toContain('"count":5');
     expect(week.chart.lines[0]!.value).toBeCloseTo((1 * B * 7) / 30);
     expect(week.chart.bars.length).toBeGreaterThan(2);
@@ -1472,7 +1464,6 @@ describe('profit on Trading', () => {
     description: '',
     amount: -50,
   };
-  // The alt (92) bought; the main (91) sold.
   const data = (): TradingProfitWidgetData => ({
     characters: [
       {
@@ -1509,7 +1500,6 @@ describe('profit on Trading', () => {
 
   it("pools every Character's buys under All characters, and leaves the header Character's sale unmatched", () => {
     const all = build({ scopeAll: true });
-    // 4 x 150 - 4 x 100 - 20 tax.
     expect(all.number?.iskAmount).toBe(180);
     expect(all.number?.notes?.join(' ')).toContain('tradingProfit.matched{"matched":1,"count":1}');
     expect(all.number?.notes?.join(' ')).toContain('"amount":"50"');
@@ -1546,7 +1536,6 @@ describe('profit sources', () => {
     expect(endpointsOf('profit', {})).toEqual([]);
     expect(endpointsOf('profit', { profitSource: 'trading' })).toEqual(wallet);
     expect(endpointsOf('profit', { profitSource: 'both' })).toEqual(wallet);
-    // A kind without settings-driven reads keeps its catalogue endpoints.
     expect(endpointsOf('lp', {})).toEqual(['getCharacterLoyaltyPoints']);
   });
 
@@ -1585,7 +1574,6 @@ describe('profit on Both', () => {
     is_personal: true,
     ...over,
   });
-  // Bought at 100, sold at 150, 10 tax: a margin of 40 per sale.
   const trading = (sales: number[]): TradingProfitWidgetData => ({
     characters: [
       {
@@ -1629,9 +1617,7 @@ describe('profit on Both', () => {
       profit: builds([run('a', DAY_MS, 300), run('b', 10 * DAY_MS, 100)]),
       tradingProfit: ok(trading([2 * DAY_MS, 9 * DAY_MS])),
     });
-    // 340 now against 140 before.
     expect(view.number.secondary?.text).toContain('"delta":"+200"');
-    // No trades before: they count 0 there, so 340 against 100.
     const noTradesBefore = both({
       profit: builds([run('a', DAY_MS, 300), run('b', 10 * DAY_MS, 100)]),
       tradingProfit: ok(trading([2 * DAY_MS])),
@@ -1653,7 +1639,6 @@ describe('profit on Both', () => {
       ['Tritanium', 'overview.widgets.profit.source.trading'],
       ['Raven', 'overview.widgets.profit.source.builds'],
     ]);
-    // The same toned signed cell Trading draws, whichever source.
     expect(view.table!.rows.map((r) => r.cells[1])).toEqual([
       { text: '+40', tone: 'good' },
       { text: '+30', tone: 'good' },
@@ -1670,7 +1655,6 @@ describe('profit on Both', () => {
     expect(view.chart.series[0]!.values).toEqual([0, 0, 0, 0, 0, 0, 300]);
     expect(view.chart.series[1]!.values).toEqual([0, 0, 0, 0, 40, 0, 0]);
     expect(view.chart.tips).toHaveLength(7);
-    // The legend reads the latest day; the axis names the span.
     expect(view.chart.series.map((s) => s.end)).toEqual(['+300', '0']);
     expect(view.chart.xStart).toBe('overview.widgets.chart.daysAgo{"count":7}');
     expect(view.chart.xEnd).toBe('overview.widgets.chart.today');

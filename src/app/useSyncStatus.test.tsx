@@ -9,8 +9,6 @@ const CHAR_B = 2;
 
 beforeEach(() => {
   useActiveCharacter.setState({ activeCharacterId: CHAR_A, hydrated: true });
-  // `status.ts` is module state with no reset; clear both Characters so one
-  // test's error does not leak into the next.
   setStatus(CHAR_A, { state: 'idle', error: null, lastSyncedAt: null });
   setStatus(CHAR_B, { state: 'idle', error: null, lastSyncedAt: null });
 });

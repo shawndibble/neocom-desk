@@ -110,7 +110,6 @@ const lpRow: BpcSearchRow = {
 };
 
 function valuesOf(row: BpcSearchRow) {
-  // A copy row (not an original) wears the BPO badge, as the panel's `bpoBadgeRows` would give it.
   const bpoBadges = new Map(row.runs === -1 ? [] : [[row, badge]]);
   const columns = bpcSourcingCsvColumns(t, { ...context, bpoBadges: bpoBadges as never });
   return Object.fromEntries(columns.map((c) => [c.header, c.value(row)]));

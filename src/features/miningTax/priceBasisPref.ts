@@ -1,8 +1,3 @@
-/**
- * Device-local: which price basis the Mining Yield Overview values days on
- * (issue #1279). Silent page state, like the date range — the Value button
- * shows it. Every basis is precomputed in the snapshot, so none costs more.
- */
 import { createLocalSetting } from '@/lib/useLocalSetting';
 import { PRICE_BASES, type PriceBasis } from '@/engine/miningTax/priceBasis';
 

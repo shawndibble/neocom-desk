@@ -1,25 +1,3 @@
-/**
- * Industry's one Character filter (decision 20261022-123837, "One picker per
- * page"). Active Jobs and Build Opportunities each had their own picker
- * (`jobs.chars`, `opps.chars`), so the jobs list and the ranked/owned
- * blueprints could name different pilots on one page. Now the picker rides in
- * the Industry `PageHeader`'s `scope` and both panels read this one value.
- *
- * Every consumer calls `useIndustryCharacterFilter` itself rather than taking
- * the value as a prop: the URL and the remembered pick are shared state, so
- * the header picker, Active Jobs and Opportunities agree without threading a
- * value through `IndustryHeader`, the three routes that mount it, and the
- * Opportunities tab.
- *
- * Order on opening a page: `industry.chars` in the URL, then the two old
- * params (an old link or bookmark still opens on what it named), then the
- * remembered `industry` pick, then the old `jobs` / `opportunities` picks,
- * then the synced Settings default. Both old pickers already read that same
- * Settings default, so there is one default to keep, not two to reconcile.
- *
- * Not `chars`: that name is the Assets/Wallet filter's, and
- * `viewedCharacter.ts` still reads it as a legacy viewed-Character param.
- */
 import { useCallback, useEffect, useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
 import { create } from 'zustand';
@@ -38,23 +16,14 @@ import {
 } from '@/features/character/characterFilterValue';
 
 export const INDUSTRY_CHARACTER_PARAM = 'industry.chars';
-/** Active Jobs' and Opportunities' params before the merge, in precedence order. */
 const LEGACY_PARAMS = ['jobs.chars', 'opps.chars'] as const;
 
 const legacyCodec = characterFilterParam('current');
 
-/**
- * The value a change just chose, keyed to the location entry it was chosen
- * on. A URL write lands in a transition, so for a frame or a slow navigation
- * the location still holds the old value; every consumer (the trigger,
- * Active Jobs, Opportunities) shows this one instead until the location
- * moves to a new entry (the write, or any other navigation).
- */
 const usePendingIndustryFilter = create<{
   pending: { value: CharacterFilterValue; locationKey: string } | null;
 }>(() => ({ pending: null }));
 
-/** The filter a link names, or null when it names none. */
 export function linkedIndustryCharacterFilter(search: string): CharacterFilterValue | null {
   const params = new URLSearchParams(search);
   for (const key of [INDUSTRY_CHARACTER_PARAM, ...LEGACY_PARAMS]) {
@@ -63,7 +32,6 @@ export function linkedIndustryCharacterFilter(search: string): CharacterFilterVa
   return null;
 }
 
-/** The value Industry opens on when the URL names none. */
 export function industryCharacterPick(
   picks: CharacterFilterPicks,
   settingsDefault: CharacterFilterValue
@@ -82,9 +50,6 @@ export function useIndustryCharacterFilter(): [
   const { remember } = useCharacterFilterPick('industry');
   const pick = industryCharacterPick(picks, fromStoredCharacterFilterValue(storedDefault));
 
-  // The remembered pick is what an absent `industry.chars` means, so it is
-  // dropped rather than written (`useRememberedUrlParams`' rule); `current`
-  // is the old params' default, so writing it drops them.
   const schema = useMemo(
     () => ({
       [INDUSTRY_CHARACTER_PARAM]: characterFilterParam(pick),
@@ -97,9 +62,6 @@ export function useIndustryCharacterFilter(): [
 
   const linked = useMemo(() => linkedIndustryCharacterFilter(search), [search]);
   const pending = usePendingIndustryFilter((state) => state.pending);
-  // Dropped once the location moves on, so an old entry never resurfaces
-  // when a later entry happens to reuse its key (a router's first entry is
-  // always "default").
   useEffect(() => {
     if (pending && pending.locationKey !== locationKey) {
       usePendingIndustryFilter.setState({ pending: null });

@@ -1,9 +1,3 @@
-/**
- * The inline note under a wormhole or bridge hop the chosen ship is too heavy
- * for (issue #2906). Progressive: it renders nothing for a ship that can pass,
- * or when no ship is chosen. Only the per-jump limit is a claim (hull mass
- * against the hole type's limit); what a hole has left is not known.
- */
 import { useTranslation } from 'react-i18next';
 import { bridgeMassVerdict, holeMassVerdict } from '@/engine/route/jumpMass';
 import { useRouteShipMass } from '@/features/route/routeShip';

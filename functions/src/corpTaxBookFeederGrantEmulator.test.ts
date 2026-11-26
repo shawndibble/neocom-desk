@@ -1,5 +1,3 @@
-// Moon owner onboarding against the Firestore emulator (issue #4511, spec #4504).
-// Runs only under `npm run test:rules` at the repo root; a plain `npm test` skips it.
 import type { Caller } from './actorAuth.js';
 import { beforeEach, expect, it } from 'vitest';
 import { clearEmulator, emulatorDb as db, emulatorSuite } from './testSupport/emulator.js';
@@ -24,16 +22,14 @@ const FEEDER = 98000002;
 const T0 = Date.parse('2026-10-18T12:00:00Z');
 const KEY = Buffer.alloc(32, 7);
 const COLLECTOR_CEO = 1;
-const PLAYER = 11; // the signed-in player
-const ALT = 12; // the Accountant alt that logs in for the mining scope
+const PLAYER = 11;
+const ALT = 12;
 const FEEDER_DIRECTOR = 13;
 const FEEDER_NOBODY = 14;
 
 let ledger: 'ok' | 'forbidden' | 'unavailable' = 'ok';
-/** The moon owner's Extractions read: refused (no Station_Manager) or one coming chunk. */
 let extractionsRead: 'ok' | 'forbidden' = 'ok';
 let now = T0;
-/** Runs during the first pull's observer read: a concurrent write landing mid-save. */
 let duringPull: (() => Promise<void>) | undefined;
 const revoked: string[] = [];
 const identities = new Map<number, CorpIdentity>();
@@ -44,7 +40,6 @@ const ok = <T>(data: T): EsiRead<T> => ({
   fetchedAt: new Date(T0).toISOString(),
   truncated: false,
 });
-/** The scopes a `mine-` token carries; a test may drop to the pre-#4654 mining scope only. */
 let mineScopes: string[] = [...FEEDER_SYNC_SCOPES];
 const esi = (): SyncEsi =>
   ({
@@ -312,7 +307,6 @@ emulatorSuite('moon owner onboarding', () => {
       });
     await db.collection(CORP_SYNC_GRANTS_COLLECTION).doc(String(FEEDER)).delete();
     await save(RECONNECT_CODE, undefined, OTHER_ALT);
-    // Joined on T0 (10-18): the gap since 10-01 was not in the book.
     expect((await feederRecord())?.coveragePeriods).toEqual([
       { from: '2026-09-20', to: '2026-10-01' },
       { from: '2026-10-18' },
@@ -354,14 +348,12 @@ emulatorSuite('moon owner onboarding', () => {
         joinedAt: Date.parse('2026-10-01T00:00:00Z'),
         coveragePeriods: [{ from: '2026-10-01', to: '2026-10-10' }],
       });
-    // A disconnect drops the grant.
     await db.collection(CORP_SYNC_GRANTS_COLLECTION).doc(String(FEEDER)).delete();
     const code = await newInvite();
     ledger = 'forbidden';
     expect(await reason(save(code))).toBe('not-an-accountant');
     expect(await pointer()).toMatchObject({ collectorCorporationId: COLLECTOR });
     expect((await feederRecord())?.status).toBe('disconnected');
-    // With a grant that reads, the same link takes it back as a new coverage period.
     ledger = 'ok';
     expect(await save(code)).toMatchObject({ rejoined: true });
     const record = await feederRecord();
@@ -410,7 +402,6 @@ emulatorSuite('moon owner onboarding', () => {
       collectorCorporationId: COLLECTOR,
       feederStatus: 'active',
       requestedRatePct: 6,
-      // A request alone is no rate until one is agreed (#6209).
       effectiveRatePct: null,
       isHolder: false,
       refineries: [{ structureId: 4001, volume: 100 }],
@@ -446,7 +437,6 @@ emulatorSuite('moon owner onboarding', () => {
     await leaveFeeder(deps(), who(ALT), call);
     const record = await feederRecord();
     expect(record?.status).toBe('left');
-    // The holder's standing ends with the feed.
     expect(record).not.toHaveProperty('grantHolder');
     expect(record).not.toHaveProperty('grantedBy');
   });
@@ -497,7 +487,6 @@ emulatorSuite('moon owner onboarding', () => {
       grantedBy: before?.grantedBy,
       payee: { kind: 'character', id: 4242 },
     });
-    // The refused pull's stale mark is the refused alt's, not the feed's.
     expect(after).not.toHaveProperty('staleSince');
     expect(after?.lastSyncResult).toEqual(before?.lastSyncResult);
   });

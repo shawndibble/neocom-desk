@@ -1,27 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { findJumpRoute, jumpDistancesFrom, routeSweepFrom, type JumpGraph } from './jumpRoute';
 
-/**
- * A hand-built stand-in for the stargate graph, shaped so the three
- * preferences disagree — which is the only way to tell them apart.
- *
- *   HUB ─ LOW ─ FAR            two jumps, but LOW is lowsec
- *   HUB ─ A ─ B ─ C ─ FAR      four jumps, every one of them highsec
- *
- * So "shortest" takes the lowsec hop, "prefer-highsec" takes the long way
- * round, and "avoid-highsec" takes the lowsec hop for a different reason.
- */
 const HUB = 30000001;
 const LOW = 30000002;
 const FAR = 30000003;
 const A = 30000004;
 const B = 30000005;
 const C = 30000006;
-/** In the graph with no stargates at all — J-space's real shape. */
 const ISLAND = 30000007;
-/** Not in the graph: not a solar system this snapshot knows. */
 const NOT_A_SYSTEM = 39999999;
-/** In the graph, but absent from the security lookup. */
 const UNCHARTED = 30000008;
 
 const GRAPH: JumpGraph = new Map([
@@ -64,8 +51,6 @@ describe('findJumpRoute', () => {
   });
 
   it('prefers, rather than requires, highsec — it still routes when no highsec path exists', () => {
-    // Nothing reaches UNCHARTED except through FAR, and UNCHARTED has no
-    // stated security at all. "Prefer" must still deliver a route.
     const result = findJumpRoute(GRAPH, HUB, UNCHARTED, {
       preference: 'prefer-highsec',
       securityOf,
@@ -80,10 +65,6 @@ describe('findJumpRoute', () => {
   });
 
   it('treats a system with no stated security as not highsec, rather than as safe', () => {
-    // Routing HUB -> FAR while avoiding highsec must not be tempted through
-    // UNCHARTED; more to the point, an unknown security must never let a
-    // prefer-highsec route claim a system is safe. FAR -> UNCHARTED is the
-    // only edge, so a prefer-highsec route to UNCHARTED still pays for it.
     const viaUncharted = findJumpRoute(GRAPH, FAR, UNCHARTED, {
       preference: 'prefer-highsec',
       securityOf,
@@ -103,9 +84,6 @@ describe('findJumpRoute', () => {
   });
 
   it('still reports zero jumps within a gateless system, where you are already there', () => {
-    // The snapshot keys every solar system, J-space included, so a haul that
-    // starts and ends in one wormhole is zero jumps — not the no-route its
-    // empty adjacency would otherwise imply.
     const result = findJumpRoute(GRAPH, ISLAND, ISLAND, { preference: 'shortest', securityOf });
     expect(result).toEqual({ kind: 'route', systems: [ISLAND] });
   });
@@ -121,8 +99,6 @@ describe('findJumpRoute', () => {
   });
 
   it('claims no distance for an unknown id even to itself, rather than zero jumps', () => {
-    // Zero jumps would be a confident answer about a place the snapshot has
-    // never heard of; no-route is the honest one.
     const result = findJumpRoute(GRAPH, NOT_A_SYSTEM, NOT_A_SYSTEM, { preference: 'shortest' });
     expect(result).toEqual({ kind: 'no-route' });
   });
@@ -157,9 +133,6 @@ describe('jumpDistancesFrom', () => {
   });
 
   it('counts jumps along the preferred route, not its weighted cost', () => {
-    // Under prefer-highsec the route to FAR is the four-jump highsec one, so
-    // the distance is 4 — the trip's length, never the penalty arithmetic
-    // that chose it.
     const distances = jumpDistancesFrom(GRAPH, HUB, { preference: 'prefer-highsec', securityOf });
     expect(distances.get(FAR)).toBe(4);
     expect(distances.get(C)).toBe(3);
@@ -180,8 +153,6 @@ describe('jumpDistancesFrom', () => {
   });
 
   it('agrees with the pair lookup for every destination it reports', () => {
-    // The two share one search; this pins them together so a future change to
-    // either cannot silently drift.
     const distances = jumpDistancesFrom(GRAPH, HUB, { preference: 'prefer-highsec', securityOf });
     for (const [destination, jumps] of distances) {
       const route = findJumpRoute(GRAPH, HUB, destination, {
@@ -199,11 +170,6 @@ describe('avoided systems', () => {
     expect(route).toEqual({ kind: 'route', systems: [HUB, A, B, C, FAR] });
   });
 
-  /*
-   * The same rule the security bias follows: a cost, never a wall. A
-   * destination only reachable through an avoided system still has a route,
-   * or every haul past a chokepoint would read as unreachable.
-   */
   it('still goes through an avoided system when it is the only way', () => {
     const route = findJumpRoute(GRAPH, HUB, UNCHARTED, { avoid: new Set([FAR]) });
     expect(route.kind === 'route' && route.systems).toContain(FAR);
@@ -232,20 +198,11 @@ describe('avoided systems', () => {
   it('counts the detour in a sweep', () => {
     const jumps = jumpDistancesFrom(GRAPH, HUB, { avoid: new Set([LOW]) });
     expect(jumps.get(FAR)).toBe(4);
-    // LOW itself is still one jump away: reaching it is not passing through it.
     expect(jumps.get(LOW)).toBe(1);
   });
 });
 
-/*
- * CCP's own route costs (developers.eveonline.com "Route Calculation"), so a
- * local route agrees with ESI's and the game's: the system jumped into costs
- * exp(0.15 × penalty) when unwanted, twice that for nullsec, and 0.9 when
- * wanted. Raw security, 0.45 the highsec line.
- */
 describe('security penalty', () => {
-  //   S ─ H1 ─ H2 ─ H3 ─ E      four jumps, highsec
-  //   S ─ L ─ E                 two jumps through one 0.4 system
   const S = 1;
   const H1 = 2;
   const H2 = 3;
@@ -277,12 +234,10 @@ describe('security penalty', () => {
     });
 
   it('takes the lowsec shortcut at penalty 0, where it costs no more than a highsec jump', () => {
-    // Two jumps at 1 + 0.9 = 1.9 beat four at 0.9 each = 3.6.
     expect(safer(0)).toEqual({ kind: 'route', systems: [S, L, E] });
   });
 
   it('goes the long way once the penalty makes the lowsec jump dearer than the detour', () => {
-    // exp(0.15 × 10) ≈ 4.48 + 0.9 = 5.38 against 3.6.
     expect(safer(10)).toEqual({ kind: 'route', systems: [S, H1, H2, H3, E] });
   });
 
@@ -296,7 +251,6 @@ describe('security penalty', () => {
   });
 
   it('reads 0.45 as highsec, on the raw status rather than the rounded one', () => {
-    // 0.449 shows as 0.4 in game but 0.45 does not round down: both sides of the line.
     const nearLine = new Map(security).set(L, 0.45);
     const route = findJumpRoute(graph, S, E, {
       preference: 'prefer-highsec',
@@ -331,7 +285,6 @@ describe('routeSweepFrom', () => {
       securityOf,
       securityPenalty: 50,
     });
-    // The long highsec way round: four wanted jumps at 0.9 each.
     expect(sweep.costs.get(FAR)).toBeCloseTo(3.6);
     expect(sweep.jumps.get(FAR)).toBe(4);
   });
@@ -363,15 +316,6 @@ describe('routeSweepFrom', () => {
   });
 });
 
-/**
- * Wormhole connections (issue #2476): extra two-way edges the stargate graph
- * does not hold, and a set of systems charged no security cost.
- *
- *   START ─ W1 ─ W2 ─ W3 ─ W4 ─ END        five highsec gate jumps
- *   START ─ ENTRY ⤳ HUB ⤳ EXIT ─ END       four jumps, two of them holes
- *
- * HUB is Thera's shape: in the graph with no stargates at all, and -0.99.
- */
 describe('extra connections and free systems', () => {
   const START = 31000001;
   const W1 = 31000002;
@@ -472,8 +416,6 @@ describe('extra connections and free systems', () => {
   });
 
   describe('a hub with stargates, as Turnur has', () => {
-    // GATED_HUB (0.39) sits on the only path START ─ GATED_HUB ─ FAR_END,
-    // and a hole joins SIDE (no stargates) to it.
     const GATED_HUB = 31100001;
     const FAR_END = 31100002;
     const SIDE = 31100003;
@@ -499,7 +441,6 @@ describe('extra connections and free systems', () => {
     it('charges the hub as lowsec when entered by stargate, holes or not', () => {
       const sweep = routeSweepFrom(gatedGraph, START, options);
       expect(sweep.routeTo(FAR_END)).toEqual([START, GATED_HUB, FAR_END]);
-      // Entered by gate from START: lowsec under Prefer safer, never the free 1.
       expect(sweep.costs.get(GATED_HUB)).toBeCloseTo(penaltyCost);
       expect(sweep.costs.get(FAR_END)).toBeCloseTo(penaltyCost + 0.9);
       const gateOnly = routeSweepFrom(gatedGraph, START, {

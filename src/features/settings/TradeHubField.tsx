@@ -27,10 +27,6 @@ import {
 } from '@/features/market/tradeHubActions';
 import { TRADE_HUBS, getTradeHub } from '@/market/hubs';
 
-/**
- * A field select over every Trade Hub, by name; shared by the Settings hub
- * controls. With `closest`, Closest hub is offered first (issue #6523).
- */
 export function HubSelect<T extends HubChoice = HubId>({
   value,
   onChange,
@@ -64,13 +60,6 @@ export function HubSelect<T extends HubChoice = HubId>({
   );
 }
 
-/**
- * Settings › Market defaults › Trade Hub (issue #5593). One Character: plain
- * "Trade Hub". Several: the default for new characters, a one-line summary of
- * where everyone is, and a closed "Set per character" disclosure with a hub
- * select per character and "Apply default to all". Hubs are read from the
- * settled stores; the caller waits for both to hydrate.
- */
 export function TradeHubField() {
   const { t } = useTranslation();
   const loaded = useCharactersOrLoading();
@@ -79,7 +68,6 @@ export function TradeHubField() {
   const globalClosest = useGlobalClosest((state) => state.value);
   const [open, setOpen] = useState(false);
   const panelId = useId();
-  // Nothing until the roster has loaded: an empty one reads as "single" and would pin nobody.
   if (loaded === undefined) return null;
   const characters = loaded;
   const ids = characters.map((c) => c.characterId);
@@ -108,7 +96,6 @@ export function TradeHubField() {
           label={label}
           onChange={(choice) => {
             if (choice === CLOSEST) return void pickGlobalHub(CLOSEST);
-            // A hub ends Closest; `changeDefaultHub` also moves the Characters still on the old default.
             const ended = globalClosest
               ? useGlobalClosest.getState().setValue(false)
               : Promise.resolve();

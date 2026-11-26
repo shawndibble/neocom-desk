@@ -1,12 +1,3 @@
-/**
- * The Corp Board's reads, loaded behind `import()` from `corpFeeds.ts`.
- *
- * **Gated before they fetch** (`features/corp/corpReadAccess.ts`): no corp call
- * at all unless the roles and grant cover it. CCP role-gates these endpoints
- * server-side, so an ungated read buys a guaranteed 403. Each goes through the
- * corp loaders `/corp` and its sub-pages already use, so the cache rows, the
- * corp-scoped keys and the 403 handling are theirs, not a second copy.
- */
 import { diffRoster } from '@/engine/corp/members';
 import { jumpsFromCurrent } from '@/features/route/jumpsFromCurrent';
 import { planetInfo } from './spaceLookups';
@@ -109,10 +100,6 @@ import type {
 } from './corpFeeds';
 import type { CorpDeadlineSource } from './corpDeadlineSources';
 
-/**
- * `withJournal: false` reads the balances only (the All scope's Divisions view): no journal
- * request, and `journal` is null, so nothing reads net or runway from it.
- */
 export function loadCorpWallet(characterId: number, withJournal = true): Promise<CorpWalletFeed> {
   return readCorpFeed<CorpWalletFeed>(characterId, {
     capability: 'canReadWallet',
@@ -125,21 +112,18 @@ export function loadCorpWallet(characterId: number, withJournal = true): Promise
           ? loadCorporationWalletJournal(characterId, corporationId, MASTER_WALLET_DIVISION)
           : null,
       ]);
-      // Balances are the data: without them a "0 ISK" would read as a broke corporation.
       if (wallets.cached === null) return unlanded('wallet', wallets);
       const lines: CorpJournalLine[] | null =
         journal === null || journal.cached === null
           ? null
           : journal.cached.data.flatMap((entry) => {
               const atMs = parseInstant(entry.date);
-              // A line with no amount moves no ISK.
               if (atMs === null || entry.amount === undefined) return [];
               return [{ atMs, amount: entry.amount, refType: entry.ref_type }];
             });
       return {
         reads: [wallets, divisions, journal],
         body: {
-          // Named by the divisions read when it landed; a missing name degrades one label only.
           divisions: walletDivisions(wallets.cached.data, divisions.cached?.data ?? null),
           journalDivision: MASTER_WALLET_DIVISION,
           journal: lines,
@@ -193,22 +177,16 @@ export function loadCorpCustoms(characterId: number): Promise<CorpCustomsFeed> {
   });
 }
 
-/**
- * The page's own corp asset read (`loadCorporationAssets`, same cache row) with
- * the page's own price and copy-value inputs, reduced to the widget's counts.
- */
 export function loadCorpAssets(characterId: number): Promise<CorpAssetsFeed> {
   return readCorpFeed<CorpAssetsFeed>(characterId, {
     capability: 'canReadAssets',
     empty: { corporationId: null, summary: null, truncated: false },
     read: async ({ corporationId, can }) => {
       const result = await loadCorporationAssets(characterId, corporationId);
-      // No assets read means no counts: a zero would read as "all clear".
       if (result.cached === null) return unlanded('assets', result);
       const assets = result.cached.data;
       const canReadBlueprints = can('canReadBlueprints');
       const [prices, copyValues] = await Promise.all([
-        // A failed price read leaves counts without values, as the page does.
         getAveragePriceByType().catch(() => new Map<number, number>()),
         loadAssetCopyValues(characterId, assets, async () =>
           canReadBlueprints
@@ -266,7 +244,6 @@ export function loadCorpMembers(characterId: number): Promise<CorpMembersFeed> {
       if (tracking.cached === null) return unlanded('member tracking', tracking);
       const members = toMemberActivity(tracking.cached.data);
       const memberIds = ids.cached?.data ?? null;
-      // Read, never recorded: `/corp/members` records it, so each change is announced there exactly once.
       const diff = memberIds === null ? null : diffRoster(baseline, memberIds);
       const darkAfterDays = useDarkThreshold.getState().value;
       const darkBefore = loadedAt - darkAfterDays * DAY_MS;
@@ -304,7 +281,6 @@ export function loadCorpMining(characterId: number): Promise<CorpMiningFeed> {
       const feed = await loadObserverFeed(characterId, corporationId);
       if (feed === 'needs-reauth') return { needsReauth: true };
       if (feed === 'unavailable') throw new CorpReadFailed('mining ledger');
-      // No refinery this Character can read is an answer, not an outage: an empty ledger.
       if (feed === 'no-refineries') {
         return { age: { fetchedAt: new Date(), fromCache: false }, body: empty };
       }
@@ -312,7 +288,6 @@ export function loadCorpMining(characterId: number): Promise<CorpMiningFeed> {
         loadTypeNames([...new Set(feed.rows.map((row) => row.typeId))]),
         resolveNames([...new Set(feed.rows.map((row) => row.characterId))]),
       ]);
-      // The oldest response behind the rows; a reduce, since a big ledger is too many arguments for Math.min.
       const oldest = feed.rows.reduce((min, row) => {
         const at = Date.parse(row.cachedAt);
         return Number.isFinite(at) && at < min ? at : min;
@@ -342,8 +317,6 @@ export function loadCorpStarbases(characterId: number): Promise<CorpStarbasesFee
       const list = await loadCorporationStarbases(characterId, corporationId);
       if (list.cached === null) return unlanded('starbases', list);
       const towers = list.cached.data;
-      // Fuel and strontium live on the per-tower call. An online tower burns fuel and a reinforced one
-      // holds its strontium bay; an offline, onlining or unanchoring one has nothing worth the read.
       const readable = towers.filter(
         (tower) => tower.state === 'online' || tower.state === 'reinforced'
       );
@@ -352,7 +325,6 @@ export function loadCorpStarbases(characterId: number): Promise<CorpStarbasesFee
         loadTypeNames([...new Set(towers.map((tower) => tower.type_id))]),
         import('@/sde/solarSystems').then((m) => m.loadSolarSystemsById()).catch(() => null),
       ]);
-      // Same static-data names as the Customs offices widget.
       const systemNames = new Map<number, string>();
       for (const tower of towers) {
         const name = systems?.get(tower.system_id)?.name;
@@ -368,7 +340,6 @@ export function loadCorpStarbases(characterId: number): Promise<CorpStarbasesFee
           reinforcedUntilMs: parseInstant(tower.reinforced_until),
           unanchorsAtMs: parseInstant(tower.unanchor_at),
           bay: read ? summariseBay(read.data.fuels) : null,
-          // Each bay's own read time: a detail that fell back to an old cached row must not drag the others.
           bayReadAtMs: read ? read.fetchedAt.getTime() : null,
         };
       });
@@ -422,7 +393,6 @@ export function loadCorpOrders(characterId: number): Promise<CorpOrdersFeed> {
         loadStationBestPrices(
           [...typesByStation].map(([stationId, ids]) => ({ stationId, typeIds: [...ids] }))
         ),
-        // Offline first visit: the station file may be missing. Names then read as a structure.
         loadNpcStations().catch(() => []),
       ]);
       return {
@@ -439,11 +409,6 @@ export function loadCorpOrders(characterId: number): Promise<CorpOrdersFeed> {
   });
 }
 
-/**
- * SRP is Firestore, not ESI: the roles gate comes first, then the live officer check (which
- * also renews the 24 h record the claim rules read), then the open claims. A failure of either
- * call throws, so the widget shows Retry rather than a false "no claims".
- */
 export function loadCorpSrp(characterId: number): Promise<CorpSrpFeed> {
   const empty = {
     enabled: false,
@@ -456,7 +421,6 @@ export function loadCorpSrp(characterId: number): Promise<CorpSrpFeed> {
     capability: 'canManageSrp',
     empty,
     read: async ({ corporationId }) => {
-      // Local table: load it while the officer check is in flight.
       const systemsLoad = import('@/sde/solarSystems')
         .then((m) => m.loadSolarSystemsById())
         .catch(() => null);
@@ -483,16 +447,10 @@ export function loadCorpSrp(characterId: number): Promise<CorpSrpFeed> {
   });
 }
 
-/**
- * Not a corp-ESI read (no role, no scope): the corporation id is public, and
- * the totals are the ones the Public info Corporation tab shows, through the
- * same cached `fetchCorporationStats`, so widget and modal never disagree.
- */
 export async function loadCorpKills(characterId: number): Promise<CorpKillsFeed> {
   const none: CorpKillsFeed = { ...UNREADABLE, corporationId: null, stats: null, failed: null };
   const corporationId = await loadCorporationId(characterId);
   if (corporationId === null) return none;
-  // The modal skips the killboard for an NPC corporation, so there is nothing to show.
   if (isNpcCorporationId(corporationId)) return { ...none, corporationId };
   const { result, fetchedAt, fromCache } = await fetchCorporationStatsRead(corporationId);
   const base = { readable: true, needsReauth: false, fetchedAt, fromCache };
@@ -540,7 +498,6 @@ export function loadCorpSovereignty(characterId: number): Promise<CorpSovereignt
         planetInfo([...new Set(skyhookList.map((s) => s.planet_id))]),
       ]);
 
-      // Every detail read failing says the reads are down, not that nothing is raidable.
       const details = [...skyhookDetails.values(), ...hubDetails.values()];
       if (details.length > 0 && details.every((result) => result.cached === null)) {
         return unlanded('sovereignty', ...details);
@@ -564,7 +521,6 @@ export function loadCorpSovereignty(characterId: number): Promise<CorpSovereignt
             planetName: planet?.name ?? null,
             windowStartMs: parseInstant(window?.start),
             windowEndMs: parseInstant(window?.end),
-            // A non-number is unknown, never "0 at risk".
             reagents:
               reagents === undefined ||
               reagents.some((r) => !Number.isFinite(r.secured) || !Number.isFinite(r.unsecured))
@@ -591,7 +547,6 @@ export function loadCorpSovereignty(characterId: number): Promise<CorpSovereignt
             windowEndMs: parseInstant(window?.end),
             reagents: null,
             state: null,
-            // An unreadable timestamp or a non-number is unknown, never "0 hours left".
             hubBay:
               detail === undefined ||
               reagents.length === 0 ||
@@ -632,9 +587,6 @@ export function loadCorpSovereignty(characterId: number): Promise<CorpSovereignt
   });
 }
 
-// --- Due soon across every corporation (All scope) ----------------------------------
-
-/** Each Due soon source, the capability that opens it, and its one-corporation read. */
 const DEADLINE_READS: readonly {
   source: CorpDeadlineSource;
   capability: CorpCapability;
@@ -647,7 +599,6 @@ const DEADLINE_READS: readonly {
   { source: 'sovereignty', capability: 'canReadSkyhooks', load: loadCorpSovereignty },
 ];
 
-/** A corporation's Due soon slice before any read lands. */
 const emptySlice = (corporationId: number): CorpDeadlinesSlice => ({
   corporationId,
   structures: null,
@@ -658,17 +609,10 @@ const emptySlice = (corporationId: number): CorpDeadlinesSlice => ({
   failed: false,
 });
 
-/**
- * Every corporation's Due soon sources, each read through a Character whose roles and grant
- * cover that source there (`corpReadersFor`), so no read is made that can only 403. A read
- * that fails leaves its corporation without that source, flagged; only when every read
- * fails does the widget get its Retry. `only` narrows the read to those sources.
- */
 export async function loadCorpDeadlinesAll(
   only?: readonly CorpDeadlineSource[]
 ): Promise<CorpDeadlinesAllFeed> {
   const accounts = await loadAccountCorpAccess();
-  // The active Character reads its own corporation, sharing the cache rows `/corp` warmed.
   const preferred = useActiveCharacter.getState().activeCharacterId ?? undefined;
   const slices = new Map<number, CorpDeadlinesSlice>();
   const tasks = DEADLINE_READS.filter(
@@ -686,7 +630,6 @@ export async function loadCorpDeadlinesAll(
   let failures = 0;
   await mapWithConcurrencyLimit(tasks, ESI_FANOUT_CONCURRENCY, async (task) => {
     try {
-      // Each source's slot takes its own read's shape.
       (task.slice as Record<CorpDeadlineSource, unknown>)[task.source] = await task.load(
         task.characterId
       );
@@ -695,8 +638,6 @@ export async function loadCorpDeadlinesAll(
       failures += 1;
     }
   });
-  // Feeder pops from the Corp Tax Books these Characters view (#6116), for every corporation
-  // no Character read from ESI. Started beside the ESI reads.
   let fromBooks = 0;
   const feeders = await feederChunks;
   const esi = new Set(
@@ -719,14 +660,6 @@ export async function loadCorpDeadlinesAll(
   };
 }
 
-// --- One widget across every corporation (All scope) --------------------------------
-
-/**
- * `load` once per corporation some Character can read `capability` for (`corpReadersFor`;
- * null for an ungated read), the active Character reading its own corporation so it shares
- * the cache rows `/corp` warmed. A failed corporation is left out, flagged; only when every
- * one fails does the widget get its Retry.
- */
 async function loadEveryCorp<F extends CorpFeedBase>(
   capability: CorpCapability | null,
   what: string,
@@ -745,39 +678,27 @@ async function loadEveryCorp<F extends CorpFeedBase>(
   };
 }
 
-/** Balances only: Cash flow, Income and runway stay on one corporation. */
 export const loadCorpWalletAll = () =>
   loadEveryCorp('canReadWallet', 'wallet', (characterId) => loadCorpWallet(characterId, false));
 
 export const loadCorpJobsAll = () =>
   loadEveryCorp('canReadIndustry', 'industry jobs', loadCorpJobs);
 
-/** Public zKillboard totals: every corporation a Character belongs to, no role asked. */
 export const loadCorpKillsAll = () => loadEveryCorp(null, 'kills', loadCorpKills);
 
-/** One corporation's read, tagged with its corporation. */
 type CorpTagged<F> = F & { corporationId: number };
 
 interface CorpAllSpec<F extends CorpFeedBase> {
   capability: CorpCapability;
   what: string;
-  /** The widget's one-corporation read. */
   load: (characterId: number) => Promise<F>;
-  /** The readable reads' bodies as one; with no read, the empty body. */
   merge: (reads: readonly CorpTagged<F>[]) => {
     body: CorpFeedBody<F>;
     corporationOf: ReadonlyMap<string, number>;
   };
-  /** Corporations read at once (default the ESI fan-out limit). */
   concurrency?: number;
 }
 
-/**
- * A widget's read over every corporation some Character can read it for (`corpReadersFor`,
- * the active Character preferred), so no read is made that can only 403. A corporation that
- * fails is left out and the feed flagged; only when every one fails does the widget get its
- * Retry. Data Age is the stalest corporation.
- */
 async function readAllCorps<F extends CorpFeedBase>(spec: CorpAllSpec<F>): Promise<F> {
   const readers = await accountCorpReaders(spec.capability, activeReader());
   const { reads, partlyFailed } = await settleCorps(
@@ -804,7 +725,6 @@ async function readAllCorps<F extends CorpFeedBase>(spec: CorpAllSpec<F>): Promi
   return merged as F;
 }
 
-/** Each read's rows under its corporation, for `mergeCorpRows`. */
 const rowsOf = <F, T>(reads: readonly CorpTagged<F>[], pick: (read: F) => readonly T[]) =>
   reads.map((read) => ({ corporationId: read.corporationId, rows: pick(read) }));
 
@@ -849,8 +769,6 @@ export function loadCorpStarbasesAll(): Promise<CorpStarbasesFeed> {
         },
       };
     },
-    // One corporation at a time: each reads its towers' details under the fan-out limit,
-    // so the limit holds across corporations too.
     concurrency: 1,
   });
 }
@@ -879,7 +797,6 @@ export function loadCorpSovereigntyAll(): Promise<CorpSovereigntyFeed> {
   });
 }
 
-/** Assets keep each corporation's counts apart: the stock targets that decide Below target are per corporation. */
 export const loadCorpAssetsAll = () => loadEveryCorp('canReadAssets', 'assets', loadCorpAssets);
 
 export function loadCorpSrpAll(): Promise<CorpSrpFeed> {
@@ -915,8 +832,6 @@ export function loadCorpContractsAll(): Promise<CorpContractsFeed> {
     what: 'contracts',
     load: loadCorpContracts,
     merge: (reads) => {
-      // A contract between two of the pilot's corporations is in both reads: kept once,
-      // under the corporation that issued it.
       const { rows, corporationOf } = mergeCorpRows(
         rowsOf(reads, (read) => read.contracts),
         contractKey

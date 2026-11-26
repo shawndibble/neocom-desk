@@ -24,7 +24,6 @@ vi.mock('./surveyStore', () => ({
   startSurvey,
   addSurveyScan,
   loadSurvey,
-  // The survey picker's labels read through the cache; here it is the same load.
   loadSurveyCached: loadSurvey,
   setSurveyScanIgnored,
   finishSurvey,
@@ -33,8 +32,6 @@ vi.mock('@/features/share/shareStore', () => ({
   shareUrl: (id: string) => `https://neocomdesk.test/s/${id}`,
   appUrl: (path: string) => `https://neocomdesk.test${path}`,
 }));
-// The info panel has its own test; here only who sees it editable matters.
-// The start boxes have their own test (startDraft.test.ts); here only the survey the scan starts matters.
 vi.mock('./SurveyStartDetails', () => ({ SurveyStartDetails: () => null }));
 vi.mock('./useHasMoonOre', () => ({ useHasMoonOre: () => true }));
 vi.mock('./SurveyInfoPanel', () => ({
@@ -42,7 +39,6 @@ vi.mock('./SurveyInfoPanel', () => ({
   SurveyInfoReadout: ({ tax }: { tax: { name: string } | null }) =>
     tax === null ? null : <div data-testid="tax-readout">{tax.name}</div>,
 }));
-// Its own test covers the ledger read; here it would reach for ESI.
 vi.mock('./SurveyCharts', () => ({
   SurveyCharts: ({ view }: { view?: string }) => <div data-testid="charts" data-view={view} />,
 }));
@@ -51,11 +47,8 @@ import { SurveyTab } from './SurveyTab';
 
 const SCAN =
   'Clear Icicle\t25\t25,000 m3\t5,120,000.00 ISK\t28 km\nClear Icicle\t55\t55,000 m3\t11,300,000.00 ISK\t10 km';
-// Rocks only shrink: one rock gone, the other untouched.
 const SHRUNK = 'Clear Icicle\t25\t25,000 m3\t5,120,000.00 ISK\t28 km';
-// More m3 than the latest scan shows, yet within what the first scan showed: could be the same field.
 const GREW = 'Clear Icicle\t40\t40,000 m3\t8,000,000.00 ISK\t28 km';
-// An ore the survey never showed: another field.
 const DIFFERENT = 'Blue Ice\t10\t1,000 m3\t1.00 ISK\t5 km';
 const ID = 'abc123XYZ';
 const EXPIRES = Date.UTC(2026, 9, 15);
@@ -68,7 +61,6 @@ function Grab() {
   }, [navigate]);
   return null;
 }
-/** A paste anywhere in the app: `GlobalPasteRouter` sends the text here in the route state. */
 function pasteInApp(text: string) {
   act(() => {
     void nav.go('/mining/survey', { state: { surveyScanText: text } });
@@ -132,7 +124,6 @@ describe('SurveyTab', () => {
     await screen.findByText('No survey yet');
     pasteInApp(SCAN);
     await screen.findByText('0% mined');
-    // The survey renders from `loadSurvey` before the paste's add settles; wait for it so it can't leak into the next test.
     await waitFor(() => expect(addSurveyScan).toHaveBeenCalledTimes(1));
     expect(startSurvey).toHaveBeenCalledWith({
       owner: { characterId: 7, ownerName: 'Shawn Dibble' },
@@ -184,7 +175,6 @@ describe('SurveyTab', () => {
   });
 
   describe('first scan with a section missing', () => {
-    // The survey shows two ores; the paste has only one, as when a group is left collapsed.
     const TWO_ORES = `${SCAN}
 Blue Ice	10	1,000 m3	1.00 ISK	5 km`;
     beforeEach(async () => {
@@ -252,7 +242,6 @@ Blue Ice	10	1,000 m3	1.00 ISK	5 km`;
     });
   });
 
-  // The field has been mined down since the first scan, so a bigger rock reads as a different field.
   function shrunkSince() {
     loadSurvey.mockResolvedValue({
       ok: true,

@@ -107,7 +107,6 @@ describe('loadAllMoonChunksBoardData', () => {
   });
 
   it('names each drill’s corporation, and flags a corporation whose read failed', async () => {
-    // No Corp Tax Book: no Feeder read is started.
     const canMoons = (capability: string) => capability === 'canReadMoonExtractions';
     for (const [characterId, corporationId] of [
       [1, 10],

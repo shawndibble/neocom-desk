@@ -1,12 +1,3 @@
-/**
- * Fetch + cache layer for the corporation's starbases (issue #4610): the tower
- * list, and one detail read per online tower for its fuel and strontium.
- *
- * Corp-keyed and corp-auth-aware through `corpRead.ts`, like every corp read.
- * The detail call is per tower (and takes the tower's system), so it fans out
- * under `ESI_FANOUT_CONCURRENCY`. A tower whose detail cannot be read is
- * unknown, never empty.
- */
 import { conditionalFetch, conditionalPagedFetch, type StatusResult } from '@/esi/cache';
 import {
   getCorporationStarbase,
@@ -20,7 +11,6 @@ import { loadCorpPaginatedWithCacheStatus, loadCorpWithCacheStatus } from './cor
 const LIST_KEY = 'starbases';
 const detailKey = (starbaseId: number) => `starbase:${starbaseId}`;
 
-/** The corporation's starbases, any state. ESI or cache. */
 export function loadCorporationStarbases(
   characterId: number,
   corporationId: number
@@ -56,7 +46,6 @@ export function loadCorporationStarbase(
   );
 }
 
-/** Detail for each listed tower, concurrency-capped; keyed by starbase id. */
 export async function loadStarbaseDetails(
   characterId: number,
   corporationId: number,

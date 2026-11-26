@@ -27,7 +27,6 @@ const swap = (slotIndex: number, fromTypeId: number, toTypeId: number): FitSwap 
 });
 
 describe('findCompletions', () => {
-  // Two ticked rows (2 and 3) together take 130 of 100 CPU, though each fit alone.
   const folded = fit([2, 3, 5]);
 
   it('finds the swaps that bring a ticked set back under, fewest first', async () => {
@@ -38,7 +37,6 @@ describe('findCompletions', () => {
       stats,
       priceOf: (id) => ({ 5: 100, 6: 300, 7: 120 })[id] ?? null,
     });
-    // 70+60+20 = 150, 70+60+55 = 185: both over, so nothing yet; the single swap cannot cover it.
     expect(options).toEqual([]);
   });
 

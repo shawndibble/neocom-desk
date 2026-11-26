@@ -65,8 +65,6 @@ describe('isNpcSeededProduct', () => {
     expect(isNpcSeededProduct(metaGroupId)).toBe(true);
   });
 
-  // CCP market-groups these blueprints too (the old T2 lottery BPOs, faction
-  // LP blueprints), but no NPC sells them.
   it.each([
     ['Tech II', 2],
     ['Storyline', 3],

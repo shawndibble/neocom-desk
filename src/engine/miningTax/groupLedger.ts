@@ -6,17 +6,6 @@ interface EntryGroup {
   lines: Map<number, number>;
 }
 
-/**
- * Groups a character's raw ESI mining ledger rows into one Mining Ledger
- * Entry per (date, solar system), summing quantity per ore type and dropping
- * anything outside `moonOreTypeIds` — ordinary asteroid ore and ice already
- * arrive under different `type_id`s, so this is the whole of what isolates
- * moon mining (decision doc: zero interruption-detection logic needed).
- *
- * `row.date` is carried through byte-for-byte as the grouping key — never
- * routed through a `Date`/`toLocaleDateString` — so the EVE/UTC calendar day
- * cannot drift with the browser's local timezone.
- */
 export function groupMiningLedger(
   rows: readonly MiningLedgerRow[],
   characterId: number,

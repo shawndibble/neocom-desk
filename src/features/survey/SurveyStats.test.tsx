@@ -36,7 +36,6 @@ describe('SurveyStats Done at default', () => {
   it('follows the time format chosen in Settings', async () => {
     await db.settings.put({ key: 'timeFormat', value: 'local' });
     render(<SurveyStats summary={summary} />);
-    // Never EVE first: the tile waits for the stored choice instead of flashing the default.
     expect(screen.queryByRole('button', { name: /EVE$/ })).toBeNull();
     expect(await screen.findByRole('button')).toBeTruthy();
     expect(screen.queryByRole('button', { name: /EVE$/ })).toBeNull();
@@ -75,7 +74,6 @@ describe('SurveyStats Time left', () => {
 
   it('counts down from the estimated finish to now, not from the last scan', () => {
     vi.useFakeTimers({ toFake: ['Date'] });
-    // The last scan was at T0 + 10m and the estimate is T0 + 20m.
     vi.setSystemTime(T0 + 15 * 60_000);
     render(<SurveyStats summary={summary} />);
     expect(screen.getByText('5m')).toBeTruthy();

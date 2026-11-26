@@ -1,10 +1,3 @@
-/**
- * Builders for the kinds that came after the old board (net worth, profit,
- * mining yield, loyalty points, best clone, location), the wallet's Flow, and the
- * feed lists they need. Same contract as `models.ts`: pure, derived at render
- * time, the widget's range applied here over data shared by every widget of
- * the kind.
- */
 import { highlightHref } from '@/lib/highlightParam';
 import { fixed1 } from '@/lib/fixedFormat';
 import { LAYER_LABEL_KEYS } from '@/features/netWorth/layerMeta';
@@ -57,7 +50,6 @@ const D = 'overview.widgets.data';
 const C = 'overview.widgets.chart';
 const W = 'overview.widgets';
 
-/** Where each net worth layer sits in the bar and which series hue it keeps (the Net Worth page's). */
 const NET_WORTH_BAR: readonly { id: LayerId; color: ChartColor }[] = [
   { id: 'assets', color: 's1' },
   { id: 'sellOrders', color: 's4' },
@@ -66,19 +58,11 @@ const NET_WORTH_BAR: readonly { id: LayerId; color: ChartColor }[] = [
   { id: 'isk', color: 's3' },
 ];
 
-/** `bounty_prize` -> `Bounty prize`: ESI's ref types have no display names of their own. */
 export function humanizeRefType(refType: string): string {
   const spaced = refType.replace(/_/g, ' ').trim();
   return spaced.charAt(0).toUpperCase() + spaced.slice(1);
 }
 
-// --- Wallet, Show Flow ------------------------------------------------------------
-
-/**
- * The wallet kind's Flow: net, net bars and a table by ref type. It and its copy
- * (`chart.walletFlow`, `walletFlow`) keep the retired Wallet flow kind's name on
- * purpose, so renaming churns no copy or tests.
- */
 export const walletFlow: Builder = (feeds, { t, now, range }) => {
   const feed = feeds.journal;
   const data = feed?.data ?? null;
@@ -88,7 +72,6 @@ export const walletFlow: Builder = (feeds, { t, now, range }) => {
   const entries = withinRange(all, now, range);
   const flow = journalRefTypeBreakdown(entries);
   const covered = journalCoverageDays(all, now);
-  // ESI keeps about 30 days: a 90-day range must say how much it really covers.
   const note =
     covered > 0 && covered < range
       ? t(`${C}.walletFlow.noteCovered`, { count: range, covered })
@@ -112,7 +95,6 @@ export const walletFlow: Builder = (feeds, { t, now, range }) => {
       value: formatIskCompactSigned(flow.net),
       iskAmount: flow.net,
       unit: t('overview.isk'),
-      // Income and spending are the chart's and the table's: the line says how the net moved.
       secondary: flowSecondary(t, all, now, range, covered, flow.rows),
       tone: 'clear',
     },
@@ -123,8 +105,6 @@ export const walletFlow: Builder = (feeds, { t, now, range }) => {
   };
 };
 
-// --- Net worth ------------------------------------------------------------------
-
 const netWorth: Builder = (feeds, { t, activeCharacterId, scopeAll, hiddenLayers }) => {
   const feed = feeds.netWorth;
   const data = feed?.data ?? null;
@@ -133,7 +113,6 @@ const netWorth: Builder = (feeds, { t, activeCharacterId, scopeAll, hiddenLayers
   const everyone = scopeAll || activeCharacterId === null;
   const scoped = data.characters.filter((c) => everyone || c.characterId === activeCharacterId);
   const included = scoped.filter((c) => c.covered);
-  // A Character with a snapshot but no longer holding every permission: ask for it, do not sum it.
   if (included.length === 0) {
     return {
       ...blank(
@@ -154,14 +133,11 @@ const netWorth: Builder = (feeds, { t, activeCharacterId, scopeAll, hiddenLayers
     for (const id of Object.keys(layers) as LayerId[]) layers[id] += character.layers[id];
   }
   const day = included.reduce((latest, c) => (c.day > latest ? c.day : latest), '');
-  // ISK and assets are always layers; the rest only when something is in them.
   const listed = NET_WORTH_BAR.filter(
     ({ id }) => id === 'isk' || id === 'assets' || layers[id] !== 0
   );
-  // The pilot's own switch-offs; if they leave nothing to draw, every listed layer stays.
   const kept = listed.filter(({ id }) => !hiddenLayers?.includes(id));
   const shown = kept.length > 0 ? kept : listed;
-  // What the widget claims is the layers it draws, so the headline and the change agree with the chart.
   const total = netWorthOf(
     layers,
     shown.map(({ id }) => id)
@@ -188,15 +164,11 @@ const netWorth: Builder = (feeds, { t, activeCharacterId, scopeAll, hiddenLayers
   return {
     ...blank(to, statusOf(feed)),
     fetchedAt: new Date(Date.parse(day)),
-    // Recorded daily snapshots are history, not a cached read of a live feed: `true`
-    // here made the header's "Showing cached data" notice show on a fresh online
-    // board. Its age is the "as of" day below.
     fromCache: false,
     number: {
       value: formatIskCompact(total),
       iskAmount: total,
       unit: t('overview.isk'),
-      // How far it moved over the recorded days; "as of" is the chart's caption.
       secondary: balanceChange(t, series.totals, 'overview.widgets.netWorth'),
       tone: 'clear',
     },
@@ -238,8 +210,6 @@ const netWorth: Builder = (feeds, { t, activeCharacterId, scopeAll, hiddenLayers
   };
 };
 
-// --- Loyalty points -----------------------------------------------------------------
-
 const LP_CHART_ROWS = 6;
 
 const lp: Builder = (feeds, { t }) => {
@@ -264,7 +234,6 @@ const lp: Builder = (feeds, { t }) => {
     number: {
       value: formatCompactNumber(total),
       unit: t(`${D}.lp.unit`),
-      // One corporation is the whole total: naming it would restate the headline.
       secondary:
         largest && data.entries.length > 1
           ? {
@@ -293,8 +262,6 @@ const lp: Builder = (feeds, { t }) => {
   };
 };
 
-// --- Mining survey ------------------------------------------------------------------
-
 const SURVEY_PATH = '/mining/survey';
 
 const survey: Builder = (feeds, { t, now }) => {
@@ -320,7 +287,6 @@ const survey: Builder = (feeds, { t, now }) => {
   if (summary.finished) {
     number = { value: t(`${D}.survey.finished`), tone: 'clear' };
   } else if (summary.etaAt !== null && finish !== null) {
-    // Past its estimate with no scan to say so: the field is due, not confirmed gone.
     const overdue = summary.etaAt <= now;
     number = {
       value: overdue ? t(`${D}.survey.overdue`) : formatDuration((summary.etaAt - now) / 1000),
@@ -335,7 +301,6 @@ const survey: Builder = (feeds, { t, now }) => {
     };
   }
 
-  // An ore with nothing left is done with: it has no row.
   const left = summary.ores.filter((o) => o.volume > 0);
   return {
     ...base,
@@ -371,8 +336,6 @@ const survey: Builder = (feeds, { t, now }) => {
         : undefined,
   };
 };
-
-// --- Hauling ------------------------------------------------------------------------
 
 const HAULING_PATH = '/market/hauling';
 
@@ -424,8 +387,6 @@ const hauling: Builder = (feeds, { t }) => {
   };
 };
 
-// --- Below-market contracts ---------------------------------------------------------
-
 const BELOW_MARKET_PATH = '/contracts/search/items?items.belowMarket=1';
 
 const belowMarket: Builder = (feeds, { t }) => {
@@ -472,8 +433,6 @@ const belowMarket: Builder = (feeds, { t }) => {
     summary: t(`${D}.belowMarket.summary`, { count: data.count }),
   };
 };
-
-// --- Jump timers --------------------------------------------------------------------
 
 const jumpTimers: Builder = (feeds, { t, now }) => {
   const feed = feeds.jumpTimers;
@@ -529,9 +488,6 @@ const jumpTimers: Builder = (feeds, { t, now }) => {
   };
 };
 
-// --- Best clone ---------------------------------------------------------------------
-
-/** The nearest jump clone and how much later it would finish: the one fact "Stay put" does not carry. */
 function nextBest(
   t: (key: string, options?: Record<string, unknown>) => string,
   rows: readonly { id: string | number; deltaSeconds: number | null }[]
@@ -573,7 +529,6 @@ const clones: Builder = (feeds, { t }) => {
       : t(`${D}.clones.cloneId`, { id: String(row.id) }));
   const best = data.rows.find((row) => row.id === data.bestId);
   const bestLabel = best ? labelOf(best) : UNKNOWN;
-  // "Stay put" is the whole answer; only a jump has a saving worth a second line.
   const number: NumberModel =
     data.verdict === 'jump' && data.savedSeconds !== null
       ? {
@@ -626,8 +581,6 @@ const clones: Builder = (feeds, { t }) => {
     summary: [number.value, number.secondary?.text].filter(Boolean).join('. '),
   };
 };
-
-// --- Location and ship ----------------------------------------------------------------
 
 const location: Builder = (feeds, { t }) => {
   const feed = feeds.location;
@@ -684,11 +637,8 @@ const location: Builder = (feeds, { t }) => {
   };
 };
 
-// --- Route safety -------------------------------------------------------------------
-
 const ROUTE_SAFETY_PATH = '/travel/route';
 
-/** Conditions, never verdicts: a busy system is one with many kills, not an unsafe one. */
 const routeSafety: Builder = (feeds, { t, now }) => {
   const feed = feeds.routeSafety;
   const data = feed?.data ?? null;
@@ -746,8 +696,6 @@ const routeSafety: Builder = (feeds, { t, now }) => {
                 : levelWord(row.level),
           ],
         })),
-        // A condition per raidable skyhook on the route, in the same row style:
-        // no kills figure of its own, the window said plainly. Not a verdict.
         ...liveRaids(data.raidable, now).map((hook) => {
           const open = raidState(hook.window, now) === 'open';
           const duration = formatCountdown(
@@ -792,10 +740,7 @@ const routeSafety: Builder = (feeds, { t, now }) => {
   };
 };
 
-// --- Kills and losses -----------------------------------------------------------
-
 const KILLS_PATH = '/travel/pilot';
-/** Newest killmails the table lists. */
 const KILLS_TABLE_ROWS = 25;
 const KILLS_DAY_MS = DAY_MS;
 
@@ -809,9 +754,7 @@ const kills: Builder = (feeds, { t, now, range, scopeAll, activeCharacterId }) =
   const window = `${range}d` as MiningYieldRange;
   const today = eveToday(new Date(now));
   const days = rangeDates(window, today);
-  // The same calendar days the chart draws, so the bars add up to the headline.
   const since = Date.parse(`${days[0]}T00:00:00Z`);
-  // Two of your Characters on one killmail is one kill: count the killmail once.
   const seen = new Set<number>();
   const inRange = data.entries.filter((entry) => {
     if (!everyone && entry.characterId !== activeCharacterId) return false;
@@ -842,7 +785,6 @@ const kills: Builder = (feeds, { t, now, range, scopeAll, activeCharacterId }) =
   const values = days.map((date) => perDay.get(date) ?? 0);
   const peak = Math.max(...values);
 
-  // zKillboard's first page holds 200 per list: a busy pilot's 90 days can reach further back than that.
   const reaches = (everyone ? data.trackedIds : [activeCharacterId]).flatMap((id) => {
     const value = data.reach[id];
     return value === undefined || value === null ? [] : [value];
@@ -955,7 +897,6 @@ const kills: Builder = (feeds, { t, now, range, scopeAll, activeCharacterId }) =
   };
 };
 
-/** The kinds built in this file, each with the feeds it reads. */
 export const KIND_DEFS: Readonly<Record<string, KindDef>> = {
   netWorth: { feeds: ['netWorth'], scope: 'account', build: netWorth },
   lp: { feeds: ['lp'], scope: 'character', build: lp },
@@ -969,7 +910,6 @@ export const KIND_DEFS: Readonly<Record<string, KindDef>> = {
   kills: { feeds: ['kills'], scope: 'account', build: kills },
   marketTrend: { feeds: ['marketTrend'], scope: 'character', build: marketTrend },
   omega: { feeds: ['omega'], scope: 'account', build: omega },
-  // Its reads and scope follow the widget's Source (`profitModel.ts`).
   profit: {
     feeds: ['profit', 'tradingProfit'],
     allFeeds: ['profitAll', 'tradingProfit'],

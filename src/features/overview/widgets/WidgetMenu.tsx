@@ -1,19 +1,3 @@
-/**
- * A widget's settings menu: the right-click (touch-and-hold) menu over the
- * whole card, and the ⋮ in its header (a `RowMoreActions` inside the card),
- * both from one item list. Open the page comes first, where the kind has one.
- *
- * Show, View, Character and Range are radio groups (the current choice ticked),
- * shown only for what the kind has: a kind with one view has no View group, one
- * without a time window (or on a Show that reads none) has no Range. Rename
- * opens a small dialog after the menu has closed (a text field inside a Radix
- * menu loses keystrokes to its typeahead, and docs/DESIGN.md §6c "Menu item
- * that opens a dialog" fixes the focus order). Esc, outside click and focus
- * return come from the primitive.
- *
- * `inert` is the signed-out landing page's demo: the same menu over a layout
- * whose actions do nothing, where Rename must not open its dialog either.
- */
 import { useId, useRef, useState, useSyncExternalStore, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
@@ -206,16 +190,10 @@ function PlexPlanDialog({
   );
 }
 
-/**
- * The Calendar widget's own kind filter: the Calendar page's types, each a checkbox, stored on the
- * widget (never the page's filter). Which kinds get a row follows the page (`kindHasFilterRow`),
- * read off the widget's feed; without counts, a readable kind keeps its row even with nothing due.
- */
 function CalendarTypesSub({ widget }: { widget: Widget }) {
   const { t } = useTranslation();
   const edit = useOverviewEdit();
   const store = useFeedStore();
-  // Live: a calendar read landing while the menu is open adds the kinds it made readable.
   const data = useSyncExternalStore(store.subscribe, () => store.get().calendar)?.data;
   const hidden = widget.hiddenKinds ?? [];
   const state = {
@@ -235,7 +213,6 @@ function CalendarTypesSub({ widget }: { widget: Widget }) {
           <MenuCheckboxItem
             key={kind}
             checked={!state.hidden.has(kind)}
-            // The menu stays open, so several types are one visit.
             onSelect={(event) => event.preventDefault()}
             onCheckedChange={() => edit.setHiddenKinds(widget.id, toggleHiddenKind(hidden, kind))}
           >
@@ -270,10 +247,8 @@ export function WidgetMenu({
   children,
 }: {
   widget: Widget;
-  /** The widget's page, when it has one: the first item opens it. */
   to?: string | null;
   inert?: boolean;
-  /** The card: right-click or touch-and-hold anywhere on it opens the menu. */
   children: ReactElement;
 }) {
   const { t } = useTranslation();
@@ -295,7 +270,6 @@ export function WidgetMenu({
   const offersScope =
     board.characterScope === 'always' || (canSum && board.allScopeOffered(widget.kind));
   const scopeKey = board.id === 'corp' ? 'corp.grid.menu' : 'overview.menu';
-  // Read across every corporation, a Show that cannot sum is disabled with its reason (DESIGN §6c).
   const onAll = offersScope && canSum && readScope(board, widget) !== 'header';
   const showSums = (show: WidgetShow) =>
     !onAll || kindSumsAcrossCharacters(widget.kind, { ...widget, show });
@@ -303,7 +277,6 @@ export function WidgetMenu({
   const index = edit.layout.widgets.findIndex((w) => w.id === widget.id);
   const last = edit.layout.widgets.length - 1;
 
-  // The right-click menu and the header's ⋮ both draw this one list.
   const items = (
     <>
       {to !== null && !inert && (
@@ -315,7 +288,6 @@ export function WidgetMenu({
           <MenuSeparator />
         </>
       )}
-      {/* What the widget draws comes before how; every Show offers the kind's views, so View stays put. */}
       {kind.shows.length > 1 && (
         <>
           <MenuLabel>{t('overview.menu.show')}</MenuLabel>
@@ -351,7 +323,6 @@ export function WidgetMenu({
           <MenuSeparator />
         </>
       )}
-      {/* On the Corp Board, "Header" is the active Character's corporation and "All" every corporation any of them can read. */}
       {offersScope && (
         <>
           <MenuLabel>{t(`${scopeKey}.character`)}</MenuLabel>
@@ -462,7 +433,6 @@ export function WidgetMenu({
       {kind.hasCampaignFaction && (
         <>
           <MenuSeparator />
-          {/* A submenu, like Calendar's Types: five choices inline pushed the menu off a laptop screen. */}
           <MenuSub>
             <MenuSubTrigger>
               {t('overview.menu.factionCurrent', {
@@ -497,9 +467,7 @@ export function WidgetMenu({
               <MenuCheckboxItem
                 key={id}
                 checked={on}
-                // At least one layer stays, so the chart is never empty.
                 disabled={on && toggleHidden(hidden, id, LAYER_IDS) === hidden}
-                // The menu stays open, so several layers are one visit.
                 onSelect={(event) => event.preventDefault()}
                 onCheckedChange={(next) =>
                   next === on
@@ -531,7 +499,6 @@ export function WidgetMenu({
           </MenuItem>
         </>
       )}
-      {/* The View group ends in its own separator; any group after it does not. */}
       {(offersScope ||
         hasRange ||
         kind.hasCalendarEvents ||
@@ -586,7 +553,6 @@ export function WidgetMenu({
 
   return (
     <>
-      {/* The demo scrolls the whole document, so a modal menu's scroll lock would hide the page scrollbar and shift the page. */}
       <RowActionsMenu
         name={title}
         items={items}
@@ -598,7 +564,6 @@ export function WidgetMenu({
       </RowActionsMenu>
       {picking && (
         <TrendItemsDialog
-          // A fresh pick list each time the dialog opens.
           key={(widget.trendItems ?? []).join(',')}
           widget={widget}
           title={title}
@@ -611,7 +576,6 @@ export function WidgetMenu({
       )}
       {renaming && (
         <RenameDialog
-          // A fresh draft each time the dialog opens.
           key={widget.title ?? ''}
           widget={widget}
           fallbackTitle={fallbackTitle}

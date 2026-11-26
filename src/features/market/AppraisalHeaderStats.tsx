@@ -1,9 +1,3 @@
-/**
- * The Appraisal result's header: three plain numbers, Buy, Split and Sell,
- * each with the figure it nets to beneath it (Buy → selling into the buy
- * orders now, Sell → listing it yourself, Split → the spread), then one line of
- * cargo facts. Nothing dropped.
- */
 import { fixed2 } from '@/lib/fixedFormat';
 import { usePricesUnavailableLabel } from '@/features/market/usePricesUnavailableLabel';
 import { useState } from 'react';
@@ -24,10 +18,8 @@ import { AppraisalVolumeChip } from './AppraisalVolumeChip';
 import { RefineChipValue } from './RefineChipValue';
 import { approxIsk } from '@/features/campaigns/turnInContent';
 
-/** How long the "copied" bubble stays by the area that copied. */
 const COPIED_FEEDBACK_MS = 2000;
 
-/** The facts row's Turn in total: the items turning in beats selling, their reward, and its breakdown. */
 export interface AppraisalTurnInTotal {
   total: number;
   count: number;
@@ -39,44 +31,25 @@ interface AppraisalHeaderStatsProps {
   net: AppraisalNetTotals | null;
   itemCount: number;
   showRefine: boolean;
-  /** The pile's refine total on the remembered price basis, and that basis, for the chip. */
   refineValue: number;
   refineBasis: RefineBasis;
   showCheapest: boolean;
   implantBonusPct: number;
-  /** The total efficiency the Refine figure was worked out at ("68.3%"), shown beside it so the default is never silent. */
   refineEfficiency?: string | null;
-  /** Opens the refine breakdown on the whole pile; absent, the chip has no control. */
   onOpenRefine?: () => void;
-  /**
-   * The items whose Turn-in Reward beats selling them now: their reward and
-   * count, and the control that opens `TurnInBreakdown`. Null hides the chip.
-   * Never part of the Buy/Sell totals above it.
-   */
   turnIn?: AppraisalTurnInTotal | null;
-  /**
-   * The price source could not be reached: the price-derived groups show a
-   * placeholder instead of 0 ISK totals. Volume and item count need no price.
-   */
   pricesUnavailable?: boolean;
 }
 
-/**
- * Sized by the header's width so a 13-digit total (about 8.5em wide) stays whole in a third of it,
- * never below body size (`text-sm`). Each step leaves slack for a wider system font.
- */
 const HEADLINE_SIZE_CLASS =
   'text-xl @[29rem]:text-sm @[32rem]:text-base @[36rem]:text-lg @[40rem]:text-xl';
 
-/** The figure a card nets to, under its divider. */
 interface SecondFigure {
   label: string;
   value: number;
-  /** What the label means; a tooltip on the area. */
   help?: string;
 }
 
-/** Per-area copy state. */
 function useCopyFigure(value: number) {
   const { t } = useTranslation();
   const { copied, flash } = useCopyFeedback(COPIED_FEEDBACK_MS);
@@ -105,7 +78,6 @@ function useCopyFigure(value: number) {
 
 type CopyFigure = ReturnType<typeof useCopyFigure>;
 
-/** The live region stays mounted and the bubble is not one: a status node mounted with its text is not reliably read out. */
 function CopiedFeedback({ figure, className }: { figure: CopyFigure; className: string }) {
   return (
     <>
@@ -125,13 +97,11 @@ function CopiedFeedback({ figure, className }: { figure: CopyFigure; className: 
   );
 }
 
-/** Under the divider: one button copies the figure. The tooltip sits on the button, so a tap copies and a hold reveals (DESIGN.md §6c). */
 function SecondFigureArea({ title, second }: { title: string; second: SecondFigure }) {
   const { t } = useTranslation();
   const figure = useCopyFigure(second.value);
   return (
     <div className="relative border-t border-line">
-      {/* Below, so the bubble does not cover the card's own total. */}
       <Tooltip content={second.help} side="bottom">
         <button
           type="button"
@@ -158,10 +128,6 @@ function SecondFigureArea({ title, second }: { title: string; second: SecondFigu
   );
 }
 
-/**
- * One headline card, two copy areas split at the divider: above, the title
- * button's `::after` covers the area; below, `SecondFigureArea`.
- */
 function PriceCell({
   title,
   hint,
@@ -290,7 +256,6 @@ export function AppraisalHeaderStats({
   }
   return (
     <div className="@container flex w-full flex-col gap-2">
-      {/* One per row below the width `HEADLINE_SIZE_CLASS` can fit three across. */}
       <div className="grid grid-cols-1 gap-2 @[29rem]:grid-cols-3">
         <PriceCell
           title={t('market.appraisal.summaryBuy')}

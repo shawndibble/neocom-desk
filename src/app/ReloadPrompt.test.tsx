@@ -77,7 +77,6 @@ const HIDDEN_FOR_MS = 10 * 60 * 1000;
 
 beforeEach(() => {
   updateServiceWorker.mockClear();
-  // Default: the published release is unreadable, so the worker is asked.
   fetchLatestRelease.mockReset().mockResolvedValue(null);
   navigateRef.current = null;
   existingWorker.current = undefined;
@@ -85,9 +84,6 @@ beforeEach(() => {
   state.needRefresh = true;
   setHidden(false);
   vi.useFakeTimers();
-  // Start the fake clock well past epoch 0 — the component uses 0 as a
-  // sentinel for "not hidden," which would collide with a real Date.now()
-  // reading if the clock started at 0.
   vi.setSystemTime(new Date('2026-01-01T00:00:00Z'));
 });
 
@@ -200,8 +196,6 @@ describe('ReloadPrompt', () => {
 
       await vi.advanceTimersByTimeAsync(CHECK_INTERVAL_MS);
 
-      // registration.update() already fetches sw.js past the HTTP cache; a
-      // pre-fetch of our own made every check download it twice.
       expect(fetch).not.toHaveBeenCalled();
       expect(update).toHaveBeenCalledTimes(1);
     });

@@ -1,9 +1,3 @@
-/**
- * Invention as a Blueprint Acquisition source (issue #3990):
- * `loadInventionMarket` loads recipes and hub prices per (Trade Hub,
- * blueprints); `inventionQuoteFor` / `inventionOffersLookup` price them per
- * plan (cost indices, facility, owned T1 originals, skills).
- */
 import type { BpcOffer } from '@/engine/industry/blueprintAcquisition';
 import {
   inventionOffers,
@@ -31,34 +25,21 @@ export interface InventionSkill {
   name: string;
 }
 
-/** What inventing one T2 blueprint takes, from the SDE. */
 export interface InventionRecipeInfo {
-  /** The T1 blueprint copied and invented from. */
   t1BlueprintTypeID: number;
   baseProbability: number;
-  /** Runs on the invented copy before a decryptor. */
   baseRuns: number;
-  /** Datacores one attempt consumes. */
   datacores: readonly { typeID: number; quantity: number }[];
-  /** The science skills the chance reads. */
   scienceSkills: readonly InventionSkill[];
   encryptionSkill: InventionSkill | null;
 }
 
-/** Recipes and hub prices for one (Trade Hub, blueprints) load. */
 export interface InventionMarket {
-  /** The recipe that invents this blueprint, or null when nothing does. */
   recipeFor: (blueprintTypeID: number) => InventionRecipeInfo | null;
   decryptors: readonly Omit<InventionDecryptorInput, 'unitPrice'>[];
-  /** Hub sell price of a datacore or decryptor; null when none. */
   unitPriceFor: (typeID: number) => number | null;
 }
 
-/**
- * The recipes inventing any of `blueprintTypeIds`, keyed by the invented
- * blueprint. "… Encryption Methods" is the encryption skill, every other
- * Science-group skill a science skill; production skills don't count.
- */
 export function inventionRecipes(
   data: InventionData,
   skills: readonly SkillType[],
@@ -94,16 +75,9 @@ export function inventionRecipes(
   return recipes;
 }
 
-/**
- * Loads the recipes inventing any of `blueprintTypeIds` and prices their
- * datacores and every decryptor at `hub`. Null when none of them is invented
- * — no price request is made then. Never rejects: unreadable data reads as
- * no market, unreadable prices as none (tiers unpriced, never free).
- */
 export function loadInventionMarket(
   hub: TradeHub,
   blueprintTypeIds: readonly number[],
-  /** The Industry percent (issue #6531): datacores and decryptors are bought at the hub too. Absent is 100. */
   pricePercent = DEFAULT_PRICE_PERCENT
 ): Promise<InventionMarket | null> {
   return loadMarket(hub, blueprintTypeIds, pricePercent).catch(() => null);
@@ -135,14 +109,11 @@ async function loadMarket(
   };
 }
 
-/** Everything one plan's invention quote reads beyond the market load. */
 export interface InventionPricingContext {
   market: InventionMarket;
   catalog: Pick<BlueprintCatalog, 'byBlueprintTypeID'>;
-  /** The plan's owned blueprints — personal, plus corp when its Corp Assets toggle is on. */
   ownedBlueprints: readonly Pick<CharacterBlueprint, 'type_id' | 'runs'>[];
   skills: SkillLevels;
-  /** Where the plan's jobs run; its copy and invention jobs run there too. */
   facility: FacilityPreset;
   facilityTaxPct?: number;
   adjustedPrices: AdjustedPrices;
@@ -150,14 +121,12 @@ export interface InventionPricingContext {
   inventionCostIndex: number;
 }
 
-/** One blueprint's invention quote, with what it was worked out from. */
 export interface InventionQuoteResult {
   recipe: InventionRecipeInfo;
   quote: InventionQuote;
   skills: InventionSkillLevels;
 }
 
-/** The quote for inventing `blueprintTypeID`, or null when nothing invents it. */
 export function inventionQuoteFor(
   blueprintTypeID: number,
   ctx: InventionPricingContext
@@ -184,7 +153,6 @@ export function inventionQuoteFor(
       ...d,
       unitPrice: ctx.market.unitPriceFor(d.typeID),
     })),
-    // No T1 original: the copy job can't run, so every tier stays unpriced.
     copyJobFee: ownsT1Original ? fee(t1.blueprint, ctx.copyingCostIndex) : null,
     inventionJobFee: fee(t2.blueprint, ctx.inventionCostIndex),
     decryptors: ctx.market.decryptors.map((d) => ({
@@ -195,7 +163,6 @@ export function inventionQuoteFor(
   return { recipe, quote, skills };
 }
 
-/** Each blueprint's priced invention tiers as offers, memoised per blueprint. */
 export function inventionOffersLookup(
   ctx: InventionPricingContext
 ): (blueprintTypeID: number) => readonly BpcOffer[] {

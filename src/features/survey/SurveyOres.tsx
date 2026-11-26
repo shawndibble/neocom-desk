@@ -1,9 +1,3 @@
-/**
- * What is left of each ore, dearest unit first: its rocks, volume, ISK and the percent of it still
- * there, as a bar. The bar's colour is how dear the ore is, its price per unit,
- * on a gray, blue, yellow, orange ramp (`engine/survey/valueTier.ts`), so a
- * pilot sees which rocks are worth the trip without reading the numbers.
- */
 import { Trans, useTranslation } from 'react-i18next';
 import { IskAmount, Panel } from '@/components/ui';
 import type { SurveySummary } from '@/engine/survey/series';
@@ -16,13 +10,11 @@ export function SurveyOres({
   priceNote,
 }: {
   summary: SurveySummary;
-  /** Where the ISK figures come from: the market hub's system, and the ore form priced. */
   priceNote: { hub: string; compressed: boolean };
 }) {
   const { t } = useTranslation();
   const tiers = oreValueTiers(summary.ores);
   const hasIsk = summary.iskLeft !== null;
-  // `summary.ores` is dearest unit first: the rocks to mine up front.
   return (
     <Panel title={t('survey.oresTitle')}>
       <div className="space-y-4">

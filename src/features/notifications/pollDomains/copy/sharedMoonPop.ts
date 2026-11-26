@@ -4,9 +4,7 @@ import { sharingCorporationLabel } from '../../sharedPopsCache';
 import { type DomainCopy, fired } from './shared';
 
 export interface SharedMoonPopNames {
-  /** The sharing corporation's name; absent falls back to its id. */
   readonly corporation?: string;
-  /** The Pop Time in the pilot's chosen clock. */
   readonly when?: string;
 }
 
@@ -18,12 +16,6 @@ const PUSH_POP_TIME: Record<SharedPopTime, string> = {
   'auto-fracture': 'Auto-fracture',
 };
 
-/**
- * Title "Moon pop · [Refinery]", body "[Pop Time] at [time] · [Refinery] · taxed by [corporation] · [rate]%"
- * (the scope decisions' words: the body names the refinery too because the Alerts panel row
- * shows the body without the title); a chunk fractured early reads "Fractured early at [time]". Opening it opens the pop on the Calendar, which
- * `notificationOptions.ts`'s `occurrencePath` reads off the Occurrence Key.
- */
 export const sharedMoonPopCopy: DomainCopy<SharedMoonPopFire, SharedMoonPopNames> & {
   readonly push: PushCopy<SharedMoonPopFire, SharedMoonPopNames>;
 } = {
@@ -43,7 +35,6 @@ export const sharedMoonPopCopy: DomainCopy<SharedMoonPopFire, SharedMoonPopNames
       rate: fire.ratePct,
     }),
   }),
-  /** Asserted: a started Extraction's times do not change (`projectionWording`). */
   push: (fire, _character, names) => {
     assertProjectionWording('sharedMoonPop', 'assert');
     return {

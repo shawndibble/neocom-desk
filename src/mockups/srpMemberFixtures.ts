@@ -1,10 +1,8 @@
-/** Sample data for the SRP member mockups. Today is 23 Oct 2026, 14:00 EVE. */
 export const SRP_PHONE = { viewport: { value: 'phone390', isRotated: false } };
 
 export const SRP_PARAMS = {
   layout: 'fullscreen',
   shell: {
-    // /corp/srp is not a route yet, so the shell borrows a real corp route for its chrome.
     path: '/corp/moons',
     scopes: [
       'esi-wallet.read_character_wallet.v1',
@@ -22,11 +20,9 @@ export interface Claim {
   system: string;
   lostAt: string;
   state: ClaimState;
-  /** ISK; null = the hull rule is "Officer decides" and no amount is set yet. */
   amount: number | null;
   filed: string;
   reason?: string;
-  /** A rejected claim can be re-filed once; true once it has been. */
   refiled?: boolean;
 }
 

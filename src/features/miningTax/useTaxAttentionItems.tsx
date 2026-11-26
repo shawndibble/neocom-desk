@@ -47,10 +47,8 @@ interface Args {
   data: TaxSnapshot | null;
   resolvedCharacterFilter: MultiSelectFilter<number>;
   personalRows: readonly DisplayRow[];
-  /** Every row of the tab, the books' own included: an attention item opens one. */
   displayRows: readonly DisplayRow[];
   payeeById: ReadonlyMap<string, PayeeRecord>;
-  /** The member's Payees nobody in EVE answers to, after the automatic link tried them (`useAutoLinkPayees`). */
   unlinkedPayees: readonly PayeeRecord[];
   openPayeeManager: () => void;
   corpView: CorpBookView | null;
@@ -60,21 +58,14 @@ interface Args {
   systemNames: ReadonlyMap<number, string>;
   refresh: () => void;
   openDetail: (dr: DisplayRow) => void;
-  /** Opens a row with the "unassign this?" question already asked — the duplicate's one-click fix. */
   openUnassign: (dr: DisplayRow) => void;
-  /**
-   * The Resolve dialog (resolving in the app): opens it on a problem, and the member's own
-   * "Not paying" set, whose problems the strip leaves out — they are listed on the quiet line.
-   */
   resolve: {
     open: (target: ResolveTarget) => void;
     hidden: ReadonlySet<string>;
-    /** "Not paying" in one click: hides the problem on this device, nothing is sent. */
     hide: (key: string) => void;
   };
 }
 
-/** What needs the pilot's attention above the ledger: lapsed logins, missing prices, duplicates, unclaimed donations, unclassified ore. */
 export function useTaxAttentionItems({
   data,
   resolvedCharacterFilter,
@@ -98,7 +89,6 @@ export function useTaxAttentionItems({
   const pricesUnavailableLabel = usePricesUnavailableLabel();
   const { claiming, claimError, handleClaim } = useClaimDonation(reloadCorpBooks);
 
-  // Every problem's two one-click answers: Resolve opens every way out; Not paying hides it here.
   const resolveActions = (target: ResolveTarget) => (
     <>
       <Button size="sm" onClick={() => resolve.open(target)}>
@@ -110,8 +100,6 @@ export function useTaxAttentionItems({
     </>
   );
 
-  // Which entries the pricing banner is about, so it can link to them — the
-  // table only shows an entry's total, never per-ore prices.
   const pricingGaps = useMemo(() => {
     if (!data) return [];
     return findPricingGaps(personalRows, {
@@ -131,8 +119,6 @@ export function useTaxAttentionItems({
     refresh();
   }
 
-  // What a Corp Tax Book says that the tab alone would not (#6204), for the Characters in view —
-  // an item about a filtered-out alt would have no row to open.
   const corp = useMemo(
     () => corpBookAttention(corpView, resolvedCharacterFilter),
     [corpView, resolvedCharacterFilter]
@@ -144,10 +130,6 @@ export function useTaxAttentionItems({
   const attentionItems: AttentionItem[] = [];
   if (!data) return attentionItems;
 
-  // Per-character re-login, never one flag hiding every other character's
-  // data behind a full-page banner — a lapsed alt must stay visible as
-  // needing attention, not disappear. Only for the Characters in view: the
-  // all-Characters view names every one, a narrowed view only its own.
   for (const c of data.reauthCharacters.filter(
     (c) => resolvedCharacterFilter === 'all' || resolvedCharacterFilter.has(c.characterId)
   )) {
@@ -176,12 +158,6 @@ export function useTaxAttentionItems({
       onOpen={openDetail}
     />
   );
-  // An ore type the hub quoted no buy order for is valued at 0, which
-  // renders exactly like a cheap ore and silently understates the bill.
-  // Named per hub rather than pooled: "no buy orders" is a fact about one
-  // order book, and once two Payees bill at two hubs, blaming both for one
-  // thin book would be wrong. A hub whose price source could not be reached
-  // (offline) is a different fact again; `UnpricedOreDetail` decides per hub.
   if (data.unpricedTypeIds.size > 0) {
     const unreachableHubs = data.datedPrices.unreachableHubs ?? NO_HUBS;
     attentionItems.push({
@@ -221,9 +197,6 @@ export function useTaxAttentionItems({
     });
   }
   if (duplicateRows.length > 0) {
-    // The copy used to say "open the day and Unassign the extra one" over a list of plain text,
-    // leaving the member to find the row themselves. Each day now opens straight on the
-    // "unassign this?" question, which still shows what it removes before anything goes.
     attentionItems.push({
       id: 'duplicates',
       tone: 'warning',
@@ -260,7 +233,6 @@ export function useTaxAttentionItems({
       ),
     });
   }
-  // A claim the automatic pass could not make (offline, say): the donor retries it by hand.
   for (const claim of corpView?.claims ?? []) {
     const claimKey = claimKeyOf(claim.corporationId, claim.payment.id);
     if (!failedClaims.has(claimKey)) continue;
@@ -301,11 +273,7 @@ export function useTaxAttentionItems({
   }
   for (const o of corp.overdue) {
     const period = formatDateRange([o.from, o.through]);
-    // #6206: the member says they paid it another way, or pays it, or stops being reminded;
-    // every way out is the Resolve dialog, which also mails whoever answers tax questions.
-    // Told the corporation already: the quiet "Waiting on the corp" line covers it, not the strip.
     if (o.declaration?.state === 'waiting') continue;
-    // A recorded day of the Late notice, so "Not paying" can tell the corporation why.
     const dayOf = (corpView?.overlay.rows ?? []).find(
       (r) =>
         r.corporationId === o.corporationId &&
@@ -346,10 +314,6 @@ export function useTaxAttentionItems({
       ...(target ? { action: resolveActions(target) } : {}),
     });
   }
-  // One item per book, not per donation: a second uncredited donation to the same corporation
-  // needs the same sync and the same dispute, so repeating the whole advisory only pushed the
-  // ledger further down the page — which is what folding the old stacked banners into one strip
-  // set out to stop (20261004-135551-mining-tax-redesign-owed-first-combined-entries-edit).
   const uncreditedByCorp = new Map<number, typeof corp.uncredited>();
   for (const u of corp.uncredited) {
     const group = uncreditedByCorp.get(u.corporationId);
@@ -360,15 +324,11 @@ export function useTaxAttentionItems({
     const loaded = corpView?.books.find((b) => b.loaded.corporationId === corporationId)?.loaded;
     const divisions = loaded?.divisions ?? [];
     const accounts = corpPayAccounts(divisions, loaded?.divisionNames, t).join(', ');
-    // With every division read, the ISK can't be in an unread one: a sync is due, or it never came.
     const every = readsEveryDivision(divisions);
     const corpName = group[0].corpName;
     const only = group.length === 1 ? group[0] : undefined;
     const total = group.reduce((sum, u) => sum + u.amount, 0);
-    // Every way out of it in one dialog: pay again, not paying, or send the proof — the
-    // transfers with their journal refs, checked against the corporation's wallet first.
     const target = uncreditedTarget(group, corpView?.overlay.rows ?? []);
-    // Hidden by the member, or already answered (a declaration waits): out of the list.
     if (resolve.hidden.has(target.hideKey) || target.answered) continue;
     attentionItems.push({
       id: `corp-uncredited:${corporationId}`,
@@ -394,7 +354,6 @@ export function useTaxAttentionItems({
               ? t('miningTax.corpBook.attention.uncreditedEveryDetail', { corp: corpName })
               : t('miningTax.corpBook.attention.uncreditedDetail', { corp: corpName, accounts })}
           </p>
-          {/* What the member needs to dispute it: the days it paid, and the transfer itself. */}
           {only ? (
             <>
               {only.covered.length > 0 && (
@@ -439,8 +398,6 @@ export function useTaxAttentionItems({
       ),
     });
   }
-  // Donations the book holds for an officer's review without counting them (#6207): neither in
-  // flight (the book has them) nor credited, so nothing else on the tab says where the ISK went.
   for (const group of corp.inReview) {
     const target = inReviewTarget(group);
     if (resolve.hidden.has(target.hideKey)) continue;
@@ -480,9 +437,6 @@ export function useTaxAttentionItems({
       ),
     });
   }
-  // A billed day whose figures differ from the member's own record: it used to be said only
-  // inside Compare with the book, with no way to act on it. And a day an officer kept the bill
-  // on, with what they said to do next. Each once per day, for the Characters in view.
   const inView = (id: number) =>
     resolvedCharacterFilter === 'all' || resolvedCharacterFilter.has(id);
   const seenDays = new Set<string>();
@@ -490,7 +444,6 @@ export function useTaxAttentionItems({
   for (const row of corpView?.overlay.rows ?? []) {
     if (!inView(row.characterId)) continue;
     const by = keptBy(row);
-    // The Late notice's own item already says an officer rejected what it declared.
     if (
       by === 'declaration' &&
       row.noticeId !== undefined &&
@@ -552,14 +505,7 @@ export function useTaxAttentionItems({
       id: `corp-also-billed:${a.corporationId}`,
       tone: 'warning',
       title: t('miningTax.corpBook.attention.alsoBilledTitle', { corp: a.corpName, payees }),
-      detail: (
-        <p>
-          {t('miningTax.corpBook.attention.alsoBilledDetail', {
-            payees,
-            action: t('miningTax.corpBook.overlap.letBill'),
-          })}
-        </p>
-      ),
+      detail: <p>{t('miningTax.corpBook.attention.alsoBilledDetail', { payees })}</p>,
       ...(target && {
         action: (
           <Button size="sm" onClick={() => openDetail(target)}>

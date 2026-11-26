@@ -5,10 +5,6 @@ import { orderDoThisText, rowFixCall } from './orderDoThis';
 import { badgeDetailText } from './orderBadgeKind';
 import { shownFloorPrice } from './orderRowFormat';
 
-/**
- * CSV columns for the Open Orders fix list, one row per `OpenOrderRow`: raw figures, `issued`
- * as the ESI ISO string, floor as shown (rounded up), station cheapest blank unless a rival beats the order.
- */
 export function ordersCsvColumns(t: CsvTranslate): CsvColumn<OpenOrderRow>[] {
   return [
     { header: t('orders.item'), value: (row) => row.typeName },

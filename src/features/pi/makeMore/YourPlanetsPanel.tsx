@@ -7,10 +7,6 @@ import { PlanetImage } from '../PlanetImage';
 import { Gain, SlotNudge } from '../PlanSlotNudge';
 import type { PlanView } from '../planView';
 
-/**
- * Each colony at a glance, the "haul between my planets" opt-in and the free
- * planet slots. Below the rebuilds: it is context, not the to-do.
- */
 export function YourPlanetsPanel({
   view,
   onFindBest,
@@ -37,8 +33,6 @@ export function YourPlanetsPanel({
       }
       padded={false}
     >
-      {/* auto-fit: the columns stretch to the card, so a few planets never leave blank space. */}
-      {/* Dividers are tile borders, not a gap over a bg-line backdrop, so a trailing empty track stays panel-coloured. */}
       <ul className="-mr-px -mb-px grid grid-cols-2 max-sm:[&>li:last-child:nth-child(odd)]:col-span-2 sm:grid-cols-[repeat(auto-fit,minmax(13rem,1fr))]">
         {view.strips.map((strip) => (
           <li

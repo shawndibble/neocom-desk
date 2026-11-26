@@ -1,12 +1,3 @@
-/**
- * Move Plan: what to carry from the selected assets to a destination, which
- * hauler hull needs the fewest trips, and which assembled ships to fly.
- *
- * Pure — the caller loads the assets, per-unit volumes and hulls. The hauler
- * suggestion is hull class and ownership only (no pilot skill or fit); trips
- * are a Cargo-Space-based estimate, never a safety verdict. Volume math is
- * shared with `planConsolidation`.
- */
 import {
   consolidationLine,
   isHangarStock,
@@ -17,41 +8,28 @@ import { packHauls, type Haul, type PackHold, type PackLine } from './haulPackin
 
 export type { Haul, HoldLoad, PackHold } from './haulPacking';
 
-/** Where the nearest owned copy of a hull sits, worked out by the caller. */
 export interface MoveHullOwnedAt {
   systemId: number;
-  /** Jumps from the nearest character's Current System; null when unknown. */
   jumps: number | null;
-  /** The character the count is from. */
   characterName: string;
 }
 
 export interface MoveHull {
   typeId: number;
   name: string;
-  /** e.g. "Freighter", "Industrial". */
   hullClass: string;
-  /** Every hold added up, for display. */
   capacityM3: number;
-  /** The holds that take any item (cargo hold, fleet hangar), each with its own m³. */
   holds: PackHold[];
-  /** Whether any of the user's Characters owns this hull. */
   owned: boolean;
-  /** The nearest owned copy, when the caller could place one. */
   ownedAt?: MoveHullOwnedAt;
-  /** Whether the pilot has the skills to fly this hull; one they cannot is never suggested. */
   canFly: boolean;
 }
 
 export interface MovePickupGroup {
   locationId: number;
-  /** Known-volume stacks, largest first. */
   lines: ConsolidationLine[];
-  /** Assembled ships to fly out. */
   ships: { itemId: number; typeId: number }[];
-  /** Assembled ships the user chose to haul packaged; their volume is in `lines`. */
   packed: { itemId: number; typeId: number }[];
-  /** Types with no known packaged volume, excluded from every total. */
   unknownVolume: { typeId: number; quantity: number }[];
   totalM3: number;
 }
@@ -59,73 +37,52 @@ export interface MovePickupGroup {
 export interface MoveCharacterPlan {
   characterId: number;
   name: string;
-  /** Largest volume first. */
   pickups: MovePickupGroup[];
   totalM3: number;
 }
 
-/** One pickup location's load, packed into hauls for one hull. */
 export interface PickupHauls {
   characterId: number;
   locationId: number;
   hauls: Haul[];
-  /** Non-ship stacks whose single unit is bigger than the hull's biggest hold. */
   unfit: PackLine[];
-  /** Stacks whose single unit is worth more than the ISK limit: never hauled. */
   overLimit: PackLine[];
-  /** Packed ships bigger than the hull's biggest hold: they have to be flown. */
   tooBigShips: PackLine[];
 }
 
 export interface HaulerOption {
   hull: MoveHull;
-  /** Hauls over every pickup (a haul loads at one pickup only). */
   trips: number;
   pickups: PickupHauls[];
-  /** Stacks this hull cannot carry at all; a hull with any ranks behind every one with none. */
   unfitCount: number;
-  /** Stacks left behind over the ISK limit; the same for every hull, so it never ranks them. */
   overLimitCount: number;
-  /** Packed ships this hull cannot carry; each is a flight of its own. */
   tooBigCount: number;
 }
 
-/** typeId of the typed-m³ pseudo hull; no real hull has it. */
 export const CUSTOM_HAULER_TYPE_ID = 0;
 
-/** A typed hold needing more hauls than this is refused: packing it would take minutes. */
 export const MAX_CUSTOM_HAULS = 10_000;
 
-/** Why a typed hold cannot be planned with, or null when it can. */
 export function customM3Problem(m3: number, totalM3: number): 'invalid' | 'tooSmall' | null {
   if (!Number.isFinite(m3) || m3 <= 0) return 'invalid';
   return totalM3 / m3 > MAX_CUSTOM_HAULS ? 'tooSmall' : null;
 }
 
-/** Per-plan choice of hauler: a listed hull, or one general hold of a typed size. */
 export type HaulerOverride = { hullTypeId: number } | { customM3: number };
 
 export interface MovePlan {
   perCharacter: MoveCharacterPlan[];
   totals: {
-    /** Hold-bound stacks with a known volume (type × pickup location). */
     stacks: number;
     totalM3: number;
-    /** Characters with anything to move or fly. */
     characters: number;
     shipsToFly: number;
-    /** Stacks left out for want of a packaged volume. */
     unknownVolumeCount: number;
-    /** Hold-bound stacks with no known ISK price: counted as 0 ISK against a limit. */
     unpricedCount: number;
-    /** Trips with the active hauler; null without one. */
     trips: number | null;
   };
-  /** Fewest left-behind stacks, then fewest hauls plus forced flights, then smallest hull; null with nothing to haul or no hulls. */
   suggested: HaulerOption | null;
-  /** The hauler the plan is worked out for: the override when valid, else `suggested`. */
   active: HaulerOption | null;
-  /** Every hull, best first, for the "Compare haulers" disclosure. */
   comparison: HaulerOption[];
 }
 
@@ -136,22 +93,14 @@ interface PickupAccumulator {
 }
 
 export function planMove(input: {
-  /** Station ids the destination covers (a system is expanded by the caller). */
   destinationLocationIds: ReadonlySet<number>;
-  /** The selected assets, per Character. */
   characters: readonly ConsolidationCharacter[];
-  /** Per-unit packaged volume (unpackaged where none) by typeID. */
   unitM3: ReadonlyMap<number, number>;
-  /** typeIDs that are ships: assembled ones are flown, not hauled. */
   shipTypeIds: ReadonlySet<number>;
-  /** Assembled ships (by itemID) to haul packaged instead of flying. */
   packedShipIds?: ReadonlySet<number>;
   hulls: readonly MoveHull[];
-  /** ISK of one unit by typeID, at the default Trade Hub's sell price; a type absent is unpriced. */
   unitIsk?: ReadonlyMap<number, number>;
-  /** Most a single haul may be worth, in ISK; null or absent for no limit. */
   maxIskPerHaul?: number | null;
-  /** The pilot's own pick; an unknown hull or a typed size that is not a positive number is ignored. */
   haulerOverride?: HaulerOverride;
 }): MovePlan {
   const perCharacter: MoveCharacterPlan[] = [];
@@ -212,7 +161,6 @@ export function planMove(input: {
   const optionFor = (hull: MoveHull): HaulerOption => {
     const packed = perCharacter.flatMap((c) =>
       c.pickups.map((p): PickupHauls => {
-        // A zero-volume line takes no room, so it never makes a haul of its own.
         const lines: PackLine[] = p.lines
           .filter((l) => l.m3 !== null && l.m3 > 0)
           .map((l) => ({
@@ -222,7 +170,6 @@ export function planMove(input: {
             ...(input.unitIsk?.has(l.typeId) ? { unitIsk: input.unitIsk.get(l.typeId) } : {}),
           }));
         const { hauls, unfit, overLimit } = packHauls(lines, hull.holds, input.maxIskPerHaul);
-        // A packed ship that fits no hold is flown instead; loose packaged stock cannot be.
         const tooBigShips: PackLine[] = [];
         const stillUnfit: PackLine[] = [];
         for (const u of unfit) {

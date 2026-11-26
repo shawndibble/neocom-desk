@@ -6,8 +6,6 @@ import { AttributeChips } from './AttributeChips';
 import type { CharacterAttributes } from '@/esi/endpoints';
 import type { Implants } from '@/engine/types';
 
-// Every value distinct, so a test can assert on one chip's text without
-// ambiguity against the other four.
 const ATTRIBUTES: CharacterAttributes = {
   intelligence: 20,
   memory: 22,
@@ -16,7 +14,6 @@ const ATTRIBUTES: CharacterAttributes = {
   charisma: 24,
 };
 
-/** The hoverable total of one chip, found by the breakdown it carries as hidden text. */
 function total(breakdown: string) {
   return screen.getByText(breakdown, { selector: '.sr-only' }).parentElement as HTMLElement;
 }
@@ -52,7 +49,6 @@ describe('AttributeChips', () => {
   it('reveals base + booster on hovering the total when only a booster applies', async () => {
     const user = userEvent.setup();
     render(<AttributeChips attributes={ATTRIBUTES} implantBonuses={{}} boosterBonus={4} />);
-    // Every attribute carries the same uniform booster bonus.
     expect(total('16 base + 4 booster = 20')).toBeInTheDocument();
     await user.hover(total('25 base + 4 booster = 29'));
     expect(await screen.findByRole('tooltip')).toHaveTextContent('25 base + 4 booster = 29');
@@ -62,12 +58,10 @@ describe('AttributeChips', () => {
     const user = userEvent.setup();
     const implants: Implants = { perception: 4 };
     render(<AttributeChips attributes={ATTRIBUTES} implantBonuses={implants} boosterBonus={4} />);
-    // Perception: 29 effective - 4 implant - 4 booster = 21 base.
     await user.hover(total('21 base + 4 implant + 4 booster = 29'));
     expect(await screen.findByRole('tooltip')).toHaveTextContent(
       '21 base + 4 implant + 4 booster = 29'
     );
-    // Intelligence: no implant, so the booster is named on its own.
     expect(total('16 base + 4 booster = 20')).toBeInTheDocument();
   });
 

@@ -1,8 +1,3 @@
-/**
- * Market › Stock: the markets the pilot stocks (issue #3521). `/market/stock`
- * lists them worst first, or opens the only one; `/market/stock/<list id>`
- * opens one. A shared market arrives as `?list=<code>` on either.
- */
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
@@ -25,11 +20,9 @@ import { useHydratedStore } from '@/lib/useHydratedStore';
 
 const MARKET_PARAM = 'market';
 
-/** The heading of whichever view is showing: one market's title, or the market list's. */
 const heading = () =>
   document.querySelector<HTMLElement>('[data-stock-market-title], [data-stock-markets]');
 
-/** The list id in `stock/<id>`, from the Market route's wildcard. */
 function listIdFromPath(wildcard: string): string | null {
   const [tab, id] = wildcard.split('/');
   return tab === 'stock' && id ? decodeURIComponent(id) : null;
@@ -54,8 +47,6 @@ export function StockTab({ activeCharacterId }: { activeCharacterId: number | nu
 
   const open = (id: string) => navigate(`${STOCK_PATH}/${encodeURIComponent(id)}`);
   const save = (next: StockList[]) => void setLists(next);
-  // "Set stock target" elsewhere defaults to the market last opened here.
-  // An alert names its market by station or structure (`?market=`): list ids are not numbers.
   const marketParam = searchParams.get(MARKET_PARAM);
   const list =
     listId !== null
@@ -69,8 +60,6 @@ export function StockTab({ activeCharacterId }: { activeCharacterId: number | nu
     if (list) void setSelectedId(list.id);
   }, [list, setSelectedId]);
 
-  // The list and one market share a page key, so the route's own focus does
-  // nothing between them: focus moves to the view's heading here (§7).
   const focusAfterCommit = useFocusAfterCommit();
   const viewKey = list?.id ?? listId ?? '';
   const shownKey = useRef(viewKey);
@@ -94,7 +83,6 @@ export function StockTab({ activeCharacterId }: { activeCharacterId: number | nu
       },
       { replace: true }
     );
-    // The banner, and the button that dismissed it, are gone.
     focusAfterCommit(heading, () => document.querySelector<HTMLElement>('[data-stock-new-market]'));
   }
 
@@ -106,14 +94,12 @@ export function StockTab({ activeCharacterId }: { activeCharacterId: number | nu
       aria-label={t('stockTargets.share.bannerLabel')}
       className="flex flex-wrap items-center gap-2 rounded-xs border border-accent-dim bg-panel px-3 py-2 text-sm"
     >
-      {/* Its own line on a phone, so the buttons wrap under it rather than squeeze it. */}
       <span className="min-w-0 basis-full sm:basis-auto sm:flex-1">
         {t('stockTargets.share.banner', { name: shared.name, count: shared.items.length })}
       </span>
       <Button
         variant="primary"
         onClick={() => {
-          // One market per place: a share for a place already stocked fills in what it lacks.
           const existing = stockListAt(lists, shared.locationId);
           const id = existing?.id ?? newStockListId();
           save(

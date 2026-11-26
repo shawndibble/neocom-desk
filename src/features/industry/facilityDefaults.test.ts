@@ -21,8 +21,6 @@ async function hydrated(): Promise<FacilityDefaults> {
 
 describe('normalizeFacilityDefaults — one activity per record', () => {
   it('resets a refinery, which this record can no longer mean anything for', () => {
-    // Reactions have their own default now, so a refinery here would be read
-    // by nothing. Reset whole rather than left inert.
     expect(
       normalizeFacilityDefaults({
         facility: 'tatara',
@@ -82,8 +80,6 @@ describe('useFacilityDefaults', () => {
   });
 
   it('normalises an incoherent stored record rather than dropping the facility', async () => {
-    // The facility is the part the pilot actually chose; discarding it over a
-    // stale rig fit would be the more surprising outcome.
     await db.settings.put({
       key: FACILITY_DEFAULTS_SETTING_KEY,
       value: { facility: 'npcStation', rigFit: ['meT2', 'teT2', 'none'], facilityTaxPct: 5 },

@@ -2,11 +2,6 @@ import type { ComponentType } from 'react';
 import * as Icon from '@/components/ui/icons';
 import type { NavPagePath } from './navDestinations';
 
-/**
- * One glyph per nav page, beside its label in the rail and on its More-sheet
- * tile. Kept out of `navDestinations.ts`, which stays plain data; typed over
- * every page path, so a page added without an icon fails typecheck.
- */
 export const NAV_ICONS: Record<NavPagePath, ComponentType<Icon.IconProps>> = {
   '/overview': Icon.NavOverview,
   '/alerts': Icon.NavAlerts,
@@ -37,6 +32,5 @@ export const NAV_ICONS: Record<NavPagePath, ComponentType<Icon.IconProps>> = {
   '/characters': Icon.NavCharacters,
 };
 
-/** The same map, read by any route path: a path that is not a nav page has no icon. */
 export const NAV_ICON_BY_PATH: Readonly<Partial<Record<string, ComponentType<Icon.IconProps>>>> =
   NAV_ICONS;

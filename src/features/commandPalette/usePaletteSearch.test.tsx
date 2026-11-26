@@ -17,7 +17,6 @@ function syncProvider(id: string, order: number, minQueryLength = 0): PalettePro
   };
 }
 
-/** An async provider whose every search waits for the test to resolve it. */
 function deferredProvider(order: number) {
   const pending: {
     query: string;
@@ -78,7 +77,6 @@ describe('usePaletteSearch', () => {
     expect(stale.length).toBeGreaterThan(0);
     for (const search of stale) expect(search.signal.aborted).toBe(true);
 
-    // The first search answers after the second began: it must not land.
     await act(async () => stale.forEach((search) => search.resolve([result('stale')])));
     expect(hook.current[0].status).toBe('loading');
 

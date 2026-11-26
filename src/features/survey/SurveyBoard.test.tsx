@@ -12,9 +12,7 @@ import { useIsPhone } from '@/lib/useIsPhone';
 import { SurveyBoard } from './SurveyBoard';
 import { useSurveyChatOptions } from './surveyPref';
 
-// Recharts needs a real layout; the chart has its own concerns.
 vi.mock('@/lib/useIsPhone', () => ({ useIsPhone: vi.fn(() => false) }));
-// Rocks are valued at market; the hook's own lookup has its own concerns.
 const priced = vi.hoisted(() => ({ on: true }));
 vi.mock('./useOrePrices', () => ({
   useOrePrices: () => ({
@@ -105,10 +103,7 @@ describe('SurveyBoard', () => {
     render(<SurveyBoard scans={SCANS} url={URL} expiresAt={Date.UTC(2026, 9, 15)} />);
     expect(screen.getByText('13% mined')).toBeTruthy();
     expect(screen.getByText('43.3')).toBeTruthy();
-    // 169,000 of the 195,000 m³ the scans have shown of this ore is left.
     expect(screen.getByText(/87% left/)).toBeTruthy();
-    // 169 units left at the market price, summed (the scanner's own ISK is ignored).
-    // The figure is an `IskAmount`: shorthand on screen, the exact value one hover away.
     expect(screen.getByText('ISK left at last scan').parentElement?.textContent).toMatch(
       /33\.\d+M/
     );
@@ -155,7 +150,6 @@ describe('SurveyBoard', () => {
     expect(lines[1]).toMatch(/^│ █+░+$/);
     expect(lines[2]).toBe('│ Left: 5 Clear Icicle');
     expect(lines[3]).toContain(`[ ${URL} ]`);
-    // The link's rail can run past the cap (a link cannot be shortened); the ore line cannot.
     expect(textWidth(lines[2])).toBeLessThanOrEqual(MAX_ROW_PX);
     await screen.findByText('Copied');
   });
@@ -171,15 +165,11 @@ describe('SurveyBoard', () => {
     await user.click(screen.getByRole('button', { name: 'More copy options' }));
     await user.click(await screen.findByRole('menuitem', { name: 'Copy link' }));
     await waitFor(() => expect(written).toEqual([URL]));
-    // The one button that flashed is the main one, so the outcome shows where the pilot is looking.
     await screen.findByRole('button', { name: 'Link copied' });
   });
 
   describe('value colours and layout', () => {
-    // Priced by the mocked market at 100, 80 and 40 ISK a unit: the unit counts below are chosen so
-    // the ISK left is round.
     const row = (ore: string, volume: number, units: number) => ({ ore, volume, units });
-    // Unit price: Scordite 100, Veldspar 80, Pyroxeres 40, so orange, yellow and gray down the range.
     const richScans = [
       {
         at: T0,
@@ -205,7 +195,6 @@ describe('SurveyBoard', () => {
       expect(
         screen.getByText('Bar colour is the price of one unit · Jita buy, compressed')
       ).toBeTruthy();
-      // Colour is never the only signal: each row also says its tier in words for a screen reader.
       expect(screen.getByText(/highest price/)).toBeTruthy();
       expect(screen.getByText(/lowest price/)).toBeTruthy();
     });
@@ -253,7 +242,6 @@ describe('SurveyBoard', () => {
         <SurveyBoard scans={WITH_IDS} url={URL} expiresAt={null} onSetIgnored={onSetIgnored} />
       );
       await userEvent.click(screen.getByText('2 scans', { selector: 'h2' }));
-      // Newest first.
       await userEvent.click(screen.getAllByRole('button', { name: 'Remove' })[0]);
       expect(onSetIgnored).toHaveBeenCalledWith('scan1', true);
     });
@@ -261,7 +249,6 @@ describe('SurveyBoard', () => {
     it("shows a scan's ores, rock counts and volume in a details popover", async () => {
       render(<SurveyBoard scans={WITH_IDS} url={URL} expiresAt={null} onSetIgnored={() => {}} />);
       await userEvent.click(screen.getByText('2 scans', { selector: 'h2' }));
-      // Newest first: the second scan, whose 29,000 m3 rock shrank to 3,000.
       await userEvent.click(screen.getAllByRole('button', { name: 'Details' })[0]);
       const dialog = await screen.findByRole('dialog');
       expect(dialog.textContent).toContain('Clear Icicle');
@@ -280,7 +267,6 @@ describe('SurveyBoard', () => {
           onSetIgnored={onSetIgnored}
         />
       );
-      // One counted scan: nothing mined yet, no chart.
       expect(screen.getByText('0% mined')).toBeTruthy();
       expect(screen.queryByTestId('charts')).toBeNull();
       expect(screen.getByText('2 scans · 1 removed', { selector: 'h2' })).toBeTruthy();
@@ -316,7 +302,6 @@ describe('SurveyBoard', () => {
   });
 
   describe('marking the field cleared', () => {
-    // Relative to the real clock: the button reads it. Pace is 43 m³/s, so 169,000 m³ left is over an hour away.
     const recent = (offsetMs = 0) => [
       { at: Date.now() - 10 * 60_000 + offsetMs, rocks: parseSurveyScan(FIRST)! },
       { at: Date.now() + offsetMs, rocks: parseSurveyScan(SECOND)! },
@@ -341,7 +326,6 @@ describe('SurveyBoard', () => {
     });
 
     it('offers anyone the button once the Done at time has passed', () => {
-      // Scanned long enough ago that the estimate is behind us.
       render(
         <SurveyBoard
           scans={recent(-3 * 60 * 60_000)}

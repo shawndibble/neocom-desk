@@ -1,13 +1,3 @@
-/**
- * Planetary Industry at phone and laptop widths.
- *
- * The Plan tab is the Goal Planner: a rail of goals, colonies and
- * assumptions stacked above the results on a phone. Its tables (hauling,
- * flow) stack into cards below `sm`, and the colony rows carry a customs box
- * and a reset beside long system names — the shapes that widen a 390px page
- * if anything in them refuses to wrap. Playwright rather than jsdom because
- * only a real layout engine can tell.
- */
 import type { Locator, Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
@@ -18,7 +8,6 @@ import { expectNoPageOverflow } from './support/overflow';
 
 const PHONE = { width: 390, height: 844 };
 
-/** Coolant (P2) and Robotics (P3): the second needs a lava or plasma planet the fixture lacks. */
 const GOALS = '9832:200,9848:30';
 
 test.describe('PI Plan — Goal Planner', () => {
@@ -29,14 +18,11 @@ test.describe('PI Plan — Goal Planner', () => {
     await mockHubPrices(page);
     await page.goto(`./planetary-industry/plan?goals=${GOALS}`);
 
-    // Well past the 5s default: the tab awaits the SDE bake, every colony's
-    // detail and a hub read, cold on a CI runner.
     await expect(page.getByText(/^ISK\/day vs selling/)).toBeVisible({ timeout: 20_000 });
     await expect(page.getByRole('heading', { name: 'Changes' })).toBeVisible();
     await expect(
       page.getByRole('table', { name: 'Everything the goals need, by tier' })
     ).toBeAttached();
-    // The rail comes first on a phone: inputs, then the answer.
     const goalsBox = (await page.getByRole('heading', { name: 'Goals' }).boundingBox())!;
     const headlineBox = (await page.getByText(/^ISK\/day vs selling/).boundingBox())!;
     expect(goalsBox.y).toBeLessThan(headlineBox.y);
@@ -51,7 +37,6 @@ test.describe('PI Plan — Goal Planner', () => {
       await signInAndGoto(page, './planetary-industry/colonies');
       await mockPlannerColonies(page);
       await mockHubPrices(page);
-      // Coolant beyond what the colonies' Ionic Solutions can make: its inputs are rationed, not short themselves.
       await page.goto('./planetary-industry/plan?goals=9832:2000');
 
       const table = page.getByRole('table', { name: 'Everything the goals need, by tier' });
@@ -109,7 +94,6 @@ test.describe('PI Plan — phone headings and filters (issue #3863)', () => {
 test.describe('PI Colonies — Switch to an alt (issue #1770)', () => {
   const ALT_ID = 90000002;
 
-  /** An alt with the planets grant and nothing cached: the "not loaded yet" row. */
   async function seedNotLoadedAlt(page: Page): Promise<void> {
     await page.evaluate(
       async ({ id, scopes }) => {
@@ -146,7 +130,6 @@ test.describe('PI Colonies — Switch to an alt (issue #1770)', () => {
     await page.setViewportSize(PHONE);
     await signInAndGoto(page, './planetary-industry/colonies');
     await seedNotLoadedAlt(page);
-    // The app reads every signed-in character's ESI feeds; a 404 (not an empty list) keeps the alt's planets uncached, so it stays "not loaded".
     await page.route(`https://esi.evetech.net/characters/${ALT_ID}/**`, (route) =>
       route.fulfill({ status: 404, contentType: 'application/json', body: '{}' })
     );
@@ -159,7 +142,6 @@ test.describe('PI Colonies — Switch to an alt (issue #1770)', () => {
     await expectNoPageOverflow(page);
 
     await action.click();
-    // The alt is now the primary character: it is no longer a "not loaded" row.
     await expect(action).toHaveCount(0);
     expect(new URL(page.url()).pathname).toContain('/planetary-industry');
   });
@@ -168,11 +150,9 @@ test.describe('PI Colonies — Switch to an alt (issue #1770)', () => {
 test.describe('PI Colonies — alt group data age (issue #2291)', () => {
   const ALT_ID = 90000003;
   const ALT_PLANET_ID = 40009999;
-  /** EVE's longest allowed Character name: 37 characters. */
   const LONG_NAME = 'Abcdefghij Klmnopqrstuvwxy Zabcdefghi';
   const LAPTOP = { width: 1024, height: 768 };
 
-  /** An alt whose colony list was cached three days ago, detail an hour ago. */
   async function seedCachedAlt(page: Page): Promise<number> {
     return page.evaluate(
       async ({ id, planetId, name, scopes }) => {
@@ -235,11 +215,9 @@ test.describe('PI Colonies — alt group data age (issue #2291)', () => {
     await page.setViewportSize(LAPTOP);
     await signInAndGoto(page, './planetary-industry/colonies');
     const listFetchedAt = await seedCachedAlt(page);
-    // Alts are cache-only; a 404 keeps any stray live read from overwriting the seeded rows.
     await page.route(`https://esi.evetech.net/characters/${ALT_ID}/**`, (route) =>
       route.fulfill({ status: 404, contentType: 'application/json', body: '{}' })
     );
-    // An alt's system security is read to price its colonies.
     await page.route('https://esi.evetech.net/universe/systems/**', (route) =>
       route.fulfill({
         status: 200,
@@ -276,11 +254,6 @@ test.describe('PI Colonies — alt group data age (issue #2291)', () => {
     await expect(badge).toBeVisible();
     await expect(badge).toHaveAttribute('datetime', new Date(listFetchedAt).toISOString());
 
-    // One row: the badge and the Switch action sit level with the name,
-    // which truncates rather than pushing either onto a second line. The
-    // header gains its summary and ISK-a-day text as the seeded colony's
-    // prices and details resolve, so measure until the layout has settled
-    // rather than once, mid-reflow.
     const midline = (box: { y: number; height: number }) => box.y + box.height / 2;
     const offsetFromName = async (target: Locator) => {
       const nameBox = await header.getByText(LONG_NAME, { exact: true }).boundingBox();

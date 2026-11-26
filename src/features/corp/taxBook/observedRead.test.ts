@@ -1,4 +1,3 @@
-// The persisted delta read over a fake Firestore and a real (fake-indexeddb) Dexie.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 type Data = Record<string, unknown>;
@@ -107,7 +106,6 @@ describe('readObservedRows', () => {
     expect(rows.map((r) => (r as unknown as { quantity: number }).quantity).sort()).toEqual([
       1, 3, 9,
     ]);
-    // The delta persisted: the next open on the new stamp reads nothing.
     store.reads.length = 0;
     await open('v2', T0 + 4_000);
     expect(store.reads).toEqual([]);
@@ -169,13 +167,11 @@ describe('readObservedRows', () => {
     await open('v1', T0);
     let release!: () => void;
     const probe = new Promise<void>((r) => (release = r));
-    // A thenable over the probe, so the test sees the read take it up.
     const gate = { then: vi.fn((ok: () => void, fail: () => void) => probe.then(ok, fail)) };
     let settled = false;
     const pending = open('v1', T0 + 1, 7, gate as unknown as Promise<void>).then(
       (r) => ((settled = true), r)
     );
-    // Parked on the probe: nothing has been handed out.
     await vi.waitFor(() => expect(gate.then).toHaveBeenCalled());
     expect(settled).toBe(false);
     release();

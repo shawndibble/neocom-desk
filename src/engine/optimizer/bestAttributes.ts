@@ -1,16 +1,3 @@
-/**
- * Optimal attribute allocation for a contiguous plan segment.
- *
- * EVE remap rules (EVE University wiki, "Skills and learning" / Neural Remap):
- * 99 base points across 5 attributes, min 17 / max 27 each, i.e. 14 freely
- * allocatable points. Implants add on top and are unaffected by a remap.
- * An Alpha `cloneState` halves every rate, which never changes which spread
- * wins on its own but does change how much SP a Booster's window covers.
- * Boosters are accounted for when a `BoosterContext` is supplied, matching
- * `computeSchedule` — a long accelerator runs to weeks, so ignoring one gives
- * the wrong optimum for weeks of training (plan §5.5). `placeRemaps` passes a
- * context whenever the character has a Booster enabled.
- */
 import { spBetween, timeToTrain, trainingRate } from '@/engine/skills/sp';
 import type {
   AttributeName,
@@ -32,9 +19,8 @@ export const ATTRIBUTE_NAMES: readonly AttributeName[] = [
 
 const BASE_MIN = 17;
 const FREE_POINTS = 14;
-const MAX_EXTRA = 10; // 27 - 17
+const MAX_EXTRA = 10;
 
-/** Fresh-character default spread; returned for empty segments. */
 const DEFAULT_ATTRIBUTES: Attributes = {
   intelligence: 20,
   memory: 20,
@@ -48,14 +34,12 @@ export interface BestAttributesResult {
   seconds: number;
 }
 
-/** SP totals keyed by `${primary}|${secondary}`. */
 export type SpByPair = ReadonlyMap<string, number>;
 
 export function pairKey(primary: AttributeName, secondary: AttributeName): string {
   return `${primary}|${secondary}`;
 }
 
-/** Sum segment SP per (primary, secondary) attribute pair. */
 export function aggregateSpByPair(
   steps: readonly PlanStep[],
   skills: ReadonlyMap<number, EngineSkill>
@@ -71,7 +55,6 @@ export function aggregateSpByPair(
   return spByPair;
 }
 
-/** All ways to spread the 14 free points over 5 attributes (cap 10 each). */
 let allocationsCache: readonly (readonly number[])[] | null = null;
 function allAllocations(): readonly (readonly number[])[] {
   if (allocationsCache) return allocationsCache;
@@ -95,7 +78,6 @@ function toAttributes(extras: readonly number[]): Attributes {
   return attributes;
 }
 
-/** `'primary|secondary'` as the two indices into `ATTRIBUTE_NAMES`. */
 function pairIndices(key: string): { primary: number; secondary: number } {
   const [primary, secondary] = key.split('|') as [AttributeName, AttributeName];
   return {
@@ -104,16 +86,6 @@ function pairIndices(key: string): { primary: number; secondary: number } {
   };
 }
 
-/**
- * Training rate for one pair under one allocation.
- *
- * The one place the formula lives. Both allocation searches call it, and they
- * have to agree: the table below CHOOSES a segment that
- * `bestAttributesForPairs` then RE-PRICES for display, so an edit landing in
- * only one of them would make the chosen segment and the reported duration
- * disagree silently. Only the rate is shared — how each turns it into seconds
- * differs, and that difference is load-bearing (see the table's docblock).
- */
 function rateFor(
   extras: readonly number[],
   implantByIndex: readonly number[],
@@ -128,7 +100,6 @@ function rateFor(
   );
 }
 
-/** Brute-force the best allocation for pre-aggregated segment SP. */
 export function bestAttributesForPairs(
   spByPair: SpByPair,
   implants: Implants = {},
@@ -157,29 +128,10 @@ export function bestAttributesForPairs(
   return { attributes: toAttributes(bestExtras), seconds: bestSeconds };
 }
 
-/**
- * The same brute-force search as `bestAttributesForPairs`, but pulled apart
- * so a caller can price many segments against one allocation.
- *
- * Segment time is linear in SP — `timeToTrain` is `(sp / rate) * 60`, with no
- * rounding — so for a fixed allocation the cost of a segment is just its
- * SP-per-pair vector dotted with this table's row. That is what lets
- * `placeRemaps` pull the choice of allocation outside its search over segment
- * boundaries.
- *
- * The reassociation is deliberate and costs precision: `sp * (60 / rate)`
- * here against `(sp / rate) * 60` there. Callers that report a number to the
- * user should select with this table and then re-price the chosen segment
- * with `bestAttributesForPairs`.
- */
 export interface AllocationCostTable {
-  /** Candidate allocations — every legal remap spread. */
   count: number;
-  /** Row stride: `secondsPerSp[a * width + p]`. */
   width: number;
-  /** Seconds per SP, allocation-major. Raw, because callers index it in a hot loop. */
   secondsPerSp: Float64Array;
-  /** The attribute spread allocation `a` stands for. */
   attributesAt(a: number): Attributes;
 }
 
@@ -210,14 +162,11 @@ export function allocationCostTable(
   };
 }
 
-/** Where this segment sits in wall-clock time, and what Boosters are live. */
 export interface BoosterContext {
   boosters: readonly Booster[];
-  /** When this segment begins training — a Booster's remaining life is measured from here. */
   startDate: Date;
 }
 
-/** Merge Booster bonuses into a copy of `implants`, for the uniform case. */
 function withBonus(implants: Implants, bonus: Partial<Attributes>): Implants {
   const merged: Implants = { ...implants };
   for (const name of ATTRIBUTE_NAMES) {
@@ -227,21 +176,17 @@ function withBonus(implants: Implants, bonus: Partial<Attributes>): Implants {
   return merged;
 }
 
-/** The stacked bonus in effect for elapsed times `< endSeconds` (`Infinity` for the last segment). */
 interface BonusSegment {
   bonus: Partial<Attributes>;
   endSeconds: number;
 }
 
-/** One Booster's live window, as elapsed seconds from the segment's own start. */
 interface BoosterWindow {
   bonus: Partial<Attributes>;
-  /** Clamped to 0: a start before this segment began means "already running". */
   startOffset: number;
   expiryOffset: number;
 }
 
-/** The stacked bonus of every window live at `t` (`startOffset <= t < expiryOffset`). */
 function stackedBonusAt(windows: readonly BoosterWindow[], t: number): Partial<Attributes> {
   const bonus: Partial<Attributes> = {};
   for (const w of windows) {
@@ -254,14 +199,6 @@ function stackedBonusAt(windows: readonly BoosterWindow[], t: number): Partial<A
   return bonus;
 }
 
-/**
- * Break a set of live Boosters into time-ordered segments of constant stacked
- * bonus, so a walk can price each Booster for its own lifetime instead of the
- * whole stack for the shortest one's. Segment `k` runs from the previous
- * segment's `endSeconds` up to its own; the stacked bonus changes whenever a
- * Booster's own start or expiry is crossed. Always ends with an `Infinity`-
- * ended segment once every live Booster has started and lapsed.
- */
 function bonusSegments(live: readonly Booster[], startMs: number): BonusSegment[] {
   const windows: BoosterWindow[] = live
     .map((b) => ({
@@ -287,12 +224,6 @@ function bonusSegments(live: readonly Booster[], startMs: number): BonusSegment[
   return segments;
 }
 
-/**
- * Longest this segment can take while fully boosted, over every allocation.
- * Uses the slowest reachable attributes (`BASE_MIN`), so if a Booster outlives
- * this it outlives the segment for *every* candidate allocation — which is
- * what makes the uniform shortcut safe rather than merely usual.
- */
 function maxBoostedSeconds(
   spByPair: SpByPair,
   boostedImplants: Implants,
@@ -314,21 +245,6 @@ function maxBoostedSeconds(
   return seconds;
 }
 
-/**
- * Brute force with one or more Boosters expiring mid-segment.
- *
- * The pair aggregation above is order-independent, which a mid-segment expiry
- * breaks: the rate a step trains at depends on *when* it trains. So walk the
- * steps in order while any Booster is still live, crossing each Booster's own
- * expiry as a breakpoint that drops the stacked bonus to `segments[seg + 1]`,
- * then hand the constant-rate (fully-lapsed) tail back to the aggregation.
- * Suffix SP-per-pair sums are precomputed once, so the tail costs O(pairs) at
- * any plan length and only the boosted prefix is walked — that prefix is
- * bounded by the last Booster's window, not by plan length.
- *
- * Matches `computeSchedule`'s semantics exactly, including the strict `<`
- * on expiry; a test cross-checks the two.
- */
 function bestAttributesWalking(
   steps: readonly PlanStep[],
   skills: ReadonlyMap<number, EngineSkill>,
@@ -350,7 +266,6 @@ function bestAttributesWalking(
   const keys = [...new Set(steps.map((_, i) => pairKey(stepPrimary[i], stepSecondary[i])))];
   const keyAt = new Map(keys.map((k, i) => [k, i]));
   const keyPairs = keys.map((k) => k.split('|') as [AttributeName, AttributeName]);
-  // suffix[i][k] = SP of pair k across steps i..end.
   const suffix: number[][] = Array.from({ length: steps.length + 1 }, () =>
     new Array<number>(keys.length).fill(0)
   );
@@ -394,8 +309,6 @@ function bestAttributesWalking(
         }
       }
       if (spLeft > 0) {
-        // Every Booster has now lapsed: finish this step at the final
-        // (zero-bonus) segment, then the rest of the plan is constant-rate.
         elapsed += timeToTrain(
           spLeft,
           trainingRate(
@@ -410,9 +323,6 @@ function bestAttributesWalking(
     }
 
     const tail = suffix[Math.min(i, steps.length)];
-    // Pruning: once the running total passes the incumbent this allocation
-    // cannot win, and `elapsed` only grows — so bailing leaves it above
-    // `bestSeconds`, which the check below then rejects.
     for (let k = 0; k < keyPairs.length && elapsed < bestSeconds; k++) {
       const sp = tail[k];
       if (sp <= 0) continue;
@@ -431,15 +341,6 @@ function bestAttributesWalking(
   return { attributes: toAttributes(bestExtras), seconds: bestSeconds };
 }
 
-/**
- * Best remap allocation for a contiguous segment of plan steps: minimizes
- * total training seconds at base + implant + live-Booster rates.
- *
- * Three cases, and only the third is expensive:
- * - no Booster still live at `startDate` → plain pair aggregation;
- * - a Booster outlasting the segment → fold it into implants, same fast path;
- * - a Booster expiring mid-segment → the ordered walk above.
- */
 export function bestAttributes(
   steps: readonly PlanStep[],
   skills: ReadonlyMap<number, EngineSkill>,
@@ -456,8 +357,6 @@ export function bestAttributes(
   const live = booster.boosters.filter((b) => b.expiresAt.getTime() > startMs);
   if (live.length === 0) return bestAttributesForPairs(spByPair, implants, cloneState);
 
-  // Piecewise: the full stacked bonus holds until the earliest live Booster's
-  // own expiry, then drops segment by segment as each one lapses in turn.
   const segments = bonusSegments(live, startMs);
   const earliestExpiry = segments[0].endSeconds;
 
@@ -469,19 +368,6 @@ export function bestAttributes(
   return bestAttributesWalking(steps, skills, implants, segments, cloneState);
 }
 
-/**
- * Costs every segment `[startStep, boundary)` that shares a start, in one pass.
- *
- * The DP asks for R segments that all begin at the same run and the same
- * wall-clock offset, differing only in where they end. Answering those
- * separately re-walks the same boosted prefix R times, which is what takes
- * `remapCount = 5` from 2.2 s to 21.7 s. Walking once per allocation and
- * recording the running total at each boundary collapses that to a single
- * pass, since a segment's cost is just the walk's elapsed time at its end.
- *
- * `boundaries` are exclusive end indices into `steps`, ascending. Returns one
- * result per boundary, in the same order.
- */
 export function bestAttributesAtBoundaries(
   steps: readonly PlanStep[],
   skills: ReadonlyMap<number, EngineSkill>,
@@ -522,8 +408,6 @@ export function bestAttributesAtBoundaries(
     let seg = 0;
     let b = 0;
     for (let i = 0; i < sp.length; i++) {
-      // A boundary can sit before this step (an empty segment) or between any
-      // two, so drain every boundary the cursor has reached before advancing.
       while (b < boundaries.length && boundaries[b] === startStep + i) {
         if (elapsed < bestSeconds[b]) {
           bestSeconds[b] = elapsed;

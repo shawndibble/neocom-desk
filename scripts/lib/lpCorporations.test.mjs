@@ -6,7 +6,6 @@ const CORP_ROWS = [
   ['1000120', 'H', '500004', 'Federation Navy'],
   ['1000130', 'L', '', 'Sisters of EVE'],
   ['1000001', 'T', '', 'Doomheim'],
-  // A short or malformed row must not become a NaN id.
   [''],
   ['abc', 'L', '', 'Broken'],
 ];

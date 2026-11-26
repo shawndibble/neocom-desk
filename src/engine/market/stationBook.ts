@@ -1,8 +1,3 @@
-/**
- * One item's open orders folded to what Fuzzwork's station aggregate reports:
- * best price, units and order count per side. The price fallback uses it when
- * Fuzzwork is down, so a station reads the same whichever source answered.
- */
 export interface StationBookOrder {
   is_buy_order: boolean;
   location_id: number;
@@ -11,9 +6,7 @@ export interface StationBookOrder {
 }
 
 export interface StationBook {
-  /** Lowest sell price, or null when no priced sell order stands. */
   sellMin: number | null;
-  /** Highest buy price, or null when no priced buy order stands. */
   buyMax: number | null;
   sellVolume: number;
   buyVolume: number;
@@ -21,12 +14,6 @@ export interface StationBook {
   buyOrders: number;
 }
 
-/**
- * Folds `orders` to a `StationBook`. With a `locationId` only orders placed at
- * that station count (Fuzzwork groups by the placing station, buy range
- * ignored); `null` keeps the whole region. A price that is not a positive
- * number is skipped, never taken as free.
- */
 export function summarizeStationBook(
   orders: readonly StationBookOrder[],
   locationId: number | null

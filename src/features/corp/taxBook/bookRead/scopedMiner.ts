@@ -1,11 +1,3 @@
-/**
- * One Miner's page (issue #5258, ADR 0032): their late notices, payments, write-offs,
- * adjustments, disputes and declarations by Miner, their closed-through checkpoint, and the
- * ledger rows from it on (`accountWindowStart`). Never the whole ledger. Every other field of its
- * parts (dismissals, Extractions, feeders, ...) is the whole book's, read as `slices.ts` reads it.
- * A missing composite index (observed: characterId + date) falls back to the Miner's characters'
- * whole ledger, filtered here, so an undeployed index costs reads, not the page.
- */
 import { collection, doc, getDoc, getDocs, query, where } from 'firebase/firestore/lite';
 import type { Adjustment } from '@/engine/corpTaxBook/adjustments';
 import { characterIdsOfMiner, type Miner } from '@/engine/corpTaxBook/charges';
@@ -29,11 +21,9 @@ import { errorCode } from '../openBook';
 import { ALL_BOOK_PARTS, type BookPart, type BookPartSet } from './parts';
 import { bookOf, readSlices, type BookRead, type ReadContext } from './slices';
 
-/** Firestore's cap on an `in` filter's values. */
 const IN_LIMIT = 30;
 const isMissingIndex = (error: unknown) => errorCode(error).endsWith('failed-precondition');
 
-/** A one-Miner read: every whole-book part, scoped to `minerId`, and any other part asked. */
 export async function readMinerScope(
   ctx: ReadContext,
   minerId: string,
@@ -50,7 +40,6 @@ export async function readMinerScope(
     const snap = await getDoc(doc(db, 'corps', String(corporationId), name, minerId));
     return snap.exists() ? (snap.data() as Record<string, unknown>) : undefined;
   };
-  // Best effort: none until the server has written one.
   const checkpoint = (async () => {
     if (!book.written(RUNNING_ACCOUNTS)) return undefined;
     try {
@@ -68,7 +57,6 @@ export async function readMinerScope(
   const characterIds = grouping.then((g) =>
     characterIdsOfMiner(minerId, Array.isArray(g?.characterIds) ? [g as unknown as Miner] : [])
   );
-  // One that is no snapshot, or summed for other characters, is none: read from the start.
   const fitting = Promise.all([checkpoint, characterIds]).then(([c, ids]) =>
     usableCheckpoint(c, ids)
   );
@@ -124,7 +112,6 @@ export async function readMinerScope(
       writeOffs: () => byMiner<RecordedWriteOff>('writeOffs'),
       adjustments: () => byMiner<Adjustment>('adjustments'),
       declarations,
-      // Best effort, as the whole book reads them: rules that predate disputes still open the page.
       disputes: async () =>
         book.written('disputes')
           ? readDisputes(await byMiner<unknown>('disputes').catch(() => []))

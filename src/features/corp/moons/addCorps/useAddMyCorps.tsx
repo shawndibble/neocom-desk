@@ -1,10 +1,3 @@
-/**
- * "Add my other corps" as one hook for the Moons page: the header button's
- * state, the one-time New corp banner, the resume notice, the Needs you panel
- * and the dialogs (picker, hidden corps, confirm, guided sign-in). The page
- * places the pieces; the run itself is persisted (`useAddCorpsRun`) because
- * EVE's login leaves the page between corporations.
- */
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { beginAlertsLogin, beginOwnCorpGrantLogin } from '@/app/loginFlow';
@@ -46,7 +39,6 @@ type Stage =
   | { kind: 'confirm'; corps: AddCorpsCandidate[] }
   | { kind: 'sign-in' };
 
-/** What EVE's return says, as the outcome the run records. */
 export function outcomeOfGrant(grant: OwnCorpGrantOutcome): AddCorpsOutcome {
   switch (grant.status) {
     case 'connected':
@@ -60,7 +52,6 @@ export function outcomeOfGrant(grant: OwnCorpGrantOutcome): AddCorpsOutcome {
   }
 }
 
-/** A moon owner row that is on the book in any live way (the picker never offers it again). */
 const LIVE = new Set([
   'active',
   'cant-read',
@@ -71,14 +62,10 @@ const LIVE = new Set([
 ]);
 
 export interface AddMyCorps {
-  /** Whether the header button shows. */
   showButton: boolean;
   open: () => void;
-  /** Banner and resume notice, for above the moon owners. */
   notices: ReactNode;
-  /** The Needs you panel; null when nothing needs the player. */
   needsYou: ReactNode;
-  /** Every dialog this feature opens. */
   dialogs: ReactNode;
 }
 
@@ -94,7 +81,6 @@ export function useAddMyCorps(rows: readonly MoonOwnerRow[]): AddMyCorps {
   const [notNow, setNotNow] = useState<ReadonlySet<number>>(new Set());
   const [showOutcome, setShowOutcome] = useState(false);
 
-  // EVE's return carries its result as router state: read it once, record it, clear it.
   const arrivalState = location.state as Partial<
     OwnCorpGrantCallbackState & AlertsCallbackState
   > | null;
@@ -126,7 +112,6 @@ export function useAddMyCorps(rows: readonly MoonOwnerRow[]): AddMyCorps {
       const next = useAddCorpsRunStore.getState().value;
       setStage(next && !isDone(next) ? { kind: 'sign-in' } : { kind: 'closed' });
     })();
-    // Only on arrival: the grant and the page are fixed for this mount.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -135,7 +120,6 @@ export function useAddMyCorps(rows: readonly MoonOwnerRow[]): AddMyCorps {
     [rows]
   );
   const hiddenIds = useMemo(() => new Set(hidden.hidden), [hidden.hidden]);
-  // Remembered for "Finish setting up" after a sign-in (#6103), so it can offer a CEO's corp here.
   const onBookKey = [...onBook].sort((a, b) => a - b).join(',');
   useEffect(() => {
     if (!canEdit) return;
@@ -144,10 +128,8 @@ export function useAddMyCorps(rows: readonly MoonOwnerRow[]): AddMyCorps {
       editorCharacterId: characterId,
       onBook: [...onBook],
     }).catch(() => undefined);
-    // `onBookKey` stands for `onBook`, a new Set on every rows change.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canEdit, corporationId, characterId, onBookKey]);
-  // Closed-app alerts are on for the account when any Character's grant is active.
   const alertsOn = Object.values(alertsGrants).some((g) => g.status === 'active');
   const lacksAlerts = (corps: readonly AddCorpsCandidate[]) =>
     alertsOn
@@ -174,16 +156,12 @@ export function useAddMyCorps(rows: readonly MoonOwnerRow[]): AddMyCorps {
   };
 
   const pending = run !== null && !isDone(run);
-  // Own corps the player is CEO of, with that CEO's name: the ones Grant again can sign in for.
   const ceoByCorp = useMemo(
     () => new Map(own.corps.map((c) => [c.corporationId, c.ceoName])),
     [own.corps]
   );
   const items = canEdit ? needsYou(run, rows, names.corporation, ceoByCorp) : [];
-  // The clicked corp first; see `wanted` for who rides along.
   const grantAgain = (id: number) => {
-    // Grant again is one pass over every own corp lacking names or ore; a gone-quiet corp's
-    // login stands alone, so the first one can be tried before the rest.
     const clicked = items.find((i) => i.corporationId === id);
     const wanted =
       clicked && offersGrantAgain(clicked)
@@ -192,7 +170,6 @@ export function useAddMyCorps(rows: readonly MoonOwnerRow[]): AddMyCorps {
     const queue = [id, ...wanted.filter((w) => w !== id)].flatMap((w) =>
       own.corps.filter((c) => c.corporationId === w)
     );
-    // A run still in progress is never replaced: Continue finishes it first.
     if (queue.length === 0 || pending) return;
     void start({
       collectorCorporationId: corporationId,
@@ -291,7 +268,6 @@ export function useAddMyCorps(rows: readonly MoonOwnerRow[]): AddMyCorps {
           onStop={() => void stop().then(() => setStage({ kind: 'closed' }))}
           onApproveAlerts={async () => {
             const { ceoCharacterId } = currentAlerts(run)!;
-            // As Settings' walk would plan it; mail only after its own listing (ADR 0030).
             const step = await planAlertsStepFor(ceoCharacterId, { location: true, mail: false });
             return beginAlertsLogin(ceoCharacterId, { nearby: step.nearby, mail: step.mail });
           }}
@@ -304,8 +280,6 @@ export function useAddMyCorps(rows: readonly MoonOwnerRow[]): AddMyCorps {
           }
           onSignIn={async () => {
             const cur = current(run)!;
-            // Read live right before leaving for EVE: a corporation or CEO that changed since
-            // the list was built is recorded as not connected, with no login wasted on it.
             const check = await verifyOwnCeoCorp(cur);
             if (check === 'unreachable') throw new Error('Could not check the corporation');
             if (check === 'stale') {

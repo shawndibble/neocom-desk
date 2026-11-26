@@ -4,14 +4,6 @@ import { Button, Field, Fields, Panel, TextInput } from '@/components/ui';
 import { exportBackupToFile } from '@/backup/io';
 import { ActionResult, SettingsHint } from '@/features/settings/settingsFields';
 
-/**
- * Every Character on this device, encrypted under a password and downloaded
- * as a JSON file — the escape hatch for a new device that would otherwise
- * need EVE SSO re-run per alt (issue #789,
- * docs/adr/0014-encrypted-device-backup-for-cross-device-setup.md).
- * No character picker: always every Character, since the whole point is one
- * file that replaces re-login for all of them at once.
- */
 export function ExportPanel() {
   const { t } = useTranslation();
   const [password, setPassword] = useState('');

@@ -36,11 +36,9 @@ describe('BpcSourcingSettingsForm', () => {
     render(<BpcSourcingSettingsForm />);
 
     await user.click(await screen.findByRole('button', { name: /Market hub/ }));
-    // Industry prices materials it buys, so its popover carries a Buy percent (issue #6531).
     expect(screen.getByRole('spinbutton', { name: 'Buy percent' })).toBeInTheDocument();
     await user.click(await screen.findByRole('button', { name: 'Amarr VIII' }));
 
-    // On Global, so the pick moves the Global hub.
     await waitFor(() => expect(useMarketHub.getState().value).toBe('amarr'));
   });
 });

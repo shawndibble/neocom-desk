@@ -352,7 +352,6 @@ describe('matchDeliveries', () => {
   });
 
   it('counts nothing finished at or after a contract it could not read, run after run', () => {
-    // X (finished at 100) is unreadable; 12 later contracts of 10 each.
     const later = Array.from({ length: 12 }, (_, i) =>
       contract(200 + i, [{ typeId: 100, quantity: 10, blueprint: null }], 101 + i)
     );

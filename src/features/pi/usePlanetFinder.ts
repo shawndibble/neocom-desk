@@ -1,9 +1,3 @@
-/**
- * The planet finder's reads: where the pilot is, and the nearest systems that
- * hold the planet types a recipe needs. The origin is the system with most of
- * their colonies; with none, the character's current system; with neither it
- * is unknown and the finder says so. It never assumes a trade hub.
- */
 import { useCallback, useMemo } from 'react';
 import type { PlanetType } from '@/engine/pi/goalTypes';
 import {
@@ -17,7 +11,6 @@ import { loadSolarSystemsById } from '@/sde/solarSystems';
 import { useKeyedLoad } from '@/lib/useAsyncLoad';
 import { homeSystemId } from './sellRoute';
 
-/** How far the finder looks, and how many systems it lists. */
 export const FINDER_MAX_JUMPS = 12;
 export const FINDER_LIMIT = 5;
 
@@ -26,7 +19,6 @@ export interface FinderOrigin {
   systemId: number | null;
   name: string | null;
   security: number | null;
-  /** Where the origin came from: the colonies, or where the pilot is now. */
   source: 'colonies' | 'location' | null;
 }
 
@@ -44,7 +36,6 @@ export function useFinderOrigin(
   characterId: number,
   colonySystemIds: readonly number[]
 ): FinderOrigin {
-  // The origin depends on the colonies only through their home system.
   const fromColonies = homeSystemId(colonySystemIds);
   const loader = useCallback(async (): Promise<FinderOrigin> => {
     try {

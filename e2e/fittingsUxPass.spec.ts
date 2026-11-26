@@ -1,9 +1,3 @@
-/**
- * Fittings UX pass (issue #3079): the editor header, and the Ring tab's budget
- * strip on the phone. Invariants only — nothing overlaps, nothing overflows the
- * viewport, every control sits inside it — never pixel numbers, since CI's
- * fonts differ. Structure only; no stat figure is awaited.
- */
 import type { Page } from '@playwright/test';
 import { test, expect, PHONE } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
@@ -35,7 +29,6 @@ async function expectNoHorizontalOverflow(page: Page) {
   ).toBe(true);
 }
 
-/** Every visible button in `region` lies inside the viewport, and none overlaps another. */
 async function expectButtonsInsideAndApart(page: Page, region: ReturnType<typeof headerOf>) {
   const width = page.viewportSize()!.width;
   const boxes = [];
@@ -93,12 +86,10 @@ test.describe('Fittings header', () => {
     await expect(header.getByRole('button', { name: /^Save/ }).first()).toBeVisible();
     await expect(header.getByRole('button', { name: /^(Alpha OK|Omega only)$/ })).toHaveCount(0);
     await expect(header.getByRole('button', { name: 'Mastery', exact: true })).toHaveCount(0);
-    // Shorter than the two-line header it replaces (identity line, then badges + Save + ⋮).
     expect((await header.boundingBox())!.height).toBeLessThan(75);
     await expectButtonsInsideAndApart(page, header);
     await expectNoHorizontalOverflow(page);
 
-    // The verdict moved out of the menu to the end of the Ring | List | Stats row.
     await expect(page.getByRole('button', { name: /^(Alpha OK|Omega only)$/ })).toBeVisible();
     await header.getByRole('button', { name: 'Fitting actions' }).click();
     await expect(page.getByRole('menuitem', { name: 'Compare' })).toBeVisible();
@@ -128,7 +119,6 @@ test.describe('Ring tab on the phone', () => {
     expect(pgBox!.y).toBeLessThan(rackBox!.y);
     expect(cpuBox!.x + cpuBox!.width).toBeLessThanOrEqual(pgBox!.x + 0.5);
     expect(pgBox!.x + pgBox!.width).toBeLessThanOrEqual(390);
-    // Under budget: no Fix link.
     await expect(
       page.getByRole('button', { name: /^Fix (CPU|powergrid|calibration)$/ })
     ).toHaveCount(0);

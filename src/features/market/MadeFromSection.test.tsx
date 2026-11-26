@@ -88,7 +88,6 @@ describe('MadeFromSection', () => {
       bestSell: 30_000,
     });
 
-    // 4,500 x 4 + 1,200 x 10 = 30,000 ISK, and it sells for exactly that.
     const cost = await screen.findByText('Inputs per run at Jita 4-4 sell prices:');
     expect(cost.closest('p')).toHaveTextContent('30,000.00 ISK');
     expect(screen.getByText('Margin on best sell:').closest('p')).toHaveTextContent('0.0%');

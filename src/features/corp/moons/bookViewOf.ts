@@ -1,7 +1,3 @@
-/**
- * The `BookView` a book read joins into, outside React too: `useCorpBook` builds the page's view
- * with it, and the Moons nav dot's background poll (`moonsAttentionCount.ts`) the same one.
- */
 import type { BookViewInput } from '@/engine/corpTaxBook/bookView';
 import { groupObservedEntries } from '@/engine/corpTaxBook/observed';
 import { utcDay } from '@/engine/localDay';
@@ -16,7 +12,6 @@ import { registerTestReset } from '@/lib/testResets';
 import type { BookRead } from '../taxBook/bookRead';
 import type { BookData } from '../taxBook/bookClient';
 
-/** A book read: a refinery page's moon docs ride beside the book's data. */
 type BookWithRefinery = BookData & Pick<BookRead, 'refinery'>;
 
 export interface BookPrices {
@@ -24,7 +19,6 @@ export interface BookPrices {
   moonOwnerPricesOn: NonNullable<BookViewInput['moonOwnerPricesOn']>;
 }
 
-/** The view's input from a book read, its prices and what the page learned beside it. */
 export function bookViewInputOf(
   corporationId: number,
   now: string,
@@ -70,10 +64,6 @@ export function bookViewInputOf(
   };
 }
 
-/**
- * The last prices loaded per hub and Ore Form today, with the ores and days they price: the Moons
- * nav dot's 30-minute recount reads its count off these rather than loading the market again.
- */
 const heldPrices = new Map<
   string,
   { loadedOn: string; typeIds: ReadonlySet<number>; dates: ReadonlySet<string>; prices: BookPrices }
@@ -82,7 +72,6 @@ registerTestReset(() => heldPrices.clear());
 
 const heldKey = (data: BookData) => `${data.settings.hubId}:${data.settings.oreForm}`;
 
-/** The ore types a survey stands in for: priced and named like the notified ones. */
 export function surveyTypeIdsOf(lines: BookViewInput['surveyOreLines']): ReadonlySet<number> {
   const ids = new Set<number>();
   for (const ls of lines?.values() ?? []) for (const l of ls) ids.add(l.typeId);
@@ -96,17 +85,11 @@ function typeIdsOf(
 ): Set<number> {
   const typeIds = new Set<number>([...priced.map((r) => r.typeId), ...extra]);
   for (const x of data.state.extractions) for (const l of x.oreLines ?? []) typeIds.add(l.typeId);
-  // A refinery page reads no ledger row: the ore its moon docs hold is priced all the same.
   for (const d of data.refinery?.docs.values() ?? [])
     for (const l of d.mined) typeIds.add(l.typeId);
   return typeIds;
 }
 
-/**
- * Prices for a count, not for display (the Moons nav dot): the ones loaded today at the book's
- * hub and Ore Form when they price every ore and day it holds, else a load. The Moons page loads
- * its own, fresh.
- */
 export async function cachedBookPrices(data: BookWithRefinery): Promise<BookPrices> {
   const held = heldPrices.get(heldKey(data));
   const covers =
@@ -117,7 +100,6 @@ export async function cachedBookPrices(data: BookWithRefinery): Promise<BookPric
   return covers ? held.prices : loadBookPrices(data);
 }
 
-/** The unit prices every loaded row and Extraction needs, as the view's two lookups. */
 export async function loadBookPrices(
   data: BookWithRefinery,
   from?: string,
@@ -136,12 +118,10 @@ export async function loadBookPrices(
     { moonOwner: true }
   );
   const result = {
-    // A page left open past midnight asks for a day it never priced: use the last loaded one.
     pricesOn: (date: string) => {
       const day = priceDay(prices, data.settings.hubId, date);
       return day.prices.size > 0 ? day : priceDay(prices, data.settings.hubId, loadedOn);
     },
-    // No fallback day: the moon owner's page prices an unsaved day at 0, so this does too.
     moonOwnerPricesOn: (date: string) =>
       moonOwnerPricesAtHubOnDate(prices, hubForPayee(data.settings.hubId).id, date),
   };

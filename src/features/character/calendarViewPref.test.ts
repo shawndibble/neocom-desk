@@ -28,19 +28,12 @@ describe('useCalendarDensity', () => {
     expect(useCalendarDensity.getState().value).toBe('fortnight');
   });
 
-  /**
-   * The migration that matters: this key held 'month' | 'week' | 'agenda' for
-   * the whole life of the old view switcher, and a device that has not opened
-   * the page since still holds one of those. Rejecting it outright would
-   * silently reset a pilot who had deliberately chosen the seven-day grid.
-   */
   it('maps the retired week view onto the fortnight density', async () => {
     await db.settings.put({ key: CALENDAR_VIEW_KEY, value: 'week' });
     await useCalendarDensity.getState().hydrate();
     expect(useCalendarDensity.getState().value).toBe('fortnight');
   });
 
-  /** Agenda had no grid at all, so it takes the default rather than a density it never expressed. */
   it('maps the retired agenda view onto the default month density', async () => {
     await db.settings.put({ key: CALENDAR_VIEW_KEY, value: 'agenda' });
     await useCalendarDensity.getState().hydrate();

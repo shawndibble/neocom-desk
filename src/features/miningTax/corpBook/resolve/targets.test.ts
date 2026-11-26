@@ -1,3 +1,4 @@
+import type { ClosedDayPlan } from '@/engine/corpTaxBook/closedDayFix';
 import { describe, expect, it } from 'vitest';
 import type { BookRowView } from '@/engine/corpTaxBook/personal';
 import {
@@ -36,7 +37,6 @@ const rejectedFlag = {
 };
 
 describe('what an officer kept', () => {
-  // The member reads the officer's next step word for word, with Resolve again.
   it('reads a rejected dispute on a billed day with the next step, word for word', () => {
     const r = row({ flagged: rejectedFlag });
     expect(keptBy(r)).toBe('dispute');
@@ -60,11 +60,9 @@ describe('what an officer kept', () => {
       nextStep: 'Send the ref',
       noticeId: 's1',
     });
-    // Keyed on the officer's answer, so a later answer is a new problem.
     expect(t.hideKey).toBe('keptStatement:1:s1:x');
   });
 
-  // "If they say f-it the tool shouldn't annoy them" - but an officer's later answer still shows.
   it('hides an officer answer only: a new answer on a hidden day shows again', () => {
     const first = row({ flagged: rejectedFlag });
     const hidden = new Set([keptTarget(first).hideKey]);
@@ -110,7 +108,6 @@ describe('what an officer kept', () => {
     );
   });
 
-  // The kept warning must go once the member pays the day.
   it('is gone once the kept day is paid', () => {
     expect(keptBy(row({ state: 'paid', flagged: rejectedFlag }))).toBeUndefined();
   });
@@ -206,6 +203,12 @@ describe('targets', () => {
     expect(rowTarget(row({ state: 'dismissed' }))).toBeUndefined();
     expect(rowTarget(row({ state: 'conflict' }))?.problem.kind).toBe('conflict');
   });
+
+  it('a paid closed day whose records differ from the book is a Conflict carrying its fix', () => {
+    const plan = { state: 'conflict', fixes: [] } as unknown as ClosedDayPlan;
+    const target = rowTarget(row({ state: 'paid' }), undefined, plan);
+    expect(target?.problem).toMatchObject({ kind: 'conflict', plan });
+  });
 });
 
 describe('inReviewTarget (donations the book holds for review)', () => {
@@ -242,7 +245,6 @@ describe('inReviewTarget (donations the book holds for review)', () => {
     expect(t.hideKey).toBe(
       uncreditedKey(1, ['2026-11-02T22:38:44.000Z', '2026-11-14T18:28:44.000Z'])
     );
-    // The proof is what the book holds: amount and time (the journal ref where known).
     expect(t.transfers).toEqual([
       {
         amount: 26_952_549,

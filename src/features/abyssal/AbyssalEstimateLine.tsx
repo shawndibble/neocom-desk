@@ -1,11 +1,3 @@
-/**
- * A Mutated module's MutaMarket estimate, in Item Detail's price line (scope
- * decision `20261016-085744-mutamarket-is-the-abyssal-price-source.md`). Looked up
- * once on open, never imported: a module MutaMarket hasn't seen gets an
- * "Ask MutaMarket to price this" button, since importing publishes it on a
- * public MutaMarket page — the warning says so beside the button. Anything but
- * a priced answer is said in words, never shown as 0.
- */
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, IskAmount, NeedsConnection } from '@/components/ui';
@@ -19,7 +11,6 @@ export function AbyssalEstimateLine({
 }: {
   typeId: number;
   itemId: number;
-  /** MutaMarket is reached through a Character's sync session. */
   characterId: number;
 }) {
   const { t } = useTranslation();

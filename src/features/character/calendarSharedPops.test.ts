@@ -206,7 +206,6 @@ describe('Shared Pops as Calendar clocks', () => {
         detail: 'fullyMined',
         pastLabelKey: 'calendar.fullyMined',
       });
-      // Nothing left to expire: the muted expiry row goes.
       expect(rows).toHaveLength(1);
     });
 

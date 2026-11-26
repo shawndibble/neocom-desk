@@ -17,9 +17,6 @@ vi.mock('@/sde/loadMarketSde', () => ({
   loadNpcStations: () => loadNpcStations(),
 }));
 
-// Handlers are registered per test, and `onUnhandledRequest: 'error'` turns
-// any request this module should no longer make into a failure — which is how
-// "the station probe is gone" is asserted below rather than merely described.
 const server = mswServer();
 
 beforeEach(async () => {
@@ -39,9 +36,6 @@ describe('loadContractLocationName', () => {
   });
 
   it('goes straight to the structure endpoint for an id the snapshot does not hold', async () => {
-    // No `/universe/stations/1000000000001` handler on purpose: the snapshot is
-    // the complete staStations table, so its silence *is* the answer, and the
-    // 404 probe this used to spend on every modal open is gone (#655).
     server.use(
       http.get(`${ESI_BASE_URL}/universe/structures/1000000000001`, () =>
         HttpResponse.json({ name: 'Tycho Brahe 18 HQ', owner_id: 1, solar_system_id: 30045349 })
@@ -66,13 +60,6 @@ describe('loadContractLocationName', () => {
   });
 
   it('judges a station the loaded snapshot predates to be a structure, and says so', async () => {
-    // Deliberate, and the accepted cost of the discriminator: a station CCP
-    // added since the last `npm run sde:build` is absent from the table, so
-    // this path calls the structure endpoint, gets nothing, and reports "don't
-    // know". Probing the station endpoint as a last resort would fire on every
-    // contract in a structure the Character cannot see into — the common case
-    // for public contracts — to rescue a case that self-heals on the next SDE
-    // build. Pinned here so it is a decision, not a surprise.
     server.use(
       http.get(`${ESI_BASE_URL}/universe/structures/60099999`, () =>
         HttpResponse.json({ error: 'Forbidden' }, { status: 403 })

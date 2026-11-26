@@ -12,19 +12,19 @@ describe('productTier', () => {
   it.each([
     [undefined, 'tech1'],
     [1, 'tech1'],
-    [54, 'tech1'], // Structure Tech I
+    [54, 'tech1'],
     [2, 'tech2'],
-    [53, 'tech2'], // Structure Tech II
+    [53, 'tech2'],
     [14, 'tech3'],
     [4, 'faction'],
-    [52, 'faction'], // Structure Faction
-    [3, 'special'], // Storyline
-    [5, 'special'], // Officer
-    [6, 'special'], // Deadspace
-    [15, 'special'], // Abyssal
-    [17, 'special'], // Premium
-    [19, 'special'], // Limited Time
-    [999, 'special'], // a meta group CCP adds later
+    [52, 'faction'],
+    [3, 'special'],
+    [5, 'special'],
+    [6, 'special'],
+    [15, 'special'],
+    [17, 'special'],
+    [19, 'special'],
+    [999, 'special'],
   ] as const)('meta group %s is %s', (metaGroupId, tier) => {
     expect(productTier(metaGroupId)).toBe(tier);
   });
@@ -39,10 +39,10 @@ describe('productCategory', () => {
     [157, 'drones'],
     [475, 'components'],
     [477, 'structures'],
-    [2202, 'structures'], // Structure Equipment
-    [2203, 'structures'], // Structure Modifications
+    [2202, 'structures'],
+    [2203, 'structures'],
     [24, 'implants'],
-    [19, 'other'], // Trade Goods
+    [19, 'other'],
     [null, 'other'],
   ] as const)('root Market Group %s is %s', (rootMarketGroupId, category) => {
     expect(productCategory(rootMarketGroupId)).toBe(category);

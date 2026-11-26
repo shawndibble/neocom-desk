@@ -1,11 +1,3 @@
-/**
- * Compare mode (issue #453): 2+ selected Build Plans, each priced against its
- * own blueprint/ME/TE/facility/hub — never the currently-open plan's
- * snapshot — side by side in one table. Mounted by `Industry.tsx` in place of
- * `BuildPlanDetail` while compare mode is active; `onDone` restores whichever
- * plan was open before compare mode started (GLOSSARY.md round 25's two-pane
- * idiom: this is a state of the detail pane, not a separate route).
- */
 import { createNumberFormat } from '@/lib/numberLocale';
 import { formatCount } from '@/lib/formatCount';
 import { useMemo, type ReactNode } from 'react';
@@ -69,20 +61,11 @@ interface BuildPlanCompareProps {
   pi: PiData | null;
   ownedBlueprints: readonly CharacterBlueprint[];
   modifiers: CharacterModifiers;
-  /** `useIndustryWorkspace`'s pricing inputs — see `useComparedBuildResults`. */
   pricingInputs: BuildPlanPricingInputs;
-  /** Exits compare mode, restoring the previously open single-plan detail. */
   onDone: () => void;
-  /** Opens a plan's own detail page, exiting compare mode in the process. */
   onOpenPlan: (planId: string) => void;
 }
 
-/**
- * A numeric cell: "…" while its row is still fetching, else the formatted
- * value or "—" when unresolved (row.error) or unpriceable (BuildResult's own
- * null). ISK cells pass an `IskAmount` node rather than a string. Sorting still
- * reads `sortValue` off the raw number.
- */
 function numericCell(
   row: ComparedBuildRow,
   value: number | null | undefined,
@@ -94,15 +77,6 @@ function numericCell(
   return format(value);
 }
 
-/**
- * Why a row's profit/margin/ISK-per-hour/break-even cells read "—": either
- * the plan couldn't be computed at all (`row.error` — missing blueprint, or
- * the market-snapshot/compute call threw), or it computed fine but priced as
- * unpriceable (`row.result.unpriceable` — a material or the product itself
- * has no hub price). Both must surface an explanation, not just the missing
- * numbers, per issue #453's "shows as such rather than being dropped
- * silently" — mirrors `ResultsSummary.tsx`'s own unpriceable warning text.
- */
 function unresolvedReason(
   row: ComparedBuildRow,
   t: (key: string, options?: Record<string, unknown>) => string
@@ -129,8 +103,6 @@ export function BuildPlanCompare({
   const { t } = useTranslation();
   const isDesktop = useIsDesktop();
   const hubChoice = useCompareHub((state) => state.value);
-  // One hub for every row prices each plan there, so the cost, revenue and profit
-  // columns follow the picker as well as the hub order-book ones.
   const pricedPlans = useMemo(
     () => (hubChoice === PLAN_HUB ? plans : plans.map((plan) => ({ ...plan, hubId: hubChoice }))),
     [plans, hubChoice]
@@ -162,9 +134,6 @@ export function BuildPlanCompare({
     }
     return byPlan;
   }, [pricedPlans, catalog]);
-  // The export holds the hub columns even while the picker hides them, so both
-  // reads run once a plan has resolved: one Fuzzwork call per hub, and one ESI
-  // history read per product (cached until the daily rollover).
   const anyResolved = rows.some((row) => !row.loading);
   const wantHub = anyResolved || showBookColumns;
   const hubOrders = useHubOrderCounts([...targets.values()], wantHub);
@@ -188,11 +157,9 @@ export function BuildPlanCompare({
     surface: 'build-plan-compare',
     rows,
     columns: csvColumns,
-    // Partial only while a read is still in flight; one that failed leaves its cells blank.
     truncated: hubOrders.loading || dailyOrders.loading,
   });
 
-  /** A hub-book cell: "…" while loading, "—" when the plan has no product or the read failed. */
   const hubCell = (row: ComparedBuildRow, pick: (c: HubOrderCounts) => number): ReactNode => {
     if (row.loading || hubOrders.loading) return '…';
     const counts = hubCountsFor(row);
@@ -486,8 +453,6 @@ export function BuildPlanCompare({
           />
         </div>
       ) : (
-        // A phone has no width to read a comparison across, so the plans become
-        // the columns and each shown metric a row (issue #4786).
         <CompareMatrix
           columns={shownColumns}
           rows={rows}

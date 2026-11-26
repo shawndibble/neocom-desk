@@ -23,7 +23,6 @@ describe('parseLpStoreSnapshot', () => {
   });
 });
 
-// Jumps from the Current System; 30000004 is unreachable (absent).
 const JUMPS = new Map<number, number>([
   [30000001, 0],
   [30000002, 3],

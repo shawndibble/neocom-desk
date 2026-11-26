@@ -13,7 +13,6 @@ import { AskToCopyDialog } from '@/features/communities/AskToCopyDialog';
 import { SAMPLE_ACTIVE_CHARACTER } from '@/storybook/sampleData';
 import { Communities } from './Communities';
 
-/** Sample Communities answer in place of the backend, fresh per story so a change never leaks into the next. */
 function SampleCommunities({
   children,
   deliveryDemo,
@@ -21,7 +20,6 @@ function SampleCommunities({
   children: ReactNode;
   deliveryDemo: boolean;
 }) {
-  // A layout effect, so the override is in place before the page's own load effects run.
   useLayoutEffect(() => {
     setCommunityBackendOverride(createCommunitiesFixture(Date.now(), { deliveryDemo }));
     return () => setCommunityBackendOverride(null);
@@ -45,28 +43,22 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** The pilot's saved Fittings (My sharing › Fittings reads them from ESI): none, so the story shows what is shared. */
 const fittingsRoutes = (): FixtureRoute[] => [
   { path: /^\/characters\/\d+\/fittings$/, respond: () => ({ body: [] }) },
 ];
 
 const phone = { viewport: { value: 'mobile1', isRotated: false } } as const;
 
-/** @summary Your Communities with the list only: one you admin, one you belong to. */
 export const List: Story = {};
 
-/** @summary The same list in the phone shell. */
 export const ListPhone: Story = { globals: phone };
 
-/** @summary A Community you admin, opening on Blueprints: the Community Library under your sharing line, with Manage (2 waiting) in the header card. */
 export const AdminEveryone: Story = {
   parameters: { shell: { path: `/communities?community=${SAMPLE_ADMIN_COMMUNITY_ID}` } },
 };
 
-/** @summary The Community Library in the phone shell. */
 export const AdminEveryonePhone: Story = { ...AdminEveryone, globals: phone };
 
-/** @summary Fittings: every Member's shared Fittings, each opening the editor. */
 export const AdminFittingsEveryone: Story = {
   parameters: {
     shell: {
@@ -76,14 +68,12 @@ export const AdminFittingsEveryone: Story = {
   },
 };
 
-/** @summary Skill plans: the Community's shared plans with Copy to my plans. */
 export const AdminPlansEveryone: Story = {
   parameters: {
     shell: { path: `/communities?community=${SAMPLE_ADMIN_COMMUNITY_ID}&tab=plans` },
   },
 };
 
-/** @summary Fittings › My sharing open: the share-all switch, what you share with Stop sharing, and Add Fittings. */
 export const AdminFittingsMine: Story = {
   parameters: {
     shell: {
@@ -93,7 +83,6 @@ export const AdminFittingsMine: Story = {
   },
 };
 
-/** @summary Skill plans › My sharing in the phone shell. */
 export const MemberPlansMinePhone: Story = {
   parameters: {
     shell: { path: `/communities?community=${SAMPLE_MEMBER_COMMUNITY_ID}&tab=plans&view=mine` },
@@ -101,7 +90,6 @@ export const MemberPlansMinePhone: Story = {
   globals: phone,
 };
 
-/** @summary A Community you only belong to, on Fittings: no Manage menu in its header card. */
 export const MemberEveryone: Story = {
   parameters: {
     shell: {
@@ -111,27 +99,23 @@ export const MemberEveryone: Story = {
   },
 };
 
-/** @summary A Community you admin, open on Members: a row menu on each other Member. */
 export const AdminMembers: Story = {
   parameters: {
     shell: { path: `/communities?community=${SAMPLE_ADMIN_COMMUNITY_ID}&tab=members` },
   },
 };
 
-/** @summary The admin's Members tab in the phone shell. */
 export const AdminMembersPhone: Story = {
   ...AdminMembers,
   globals: phone,
 };
 
-/** @summary A Community you only belong to, on Members: no row menus, Leave at the foot. */
 export const MemberView: Story = {
   parameters: {
     shell: { path: `/communities?community=${SAMPLE_MEMBER_COMMUNITY_ID}&tab=members` },
   },
 };
 
-/** @summary Manage › Invites (an old `?tab=invites` link opens it): join requests, approval switch, link, mail invites. */
 export const AdminInvites: Story = {
   parameters: {
     shell: { path: `/communities?community=${SAMPLE_ADMIN_COMMUNITY_ID}&tab=invites` },
@@ -140,7 +124,6 @@ export const AdminInvites: Story = {
 
 const requestsPath = (id: string) => `/communities?community=${id}&tab=requests`;
 
-/** The sample pilot is in Efa (Khanid), and holds the location and Open in EVE Permissions. */
 const requestsRoutes = (): FixtureRoute[] => [
   ...walletFixtureRoutes(),
   {
@@ -161,7 +144,6 @@ const requestsShell = (id: string) => ({
   scopes: requestsScopes,
 });
 
-/** Clicks the board row whose first line is `name`, the way a pilot opens its side panel. */
 const openRequest =
   (name: string): Story['play'] =>
   async ({ canvasElement }) => {
@@ -169,12 +151,10 @@ const openRequest =
     await userEvent.click(await canvas.findByText(new RegExp(`^${name}`)));
   };
 
-/** @summary Requests: the board of the Community's Requests, Open and Mine filters, search, a table. */
 export const RequestsBoard: Story = {
   parameters: { shell: requestsShell(SAMPLE_ADMIN_COMMUNITY_ID) },
 };
 
-/** @summary The board with "I can fill" on: open Requests with a line for a blueprint you share. */
 export const RequestsBoardCanFill: Story = {
   ...RequestsBoard,
   play: async ({ canvasElement }) => {
@@ -184,7 +164,6 @@ export const RequestsBoardCanFill: Story = {
   },
 };
 
-/** @summary The board limited to Requests within 5 jumps of the pilot (in Efa), with the count of those it cannot place. */
 export const RequestsBoardNearby: Story = {
   ...RequestsBoard,
   play: async ({ canvasElement }) => {
@@ -198,7 +177,6 @@ export const RequestsBoardNearby: Story = {
   },
 };
 
-/** @summary Distance with no location Permission: the board says why distance can't be used, with the Grant link. */
 export const RequestsBoardNoLocationGrant: Story = {
   parameters: {
     shell: {
@@ -208,19 +186,15 @@ export const RequestsBoardNoLocationGrant: Story = {
   },
 };
 
-/** @summary The Requests board in the phone shell (dense cards). */
 export const RequestsBoardPhone: Story = { ...RequestsBoard, globals: phone };
 
-/** @summary A Request opened as a Member: terms, each line's progress and its Pledge controls. */
 export const RequestsPanelAsMember: Story = {
   ...RequestsBoard,
   play: openRequest('Reactive Metals'),
 };
 
-/** @summary A Member's panel in the phone shell. */
 export const RequestsPanelAsMemberPhone: Story = { ...RequestsPanelAsMember, globals: phone };
 
-/** @summary Delivery marked from contracts: a copy counted but flagged ("runs 5, asked 10") and a typed amount marked manual, under the delivery sentence. */
 export const RequestsPanelDelivery: Story = {
   parameters: { shell: requestsShell(SAMPLE_ADMIN_COMMUNITY_ID), deliveryDemo: true },
   play: async ({ canvasElement }) => {
@@ -230,10 +204,8 @@ export const RequestsPanelDelivery: Story = {
   },
 };
 
-/** @summary The delivery panel in the phone shell. */
 export const RequestsPanelDeliveryPhone: Story = { ...RequestsPanelDelivery, globals: phone };
 
-/** @summary Without the Contracts Permission: the grant prompt (not an error) and a delivered-amount field per Pledged line. */
 export const RequestsPanelNoContractsGrant: Story = {
   parameters: {
     shell: {
@@ -251,22 +223,18 @@ export const RequestsPanelNoContractsGrant: Story = {
   },
 };
 
-/** @summary Your own Request: Extend 30 days and Close request. */
 export const RequestsPanelAsRequester: Story = {
   ...RequestsBoard,
   play: openRequest('Ishtar Blueprint'),
 };
 
-/** @summary A Request opened by the admin: each Pledger with Remove, and Remove request. */
 export const RequestsPanelAsAdmin: Story = {
   ...RequestsBoard,
   play: openRequest('Reactive Metals'),
 };
 
-/** @summary The admin's panel in the phone shell. */
 export const RequestsPanelAsAdminPhone: Story = { ...RequestsPanelAsAdmin, globals: phone };
 
-/** @summary My pledges: the slide-out of this Member's Pledges, opened from the strip. */
 export const RequestsMyPledges: Story = {
   ...RequestsBoard,
   play: async ({ canvasElement }) => {
@@ -275,10 +243,8 @@ export const RequestsMyPledges: Story = {
   },
 };
 
-/** @summary My pledges in the phone shell. */
 export const RequestsMyPledgesPhone: Story = { ...RequestsMyPledges, globals: phone };
 
-/** @summary New request: location, terms, pasted list, editable lines, add an item, and how to hear about a Pledge (in the app / by in-game mail). */
 export const RequestsCompose: Story = {
   ...RequestsBoard,
   play: async ({ canvasElement }) => {
@@ -294,15 +260,12 @@ export const RequestsCompose: Story = {
   },
 };
 
-/** @summary New request in the phone shell. */
 export const RequestsComposePhone: Story = { ...RequestsCompose, globals: phone };
 
-/** @summary A Community with no Requests yet. */
 export const RequestsEmpty: Story = {
   parameters: { shell: requestsShell(SAMPLE_MEMBER_COMMUNITY_ID) },
 };
 
-/** What BPC Sourcing opens from a Community Offer row's "ask <name> to copy…": Rifter Blueprint (a BPO) held by Ilvara Nokk. */
 const askToCopy = (communities: { id: string; name: string }[]): Story => ({
   render: () => (
     <AskToCopyDialog
@@ -324,11 +287,8 @@ const askToCopy = (communities: { id: string; name: string }[]): Story => ({
 const brass = { id: SAMPLE_ADMIN_COMMUNITY_ID, name: 'Brass Meridian Industrialists' };
 const providence = { id: SAMPLE_MEMBER_COMMUNITY_ID, name: 'Providence Mining Co-op' };
 
-/** @summary Ask to copy (BPC Sourcing): compose opens with one Rifter Blueprint line, quantity 1. */
 export const AskToCopyCompose: Story = askToCopy([brass]);
 
-/** @summary Ask to copy in the phone shell. */
 export const AskToCopyComposePhone: Story = { ...AskToCopyCompose, globals: phone };
 
-/** @summary Ask to copy when the holder shares it in two Communities: pick which one first. */
 export const AskToCopyPickCommunity: Story = askToCopy([brass, providence]);

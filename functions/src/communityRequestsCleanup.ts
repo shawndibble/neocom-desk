@@ -1,10 +1,3 @@
-// Community Requests cleanup (issue #3812, ADR 0021): the scheduled sweep that
-// deletes expired and long-closed Requests with their Pledges, and the admin's
-// removal of one Request or one Pledge. Leaving, removal and the stale-account
-// purge already delete a Member's Requests and Pledges
-// (communitiesStore.deleteMemberShares). The timing decision is the pure
-// `decideRequestSweep` in communityRequests.ts.
-
 import type { Caller } from './actorAuth.js';
 import type { Firestore } from 'firebase-admin/firestore';
 import { COMMUNITIES_COLLECTION } from './communities.js';
@@ -20,29 +13,15 @@ import {
 import { communityRef, requireAdmin } from './communitiesStore.js';
 import { indexedPages, isTopLevelChild, pages } from './indexedSweep.js';
 
-/** Requests read per query page. */
 export const SWEEP_PAGE_SIZE = 100;
-/** Requests deleted per run across all Communities; a larger backlog continues on the next tick. */
 export const SWEEP_MAX_DELETES = 500;
 
 export interface SweepResult {
   deleted: number;
-  /** Requests whose delete failed: left in place, retried next run. */
   failed: number;
-  /** The delete cap was reached with more waiting. */
   truncated: boolean;
 }
 
-/**
- * Deletes every Request expired a week ago and every Request closed a week ago,
- * each with its Pledges. Two single-field collection-group queries across all
- * Communities (the per-Community scan until their index is deployed; see
- * indexedSweep.ts), and each candidate is read again right before its delete,
- * so one the owner extended or reopened in the meantime survives and one
- * already gone is skipped. The re-read only costs on a Request being deleted,
- * never on an idle run. Bounded per run, idempotent, and one Request failing to delete does
- * not stop the rest.
- */
 export async function sweepRequests(
   db: Firestore,
   now: number,
@@ -97,7 +76,6 @@ export async function sweepRequests(
           result.failed += 1;
           continue;
         }
-        // The delete stands even if the stamp fails; a cached board then ages out on its own.
         await boardVersionRef(db, candidate.ref.path.split('/')[1])
           .set(boardVersionBump(true), { merge: true })
           .catch(() => undefined);
@@ -107,7 +85,6 @@ export async function sweepRequests(
   return result;
 }
 
-/** The admin removes any Request, with all its Pledges. Removing one already gone is not an error. */
 export async function removeRequest(
   db: Firestore,
   caller: Caller,
@@ -121,7 +98,6 @@ export async function removeRequest(
   await boardVersionRef(db, communityId).set(boardVersionBump(true), { merge: true });
 }
 
-/** The admin removes one Member's Pledge on a Request; the Request and the other Pledges stay. */
 export async function removePledge(
   db: Firestore,
   caller: Caller,

@@ -2,24 +2,6 @@ import { useCopyFeedback } from '@/lib/useCopyFeedback';
 import { formatAge } from '@/lib/age';
 import { HaulingHowItWorks } from './HaulingHowItWorks';
 import { formatCount } from '@/lib/formatCount';
-/**
- * The Market page's Hauling tab (back from Travel, #4702): what is worth buying
- * at one Trade Hub to sell at another, priced at what a hauler can expect to
- * actually get rather than at today's cheapest listing, and sized to a hold.
- *
- * The first view needs nothing from the user: a route and a category are
- * preset and the list works with no ship chosen. Choosing Cargo Space (and,
- * optionally, Max spend) adds the hold meter and lets the Trip Plan stop at
- * what fits. The plan is a suggestion — every row starts ticked at a suggested
- * quantity, and unticking or typing a number re-sizes the rest through the
- * same `planTrip` the suggestion came from.
- *
- * The Trip Plan lives in a rail beside the table: its totals, the
- * fill offer, and Copy multibuy. A
- * row click selects the row and shows its detail in the rail. Where the
- * panel is too narrow for the rail (by its own width, ADR 0017), a sticky bar
- * carries the trip instead, and the trip and the detail open as sheets.
- */
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
@@ -126,31 +108,21 @@ import { VIRTUALIZE_THRESHOLD } from '@/components/ui/DataTable';
 import { useAsyncLoad } from '@/lib/useAsyncLoad';
 const DAY_CHOICES = [7, 14, 30, 0] as const;
 
-/** Rail 20rem + 1rem gap. */
 const RAIL_REM = 21;
-/**
- * Narrowest column left of the rail: a phone's card list (24rem). Beside the
- * rail the table goes compact, then to cards, before the panel falls back to
- * the phone layout (trip bar + sheets) — a laptop keeps the rail.
- */
 const RAIL_MIN_COLUMN_REM = 24;
 const RAIL_GRID = { gridTemplateColumns: 'minmax(0, 1fr) 20rem' } as const;
 const MARGIN_CHOICES = [0, 3, 5, 10] as const;
 
 const HAULING_URL_FILTERS = {
   cat: intParam(DEFAULT_HAULING_CATEGORY_ID),
-  /** How the cargo is sold at the destination. Lives in the URL only — never remembered with the filters. */
   mode: enumParam(HAUL_MODES, 'list'),
   days: intParam(DEFAULT_HAULING_FILTER.days, { min: 0, max: 365 }),
   margin: intParam(DEFAULT_HAULING_FILTER.margin, { min: 0, max: 100 }),
   demand: enumParam(['steady', 'any'] as const, DEFAULT_HAULING_FILTER.demand),
-  /** Max price per item, whole ISK; absent is no limit. */
   maxprice: optionalIntParam({ min: 1 }),
-  /** Max spend: the Trip Plan's ISK budget, whole ISK; absent is no limit. */
   spend: optionalIntParam({ min: 1 }),
 };
 
-/** From/To default to the pilot's Trade Hub (`haulingHubs.ts`), so the schema is built per hub. */
 function haulingUrl(hubId: TradeHub['id']) {
   const defaults = haulingHubDefaults(hubId);
   return {
@@ -162,11 +134,6 @@ function haulingUrl(hubId: TradeHub['id']) {
 
 type HaulingUrlValues = UrlParamValues<ReturnType<typeof haulingUrl>>;
 
-/**
- * Lifts the remembered filter fields off any wider object that carries them
- * (`params`, a store patch merged over its value) — the one place that
- * reassembles them rather than each call site picking fields by hand.
- */
 function pickHaulingFilter(source: StoredHaulingFilter): StoredHaulingFilter {
   return {
     days: source.days,
@@ -176,22 +143,14 @@ function pickHaulingFilter(source: StoredHaulingFilter): StoredHaulingFilter {
   };
 }
 
-/** Every remembered field as the URL holds it: the stored filter plus Max spend. */
 type RememberedHaulingParams = StoredHaulingFilter & { spend: number | null };
 
 function pickRememberedParams(source: RememberedHaulingParams): RememberedHaulingParams {
   return { ...pickHaulingFilter(source), spend: source.spend };
 }
 
-/** What the filter bar edits: the remembered fields, with Category and mode for the narrow sheet. */
 type HaulingFilterValue = RememberedHaulingParams & { cat: number; mode: HaulMode };
 
-/**
- * The filters set away from their default, for the bar's pills. Category and
- * mode are the route's own choice, not a narrowing of it, so never pills;
- * selling into buy orders reads neither days nor demand, so in instant mode
- * those two are not on whatever the URL says.
- */
 function activeHaulingFilters(
   value: HaulingFilterValue,
   t: TFunction
@@ -238,11 +197,6 @@ function activeHaulingFilters(
   return active;
 }
 
-/**
- * The remembered defaults behind the URL (a link's own value wins): the
- * filters in `haulingFilterPref.ts`, Max spend in the Trip Plan budget's own
- * store. The one place that knows `spend` lives apart.
- */
 function useRememberedHaulingFilter(): RememberedDefaults<ReturnType<typeof haulingUrl>> {
   const filterPref = useHaulingFilterPref((s) => s.value);
   const storedBudget = useHaulingBudget((s) => s.value);
@@ -251,10 +205,8 @@ function useRememberedHaulingFilter(): RememberedDefaults<ReturnType<typeof haul
     () => ({
       values: pickRememberedParams({
         ...filterPref,
-        // Whole ISK, as the link holds it: a stored budget may be a fraction.
         spend: storedBudget === null ? null : Math.round(storedBudget) || null,
       }),
-      // Called with only the remembered fields that changed.
       remember: ({ spend, ...filter }: Partial<HaulingUrlValues>) => {
         if (spend !== undefined) void useHaulingBudget.getState().setValue(spend);
         if (Object.keys(filter).length === 0) return;
@@ -271,22 +223,13 @@ const useIntroDismissed = createLocalSetting<boolean>({
   defaultValue: false,
 });
 
-/** What the page header needs to render Hauling's reload button and Data Age beside the page title. */
 export interface HaulingRefreshInfo {
   refresh: () => void;
   disabled: boolean;
-  /** When the shown scan was fetched (epoch ms), or `null` while no scan is ready. */
   fetchedAt: number | null;
 }
 
 interface HaulingPanelProps {
-  /**
-   * Reload and the scan's Data Age live in the page title bar next to
-   * "Travel", not in this Panel's own header or filter bar (DESIGN.md §6c:
-   * Refresh beside the `DataAgeBadge`) — so the scan state (and the function
-   * that re-triggers it) is handed up to whoever renders that title bar. Called on every change,
-   * and with `null` on unmount so a stale button never lingers.
-   */
   onRefreshInfoChange?: (info: HaulingRefreshInfo | null) => void;
 }
 
@@ -301,37 +244,25 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
   const rememberedFilter = useRememberedHaulingFilter();
   const [params, setParams] = useRememberedUrlParams(haulingSchema, rememberedFilter);
   const maxSpend = params.spend;
-  // Stable references (a hub from `TRADE_HUBS`, or the Any string): the scans key their effects on them.
   const from = haulingEnd(params.from);
   const to = haulingEnd(params.to);
-  // The end set to Any hub, if one is: the table then says which hub each row uses there.
   const anyEnd = anyEndOf(params);
   const categoryId = isHaulingCategoryId(params.cat) ? params.cat : DEFAULT_HAULING_CATEGORY_ID;
   const mode: HaulMode = params.mode;
   const instant = mode === 'instant';
 
   const isNarrow = useIsNarrow();
-  // A phone's dense card holds Buy, Sell and the margin on one ~200px line, so
-  // its figures go compact (`3.41K`). Chosen in JS, not by a hidden/shown
-  // pair of spans: one DOM at every width (DESIGN.md, DataTable).
   const isPhone = useIsPhone();
   const widths = TABLE_WIDTHS[anyEnd === null ? 'oneHub' : 'anyHub'];
-  // The rail shows by the panel's own width, not the viewport's (ADR 0017):
-  // measured on the whole panel, never on the table beside the rail, whose
-  // width the rail itself decides.
   const [layoutRef, [layoutNarrow = false]] = useElementNarrowerThan<HTMLDivElement>([
     RAIL_MIN_COLUMN_REM + RAIL_REM,
   ]);
   const railShown = !isPhone && !layoutNarrow;
-  // Narrow table → compact figures (full ones starve Item, scroll page); narrower still → cards.
   const [tableRef, [tableNarrow = false, tableCards = false]] =
     useElementNarrowerThan<HTMLDivElement>([widths.compact, widths.cards]);
-  // The table's `stacked`, and every cell class that would otherwise follow
-  // the viewport (`max-sm:`) picks by it instead (ADR 0017).
   const cards = isPhone || tableCards;
   const compact = isPhone || tableNarrow;
 
-  // Category names fall back to their ids' English names while this loads or if it fails.
   const groups: MarketGroupNode[] | null = useAsyncLoad(loadMarketGroups).data ?? null;
   const categoryName = useCallback(
     (id: number) =>
@@ -348,7 +279,6 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
   useHydratedStore(useHaulingCargo, useIntroDismissed);
   const cargoSet = cargo !== null && cargo.holds.length > 0;
 
-  // The pickers never leave Any at both ends (`pickHaulingHub` swaps), but a hand-written link can.
   const bothAny = params.from === ANY_HUB && params.to === ANY_HUB;
   const sameHub = !bothAny && params.from === params.to;
   const { state, refresh } = useHaulingScan(
@@ -356,15 +286,11 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
     to,
     categoryId,
     mode,
-    // Not before the default hub has loaded: until then the lane is the
-    // fallback one, and scanning it would spend ESI budget on the wrong route.
     defaultHubHydrated && !sameHub && !bothAny,
     params.maxprice
   );
   const fees = useHaulingFees(activeCharacterId);
 
-  // A disabled scan keeps its last `ready` state, so a same-hub or both-Any
-  // lane must not report that stale scan's age (or offer to reload it).
   const fetchedAt = state.status === 'ready' && !sameHub && !bothAny ? state.scan.fetchedAt : null;
   const refreshDisabled = fetchedAt === null;
 
@@ -386,11 +312,9 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
     [viewRows, rowFilters]
   );
 
-  // The Overview's Hauling widget reads this instead of scanning (#3579).
   const scanFetchedAt = state.status === 'ready' ? state.scan.fetchedAt : null;
   useEffect(() => {
     if (scanFetchedAt === null || sameHub || bothAny) return;
-    // The default filters, not the pilot's current ones: tightening a filter must not change what the Overview shows for the same scan.
     const { shown: usual } = filterHaulingRows(viewRows, {
       maxDays: DEFAULT_HAULING_FILTER.days,
       minMarginPct: DEFAULT_HAULING_FILTER.margin,
@@ -401,12 +325,10 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
     if (summary) rememberHaulingSummary(summary);
   }, [viewRows, scanFetchedAt, sameHub, bothAny]);
 
-  // A new route, category or mode starts a fresh plan — the fill and the items added from it included.
   const [selectedTypeId, setSelectedTypeId] = useState<number | null>(null);
   const [howOpen, setHowOpen] = useState(false);
   const [detailOpen, setDetailOpen] = useState(false);
   const [tripOpen, setTripOpen] = useState(false);
-  // Crossing the rail's width closes the sheets, so a resize never opens one on its own.
   const [railWas, setRailWas] = useState(railShown);
   if (railWas !== railShown) {
     setRailWas(railShown);
@@ -421,7 +343,6 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
     setDetailOpen(false);
   }
 
-  // What the category scan returned or examined: the fill never spends a batch on them again.
   const scannedTypeIds = useMemo(
     () =>
       state.status === 'ready'
@@ -462,8 +383,6 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
     tableRows,
     scanKey,
   });
-  // A reload re-prices the lane: the fill and the rows added from it were
-  // priced from the old books, so they go, and with them Add's pins.
   const resetFill = fill.reset;
   const reload = useCallback(() => {
     refresh();
@@ -476,11 +395,8 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
     return () => onRefreshInfoChange?.(null);
   }, [onRefreshInfoChange, reload, refreshDisabled, fetchedAt]);
 
-  /** The room left in every hold: one figure for the summary, the fill offer and the trip bar. */
   const freeM3 = shownFreeM3(plan.holds);
 
-  // Fill the free space: needs a Cargo Space and a fixed lane (Any hub would
-  // scan every hub's books), and the category scan landed, so its rows stay out.
   const fillOffered = cargoSet && anyEnd === null && !sameHub && state.status === 'ready';
   const fillOffer = useHaulingFillOffer(fill, {
     offered: fillOffered,
@@ -498,16 +414,10 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
       }),
   });
 
-  // What ships, not what is ticked: a ticked row the plan sized to nothing is not in the trip.
   const selectedCount = plan.totals.items;
 
-  // A row click selects the row and shows its detail; a click on the
-  // selected row clears it (DESIGN.md §6c). The rail's "‹ Trip" only leaves
-  // the detail: the row stays selected.
   const selectedRow =
     selectedTypeId === null ? undefined : tableRows.find((r) => r.typeId === selectedTypeId);
-  // A filter or reload that drops the selected row drops the selection, so
-  // its detail never springs back open on its own when the row returns.
   if (selectedTypeId !== null && !selectedRow && state.status === 'ready') {
     setSelectedTypeId(null);
     setDetailOpen(false);
@@ -525,12 +435,8 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
   const { copied: copyFlash, flash: flashCopy } = useCopyFeedback<'copied' | 'failed'>(2000);
   const copyStatus = copyFlash ?? 'idle';
   const listText = multibuyText(plan.lines);
-  // The list itself stays out of the way until asked for (the trip's
-  // menu) — or until the clipboard refuses it, below.
   const [listShown, setShowList] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
-  // Opened by a refused copy, the list may sit off screen (a phone scrolled
-  // down the rows): bring it into view so "copy the list below" points at it.
   useEffect(() => {
     if (copyStatus === 'failed') listRef.current?.scrollIntoView?.({ block: 'nearest' });
   }, [copyStatus]);
@@ -539,20 +445,16 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
       await writeToClipboard(listText);
       flashCopy('copied');
     } catch {
-      // Clipboard refused: open the list so it can be copied by hand, and
-      // say so rather than leaving the button looking like it did nothing.
       setShowList(true);
       setTripOpen(false);
       flashCopy('failed');
     }
   }
 
-  /** What capped a row's planned quantity ("22 m³ · about a week of sales"), or nothing for a row with no plan line. */
   const limitTextOf = (row: HaulingViewRow): string | undefined => {
     const line = lineOf.get(row.typeId);
     if (!line) return undefined;
     const unit = line.volumeM3 > 0 ? `${formatCount(line.volumeM3)} m³ · ` : '';
-    // Unless the Cargo Space is one plain hold, say which the line rides in ("in Ammo hold, Cargo hold").
     const plainHold = plan.holds.length === 1 && plan.holds[0]!.kind === 'general';
     const holdsText =
       !plainHold && line.placements.length > 0
@@ -563,7 +465,6 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
     return `${unit}${holdsText}${t(`market.hauling.limit.${line.limitedBy}`)}`;
   };
 
-  /** The category a row was added from by the fill, or null for a row the scan found. */
   const addedFromOf = useCallback(
     (typeId: number): string | null => {
       const category = fill.addedIds.has(typeId) ? fill.categoryOf?.get(typeId) : undefined;
@@ -580,8 +481,6 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
     addedFromOf,
   });
 
-  // Turn-ins at the hub each row sells at: every To hub the scan's lanes reach
-  // (one, or the fan-out with Any hub there). LP counts at that hub's LP Value.
   const turnIns = useTurnInOffersByHub([
     ...new Set(expandHaulingLane(params.from, params.to).map((lane) => lane.to)),
   ]);
@@ -604,19 +503,15 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
       turnInOfferFor,
     });
 
-  // Max price hides at both ends: the scan's price pass drops most, the row filter what a lot pushes over it.
   const dear = hidden.tooDear + (state.status === 'ready' ? state.scan.overMaxPrice : 0);
   const hiddenCount = dear + (instant ? 0 : hidden.thin + hidden.slow) + hidden.lowMargin;
-  // Only when Max price hid something does the hidden line name it.
   const hiddenKeySuffix = dear > 0 ? 'MaxPrice' : '';
-  // Category and mode ride along so the narrow sheet can edit them in its draft; neither is remembered.
   const filterValue: HaulingFilterValue = {
     ...pickRememberedParams(params),
     cat: categoryId,
     mode,
   };
 
-  // With Any hub at an end each row has its own lane: no one label, no one jump count.
   const laneLabel =
     from !== ANY_HUB && to !== ANY_HUB
       ? t('market.hauling.itemDetail.lane', { from: from.systemName, to: to.systemName })
@@ -657,7 +552,6 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
       </MenuItem>
     </TableActionsMenu>
   );
-  /** Under both rail views and at the foot of the trip sheet: what the trip frees and earns, and what to do with it. */
   const tripFooter = (
     <div className="flex flex-col gap-2">
       <p className="flex items-baseline gap-2 text-sm tabular-nums">
@@ -688,7 +582,6 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
         cargoValueAfterFill={fillOffer.cargoValueAfterFill}
         freeM3={freeM3}
       />
-      {/* A full hold has nothing to offer until the user asks (or has asked). */}
       {fillOffered && (fill.requested || freeM3 >= 1) && (
         <HaulingFillList
           {...fillOffer.list}
@@ -700,13 +593,11 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
       )}
     </div>
   );
-  // Without the rail the sheet is the selection's only sign: closing it clears both (§6c).
   const closeDetail = () => {
     setDetailOpen(false);
     setSelectedTypeId(null);
   };
   const detail = (row: HaulingViewRow, showTitle: boolean, laneActions?: ReactNode) => (
-    // Keyed, so a new row opens with its own folds closed ("Show the math").
     <HaulingItemDetail
       key={row.typeId}
       row={row}
@@ -815,7 +706,6 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
           />
         </div>
 
-        {/* The multibuy text, on request, or opened by a refused copy to copy by hand. */}
         {listShown && (
           <div
             ref={listRef}
@@ -833,10 +723,6 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
           </div>
         )}
 
-        {/* A container, not a viewport, query: the rail decides how much
-            room the table has, so the secondary words (the demand label)
-            drop by the table's own width. Where even the compact table
-            cannot fit, it scrolls inside this wrapper, never the page. */}
         <div ref={tableRef} className="@container overflow-x-auto">
           <DataTable
             {...tableExport.tableProps}
@@ -899,9 +785,6 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
     );
 
     content = (
-      // One wrapper either way, so crossing the rail's width never remounts
-      // the table (its sort, its scroll). The rail is a direct grid child: a
-      // wrapper would end its sticky.
       <div
         className={railShown ? 'grid items-start gap-4' : 'flex flex-col gap-4'}
         style={railShown ? RAIL_GRID : undefined}
@@ -909,7 +792,6 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
         {table}
         {railShown ? (
           <>
-            {/* The rail repaints in place; a sheet would announce itself. */}
             <p aria-live="polite" className="sr-only">
               {detailOpen && selectedRow
                 ? t('market.hauling.selectedAnnouncement', { name: selectedRow.name })
@@ -962,7 +844,6 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
                 </Modal>
               </>
             ) : (
-              // Too narrow for the rail but not a phone: the same views slide in over the right edge (§6c drawer).
               <>
                 <SlideOver
                   open={tripOpen}
@@ -992,21 +873,12 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
   }
 
   return (
-    // The route bar spans the panel; the table (and the rail beside it) sit under it.
     <div ref={layoutRef} className="flex flex-col gap-4">
-      {/* No title bar: the Hauling tab right above already names the panel. */}
       <Panel padded={false}>
-        {/*
-          Route controls ride in `search` (no search box here; DESIGN.md §4b): a sibling row
-          would reflow when FilterBar opens. Uncaptioned, `aria-label` names each. Category
-          and Sell by move into the filter sheet below `useIsNarrow` (FilterBar's own
-          breakpoint), with a one-line summary under the bar.
-        */}
         <FilterBar
           value={filterValue}
           onChange={(next) => setParams(next)}
           active={activeHaulingFilters(filterValue, t)}
-          // Until the scan is in, there are no rows to count.
           resultCount={state.status === 'ready' ? tableRows.length : undefined}
           title={t('market.hauling.filters.title')}
           className="px-3 py-2.5"
@@ -1069,8 +941,6 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
           }
         >
           {(draft, setDraft) => {
-            // Read off the value FilterBar hands in: switching to instant
-            // hides the listing-only fields at once.
             const draftInstant = draft.mode === 'instant';
             return (
               <>
@@ -1191,7 +1061,6 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
           </p>
         )}
 
-        {/* The intro explains the Expected Sell Price: an instant sale has none. */}
         {!introDismissed && !instant && (
           <div className="flex items-start justify-between gap-3 border-t border-accent-dim bg-accent/10 px-3 py-2 text-sm">
             <p>

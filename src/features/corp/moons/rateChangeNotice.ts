@@ -1,10 +1,3 @@
-/**
- * Tells a moon owner's CEO and payee, by the Officer mail queue, that the
- * accounting corporation changed its rate (#4515) or turned settled otherwise on
- * or off (#6209). Called after the change is saved: it never blocks or fails the
- * change, and without the mail permission it does nothing (the moon owner's page
- * carries the in-app line).
- */
 import {
   rateChangeEvent,
   type OwnerRateChange,
@@ -15,7 +8,6 @@ import { enqueueModeChangeMail, enqueueRateChangeMail } from '@/features/corpTax
 import { queueOfficerMail } from '@/features/corpTaxBook/officerMail';
 import { utcDay } from '@/engine/localDay';
 
-/** The change the agreed rate `pct` makes from `asOf` (today by default), or undefined when the effective rate does not move. */
 export function agreedRateChange(
   before: readonly OwnerRateEntry[],
   pct: number,
@@ -31,7 +23,6 @@ export function agreedRateChange(
 
 type Payee = { kind: 'corporation' | 'character'; id: number };
 
-/** The moon owner's CEO and its payee (a corporation payee through its CEO), read live. */
 async function ownerRecipients(feederCorporationId: number, payee: Payee | undefined) {
   const { loadPublicCorporationRecord } = await import('@/features/character/publicInfoData');
   const owner = await loadPublicCorporationRecord(feederCorporationId);
@@ -52,10 +43,8 @@ export async function mailModeChange(input: {
   feederCorporationId: number;
   payee?: Payee;
   mode: 'normal' | 'settled-otherwise';
-  /** When the switch was saved (ms). */
   at: number;
 }): Promise<void> {
-  // The mode is already saved; a mail that cannot be queued never undoes it.
   await queueOfficerMail({
     senderCharacterId: input.characterId,
     grantedScopes: input.grantedScopes,
@@ -82,7 +71,6 @@ export async function mailRateChange(input: {
   payee?: Payee;
   change: OwnerRateChange;
 }): Promise<void> {
-  // The rate is already saved; a mail that cannot be queued never undoes it.
   await queueOfficerMail({
     senderCharacterId: input.characterId,
     grantedScopes: input.grantedScopes,

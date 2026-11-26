@@ -4,12 +4,6 @@ import { DOGMA_ATTRIBUTE } from '@/engine/fittings/types';
 import { skilledAttributes } from './dogmaFittingEngine';
 import { loadRealDogmaEngine } from './__fixtures__/realDogmaEngine';
 
-/**
- * Item Detail's "base → skilled" values (`skilledAttributes`) against the
- * real pinned engine (ADR 0016): a hull alone, and a module alone on a
- * Capsule so no hull bonus leaks into the module's own figures. Type ids
- * looked up by exact name in `public/data/types.json`, 2026-11-03.
- */
 const ZEALOT = 12003;
 const MEDIUM_ARMOR_REPAIRER_II = 3530;
 const MECHANICS = 3392;
@@ -22,7 +16,6 @@ const NOBLE_HULL_UPGRADES_HG_1004 = 3481;
 const ARMOR_HP = DOGMA_ATTRIBUTE.armorHp;
 const STRUCTURE_HP = DOGMA_ATTRIBUTE.hullHp;
 const DURATION = 73;
-// Looked up in `public/data/mutaplasmids.json` / `types.json`, 2026-11-03.
 const MEDIUM_ABYSSAL_ARMOR_REPAIRER = 47773;
 const DECAYED_ARMOR_REPAIRER_MUTAPLASMID = 47770;
 
@@ -41,10 +34,8 @@ describe('skilledAttributes', () => {
       []
     );
     const skilled = await skilledAttributes({ kind: 'ship', typeId: ZEALOT }, profile);
-    // Zealot: 2,250 armor and 1,670 structure HP; each skill +5% a level.
     expect(skilled.get(ARMOR_HP)?.value).toBeCloseTo(2250 * 1.25, 3);
     expect(skilled.get(STRUCTURE_HP)?.value).toBeCloseTo(1670 * 1.25, 3);
-    // Each value says what made it.
     expect(skilled.get(ARMOR_HP)?.sources).toEqual([{ kind: 'skill', typeId: HULL_UPGRADES }]);
     expect(skilled.get(STRUCTURE_HP)?.sources).toEqual([{ kind: 'skill', typeId: MECHANICS }]);
   });
@@ -54,7 +45,6 @@ describe('skilledAttributes', () => {
       { kind: 'ship', typeId: SACRILEGE },
       buildPilotProfile(new Map([[AMARR_CRUISER, 5]]), [])
     );
-    // Sacrilege: 5% armor resists per level of Amarr Cruiser, through the hull's bonus.
     expect(skilled.get(DOGMA_ATTRIBUTE.armorEmResonance)?.value).toBeCloseTo(0.5 * 0.75, 6);
     expect(skilled.get(DOGMA_ATTRIBUTE.armorEmResonance)?.sources).toEqual([
       { kind: 'skill', typeId: AMARR_CRUISER },
@@ -79,7 +69,6 @@ describe('skilledAttributes', () => {
       { kind: 'module', typeId: MEDIUM_ARMOR_REPAIRER_II, slot: 'low' },
       buildPilotProfile(new Map([[REPAIR_SYSTEMS, 5]]), [])
     );
-    // A 12 s cycle, 5% shorter per level of Repair Systems.
     expect(skilled.get(DURATION)?.value).toBeCloseTo(12000 * 0.75, 3);
   });
 
@@ -105,7 +94,6 @@ describe('skilledAttributes', () => {
       { kind: 'ship', typeId: ZEALOT },
       buildPilotProfile(new Map(), [])
     );
-    // No skills, no implants: nothing on the hull is modified.
     expect(skilled.size).toBe(0);
   });
 

@@ -9,7 +9,6 @@ import { DialogShell, Label } from './BookDialogs';
 import { ExportFirst } from './ExportBook';
 import { useBook } from './useBook';
 
-/** Whoever turned the book on (a Director) or the CEO may delete it. The callable stays the gate. */
 function useCanDeleteBook(): boolean {
   const { characterId, verdict, settings } = useBook();
   return (
@@ -18,10 +17,6 @@ function useCanDeleteBook(): boolean {
   );
 }
 
-/**
- * "Delete the book" in the settings' Access tab: only the entry point. `onDelete` closes the
- * settings and opens `DeleteBookDialog`, so the confirmation is the one dialog on screen.
- */
 export function DeleteBookSection({ onDelete }: { onDelete: () => void }) {
   const { t } = useTranslation();
   const allowed = useCanDeleteBook();
@@ -39,21 +34,15 @@ export function DeleteBookSection({ onDelete }: { onDelete: () => void }) {
   );
 }
 
-/**
- * The one confirmation for deleting the book (§6c: destructive, so what goes is said first).
- * The officer types the corporation's ticker; the id stands in only if the ticker cannot be read.
- */
 export function DeleteBookDialog({ onClose }: { onClose: () => void }) {
   const { t } = useTranslation();
   const { characterId, corporationId, reload } = useBook();
   const [typed, setTyped] = useState('');
   const [exporting, setExporting] = useState(false);
-  // The id stands in when the ticker is unreadable: the label then names it as the id.
   const loadTicker = useCallback(
     () =>
       getCorporationPublicInfo(corporationId).then(
         (r) => ({ isId: !r.data?.ticker, expected: r.data?.ticker || String(corporationId) }),
-        // Resolved, not failed: a retry landing mid-typing would swap the word being typed.
         () => ({ isId: true, expected: String(corporationId) })
       ),
     [corporationId]
@@ -66,7 +55,6 @@ export function DeleteBookDialog({ onClose }: { onClose: () => void }) {
     try {
       await deleteBook(characterId, corporationId);
     } finally {
-      // Even a refusal may mean the screen is stale (the book or the role changed).
       reload();
     }
   };

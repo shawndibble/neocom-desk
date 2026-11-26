@@ -1,20 +1,3 @@
-/**
- * Which build chunks the service worker precaches at install, and which it
- * leaves to the idle warm and a cache-first runtime route (`sw.ts`).
- *
- * Only the boot graph is precached: the entry's static imports (what
- * `index.html` modulepreloads), the css they pull in, and the signed-in shell
- * that boot preloads. Every other hashed chunk is a route a pilot may never
- * open; precaching them made every install download most of the app whatever
- * the connection. Chunks import each other through an import map
- * (`chunkImportMapping`), so a deploy renames only the chunks whose own code
- * changed.
- *
- * Pure and import-free: `vite.config.ts` loads this file at config time, and
- * `sw.ts` uses `chunkKey`/`chunksToDelete`.
- */
-
-/** The slice of a Rollup/Rolldown output item this module reads. */
 export interface BundleItemLike {
   type: 'chunk' | 'asset';
   fileName: string;
@@ -22,38 +5,21 @@ export interface BundleItemLike {
   isEntry?: boolean;
   imports?: string[];
   viteMetadata?: { importedCss?: Set<string> };
-  /** A chunk's code; an asset's content (`importmap.json`). */
   code?: string;
   source?: string | Uint8Array;
 }
 export type BundleLike = Record<string, BundleItemLike>;
 
-/**
- * Chunks boot starts by dynamic import (`bootShellPreload.ts` →
- * `preloadSignedInShell`), so they are not in `index.html`'s preload list yet
- * a returning pilot needs them on the first frame, offline included.
- */
 const SHELL_CHUNK_NAMES = new Set(['Layout', 'Overview']);
 
-/** The entry chunk's file name: what identifies a build (its hash changes with every deploy). */
 export function entryFile(bundle: BundleLike): string {
   const entry = Object.values(bundle).find((item) => item.type === 'chunk' && item.isEntry);
   if (!entry) throw new Error('entryFile: the bundle has no entry chunk');
   return entry.fileName;
 }
 
-/**
- * The shell chunks' source modules, as path suffixes of their module ids
- * (`shellChunkGroups`' `shellRoots`).
- */
 export const SHELL_MODULE_SUFFIXES = ['/src/app/Layout.tsx', '/src/routes/Overview.tsx'];
 
-/**
- * The routes `App.tsx` renders lazily outside the signed-in shell, as path
- * suffixes of their module ids (`shellChunkGroups`' `publicRoots`). A visitor
- * with no Character opens them, so they must not load the shell chunk.
- * `lazyChunks.test.ts` checks the list against `App.tsx`.
- */
 export const PUBLIC_ROUTE_SUFFIXES = [
   '/src/routes/FittingShared.tsx',
   '/src/routes/SharedLink.tsx',
@@ -65,47 +31,15 @@ export const PUBLIC_ROUTE_SUFFIXES = [
   '/src/routes/ErrorProbe.tsx',
 ];
 
-/** The module graph `shellChunkGroups` reads, by module id. */
 export interface ShellGraph {
-  /** The build's entry modules (`index.html`). */
   entries: readonly string[];
   shellRoots: readonly string[];
   publicRoots: readonly string[];
-  /**
-   * The route modules `routeChunks.ts` loads by `import()`. A walk of what a
-   * signed-out visitor can load follows dynamic imports but stops here: past
-   * this line is the signed-in app, not the page they are on.
-   */
   routeModules: readonly string[];
-  /** The bundler's static imports of a module; `undefined` (unknown) is none. */
   importedIds: (id: string) => readonly string[] | undefined;
-  /** The bundler's `import()` targets of a module; `undefined` (unknown) is none. */
   dynamicallyImportedIds: (id: string) => readonly string[] | undefined;
 }
 
-/**
- * The modules of the three code-splitting groups (`vite.config.ts`) that make
- * the signed-in shell a handful of chunks. Rolldown otherwise gives every set
- * of routes sharing a module a chunk of its own: boot → Overview was ~220 shell
- * files, most under 2 KiB, each a request before first paint.
- *
- * Each takes the shell's static closure (less what the entry statically
- * reaches, which is the `boot` group's: in a shell chunk it would make the
- * entry import it, so /login would download it; and less the shell modules
- * themselves, so their chunks keep their names for `missingShellChunks`):
- * - `publicShared`: the part a public route reaches, `import()`s included (a
- *   Share Link's lazy share views).
- * - `entryLazy`: the part the entry reaches only by `import()` (the info
- *   modals `App` mounts on every route, the prefetchers), short of the
- *   signed-in routes (`routeModules`). Kept apart from `publicShared` because
- *   most of it never loads signed out, and a Share Link visitor would
- *   otherwise download it all.
- * - `shell`: the rest, which only the signed-in app loads.
- *
- * Each set is closed under static imports into itself, the sets before it and
- * the entry's, so `publicShared` never imports the others and `entryLazy`
- * never imports `shell`: a signed-out page never loads the `shell` chunk.
- */
 export function shellChunkGroups(graph: ShellGraph): {
   shell: Set<string>;
   publicShared: Set<string>;
@@ -144,10 +78,6 @@ export function shellChunkGroups(graph: ShellGraph): {
 
 const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-/**
- * The value names in an `{ a, b as c, type T }` clause, by their exported
- * (left-hand) name. Inline `type` names are dropped: they import no module.
- */
 const clauseNames = (clause: string) =>
   clause
     .split(',')
@@ -155,26 +85,11 @@ const clauseNames = (clause: string) =>
     .filter((part) => part.length > 0 && !/^type\s/.test(part))
     .map((part) => part.split(/\s+as\s+/)[0]);
 
-/**
- * A module's static imports with a re-export barrel replaced by the modules
- * that declare the names it imports from it. `@/components/ui` is
- * side-effect-free, so the bundle keeps only the primitives a module uses, but
- * the import graph names the barrel, which re-exports every one of them: a
- * closure walked through it held DataTable, Select and the virtualizer, and the
- * shell group dragged them onto the boot path. Reads the module's `code` as
- * the bundler holds it (Rolldown's is after the TypeScript transform, so type
- * imports are already gone; `import type` and inline `type` names are skipped
- * anyway). Where the import is not a plain `{ … }` list, or a name is not a
- * re-export, the barrel stays, and `onFallback` hears of it: too much is safe,
- * too little is not.
- */
 export function throughBarrel(options: {
   barrel: string;
-  /** How importers name the barrel, as written in their code. */
   specifier: string;
   importedIds: (id: string) => readonly string[] | undefined;
   code: (id: string) => string | null | undefined;
-  /** Called with each importer whose barrel import could not be traced. */
   onFallback?: (id: string) => void;
 }): (id: string) => readonly string[] | undefined {
   const { barrel, specifier, importedIds, code, onFallback } = options;
@@ -220,22 +135,11 @@ export function throughBarrel(options: {
   };
 }
 
-/**
- * The shell chunks the bundle no longer has under their expected `name`
- * (a rename, or a name collision like `Overview2`, would quietly drop them from
- * the boot graph). The build fails on a non-empty result.
- */
 export function missingShellChunks(bundle: BundleLike): string[] {
   const names = new Set(Object.values(bundle).map((item) => item.name));
   return [...SHELL_CHUNK_NAMES].filter((name) => !names.has(name));
 }
 
-/**
- * Rolldown's chunk import map (`build.chunkImportMap`) as stable name → hashed
- * file, both under the base (`assets/x-STABLE.js` → `assets/x-HASH.js`). A chunk
- * imports its neighbours by the stable name, so its own hash no longer changes
- * when theirs do. Empty when the bundle has none.
- */
 export function chunkImportMapping(bundle: BundleLike, base: string): Record<string, string> {
   const source = bundle['importmap.json']?.source;
   if (source === undefined) return {};
@@ -246,23 +150,11 @@ export function chunkImportMapping(bundle: BundleLike, base: string): Record<str
   );
 }
 
-/**
- * Whether the entry chunk's code carries the release. With the import map a
- * chunk's hash follows its own code only, and `lazy-chunks.json`'s `entry`
- * (`listMatchesBuild`) must still name exactly one build: `instrument.ts`
- * hands Sentry the release from the entry, so the entry changes every deploy.
- */
 export function entryNamesRelease(bundle: BundleLike, release: string): boolean {
   const entry = bundle[entryFile(bundle)];
   return entry.code?.includes(release) ?? false;
 }
 
-/**
- * Every file the app needs to boot: static imports (and their css) of the entry
- * and the shell chunks. An import may name the chunk by its import-map key
- * (`chunkImportMapping`); one that names no file throws, since a boot chunk
- * missing here would quietly drop out of the precache.
- */
 export function bootClosure(
   bundle: BundleLike,
   importMap: Readonly<Record<string, string>> = {}
@@ -292,7 +184,6 @@ export function bootClosure(
   return boot;
 }
 
-/** The hashed js and css under `assets/` that are not boot files, sorted: the lazy set. */
 export function lazyChunkFiles(bundle: BundleLike, boot: ReadonlySet<string>): string[] {
   return Object.values(bundle)
     .map((item) => item.fileName)
@@ -304,11 +195,6 @@ interface ManifestEntryLike {
   url: string;
 }
 
-/**
- * A Workbox `manifestTransforms` function that drops the lazy chunks from the
- * precache manifest and keeps everything else. An empty set would drop nothing
- * and quietly precache the whole app again, so it throws.
- */
 export function dropLazyFromManifest(lazy: ReadonlySet<string>) {
   if (lazy.size === 0) throw new Error('dropLazyFromManifest: the lazy chunk list is empty');
   return async <T extends ManifestEntryLike>(entries: T[]) => ({
@@ -317,38 +203,25 @@ export function dropLazyFromManifest(lazy: ReadonlySet<string>) {
   });
 }
 
-/** `lazy-chunks.json`: what the warm, the Offline panel and the worker's cleanup read. `entry` names the build it belongs to. */
 export function lazyChunksJson(files: readonly string[], release: string, entry: string): string {
   return JSON.stringify({ release, entry, files });
 }
 
-/**
- * Whether a `lazy-chunks.json` body belongs to the build this worker precached
- * (its entry file is in the worker's precache manifest). The file is read live,
- * so a worker for build N activating after N+1 deployed would otherwise prune
- * the chunks the page, still on N, is about to ask for.
- */
 export function listMatchesBuild(body: unknown, precachedUrls: readonly string[]): boolean {
   const entry = (body as { entry?: unknown } | null)?.entry;
   return typeof entry === 'string' && precachedUrls.includes(entry);
 }
 
-/** A request URL as the list names it: its path under the site base, query dropped. */
 export function chunkKey(url: string, basePath: string): string {
   return new URL(url).pathname.slice(basePath.length);
 }
 
-/**
- * The cached chunks (as `chunkKey`s) the current build no longer lists. An
- * empty list means it could not be read, never "delete everything".
- */
 export function chunksToDelete(cached: readonly string[], current: readonly string[]): string[] {
   if (current.length === 0) return [];
   const keep = new Set(current);
   return cached.filter((key) => !keep.has(key));
 }
 
-/** The file names in a `lazy-chunks.json` body, or `[]` when it is not one (an HTML fallback page, a bad shape). */
 export function parseLazyChunksJson(body: unknown): string[] {
   const files = (body as { files?: unknown } | null)?.files;
   return Array.isArray(files)
@@ -356,7 +229,6 @@ export function parseLazyChunksJson(body: unknown): string[] {
     : [];
 }
 
-/** The slice of a Rolldown `RenderedChunk` (`renderChunk`'s `meta.chunks`) `preloadGraphSignature` reads. */
 export interface RenderedChunkLike {
   name: string;
   moduleIds: readonly string[];
@@ -364,17 +236,6 @@ export interface RenderedChunkLike {
   dynamicImports: readonly string[];
 }
 
-/**
- * What a chunk's preload lists will name, as a string for `augmentChunkHash`.
- * Vite writes each `import()`'s preload list (`__vite__mapDeps`: the target and
- * everything it statically imports, css included) after the hash is fixed. With
- * the import map a chunk's hash covers only its own code, so a chunk whose list
- * changed kept its name with new bytes, and the precache (`revision: null`) and
- * the `lazy-chunks` route kept the old bytes for good. Signing each chunk the
- * import pulls in by name and modules (never the preliminary file name, whose
- * placeholders are positional) renames it exactly when its lists can change.
- * Empty without a dynamic import.
- */
 export function preloadGraphSignature(
   fileName: string,
   chunks: Readonly<Record<string, RenderedChunkLike>>

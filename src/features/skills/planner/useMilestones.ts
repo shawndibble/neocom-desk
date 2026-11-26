@@ -21,7 +21,6 @@ import {
 import { appendImport, type SkillPlanEditable } from './skillPlanEdit';
 import { useFitGoalNeeds } from './useFitGoalNeeds';
 
-/** The naming modal's state: 'add' opens it blank, anchored to a row; 'rename' seeds it with the current name. */
 export type MilestoneModalState =
   | { mode: 'add'; skillTypeID: number; level: number }
   | { mode: 'rename'; id: string; currentName: string }
@@ -40,12 +39,6 @@ interface UseMilestonesArgs {
   onUpdate: (patch: Partial<SkillPlanRecord>) => void | Promise<void>;
 }
 
-/**
- * Plan Milestones (GLOSSARY.md) and fit goals: their statuses against the
- * current schedule, the naming modal, and the fit-goal picker. Recomputed
- * whenever the schedule or the milestones change, like every other
- * schedule-derived value.
- */
 export function useMilestones({
   characterId,
   milestones,
@@ -58,10 +51,7 @@ export function useMilestones({
   startDate,
   onUpdate,
 }: UseMilestonesArgs) {
-  // The Plan Milestone naming modal (MilestoneModal). One instance shared by
-  // every row, like the marker editor's index.
   const [milestoneModal, setMilestoneModal] = useState<MilestoneModalState>(null);
-  // The fit-goal picker (issue #3564): open while a saved Fitting is being chosen.
   const [fitGoalOpen, setFitGoalOpen] = useState(false);
 
   const trackedFittingIds = useMemo(
@@ -69,8 +59,6 @@ export function useMilestones({
     [milestones]
   );
   const fitGoalData = useFitGoalNeeds(characterId, trackedFittingIds, fitGoalOpen);
-  // Needs the plan can't schedule (catalog-unknown skills) are left out, so a
-  // Fitting using one still resolves instead of staying "missing" forever.
   const fitNeeds = useMemo(
     () =>
       new Map(
@@ -88,8 +76,6 @@ export function useMilestones({
     () => new Map([...trainedSkills].map(([id, skill]) => [id, skill.level])),
     [trainedSkills]
   );
-  // A fit goal reads orphaned once its Fitting is deleted, or once the plan no
-  // longer covers what the Fitting needs (an edit added a module, an entry went).
   const goneFittingIds = useMemo(
     () =>
       new Set(
@@ -120,9 +106,6 @@ export function useMilestones({
       milestoneStatusByKey.get(stepKey({ skillTypeID, level })),
     [milestoneStatusByKey]
   );
-  // Gone from the plan entirely (never trained, never scheduled) — the only
-  // milestones with no row of their own to show on, so the header lists them
-  // separately with a remove action rather than dropping them silently.
   const orphanedMilestones = useMemo(
     () => milestoneStatuses.filter((s) => s.state === 'orphaned'),
     [milestoneStatuses]
@@ -157,20 +140,16 @@ export function useMilestones({
     ]
   );
 
-  // Keeps each fit goal on the latest step its Fitting needs: follows a
-  // Fitting edit, a rename and a reorder. Only writes when something moved.
   useEffect(() => {
     if (!milestones?.some((m) => m.fittingId !== undefined)) return;
     const next = reanchorFitGoals(milestones, fitNeeds, trainedLevels, scheduled);
     if (next !== milestones) void onUpdate({ milestones: [...(next ?? [])] });
   }, [milestones, fitNeeds, trainedLevels, scheduled, onUpdate]);
 
-  /** EntryList's row menu "Add milestone": opens the naming modal anchored to that row. */
   const handleAddMilestone = useCallback((skillTypeID: number, level: number) => {
     setMilestoneModal({ mode: 'add', skillTypeID, level });
   }, []);
 
-  /** The row menu's "Rename": opens the same modal, seeded with the existing name. */
   const handleRenameMilestone = useCallback(
     (milestoneId: string) => {
       const current = (milestones ?? []).find((m) => m.id === milestoneId);
@@ -187,7 +166,6 @@ export function useMilestones({
     [milestones, onUpdate]
   );
 
-  /** FitGoalModal's pick: add the Fitting's missing skills (prerequisites follow), then anchor its goal. */
   function pickFitGoal(option: FitGoalOption) {
     const need = fitNeeds.get(option.id);
     if (!need || !isFitGoalPickable(option)) return;
@@ -208,7 +186,6 @@ export function useMilestones({
     });
   }
 
-  /** MilestoneModal's Save, for both 'add' and 'rename'. */
   function submitMilestoneModal(name: string) {
     if (!milestoneModal) return;
     if (milestoneModal.mode === 'add') {

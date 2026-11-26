@@ -1,7 +1,3 @@
-/**
- * Mails the pilot a claim's result from the active officer's Character, by the paced Officer mail queue. Never
- * throws: whatever goes wrong comes back as a `MailRun` the result line reports.
- */
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useActiveCharacter } from '@/stores/activeCharacter';

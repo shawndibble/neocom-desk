@@ -31,12 +31,6 @@ const ORDER_DEPTH_TONE: Record<OrderDepthLevel, StatChipTone> = {
   unknown: 'default',
 };
 
-/**
- * The columns' sort keys, at module scope: the columns themselves close over
- * render-time state (and `onStartPlan`, which the parent rebuilds every
- * render), but `DataTable` keys its sort memo on the active `sortValue`, so
- * keeping these stable is what stops a re-render from re-sorting every row.
- */
 export const SORT_VALUE = {
   product: (row: MarketWideDayRow) => row.productName,
   blueprintSource: (row: MarketWideDayRow) => BLUEPRINT_SOURCE_RANK[row.blueprintSource],
@@ -49,7 +43,6 @@ export const SORT_VALUE = {
   iskPerDay: (row: MarketWideDayRow) => row.iskPerDay ?? undefined,
 };
 
-/** The ranking table's columns, closed over the panel's render-time state. */
 export function useMarketWideColumns({
   catalog,
   characterNames,
@@ -106,8 +99,6 @@ export function useMarketWideColumns({
       id: 'blueprintSource',
       header: t('industry.marketOpportunitiesBlueprintSource'),
       sortValue: SORT_VALUE.blueprintSource,
-      // The header already names the column, so the cell is just the toned value.
-      // The NPC market is nearly every row's source; only an exception is worth a word.
       render: (row) =>
         row.blueprintSource === 'market' ? null : (
           <span
@@ -137,7 +128,6 @@ export function useMarketWideColumns({
       render: (row) => <Vs90dFigure value={row.vs90d} />,
     },
     {
-      // The whole tree's TE-0 job time: ISK/hour's denominator, not a wall-clock promise.
       id: 'duration',
       header: t('industry.time'),
       align: 'right',
@@ -152,8 +142,6 @@ export function useMarketWideColumns({
       className: 'tabular-nums',
       sortValue: SORT_VALUE.iskPerHour,
       cellClassName: (row) => (row.iskPerHour !== null ? iskToneClass(row.iskPerHour) : undefined),
-      // Tap, not long press: the ranking's figures are inert — the row's only
-      // actions are the button in its last cell and the row's context menu.
       render: (row) =>
         row.iskPerHour === null ? (
           t('common.unknown')
@@ -179,7 +167,6 @@ export function useMarketWideColumns({
       cellClassName: (row) => (row.iskPerDay !== null ? iskToneClass(row.iskPerDay) : undefined),
       render: (row) =>
         row.iskPerDay === null ? (
-          // Still reading this product's sales: a blank dash would read as no sales at all.
           dailySales.pending > 0 && !dailySales.sales.has(row.productTypeID) ? (
             <span className="text-text-dim">…</span>
           ) : (

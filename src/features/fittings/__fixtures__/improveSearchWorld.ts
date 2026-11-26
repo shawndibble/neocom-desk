@@ -1,8 +1,3 @@
-/**
- * Test-only: the Improve search's ports over the real engine and SDE
- * (`computeFittingStats`, an All-V pilot) with a fixed price for every type,
- * and the catalogue built from public/data, so `runImproveSearch` runs whole.
- */
 import { createRequire } from 'node:module';
 import { readFile } from 'node:fs/promises';
 import { buildAllVProfile } from '@/engine/fittings/pilotProfile';
@@ -18,9 +13,7 @@ const require = createRequire(import.meta.url);
 const readJson = async <T>(path: string): Promise<T> =>
   JSON.parse(await readFile(require.resolve(`../../../../public/data/${path}`), 'utf8')) as T;
 
-/** Every type's price in the fixed price map. */
 export const PRICE = 1_000_000;
-/** What every test fit costs. */
 export const FIT_TOTAL = 50_000_000;
 
 export type Racks = Partial<Record<FittingSlotKind, string[]>>;

@@ -8,11 +8,6 @@ interface TypeIconLabelProps {
   className?: string;
 }
 
-/**
- * A type's icon, then its name (or any label node), on one line: the plain-text
- * module lists (killmail fit, SRP doctrine diff) use it so a row reads like the
- * fitting editor's. The icon is decorative; `children` names the item.
- */
 export function TypeIconLabel({ typeId, children, className }: TypeIconLabelProps) {
   return (
     <span className={cx('inline-flex min-w-0 items-center gap-1.5 align-middle', className)}>

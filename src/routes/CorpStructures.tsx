@@ -1,14 +1,3 @@
-/**
- * `/corp/structures` — every Upwell structure in every corporation the
- * account's Characters can read, as one table (issue #6089): where each is,
- * how long its fuel lasts, what state it is in and which services are off.
- *
- * Read across corporations, not only the active Character's: a pilot with a
- * structure in each of a dozen holding corporations is the reader this page is
- * for, so it is gated on the account (`loadAllStructuresBoard`), not on
- * `useCorpRouteGate`. Rows come from the same model the Structures widget draws
- * (`structureRows`), so its Problems only and this page's keep the same rows.
- */
 import { useCallback, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { GrantBanner } from '@/app/GrantNote';
@@ -107,16 +96,12 @@ const FILTER_PARAMS = {
 const SORT_PARAM = optionalSortParam();
 const OPEN_PARAM = optionalIdParam();
 
-/** "Any" sentinel for the corporation select: Radix reads `''` as "nothing selected". */
 const ANY = '__any';
 const DASH = '—';
 const NO_CORPORATIONS: ReadonlyMap<number, CorpLabel> = new Map();
-/** A slow burn (under a block a day) keeps its tenth rather than rounding to 0. */
 const formatTenths = createNumberFormat({ maximumFractionDigits: 1 });
-/** The "Fuel until" date an untouched page plans toward, in days from today. */
 const DEFAULT_FUEL_DAYS = 30;
 
-/** A structure's fuel bay and what it implies; `blocks` is null when the bay cannot be read. */
 interface FuelRow {
   blocks: number | null;
   plan: FuelPlan;
@@ -124,23 +109,17 @@ interface FuelRow {
 
 interface StructuresSnapshot {
   data: StructuresBoardData;
-  /** Refinery extractions by structure id; empty when no reader can read them. */
   extractions: ReadonlyMap<number, BoardExtractionSource>;
   typeNames: ReadonlyMap<number, string>;
-  /** Fuel bays by corporation id; a corporation without assets access has no entry. */
   fuelBays: ReadonlyMap<number, CorpFuelBays>;
-  /** Control towers, which are structures that need fuel too; null when they could not be read. */
   towers: CorpStarbasesFeed | null;
 }
 
 async function loadStructuresSnapshot(): Promise<StructuresSnapshot> {
   const [data, moons, fuelBays, towerFeed] = await Promise.all([
     loadAllStructuresBoard(),
-    // Extractions only add a section to a refinery's detail: a failed read costs that, nothing else.
     loadAllMoonChunksBoard().catch(() => null),
-    // Fuel bays only add the block counts: without them every row shows time left alone.
     loadStructureFuelBays().catch(() => new Map<number, CorpFuelBays>()),
-    // Towers only add rows: a corporation whose towers cannot be read still lists its Upwell ones.
     loadCorpStarbasesAllFeed().catch(() => null),
   ]);
   const typeIds = (data.structures ?? [])
@@ -152,14 +131,12 @@ async function loadStructuresSnapshot(): Promise<StructuresSnapshot> {
     extractions: new Map(
       (moons?.extractions ?? []).map((extraction) => [extraction.structureId, extraction])
     ),
-    // A tower's type name comes with its feed.
     typeNames: new Map([...typeNames, ...(towerFeed?.typeNames ?? [])]),
     fuelBays,
     towers: towerFeed?.readable ? towerFeed : null,
   };
 }
 
-/** A system name as the structure's own name gives it, for a system the index lacks. */
 function namePrefix(name: string): string {
   const cut = name.indexOf(' - ');
   return cut > 0 ? name.slice(0, cut) : DASH;
@@ -184,7 +161,6 @@ export function CorpStructures() {
   const setFuelRates = useFuelRates((s) => s.setValue);
   const fuelPrefsHydrated = useHydratedStore(useFuelUntil, useFuelRates);
   const today = utcDay(now);
-  // A saved date that has passed would zero every row: plan the default month instead.
   const fuelUntil =
     storedFuelUntil !== null && storedFuelUntil >= today
       ? storedFuelUntil
@@ -192,7 +168,6 @@ export function CorpStructures() {
   const { copied, flash } = useCopyFeedback<'copied' | 'failed'>(2000);
 
   const towers = snapshot.data?.towers ?? null;
-  // A Director who has not granted the starbases scope reads the structures but no towers, silently.
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
   const { missingScopes } = useCorpAccess();
   const towersNeedGrant = CORP_SCOPES_FOR_CAPABILITY.canReadStarbases.some((scope) =>
@@ -225,7 +200,6 @@ export function CorpStructures() {
     const untilMs = fuelUntilMs(fuelUntil);
     for (const { source } of rows) {
       if (source.tower) {
-        // Its bay came with the tower and its burn rate is CCP's: no assets read, nothing to measure.
         byId.set(source.structureId, {
           blocks: source.tower.blocks,
           plan: starbaseFuelPlan({
@@ -258,7 +232,6 @@ export function CorpStructures() {
     }
     return byId;
   }, [rows, data, snapshot.data, fuelUntil, fuelRates]);
-  // Remember each rate measured from a same-time pair, for when a refuel splits the next one.
   useEffect(() => {
     if (!fuelPrefsHydrated) return;
     const measured = new Map<number, number>();
@@ -496,8 +469,6 @@ export function CorpStructures() {
               )}
             </span>
           );
-          // The phone card prints no Services text, so it names the offline ones as one token:
-          // a second child keeps the cell on the meta line past the `data-dense-omit` rule.
           return row.offline.length === 0 ? (
             services
           ) : (
@@ -524,7 +495,6 @@ export function CorpStructures() {
     ];
   }, [t, multiCorp, corpOf, systemOf, systemName, snapshot.data, fuelOf]);
 
-  /** The visible rows that need blocks, in table order: the footer total and Copy list both read this. */
   const shoppingList = useMemo(
     () =>
       visible.flatMap((row) => {
@@ -535,7 +505,6 @@ export function CorpStructures() {
   );
   const totalNeeded = shoppingList.reduce((sum, item) => sum + item.needed, 0);
   const unknownNeeded = visible.filter((row) => (fuelOf(row)?.plan.needed ?? null) === null).length;
-  // A tower's bay is read with the tower, not through assets, so it never lacks assets access.
   const noBayAccess = visible.some(
     (row) => !row.source.tower && (fuelOf(row)?.blocks ?? null) === null
   );
@@ -727,7 +696,6 @@ export function CorpStructures() {
                     rowKey={(row) => row.source.structureId}
                     sort={sort}
                     onSortChange={setSort}
-                    // Opening pushes, so Back closes the panel; closing replaces.
                     onRowClick={(row) => setOpenId(row.source.structureId, { push: true })}
                     selectedRowKey={openId}
                     stackLayout="dense"
@@ -751,7 +719,6 @@ export function CorpStructures() {
                       />
                     </label>
                     <span data-testid="fuel-total" className="tabular-nums">
-                      {/* All unknown: a "Total 0" would read as a fact. */}
                       {unknownNeeded < visible.length &&
                         t('corp.structures.fuelPlan.total', {
                           count: totalNeeded,

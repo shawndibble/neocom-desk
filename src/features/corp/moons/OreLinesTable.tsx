@@ -7,11 +7,6 @@ import { useIsPhone } from '@/lib/useIsPhone';
 import { isk } from './moonsFormat';
 import { useBook } from './useBook';
 
-/**
- * What an opened row says: one line per ore (amount, estimated value, tax) and, unless `showTotal` is off, a total line.
- * On a phone each ore is one labelled line instead of a four-column table.
- * `foot` is the row's one link ("Open miner", "Open page"), set apart under the lines.
- */
 export function OreLinesTable({
   lines,
   label,
@@ -21,7 +16,6 @@ export function OreLinesTable({
   lines: readonly OreTaxLine[];
   label: string;
   foot?: ReactNode;
-  /** Off where the opened row's own cells already carry the totals (the Moon page's Miner rows). */
   showTotal?: boolean;
 }) {
   const { t } = useTranslation();

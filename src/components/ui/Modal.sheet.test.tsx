@@ -35,10 +35,8 @@ function SheetHarness({
   );
 }
 
-/** The grabber-plus-header drag zone: the header's parent. */
 const dragZone = () => screen.getByRole('banner', { hidden: true }).parentElement!;
 
-/** Press, drag `dy` px down in two steps, release; the clock is stubbed so velocity is deterministic. */
 function swipe(zone: Element, dy: number, elapsedMs: number) {
   let now = 1000;
   const spy = vi.spyOn(performance, 'now').mockImplementation(() => now);
@@ -53,7 +51,6 @@ function swipe(zone: Element, dy: number, elapsedMs: number) {
 
 afterEach(async () => {
   cleanup();
-  // Let each test's deferred history cleanup land before the next one starts.
   await waitFor(() => expect(overlayEntry()).toBeUndefined());
   window.history.replaceState(null, '');
 });
@@ -127,10 +124,8 @@ describe('Modal bottom sheet', () => {
     }
     render(<Counting />);
     swipe(dragZone(), 120, 1000);
-    // Escape (or a tap on the backdrop) while the sheet is still sliding off.
     fireEvent(screen.getByRole('dialog'), new Event('cancel', { cancelable: true }));
     expect(closes).toHaveBeenCalledTimes(1);
-    // Once the slide has finished and the sheet is gone, still the one close.
     await waitFor(() =>
       expect(screen.queryByRole('button', { name: 'Inside' })).not.toBeInTheDocument()
     );

@@ -42,7 +42,6 @@ describe('purgeCharacterCache', () => {
   });
 
   it('spares GLOBAL_CACHE_CHARACTER_ID rows — public universe data behind no scope', async () => {
-    // Public reference data: purging is churn with no privacy benefit.
     await seed(GLOBAL_CACHE_CHARACTER_ID, 'type:587');
     await seed(GLOBAL_CACHE_CHARACTER_ID, 'name:1000035');
     await seed(GLOBAL_CACHE_CHARACTER_ID, 'station:60003760');
@@ -83,11 +82,6 @@ describe('purgeCharacterCache', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Escalating fallback: a failing purge must never fail login or a token
-// refresh, and must never leave the previous owner's rows readable.
-// ---------------------------------------------------------------------------
-
 function throwing(message: string): () => never {
   return () => {
     throw new Error(message);
@@ -113,7 +107,6 @@ describe('purgeCharacterCacheOrSuppress', () => {
   });
 
   it('tier 2: escalates to clearing the WHOLE table when the targeted range delete fails', async () => {
-    // A damaged compound index fails the range delete but not a table clear.
     await seed(CHAR_ID, 'wallet:balance');
     await seed(NEIGHBOUR_ABOVE, 'wallet:balance');
     await seed(GLOBAL_CACHE_CHARACTER_ID, 'type:587');
@@ -135,7 +128,6 @@ describe('purgeCharacterCacheOrSuppress', () => {
     where.mockRestore();
     clear.mockRestore();
 
-    // The row is still on disk — we could not delete it. It must never be read.
     expect(await keysFor(CHAR_ID)).toEqual(['wallet:balance']);
     expect(await isCachePurgePending(CHAR_ID)).toBe(true);
   });
@@ -150,14 +142,10 @@ describe('purgeCharacterCacheOrSuppress', () => {
 
     const key = `${CACHE_PURGE_PENDING_PREFIX}${CHAR_ID}`;
     expect((await db.settings.get(key))?.value).toBe(true);
-    // Device state: a stuck purge on THIS device must not suppress the cache
-    // on every other device (sync/planSync only pushes 'sync.'-prefixed keys).
     expect(key.startsWith('sync.')).toBe(false);
   });
 
   it('tier 3 still suppresses in memory when the durable marker write ALSO fails', async () => {
-    // Origin-wide quota exhaustion fails every readwrite transaction, the
-    // settings write included. The in-memory set is what holds the line.
     await seed(CHAR_ID, 'wallet:balance');
     const where = vi.spyOn(db.esiCache, 'where').mockImplementation(throwing('index damaged'));
     const clear = vi.spyOn(db.esiCache, 'clear').mockRejectedValue(new Error('QuotaExceeded'));
@@ -212,12 +200,6 @@ describe('purgeCharacterCacheOrSuppress', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Corp change (issue #293). Leaving a corporation revokes consent for that
-// corporation's rows and nothing else — a pilot who changes corp keeps their
-// own skills, mail and wallet.
-// ---------------------------------------------------------------------------
-
 describe('purgeCorpScopedCache', () => {
   const CORP_A = 98000001;
   const CORP_B = 98000002;
@@ -227,9 +209,6 @@ describe('purgeCorpScopedCache', () => {
     await seed(CHAR_ID, corpCacheKey(CORP_A, 'wallets'));
     await seed(CHAR_ID, 'skills');
     await seed(CHAR_ID, 'wallet:balance');
-    // Real key from features/character/employmentHistory.ts, plus a synthetic
-    // probe of the range's upper bound: ':' sorts below every letter, so a key
-    // merely *starting* with "corp" must fall outside `corp:`..`corp:￿`.
     await seed(CHAR_ID, 'employment-history');
     await seed(CHAR_ID, 'corporation-history');
 
@@ -245,7 +224,6 @@ describe('purgeCorpScopedCache', () => {
   });
 
   it('deletes rows for every corporation the character holds, not just one', async () => {
-    // A pilot who has been round the block: A -> B -> A leaves rows under both.
     await seed(CHAR_ID, corpCacheKey(CORP_A, 'structures'));
     await seed(CHAR_ID, corpCacheKey(CORP_B, 'structures'));
     await seed(CHAR_ID, 'skills');
@@ -293,12 +271,6 @@ describe('purgeCorpScopedCache', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// The roster emptying out (issue #669's follow-up). A structure name shared
-// across the roster is not the sentinel's usual public reference data, so it
-// has exactly one purge trigger: nobody left in the roster to have shared it.
-// ---------------------------------------------------------------------------
-
 describe('purgeSharedStructureCache', () => {
   it('deletes every shared structure row under the sentinel, whatever suffix it carries', async () => {
     await seed(GLOBAL_CACHE_CHARACTER_ID, 'structure:1000000000001');
@@ -315,9 +287,6 @@ describe('purgeSharedStructureCache', () => {
     await seed(GLOBAL_CACHE_CHARACTER_ID, 'name:1000035');
     await seed(GLOBAL_CACHE_CHARACTER_ID, 'station:60003760');
     await seed(GLOBAL_CACHE_CHARACTER_ID, 'structure:1000000000001');
-    // A key merely starting with the same letters must not fall inside the
-    // range — same discriminating case `purgeCorpScopedCache`'s own test
-    // makes for `corp:` vs. `corporation-history`.
     await seed(GLOBAL_CACHE_CHARACTER_ID, 'structured-data-probe');
 
     await purgeSharedStructureCache();

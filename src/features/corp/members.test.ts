@@ -16,11 +16,6 @@ import {
   toMemberRoles,
 } from './members';
 
-/**
- * `loadTypeNames` reads the SDE snapshot off disk before it touches ESI and has
- * its own tests for that. Stubbing it keeps these cases about the *roster's*
- * call budget, which is what AC3 is a claim about.
- */
 vi.mock('@/features/character/typeNames', () => ({
   loadTypeNames: vi.fn(
     async (ids: readonly number[]) => new Map(ids.map((id) => [id, `Type ${id}`]))
@@ -84,10 +79,6 @@ describe('loadCorporationMemberTracking', () => {
     );
   });
 
-  /**
-   * A Character who lost the Director role, or never had it. Re-authing cannot
-   * grant an in-game role, so this must not raise the app-wide notice.
-   */
   it('treats a 403 as the in-game role gate, not a re-login prompt', async () => {
     server.use(
       http.get(`${ESI_BASE_URL}/corporations/${CORP_ID}/membertracking`, () =>
@@ -140,7 +131,6 @@ describe('toMemberRoles', () => {
     expect(roles.get(1002)).toEqual(['Accountant', 'Trader']);
   });
 
-  /** ESI omits the array rather than sending `[]` — `roles.ts`'s note. */
   it('reads an omitted roles array as no roles, not unknown', () => {
     expect(toMemberRoles([{ character_id: 1003 }]).get(1003)).toEqual([]);
   });
@@ -175,7 +165,6 @@ describe('toMemberActivity', () => {
 });
 
 describe('loadMemberLabels (AC3)', () => {
-  /** Two hundred members, one station, one ship: the shape of a real corp. */
   function roster(size: number) {
     return Array.from({ length: size }, (_, i) => ({
       characterId: 1000 + i,
@@ -188,9 +177,6 @@ describe('loadMemberLabels (AC3)', () => {
   }
 
   it('resolves a 200-member roster in one names call, not two hundred', async () => {
-    // Every request body, not just the last: `loadMemberLabels` fans its
-    // three lookups out with `Promise.all`, so which one lands last is not
-    // something this test gets to assert.
     const batches: number[][] = [];
     server.use(
       http.post(`${ESI_BASE_URL}/universe/names`, async ({ request }) => {
@@ -204,7 +190,6 @@ describe('loadMemberLabels (AC3)', () => {
 
     const labels = await loadMemberLabels(CHAR_ID, roster(200));
 
-    // One batch for the 200 characters, one for the single distinct location.
     expect(batches).toHaveLength(2);
     expect(batches).toContainEqual([60003760]);
     expect(batches.some((ids) => ids.length === 200)).toBe(true);
@@ -213,11 +198,6 @@ describe('loadMemberLabels (AC3)', () => {
     expect(labels.locations.get(60003760)).toBe('Name 60003760');
   });
 
-  /**
-   * An Upwell structure has no bulk name endpoint and would 404 the whole
-   * `/universe/names` batch if it were mixed in, so it is split out by id range
-   * and asked for on its own — once per distinct structure, not per member.
-   */
   it('resolves an Upwell structure separately from the bulk batch', async () => {
     const STRUCTURE_ID = 1035466617946;
     let structureCalls = 0;
@@ -242,16 +222,6 @@ describe('loadMemberLabels (AC3)', () => {
     expect(labels.locations.get(STRUCTURE_ID)).toBe('X-7OMU - Home');
   });
 
-  /**
-   * Issue #655. Deduplication alone does not bound this: a corp spread across
-   * nullsec stands in as many distinct Upwell structures as it holds, each its
-   * own `/universe/structures/{id}`, and the roster used to ask for all of them
-   * at once — on top of every other read the app had in flight.
-   * `corp/assets.ts` took the `ESI_FANOUT_CONCURRENCY` cap in issue #420 and
-   * this call site was missed, so pin the cap rather than trust the shape of
-   * the code: the upper bound is what an uncapped `Promise.all` fails, the
-   * lower bound is what a fully sequential loop fails.
-   */
   it('caps the per-structure name-resolution fan-out instead of firing every request at once', async () => {
     const FLOOR = 1_000_000_000_000;
     const structureIds = Array.from({ length: ESI_FANOUT_CONCURRENCY + 5 }, (_, i) => FLOOR + i);
@@ -267,8 +237,6 @@ describe('loadMemberLabels (AC3)', () => {
     let inFlight = 0;
     let peak = 0;
     server.use(
-      // The character column still resolves in parallel with the structures;
-      // only the structure half is counted below.
       http.post(`${ESI_BASE_URL}/universe/names`, async ({ request }) => {
         const ids = (await request.json()) as number[];
         return HttpResponse.json(

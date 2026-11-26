@@ -1,12 +1,3 @@
-/**
- * Invite links, for any reviewer: `mode="new"` is the small dialog the queue's header opens for
- * an invite-only corp (who the link is for, Create, then the link with Copy); `mode="list"` is
- * every live link with who made it, when and how often it was used, and the same form under it.
- * A row's one visible action is Copy link; Revoke, which a confirm guards, sits in the row's
- * menu (⋮, right-click, touch and hold) with Copy link again, so the menu alone does the lot.
- * One `DataTable` at every width: cards on a phone. A link is
- * `<origin>/apply/<corporationId>?invite=<code>`.
- */
 import { useRef, useState, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -42,9 +33,7 @@ interface VettingInvitesDialogProps {
   mode: 'new' | 'list';
   corporationId: number;
   invites: readonly VettingInvite[];
-  /** The apply link works without an invite: the list says so. */
   inviteOnly: boolean;
-  /** Makes a link and answers with the invites as they now stand; rejects with the refusal. */
   onCreate: (label: string) => Promise<readonly VettingInvite[]>;
   onRevoke: (code: string) => Promise<void>;
   onClose: () => void;
@@ -70,14 +59,12 @@ export function VettingInvitesDialog({
   const [revoking, setRevoking] = useState<VettingInvite | null>(null);
   const { copied, flash } = useCopyFeedback<{ code: string; failed: boolean }>(2000);
   const { run, onCloseAutoFocus } = useOpenAfterMenu();
-  // Each row's Copy link, so focus has somewhere to land once a revoked row is gone (§7).
   const copyButtons = useRef(new Map<string, HTMLButtonElement>());
   const afterRevoke = useRef<readonly FocusCandidate[]>([]);
   const askRevoke = (row: VettingInvite) => {
     const index = invites.findIndex((invite) => invite.code === row.code);
     const button = (invite: VettingInvite | undefined) => () =>
       invite === undefined ? null : copyButtons.current.get(invite.code);
-    // The next link, else the one before, else the field that makes a new one.
     afterRevoke.current = [button(invites[index + 1]), button(invites[index - 1]), labelRef];
     setRevoking(row);
   };
@@ -105,7 +92,6 @@ export function VettingInvitesDialog({
       await writeToClipboard(applyLink(corporationId, invite.code));
       flash({ code: invite.code, failed: false });
     } catch {
-      // The clipboard was refused: nothing was copied, and the button says so.
       flash({ code: invite.code, failed: true });
     }
   };
@@ -241,7 +227,6 @@ export function VettingInvitesDialog({
       header: '',
       align: 'right',
       stackEdge: 'end',
-      // On a card: its own row at the foot, the button at its natural width.
       cellClassName: () => 'dt-action-row',
       render: (row) => copyButton(row, true),
     },
@@ -309,7 +294,6 @@ export function VettingInvitesDialog({
           if (made?.code === revoking.code) setMade(null);
         }}
         onClose={() => setRevoking(null)}
-        // The ⋮ that opened it goes with the revoked row.
         returnFocusFallback={() => firstConnected(afterRevoke.current)}
       />
     </>

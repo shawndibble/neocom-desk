@@ -1,13 +1,3 @@
-/**
- * Buckets mail headers into System Label tabs (GLOSSARY.md round 18). ESI
- * documents no fixed `label_id` numbers for the four built-in labels, so
- * categorization goes by the `name` each `/mail/labels/` entry already
- * carries ("Inbox"/"Sent"/"Corp"/"Alliance") rather than a guessed id — a
- * name that doesn't match one of the four just isn't in the map, which is
- * what makes "unrecognized folds into Inbox" fall out of `resolveMailTab`'s
- * default without a special case.
- */
-
 import { plainTextToMarkup } from './mailEditorDoc';
 
 export type MailTab = 'inbox' | 'sent' | 'corp' | 'alliance';
@@ -25,15 +15,8 @@ const NAME_TO_TAB: Readonly<Record<string, MailTab>> = {
   alliance: 'alliance',
 };
 
-/**
- * A header carrying more than one recognized System Label needs one
- * canonical tab (AC: "one row, one tag"). Sent takes priority since it
- * reflects the character's own action; Alliance over Corp as the more
- * specific audience. ESI does not guarantee `labels` array order.
- */
 const TAB_PRECEDENCE: readonly MailTab[] = ['sent', 'alliance', 'corp', 'inbox'];
 
-/** `label_id -> MailTab` for whichever of the four System Labels are present in this response. */
 export function buildLabelTabMap(labels: readonly SystemLabel[]): ReadonlyMap<number, MailTab> {
   const map = new Map<number, MailTab>();
   for (const label of labels) {
@@ -43,11 +26,6 @@ export function buildLabelTabMap(labels: readonly SystemLabel[]): ReadonlyMap<nu
   return map;
 }
 
-/**
- * The names of a mail's Custom Labels, in the mail's own label order. A System
- * Label (it has a tab) is never a tag, and a label id with no name (a label
- * deleted in game) or no match shows nothing, never a raw id.
- */
 export function customLabelNames(
   labelIds: readonly number[] | undefined,
   labels: readonly SystemLabel[],
@@ -63,7 +41,6 @@ export function customLabelNames(
   return names;
 }
 
-/** One canonical tab for a header's `labels` ids; no recognized System Label (or none at all) folds into Inbox. */
 export function resolveMailTab(
   labelIds: readonly number[] | undefined,
   labelTabById: ReadonlyMap<number, MailTab>
@@ -79,12 +56,6 @@ export function resolveMailTab(
   return 'inbox';
 }
 
-/**
- * Per-tab unread badge counts, straight from each System Label's own
- * `unread_count` (GLOSSARY.md: "used as-is, not computed client-side") — the
- * All tab's count is `total_unread_count` on the labels response itself, not
- * a sum of these, since the two can differ once Custom Labels exist.
- */
 export function unreadCountsByTab(labels: readonly SystemLabel[]): ReadonlyMap<MailTab, number> {
   const map = new Map<MailTab, number>();
   for (const label of labels) {
@@ -100,19 +71,11 @@ interface MailHeaderLike {
 
 export interface MergedMailHeaderPage<H extends MailHeaderLike> {
   headers: H[];
-  /** True when `page` came back at `pageSize` — ESI gives no total count, so a full page is the only "more may exist" signal available. */
   hasMore: boolean;
 }
 
-/** ESI's per-call cap on `/characters/{id}/mail` (both the uncursored and `last_mail_id` cursored calls). */
 export const MAIL_HEADERS_PAGE_SIZE = 50;
 
-/**
- * Folds one more `last_mail_id`-cursored page into the already-loaded list
- * (issue #161: pagination beyond the 50-cap). Dedupes by `mail_id` since
- * `last_mail_id` is documented exclusive but a defensive merge costs nothing
- * and protects against an off-by-one on ESI's side.
- */
 export function mergeMailHeaderPage<H extends MailHeaderLike>(
   existing: readonly H[],
   page: readonly H[],
@@ -127,13 +90,6 @@ interface MailSearchable {
   subject?: string;
 }
 
-/**
- * Subject/sender substring match, case-insensitively (issue #416, reversing
- * GLOSSARY.md round 18's "no subject/sender search" — see round 55: "load
- * more" (round 22) plus this ticket's own display cap mean a bucket is no
- * longer necessarily small). A blank query matches everything, so callers can
- * pass the raw (possibly-empty) search box value without a separate branch.
- */
 export function mailSearchMatches(
   header: MailSearchable,
   senderName: string | undefined,
@@ -145,20 +101,13 @@ export function mailSearchMatches(
   return (senderName ?? '').toLowerCase().includes(q);
 }
 
-/** Rendered header-list cap (issue #416): "load more" can accumulate far past what's worth rendering as DOM rows. */
 export const MAIL_HEADER_DISPLAY_CAP = 200;
 
 export interface CappedHeaders<H> {
   headers: H[];
-  /** True when the input list held more than `cap` and was cut down. */
   truncated: boolean;
 }
 
-/**
- * Truncates an already-ordered header list to the first `cap` entries. Order
- * is the caller's responsibility (Mail.tsx sorts newest-first before this),
- * not re-derived here — this is a display cap, not a recency policy.
- */
 export function capHeadersForDisplay<H>(
   headers: readonly H[],
   cap: number = MAIL_HEADER_DISPLAY_CAP
@@ -167,26 +116,8 @@ export function capHeadersForDisplay<H>(
   return { headers: headers.slice(0, cap), truncated: true };
 }
 
-/**
- * The four System Label folders, in the order the filter row renders them.
- * Inbox/Corp/Alliance lead because they are the folders mail *arrives* in;
- * Sent trails as the one that holds only the pilot's own outgoing mail.
- *
- * Deliberately not `TAB_PRECEDENCE`'s order — that one resolves which single
- * tag a multi-labelled header wears, which is a different question from which
- * order a pilot scans the filters in.
- */
 export const MAIL_FOLDERS: readonly MailTab[] = ['inbox', 'corp', 'alliance', 'sent'];
 
-/**
- * Validates a persisted folder selection (`parse` for `createLocalSetting`).
- *
- * An empty stored array is rejected rather than honoured. Deselecting every
- * folder is allowed *within* a session — the page explains that state and
- * offers a way out of it — but a reload that restored it would drop a pilot
- * onto an empty page with no memory of having asked for one, so the stored
- * value falls back to all four.
- */
 export function parseMailFolders(raw: unknown): MailTab[] | null {
   if (!Array.isArray(raw) || raw.length === 0) return null;
   const isTab = (value: unknown): value is MailTab =>
@@ -204,17 +135,8 @@ interface ReplyAllSource {
   recipients?: readonly RecipientLike[];
 }
 
-/** A reply-all candidate: the sender's own chip is pinned (`removable: false`), every other one isn't. */
 export type ReplyRecipient = RecipientLike & { removable: boolean };
 
-/**
- * Reply defaults to reply-all (mail-reply-and-forward decision): the sender
- * plus every original recipient except the reading character. The sender's
- * chip is not removable — dropping it would turn "reply" into "forward to
- * the CC list", a different action with its own entry point. Replying to a
- * Sent mail (`from === ownCharacterId`) has no sender to pin, so every
- * recipient stays removable.
- */
 export function buildReplyAllRecipients(
   header: ReplyAllSource,
   ownCharacterId: number
@@ -240,7 +162,6 @@ export function buildReplyAllRecipients(
   return out;
 }
 
-/** The rule that opens a Reply's quoted history (the EVE client writes the same one). */
 export const QUOTE_SEPARATOR = '-'.repeat(32);
 
 export type ComposeKind = 'reply' | 'forward';
@@ -250,13 +171,6 @@ const SUBJECT_PREFIX: Readonly<Record<ComposeKind, string>> = {
   forward: 'FWD:',
 };
 
-/**
- * `RE: <subject>` / `FWD: <subject>`, without doubling a prefix the subject
- * already carries (case-insensitive — mail clients vary the case). Crossing
- * the two (`FWD: RE: ...`) is left alone rather than de-duplicated: a
- * forwarded reply genuinely is both, and collapsing it would lose that a
- * pilot already replied once.
- */
 export function prefixSubject(kind: ComposeKind, subject: string): string {
   const prefix = SUBJECT_PREFIX[kind];
   const trimmed = subject.trim();
@@ -264,14 +178,6 @@ export function prefixSubject(kind: ComposeKind, subject: string): string {
   return trimmed === '' ? prefix : `${prefix} ${trimmed}`;
 }
 
-/**
- * The original message under a dashed separator and a From/Sent header, the
- * way the EVE client's own reply does: the body is kept verbatim, with no `>`
- * on any line, so a thread never turns into a wall of markers. `senderName`
- * and `formattedTimestamp` are supplied already-resolved: this stays a pure
- * string join, with no name lookup or timezone formatting of its own to keep
- * in sync with the reading pane's.
- */
 export function quoteMailBody(
   senderName: string,
   formattedTimestamp: string,
@@ -280,19 +186,16 @@ export function quoteMailBody(
   return `\n\n${QUOTE_SEPARATOR}\nFrom: ${senderName}\nSent: ${formattedTimestamp}\n\n${body}`;
 }
 
-/** A header plus the Character whose mailbox it came from — `mail_id` is per-Character, so the pair is the identity. */
 export interface OwnedMail<H extends MailHeaderLike> {
   ownerId: number;
   ownerName: string;
   header: H;
 }
 
-/** Stable identity of one mail across Characters (`mail_id` alone collides between mailboxes). */
 export function mailKey(ownerId: number, mailId: number): string {
   return `${ownerId}:${mailId}`;
 }
 
-/** Every Character's headers as one list, newest first by timestamp, each tagged with its owner. */
 export function mergeOwnedMail<H extends MailHeaderLike & { timestamp?: string }>(
   sources: readonly { characterId: number; characterName: string; headers: readonly H[] }[]
 ): OwnedMail<H>[] {
@@ -307,14 +210,12 @@ export function mergeOwnedMail<H extends MailHeaderLike & { timestamp?: string }
     .sort((a, b) => (b.header.timestamp ?? '').localeCompare(a.header.timestamp ?? ''));
 }
 
-/** One Character's unread: the sum of its four System Labels' own `unread_count` (custom labels excluded). */
 export function totalSystemUnread(labels: readonly SystemLabel[]): number {
   let total = 0;
   for (const count of unreadCountsByTab(labels).values()) total += count;
   return total;
 }
 
-/** Each System Label's own `unread_count`, summed across the given Characters' label sets. */
 export function sumUnreadByTab(
   labelSets: readonly (readonly SystemLabel[])[]
 ): ReadonlyMap<MailTab, number> {
@@ -333,12 +234,6 @@ interface DeltaRow {
   header: { is_read?: boolean };
 }
 
-/**
- * How many unread mails each folder gained or lost this session, from what the
- * pilot marked read, marked unread or deleted since the label counts were
- * read. Attributed to the mail's own folder (the one label that decides its
- * tab), so a mail carrying several labels is approximate, never double counted.
- */
 export function unreadDeltaByTab(
   rows: readonly DeltaRow[],
   locallyReadKeys: ReadonlySet<string>,
@@ -358,7 +253,6 @@ export function unreadDeltaByTab(
   return delta;
 }
 
-/** Label unread counts moved by a session delta, floored at zero. */
 export function applyUnreadDelta(
   counts: ReadonlyMap<MailTab, number>,
   delta: ReadonlyMap<MailTab, number>
@@ -369,14 +263,6 @@ export function applyUnreadDelta(
   return out;
 }
 
-/**
- * Which mail bodies are worth fetching ahead of being opened, so the reader
- * works offline: the `limit` newest headers (unread first, then read, each
- * newest first by mail id, which ESI hands out in order) minus those already
- * cached and the Character's own sent mail. The window is cut before the
- * cached ones are dropped, so each sync adds at most what newly entered the
- * window instead of walking back through the whole mailbox.
- */
 export function selectMailBodiesToPrefetch(
   headers: ReadonlyArray<{ mail_id: number; from?: number; is_read?: boolean }>,
   options: { ownerId: number; cachedIds: ReadonlySet<number>; limit: number }
@@ -386,7 +272,6 @@ export function selectMailBodiesToPrefetch(
     .sort((a, b) => {
       const readRankA = a.is_read === true ? 1 : 0;
       const readRankB = b.is_read === true ? 1 : 0;
-      // Unread (rank 0) sorts ahead of read (rank 1); newest first within each.
       return readRankA - readRankB || b.mail_id - a.mail_id;
     });
   return ordered
@@ -395,11 +280,6 @@ export function selectMailBodiesToPrefetch(
     .filter((id) => !options.cachedIds.has(id));
 }
 
-/**
- * A Forward's starting body, as EVE markup: a plain header (escaped so `< > &`
- * in a name stay literal) over the original body with its formatting kept.
- * `originalMarkup` must already be safe markup (`sanitizeMarkup`).
- */
 export function forwardMailBody(
   senderName: string,
   formattedTimestamp: string,

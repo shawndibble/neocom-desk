@@ -48,8 +48,6 @@ describe('maxMarketOrders', () => {
     expect(maxMarketOrders(trained({ 3300: 5 }))).toBe(BASE_ORDER_SLOTS);
   });
 
-  // ESI can report a level outside 0-5 only if a payload is malformed, but a
-  // wrong slot total is worse than a clamped one: the tile reads as a limit.
   it('clamps a level outside 0-5 rather than trusting it', () => {
     expect(maxMarketOrders(trained({ [TRADE]: 9 }))).toBe(5 + 20);
     expect(maxMarketOrders(trained({ [TRADE]: -2 }))).toBe(BASE_ORDER_SLOTS);

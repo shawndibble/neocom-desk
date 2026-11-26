@@ -1,21 +1,5 @@
-/**
- * Survey connections (issue #4684): the store and the writes behind "Manage
- * Taxes" on a moon Survey. A connection ties one Survey's moon to its Payee
- * and rate for one Character; while it is live, `applySurveyConnections`
- * assigns that moon's ore as it reaches the Mining Ledger (the planning is
- * `engine/miningTax/surveyConnection.ts`).
- *
- * Kept as one synced setting, so a second device keeps assigning the same
- * moon: a list of short-lived records (one, since only one Auto Assignment
- * runs at a time), pruned on every write, needs no collection of its own (and
- * no Firestore rules change).
- *
- * Runs from the Tax tab's load (`snapshot.ts`) and from the Survey while it
- * is open (`useSurveyConnection`), so ore is assigned whichever the pilot is
- * looking at.
- */
-import { db, type MiningTaxAssignmentRecord, type MiningTaxOreLine } from '@/db';
-import { isUnpaidDefault } from '@/engine/miningTax/defaultSystems';
+import { db, type MiningTaxAssignmentRecord } from '@/db';
+import { autoAssignSlice } from './autoAssignSlice';
 import type { PayeeRunningAccounts } from './payeeRunningAccounts';
 import { loadPayeeRunningAccounts } from './paymentLinkStore';
 import {
@@ -24,16 +8,12 @@ import {
   planSurveyAutoAssign,
   updateSurveyConnection,
   type SurveyConnection,
-  type Takeover,
 } from '@/engine/miningTax/surveyConnection';
 import type { MiningLedgerEntry } from '@/engine/miningTax/types';
-import { computeAssignmentValue } from '@/engine/miningTax/valuation';
 import { createSyncedSetting } from '@/lib/useSyncedSetting';
-import { assign, releaseOre } from './ledgerActions';
 import { loadAllCharacterLedgers } from './ledger';
 import { readCompressedOre } from './oreForm';
 import { loadPayees } from './payees';
-import { hubForPayee, loadUnitPricesOnDate } from './pricing';
 import { reconcileAssignments } from './reconcile';
 import { loadManualMoonOreTypeIds } from './typeOverrides';
 import { loadMoonOreTypeIds, loadTypes } from '@/sde/loadSde';
@@ -46,12 +26,6 @@ export const useSurveyConnections = createSyncedSetting<SurveyConnection[]>({
   parse: parseSurveyConnections,
 });
 
-/**
- * The stored list, read before any write: a write before hydration would
- * replace it with `[]`. Read from Dexie, not the store, which another tab's
- * write reaches only on the next sync: a tab still showing a replaced
- * connection must not write it back over the one running now.
- */
 async function current(): Promise<{
   value: SurveyConnection[];
   setValue: (value: SurveyConnection[]) => Promise<void>;
@@ -67,11 +41,6 @@ async function liveConnections(nowMs: number): Promise<SurveyConnection[]> {
   return (await current()).value.filter((c) => isConnectionLive(c, nowMs));
 }
 
-/**
- * The moon ore type ids among a Survey's scanner ore names (raw names, the
- * ledger's type ids): the SDE's moon ores plus any the pilot tagged as moon
- * ore, the same set the ledger groups into entries (`ledger.ts`).
- */
 export async function surveyMoonOreTypeIds(oreNames: readonly string[]): Promise<number[]> {
   const [moonIds, tagged, types] = await Promise.all([
     loadMoonOreTypeIds(),
@@ -84,11 +53,6 @@ export async function surveyMoonOreTypeIds(oreNames: readonly string[]): Promise
     .sort((a, b) => a - b);
 }
 
-/**
- * Starts `connection` as the only one: one Auto Assignment runs at a time, on
- * any Character, so Assign Taxes stops whichever was running. Resolves to the
- * live connections it replaced, for Undo (`restoreSurveyConnections`).
- */
 export async function startSurveyConnection(
   connection: SurveyConnection
 ): Promise<SurveyConnection[]> {
@@ -98,7 +62,6 @@ export async function startSurveyConnection(
   return replaced;
 }
 
-/** Saves a running connection as its Survey moves on; does nothing once it was stopped or replaced. */
 export async function refreshSurveyConnection(connection: SurveyConnection): Promise<void> {
   const { value, setValue } = await current();
   await setValue(updateSurveyConnection(value, connection, Date.now()));
@@ -107,11 +70,6 @@ export async function refreshSurveyConnection(connection: SurveyConnection): Pro
 const sameStart = (a: SurveyConnection, b: SurveyConnection) =>
   a.surveyId === b.surveyId && a.characterId === b.characterId && a.connectedAt === b.connectedAt;
 
-/**
- * Puts the connections back as they were, for Undo of `startSurveyConnection`
- * (`started`; null puts them back unconditionally). Does nothing once
- * `started` is no longer running: Undo never stops one started since.
- */
 export async function restoreSurveyConnections(
   connections: readonly SurveyConnection[],
   started: SurveyConnection | null
@@ -126,16 +84,9 @@ export async function removeSurveyConnection(surveyId: string, characterId: numb
   await setValue(value.filter((c) => !(c.surveyId === surveyId && c.characterId === characterId)));
 }
 
-/**
- * Assigns, for each ledger, what its Character's live connections plan, one
- * Assignment per slice, each priced at its Payee's hub on the mined date.
- * Resolves to the Assignments made; a slice that fails to price or save is
- * skipped, and tried again on the next load.
- */
 export async function applySurveyConnections(
   ledgers: readonly { characterId: number; entries: readonly MiningLedgerEntry[] }[],
   nowMs = Date.now(),
-  /** Every personal Payee's account, which says which days are paid; read from Dexie when absent. */
   accounts?: PayeeRunningAccounts
 ): Promise<MiningTaxAssignmentRecord[]> {
   const live = await liveConnections(nowMs);
@@ -149,7 +100,6 @@ export async function applySurveyConnections(
       db.miningTaxAssignments.where('characterId').equals(ledger.characterId).toArray(),
       loadPayees(ledger.characterId),
     ]);
-    // Read Paid off the Payees' accounts: a default's day is only taken over after its paid-through.
     const slices = planSurveyAutoAssign(
       ledger.entries,
       assignments.map((a) => paid.view(a)),
@@ -162,68 +112,25 @@ export async function applySurveyConnections(
       const payee = payees.find((p) => p.id === slice.connection.payeeId);
       if (!payee) continue;
       try {
-        const { prices } = await loadUnitPricesOnDate(
-          slice.oreLines.map((line) => line.typeId),
-          hubForPayee(payee.hubId),
-          slice.date,
-          compressed
-        );
-        const value = computeAssignmentValue(slice.oreLines, prices, slice.connection.taxPct);
-        // Ore a Default System had assigned is the Survey's now: take those types off it first.
-        // A failure here (or in the assign below) leaves the entry for the next load to redo.
-        if (!(await takeOverFromDefaults(slice.takeovers, paid))) continue;
-        const result = await assign({
+        const result = await autoAssignSlice({
           characterId: slice.characterId,
           date: slice.date,
           solarSystemId: slice.solarSystemId,
-          payeeId: payee.id,
+          payee,
           oreLines: slice.oreLines,
           entryOreLines: slice.entryOreLines,
           taxPct: slice.connection.taxPct,
-          estimatedValue: value.estimatedValue,
-          taxOwed: value.taxOwed,
-          takesGrowth: true,
-          label: slice.label,
-          isPaid: (a) => paid.isPaid(a),
+          compressed,
+          ...(slice.label !== undefined ? { label: slice.label } : {}),
+          takeOver: { takeovers: slice.takeovers, paid },
         });
-        if (result.ok) created.push(result.value);
-      } catch {
-        // No prices yet (offline): the next load tries again.
-      }
+        if (result?.ok) created.push(result.value);
+      } catch {}
     }
   }
   return created;
 }
 
-/**
- * Takes the Survey's ore types off the Assignments a Default System made (an Assignment is read
- * again first: an earlier slice may have changed it). Resolves false if any release failed.
- */
-async function takeOverFromDefaults(
-  takeovers: readonly Takeover[],
-  paid: PayeeRunningAccounts
-): Promise<boolean> {
-  const releases: { assignment: MiningTaxAssignmentRecord; after: MiningTaxOreLine[] }[] = [];
-  for (const takeover of takeovers) {
-    const assignment = await db.miningTaxAssignments.get(takeover.assignmentId);
-    if (!assignment || !isUnpaidDefault(paid.view(assignment))) {
-      continue;
-    }
-    releases.push({
-      assignment,
-      after: assignment.oreLines.filter((l) => !takeover.typeIds.includes(l.typeId)),
-    });
-  }
-  if (releases.length === 0) return true;
-  return (await releaseOre(releases, true)).ok;
-}
-
-/**
- * Reads every Character's ledger and applies the live connections — for the
- * Survey, which has no snapshot of its own. Then reconciles those Characters,
- * as the Tax tab's load would, so growth a connection leaves to its own
- * earlier Assignment is folded in now rather than on the next Tax tab visit.
- */
 export async function autoAssignFromSurveys(): Promise<MiningTaxAssignmentRecord[]> {
   const live = await liveConnections(Date.now());
   if (live.length === 0) return [];

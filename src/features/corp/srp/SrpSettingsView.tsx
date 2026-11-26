@@ -1,8 +1,3 @@
-/**
- * `/corp/srp` Settings: the Director's view of the corp's SRP. Picks the state
- * `useSrpSettings` reports: the form, the first-time "Turn on SRP", or a line for an officer who
- * may approve claims but not change settings. Hidden, never locked: Accountants never see the form.
- */
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, EmptyState, LoadFailedState, Panel, Spinner, Toast } from '@/components/ui';
@@ -57,7 +52,6 @@ export function SrpSettingsView() {
   const [, selectTab] = usePageTab(SRP_TABS);
   const [saveFailed, setSaveFailed] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
-  // A half-done save reloads and remounts the form, so the failure line lives here.
   const save: typeof data.save = async (patch, enabled) => {
     setSaveFailed(false);
     try {
@@ -67,7 +61,6 @@ export function SrpSettingsView() {
       setSaveFailed(true);
     }
   };
-  // Turning SRP on adds the Queue tab: stay on Settings, where the percents and Hull Rules are set.
   const turnOn = async () => {
     selectTab('settings');
     await data.turnOn();
@@ -100,7 +93,6 @@ export function SrpSettingsView() {
     case 'ready':
       body = (
         <SrpSettingsEditor
-          // A reload hands back new settings: start the form from them.
           key={state.settings.updatedAt}
           settings={state.settings}
           verdict={state.verdict}
@@ -115,7 +107,6 @@ export function SrpSettingsView() {
   return (
     <>
       {body}
-      {/* The only thing this toast ever reports is a save that went through. */}
       {toast && <Toast message={toast} tone="success" onClose={() => setToast(null)} />}
     </>
   );

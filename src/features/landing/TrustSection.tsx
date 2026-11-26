@@ -1,56 +1,61 @@
-import type { ComponentType } from 'react';
+import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ExternalLink } from '@/components/ui/ExternalLink';
 import { Panel } from '@/components/ui';
 import { inlineLinkClassName } from '@/components/ui/controlStyles';
-import {
-  ICON_SIZE,
-  Offline,
-  OpenSource,
-  ReadOnly,
-  TokenPrivacy,
-  type IconProps,
-} from '@/components/ui/icons';
+import { cx } from '@/lib/cx';
 import { AUTHORIZED_APPS_URL, REPO_URL } from '@/lib/links';
+import { hudLabelClassName } from './hudLabel';
 import { ScopesAccordion } from './ScopesAccordion';
 
-/**
- * The objections a pilot weighs before handing an EVE SSO grant to a
- * third-party site. Deliberately the last thing above the closing button:
- * it is where the hesitation actually happens.
- */
-const TRUST: { icon: ComponentType<IconProps>; key: string }[] = [
-  { icon: ReadOnly, key: 'readOnly' },
-  { icon: TokenPrivacy, key: 'token' },
-  { icon: Offline, key: 'offline' },
-  { icon: OpenSource, key: 'openSource' },
-];
+const WRITE_ITEMS = ['mail', 'calendar', 'send', 'fitting', 'waypoints', 'window'] as const;
 
-/** The body of the landing page's trust section: four trust points, then what login asks for, by area. */
+function TrustCard({ id, children }: { id: string; children: ReactNode }) {
+  const { t } = useTranslation();
+  return (
+    <Panel className="border-t-2 border-t-accent">
+      <p className={cx(hudLabelClassName, 'text-[0.6875rem] text-accent')}>
+        {t(`login.trust.${id}.eyebrow`)}
+      </p>
+      <h3 className="mt-2 text-lg leading-tight font-semibold text-balance">
+        {t(`login.trust.${id}.name`)}
+      </h3>
+      {children}
+    </Panel>
+  );
+}
+
 export function TrustSection() {
   const { t } = useTranslation();
   return (
     <>
-      <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        {TRUST.map(({ icon: Icon, key }) => (
-          <Panel key={key} className="border-t-2 border-t-accent">
-            <Icon size={ICON_SIZE.lg} aria-hidden="true" className="text-accent" />
-            <h3 className="mt-3 text-sm font-semibold">{t(`login.trust.${key}.name`)}</h3>
-            <p className="mt-1 text-sm text-text-dim">{t(`login.trust.${key}.desc`)}</p>
-            {key === 'openSource' && (
-              <p className="mt-2 text-sm">
-                <ExternalLink href={REPO_URL}>{t('login.trustRepoLink')}</ExternalLink>
-              </p>
-            )}
-          </Panel>
-        ))}
+      <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <TrustCard id="reads">
+          <p className="mt-2.5 text-sm text-text-dim">{t('login.trust.reads.desc')}</p>
+        </TrustCard>
+        <TrustCard id="writes">
+          <ul className="mt-3 space-y-1.5 text-sm text-text-dim">
+            {WRITE_ITEMS.map((item) => (
+              <li key={item} className="flex gap-2">
+                <span aria-hidden="true" className="text-accent">
+                  —
+                </span>
+                {t(`login.trust.writes.items.${item}`)}
+              </li>
+            ))}
+          </ul>
+          <p className="mt-3 text-sm font-semibold">{t('login.trust.writes.note')}</p>
+        </TrustCard>
+        <TrustCard id="stays">
+          <p className="mt-2.5 text-sm text-text-dim">{t('login.trust.stays.desc')}</p>
+        </TrustCard>
+        <TrustCard id="costs">
+          <p className="mt-2.5 text-sm text-text-dim">{t('login.trust.costs.desc')}</p>
+          <p className="mt-2 text-sm">
+            <ExternalLink href={REPO_URL}>{t('login.trustRepoLink')}</ExternalLink>
+          </p>
+        </TrustCard>
       </div>
-      {/*
-        The scope list sits here rather than beside the hero button: it is
-        what a hesitant reader wants after the trust points and immediately
-        before the closing CTA. Closed, it is a list of area names and counts.
-        From lg the accordion fills the left column and the notes the right.
-      */}
       <div className="mt-8 grid gap-8 lg:grid-cols-2 lg:gap-10">
         <div>
           <p className="text-sm text-text-dim">{t('login.permissionsHint')}</p>

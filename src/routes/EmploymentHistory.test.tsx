@@ -88,7 +88,6 @@ beforeEach(async () => {
     addedAt: 1,
     corporationId: 200,
   });
-  // No token scopes granted at all: the route is public and must not require one.
   await db.tokens.put({
     characterId: CHAR_ID,
     accessToken: 'access-token',
@@ -100,17 +99,12 @@ beforeEach(async () => {
   window.history.pushState({}, '', '/employment-history');
 });
 
-/** The timeline's stint cards, most-recent first. */
 const stints = () =>
   within(screen.getByRole('list', { name: 'Employment' })).getAllByRole('listitem');
 
-/** The EmploymentHistory page on its own route, with no App boot or signed-in shell. */
 const renderEmploymentHistoryRoute = () =>
   renderPageRoute('/employment-history', <EmploymentHistory />);
 
-// The one App-level test below: its graph and shell chunk load here, under the
-// hook's own budget, not inside the test's findBy. Every other test renders the
-// page on its own (`renderEmploymentHistoryRoute`).
 beforeAll(async () => {
   await Promise.all([
     import('@/app/App'),
@@ -125,26 +119,19 @@ describe('EmploymentHistory', () => {
     await screen.findByRole('link', { name: 'Past Corp' });
 
     const past = stints()[1];
-    // Two text nodes carry the start: the gutter's (md+) and the under-name range (below md).
-    // Tailwind's `md:hidden` / `hidden md:block` show exactly one at any width.
     const underName = within(past).getByText(/Jan 2025 – Jan 2026/);
     expect(underName).toHaveClass('md:hidden');
     expect(within(past).getByText('Jan 2025', { selector: 'span' })).toHaveClass('block');
     expect(past.querySelector('.hidden.md\\:block')).not.toBeNull();
   });
 
-  // The one App-level test of the Employment History route: it mounts at
-  // /employment-history inside the signed-in shell, its rail link current.
   it('lists corporations most-recent first, with resolved names, without any granted scope, at /employment-history inside the shell', async () => {
     const { App } = await import('@/app/App');
     render(<App />);
-    // 'Past Corp' rather than 'Current Corp': the shared header names the
-    // character's *current* corporation too, and it resolves first.
     expect(await screen.findByRole('link', { name: 'Past Corp' })).toBeInTheDocument();
     const rows = stints();
     expect(rows[0]).toHaveTextContent('Current Corp');
     expect(rows[1]).toHaveTextContent('Past Corp');
-    // Past Corp ran exactly 2025-01-01 to 2026-01-01: a full non-leap year.
     expect(rows[1]).toHaveTextContent('1y');
     const rail = (await screen.findAllByRole('navigation'))[0];
     const links = await within(rail).findAllByRole('link', { name: 'Employment' });
@@ -152,8 +139,6 @@ describe('EmploymentHistory', () => {
   });
 
   it('badges the ongoing row when it matches the character record', async () => {
-    // A typical user has no grant on /corp and would just be rejected there,
-    // so the ongoing row's name opens Show Info (like every row's), never /corp.
     renderEmploymentHistoryRoute();
 
     await screen.findByRole('link', { name: 'Past Corp' });
@@ -164,17 +149,10 @@ describe('EmploymentHistory', () => {
       'href',
       expect.stringContaining('info=corporation-200')
     );
-    // The past corp's row gets no badge either.
     expect(rows[1]).not.toHaveTextContent('Current');
   });
 
   it('does not badge the ongoing row when the character record has a different corp', async () => {
-    // The character's own corp record resolves from ESI's public-info fetch
-    // (CharacterHeader triggers it), which would otherwise resync back to
-    // 200 — override the endpoint itself rather than the db row, so this
-    // reflects a character whose current corp genuinely isn't the ongoing
-    // history row's corp (e.g. corp record hasn't caught up to a corp move
-    // reflected in the history yet).
     server.use(
       http.get(`https://esi.evetech.net/characters/${CHAR_ID}`, () =>
         HttpResponse.json({
@@ -211,8 +189,6 @@ describe('EmploymentHistory', () => {
     expect(await screen.findByRole('link', { name: 'Current Corp' })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { level: 1, name: 'Employment' })).toBeNull();
 
-    // Data age sits on the tab row, not in the header; Refresh and export sit in
-    // the header with the bell. The panel below has no title bar of its own: the tab says it.
     const header = screen.getByRole('heading', { level: 1, name: 'Pilot One' }).closest('header');
     expect(within(header!).getByRole('button', { name: 'Refresh' })).toBeInTheDocument();
     expect(within(header!).getByRole('button', { name: 'Export Employment' })).toBeInTheDocument();
@@ -220,7 +196,6 @@ describe('EmploymentHistory', () => {
     expect(header).not.toContainElement(dataAge);
     expect(screen.queryByRole('heading', { level: 2, name: 'Employment' })).toBeNull();
 
-    // No SP at all, and nothing asked ESI for skills this character never granted.
     expect(screen.queryByText('Total SP')).toBeNull();
     expect(screen.queryByText('Unallocated SP')).toBeNull();
     expect(skillCalls).toBe(0);
@@ -240,16 +215,10 @@ describe('EmploymentHistory', () => {
     );
     renderEmploymentHistoryRoute();
     expect(await screen.findByText(/showing cached data/i)).toBeInTheDocument();
-    // The first stint is the cached, ongoing/matching corp — its name may or
-    // may not have resolved yet.
     expect(stints()[0]).toHaveTextContent(/#200|Current Corp/);
   });
 
   it("renders the previous visit's rows immediately, with no spinner, while it re-reads", async () => {
-    // The retained snapshot `useRouteSnapshot`'s `cacheKey` writes on a
-    // successful load. Seeded directly here because it only exists on a
-    // *second* mount, and the global `resetRouteSnapshots` in `vitest.setup.ts`
-    // rightly empties it before every test.
     writeRouteSnapshot('employment-history', CHAR_ID, {
       historyResult: {
         data: history,
@@ -264,11 +233,6 @@ describe('EmploymentHistory', () => {
       sp: { totalSp: null, unallocatedSp: null },
       loadedAt: Date.parse('2026-06-01T00:00:00Z'),
     });
-    // Held open for the duration of the assertions, so anything on screen can
-    // only be the retained snapshot. Released before the test ends rather than
-    // left hanging: `esi/cache.ts` keys an in-flight read in `inFlightLoads`,
-    // and a promise that never settles would still be there for the next test
-    // to dedupe onto.
     let release!: () => void;
     const held = new Promise<void>((resolve) => {
       release = resolve;
@@ -283,9 +247,7 @@ describe('EmploymentHistory', () => {
     renderEmploymentHistoryRoute();
 
     expect(await screen.findByRole('link', { name: 'Past Corp' })).toBeInTheDocument();
-    // The whole point: a load really is in flight, and no spinner is shown.
     expect(screen.queryByRole('status', { name: 'Loading' })).toBeNull();
-    // Refresh still reports the in-flight load honestly.
     expect(screen.getByRole('button', { name: 'Refresh' })).toHaveAttribute(
       'aria-disabled',
       'true'
@@ -305,7 +267,6 @@ describe('EmploymentHistory', () => {
     );
     renderEmploymentHistoryRoute();
     expect(await screen.findByText(/no employment history yet/i)).toBeInTheDocument();
-    // The panel's toolbar outlives its rows, so there is still a way back.
     expect(screen.getByRole('button', { name: 'Refresh' })).toBeInTheDocument();
   });
 });

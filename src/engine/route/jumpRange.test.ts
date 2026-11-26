@@ -86,7 +86,6 @@ describe('effectiveCurrentSystem', () => {
   });
 
   it('keeps a pick made before ESI had answered, whatever ESI then reports', () => {
-    // Slow ESI while travelling: the first answer may be where you were, not where you are.
     expect(effectiveCurrentSystem(HERE, { systemId: FAR, gameSystemId: null })).toEqual({
       systemId: FAR,
       source: 'picked',

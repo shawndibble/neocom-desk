@@ -41,7 +41,6 @@ describe('ContractPriceCheck', () => {
         hubMenu={{ hub: jita, area: 'contracts' }}
       />
     );
-    // The heading still reads whole around the trigger.
     expect(screen.getByRole('region', { name: 'Is it fair? · Jita 4-4 right now' })).toBeVisible();
     await userEvent.click(screen.getByRole('button', { name: /^Jita 4-4, choose another/ }));
     expect(screen.getByRole('button', { name: 'Contracts' })).toBeInTheDocument();

@@ -1,12 +1,3 @@
-/**
- * The Sharing tab's rows (issue #6222): every moon the book handles, its own refineries and
- * its moon owners' alike, each with its effective Pop Sharing settings. The resolver is the
- * server's own (`functions/src/popSharing.ts`), so the tab and the published pops never differ.
- *
- * A moon is known from any Extraction the book holds, past or cancelled included, so a refinery
- * between cycles keeps its row. A refinery with no Extraction yet has no known moon: it is listed
- * apart (`unplacedRefineries`, #6240) until its first one syncs.
- */
 import {
   effectivePopSharing,
   type EffectivePopSharing,
@@ -16,11 +7,8 @@ import type { MoonOwnerFeeder } from './moonOwners';
 
 export interface SharingMoonRow {
   moonId: number;
-  /** The refinery of the moon's latest Extraction. */
   structureId: number;
-  /** The moon owner whose moon it is; absent is the book's own corporation. */
   ownerCorporationId?: number;
-  /** That moon owner turned Pop Sharing off: the settings stay, inert. */
   ownerOptedOut: boolean;
   effective: EffectivePopSharing;
 }
@@ -32,13 +20,10 @@ interface MoonPull {
   sourceCorporationId?: number;
 }
 
-/** A moon owner the book still handles (as the publisher reads it); one gone has none here. */
 const HANDLED: ReadonlySet<MoonOwnerFeeder['status']> = new Set(['active', 'pending-removal']);
-/** A record with no status yet (an older read) counts as handled. */
 export const isHandled = (f: { status?: MoonOwnerFeeder['status'] }): boolean =>
   f.status === undefined || HANDLED.has(f.status);
 
-/** One row per moon, in moon id order. Moons of a moon owner the book no longer handles are left out. */
 export function sharingMoons(
   extractions: readonly MoonPull[],
   feeders: readonly {
@@ -56,7 +41,6 @@ export function sharingMoons(
   const optedOut = new Set(
     feeders.filter((f) => f.popSharingOptOut !== undefined).map((f) => f.corporationId)
   );
-  // A moon owner the book no longer handles shares nothing (as the publisher reads it): no row.
   const gone = new Set(feeders.filter((f) => !isHandled(f)).map((f) => f.corporationId));
   return [...latest.values()]
     .filter((x) => x.sourceCorporationId === undefined || !gone.has(x.sourceCorporationId))
@@ -76,10 +60,8 @@ export function sharingMoons(
     });
 }
 
-/** A refinery the book knows with no Extraction yet: its moon is not known, so it has no row. */
 export interface UnplacedRefinery {
   structureId: number;
-  /** The moon owner whose refinery it is; absent is the book's own corporation. */
   ownerCorporationId?: number;
   ownerOptedOut: boolean;
 }
@@ -93,11 +75,6 @@ interface KnownOwnerRefineries {
   refineryStructures?: Readonly<Record<string, unknown>>;
 }
 
-/**
- * The refineries the book knows that no Extraction places at a moon yet (#6240): its own (the
- * mining observers the Automatic sync read) and each handled moon owner's (its record's refinery
- * labels, systems and structure reads). Own first, then by refinery id.
- */
 export function unplacedRefineries(
   extractions: readonly Pick<MoonPull, 'structureId'>[],
   feeders: readonly KnownOwnerRefineries[],

@@ -25,10 +25,8 @@ interface Names {
   characters: readonly VettingReportCharacter[];
 }
 
-/** Where a flag's rows are on the data page: the source and the query that tints them. */
 export type DataHref = (source: VettingRawSource, query: string) => string;
 
-/** The way from a flag to its rows in the data the review kept, when it has any. */
 function FlagDataLink({ flag, dataHref }: { flag: VettingFlag; dataHref: DataHref }) {
   const { t } = useTranslation();
   const target = flagDataTarget(flag);
@@ -47,7 +45,6 @@ function FlagDataLink({ flag, dataHref }: { flag: VettingFlag; dataHref: DataHre
   );
 }
 
-/** The rows behind a flag: when, who with (an entity link), what, and the ISK where there is any. */
 function EvidenceRows({ flag, names }: { flag: VettingFlag; names: Names }) {
   const { t } = useTranslation();
   const timeZone = useTimeZone();
@@ -106,10 +103,6 @@ function EvidenceRows({ flag, names }: { flag: VettingFlag; names: Names }) {
   );
 }
 
-/**
- * One flag: severity glyph and word, a title, one sentence a recruiter can act on, which
- * character and source it came from, and the rows behind it under a disclosure.
- */
 function FlagItem({
   flag,
   names,
@@ -120,7 +113,6 @@ function FlagItem({
   flag: VettingFlag;
   names: Names;
   open: boolean;
-  /** The first flag of its check: the one `#flag-<check>` points at. */
   first: boolean;
   dataHref?: DataHref;
 }) {
@@ -186,7 +178,6 @@ export function VettingFlagList({
   flags: readonly VettingFlag[];
   parties: readonly VettingParty[];
   characters: readonly VettingReportCharacter[];
-  /** Where a flag's rows are in the kept data; absent when the review has none to browse. */
   dataHref?: DataHref;
 }) {
   const names = { parties, characters };
@@ -194,7 +185,6 @@ export function VettingFlagList({
     <ul className="divide-y divide-line">
       {flags.map((flag, index) => (
         <FlagItem
-          // A check can flag more than once (one per undeclared character, one per hopper).
           key={`${flag.check}:${flag.characterIds.join(',')}:${flag.facts.partyId ?? index}`}
           flag={flag}
           names={names}

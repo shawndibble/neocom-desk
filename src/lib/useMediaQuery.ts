@@ -1,9 +1,5 @@
 import { useEffect, useState } from 'react';
 
-/**
- * Whether `query` matches, tracking changes — the general form of
- * `useIsDesktop`/`useIsPhone` for a page with a breakpoint of its own.
- */
 export function useMediaQuery(query: string): boolean {
   const [matches, setMatches] = useState(
     () => typeof window !== 'undefined' && window.matchMedia(query).matches
@@ -19,29 +15,16 @@ export function useMediaQuery(query: string): boolean {
   return matches;
 }
 
-/**
- * The primary input is a finger. Written as `coarse` rather than "not fine" so
- * the non-matching `matchMedia` stub in tests reads as a mouse. Use it where
- * the *behaviour* is touch-specific (drag vs long-press, inline submenus);
- * layout-only breakpoints stay on width.
- */
 export const COARSE_POINTER_QUERY = '(pointer: coarse)';
 
-/**
- * The primary input cannot hover (a touch tablet or phone): anything shown on
- * hover needs another way in. Written as `none` so the test stub reads as a mouse.
- */
 export const NO_HOVER_QUERY = '(hover: none)';
 
-/** i18next `context` for copy with a `_touch` variant ("Tap" for "Click"/"Hover or focus"). */
 export function useTouchContext(): 'touch' | undefined {
   return useMediaQuery(COARSE_POINTER_QUERY) ? 'touch' : undefined;
 }
 
-/** The `md` breakpoint as a *min*-width: `Layout`'s phone/desktop line. */
 export const MD_UP_QUERY = '(min-width: 48rem)';
 
-/** Whether the user asked the OS for less motion; gate JS-driven animation and smooth scrolling on it. */
 export function usePrefersReducedMotion(): boolean {
   return useMediaQuery('(prefers-reduced-motion: reduce)');
 }

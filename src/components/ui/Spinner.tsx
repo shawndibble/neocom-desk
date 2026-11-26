@@ -7,17 +7,7 @@ interface SpinnerProps {
   size?: SpinnerSize;
   label?: string;
   className?: string;
-  /**
-   * Hold the arc back for this long, so a load served from cache in a few ms
-   * never flashes one. Until then a same-size, `aria-hidden` placeholder holds
-   * the space (no `role="status"`, nothing announced, no shift when the arc
-   * appears). Omit for an immediate spinner.
-   */
   delayMs?: number;
-  /**
-   * Centre the arc in its own row with vertical padding: `page` (`py-16`) for a
-   * view waiting on its only content, `panel` (`py-8`) inside a card or modal.
-   */
   block?: 'page' | 'panel';
 }
 

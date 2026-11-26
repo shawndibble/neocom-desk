@@ -8,7 +8,6 @@ function dscanState(share: StoredShare): DscanShareState {
   return scan === null ? { status: 'invalid' } : { status: 'ready', rows: scan.rows };
 }
 
-/** A stored D-scan share. Its own chunk (`SharedLink` loads it on demand). */
 export function DscanSharedView({ share, shareId }: { share: StoredShare; shareId: string }) {
   const state = dscanState(share);
   return (

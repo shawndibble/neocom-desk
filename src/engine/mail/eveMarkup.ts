@@ -1,20 +1,3 @@
-/**
- * EVE markup: the small HTML-ish tag language an EVE mail body is written in
- * (GLOSSARY "EVE Markup"). One parse → typed tree → serialize module shared by
- * the mail reader and the composer, so both agree on what is safe.
- *
- * Pure: no fetch, DOM or Dexie. The tree can only hold what the safe subset
- * allows (bold, italic, underline, size, colour, links with a known scheme),
- * so nothing a mail carries (style attributes, scripts, odd schemes) survives
- * parsing, and rendering the tree is safe by construction.
- *
- * Public API: `parseEveMarkup`, `serializeEveMarkup`, `eveMarkupLength`
- * (+ `EVE_MARKUP_LIMIT`), `classifyMarkupLink`, `markupColorToCss`,
- * `markupPlainText`, `splitMarkupLines`, and the `markupText` / `markupBr`
- * node builders.
- */
-
-/** The game's body limit, counted over the markup as sent. */
 export const EVE_MARKUP_LIMIT = 10_000;
 export const MARKUP_MIN_SIZE = 6;
 export const MARKUP_MAX_SIZE = 64;
@@ -24,9 +7,7 @@ export type MarkupNode =
   | { type: 'br' }
   | { type: 'b' | 'i' | 'u'; children: MarkupNode[] }
   | { type: 'size'; px: number; children: MarkupNode[] }
-  /** `color` is `#aarrggbb` (alpha first), lowercase. */
   | { type: 'color'; color: string; children: MarkupNode[] }
-  /** `href` has passed `classifyMarkupLink`; `target` is that classification, parsed once. */
   | { type: 'link'; href: string; target: MarkupLinkTarget; children: MarkupNode[] };
 
 export const markupText = (text: string): MarkupNode => ({ type: 'text', text });
@@ -47,10 +28,8 @@ const INERT_SCHEMES: Record<string, InertScheme> = {
   localsvc: 'localsvc',
 };
 
-/** What a link href points at, or `null` when it is not an allowed link. */
 export function classifyMarkupLink(href: string): MarkupLinkTarget | null {
   const value = href.trim();
-  // Nothing that could break out of an attribute or smuggle a control char.
   // eslint-disable-next-line no-control-regex
   if (value === '' || /["'<>\s\u0000-\u001f]/.test(value)) return null;
   const scheme = /^([a-zA-Z][a-zA-Z0-9+.-]*):/.exec(value)?.[1].toLowerCase();
@@ -74,7 +53,6 @@ export function classifyMarkupLink(href: string): MarkupLinkTarget | null {
 
 const COLOR_RE = /^(?:#|0x)([0-9a-f]{8}|[0-9a-f]{6})$/i;
 
-/** `#aarrggbb`, from `#AARRGGBB`/`0xAARRGGBB` (alpha first, trailing `L` ok) or opaque RRGGBB. */
 function parseColor(raw: string): string | null {
   const m = COLOR_RE.exec(raw.trim().replace(/l$/i, ''));
   if (!m) return null;
@@ -88,10 +66,9 @@ function parseSize(raw: string): number | null {
   return Math.min(MARKUP_MAX_SIZE, Math.max(MARKUP_MIN_SIZE, Number(m[1])));
 }
 
-/** `#aarrggbb` as a CSS `rgba(...)` colour. */
 export function markupColorToCss(color: string): string {
   const [a, r, g, b] = [1, 3, 5, 7].map((i) => parseInt(color.slice(i, i + 2), 16));
-  return `rgba(${r}, ${g}, ${b}, ${Number((a / 255).toFixed(3))})`; // fixed format: CSS rgba alpha
+  return `rgba(${r}, ${g}, ${b}, ${Number((a / 255).toFixed(3))})`;
 }
 
 const ENTITIES: Record<string, string> = { amp: '&', lt: '<', gt: '>', nbsp: ' ' };
@@ -109,7 +86,6 @@ function parseAttrs(rest: string): Record<string, string> {
   return attrs;
 }
 
-/** `<url=X>` / `<color=X>` / `<url:X>`: the value after `=` or `:`. */
 function shorthandValue(rest: string): string {
   const v = rest
     .replace(/^\s*[=:]/, '')
@@ -119,11 +95,9 @@ function shorthandValue(rest: string): string {
   return decode(q ? q[2] : v);
 }
 
-/** Open frames beyond this are ignored, so render and serialize recursion stay bounded. */
 export const MARKUP_MAX_DEPTH = 32;
 
 interface Frame {
-  /** Close-tag names that end this frame. */
   closers: string[];
   wrap: (children: MarkupNode[]) => MarkupNode[];
   children: MarkupNode[];
@@ -140,7 +114,6 @@ function colorWrap(color: string | null) {
 function sizeWrap(px: number | null) {
   return (c: MarkupNode[]): MarkupNode[] => (px ? [{ type: 'size', px, children: c }] : c);
 }
-/** A link inside a link is dropped (children kept) so anchors never nest. */
 function linkWrap(href: string, nested: boolean) {
   const target = nested ? null : classifyMarkupLink(href);
   return (c: MarkupNode[]): MarkupNode[] =>
@@ -179,7 +152,6 @@ function openFrame(name: string, rest: string, insideLink: boolean): Frame | nul
 
 const TAG_RE = /<(\/?)([a-zA-Z][a-zA-Z0-9]*)((?:[^>"']|"[^"]*"|'[^']*')*)>/g;
 
-/** Parse an EVE mail body into the safe node tree. Never throws. */
 export function parseEveMarkup(src: string): MarkupNode[] {
   const root: Frame = { closers: [], wrap: (c) => c, children: [] };
   let linkDepth = 0;
@@ -248,7 +220,6 @@ function escapeText(text: string): string {
     .replaceAll(NBSP, '&nbsp;');
 }
 
-/** Serialize a tree as EVE markup, emitting only the safe subset (a break is a newline). */
 export function serializeEveMarkup(nodes: readonly MarkupNode[]): string {
   return nodes
     .map((node): string => {
@@ -272,12 +243,10 @@ export function serializeEveMarkup(nodes: readonly MarkupNode[]): string {
     .join('');
 }
 
-/** Length as sent, markup included — compare with `EVE_MARKUP_LIMIT`. */
 export function eveMarkupLength(input: string | readonly MarkupNode[]): number {
   return (typeof input === 'string' ? input : serializeEveMarkup(input)).length;
 }
 
-/** The text a tree reads as, breaks as newlines. */
 export function markupPlainText(nodes: readonly MarkupNode[]): string {
   return nodes
     .map((node): string =>
@@ -286,7 +255,6 @@ export function markupPlainText(nodes: readonly MarkupNode[]): string {
     .join('');
 }
 
-/** Split a tree at its breaks into lines; formatting is re-wrapped around each piece. */
 export function splitMarkupLines(nodes: readonly MarkupNode[]): MarkupNode[][] {
   const lines: MarkupNode[][] = [[]];
   for (const node of nodes) {
@@ -304,7 +272,6 @@ export function splitMarkupLines(nodes: readonly MarkupNode[]): MarkupNode[][] {
   return lines;
 }
 
-/** The part of a break-free line between two plain-text offsets, formatting kept. */
 export function sliceMarkupNodes(
   nodes: readonly MarkupNode[],
   from: number,

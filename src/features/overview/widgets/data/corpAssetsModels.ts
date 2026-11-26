@@ -1,10 +1,3 @@
-/**
- * Corp assets builder (issue #4671). Same contract as `models.ts`: pure,
- * derived at render time. Lines: Asset safety and Impounded (stacks + value,
- * danger), Corp deliveries waiting (stacks) and Below target (types), both
- * warning. A line at zero is left out; nothing left is the all-clear. No
- * countdown: ESI exposes no asset-safety timers.
- */
 import { formatIskCompact } from '@/lib/isk';
 import { blank, corpUnreadable, count, statusOf, type Builder } from './builderKit';
 import { countShortTypes, type CorpAssetsSummary } from './corpAssetsSummary';
@@ -18,7 +11,6 @@ import type { Translate } from '@/lib/translate';
 const K = 'overview.widgets.corpAssets';
 const ASSETS = '/corp/assets';
 
-/** A stack worth 0 ISK is one the price list doesn't know, so it prints like an unpriced one rather than "0". */
 function pricedValue(value: number | null): number | null {
   return value !== null && value > 0 ? value : null;
 }
@@ -31,7 +23,6 @@ interface Line {
   to: string;
 }
 
-/** The four lines for one corporation's summary, `below` counting the types short of its own targets. */
 function linesFor(summary: CorpAssetsSummary, below: number): Line[] {
   return [
     {
@@ -59,7 +50,6 @@ function linesFor(summary: CorpAssetsSummary, below: number): Line[] {
   ];
 }
 
-/** Each line summed over the corporations: a value stays unknown only when none of them priced it. */
 function sumLines(perCorporation: readonly Line[][]): Line[] {
   return perCorporation[0]!.map((line, i) => {
     const values = perCorporation.flatMap((lines) => {
@@ -78,7 +68,6 @@ interface AssetsRead {
   fetchedAt: Date | null;
   fromCache: boolean;
   truncated: boolean;
-  /** Nothing held and no target set: "no assets", not an all-clear. */
   nothingHeld: boolean;
 }
 
@@ -152,7 +141,6 @@ export const corpAssets: Builder = (feeds, { t }) => {
   if (!data.readable || data.summary === null || data.corporationId === null) {
     return corpUnreadable(ASSETS, feed, data.needsReauth, t);
   }
-  // Targets decide the Below target line and the all-clear: until they are hydrated, say nothing.
   const targetFeed = feeds.corpStockTargets;
   if (!targetFeed?.data) return blank(ASSETS, statusOf(targetFeed));
   const { summary } = data;
@@ -166,11 +154,6 @@ export const corpAssets: Builder = (feeds, { t }) => {
   });
 };
 
-/**
- * The same four lines summed over every corporation read, so an asset safety clock or an impound
- * in any of them lights the widget. Below target is each corporation's own against its own
- * targets, since a stack in one corporation's hangar cannot cover another's shortfall.
- */
 export const corpAssetsAcross: Builder = (feeds, ctx) => {
   const { t } = ctx;
   const feed = feeds.corpAssetsAll;
@@ -186,7 +169,6 @@ export const corpAssetsAcross: Builder = (feeds, ctx) => {
       ? []
       : [{ read, summary: read.summary, targets: targetsForCorp(targetData, read.corporationId) }]
   );
-  // Every read readable yet none with a summary is a read that landed nothing: never an all-clear.
   if (held.length === 0) return corpUnreadable(ASSETS, feed, false, t);
   const lines = sumLines(
     held.map(({ summary, targets }) =>

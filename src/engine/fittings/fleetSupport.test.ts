@@ -19,7 +19,6 @@ const result = (attributes: [number, number][], state = 'active'): Result => ({
   state,
 });
 
-/** A Mining Foreman Burst II with a charge, as the pinned engine reads it on an Orca. */
 const burst = (state = 'active'): Result =>
   result(
     [

@@ -1,7 +1,3 @@
-/**
- * Who a member's tax question is mailed to (the book's `taxContact` setting). Pure; the
- * sender and the lists they joined are the caller's to look up.
- */
 import type { TaxContact } from './bookDocs';
 
 export interface TaxMailRecipient {
@@ -9,12 +5,6 @@ export interface TaxMailRecipient {
   type: 'character' | 'mailing_list';
 }
 
-/**
- * Who a member's tax question is mailed to. A mailing list only when the sender is on it (EVE
- * delivers to a list only from its members), else the CEO; named officers each; nothing set → CEO.
- * The sender is never mailed themselves. Empty when no CEO is known and nothing else applies.
- * `fellBackToCeo` is true when a set contact could not be used and the CEO is mailed instead.
- */
 export function taxMailRecipients(input: {
   contact: TaxContact | undefined;
   ceoId: number | null;

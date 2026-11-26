@@ -7,24 +7,13 @@ import type { ScopeGroup } from '@/esi/registry';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { grantMissingPath } from './grantMissingPath';
 
-/**
- * The one line every "this Character hasn't granted X" message shrinks to:
- * a plain text link to the Permissions page, which flashes the Grant button for
- * each of `groups`. Deliberately not a Button, and no touch-target growth: it
- * sits inline in a sentence-sized slot (DESIGN.md §6c, inline link).
- */
 export function GrantMissingLink({
   groups,
   asCharacter,
   children,
 }: {
   groups: readonly ScopeGroup[];
-  /**
-   * The Character lacking them, when it isn't the active one: Permissions
-   * shows the active Character, so the link switches to it first.
-   */
   asCharacter?: number;
-  /** A label naming the gap where the link stands alone (a table cell); "Grant missing" by default. */
   children?: ReactNode;
 }) {
   const { t } = useTranslation();
@@ -43,11 +32,6 @@ export function GrantMissingLink({
   );
 }
 
-/**
- * The menu twin: a bubble can't carry a link (it ignores the pointer), so a
- * row menu whose action is blocked by a missing Permission lists this item
- * under the inert one.
- */
 export function GrantMissingMenuItem({ groups }: { groups: readonly ScopeGroup[] }) {
   const { t } = useTranslation();
   const navigate = useNavigate();

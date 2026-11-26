@@ -7,11 +7,6 @@ import { blank } from './data/builderKit';
 import type { KindView } from './data/types';
 import type { Widget as WidgetModel } from './layout';
 
-/**
- * A new pilot's Overview: every card empty. Each empty card says what it has nothing of,
- * then what the kind is for (its Gallery description), then its Open link when the kind
- * has one. Remove lives in the ⋮ menu.
- */
 const meta = {
   title: 'overview/EmptyWidget',
   parameters: { layout: 'fullscreen' },
@@ -67,8 +62,6 @@ function Board(): ReactNode {
 
 const PHONE = { viewport: { value: 'mobile1', isRotated: false } } as const;
 
-/** @summary Empty Mining yield, Mining survey, Route safety and Hauling cards: description and Open link. */
 export const NewPilot: Story = { render: () => <Board /> };
 
-/** @summary The same empty cards in the phone shell. */
 export const NewPilotPhone: Story = { ...NewPilot, globals: PHONE };

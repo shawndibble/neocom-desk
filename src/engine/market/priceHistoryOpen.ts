@@ -1,16 +1,7 @@
-/**
- * Daily open prices for the Price History chart: the highest buy order and the
- * lowest sell order standing at the end of each UTC day, as the
- * R2 `open-prices/<typeId>.json` objects store them (docs/context/decisions/
- * 20261018-121126-price-history-draws-daily-open-buy-and-sell.md). ESI history
- * only records trades, so it cannot say this. Pure — the loader adapts the
- * stored document.
- */
 import { median } from '../math';
 import { filterPriceHistoryRange, type PriceHistoryRange } from './priceHistory';
 import type { ComparedHistoryDay } from './priceHistoryCompare';
 
-/** One region of a stored type document: parallel arrays, `null` where no order stood that day. */
 export interface OpenPriceSeries {
   dates: readonly string[];
   buy: readonly (number | null)[];
@@ -23,11 +14,6 @@ export interface OpenPricePoint {
   sell: number | null;
 }
 
-/**
- * Which lines the chart draws: open buy and/or sell where a region has them,
- * or `average` — every region's ESI average, so a trade hub and a region
- * without open prices compare on the same footing.
- */
 export type PriceSeriesChoice = 'both' | 'buy' | 'sell' | 'average';
 
 export const PRICE_SERIES_CHOICES: readonly PriceSeriesChoice[] = [
@@ -39,7 +25,6 @@ export const PRICE_SERIES_CHOICES: readonly PriceSeriesChoice[] = [
 
 export type OpenPriceSide = 'buy' | 'sell';
 
-/** Whether `side`'s line is drawn under `choice`; never under `average`. */
 export function seriesShows(choice: PriceSeriesChoice, side: OpenPriceSide): boolean {
   return choice === 'both' || choice === side;
 }
@@ -48,7 +33,6 @@ function priceOrNull(value: unknown): number | null {
   return typeof value === 'number' && Number.isFinite(value) ? value : null;
 }
 
-/** The parallel arrays as dated points, oldest first; a day with neither price is dropped and a short array reads as null. */
 export function openPricePoints(series: OpenPriceSeries): OpenPricePoint[] {
   const points: OpenPricePoint[] = [];
   series.dates.forEach((date, i) => {
@@ -60,7 +44,6 @@ export function openPricePoints(series: OpenPriceSeries): OpenPricePoint[] {
   return points.sort((a, b) => a.date.localeCompare(b.date));
 }
 
-/** Keeps the days inside `range`, on the same cutoff as ESI's history. */
 export function clipOpenPrices(
   points: readonly OpenPricePoint[],
   range: PriceHistoryRange,
@@ -71,26 +54,15 @@ export function clipOpenPrices(
 
 export interface RegionOpenSeries {
   regionId: number;
-  /**
-   * The hub station whose orders these are ("Jita 4-4"), which names the
-   * region's Buy and Sell lines.
-   */
   station?: string;
   points: readonly OpenPricePoint[];
 }
 
 export interface OpenJoinedDay extends ComparedHistoryDay {
-  /** Each region's highest buy order that day, by region id; absent where none stood. */
   buy: Readonly<Record<number, number>>;
-  /** Each region's lowest sell order that day, by region id. */
   sell: Readonly<Record<number, number>>;
 }
 
-/**
- * The joined ESI days (`joinRegionAverages`) plus each region's open buy and
- * sell, over the union of their dates, ascending. The open series is recorded
- * for days ESI saw no trade, and the line should still pass through them.
- */
 export function joinOpenPrices(
   days: readonly ComparedHistoryDay[],
   open: readonly RegionOpenSeries[]
@@ -120,7 +92,6 @@ export interface OpenPriceSummary {
   sellMedian: number | null;
 }
 
-/** The typical day's open buy and sell. Null for no points — never a fabricated 0. */
 export function summarizeOpenPrices(points: readonly OpenPricePoint[]): OpenPriceSummary | null {
   if (points.length === 0) return null;
   const medianOfPresent = (values: (number | null)[]): number | null => {

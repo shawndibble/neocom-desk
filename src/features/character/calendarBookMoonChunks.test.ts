@@ -46,7 +46,6 @@ beforeEach(() => {
 
 describe("Calendar: moon owners' pops from a Corp Tax Book (#6116)", () => {
   it("shows a moon owner's coming chunk, named for its corporation, to a CEO with no refinery", async () => {
-    // The accounting corporation's CEO: views the book, reads no corp source from ESI.
     accounts.push({
       characterId: 2,
       access: { corporationId: 20, can: (c: string) => c === 'canViewTaxBook' },
@@ -61,7 +60,6 @@ describe("Calendar: moon owners' pops from a Corp Tax Book (#6116)", () => {
       corporation: { id: 30, name: 'Corp 30' },
     });
     expect(read.corporations.map((c) => c.name)).toEqual(['Corp 30']);
-    // Its refinery is read, so a Shared Pop there is left out (#6224).
     expect(read.refineryIds).toEqual([7001]);
   });
 

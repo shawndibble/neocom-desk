@@ -9,13 +9,6 @@ import { cx } from '@/lib/cx';
 import { LANDING_ANCHORS } from './landingAnchors';
 import { DISCORD_URL, REPO_URL } from '@/lib/links';
 
-/**
- * Whether every large login button on the page is scrolled out of view. `targets`
- * must be a stable array. Starts
- * as "visible" and stays that way until each target has reported, and without
- * `IntersectionObserver` (jsdom, very old browsers), so the header never shows
- * a second login button by default.
- */
 function useAllOutOfView(targets: RefObject<HTMLElement | null>[]): boolean {
   const [out, setOut] = useState(false);
   useEffect(() => {
@@ -42,18 +35,11 @@ const ANCHOR_CLASS = cx(
   focusRingClassName
 );
 
-/**
- * The landing page's sticky banner: brand, section anchors (lg up), Discord and
- * GitHub, and, once no large login button is in view, a small one in its place.
- * Phones get the logo and Discord, and that conditional button in a bar fixed
- * to the bottom of the screen.
- */
 export function LandingHeader({
   ctaRefs,
   pending,
   onLogin,
 }: {
-  /** Wrap each of the page's large login buttons; the header's own appears only when none is in the viewport. */
   ctaRefs: RefObject<HTMLElement | null>[];
   pending: boolean;
   onLogin: () => void;
@@ -62,14 +48,13 @@ export function LandingHeader({
   const ctaOut = useAllOutOfView(ctaRefs);
   return (
     <header className="sticky top-0 z-30 border-b border-line bg-bg/95">
-      <div className="mx-auto flex max-w-[96rem] items-center gap-4 px-4 py-2 sm:px-6">
+      <div className="mx-auto flex max-w-page items-center gap-4 px-4 py-2 sm:px-6">
         <div className="flex items-center gap-2">
           <LogoMark className="size-7" />
           <span className="font-hud text-base font-bold tracking-wider whitespace-nowrap uppercase">
             {t('app.name')}
           </span>
         </div>
-        {/* Left-aligned after the name, so the header's login button opening on the right never moves it. */}
         <nav aria-label={t('login.header.nav')} className="ml-6 hidden lg:flex">
           <ul className="flex gap-1">
             {LANDING_ANCHORS.map(({ id, key }) => (
@@ -90,15 +75,6 @@ export function LandingHeader({
               <Github aria-hidden="true" />
             </HeaderIconLink>
           </span>
-          {/*
-            From md: always laid out, collapsed to zero width until no large
-            login button is in view. Opening the track (not mounting the
-            button) is what slides the icons beside it over instead of making
-            them jump. Below md the same button rides in a bar fixed to the
-            bottom of the screen, under the thumb, sliding up into view.
-            Collapsed it is `inert` and hidden from assistive tech, so it can
-            neither be tabbed to nor announced. Without motion it just appears.
-          */}
           <div
             data-open={ctaOut}
             inert={!ctaOut}
@@ -133,7 +109,6 @@ export function LandingHeader({
   );
 }
 
-/** An icon-only link to another site: IconButton's look, an anchor's semantics, opened in a new tab like `ExternalLink`. */
 function HeaderIconLink({
   href,
   label,

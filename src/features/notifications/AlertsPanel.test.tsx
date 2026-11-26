@@ -1,11 +1,3 @@
-/**
- * The global alerts panel: what the bell opens. The paths worth guarding are
- * the ones that decide what leaves the list: Mark all read sparing danger,
- * Acknowledge standing in for Dismiss on a danger type, Snooze existing only
- * for price alerts, the chips actually narrowing the rows, a dismiss waiting on
- * its Undo toast before it writes, and Stop these alerts reaching every
- * Character on the account.
- */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -82,7 +74,6 @@ const liveIds = async () =>
     .map((row) => row.id)
     .sort();
 
-/** A dismiss waits on its Undo toast (8s); the page hiding commits what is pending at once. */
 const endUndoWindow = () => act(() => void window.dispatchEvent(new Event('pagehide')));
 
 const rowOf = async (name: string) =>
@@ -112,7 +103,6 @@ describe('AlertsPanel', () => {
     expect(within(mailRow).getByText('New Mail body')).toBeInTheDocument();
     expect(within(mailRow).getByText('2 alerts')).toBeInTheDocument();
     expect(within(mailRow).getByText('5m ago')).toBeInTheDocument();
-    // The eyebrow names the topic; a type with no chip files under "Alerts".
     expect(mailRow).toHaveTextContent(/Mail · 5m ago/);
     expect(await rowOf('Structure Under Attack')).toHaveTextContent(/Structures · 5m ago/);
   });
@@ -188,7 +178,6 @@ describe('AlertsPanel', () => {
       await db.notificationFeed.bulkPut([MAIL, PRICE]);
       renderPanel();
 
-      // Worst first: New mail (watch) sits above the price alert (clear).
       await userEvent.click(
         within(await rowOf('New mail')).getByRole('button', { name: 'Dismiss New mail' })
       );
@@ -259,7 +248,6 @@ describe('AlertsPanel', () => {
     expect(screen.getAllByRole('listitem')).toHaveLength(1);
     expect(screen.queryByText('Structure Under Attack')).not.toBeInTheDocument();
 
-    // A chip with no alerts behind it is not offered.
     expect(screen.queryByRole('button', { name: 'Industry' })).not.toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('button', { name: 'Danger' }));
@@ -320,7 +308,6 @@ describe('AlertsPanel', () => {
         within(mailMenu).getByRole('menuitem', { name: 'Notification settings' })
       ).toBeVisible();
       expect(within(mailMenu).queryByRole('menuitem', { name: /Snooze/ })).not.toBeInTheDocument();
-      // Dismiss is the row's ×, never a second place.
       expect(within(mailMenu).queryByRole('menuitem', { name: /Dismiss/ })).not.toBeInTheDocument();
       await userEvent.keyboard('{Escape}');
 
@@ -419,7 +406,6 @@ describe('AlertsPanel', () => {
 
     it('turns the type off on both channels for every Character on the account, after the Undo window', async () => {
       await db.characters.bulkPut([character(91), character(OTHER), character(THIRD)]);
-      // Only 91 has fired; the others must be muted too.
       await db.notificationFeed.bulkPut([MAIL, PRICE]);
       renderPanel();
 
@@ -427,7 +413,6 @@ describe('AlertsPanel', () => {
       expect(await screen.findAllByText('New mail alerts off for all characters')).not.toHaveLength(
         0
       );
-      // Held back: nothing is muted or dismissed until the toast ends.
       expect(isEventEnabledFor(characterEventPrefs(prefs(), OTHER), 'newMail', 'feed')).toBe(true);
       expect(await liveIds()).toEqual(['mail', 'price']);
 
@@ -439,7 +424,6 @@ describe('AlertsPanel', () => {
             false
           );
         }
-        // A sibling type is untouched.
         expect(
           isEventEnabledFor(characterEventPrefs(prefs(), id), 'priceAlertTriggered', 'feed')
         ).toBe(true);
@@ -530,7 +514,7 @@ describe('AlertsPanel', () => {
 
       await userEvent.click(row);
       expect(row).toHaveAttribute('aria-expanded', 'true');
-      expect(screen.getAllByText(/^Event \d body$/)).toHaveLength(4); // newest also heads the group
+      expect(screen.getAllByText(/^Event \d body$/)).toHaveLength(4);
       expect(screen.getByTestId('path')).toHaveTextContent('/overview');
 
       await userEvent.click(row);

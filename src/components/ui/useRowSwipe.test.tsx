@@ -33,17 +33,11 @@ function Row({
 const row = () => screen.getByTestId('row');
 
 interface SwipeOptions {
-  /** Vertical drift while dragging, in px. */
   dy?: number;
   pointerType?: string;
-  /** Release a beat after the last move. */
   holdMs?: number;
 }
 
-/**
- * Press, drag `dx` px (negative is toward the inline start in LTR) in two
- * steps, release. The clock is stubbed so velocity is deterministic.
- */
 function swipe(el: Element, dx: number, elapsedMs: number, opts: SwipeOptions = {}) {
   const { dy = 0, pointerType = 'touch', holdMs = 0 } = opts;
   let now = 1000;

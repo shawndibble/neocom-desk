@@ -1,9 +1,3 @@
-/**
- * The selected item's required skills, once, under its name — they belong to
- * the item, not to any one order, so they used to repeat in every expanded
- * order row. Folded by default behind a "2 of 3 trained" count; open, it is
- * the same section Show Info carries, Add to Plan and all.
- */
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Disclosure } from '@/components/ui';
@@ -29,7 +23,6 @@ export function ItemSkillsDisclosure({
 }) {
   const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
-  // Still loading, a different item's, or an item that needs no skills.
   if (itemSkills === null || itemSkills.typeId !== typeId) return null;
   const { requiredSkills } = itemSkills;
   if (requiredSkills.length === 0) return null;

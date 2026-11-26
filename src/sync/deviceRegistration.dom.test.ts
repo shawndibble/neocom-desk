@@ -222,9 +222,6 @@ describe('registerDeviceForWebPush', () => {
   });
 
   it('still registers the Characters whose token fetch succeeded when one fails', async () => {
-    // A stale/expired access token for one Character (e.g. not opened in a
-    // while) must not stop the others from registering — matches the
-    // backend's own per-character partial-success design in registerDevice.ts.
     vi.mocked(getToken).mockResolvedValue('fcm-token');
     vi.spyOn(db.characters, 'toArray').mockResolvedValue([
       { characterId: 1, name: 'A', ownerHash: 'h', addedAt: 0 },
@@ -323,8 +320,6 @@ describe('registerDeviceForWebPush with skipIfUnchanged (the 5-minute poll)', ()
   });
 
   it('trusts an unchanged registration for one hour', () => {
-    // Short on purpose: it bounds outages the client can't see (a spurious
-    // FCM UNREGISTERED deleting a live registration, a cloned deviceId).
     expect(REREGISTER_AFTER_MS).toBe(3_600_000);
   });
 
@@ -435,9 +430,6 @@ describe('registerDeviceForWebPush with skipIfUnchanged (the 5-minute poll)', ()
     expect(call).toHaveBeenCalledTimes(1);
   });
 
-  // The Enable tap uploads an empty Projection, replacing this device's rows
-  // on the server. If that upload doesn't fully land, the poll's earlier
-  // fingerprint no longer describes the server and must not skip.
   it('forgets the last registration when a later upload is only partial', async () => {
     await poll();
     call.mockResolvedValueOnce({ data: { deviceId: 'device-1', registered: [], rejected: [1] } });
@@ -466,9 +458,6 @@ describe('registerDeviceForWebPush with skipIfUnchanged (the 5-minute poll)', ()
   });
 
   it('does not remember either of two overlapping uploads', async () => {
-    // A poll (rows) and Enable (empty rows) in flight at once: the server may
-    // have committed Enable's empty Projection last, so the poll's
-    // fingerprint — answered last here — must not be trusted.
     let finishPoll!: () => void;
     call.mockImplementationOnce(
       () =>

@@ -40,7 +40,6 @@ const quantityOf = (lines: readonly { typeId: number; quantity: number }[], type
 describe('planFill', () => {
   it('keeps the current plan as it is, even when an extra earns more per m³', () => {
     const current = [candidate({ typeId: 1, demandCapUnits: 60 })];
-    // Earns far more per m³ than item 1: planned together, it would take item 1's room.
     const extras = [candidate({ typeId: 2, expectedPrice: 1_000, demandCapUnits: 500 })];
     const result = fill({ current, extras, holds: anyHold(100) });
 
@@ -51,7 +50,7 @@ describe('planFill', () => {
   });
 
   it('gives the extras only the ISK the current plan leaves', () => {
-    const current = [candidate({ typeId: 1, demandCapUnits: 10 })]; // 1,000 ISK
+    const current = [candidate({ typeId: 1, demandCapUnits: 10 })];
     const extras = [candidate({ typeId: 2 })];
     const result = fill({ current, extras, budgetIsk: 1_500 });
 
@@ -76,7 +75,6 @@ describe('planFill', () => {
       ],
     });
 
-    // 20 m³ of general room left; the ammo hold's 500 m³ only takes the ammo.
     expect(quantityOf(result.lines, 2)).toBe(20);
     expect(quantityOf(result.lines, 3)).toBe(300);
   });
@@ -135,7 +133,7 @@ describe('planFill', () => {
 
   it('leaves out extras that would ship nothing', () => {
     const extras = [
-      candidate({ typeId: 2, expectedPrice: 90 }), // never profitable
+      candidate({ typeId: 2, expectedPrice: 90 }),
       candidate({ typeId: 3, demandCapUnits: 0 }),
       candidate({ typeId: 4, demandCapUnits: 10 }),
     ];

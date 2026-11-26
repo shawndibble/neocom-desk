@@ -183,11 +183,9 @@ describe('stationsModel', () => {
     expect(brokerRelationsLevel).toBe(4);
     const [broker, reprocessing] = rows;
     expect(broker).toMatchObject({ kind: 'broker', place: 'Jita 4-4' });
-    // 3% - 0.3% * 4 = 1.8% at zero; 0.03 * 5 + 0.02 * 6 = 0.27 off.
     expect(broker!.atZeroPct).toBeCloseTo(1.8, 10);
     expect(broker!.atYoursPct).toBeCloseTo(1.53, 10);
     expect(broker!.savingPct).toBeCloseTo(0.27, 10);
-    // Effective corporation standing 6 + 4 * 0.04 * 4 = 6.64: 5% * (1 - 0.15 * 6.64).
     expect(reprocessing).toMatchObject({ kind: 'reprocessing', place: null, atZeroPct: 5 });
     expect(reprocessing!.atYoursPct).toBeCloseTo(5 * (1 - 0.15 * 6.64), 10);
   });
@@ -280,7 +278,6 @@ describe('stationsModel', () => {
       ['broker', 'Jita 4-4'],
       ['reprocessing', 'Jita 4-4'],
     ]);
-    // Same fee as the Caldari Navy's own modal: 5 faction, 6 corporation.
     expect(rows[0]!.savingPct).toBeCloseTo(0.27, 10);
     expect(rows[1]!.atYoursPct).toBeCloseTo(5 * (1 - 0.15 * 6.64), 10);
   });

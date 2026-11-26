@@ -16,8 +16,6 @@ const base = {
 } as const;
 
 describe('declaredLeft', () => {
-  // Found transfers are credited at once server-side: recording the declared total again
-  // would count them twice.
   it('leaves out transfers the check found, which are already credited', () => {
     const d: Declaration = {
       ...base,

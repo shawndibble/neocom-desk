@@ -1,21 +1,3 @@
-/**
- * Route Safety's route strip (issue #2474): one cell per system, coloured by
- * security, so the shape of a trip reads at a glance before its rows.
- *
- * Colour is never the only signal (DESIGN.md §7): the strip carries a
- * spoken description, every cell names its system and security on hover,
- * and the key systems — both ends, the lowest security, every Gank
- * Chokepoint — are written out under it. A chokepoint has a line over its
- * cell and a system with kills in the last hour a mark inside it.
- *
- * A jump through a Thera / Turnur hole (issue #2476) is a hatched cell of
- * its own between its two systems' cells: a step, with no security to colour.
- * A jump over an Ansiblex (issue #2546) is a cell of its own too, edged in
- * the bridge row's dashed line. Both read the rows' own tags.
- *
- * One `role="img"`, not a tab stop per cell: a 40-jump route would otherwise
- * be 40 stops the table below already covers.
- */
 import { fixed1 } from '@/lib/fixedFormat';
 import { Fragment } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -28,11 +10,6 @@ import { routeSystemName } from './routeSystemName';
 import type { RouteKillsCell } from './useRouteKills';
 import type { RouteSafetyTripRow } from './useRouteSafety';
 
-/**
- * The cell a hole or bridge jump draws between its two systems. A bridge
- * takes the bridge row's dashed line, top and bottom only: a full box would
- * read as a control.
- */
 const STEP_CELL = {
   hole: {
     tip: 'travel.holes.stripCell',
@@ -67,17 +44,14 @@ export function RouteStrip({
   killsOf,
   stopIndexes,
 }: {
-  /** The trip's systems in flying order, each tagged with how it was entered. */
   rows: readonly RouteSafetyTripRow[];
   killsOf: (systemId: number) => RouteKillsCell;
-  /** On a trip through several Stops, where each one falls: those are key systems too. */
   stopIndexes?: readonly number[];
 }) {
   const { t } = useTranslation();
   const first = rows[0];
   const last = rows[rows.length - 1];
   if (!first || !last) return null;
-  // A trip can cross a system twice, so cells key by position, not system.
   const keys = routeStripKeySystems(rows, stopIndexes).flatMap((index) => {
     const row = rows[index];
     return row ? [{ index, row }] : [];
@@ -167,14 +141,12 @@ export function RouteStrip({
           );
         })}
       </div>
-      {/* Written out for sight; the strip's own label already speaks them. */}
       <ul
         aria-hidden="true"
         className="mt-1 flex flex-wrap justify-between gap-x-3 text-[0.75rem] text-text-dim"
       >
         {keys.map(({ index, row }) => (
           <li key={index} className="inline-flex min-w-0 items-center gap-1">
-            {/* The strip's own top line, so a chokepoint is never colour alone. */}
             <span
               className={`truncate ${row.chokepoint ? 'border-t-2 border-warning text-warning' : ''}`}
             >

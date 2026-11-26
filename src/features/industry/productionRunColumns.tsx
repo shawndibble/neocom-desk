@@ -14,27 +14,6 @@ import { formatCount } from '@/lib/formatCount';
 
 type T = (key: string) => string;
 
-/*
- * ISK here stays on `formatIsk` at full precision, deliberately (issue #948).
- * These columns feed the Production Runs table and the Production Log's
- * Logs tab, which is where a player reconciles logged costs and realized
- * sales against the game client — the ledger side of the shorthand rule, not
- * the scanning side. `RealizedProfitCell` and the panels' own money columns
- * stay exact for the same reason.
- */
-
-/**
- * The `DataTableColumn`s `ProductionRunsPanel` (one Build Plan's own runs)
- * and `ProductionLogPanel` (every run, every plan) share verbatim — every
- * row in either table is a `ProductionRunSummary`, so one column definition
- * covers both regardless of what else the row type adds (`ProductionLogPanel`
- * also carries `itemName`/`planExists`). Each panel still assembles its own
- * `columns` array in its own order and splices in its own extra columns
- * (`realizedRevenue` for the per-plan panel, `item` for the cross-plan one)
- * — factoring out a single fixed-order column list would have forced one of
- * the two tables to reorder columns it already shipped with.
- */
-
 export function loggedAtColumn<Row extends ProductionRunSummary>(
   t: T,
   timeZone?: string
@@ -85,13 +64,6 @@ export function quantitySoldColumn<Row extends ProductionRunSummary>(t: T): Data
 export function realizedProfitColumn<Row extends ProductionRunSummary>(
   t: T,
   skills: SkillLevels,
-  /**
-   * The standing already baked into each row's own `profit` (issue #1238),
-   * per row rather than a single value: `ProductionRunsPanel`'s rows all
-   * share one Build Plan's Trade Hub, but `ProductionLogPanel`'s cross-plan
-   * rows each belong to a different plan, and its own hub. Absent renders
-   * the breakdown at 0 standing, matching a row computed the same way.
-   */
   standingFor?: (row: Row) => ResolvedStandings | undefined
 ): DataTableColumn<Row> {
   return {
@@ -127,7 +99,6 @@ export function statusColumn<Row extends ProductionRunSummary>(t: T): DataTableC
   };
 }
 
-/** The "Sold" split button wired to `useSaleLinking`, keyed off each row's own run/product — no plan context needed. Its "Delete production run" item deletes the row's run, so this column also carries the delete action for both tables. */
 export function soldActionsColumn<Row extends ProductionRunSummary>(
   sale: SaleLinking,
   runLoss: RunLoss
@@ -141,9 +112,9 @@ export function soldActionsColumn<Row extends ProductionRunSummary>(
         onSold={() => void sale.openPicker(r.run.id, r.run.productTypeID, 'sale')}
         onWatch={() => void sale.openPicker(r.run.id, r.run.productTypeID, 'watch')}
         onManual={() => sale.openManualSale(r.run.id)}
-        onLost={() => void runLoss.openLoss(r)}
+        onLost={() => runLoss.openLoss(r)}
         losses={r.losses}
-        onEditLoss={(loss) => void runLoss.openLoss(r, loss)}
+        onEditLoss={(loss) => runLoss.openLoss(r, loss)}
         onRemoveLoss={(loss) => runLoss.confirmRemoveLoss(loss.id)}
         onDelete={() => sale.confirmDeleteRun(r.run.id)}
         onRefresh={

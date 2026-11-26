@@ -1,10 +1,3 @@
-// One-time copy for decision 20261120-235011, run once the functions that write `lateNotices` are
-// deployed: every Late notice issued before them lives only as a `statements` doc (`kind:
-// 'notice'`), its link only in `statementLinks`. This copies each into `lateNotices` /
-// `lateNoticeLinks` where it has no copy yet, and deletes the retired Statement-built Miner totals
-// (`minerTotals`, #5255). No server read looks at the legacy collections after it. A re-run copies
-// nothing new. Run by functions/scripts/backfill-late-notices.mjs.
-
 import { FieldValue, type Firestore } from 'firebase-admin/firestore';
 import { commitInBatches, type BatchOp } from './commitInBatches.js';
 import { LATE_NOTICES, LATE_NOTICE_LINKS, STATEMENTS, STATEMENT_LINKS } from './corpTaxBook.js';
@@ -20,14 +13,12 @@ import {
 
 const str = (v: unknown): string | undefined => (typeof v === 'string' ? v : undefined);
 const num = (v: unknown): number | undefined => (isFiniteNumber(v) ? v : undefined);
-/** A stored `{ key: string }` map, or undefined when there is none. */
 function stringRecord(v: unknown): Record<string, string> | undefined {
   if (!isRecord(v)) return undefined;
   return Object.fromEntries(
     Object.entries(v).filter((e): e is [string, string] => typeof e[1] === 'string')
   );
 }
-/** A stored `{ typeId: number }` map, or undefined when there is none. */
 function numberRecord(v: unknown): Record<number, number> | undefined {
   if (!isRecord(v)) return undefined;
   return Object.fromEntries(
@@ -35,10 +26,6 @@ function numberRecord(v: unknown): Record<number, number> | undefined {
   );
 }
 
-/**
- * Reads a `statements` doc that holds a late notice. Undefined for anything else: a calendar
- * Statement is not a notice, and production holds none.
- */
 export function lateNoticeFromStatementDoc(raw: Record<string, unknown>): LateNotice | undefined {
   if (raw.kind !== 'notice') return undefined;
   const id = str(raw.id) ?? '';
@@ -87,7 +74,6 @@ export function lateNoticeFromStatementDoc(raw: Record<string, unknown>): LateNo
     kind: isFinalNoticeId(id) ? 'final' : 'late',
     issuedAt: str(raw.issuedAt) ?? '',
     ...(issuedBy !== undefined ? { issuedBy } : {}),
-    // An empty code would match every donation's reason: no code is printed instead.
     ...(str(raw.code) ? { code: str(raw.code) } : {}),
     ...(typeof raw.hubId === 'string' && (raw.oreForm === 'compressed' || raw.oreForm === 'raw')
       ? { pricing: { hubId: raw.hubId, oreForm: raw.oreForm } }
@@ -114,7 +100,6 @@ export interface LateNoticeCopies {
   links: { id: string; token: string }[];
 }
 
-/** What to copy: legacy notices and links whose id has no copy in the new collections yet. */
 export function planLateNoticeCopies(
   statements: readonly Doc[],
   links: readonly Doc[],
@@ -133,7 +118,6 @@ export function planLateNoticeCopies(
   };
 }
 
-/** Reads one book's legacy and new collections and plans its copies. */
 export async function planLateNoticeBackfill(
   db: Firestore,
   corporationId: number
@@ -152,10 +136,6 @@ export async function planLateNoticeBackfill(
   return planLateNoticeCopies(statements, links, { notices, links: noticeLinks });
 }
 
-/**
- * Writes a plan, creating copies only where none exists: a doc written meanwhile (a notice issued
- * during the run) fails its batch, and a re-run copies what is left.
- */
 export async function applyLateNoticeBackfill(
   db: Firestore,
   corporationId: number,
@@ -180,7 +160,6 @@ export async function applyLateNoticeBackfill(
   await commitInBatches(db, ops);
 }
 
-/** Deletes every retired `minerTotals` doc and their health doc. Returns how many totals. */
 export async function retireMinerTotals(db: Firestore, corporationId: number): Promise<number> {
   const book = db.collection('corps').doc(String(corporationId));
   const refs = [

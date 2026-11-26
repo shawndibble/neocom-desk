@@ -1,5 +1,3 @@
-// Dev-only config for the manual-testing skill (.claude/skills/manual-testing). Not part of the
-// e2e suite or CI: run it by hand with `-c`. Opens a headed browser and waits for the user to close it.
 import { defineConfig } from '@playwright/test';
 export default defineConfig({
   testDir: '.',

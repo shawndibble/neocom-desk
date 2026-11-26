@@ -1,21 +1,8 @@
-/**
- * Loyalty Store at phone width: the phone sort control (issue #2174) and the
- * corporation picker's fit (issue #2321).
- *
- * The picker-fit test renders only the route's chrome with no offers, so the
- * empty LP fixtures in `support/mockEsi.ts` are enough; the phone-sort-control
- * test seeds its own offers via `mockLoyaltyOffers`.
- */
 import type { Page } from '@playwright/test';
 import { test, expect, PHONE, DESKTOP } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 import { CORPORATION_ID } from './support/fixtureData';
 
-/**
- * Tritanium (34) and Pyerite (35): both resolve their names from the app's
- * own bundled `public/data/types.json` catalogue, so the offer rows render
- * without needing an ESI-name mock (see marketOrderBookOverflow.spec.ts).
- */
 const OFFERS = [
   { isk_cost: 0, lp_cost: 1000, offer_id: 1, quantity: 1, required_items: [], type_id: 34 },
   { isk_cost: 0, lp_cost: 2000, offer_id: 2, quantity: 1, required_items: [], type_id: 35 },
@@ -25,9 +12,6 @@ async function mockLoyaltyOffers(page: Page) {
   await page.route(`https://esi.evetech.net/loyalty/stores/${CORPORATION_ID}/offers/`, (route) =>
     route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(OFFERS) })
   );
-  // The Offers rows only render once the LP Store's market snapshot resolves
-  // (useLoyaltyStoreOffers gates on `catalog && snapshot`) — an empty order
-  // book is enough, the test only cares about item names and sort order.
   await page.route('https://esi.evetech.net/markets/*/orders*', (route) =>
     route.fulfill({ status: 200, contentType: 'application/json', body: '[]' })
   );
@@ -40,8 +24,6 @@ test('a phone sort control changes the Offers table order at 390px (issue #2174)
   page,
 }) => {
   await mockLoyaltyOffers(page);
-  // Pinned off: Affordable defaults on whenever the LP balance isn't a known
-  // 0, which could filter both fixture offers out of `filteredRows`.
   await signInAndGoto(page, `./wallet/lp-store/${CORPORATION_ID}?affordableOnly=0`);
   await page.setViewportSize(PHONE);
 
@@ -51,9 +33,6 @@ test('a phone sort control changes the Offers table order at 390px (issue #2174)
   const sortSelect = page.getByRole('combobox', { name: 'Sort by' });
   await expect(sortSelect).toBeVisible();
 
-  // Alphabetically, Pyerite sorts before Tritanium — pin the expected order
-  // rather than just asserting "something changed", so this proves the
-  // Item column specifically drove the reorder, not an unrelated re-render.
   await sortSelect.selectOption('item:asc');
   await expect
     .poll(() => itemCells.allTextContents())
@@ -109,7 +88,6 @@ for (const width of [390, 1024, 1280]) {
     const header = page.getByRole('dialog').locator('header').first();
     await expect(header.getByText('Offers shown')).toHaveCount(0);
 
-    // Direct children of the header's meta row never sit on top of each other.
     const meta = header.locator('> div').first();
     const boxes = await meta.locator('> *').evaluateAll((nodes) =>
       nodes.map((node) => {
@@ -135,7 +113,6 @@ for (const width of [390, 1024, 1280]) {
     );
     expect(overflow).toBeLessThanOrEqual(0);
 
-    // From md up the count rides the list panel's title line, clear of the export button.
     if (width >= 768) {
       const count = page.locator('[aria-hidden="true"]').getByText(/^2 \/ 2 offers$/);
       await expect(count).toBeVisible();
@@ -167,7 +144,6 @@ for (const width of [390, 1024, 1280]) {
     await expect(readout).toHaveText('Jita · Sell order');
     const panelHeader = readout.locator('xpath=ancestor::header[1]');
     const title = panelHeader.getByRole('heading', { level: 2 });
-    // A phone drops the heading (the modal title names the store); wider screens keep it.
     const hasTitle = width >= 640;
     if (!hasTitle) await expect(title).toHaveCount(0);
     const [r, t, h, actions] = await Promise.all([
@@ -176,7 +152,6 @@ for (const width of [390, 1024, 1280]) {
       panelHeader.boundingBox(),
       panelHeader.getByRole('button').last().boundingBox(),
     ]);
-    // Inside the header, clear of the title and the export button.
     expect(r!.x).toBeGreaterThanOrEqual(h!.x - 1);
     expect(r!.x + r!.width).toBeLessThanOrEqual(h!.x + h!.width + 1);
     expect(r!.y).toBeGreaterThanOrEqual(h!.y - 1);
@@ -213,8 +188,6 @@ for (const width of [1024, 1280, 1440]) {
     const box = await list.boundingBox();
     if (width >= 1280) expect(box!.width).toBeGreaterThanOrEqual(26 * 16);
 
-    // Real figures are wider than the fixture's dashes: a seven-digit ISK/LP and a
-    // nine-figure profit must still sit inside the list's panel, not spill over its edge.
     const spill = await list.evaluate((section) => {
       for (const td of section.querySelectorAll('td')) {
         if (td.textContent === '—') td.textContent = td.cellIndex === 2 ? '-648.2M' : '1,620,520';
@@ -224,7 +197,6 @@ for (const width of [1024, 1280, 1440]) {
     });
     expect(spill).toBeLessThanOrEqual(1);
 
-    // The detail panel is the list's right-hand sibling: no overlap, no clipping.
     const sibling = list.locator('xpath=following-sibling::*[contains(@class,"min-w-0")][1]');
     const d = await sibling.boundingBox();
     expect(d!.x).toBeGreaterThanOrEqual(box!.x + box!.width - 1);

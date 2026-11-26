@@ -10,12 +10,6 @@ function rgb(hex: string): Rgb {
   };
 }
 
-/**
- * Where the pilot meters' fill sits on each colour: gray, blue, green, then
- * yellow only past half, orange, and a muted red at the top. Every stop is
- * desaturated on purpose: the Threat verdict is the one loud red on a pilot's
- * profile, and a meter that leans high should read as "more", not "alarm".
- */
 export const METER_STOPS: readonly (readonly [pct: number, hex: string])[] = [
   [0, '#6f8296'],
   [22, '#6e9cc4'],
@@ -25,10 +19,6 @@ export const METER_STOPS: readonly (readonly [pct: number, hex: string])[] = [
   [100, '#d1675f'],
 ];
 
-/**
- * The fill colour of a 0-100 meter, blended along `METER_STOPS`. Callers
- * always print the figure beside it, so the colour is never the only signal.
- */
 export function ratioMeterColor(pct: number): string {
   const p = Math.min(100, Math.max(0, pct));
   let i = 1;

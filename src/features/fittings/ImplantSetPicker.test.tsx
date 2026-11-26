@@ -14,7 +14,6 @@ vi.mock('@/features/skills/typeCatalog', () => ({
       ['damage control ii', { typeID: 2048 }],
     ]),
 }));
-// Which slot each item takes; anything else is neither an implant nor a booster.
 const SLOTS = new Map([
   [9950, { kind: 'booster', slot: 1 }],
   [13283, { kind: 'implant', slot: 6 }],
@@ -26,7 +25,6 @@ vi.mock('./useImplantFinder', () => ({
 vi.mock('@/features/character/typeNames', () => ({
   loadTypeNames: async () => new Map([[9950, 'Standard Blue Pill Booster']]),
 }));
-// What the finder is handed, and one change made through it.
 vi.mock('./ImplantFinder', () => ({
   ImplantFinder: ({
     fitting,
@@ -50,7 +48,6 @@ vi.mock('./ImplantFinder', () => ({
   ),
 }));
 
-// The item's details, as the dialog that opens on them.
 vi.mock('@/features/market/ItemDetailModal', () => ({
   ItemDetailModal: ({ typeId, itemName }: { typeId: number; itemName: string }) => (
     <p>
@@ -59,7 +56,6 @@ vi.mock('@/features/market/ItemDetailModal', () => ({
   ),
 }));
 
-// The suggestions behind the add box.
 vi.mock('./implantSlotLookup', () => ({
   loadImplantMarketEntries: async () => ({
     implants: [
@@ -191,7 +187,6 @@ describe('ImplantSetPicker — planning from the clone', () => {
     );
     expect(await screen.findByText('Plan: 10228,13283')).toBeInTheDocument();
     expect(screen.getByText('Measured on: 10228,13283')).toBeInTheDocument();
-    // Opening it alone saves nothing, and on the clone there is nothing to go back from.
     expect(onChange).not.toHaveBeenCalled();
     expect(screen.queryByRole('button', { name: 'Use my clone' })).not.toBeInTheDocument();
 

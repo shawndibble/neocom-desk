@@ -44,9 +44,6 @@ import {
   type WaitingRow,
 } from './reviewMemberFixtures';
 
-// ------------------------------------------------------------- Member combobox
-
-/** The query's match in a name, bold, so a narrowed list shows why each member is there. */
 function Matched({ name, query }: { name: string; query: string }) {
   const at = query === '' ? -1 : name.toLowerCase().indexOf(query.toLowerCase());
   if (at < 0) return <>{name}</>;
@@ -64,7 +61,6 @@ function memberLine(member: RosterMember): string {
   return [member.title, member.seen && `seen ${member.seen}`].filter(Boolean).join(' · ');
 }
 
-/** Names starting with the query first, then names that contain it; the roster order otherwise. */
 function narrow(members: readonly RosterMember[], query: string): RosterMember[] {
   const q = query.trim().toLowerCase();
   if (q === '') return [...members].sort((a, b) => a.name.localeCompare(b.name));
@@ -79,16 +75,9 @@ interface MemberComboboxProps {
   query: string;
   onQuery: (query: string) => void;
   onPick: (member: RosterMember) => void;
-  /** Roster could not be read (no membership permission): the box asks for the exact name. */
   rosterMissing?: boolean;
 }
 
-/**
- * A listbox under a text field (WAI-ARIA combobox, list autocomplete): typing narrows the whole
- * roster, Arrow keys move, Enter picks, Escape clears. The list sits in the flow under the field,
- * not in a floating layer, so it is never clipped by the dialog or hidden under a phone's
- * keyboard. A member who cannot be picked stays in the list with the reason on the row.
- */
 export function MemberCombobox({ query, onQuery, onPick, rosterMissing }: MemberComboboxProps) {
   const listId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -227,7 +216,6 @@ export function MemberCombobox({ query, onQuery, onPick, rosterMissing }: Member
   );
 }
 
-/** The picked member: portrait, name, title and last seen, with Change. */
 export function PickedMember({
   member,
   onChange,
@@ -252,9 +240,6 @@ export function PickedMember({
   );
 }
 
-// ------------------------------------------------------------------ Role field
-
-/** Free text with suggestions under it: the corp's titles first, EVE's roles after. Typing narrows them. */
 export function RoleField({
   value,
   onChange,
@@ -299,8 +284,6 @@ export function RoleField({
   );
 }
 
-// ------------------------------------------------------------ The dialog (ask)
-
 export type AskStep = 'ask' | 'asked' | 'mailed';
 
 interface ReviewMemberDialogProps {
@@ -308,16 +291,10 @@ interface ReviewMemberDialogProps {
   picked?: RosterMember | null;
   role?: string;
   rosterMissing?: boolean;
-  /** The dialog's footer button reads ready. */
   step?: AskStep;
-  /** The mail preview is open over the result. */
   previewing?: boolean;
 }
 
-/**
- * "Review a member", proposed. Step 1 picks the member from the roster and the role; step 2 (the
- * result) offers the in-game mail. Interactive in Storybook: type, arrow, pick.
- */
 export function ProposedReviewMemberDialog({
   query: initialQuery = '',
   picked: initialPicked = null,
@@ -475,9 +452,6 @@ function firstName(name: string): string {
   return name.split(' ')[0] ?? name;
 }
 
-// ------------------------------------------------------------- Mail preview
-
-/** The mail as the member reads it, in the Late notice mail preview's monospace box. */
 export function MailPreviewDialog({
   onClose,
   sent = false,
@@ -540,8 +514,6 @@ export function MailPreviewDialog({
   );
 }
 
-// ---------------------------------------------------------------- Queue rows
-
 function mailCell(row: WaitingRow) {
   if (row.mail === 'none') return <span className="text-warning">Mail not sent</span>;
   return <span className="text-text-dim">Mail sent {row.mailAgo}</span>;
@@ -601,7 +573,6 @@ const QUEUE_COLUMNS = (
   },
 ];
 
-/** One waiting row's menu: Send or Resend mail (resend waits a day), and Copy link. */
 function rowMenu(row: WaitingRow | (typeof SHARED_ROWS)[number], tr: React.ReactElement) {
   if (!('role' in row)) return tr;
   const name = firstName(row.name);
@@ -631,7 +602,6 @@ function rowMenu(row: WaitingRow | (typeof SHARED_ROWS)[number], tr: React.React
   );
 }
 
-/** The Open queue with waiting rows that now open a page, say where the mail stands, and carry a menu. */
 export function ProposedQueue({ only }: { only?: readonly string[] }) {
   const phone = useIsPhone();
   const rows = [...WAITING_ROWS, ...SHARED_ROWS].filter((r) => !only || only.includes(r.id));
@@ -656,15 +626,11 @@ export function ProposedQueue({ only }: { only?: readonly string[] }) {
   );
 }
 
-// ------------------------------------------------- Officer's page: requested
-
-/** The review page of a request the member has not answered: the request, then nothing to read yet. */
 export function RequestedReviewPage({
   mail = 'sent',
   rail,
 }: {
   mail?: 'none' | 'sent';
-  /** The real decision rail, loaded from the fixture backend. */
   rail: ReactNode;
 }) {
   const member = PICKED;
@@ -725,7 +691,6 @@ export function RequestedReviewPage({
   );
 }
 
-/** A review about the officer: the real page's closed state. */
 export function OwnReviewPage() {
   return (
     <div className="mx-auto max-w-page space-y-4 px-4 py-4">
@@ -742,8 +707,6 @@ export function OwnReviewPage() {
     </div>
   );
 }
-
-// ------------------------------------------------------------- Member's page
 
 const DEVICE_ROWS = [
   { characterId: 2118000009, name: 'Ren Halvard', corporationName: CORP_NAME, state: 'ready' },
@@ -779,10 +742,6 @@ function Step({ n, title, children }: { n: number; title: string; children: Reac
   );
 }
 
-/**
- * `/vetting`, a member's side. The top now says in plain words who asked, for what, what happens
- * and in what order; the existing Characters panel, consent terms and Share / Decline follow.
- */
 export function MemberRequestPage() {
   return (
     <div className="mx-auto max-w-2xl space-y-4 px-4 py-4">

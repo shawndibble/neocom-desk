@@ -12,7 +12,6 @@ import { clearJumpGraphIndex } from '@/sde/jumpGraph';
 import { clearSolarSystemIndex } from '@/sde/solarSystems';
 import { jumpsBetween } from './jumpBasis';
 
-// HUB - A - B - C, and HUB - LOW - FAR - C: two three-jump ways round.
 const HUB = 30000001;
 const LOW = 30000002;
 const FAR = 30000003;

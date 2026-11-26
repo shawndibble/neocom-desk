@@ -61,7 +61,6 @@ import {
 import { DividedList } from '@/components/ui/DividedList';
 
 const formatDecimal = createNumberFormat({ maximumFractionDigits: 3 });
-/** The "behind" days a book that notices by day of month starts from, if switched back. */
 const behindDefault =
   DEFAULT_NOTICE_RULES.after.kind === 'behind' ? DEFAULT_NOTICE_RULES.after.days : 14;
 
@@ -74,7 +73,6 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
-/** A UTC day in the viewer's locale, the way a native date input prints it. */
 const displayDate = (iso: string) =>
   new Date(`${iso}T00:00:00Z`).toLocaleDateString(undefined, { timeZone: 'UTC' });
 
@@ -88,12 +86,10 @@ const RATE_SCOPES = [
   'feeder',
   'feeder-member',
 ] as const;
-/** Scopes that name a moon owner corporation. */
 const OWNER_SCOPES: readonly string[] = ['feeder', 'feeder-member'];
 
 type NewRate = Exclude<TaxRate, { scope: 'record' }>;
 
-/** Two pending rates for the same scope, target and day: the server keeps only one. */
 const pendingKey = (r: NewRate) =>
   [
     r.scope,
@@ -129,10 +125,6 @@ function rateLabel(
 
 const NO_DIVISION_NAMES = new Map<number, string>();
 
-/**
- * The corporation's own names for its wallet divisions (the Corp Wallet's divisions read), by
- * number. Empty without the role to read them or until loaded: the checkboxes fall back to numbers.
- */
 function useWalletDivisionNames(characterId: number, corporationId: number): Map<number, string> {
   const canRead = useCorpAccess().capabilities.canReadDivisions;
   const load = useCallback(
@@ -150,13 +142,6 @@ function useWalletDivisionNames(characterId: number, corporationId: number): Map
   return useKeyedLoad(`${characterId}:${corporationId}`, load).data ?? NO_DIVISION_NAMES;
 }
 
-/**
- * The book's settings (D21: from the page header's gear): the dated rates
- * (corp default, Guest default, per-Miner, per-moon, per-refinery, per-moon-owner), hub and Ore Form, grace,
- * divisions, late-notice rules, chunk rate, per-structure
- * expiry and the dismissal approval limit. A rate may start up to 30 days back, so a
- * new one can fix recent days; everything else saves as one patch.
- */
 export function BookSettingsDialog({
   open,
   onClose,
@@ -166,11 +151,8 @@ export function BookSettingsDialog({
 }: {
   open: boolean;
   onClose: () => void;
-  /** Save went through; the page owns the "Settings saved" toast, since this dialog closes. */
   onSaved?: () => void;
-  /** "Delete the book" was pressed: the page closes this dialog and opens the one confirmation. */
   onDeleteBook?: () => void;
-  /** The tab it opens on; a return from EVE's opt-in opens Access either way. */
   initialTab?: SettingsTab;
 }) {
   const { t } = useTranslation();
@@ -186,7 +168,6 @@ export function BookSettingsDialog({
     corporationId,
     requestRows,
   } = useBook();
-  // The refinery list below includes a moon owner's, which only its ledger rows name.
   useEffect(() => {
     if (open) requestRows?.();
   }, [open, requestRows]);
@@ -196,10 +177,7 @@ export function BookSettingsDialog({
   const [oreForm, setOreForm] = useState(settings.oreForm);
   const [grace, setGrace] = useState(String(settings.graceHours));
   const [divisions, setDivisions] = useState<number[]>(settings.divisions);
-  // The list the dialog opened on: a save that changes the divisions sends it, so the server
-  // refuses it rather than drop another officer's change made meanwhile.
   const divisionsBase = useRef(settings.divisions).current;
-  // The Account members are asked to pay into first; the book still reads every division above.
   const [primaryPick, setPrimaryPick] = useState(
     primaryDivisionOf(settings.divisions, settings.primaryDivision)
   );
@@ -217,7 +195,6 @@ export function BookSettingsDialog({
     )
   );
   const [taxContact, setTaxContact] = useState(() => draftFromContact(settings.taxContact));
-  // A running account's late notices and per-day tolerance (#6294).
   const rules = settings.noticeRules;
   const [noticeAfter, setNoticeAfter] = useState<NoticeAfter['kind']>(rules.after.kind);
   const [noticeDays, setNoticeDays] = useState(
@@ -241,7 +218,6 @@ export function BookSettingsDialog({
   const [ratePct, setRatePct] = useState('');
   const today = utcDay();
   const [rateFrom, setRateFrom] = useState(today);
-  // Rates added with "Add rate", written together by Save (#6323).
   const [pending, setPending] = useState<{ id: number; rate: NewRate }[]>([]);
   const nextPendingId = useRef(0);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
@@ -254,7 +230,6 @@ export function BookSettingsDialog({
     () => [...new Set(view.input.extractions.map((x) => x.moonId))],
     [view.input.extractions]
   );
-  // Every refinery the book reads, a moon owner's included: its rows never carry a moon (#4621).
   const refineries = useMemo(
     () =>
       [...new Set([...structures, ...view.input.entries.map((e) => e.structureId)])].sort(
@@ -262,7 +237,6 @@ export function BookSettingsDialog({
       ),
     [structures, view.input.entries]
   );
-  // The moon owners still in the book: one that left or was removed mines here no more.
   const owners = useMemo(
     () =>
       (data.feeders ?? [])
@@ -294,7 +268,6 @@ export function BookSettingsDialog({
     (rateScope !== 'moon' || rateMoon !== '') &&
     (rateScope !== 'structure' || rateRefinery !== '') &&
     (!OWNER_SCOPES.includes(rateScope) || rateOwner !== '');
-  // One save model: Save commits the settings and a rate left in the form.
   const rateFilled = ratePct !== '';
 
   const formRate = (): NewRate => {
@@ -310,7 +283,6 @@ export function BookSettingsDialog({
             : { scope: rateScope, ...base };
   };
 
-  // Why a pending rate cannot be written, by its id: the rules a single rate always had.
   const pendingProblems = useMemo(() => {
     const seen = new Set<string>();
     const out = new Map<number, 'start' | 'past' | 'duplicate'>();
@@ -326,8 +298,6 @@ export function BookSettingsDialog({
 
   const rateIsDuplicate =
     rateReady && pending.some((p) => pendingKey(p.rate) === pendingKey(formRate()));
-  // History before the lock date is read-only (decision 20261120-235011, "a lock date"): the start
-  // date cannot move from or to a day before it, the same rule the server applies.
   const lockDate = lockDateFor(today);
   const startIsLocked = settings.startDate < lockDate;
   const startMovedBeforeLock = startDate !== settings.startDate && startDate < lockDate;
@@ -343,7 +313,6 @@ export function BookSettingsDialog({
   const addPending = () => {
     const rate = formRate();
     setPending((p) => [...p, { id: nextPendingId.current++, rate }]);
-    // The scope stays: the next rate is likely the same kind.
     setRatePct('');
     setRateMiner('');
     setRateMoon('');
@@ -363,7 +332,6 @@ export function BookSettingsDialog({
       const toWrite = [...pending.map((p) => p.rate), ...(rateFilled ? [formRate()] : [])];
       const rateAdded = toWrite.length > 0;
       if (rateAdded) {
-        // One rate keeps the single `addRate` an older server knows; several go as one batch.
         await edit(
           toWrite.length === 1
             ? { action: 'addRate', rate: toWrite[0] }
@@ -384,7 +352,6 @@ export function BookSettingsDialog({
         ),
       };
       Object.assign(patch, taxContactPatch(taxContact, settings.taxContact));
-      // Sent only when changed, so a save of other settings never touches them.
       const noticeRules: NoticeRules = {
         after:
           noticeAfter === 'behind'
@@ -394,8 +361,6 @@ export function BookSettingsDialog({
         cooldownDays: Number(cooldown),
         ...(Number(earlyAt) > 0 ? { earlyAt: Number(earlyAt) } : {}),
       };
-      // Out-of-bounds or blank figures are never sent (the server would refuse the whole save):
-      // `parseNoticeRules` puts back a default for any it cannot take, so they differ.
       const asStored = JSON.stringify(parseNoticeRules(noticeRules));
       if (
         asStored === JSON.stringify(noticeRules) &&
@@ -411,22 +376,17 @@ export function BookSettingsDialog({
       )
         patch.dayTolerancePct = tolerancePct;
       if (chunk !== '') patch.chunkM3PerHour = Number(chunk);
-      // Unchanged divisions are left out, so a save of other settings never overwrites them.
       const baseDivisions = [...divisionsBase].sort((a, b) => a - b);
       const divisionsChanged = sortedDivisions.join() !== baseDivisions.join();
       if (divisionsChanged) {
         patch.divisions = sortedDivisions;
         patch.divisionsBase = baseDivisions;
       }
-      // Only when it moved: the server checks it against the divisions the book reads.
       if (
         sortedDivisions.length > 1 &&
         primary !== primaryDivisionOf(settings.divisions, settings.primaryDivision)
       )
         patch.primaryDivision = primary;
-      // The names of the divisions it now reads go with them, so members see the corp's name for
-      // a newly read division at once (#6161). Only with a divisions change: the base check then
-      // guards them too, where names alone would replace the stored map from a stale list.
       const names = divisionsChanged
         ? await divisionNamesFor(
             characterId,
@@ -445,7 +405,6 @@ export function BookSettingsDialog({
         await edit({ action: 'updateSettings', patch });
       } catch (e) {
         if (!rateAdded) throw e;
-        // The rate is already committed and its form cleared: say so, so a retry is not read as a redo.
         setError(
           `${t('corpTaxBook.moons.settings.rateAddedSettingsFailed')} ${callableErrorText(t, e, 'corpTaxBook.moons.dialogs.failed')}`
         );
@@ -464,7 +423,6 @@ export function BookSettingsDialog({
   const tabsId = useTabsId();
   const rateHintId = useId();
   const fieldId = useId();
-  // Back from EVE's page after the Automatic sync opt-in: open where its notice is shown.
   const { state: routerState } = useLocation();
   const [tab, setTab] = useState<SettingsTab>(() =>
     (routerState as { corpSyncGrant?: unknown } | null)?.corpSyncGrant !== undefined
@@ -793,7 +751,6 @@ export function BookSettingsDialog({
           )}
 
           {tab === 'billing' && (
-            // One grid for both groups, so Pricing's controls line up with Statements'.
             <Fields variant="form">
               <FieldsHeading>{t('corpTaxBook.moons.settings.pricing')}</FieldsHeading>
               <Field label={t('corpTaxBook.moons.settings.hub')}>

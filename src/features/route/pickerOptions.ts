@@ -1,7 +1,3 @@
-/**
- * The rows of a system picker that also finds stations (issue #4964): the
- * ranked systems, then the stations and structures beside them, one list.
- */
 import { rankedSearch } from '@/lib/rankedSearch';
 import type { FoundPlace } from '@/features/places/useKnownPlaces';
 import type { PickedStation } from '@/features/places/placeSearch';
@@ -35,7 +31,6 @@ export function buildPickerOptions(
     security: system.security,
     stationId: null,
   }));
-  // Built only when stations matched: most keystrokes have none.
   const securityOf =
     placeHits.length > 0
       ? new Map(systems.map((system) => [system.id, system.security]))
@@ -53,7 +48,6 @@ export function buildPickerOptions(
   return [...systemOptions, ...placeOptions];
 }
 
-/** What picking a row answers: its system, and the station when the row is one. */
 export function pickedStationOf(option: PickerOption): PickedStation | undefined {
   return option.stationId === null ? undefined : { id: option.stationId, name: option.name };
 }

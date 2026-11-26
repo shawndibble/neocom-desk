@@ -4,10 +4,6 @@ import type { PlanetType } from '@/engine/pi/goalTypes';
 import { cx } from '@/lib/cx';
 import { PLANET_TYPE_ICON_ID } from './planetTypeIcons';
 
-/**
- * A planet-type image, round. Decorative: the planet's name and type sit in
- * text beside it. `badge` is a small glyph over the corner (a quick win's action).
- */
 export function PlanetImage({
   type,
   size = 40,

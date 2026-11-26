@@ -44,9 +44,7 @@ describe('affectedAttributes', () => {
           ],
         },
       ],
-      // Unchanged: no sources worth listing.
       [158, { base: 5000, value: 5000, sources: [] }],
-      // A patched (derived) attribute: never listed.
       [-12, { base: 0, value: 40, sources: [source({ type: 'item', index: 0 })] }],
     ]);
 

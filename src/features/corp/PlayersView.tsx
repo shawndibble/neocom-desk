@@ -1,9 +1,3 @@
-/**
- * The Members page's Players view: each Player is a parent row that opens to its characters in
- * the same columns, and members in no group stay single rows. The row click on a Player expands
- * it; right-click, touch-and-hold and the ⋮ share one menu (DESIGN.md §6c). Officer-only: the
- * page offers the view only where it can edit a book.
- */
 import {
   useCallback,
   useEffect,
@@ -62,7 +56,6 @@ const CHIP_KEYS: Record<CharacterChip, { word: string; tip: string }> = {
   conflict: { word: 'corp.members.players.conflictChip', tip: 'corp.members.players.conflictTip' },
 };
 
-/** A static badge: the word shows, the tooltip explains (§6c). */
 function Tag({ tip, children, warn }: { tip: string; children: ReactNode; warn?: boolean }) {
   return (
     <Tooltip content={tip}>
@@ -75,36 +68,21 @@ function Tag({ tip, children, warn }: { tip: string; children: ReactNode; warn?:
   );
 }
 
-/**
- * The builder orders the rows (a sort must keep each Player's alts under it), so DataTable's own
- * sort must not move them: a constant `sortValue` makes a column sortable (header button, active
- * arrow, `?sort=`) while its stable sort leaves the builder's order alone.
- */
 const PASS_THROUGH_SORT = { sortValue: () => 0 } as const;
-/** A first click sorts text A-Z and dates / spans most recent first, as the Characters table does. */
 const firstDirection = (id: string): 'asc' | 'desc' =>
   id === 'lastSeen' || id === 'joined' ? 'desc' : 'asc';
 
 const lineKey = (line: Line) => line.key;
 
 export interface PlayersViewProps {
-  /** The whole roster. */
   rows: readonly RosterRow[];
-  /** The rows that pass the search and every filter. */
   visibleRows: readonly RosterRow[];
   grouping: RosterGrouping;
-  /** The search text (debounced) and whether the dark / ship / place filters are on. */
   search: string;
   otherFilters: boolean;
-  /** Opens the page's group dialog for the Player holding this character (or the lone member). */
   onGroupWith: (characterId: number) => void;
   onResetFilters: () => void;
-  /**
-   * A `?highlight` character id the page latched before this view mounted (a cold link reaches the
-   * Characters table first, which spends the param while the groups are still loading).
-   */
   highlightId?: number | null;
-  /** Called once this view has taken the latched `highlightId`, so the page can drop it. */
   onHighlightSeen?: () => void;
 }
 
@@ -125,8 +103,6 @@ export function PlayersView({
   const [removing, setRemoving] = useState<Line | null>(null);
   const [changingMain, setChangingMain] = useState<Line | null>(null);
   const urlHighlight = useHighlightParam();
-  // The page's latch is taken once at mount and handed back, so leaving this view and returning
-  // does not replay it.
   const [latchedHighlight] = useState(pageHighlight);
   useEffect(() => {
     if (pageHighlight !== null) onHighlightSeen?.();
@@ -144,7 +120,6 @@ export function PlayersView({
     [query, otherFilters]
   );
   const baseColumns = useRosterColumns();
-  // The same `?sort=` and column ids as the Characters table, so the two views behave alike.
   const sortProps = useUrlSort(
     'sort',
     ROSTER_SORT,
@@ -183,7 +158,6 @@ export function PlayersView({
     ]
   );
 
-  // A highlight opens its Player once, as if the reader had; after that the row click collapses it.
   useEffect(() => {
     if (seeded.current || highlightPlayerKey === null) return;
     seeded.current = true;
@@ -220,7 +194,6 @@ export function PlayersView({
     },
     [grouping.source, t]
   );
-  // The other edits (Remove, Change main) clear a stale page error when they succeed.
   const editAndClear = useCallback(
     async (action: Parameters<RosterGrouping['source']['edit']>[0]) => {
       await grouping.source.edit(action);
@@ -255,7 +228,6 @@ export function PlayersView({
     const wrapped = baseColumns
       .filter((c) => c.id !== 'member' && isVisible(c.id as CorpRosterColumnId))
       .map<DataTableColumn<Line>>((c) => {
-        // A Player's Last seen is its latest corp character's; every other cell is its main's.
         const source = (line: Line) =>
           c.id === 'lastSeen' && line.kind === 'player' ? line.seen : line.member;
         return {
@@ -269,7 +241,6 @@ export function PlayersView({
           render: (line) => {
             const row = source(line);
             if (!row) return noData;
-            // A Player row's click expands it, so its ship is plain text (DESIGN.md §6c primary action).
             if (c.id === 'ship' && line.kind === 'player')
               return label(row.shipName, row.shipTypeId);
             const cell = c.render(row);
@@ -392,11 +363,6 @@ export function PlayersView({
   );
 }
 
-/**
- * The member cell. Below `sm` the pinned column is ~120px, so the NAME is all it keeps: the Main
- * pill, counts and chips drop (CSS, one DOM) and an alt's chips shrink to one amber dot whose
- * label names them. Rows never wrap.
- */
 function MemberCell({ line }: { line: Line }) {
   const { t } = useTranslation();
   if (line.kind === 'player') {
@@ -407,7 +373,6 @@ function MemberCell({ line }: { line: Line }) {
         <span className="sr-only">
           {line.expanded ? t('corp.members.players.collapse') : t('corp.members.players.expand')}
         </span>
-        {/* The row click is the expand, so the name is plain accent text, not a link (§6c restraint). */}
         <span className={entityLinkClassName('min-w-0 truncate font-medium')}>{line.name}</span>
         <Pill tone="accent" className="shrink-0 max-sm:hidden">
           {t('corp.members.players.main')}
@@ -469,12 +434,6 @@ function MemberCell({ line }: { line: Line }) {
   );
 }
 
-/**
- * A Player or alt row's menu. Groups fold by id (§6c); a dialog opens after the menu closes
- * (`useOpenAfterMenu`). A Player's: Add character, Change main. An alt's: Make main (inert
- * with its reason for an outside character while the group has a corp member) and the danger
- * Remove from Player.
- */
 function PlayerLineMenu({
   line,
   onAdd,
@@ -486,9 +445,7 @@ function PlayerLineMenu({
   children,
 }: {
   line: Line;
-  /** The group holds a character two groups claim (the server cannot move its main yet): that character's name. */
   conflictedName: string | null;
-  /** A Make main is running; a second click waits. */
   busy: boolean;
   onAdd: (line: Line) => void;
   onChangeMain: (line: Line) => void;
@@ -568,7 +525,6 @@ function PlayerLineMenu({
   );
 }
 
-/** Pick the character that gets the mail: a corp member while the Player has one. */
 function ChangeMainDialog({
   line,
   rows,
@@ -577,7 +533,6 @@ function ChangeMainDialog({
   onClose,
 }: {
   line: Line;
-  /** The corporation's roster rows: who counts as a corp member. */
   rows: readonly RosterRow[];
   grouping: RosterGrouping;
   edit: (action: Parameters<RosterGrouping['source']['edit']>[0]) => Promise<void>;

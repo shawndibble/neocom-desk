@@ -53,7 +53,6 @@ beforeEach(async () => {
   routed.callRouted.mockResolvedValue({});
 });
 
-/** Index query + one read per Community: what one fresh load costs. */
 const reads = () => fs.getDocs.mock.calls.length + fs.getDoc.mock.calls.length;
 
 describe('a deleted Community', () => {
@@ -135,7 +134,7 @@ describe('loadMyCommunitiesCached', () => {
 describe('withMyCommunities', () => {
   it('reruns over a fresh list when a Community refuses this Member (left or removed elsewhere)', async () => {
     await loadMyCommunitiesCached(1, NOW);
-    fs.getDocs.mockResolvedValue({ docs: [] }); // removed from c1 on another device
+    fs.getDocs.mockResolvedValue({ docs: [] });
     const seen: string[][] = [];
     const attempts: boolean[] = [];
     const result = await withMyCommunities(
@@ -155,7 +154,6 @@ describe('withMyCommunities', () => {
     expect(result).toBe('ok');
     expect(seen).toEqual([['c1'], []]);
     expect(attempts).toEqual([false, true]);
-    // The fresh list is what the cache holds now.
     expect(await loadMyCommunitiesCached(1, NOW)).toEqual([]);
   });
 
@@ -188,7 +186,7 @@ describe('rosters and libraries', () => {
         return {
           docs: [
             memberDoc('char:2', { characterName: 'Two', pushedAt: stamp(100), chunkCount: 1 }),
-            memberDoc('char:3', { characterName: 'Three' }), // shares nothing
+            memberDoc('char:3', { characterName: 'Three' }),
             memberDoc('char:4', { characterName: 'Four', pushedAt: stamp(50), chunkCount: 0 }),
           ],
         };
@@ -225,7 +223,6 @@ describe('rosters and libraries', () => {
     const roster = await loadCommunityMembersCached(1, 'c1', NOW);
     const first = await loadMemberLibrariesFor(1, 'c1', roster);
     expect(libraryReads()).toBe(1);
-    // The roster is by name: Four (a cleared library), Three (never shared), Two.
     expect(first.libraries.map((l) => [l.uid, l.items.length])).toEqual([
       ['char:4', 0],
       ['char:3', 0],
@@ -244,7 +241,6 @@ describe('rosters and libraries', () => {
         code: 'permission-denied',
       })
     );
-    // Thrown, not read as empty: `withMyCommunities` around it then reads the list again.
     await expect(
       loadMemberLibrariesFor(1, 'c1', [{ uid: 'char:2', libraryAsOf: 100 }])
     ).rejects.toMatchObject({ code: 'permission-denied' });

@@ -2,16 +2,8 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-/**
- * Catalogue ratchet: every component exported from `src/components/ui` has a
- * story (`<Module>.stories.tsx` beside its source) or sits on UNSTORIED. The
- * list may only shrink. Agents look components up in Storybook, so a gap
- * there sends them back to hand-drawn HTML.
- */
-
 const UI_DIR = 'src/components/ui';
 
-/** Today's unstoried components. Delete a name once its story lands. */
 const UNSTORIED = [
   'AlertsBell',
   'CharacterAvatar',
@@ -26,10 +18,8 @@ const UNSTORIED = [
   'TypeIcon',
 ];
 
-/** Pinned size. Removing a name means lowering this; adding a name fails. */
 const PINNED_COUNT = 11;
 
-/** Component name -> source module, from the value (non-type) re-exports in index.ts. */
 function exportedComponents(): Map<string, string> {
   const source = readFileSync(join(UI_DIR, 'index.ts'), 'utf8');
   const components = new Map<string, string>();
@@ -38,7 +28,6 @@ function exportedComponents(): Map<string, string> {
   )) {
     for (const raw of names.split(',')) {
       const name = raw.trim();
-      // PascalCase only: skips hooks, helpers, SHOUTING constants and `type X`.
       if (/^[A-Z][a-z]\w*$/.test(name) && !name.endsWith('Context')) components.set(name, module);
     }
   }

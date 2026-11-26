@@ -1,12 +1,4 @@
 import { idSetKey } from '@/lib/idSetKey';
-/**
- * The Implant Finder's engine half: tries implants and boosters on the open
- * Fitting and works out where to get them, so the window can say "this one
- * gets you under CPU, for this much, from here". Nothing about which item
- * does what is written down here — each family's best grade is run through
- * the engine against this very Fitting, and a goal lists only the families
- * that actually move it.
- */
 import { useEffect, useMemo, useState } from 'react';
 import {
   IMPLANT_GOALS,
@@ -44,11 +36,8 @@ import { useStatsConditions } from './statsConditions';
 import { evaluateImplantSet } from './useFittingEvaluation';
 import { yieldToEventLoop } from './yieldToEventLoop';
 
-/** A gain below this is rounding, not an implant doing something. */
 const MIN_GAIN = 1e-4;
-/** How many fix options the window lists. */
 const FIX_LIMIT = 4;
-/** How many estimated fixes are re-run whole before the list is thinned to FIX_LIMIT. */
 const FIX_SEARCH = 12;
 
 const EMPTY_SET: FittingImplantSet = { implants: [], boosters: [] };
@@ -60,7 +49,6 @@ export interface ImplantCatalog {
 
 let catalogPromise: Promise<ImplantCatalog> | null = null;
 
-/** Every implant and booster family, once per session. */
 export function loadImplantCatalog(): Promise<ImplantCatalog> {
   if (!catalogPromise) {
     const pending = loadImplantMarketEntries().then(({ implants, boosters, slotOf }) => ({
@@ -78,13 +66,9 @@ export function loadImplantCatalog(): Promise<ImplantCatalog> {
 export interface GradeResult {
   grade: ImplantGrade;
   stats: FittingStats;
-  /** Every way to get it, best first; null while still being looked up. */
   sources: Source[] | null;
-  /** The best of those the pilot can buy from now. */
   best: Source | null;
-  /** This exact item is already in the Fitting's set. */
   inSet: boolean;
-  /** What it would replace in its slot, if anything else is there. */
   replaces: number | null;
 }
 
@@ -96,44 +80,29 @@ export interface FamilyResult {
 export interface FixResult {
   typeIds: number[];
   cost: number;
-  /** Where each item of the fix comes from, index-parallel to `typeIds`. */
   sources: Source[];
-  /** The Fitting with every item of the fix in place. */
   stats: FittingStats;
-  /** What is left of the budget with them, in its unit. */
   headroom: number;
 }
 
 export interface GoalSummary {
   goal: ImplantGoal;
-  /** Families that move this goal on this Fitting. */
   helpers: number;
-  /** The Fitting has something this goal measures (a budget always; missiles for "Missiles"). */
   used: boolean;
-  /** Which slots (`slotKey`) those families go in. */
   slots: ReadonlySet<string>;
 }
 
 export interface ImplantFinderState {
   status: 'loading' | 'ready' | 'error';
-  /** Showing the last results while the Fitting's new ones are worked out (after an Add). */
   updating: boolean;
-  /** How many families have been tried, for a progress line. */
   progress: { done: number; total: number };
-  /** LP Stores searched so far for the selected goal's items; null when not searching. */
   storeProgress: { done: number; total: number } | null;
   catalog: ImplantCatalog | null;
-  /** The Fitting on its own carried set, as the shown results measure from. */
   baseline: FittingStats | null;
-  /** Every goal, with how many families move it here. */
   goals: GoalSummary[];
-  /** For the selected goal; null while it loads. */
   results: FamilyResult[] | null;
-  /** Cheapest ways back under budget; empty when the goal isn't a budget or already fits. */
   fixes: FixResult[];
-  /** Where the shown items come from: LP Stores with the pilot's LP and the rate. */
   purchase: ImplantPurchase | null;
-  /** What goals are measured against (the selected Target Profile). */
   context: GoalContext;
 }
 
@@ -144,22 +113,17 @@ interface Input {
   goalId: ImplantGoalId | null;
   hubId: TradeHub['id'];
   characterId: number | null;
-  /** The Fitting page's selected Target Profile, for applied DPS. */
   target: TargetProfile;
 }
 
-/** Runs one implant/booster set on the Fitting, remembering every answer for as long as the Fitting is the same. */
 type Evaluate = (set: FittingImplantSet) => Promise<FittingStats>;
 
-/** The Fitting's own set and its stats, plus each occupied slot's stats with that slot left empty. */
 interface Baselines {
   set: FittingImplantSet;
   stats: FittingStats;
-  /** Keyed `kind:slot`; an empty slot isn't listed (its stats are `stats`). */
   emptied: Map<string, FittingStats>;
 }
 
-/** Every item's full name with its grade ("… EE-603", "Strong … Booster") and its grade alone. */
 export function implantNames(
   families: readonly ImplantFamily[]
 ): Map<number, { full: string; short: string }> {
@@ -179,7 +143,6 @@ export function implantNames(
   return map;
 }
 
-/** One slot, kind and number: implant slot 3 and booster slot 3 are different slots. */
 export const slotKey = (kind: string, slot: number) => `${kind}:${slot}`;
 
 async function runBaselines(
@@ -208,12 +171,6 @@ async function runBaselines(
   return { set, stats, emptied };
 }
 
-/**
- * What the finder worked out for one Fitting under one set of conditions,
- * kept past the window closing: reopening it (say, after the item-detail
- * window on top of it closes) must not screen the whole catalog again.
- * Keyed by the Fitting object, so any edit to the Fitting starts afresh.
- */
 type DamageProfileArg = Parameters<typeof evaluateImplantSet>[2];
 type ConditionsArg = Parameters<typeof evaluateImplantSet>[3];
 
@@ -222,10 +179,8 @@ interface FinderMemo {
   damageProfile: DamageProfileArg;
   conditions: ConditionsArg;
   runs: Map<string, Promise<FittingStats>>;
-  /** The screening result per starting set (`setKey`). */
   screened: Map<string, { baselines: Baselines; bestGradeStats: Map<string, FittingStats> }>;
 }
-// Not `memoByRow` (src/lib): this one invalidates on four inputs, not one derived figure.
 const finderMemos = new WeakMap<Fitting, FinderMemo>();
 
 function memoFor(
@@ -283,7 +238,6 @@ export function useImplantFinder({
   } | null>(null);
   const [progress, setProgress] = useState({ done: 0, total: 0 });
   const [failed, setFailed] = useState(false);
-  /** Every grade of the families that help one goal — one consistent snapshot. */
   const [gradeRun, setGradeRun] = useState<{
     goalId: ImplantGoalId;
     familyKeys: Set<string>;
@@ -302,7 +256,6 @@ export function useImplantFinder({
     fixes: FixResult[];
   } | null>(null);
 
-  // One cache per Fitting and conditions: a goal switch or a hub change re-reads it, never the engine.
   const memo = useMemo(
     () => (fitting && profile ? memoFor(fitting, profile, damageProfile, conditions) : null),
     [fitting, profile, damageProfile, conditions]
@@ -322,7 +275,6 @@ export function useImplantFinder({
     };
   }, [fitting, profile, damageProfile, conditions, memo]);
 
-  // 1. The catalog, then each family's best grade on this Fitting.
   useEffect(() => {
     if (!open || !evaluate || !fitting || !memo) return;
     let cancelled = false;
@@ -363,14 +315,8 @@ export function useImplantFinder({
     };
   }, [open, evaluate, fitting, memo]);
 
-  /** The screening, once it describes the Fitting now open — later stages wait for it. */
   const current = screening?.fitting === fitting ? screening : null;
 
-  /**
-   * Families that move `goal` at all: their best grade against their slot
-   * left empty — so a family already in the set still counts, and keeps its
-   * Remove and its lower grades.
-   */
   const helpersOf = useMemo(() => {
     if (!screening || !catalog) return null;
     const { baselines, bestGradeStats } = screening;
@@ -399,7 +345,6 @@ export function useImplantFinder({
   const goal = goalId ? goalById(goalId) : null;
   const helping = useMemo(() => (goal && helpersOf ? helpersOf(goal) : []), [goal, helpersOf]);
 
-  // 2. Every grade of the families that help the selected goal.
   useEffect(() => {
     if (!open || !evaluate || !current || !catalog || !goalId || helping.length === 0) return;
     let cancelled = false;
@@ -430,7 +375,6 @@ export function useImplantFinder({
     };
   }, [open, evaluate, current, catalog, goalId, helping]);
 
-  // 3. Where each of those can be had — the market, and every LP Store that hands it out.
   const helpingTypeIds = useMemo(
     () => helping.flatMap((f) => f.grades.map((g) => g.typeId)).sort((a, b) => a - b),
     [helping]
@@ -454,7 +398,6 @@ export function useImplantFinder({
       .then((purchase) => {
         if (!cancelled) setPurchaseRun({ key: purchaseKey, purchase });
       })
-      // Where to buy is best-effort: a failed lookup leaves the rows unpriced, not the window broken.
       .catch(() => {})
       .finally(() => {
         if (!cancelled) setStoreProgress(null);
@@ -466,7 +409,6 @@ export function useImplantFinder({
   }, [open, typeIdsKey, hubId, percent, characterId, purchaseKey]);
   const purchase = purchaseRun?.purchase ?? null;
 
-  // Built from one run only, so a row's effect and its Add/Remove always describe the same set.
   const shown = gradeRun && gradeRun.goalId === goalId ? gradeRun : null;
   const results = useMemo<FamilyResult[] | null>(() => {
     if (!goal || !catalog || !helpersOf) return null;
@@ -502,7 +444,6 @@ export function useImplantFinder({
       .map(({ family, grades }) => ({ family, grades }));
   }, [goal, catalog, helpersOf, helping, shown, purchase, context]);
 
-  // 4. Cheapest fixes: searched on each item's own headroom, then re-run whole and priced together.
   useEffect(() => {
     if (!open || !evaluate || !catalog || !goal || goal.kind !== 'budget') return;
     if (!shown || !results || !purchase || shown.fitting !== fitting) return;
@@ -514,7 +455,6 @@ export function useImplantFinder({
         .filter((g) => !g.inSet)
         .map((g) => ({
           typeId: g.grade.typeId,
-          // Implant and booster slots are numbered apart; keep them apart here too.
           slot: slotKey(r.family.kind, r.family.slot),
           headroomGain: headroomGain(goal, before, g.stats),
           price: g.best?.cost ?? Number.NaN,
@@ -523,7 +463,6 @@ export function useImplantFinder({
     let cancelled = false;
     void (async () => {
       const confirmed: FixResult[] = [];
-      // Search wider than shown: stacking can sink an estimate below the line.
       for (const option of cheapestFixes(candidates, needed, FIX_SEARCH)) {
         await yieldToEventLoop();
         if (cancelled) return;
@@ -531,7 +470,6 @@ export function useImplantFinder({
           placeAllInSet(shown.baselines.set, catalog.slotOf, option.typeIds)
         );
         const budget = goal.read(stats);
-        // Bought together: one store's LP and the pilot's tags are spent once.
         const priced = priceFix(option.typeIds, purchase.offersFor, purchase.context);
         if (shortfall(budget) <= 0 && priced) {
           confirmed.push({
@@ -558,7 +496,6 @@ export function useImplantFinder({
   }, [open, evaluate, catalog, goal, shown, results, purchase, fitting]);
 
   const over = goal?.kind === 'budget' && shown ? shortfall(goal.read(shown.baselines.stats)) : 0;
-  // An older run's fix list stays up, marked updating, until the new one is confirmed.
   const fixes = over > 0 && fixRun?.goalId === goalId ? fixRun.fixes : [];
   const fixesCurrent = over <= 0 || fixRun?.from === shown;
   const resultsCurrent = goal === null || helping.length === 0 || shown?.fitting === fitting;

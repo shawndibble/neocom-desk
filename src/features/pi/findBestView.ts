@@ -1,18 +1,3 @@
-/**
- * "Find the best thing to build", shaped for drawing. The recommendation model
- * prices every one-planet recipe on every planet type (`PlanAdvice.recipeRows`);
- * this decides which of the pilot's planet types count, what a what-if planet
- * would unlock, and the order. No ISK figure is computed here: `rankRecipes`
- * ranks the model's own rows, so Plan, Map and Colonies share one number.
- *
- * ## Which types count
- *
- * - With colonies, the types they sit on start switched on; switching one off
- *   means "treat it as not mine" and recipes that need it read "find one". A
- *   what-if type counts as owned for the ranking and is marked "if added".
- * - With no colonies every type starts on ("all available") and switching one
- *   off hides the recipes that only it hosts: the pilot can't reach it.
- */
 import type { PlanetType } from '@/engine/pi/goalTypes';
 import { piTier } from '@/engine/pi/chain';
 import { securityBand } from '@/engine/securityStatus';
@@ -31,14 +16,11 @@ export type TypeState = 'have' | 'whatif' | 'find';
 export interface FindBestInput {
   rows: readonly RecipeRow[];
   unpriced: readonly number[];
-  /** The planet types of the pilot's colonies. */
   colonyTypes: readonly PlanetType[];
   allTypes: readonly PlanetType[];
-  /** Types switched off. */
   off: ReadonlySet<PlanetType>;
   whatIf: ReadonlySet<PlanetType>;
   filter: RecipeFilter;
-  /** Product typeIDs the pilot's colonies sell today. */
   madeTypeIds: ReadonlySet<number>;
 }
 
@@ -50,7 +32,6 @@ export interface TypeToggle {
 export interface WhatIfChip {
   type: PlanetType;
   on: boolean;
-  /** Recipes this type would newly host (under the current filter). */
   unlocks: number;
 }
 
@@ -58,9 +39,7 @@ export interface RecipeCardView {
   rank: number;
   recipe: RecipeRank;
   hosts: { type: PlanetType; state: TypeState }[];
-  /** Only a what-if planet makes it reachable: highlighted, and labelled, not colour alone. */
   isNew: boolean;
-  /** One of the pilot's own planet types hosts it, so they can make it today. Always true with no colonies. */
   makeableNow: boolean;
 }
 
@@ -69,12 +48,9 @@ export interface FindBestView {
   toggles: TypeToggle[];
   chips: WhatIfChip[];
   cards: RecipeCardView[];
-  /** Rank of the first card that needs a planet the pilot lacks, under cards they can make now. Null with no such split. */
   addDividerBefore: number | null;
-  /** The best recipe is one the pilot's colonies already make. */
   alreadyBest: boolean;
   unpricedCount: number;
-  /** Some recipe ranks under the toggles when no tier filter is set. */
   hasRecipesAtAll: boolean;
 }
 
@@ -98,8 +74,6 @@ export function buildFindBestView(input: FindBestInput): FindBestView {
 
   const makeableNow = (recipe: RecipeRank) =>
     !hasColonies || recipe.hostTypes.some((type) => base.has(type));
-  // Fits the Command Center first (the engine's order), then what the pilot can make
-  // today, then ISK a day. The sort is stable, so each group keeps the engine's order.
   const ordered = [...ranking.recipes].sort(
     (a, b) =>
       (a.needsCcLevel ?? 0) - (b.needsCcLevel ?? 0) ||
@@ -116,8 +90,6 @@ export function buildFindBestView(input: FindBestInput): FindBestView {
     };
   });
   const firstAdd = cards.findIndex((card) => !card.makeableNow);
-  // A divider only when the can-make-now cards are a clean top block: an over-budget
-  // setup the pilot hosts sorts below every fitting one, so it can split the groups.
   const clean = firstAdd > 0 && cards.slice(firstAdd).every((card) => !card.makeableNow);
   const addDividerBefore = clean ? cards[firstAdd].rank : null;
 
@@ -126,7 +98,6 @@ export function buildFindBestView(input: FindBestInput): FindBestView {
     on: !input.off.has(type),
   }));
 
-  // What a type would unlock: recipes it hosts that nothing the pilot has hosts.
   const everyRecipe = rankRecipes({
     rows: input.rows,
     haveTypes: [],
@@ -164,21 +135,14 @@ export function buildFindBestView(input: FindBestInput): FindBestView {
   };
 }
 
-// --- All products ----------------------------------------------------------------
-
 export interface ProductTile {
   typeId: number;
   name: string;
   tier: 0 | 1 | 2 | 3 | 4;
-  /** ISK a day from one planet (a raw: sold as extracted); null without a one-planet figure. */
   perDay: number | null;
-  /** A raw the sell market quotes no price for, so it has no figure. */
   noPrice: boolean;
-  /** Planets it takes between them; 1 for a raw. */
   planets: number | null;
-  /** The planet-type toggles cover it. */
   reachable: boolean;
-  /** Reachable only with the what-if planet. */
   isNew: boolean;
   comparison: RecipeRank['comparison'];
 }
@@ -191,7 +155,6 @@ export interface TierColumn {
 
 export function buildAllProducts(
   input: Pick<FindBestInput, 'rows' | 'colonyTypes' | 'off' | 'whatIf'> & {
-    /** From `PlanAdvice.rawRows` / `rawUnpriced`. */
     rawRows?: readonly RawRow[];
     rawUnpriced?: readonly number[];
   },
@@ -203,8 +166,6 @@ export function buildAllProducts(
     (hasColonies ? input.colonyTypes : allTypes).filter((type) => !input.off.has(type))
   );
   const have = new Set<PlanetType>([...base, ...input.whatIf]);
-  // A tile's figure is one the pilot's Command Center can host; a setup that
-  // needs a higher level is Best picks' to show, tagged.
   const fits = input.rows.filter((row) => !row.needsCcLevel);
   const rows = hasColonies ? fits : fits.filter((row) => have.has(row.planetType));
   const ranked = new Map(
@@ -245,7 +206,6 @@ export function buildAllProducts(
       })
       .sort(
         (a, b) =>
-          // Raws keep name order: a figure is shown, never a ranking of what to extract.
           (a.tier === 0 ? 0 : (b.perDay ?? -1) - (a.perDay ?? -1)) ||
           (a.planets ?? 99) - (b.planets ?? 99) ||
           a.name.localeCompare(b.name)
@@ -263,14 +223,10 @@ function tierOf(typeId: number, pi: PiData): 1 | 2 | 3 | 4 | null {
   }
 }
 
-// --- The planet finder's defaults ---------------------------------------------------
-
-/** "Highsec only" starts on when the origin is highsec; unknown security leaves it off. */
 export function defaultHighsecOnly(originSecurity: number | null | undefined): boolean {
   return originSecurity != null && securityBand(originSecurity) === 'highsec';
 }
 
-/** A nullsec system shows the Skyhook / customs note. */
 export function needsSkyhookNote(security: number | null | undefined): boolean {
   return security != null && securityBand(security) === 'nullsec';
 }

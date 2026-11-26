@@ -1,8 +1,4 @@
 #!/usr/bin/env node
-// `npm run ui:shot <storyId> [--widths 1440,390] [--out <dir>]`: PNG of a story.
-//
-// Starts (or reuses) this worktree's Storybook, screenshots the story at each
-// width with Playwright, prints the PNG paths, and shuts down what it started.
 
 import { mkdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';

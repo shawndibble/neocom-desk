@@ -1,11 +1,3 @@
-/**
- * Test-only Order Detail loaders: every fetch an in-memory spy, so a test
- * sets only the answers it cares about and asserts on the calls. Region
- * books and price history never resolve by default (a check "still
- * running"); routes resolve as unknown, structures as unreadable, and no
- * item reprocesses into anything. A `.ts` file (`createElement`, no JSX) so
- * Fast Refresh's component-only-exports rule doesn't apply to a test helper.
- */
 import { createElement, type ReactNode } from 'react';
 import { vi, type Mock } from 'vitest';
 import { OrderDetailLoadersContext, type OrderDetailLoaders } from '../orderDetailLoaders';
@@ -28,7 +20,6 @@ export function fakeOrderDetailLoaders(): FakeOrderDetailLoaders {
   };
 }
 
-/** `ui` under `loaders` — for `render(withOrderDetailLoaders(<Panel />, loaders))`. */
 export function withOrderDetailLoaders(ui: ReactNode, loaders: OrderDetailLoaders) {
   return createElement(OrderDetailLoadersContext.Provider, { value: loaders }, ui);
 }

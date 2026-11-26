@@ -1,24 +1,13 @@
-/**
- * Popular fits (issue #2327): how people actually fly a hull, read from its
- * recent zKillboard losses. Each loss's victim becomes a Fitting the way a
- * killmail Load does (`killmailVictimToLoadResult`), and losses group by the
- * multiset of fitted modules — charges, drones, cargo and which slot index a
- * module sat in don't split a group. Pure: the caller fetches the losses.
- */
 import type { EftSlotLookup } from './eftLoader';
 import { killmailVictimToLoadResult, type KillmailVictim } from './linkLoader';
 import type { LoadedFitting, LoadParts } from './load';
 import { parseInstant } from '../esiInstant';
 
-/** A fit this thin is a pod-and-a-prayer, not a fit worth showing. */
 const MIN_FITTED_MODULES = 3;
 
-/** One loss of the hull, its victim already resolved. */
 export interface HullLoss {
   killmailId: number;
-  /** When it died (ISO); null when unknown. */
   time: string | null;
-  /** zKillboard's ISK estimate; null when absent. */
   value: number | null;
   victim: KillmailVictim;
 }
@@ -26,16 +15,11 @@ export interface HullLoss {
 type ResolvedParts = Extract<LoadParts, { hullTypeId: number }>;
 
 export interface PopularFit {
-  /** The group's identity: its fitted module typeIds, sorted. */
   key: string;
   count: number;
-  /** The group's most recent loss time; null when none carried one. */
   lastSeen: string | null;
-  /** Mean value over the group's losses that carried one; null when none did. */
   value: number | null;
-  /** Newest first. */
   killmailIds: number[];
-  /** The group's most recent loss as a Fitting's parts, cargo left out. */
   parts: ResolvedParts;
 }
 
@@ -43,16 +27,10 @@ function timeMs(loss: HullLoss): number {
   return parseInstant(loss.time ?? undefined) ?? Number.NEGATIVE_INFINITY;
 }
 
-/** Newest first: by time, then by killmail id (ids rise with time). */
 function byRecency(a: HullLoss, b: HullLoss): number {
   return timeMs(b) - timeMs(a) || b.killmailId - a.killmailId;
 }
 
-/**
- * A Popular fit's identity: its fitted modules' typeIds as a sorted multiset.
- * Charges, drones, cargo and slot order never reach it. The one definition of
- * "the same fit" — the Workbench "Seen on zKillboard" match uses it too.
- */
 export function popularFitKey(modules: readonly { typeId: number }[]): string {
   return modules
     .map((module) => module.typeId)
@@ -60,7 +38,6 @@ export function popularFitKey(modules: readonly { typeId: number }[]): string {
     .join(',');
 }
 
-/** Groups a hull's losses into distinct fits, most flown first, ties to the most recent. */
 export function groupPopularFits(
   losses: readonly HullLoss[],
   slotByTypeId: EftSlotLookup
@@ -86,11 +63,9 @@ export function groupPopularFits(
       parts: group.parts,
     };
   });
-  // Groups were built newest-first, so a stable sort by count keeps ties in recency order.
   return fits.sort((a, b) => b.count - a.count);
 }
 
-/** A Popular fit as a Load, for the editor to open. */
 export function popularFitLoad(fit: PopularFit, name: string): LoadedFitting {
   const { parts } = fit;
   return {

@@ -111,7 +111,6 @@ describe('AuthFailureRedirect', () => {
     useAuthFailure.getState().reportTokenFailure(CHARACTER_ID + 1);
     renderApp();
     expect(screen.getByText('mail view')).toBeInTheDocument();
-    // Marked for its own row and alert, but no redirect and no shell banner.
     await waitFor(() => expect(useNeedsLogin.getState().value).toEqual([CHARACTER_ID + 1]));
     expect(screen.getByText('mail view')).toBeInTheDocument();
   });
@@ -123,8 +122,6 @@ describe('AuthFailureNotice', () => {
   });
 
   it('asks for the Permission the failed request needed, not just a plain re-login', async () => {
-    // A mail send refused for a scope the grant never held: a plain re-login
-    // re-requests the same scopes, comes back identical and fails again.
     useAuthFailure.getState().reportRequestFailure(CHARACTER_ID, 'postCharacterMail');
     render(
       <MemoryRouter>
@@ -163,7 +160,6 @@ describe('AuthFailureNotice', () => {
         <AuthFailureNotice />
       </MemoryRouter>
     );
-    // Once in the live region, once in the visible block.
     expect(await screen.findAllByText(/Pilot One/)).toHaveLength(2);
   });
 
@@ -231,7 +227,6 @@ describe('AuthFailureNotice on a page that owns the banner', () => {
   it('still shows for the same refusal elsewhere', () => {
     renderAt('/mail');
     expect(screen.getByRole('button', { name: /dismiss/i })).toBeInTheDocument();
-    // Announced through the always-mounted region, not a role on the block.
     expect(screen.getAllByRole('status')).toHaveLength(1);
   });
 });

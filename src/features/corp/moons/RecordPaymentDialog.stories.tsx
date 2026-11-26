@@ -5,13 +5,6 @@ import { BookProvider } from './BookContext';
 import { RecordPaymentDialog } from './BookDialogs';
 import { BOOK_CONTEXT, BOOK_VIEW, VARRO_ID } from './corpBookFixture';
 
-/**
- * Record payment on the sample book (`corp/CorpBookDialogs` has the plain one): the
- * outcome panel across two days, an overpayment held as credit, and matching
- * the wallet's Unmatched donation instead of typing an amount.
- */
-
-/** The sample book with an older unpaid day for Varro, so a payment reaches two. */
 function withOlderDay(view: BookView): BookView {
   const varro = view.input.entries.find((e) => e.characterId === 1);
   if (!varro) return view;
@@ -50,14 +43,11 @@ function Dialog({ view = BOOK_VIEW, amount }: { view?: BookView; amount?: number
   );
 }
 
-/** @summary Part of what is owed: pays the oldest day, part-pays the next, says what is left. */
 export const AcrossTwoDays: Story = {
   render: () => <Dialog view={TWO} amount={7_000_000} />,
 };
-/** @summary Across two days, phone. */
 export const AcrossTwoDaysPhone: Story = { ...AcrossTwoDays, ...phone };
 
-/** @summary More than is owed: every day paid and the rest held as credit. */
 export const Overpay: Story = {
   render: () => {
     const miner = BOOK_VIEW.miners.find((m) => m.id === VARRO_ID)!;
@@ -73,10 +63,8 @@ const pickDonation: Story['play'] = async () => {
   document.querySelector<HTMLInputElement>('dialog input[name="record-donation"]')?.click();
 };
 
-/** @summary Matching a wallet donation: picking it assigns that ISK to the Miner, nothing new is recorded. */
 export const MatchDonation: Story = {
   render: () => <Dialog />,
   play: pickDonation,
 };
-/** @summary Matching a wallet donation, phone. */
 export const MatchDonationPhone: Story = { ...MatchDonation, ...phone };

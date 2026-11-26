@@ -26,7 +26,6 @@ export { viewKey, type ViewRequest };
 
 const NO_FEEDS: readonly FeedId[] = [];
 
-/** The feed reads a kind builds from, as the store's per-feed state objects (identity-stable until that feed changes). */
 const feedSlice = (store: FeedStore, feedIds: readonly FeedId[]): readonly unknown[] => {
   const feeds = store.get();
   return feedIds.map((id) => feeds[id]);
@@ -40,11 +39,6 @@ interface CachedView {
   view: KindView;
 }
 
-/**
- * Built views, shared by every widget and the header summary on one store: the
- * same request is built once per change, not once per reader. An entry is reused
- * while its inputs (own feeds, clock, context) are identical.
- */
 const viewCaches = new WeakMap<FeedStore, Map<string, CachedView>>();
 
 function cachedView(
@@ -79,8 +73,6 @@ function cachedView(
     scopeAll: request.scopeAll,
     ...settingsContext(request.kind, request),
   });
-  // Only a first read still out counts: a refresh also reports `loading`, but over data that is
-  // already on screen, so the body is at its height.
   const settling = feedIds.some((feedId) => {
     const feed = feeds[feedId];
     return feed?.loading === true && feed.data === null;
@@ -90,7 +82,6 @@ function cachedView(
   return view;
 }
 
-/** Views for several kinds at once, rebuilt as their own feeds change and as the clock ticks. */
 export function useKindViews(requests: readonly ViewRequest[]): ReadonlyMap<string, KindView> {
   const store = useFeedStore();
   const now = useTicker(OVERVIEW_TICK_MS);
@@ -98,12 +89,10 @@ export function useKindViews(requests: readonly ViewRequest[]): ReadonlyMap<stri
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
   const zone = useTimeZone();
   const sharedPopTime = useSharedPopTime((state) => state.value);
-  // A lazy builder landing (`ensureBuilders`) makes every view built before it stale.
   const builders = useSyncExternalStore(subscribeBuilders, builderEpoch);
   const prefs = useNotificationPreferences((state) => state.value);
   const notTrainingAlert =
     activeCharacterId !== null && isNotTrainingAlertEnabledFor(prefs, activeCharacterId);
-  // The requests arrive as a fresh array each render; hold the last one with the same content.
   const signature = requests.map(viewKey).join('|');
   const [held, setHeld] = useState({ signature, requests });
   let stable = held.requests;
@@ -117,7 +106,6 @@ export function useKindViews(requests: readonly ViewRequest[]): ReadonlyMap<stri
       for (const id of feedsOf(request.kind, request, request.scopeAll) ?? NO_FEEDS) ids.add(id);
     return [...ids];
   }, [stable]);
-  // Re-render only when a feed these kinds read changes, not on any feed's update.
   const last = useRef<readonly unknown[]>([]);
   const getSlice = useCallback(() => {
     const next = feedSlice(store, feedIds);
@@ -148,7 +136,6 @@ export function useKindViews(requests: readonly ViewRequest[]): ReadonlyMap<stri
       );
     }
     return views;
-    // `slice` is the signal that an own feed changed; the store read inside is current.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     stable,
@@ -164,7 +151,6 @@ export function useKindViews(requests: readonly ViewRequest[]): ReadonlyMap<stri
   ]);
 }
 
-/** The view for one widget. */
 export function useWidgetView(
   kind: string,
   scopeAll: boolean,

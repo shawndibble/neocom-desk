@@ -1,33 +1,12 @@
 import { defineConfig, devices } from '@playwright/test';
 import { EVE_CLIENT_ID, KEY_DIR } from './e2e/support/taxBook/runEnv';
 
-/**
- * The Corp Tax Book browser tests (`e2e/*.book.spec.ts`): the officer pages, the verify and pay
- * pages and the member tab against the real Cloud Functions and Firestore rules, run by the
- * Firebase emulators (`scripts/e2e-book/emulators.mjs`, which stubs only CCP: SSO's key set and
- * ESI's who-is-who). The browser side is mocked as in every e2e spec (`e2e/support`).
- *
- * Its own config, not a project of `playwright.config.ts`: Playwright starts every `webServer`
- * of a config whatever specs a run holds, and the main suite's dev server blanks Firebase.
- * Needs a Java runtime (the Firestore emulator is a JAR) and `npm ci --prefix functions`.
- *
- *   npx playwright test -c playwright.book.config.ts e2e/<file>.book.spec.ts --trace off
- *
- * One worker: every test wipes and seeds the one emulator database, so they run in turn.
- */
 const PORT = 5197;
 const BASE_URL = `http://localhost:${PORT}/`;
 
-/*
- * Never `reuseExistingServer`: several worktrees share one machine, and these ports are fixed
- * (the emulators' in firebase.json, Vite's 5197), so a server already up is as likely another
- * worktree's as this one's, serving its app code and its functions. A run that finds the ports
- * taken fails at once ("is already used"); wait for the other run, or stop your own servers.
- */
 export default defineConfig({
   testDir: './e2e',
   testMatch: /\.book\.spec\.ts$/,
-  // Pays the cold servers' first compile and function load before the first test does.
   globalSetup: './e2e/support/taxBook/warmUp.ts',
   fullyParallel: false,
   workers: 1,
@@ -39,20 +18,16 @@ export default defineConfig({
     trace: 'on-first-retry',
     viewport: { width: 1280, height: 800 },
     contextOptions: { reducedMotion: 'reduce' },
-    // The Firestore emulator speaks plain HTTP on 127.0.0.1; nothing here needs a worker.
     serviceWorkers: 'block',
   },
   webServer: [
     {
       command: 'node scripts/e2e-book/emulators.mjs',
-      // A GET on a callable answers 400 once the Functions emulator has loaded it.
       url: 'http://127.0.0.1:5001/demo-neocom-desk/us-central1/corpTaxBookCall',
       reuseExistingServer: false,
       timeout: 240_000,
       stdout: 'ignore',
       env: { E2E_BOOK_KEY_DIR: KEY_DIR, EVE_CLIENT_ID },
-      // The Firestore emulator is a JVM the Firebase CLI starts in its own process group: only
-      // the CLI's own shutdown (on SIGINT) stops it, so a kill would leave it holding 8080.
       gracefulShutdown: { signal: 'SIGINT', timeout: 15_000 },
     },
     {
@@ -62,7 +37,6 @@ export default defineConfig({
       timeout: 120_000,
       env: {
         VITE_EVE_CLIENT_ID: EVE_CLIENT_ID,
-        // Any key turns sync on; `VITE_FIREBASE_EMULATORS` points it at the emulators.
         VITE_FIREBASE_API_KEY: 'e2e-demo-key',
         VITE_FIREBASE_AUTH_DOMAIN: '',
         VITE_FIREBASE_PROJECT_ID: 'demo-neocom-desk',

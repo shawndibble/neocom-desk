@@ -7,7 +7,7 @@ import {
   withoutAbyssalTypePrices,
 } from './abyssalValuation';
 
-const NEUT = 47832; // Heavy Abyssal Energy Neutralizer
+const NEUT = 47832;
 const BCS = 49738;
 const TRIT = 34;
 const isAbyssalType = (typeId: number) => typeId === NEUT || typeId === BCS;

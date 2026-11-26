@@ -16,16 +16,10 @@ import { is, shapeGuard } from '../snapshotShape';
 import { defineDomain } from './defineDomain';
 import { HOUR_MS, currentThresholds, resolveProjectionNames } from './shared';
 
-/* Planetary colonies --------------------------------------------------------- */
-
 const isExtractorSnapshot = shapeGuard<ColonyExtractorSnapshot>({
   pinId: is.number,
   expiryTimeMs: is.number,
   thresholdMs: is.number,
-  // Optional in storage as well as on the wire: every snapshot written before
-  // `disprovenExtractorOccurrences` needed `install_time` lacks the field,
-  // and those must stay readable rather than being discarded as a stale shape
-  // on the first poll after an update.
   installTimeMs: is.optional(is.number),
 });
 
@@ -66,9 +60,6 @@ export const colonyDomain = defineDomain<
           expiryTimeMs: p.expiryTimeMs,
           thresholdMs,
           ...(p.installTimeMs !== undefined ? { installTimeMs: p.installTimeMs } : {}),
-          // Carried only for `disprovenExtractorOccurrences`; no warning
-          // reads it (ADR 0005). Omitted rather than defaulted when ESI left
-          // it out, since a default would be evidence this does not have.
         })),
       });
     }
@@ -76,10 +67,6 @@ export const colonyDomain = defineDomain<
   },
   toSnapshot: (colonies, nowMs) => ({ colonies: [...colonies], nowMs }),
   disproven: disprovenExtractorOccurrences,
-  // The baseline's baked-in `thresholdMs` stays as the diff needs it (the
-  // setting in force at load time); the Projection instead uses the current
-  // lead time, so a Settings change rebuilt from that baseline (issue #1248,
-  // `projectionRebuild.ts`) projects the new warning time, not the old one.
   projection: async (characterId, characterName, snapshot, nowMs) => {
     const thresholdMs = (await currentThresholds(characterId)).extractorExpiringLeadHours * HOUR_MS;
     const colonies = snapshot.colonies.map((colony) => ({

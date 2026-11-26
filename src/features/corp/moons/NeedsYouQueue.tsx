@@ -41,7 +41,6 @@ import { tabPath } from '@/lib/pageTabs';
 import { mailTarget, useCorporationName } from './lateNoticeMailing';
 import { declaredLeft } from './declaredLeft';
 
-/** The card's second action: a text link off the primary Button, so the pair is not two boxes (DESIGN.md §6, text action off a primary). */
 const secondaryActionClassName = plainTextActionClassName('min-h-9 md:min-h-6');
 
 function QueueCard({
@@ -54,7 +53,6 @@ function QueueCard({
   tone: 'danger' | 'warning' | 'neutral';
   title: ReactNode;
   body?: string;
-  /** Under the body: a declaration's wallet check, a dispute's hold. */
   detail?: ReactNode;
   actions: ReactNode;
 }) {
@@ -111,7 +109,6 @@ function TransferLines({
 const sumOf = (transfers: readonly ClaimedTransfer[]) =>
   transfers.reduce((n, tr) => n + tr.amount, 0);
 
-/** A card's headline, a link to the Miner's page whenever the item has a Miner. */
 function MinerTitle({ minerId, children }: { minerId: string | undefined; children: string }) {
   if (minerId === undefined) return <>{children}</>;
   return (
@@ -123,7 +120,6 @@ function MinerTitle({ minerId, children }: { minerId: string | undefined; childr
 
 const D = 'corpTaxBook.moons.needs.dispute';
 
-/** What each kind of dispute says on its card: one record, so nothing branches on the kind twice. */
 const DISPUTE_COPY: Record<
   DisputeKind,
   {
@@ -169,7 +165,6 @@ type Open =
   | { kind: 'disputeReject'; dispute: OreDispute }
   | null;
 
-/** "Needs you": the few things only an officer can answer, a panel of the Overview. */
 export function NeedsYouQueue() {
   const zone = useTimeZone();
   const { t } = useTranslation();
@@ -177,7 +172,6 @@ export function NeedsYouQueue() {
   const { view, names, edit, canEdit, characterId, corporationId, settings } = ctx;
   const { miners } = view;
   const { needsYou, uncounted, disputes, noticesDue, declined, count } = useNeedsYou();
-  // The officer's own Characters on this device: a transfer paid to one is checked in its journal.
   const ownIds = new Set(useCharacters().map((c) => c.characterId));
   const journals = useOwnWalletJournals(
     needsYou.flatMap((item) =>
@@ -190,17 +184,14 @@ export function NeedsYouQueue() {
   const [notice, setNotice] = useState<string | null>(null);
   const now = useNow();
   const close = () => setOpen(null);
-  // The tax on only the disputed ore: what waiving a dispute credits (undefined: cannot price it).
   const waiveIsk =
     open?.kind === 'disputeDismiss' ? disputedTax(open.dispute, view.charges) : undefined;
   const [busy, setBusy] = useState(false);
-  // The corp's own name when a Director's visit stored one, else the numbered division.
   const divisionLabel = (division: number) =>
     settings.divisionNames?.[division] ?? t('corpTaxBook.moons.settings.division', { n: division });
   const canReadDivisions = useCorpAccess().capabilities.canReadDivisions;
   const countPatch = async (division: number) => {
     const divisions = [...settings.divisions, division].sort((a, b) => a - b);
-    // Its name goes with it, so members see the corp's name for the division at once (#6161).
     const divisionNames = await divisionNamesFor(
       characterId,
       corporationId,
@@ -208,9 +199,6 @@ export function NeedsYouQueue() {
       divisions,
       settings.divisionNames
     );
-    // The server adds `addDivision` to the list it stores, so another officer's concurrent change
-    // is kept; `divisions` is only for a server that predates `addDivision` and ignores it. Drop
-    // it once the functions with `addDivision` are deployed to production.
     return {
       addDivision: division,
       divisions,
@@ -276,7 +264,6 @@ export function NeedsYouQueue() {
     return n ? atDate(n.issuedAt, zone) : id;
   };
 
-  // An overdue Miner and a leaver get the same manual reminder (one per late notice).
   const remind = async (item: { minerId: string; noticeId?: string }) => {
     const miner = minerOf(item.minerId);
     const notice = view.input.notices.find((n) => n.id === item.noticeId);
@@ -327,8 +314,6 @@ export function NeedsYouQueue() {
       ))}
       <ul className="divide-y divide-line">
         {noticesDue.length > 0 && (
-          // #6294: a Miner who is behind gets a late notice, mailed from an officer's Character;
-          // automatic sync never sends one.
           <QueueCard
             tone="warning"
             title={
@@ -399,7 +384,6 @@ export function NeedsYouQueue() {
                       {paidToYou
                         ? t('corpTaxBook.moons.needs.paidToYou.title', {
                             name: nameOf(item.minerId),
-                            // Only what went to this officer: the rest went to the corporation.
                             amount: isk(sumOf(toYou)),
                           })
                         : t('corpTaxBook.moons.needs.declaration.title', {
@@ -413,7 +397,6 @@ export function NeedsYouQueue() {
                       kind: t(`corpTaxBook.moons.needs.declaration.kind.${d.kind}`),
                       date: atDate(d.at, zone),
                     }),
-                    // What is still to count: transfers the check found are credited already.
                     declaredLeft(d) !== undefined &&
                       t('corpTaxBook.moons.needs.declaration.declared', {
                         amount: isk(declaredLeft(d)!),
@@ -509,7 +492,6 @@ export function NeedsYouQueue() {
                   tone="neutral"
                   title={
                     <MinerTitle
-                      // From the book as it is now: a sender who has since joined a Miner has a page.
                       minerId={
                         miners.find((m) => m.characterIds.includes(item.payment.characterId))?.id
                       }
@@ -521,8 +503,6 @@ export function NeedsYouQueue() {
                     </MinerTitle>
                   }
                   body={t(
-                    // Held because the sender's Miner owed nothing (#6207); otherwise, from the book
-                    // as it is now: a sender who has since joined a Miner is not a stranger.
                     item.payment.reviewReason === 'ambiguous'
                       ? 'corpTaxBook.moons.needs.unmatched.bodyAmbiguous'
                       : item.payment.reviewReason === 'account-closed'
@@ -633,7 +613,6 @@ export function NeedsYouQueue() {
             .filter(Boolean)
             .join(' ');
           const hold = disputeHold(d, new Date(now).toISOString());
-          // What the hold keeps out of what is due: the disputed day, which payments skip.
           const heldDay = view.internals.byMiner.get(d.minerId)?.account.day(d.date);
           const heldIsk = hold && heldDay?.held ? heldDay.tax : 0;
           const waiveLabel = t(copy.waiveKey);
@@ -664,8 +643,6 @@ export function NeedsYouQueue() {
                 )
               }
               actions={
-                // An officer may answer a dispute of a locked day too: the snapshot holds the day
-                // aside, so the answer settles only that day (decision 20261120-235011).
                 canEdit ? (
                   <>
                     <Button
@@ -689,8 +666,6 @@ export function NeedsYouQueue() {
         })}
         {declined.map((a) => {
           const group = miners.find((m) => m.id === a.minerId);
-          // A dissolved group is named by the others it held, and linked where the first of them is
-          // now; with none known, the decliner's own Miner.
           const others = a.otherCharacterIds ?? [];
           const linkId = group ? a.minerId : minerIdFor(others[0] ?? a.characterId, miners);
           return (
@@ -770,16 +745,12 @@ export function NeedsYouQueue() {
           onClose={close}
           miner={open.miner}
           minerName={names.character(open.miner.mainCharacterId)}
-          // The amount the Miner declared, when they gave one (#6206).
           defaultAmount={
             declaredLeft(open.item.declaration) ??
             (open.item.declaration.transfers?.length
               ? sumOf(open.item.declaration.transfers)
               : open.item.owed)
           }
-          // One payment per declaration: a retry finds it recorded, and the declaration is
-          // resolved in the same write, so a second officer (by hand or by matching a donation)
-          // is refused instead of counting the ISK twice.
           paymentId={`m_${open.item.declaration.id}`}
           declarationId={open.item.declaration.id}
         />
@@ -828,8 +799,6 @@ export function NeedsYouQueue() {
           }
           canConfirm={waiveIsk !== undefined && waiveIsk > 0}
           run={async (reason) => {
-            // Only the disputed ore's tax, as one credit. The server prices it from the day's
-            // late notice; this figure counts only for a day not billed yet (a Director's call).
             await edit({
               action: 'dismissDispute',
               disputeId: open.dispute.id,
@@ -909,7 +878,6 @@ export function NeedsYouQueue() {
             amount: isk(open.item.owed),
           })}
           run={async (reason) => {
-            // The whole balance: it forgives the Miner's oldest unpaid days first (#4637).
             await edit({
               action: 'writeOff',
               minerId: open.miner.id,

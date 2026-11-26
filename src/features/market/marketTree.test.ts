@@ -8,13 +8,6 @@ import {
 } from './marketTree';
 import type { MarketGroupNode, MarketTypeEntry } from '@/sde/marketTypes';
 
-// Ships (1)
-//   Frigates (2, hasTypes)
-//     Rifter (type 587)
-//     Punisher (type 597)
-//   Cruisers (3, hasTypes)
-//     Rupture (type 620)
-// Blueprints (4, hasTypes) — no matches, should disappear entirely under 'rifter'
 const GROUPS: MarketGroupNode[] = [
   { id: 1, name: 'Ships', parentId: null, hasTypes: false },
   { id: 2, name: 'Frigates', parentId: 1, hasTypes: true },

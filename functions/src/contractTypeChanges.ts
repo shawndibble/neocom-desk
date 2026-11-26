@@ -1,26 +1,16 @@
-/**
- * Sizes the per-type R2 writer of ADR 0019 (issue #3744): how many contract
- * types change between publishes, and how big the per-type objects would be.
- * Pure — the caller owns Firestore and logging.
- */
 import { createHash } from 'node:crypto';
 import { gzipSync } from 'node:zlib';
 import type { PublicContractOfferRow } from './publicContracts.js';
 
-/** Hex chars kept per hash: the hashes doc holds ~11k types against Firestore's 1MiB limit. */
 const HASH_LENGTH = 16;
 
-/** Content hash per type id (as string key), the shape stored between runs. */
 export type ContractTypeHashes = Record<string, string>;
 
 export interface ContractTypeChangeStats {
   typeCount: number;
   rowCount: number;
-  /** Types whose hash differs from the previous run, plus previous types now gone. */
   changedTypeCount: number;
-  /** Sum of per-type JSON bytes. */
   totalBytes: number;
-  /** Sum of per-type gzip bytes. */
   totalGzipBytes: number;
   largestTypeRows: number;
   largestTypeBytes: number;
@@ -45,7 +35,6 @@ export function measureContractTypeChanges(
   let largestTypeBytes = 0;
   let changedTypeCount = 0;
   for (const [typeId, jsonRows] of byType) {
-    // Sorting the serialized rows makes the hash independent of row order.
     const body = `[${jsonRows.sort().join(',')}]`;
     const bytes = Buffer.byteLength(body);
     const key = String(typeId);

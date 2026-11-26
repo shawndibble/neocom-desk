@@ -1,10 +1,3 @@
-/**
- * A member's own `observed` rows through the part store (#5243, ADR 0031's delta
- * on the member side): nothing while the collection's stamp is unchanged, the
- * own rows written since the watermark otherwise, all own rows when no copy can
- * be trusted. The query is `uid == me` (the rules' own-line check) plus the
- * `updatedAt` watermark; the plan is the officer's (`planObservedRead`).
- */
 import { collection, getDocs, query, where } from 'firebase/firestore/lite';
 import type { Firestore } from 'firebase/firestore/lite';
 import { OBSERVED_UPDATED_AT_FIELD } from '../../../../functions/src/corpTaxBookVersionKeys';
@@ -25,7 +18,6 @@ import {
 type Data = Record<string, unknown>;
 export const MEMBER_OBSERVED_SLOT = 'observed';
 
-/** What the copy holds besides its rows: the officer's `ObservedCopyMeta` minus the stamp. */
 interface Held {
   rows: StoredObserved<Data>[];
   fullAt: number;
@@ -54,7 +46,6 @@ export async function readMemberObserved({
   key: string;
   root: string;
   uid: string;
-  /** The `observed` stamp on the book document; undefined when the server never stamped it. */
   version: string | undefined;
   store: PartStore;
   now?: number;
@@ -95,7 +86,6 @@ export async function readMemberObserved({
         ).docs as never
       );
     } catch {
-      // Its composite index is not deployed yet: read the own rows whole, as before.
       delta = null;
     }
   }

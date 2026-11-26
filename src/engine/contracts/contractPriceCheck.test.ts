@@ -10,7 +10,6 @@ import {
 
 describe('percentDifference', () => {
   it('is negative when the asking price sits below the reference', () => {
-    // (476,740,542 - 512,319,400) / 512,319,400 = -6.94…%
     expect(percentDifference(476_740_542, 512_319_400)).toBeCloseTo(-6.94, 2);
   });
 
@@ -38,7 +37,6 @@ describe('valueLines', () => {
       [28434, 12_300],
       [28433, 5_450],
     ]);
-    // 590 x 12,300 = 7,257,000; 92,672 x 5,450 = 505,062,400
     expect(valueLines(lines, units)).toEqual({
       total: 512_319_400,
       pricedLines: 2,
@@ -59,8 +57,6 @@ describe('valueLines', () => {
   });
 
   it('never values a line marked unpriceable, even when its type has a market price', () => {
-    // A blueprint copy shares its type with the original, which trades at the hub;
-    // the copy itself never does, so the original's price must not stand in for it.
     const copyAndTrit = [
       { typeId: 691, quantity: 1, unpriceable: true as const },
       { typeId: 34, quantity: 10 },
@@ -91,7 +87,6 @@ describe('iskPriceCheck', () => {
   it('values the included items at the chosen side and compares the ask to it', () => {
     const result = iskPriceCheck({ asking: 476_740_542, included, prices, side: 'buy' });
     expect(result).toMatchObject({ kind: 'priced', asking: 476_740_542, value: 512_319_400 });
-    // 590 x 13,100 + 92,672 x 5,900 = 7,729,000 + 546,764,800
     const sell = iskPriceCheck({ asking: 476_740_542, included, prices, side: 'sell' });
     expect(sell).toMatchObject({ kind: 'priced', value: 554_493_800 });
     expect(sell.kind === 'priced' && sell.diff).toBeCloseTo(-14.02, 2);
@@ -138,13 +133,11 @@ describe('itemSwapPriceCheck', () => {
 
   it('values both sides the same way and compares Included to Requested', () => {
     const result = itemSwapPriceCheck({ included, requested, prices, side: 'buy' });
-    // 590 x 12,300 = 7,257,000 against 1,300 x 5,450 = 7,085,000
     expect(result).toMatchObject({ kind: 'priced', included: 7_257_000, requested: 7_085_000 });
     expect(result.kind === 'priced' && result.diff).toBeCloseTo(2.43, 2);
   });
 
   it('follows the chosen side', () => {
-    // 590 x 13,100 = 7,729,000 against 1,300 x 5,900 = 7,670,000
     expect(itemSwapPriceCheck({ included, requested, prices, side: 'sell' })).toMatchObject({
       included: 7_729_000,
       requested: 7_670_000,

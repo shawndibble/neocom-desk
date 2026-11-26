@@ -13,18 +13,6 @@ import { CorpCeo, CorpStatePill } from './CorpRow';
 
 const k = (key: string) => `corpTaxBook.moons.addCorps.needs.${key}`;
 
-/**
- * "Needs you (N)": every corp of the player's that did not end up connected,
- * with the one-line reason and the fix that applies. Gone quiet is removed from
- * here, or logged in again as its CEO when the player leads it; sign-in problems start
- * that corp's sign-in again; a corp with its own book has only the instruction, because moving a book is not built yet. A moon
- * owner read without refinery names offers Grant again when it is the player's
- * own, and otherwise only says whose officer can; that one is not counted. One of
- * the player's own read without each chunk's ore offers Grant again too. A row whose
- * fix is a login names the CEO to log in as, so a player leading many corps knows
- * which character each one needs.
- * Renders nothing when the list is empty.
- */
 export function CorpStatusPanel({
   items,
   connected,
@@ -34,13 +22,10 @@ export function CorpStatusPanel({
   onRemove,
 }: {
   items: readonly NeedsYouItem[];
-  /** The run's tally for the meta line; omit when no run is kept. */
   connected?: number;
   total?: number;
   onSignInAgain: (corporationId: number) => void;
-  /** Sign in again as the CEO so the grant reads refinery names and each chunk's ore. */
   onGrantAgain: (corporationId: number) => void;
-  /** Resolves `false` when the removal was refused. */
   onRemove: (corporationId: number) => Promise<boolean>;
 }) {
   const { t } = useTranslation();
@@ -68,7 +53,6 @@ export function CorpStatusPanel({
           <li key={item.corporationId} className="space-y-1 py-2 text-sm">
             <div
               className={`flex items-start justify-between gap-2 sm:items-center ${
-                // Two buttons would squeeze the name and pills on a phone: they take their own line.
                 offersLoginAgain(item) ? 'flex-wrap sm:flex-nowrap' : ''
               }`}
             >

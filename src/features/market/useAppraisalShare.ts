@@ -12,12 +12,6 @@ import { useRefineMineralNames } from './useRefineMineralNames';
 
 const NO_ITEMS: readonly AppraisalItem[] = [];
 
-/**
- * The Share button's progress. `manual` is a link that was stored but could
- * not be copied: the save took long enough that the browser no longer counts
- * the copy as part of the click (Safari is strict about this), so the link is
- * shown for a second, in-gesture copy instead of being lost.
- */
 export type ShareState =
   | { status: 'idle' }
   | { status: 'saving' }
@@ -37,20 +31,13 @@ export function useAppraisalShare({
   characterId: number | null;
 }) {
   const [share, setShare] = useState<ShareState>({ status: 'idle' });
-  // Read ahead of the press, so the handler stays inside the click.
   const mineralNames = useRefineMineralNames(result?.appraisal.items ?? NO_ITEMS);
-  // A link belongs to the result it was made from; a new appraisal drops it.
   const [shareResult, setShareResult] = useState(result);
   if (result !== shareResult) {
     setShareResult(result);
     setShare({ status: 'idle' });
   }
 
-  /**
-   * Stores the appraisal as it stands — prices included — and copies its short
-   * `/s/<id>` link. The same appraisal shared again gets the same link, and
-   * a failed save copies nothing.
-   */
   async function handleShare() {
     if (!result || characterId === null || share.status === 'saving') return;
     const snapshot = buildAppraisalSnapshot({
@@ -62,12 +49,10 @@ export function useAppraisalShare({
         yieldRate: result.refining.stationRate,
         taxRate: result.refining.taxRate,
       },
-      // The minerals' names travel with the link so a signed-out visitor can read the breakdown.
       mineralNames,
     });
-    if (!snapshot.ok) return; // pre-checked by the disabled state below
+    if (!snapshot.ok) return;
     const reuseKey = appraisalSnapshotReuseKey(snapshot.value);
-    // A link already made copies with no await first, so it stays inside the click.
     let url = existingShareLink('appraisal', reuseKey);
     if (url === null) {
       setShare({ status: 'saving' });
@@ -95,9 +80,7 @@ export function useAppraisalShare({
     try {
       await writeToClipboard(url);
       setShare({ status: 'copied', url });
-    } catch {
-      // Still on screen to copy by hand.
-    }
+    } catch {}
   }
 
   const shareItemCount = result?.appraisal.items.length ?? 0;

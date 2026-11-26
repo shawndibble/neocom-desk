@@ -1,12 +1,3 @@
-/**
- * BPC Sourcing's prepare / rank as one shared worker call (`useBpcOfferSearch`
- * is its only caller). The worker gets the contract rows once — again only
- * when the page holds different arrays — the rest of the source data when any
- * of its fields changes, and stage 1's input when it changes; then it answers
- * each query with indices into the rows it was given. Where there is no
- * Worker (jsdom, old browsers), or it has failed, `bpcQueryWorkerAvailable`
- * says so and the caller runs the same pure functions on the page.
- */
 import type {
   BpcPrepareInput,
   BpcQuery,
@@ -39,7 +30,6 @@ const client = createWorkerClient<BpcQueryReply, BpcRankReplyParts>({
   reset: forgetLoaded,
 });
 
-/** Whether a query can go to the worker; false once it has failed. */
 export const bpcQueryWorkerAvailable = client.available;
 
 function splitSourceData(data: BpcSourceData): {
@@ -58,7 +48,6 @@ function sameFields(a: object, b: object): boolean {
   );
 }
 
-/** Rejects with `SUPERSEDED` when a newer query replaced this one before it ran. */
 export function askBpcQuery(
   data: BpcSourceData,
   prepareInput: BpcPrepareInput,

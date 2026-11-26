@@ -1,10 +1,3 @@
-/**
- * The Hull Rules panel body: an add-hull-or-class search over the whole SDE ship list, then
- * the ship classes that carry a rule, each with its rule select and, under an expanded class, the
- * hulls that carry a rule. A class with no rule is not listed; the search adds it.
- * A hull's rule beats its class's. Table from `sm` up; one-line rows on a phone (classes collapsed,
- * ISK input only for Pay: fixed ISK). Rows come from `hullRuleRows.ts`.
- */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -47,15 +40,12 @@ interface Props {
   form: SrpSettingsForm;
   onChange: (form: SrpSettingsForm) => void;
   hulls: HullCatalogState;
-  /** Hull ids added from the search that have no rule yet; kept by the editor so they survive a re-render. */
   added: readonly number[];
   onAdd: (hullId: number) => void;
-  /** Class ids added or edited this session; they keep their row even at No rule until Save. */
   keptClasses: readonly number[];
   onKeepClass: (classId: number) => void;
   expanded: ReadonlySet<number>;
   onToggle: (classId: number) => void;
-  /** The corp's Doctrine Fits: a hull row offers the ones built on its hull. */
   doctrines: readonly DoctrineFit[];
 }
 
@@ -82,7 +72,6 @@ export function HullRulesEditor({
     () => (catalog ? listedHullIds(form, catalog, added) : new Set<number>()),
     [form, catalog, added]
   );
-  // A hull whose fixed price is blank stays on screen even if its class is collapsed: Save is blocked on it.
   const shown = useMemo(() => {
     const open = new Set(expanded);
     if (catalog)
@@ -123,7 +112,6 @@ export function HullRulesEditor({
     [catalog, className, query, listed, listedClasses]
   );
 
-  // A class added from the search takes focus on its rule select once its row is rendered.
   useEffect(() => {
     if (!focusKey.current) return;
     const select = rootRef.current?.querySelector<HTMLSelectElement>(
@@ -139,8 +127,6 @@ export function HullRulesEditor({
     if (scope === 'hull') onAdd(id);
     else {
       onKeepClass(id);
-      // Default: Pay: corp percent. It is the rule a Director most often means by naming a class
-      // (spelling out the percent for it), and unlike Officer decides it never stalls a claim.
       if (ruleOf(form, 'class', id).kind === 'none')
         onChange(setRule(form, 'class', id, { ...ruleOf(form, 'class', id), kind: 'pay-percent' }));
       focusKey.current = ruleKey('class', id);
@@ -148,7 +134,6 @@ export function HullRulesEditor({
     setQuery('');
   };
 
-  // An invalid percent is not shown as the rule's meaning: the field already says what is wrong.
   const percentNote = (): string | null =>
     form.killmailPct.trim() !== '' && !problems.killmailPct
       ? t('srp.settings.hullRules.percentKillmail', { pct: form.killmailPct })
@@ -156,7 +141,6 @@ export function HullRulesEditor({
         ? t('srp.settings.hullRules.percentAppraisal', { pct: form.appraisalPct })
         : null;
 
-  /** The dim line under or beside a row's select: what the rule means for the claim. */
   const helper = (row: HullRuleRow): string => {
     const kind = ruleOf(form, row.scope, row.id).kind;
     if (kind === 'pay-percent') return percentNote() ?? t('srp.settings.hullRules.percentNeeded');
@@ -218,7 +202,6 @@ export function HullRulesEditor({
     );
   };
 
-  /** A hull row's Doctrine Fits: tick the ones a claim must match; none ticked, not checked. */
   const attach = (row: HullRuleRow) => {
     if (row.scope !== 'hull') return null;
     const fits = doctrines.filter((d) => d.snapshot.hullTypeId === row.id);

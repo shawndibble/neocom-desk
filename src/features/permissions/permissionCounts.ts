@@ -1,13 +1,3 @@
-/**
- * How many Permissions a Character has granted, for the Character picker on
- * Settings › Permissions and the Character switcher. Pure: it takes a token's
- * scopes and nothing else, so no `TokenRecord` reaches feature code (ADR 0001).
- *
- * Corporation is left out of both numbers: it only matters to a Character with
- * a Corp Role, which is only knowable by asking ESI per Character (a roster of
- * twenty must not do that on every visit), and the panel hides its row without
- * one, so counting it showed a "missing" Permission nobody could see.
- */
 import { PERMISSIONS, SCOPE_GROUPS } from '@/esi/registry';
 import { isPermissionGranted } from '@/esi/scopes';
 
@@ -21,15 +11,6 @@ export interface CharacterPermissionCount extends PermissionCount {
   name: string;
 }
 
-/**
- * The Permissions the count covers: every one but Corporation and the Write to
- * EVE section, which is off by default on purpose — a Character that never
- * opted in to a write is not missing anything. Military Campaigns is left out
- * too: every Character signed in before it shipped lacks it, and the scope
- * decision (20261123-164921) is that they are never pushed to re-login for it;
- * a count turning every roster amber would be that push. Its own figures carry
- * the missing-Permission mark instead.
- */
 export const COUNTED_PERMISSIONS = SCOPE_GROUPS.filter(
   (group) =>
     group !== 'corp' && group !== 'militaryCampaigns' && PERMISSIONS[group].section !== 'write'
@@ -42,13 +23,11 @@ export function countGrantedPermissions(scopes: readonly string[]): PermissionCo
   };
 }
 
-/** Complete is success; fewer than half is danger; the rest warning. */
 export function pickerTone({ granted, total }: PermissionCount): 'success' | 'warning' | 'danger' {
   if (granted >= total) return 'success';
   return granted * 2 < total ? 'danger' : 'warning';
 }
 
-/** The picker's two groups: those that need Permissions (fewest granted first), then the complete ones, each by name. */
 export function orderForPicker<T extends CharacterPermissionCount>(
   rows: readonly T[]
 ): { needs: T[]; complete: T[] } {

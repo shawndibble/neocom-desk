@@ -1,11 +1,3 @@
-/**
- * Route Safety's jump drive legs (issue #3147): whether a route may fly a
- * stretch by jump drive, and the longest single jump it may ask for.
- *
- * Route Safety only and device-local, like the bridge switch beside it: it is
- * a note about the move being planned, not a setting other devices need. The
- * drive itself comes from the hull chosen in "My ship" (`routeShip.ts`).
- */
 import { useEffect, useMemo, useState } from 'react';
 import {
   indexSystemPositions,
@@ -30,7 +22,6 @@ export const useRouteJumpsEnabled = createLocalSetting<boolean>({
 export const ROUTE_JUMP_RANGES = ['short', 'max'] as const;
 export type RouteJumpRange = (typeof ROUTE_JUMP_RANGES)[number];
 
-/** "Short" caps a single jump at this share of the hull's range: fewer light years per fatigue step. */
 export const SHORT_JUMP_SHARE = 0.5;
 
 export const useRouteJumpRange = createLocalSetting<RouteJumpRange>({
@@ -39,9 +30,7 @@ export const useRouteJumpRange = createLocalSetting<RouteJumpRange>({
   parse: (raw) => (raw === 'short' || raw === 'max' ? raw : 'max'),
 });
 
-/** What a Route Safety route needs to plan jump drive legs. */
 export interface RouteJumpSetup {
-  /** Names the setup: equal keys plan the same trip. */
   key: string;
   systems: readonly JumpSystem[];
   positions: ReadonlyMap<number, SystemPosition>;
@@ -49,16 +38,8 @@ export interface RouteJumpSetup {
 }
 
 export interface RouteJump {
-  /** `null` while jump legs are off, the hull has no drive, or the map is still loading. */
   setup: RouteJumpSetup | null;
-  /** False until the settings are read and, when jump legs are wanted, the positions are in. */
   ready: boolean;
-  /**
-   * Jump legs are on and the hull has a drive, but the system map could not be
-   * read (offline with nothing cached). The route is then planned without jump
-   * legs, which a view must say rather than leave looking like "no jump helps".
-   * Retried when the connection returns.
-   */
   unavailable: boolean;
 }
 
@@ -69,13 +50,10 @@ interface JumpMap {
 
 let jumpMap: Promise<JumpMap | null> | null = null;
 
-/** Every system's position and security, read once. */
 function loadJumpMap(): Promise<JumpMap | null> {
   jumpMap ??= Promise.all([loadSystemPositions(), loadSolarSystemsById()])
     .then(([flat, entries]) => {
       if (!entries) {
-        // `loadSolarSystemsById` resolves null on a failed read; drop the cached
-        // promise so a retry (on reconnect) reads again instead of replaying null.
         jumpMap = null;
         return null;
       }
@@ -95,7 +73,6 @@ function loadJumpMap(): Promise<JumpMap | null> {
   return jumpMap;
 }
 
-/** The jump drive legs this route may fly: the saved switch and range, on the chosen hull. */
 export function useRouteJump(): RouteJump {
   const enabled = useRouteJumpsEnabled((state) => state.value);
   const enabledHydrated = useRouteJumpsEnabled((state) => state.hydrated);
@@ -104,7 +81,6 @@ export function useRouteJump(): RouteJump {
   const { ship } = useRouteShipMass();
   const [map, setMap] = useState<JumpMap | null>(null);
   const [mapSettled, setMapSettled] = useState(false);
-  /** Bumped on reconnect after a failed map read, to try it again. */
   const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     void useRouteJumpsEnabled.getState().hydrate();
@@ -114,7 +90,6 @@ export function useRouteJump(): RouteJump {
   useEffect(() => {
     if (!wanted) return;
     let live = true;
-    // A fresh attempt is not yet settled, so it cannot flash "unavailable" first.
     // eslint-disable-next-line react-hooks/set-state-in-effect -- restarting the map read
     setMapSettled(false);
     void loadJumpMap().then((loaded) => {
@@ -126,7 +101,6 @@ export function useRouteJump(): RouteJump {
       live = false;
     };
   }, [wanted, attempt]);
-  // The map read failed: try again when the connection returns.
   useEffect(() => {
     if (!wanted || !mapSettled || map) return;
     return onReconnect(() => {

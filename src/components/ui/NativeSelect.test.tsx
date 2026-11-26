@@ -15,8 +15,6 @@ describe('NativeSelect', () => {
       </label>
     );
 
-    // The caret needs a wrapper element around the <select>; implicit label
-    // association survives it because the control is still a descendant.
     expect(screen.getByLabelText('Trade Hub')).toBe(screen.getByRole('combobox'));
   });
 
@@ -41,9 +39,6 @@ describe('NativeSelect', () => {
         <option>Domain</option>
       </NativeSelect>
     );
-    // `md`'s caret is the larger glyph and sits further in, so the padding
-    // reserved for it has to be the larger one too — the two are set together
-    // and this is what catches them drifting apart.
     expect(screen.getByRole('combobox')).toHaveClass('pr-8');
 
     rerender(

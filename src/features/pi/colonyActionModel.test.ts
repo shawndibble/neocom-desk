@@ -15,7 +15,6 @@ const AQUEOUS_LIQUIDS = 2268;
 const BACTERIA_SCHEMATIC = 131;
 const WATER_SCHEMATIC = 121;
 
-/** Efa II as reported: eight Basic pins against extraction that feeds four. */
 function colony(
   overrides: {
     pins?: number;
@@ -66,7 +65,6 @@ function planFor(built: BuiltColonyAdvice, spare = { cpu: 17_855, powergrid: 2_8
 
 describe('idleFacilityPlan', () => {
   it('says nothing at all about a colony whose facilities are all fed', () => {
-    // A reassurance on every card would bury the ones with something to act on.
     const fed = colony({
       pins: 2,
       production: [{ schematicId: BACTERIA_SCHEMATIC, count: 2 }],
@@ -79,16 +77,11 @@ describe('idleFacilityPlan', () => {
     const plan = planFor(colony());
     expect(plan?.lines).toHaveLength(1);
     expect(plan?.lines[0].gap?.name).toBe('Microorganisms');
-    // Eight pins want 48,000/hr against 21,201 extracted.
     expect(plan?.lines[0].gap?.demand).toBeCloseTo(48_000, 6);
     expect(plan?.lines[0].gap?.supply).toBeCloseTo(21_201, 6);
   });
 
   it('gives each starved schematic its own line and its own freed budget', () => {
-    // A colony refining two P0s can be short of both. One summed line would
-    // take its facility kind and its shortfall from the first while counting
-    // idle pins from all of them — naming one input as the reason pins short
-    // of a different one have to go.
     const two = colony({
       pins: 8,
       extraction: [
@@ -102,15 +95,12 @@ describe('idleFacilityPlan', () => {
     });
     const plan = planFor(two);
     expect(plan?.lines).toHaveLength(2);
-    // Three idle pins each, at a Basic Industry Facility's 200 tf / 800 MW.
     for (const line of plan?.lines ?? []) {
       expect(line.freed.powergrid).toBeCloseTo(line.line.surplusPins * 800, 6);
     }
   });
 
   it('refuses to size extraction against two starved schematics', () => {
-    // "The shortfall" is not one number there, and buying to close one of them
-    // would be reported as closing both.
     const two = colony({
       pins: 8,
       extraction: [
@@ -127,21 +117,14 @@ describe('idleFacilityPlan', () => {
   });
 
   it('will not buy extraction into a colony that is out of Powergrid', () => {
-    // The reported colony. A control unit alone is 2,600 MW of the 2,845 free.
     const plan = planFor(colony());
     expect(plan?.upgrade.status).toBe('needs-removal');
-    // And it reports what would be free once the idle pins are gone, which is
-    // the budget that verdict was reached against.
     expect(plan?.freeAfterRemoval.powergrid).toBeCloseTo(2_845 + 4 * 800, 6);
   });
 
   it('counts fed facilities off the binding input’s per-pin rate', () => {
-    // `demandPerHour` is the colony's whole appetite, not one pin's. Read as a
-    // per-pin rate it reports that a purchase feeds nothing.
     const plan = planFor(colony(), { cpu: 40_000, powergrid: 40_000 });
     expect(plan?.upgrade.status).toBe('fits');
-    // 13 heads at 2,120.1/hr is 27,561/hr, over a pin's 6,000/hr — but only
-    // four pins are idle, so four is the answer.
     expect(plan?.wouldFeed).toBe(4);
   });
 

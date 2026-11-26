@@ -12,11 +12,11 @@ import {
   CREDIT_LEDGER,
   EMPTY_LEDGER,
   LEDGER_TYPE_NAMES,
+  SUB_ISK_LEDGER,
 } from './payeeLedgerFixture';
 
 const renderPanel = (source: PayeeLedgerSource | null, lockDate?: string) =>
   render(
-    // An ore name links to its Market listing, so the panel needs a router.
     <MemoryRouter>
       <PayeeLedgerPanel
         open
@@ -44,14 +44,13 @@ describe('PayeeLedgerPanel', () => {
     expect(rows.at(-1)).toHaveTextContent('Mined at Hakonen - Moon 4 Athanor');
     expect(screen.getByText('Late notice sent')).toBeInTheDocument();
     expect(screen.getByText('Written off by an officer')).toBeInTheDocument();
-    expect(screen.getByText('Shortfall forgiven')).toBeInTheDocument();
+    expect(screen.getByText('Closed within tolerance')).toBeInTheDocument();
     expect(within(table()).getByRole('columnheader', { name: 'Credited' })).toBeInTheDocument();
   });
 
   it("keeps each row's balance the one after it in date order, only displayed in reverse", () => {
     renderPanel(CORP_BOOK_LEDGER);
     const shown = bodyRows().map((r) => within(r).getAllByRole('cell').at(-1)?.textContent);
-    // Owed reads with a minus, money ahead plain, nothing at zero.
     const inDateOrder = payeeLedger(CORP_BOOK_LEDGER).rows.map((r) =>
       r.balance > 0.005
         ? `−${formatIsk(r.balance)}`
@@ -60,6 +59,13 @@ describe('PayeeLedgerPanel', () => {
           : '0'
     );
     expect(shown.reverse()).toEqual(inDateOrder);
+  });
+
+  it('shows a balance under one whole ISK as a plain 0, neither red nor green', () => {
+    renderPanel(SUB_ISK_LEDGER);
+    const balance = within(bodyRows()[0]!).getAllByRole('cell').at(-1)!;
+    expect(balance).toHaveTextContent(/^0$/);
+    expect(balance.querySelector('.text-isk-neg, .text-isk-pos')).toBeNull();
   });
 
   it('writes every date, the status line included, the way its rows do', () => {
@@ -77,6 +83,20 @@ describe('PayeeLedgerPanel', () => {
     expect(screen.getByText('Zeolites')).toBeInTheDocument();
   });
 
+  it('opens a saved tolerance close-out and an automatic change to show what they recorded', async () => {
+    const user = userEvent.setup();
+    renderPanel(CORP_BOOK_LEDGER);
+    await user.click(screen.getByText('Closed within tolerance'));
+    expect(screen.getByText(/no more than the book’s 0.5% tolerance/)).toBeInTheDocument();
+    expect(screen.getByText('Billed').parentElement).toHaveTextContent('5,500,000 ISK');
+    expect(screen.getByText('Written off').parentElement).toHaveTextContent('10,000 ISK');
+    expect(screen.getByText('Tolerance').parentElement).toHaveTextContent('27,500 ISK');
+    await user.click(screen.getByText('Fixed automatically at close'));
+    expect(screen.getByText('Before').parentElement).toHaveTextContent('12%: 3,846,000 ISK');
+    expect(screen.getByText('After').parentElement).toHaveTextContent('10%: 3,205,000 ISK');
+    expect(screen.getAllByRole('link', { name: 'Bitumens' })).toHaveLength(2);
+  });
+
   it('unlinks a payment from its opened row, for a personal Payee only', async () => {
     const user = userEvent.setup();
     const onUnlinkPayment = vi.fn();
@@ -92,7 +112,6 @@ describe('PayeeLedgerPanel', () => {
       </MemoryRouter>
     );
     await user.click(screen.getAllByText('Payment from Varro Kestane')[0]!);
-    // It says what Unlink does before the pilot presses it.
     expect(await screen.findByText(/Unlinking frees this payment/)).toBeInTheDocument();
     await user.click(await screen.findByRole('button', { name: 'Unlink' }));
     expect(onUnlinkPayment).toHaveBeenCalledWith(expect.any(String));
@@ -108,7 +127,7 @@ describe('PayeeLedgerPanel', () => {
     const user = userEvent.setup();
     renderPanel(CORP_BOOK_LEDGER);
     await user.click(screen.getByRole('button', { name: /filters/i }));
-    for (const name of ['Charges', 'Payments', 'Write-offs'])
+    for (const name of ['Charges', 'Payments', 'Write-offs', 'Automatic changes'])
       await user.click(screen.getByRole('button', { name }));
     expect(bodyRows()).toHaveLength(1);
     expect(bodyRows()[0]).toHaveTextContent('Late notice sent');
@@ -129,7 +148,6 @@ describe('PayeeLedgerPanel', () => {
       );
       const rows = bodyRows();
       const at = rows.findIndex((r) => r.textContent?.includes('Locked before'));
-      // Newest first: the open rows above the divider, the locked ones below.
       expect(rows[at - 1]).toHaveTextContent('2026-10-1');
       expect(rows[at + 1]).toHaveTextContent('2026-10-0');
     });
@@ -170,7 +188,6 @@ describe('PayeeLedgerPanel', () => {
     const cells = bodyRows().map((r) => within(r).getAllByRole('cell').at(-1)!);
     const balances = cells.map((c) => c.textContent);
     expect(balances.some((b) => /credit/i.test(b ?? ''))).toBe(false);
-    // The latest row, now on top, is the one that left the Payee paid ahead.
     expect(balances[0]).toBe('4,150,000');
     expect(cells[0]).toHaveClass('text-isk-pos');
     const owed = cells.find((c) => c.textContent?.startsWith('−'));
@@ -195,7 +212,6 @@ describe('PayeeLedgerPanel', () => {
         i === 0 ? { ...p, href: '/wallet/journal?highlight=42' } : p
       ),
     });
-    // The first payment in date order is the last one shown.
     await user.click(screen.getAllByText('Payment from Varro Kestane').at(-1)!);
     expect(screen.getByRole('link', { name: 'View the payment' })).toHaveAttribute(
       'href',
@@ -230,6 +246,17 @@ describe('PayeeLedgerPanel', () => {
 
 describe('ledgerCsvColumns', () => {
   const t = i18n.t.bind(i18n);
+  it('writes what a saved change recorded into its line', () => {
+    const what = ledgerCsvColumns(t)[1]!;
+    const lines = payeeLedger(CORP_BOOK_LEDGER)
+      .rows.filter((r) => r.kind === 'recordChange')
+      .map((r) => what.value(r));
+    expect(lines).toEqual([
+      'Closed within tolerance: 2026-10-03: billed 5,500,000 ISK, paid 5,490,000 ISK, 10,000 ISK written off (tolerance 27,500 ISK)',
+      'Fixed automatically at close: 2026-10-17: 12% 3,846,000 ISK → 10% 3,205,000 ISK',
+    ]);
+  });
+
   it('has a balance column on a normal ledger, none on an old history', () => {
     const balance = t('miningTax.ledger.column.balance');
     expect(ledgerCsvColumns(t).map((c) => c.header)).toContain(balance);

@@ -3,11 +3,6 @@ import { SkillLink } from '@/features/entities';
 import { COMMAND_CENTER_UPGRADES_SKILL_ID } from './colonyBudget';
 import { Sentence } from './sentence';
 
-/**
- * "needs CC level N", with the skill linked: the tag a setup carries when the
- * pilot's Command Center cannot host it yet. Plan's Find best and the Map's
- * picks and detail share it.
- */
 export function CcLevelTag({ level }: { level: number }) {
   const { t } = useTranslation();
   return (

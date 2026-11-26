@@ -15,7 +15,6 @@ const TYPE_BY_REF: Record<string, string> = {
   corporation_account_withdrawal: 'payment',
 };
 
-/** A journal row that only carries a contract's price or fee: Contracts counts it once. */
 function carriesContract(entry: WalletJournalEntry): boolean {
   return entry.ref_type.startsWith('contract_') || entry.context_id_type === 'contract_id';
 }
@@ -29,7 +28,6 @@ export interface WalletInteractionsInput {
   t: Translate;
 }
 
-/** One Character's wallet journal rows with `otherId`, as Interactions. Pure. */
 export function walletInteractions(input: WalletInteractionsInput): Interaction[] {
   const { characterId, otherId, journal, transactions, typeNames, t } = input;
   const fills = new Map(transactions.map((tx) => [tx.journal_ref_id, tx]));

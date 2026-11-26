@@ -32,7 +32,6 @@ vi.mock('@/features/corpTaxBook/mailQueue', () => ({
   enqueueReminder: vi.fn(),
 }));
 
-// The rich editor is its own chunk (Tiptap); a plain field stands in for it here.
 vi.mock('@/features/character/MailBodyEditor', async () => {
   const { TextArea } = await import('@/components/ui');
   return {
@@ -225,9 +224,7 @@ describe('MinersTab', () => {
     for (const name of ['Show info', 'Record payment', 'Dismiss tax']) {
       expect(within(menu).getByRole('menuitem', { name })).toBeInTheDocument();
     }
-    // Show info, Open in new tab (the row opens a page), then the three real actions: nothing else.
     expect(within(menu).getAllByRole('menuitem')).toHaveLength(5);
-    // No payment in this book: the item stays, inert.
     expect(within(menu).getByRole('menuitem', { name: 'Mark not tax' })).toHaveAttribute(
       'aria-disabled',
       'true'
@@ -302,7 +299,6 @@ describe('Mark not tax dialog', () => {
 });
 
 describe('LateNoticeRun (late notices, #6294)', () => {
-  /** Two Miners 60 days behind, each owing at least the default notice minimum. */
   const behind = {
     now: '2026-10-18T14:00:00Z',
     lastSyncedAt: '2026-10-18T12:00:00Z',
@@ -399,7 +395,6 @@ describe('LateNoticeRun (late notices, #6294)', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Send 1 late notice' }));
 
     await waitFor(() => expect(enqueueLateNotices).toHaveBeenCalledTimes(1));
-    // A notice is rebuilt every run, so an unticked one is not issued at all.
     const issued = editBook.mock.calls.map((c) => (c[2] as { action: string }).action);
     expect(issued).toEqual(['issueLateNotice']);
     expect(enqueueLateNotices.mock.calls[0][0].notices).toHaveLength(1);
@@ -507,10 +502,6 @@ describe('LateNoticeRun (late notices, #6294)', () => {
 });
 
 describe('Totals links and Overdue by age', () => {
-  /**
-   * Pilot 1 (100,000 owed) issued 2026-09-02: 2 days overdue on 2026-09-18. Pilot 2 (200,000)
-   * issued 2026-07-20: 46 days overdue.
-   */
   function overdueBook() {
     const first = buildBookView(input({ now: '2026-09-02T12:00:00Z' }));
     const notices = first.miners.map((m) => {

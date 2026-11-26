@@ -67,7 +67,6 @@ describe('turretHitChance', () => {
   });
 
   it('halves when angular speed x sig resolution equals tracking x target sig', () => {
-    // angular = 100 / 1000 = 0.1 rad/s; 0.1 * 40 / (0.5 * 8) = 1
     expect(turretHitChance(turret, { signatureRadius: 8, velocity: 100 }, 1000)).toBeCloseTo(0.5);
   });
 
@@ -94,7 +93,6 @@ describe('turretDamageMultiplier', () => {
   });
 
   it('matches a worked example at a 50% hit chance', () => {
-    // Wrecking: 0.01 × 3 = 0.03. Normal: 0.49 × ((0.01 + 0.5) / 2 + 0.49) = 0.36505.
     expect(turretDamageMultiplier(0.5)).toBeCloseTo(0.39505, 5);
   });
 });
@@ -196,7 +194,6 @@ describe('appliedDps fighters', () => {
   it('applies a squadron at full wherever the target is, then takes its resists', () => {
     const fast = { signatureRadius: 35, velocity: 3000 };
     expect(appliedDps(inputs([fighter], 20000), fast, 0)).toBeCloseTo(230, 6);
-    // Far past drone control range: fighters fly to the target.
     expect(appliedDps(inputs([fighter], 20000), fast, 150000)).toBeCloseTo(230, 6);
     const resists = { em: 0.5, thermal: 0, kinetic: 0, explosive: 0 };
     expect(appliedDps(inputs([fighter]), { ...fast, resists }, 1000)).toBeCloseTo(115, 6);
@@ -204,9 +201,7 @@ describe('appliedDps fighters', () => {
 
   it('counts in raw DPS, and a fighter-only fit’s range axis runs to drone control range', () => {
     expect(rawDps(inputs([fighter, missile]))).toBe(330);
-    // 57 km x1.1 = 62.7 -> 65 km
     expect(graphMaxRange([inputs([fighter], 57000)])).toBe(65000);
-    // Beside weapons with a reach, fighters don't stretch the axis.
     expect(graphMaxRange([inputs([fighter, missile], 57000)])).toBe(45000);
   });
 });
@@ -222,7 +217,6 @@ describe('appliedDps area weapons', () => {
 
   it('counts in raw DPS and stretches the range axis', () => {
     expect(rawDps(inputs([area, missile]))).toBe(180);
-    // 7.5 km x1.1 = 8.25 -> 10 km
     expect(graphMaxRange([inputs([area])])).toBe(10000);
   });
 });
@@ -253,9 +247,7 @@ describe('graphs', () => {
   });
 
   it('reaches past the longest weapon, rounded up to a whole 5 km', () => {
-    // turret optimal + 3 x falloff = 18 km; missile 40 km -> x1.1 = 44 -> 45 km
     expect(graphMaxRange([fit])).toBe(45000);
-    // drones reach as far as control range: 57 km x1.1 = 62.7 -> 65 km
     expect(graphMaxRange([inputs([drone], 57000)])).toBe(65000);
     expect(graphMaxRange([inputs([])])).toBe(0);
   });

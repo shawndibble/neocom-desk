@@ -4,7 +4,6 @@ import { QuestionRow } from '@/components/ui/QuestionRow';
 import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import { LANDING_FAQ } from './landingFaqEntries';
 
-/** Short answers to the questions asked before logging in, closed by default, hairline-divided. */
 export function LandingFaq() {
   const { t } = useTranslation();
   const [open, setOpen] = useState<ReadonlySet<string>>(new Set());
@@ -17,8 +16,6 @@ export function LandingFaq() {
   }
 
   const half = Math.ceil(LANDING_FAQ.length / 2);
-  // Two independent columns from lg, so opening an answer in one never
-  // stretches a row in the other; one column (in order) below that.
   return (
     <div className="mt-6 grid items-start gap-3 lg:grid-cols-2 lg:gap-x-6">
       {[LANDING_FAQ.slice(0, half), LANDING_FAQ.slice(half)].map((column) => (

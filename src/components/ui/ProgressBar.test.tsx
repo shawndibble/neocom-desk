@@ -60,7 +60,6 @@ describe('ProgressBar', () => {
     render(<ProgressBar label="x" value={10} className="w-24" />);
     const bar = screen.getByRole('progressbar');
     expect(bar).toHaveClass('w-24');
-    // Spans, so it can sit in a table cell or a flex span without invalid nesting.
     expect(bar.tagName).toBe('SPAN');
     expect(fill(bar).tagName).toBe('SPAN');
   });

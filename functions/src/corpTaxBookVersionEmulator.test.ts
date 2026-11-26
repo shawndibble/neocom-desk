@@ -1,5 +1,3 @@
-// The Corp Tax Book's version marker (issue #5047) against the Firestore emulator.
-// Runs only under `npm run test:rules` at the repo root; a plain `npm test` skips it.
 import { beforeEach, expect, it, vi } from 'vitest';
 import { emulatorDb as db, emulatorSuite } from './testSupport/emulator.js';
 import { VERSIONED_COLLECTIONS } from './corpTaxBookVersionKeys.js';
@@ -59,7 +57,7 @@ emulatorSuite('Corp Tax Book version marker (emulator)', () => {
     const feeder = book().collection('feeders').doc('9');
     await feeder.set({ status: 'active' });
     await feeder.collection('payouts').doc('p1').set({ amount: 1 });
-    await versioned(async () => undefined); // nothing written: nothing stamped
+    await versioned(async () => undefined);
     expect((await versions()).bookVersion).toBeUndefined();
 
     await versioned(() => db.recursiveDelete(feeder));

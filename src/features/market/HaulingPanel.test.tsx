@@ -57,7 +57,6 @@ const SCAN_ROW: ListHaulingScanRow = {
   },
 };
 
-/** From another category: what the fill offers. */
 const FILL_ROW: ListHaulingScanRow = {
   ...SCAN_ROW,
   typeId: 4051,
@@ -129,7 +128,6 @@ vi.mock('./useHaulingScan', () => ({
 }));
 
 let fillState: HaulingFillScanState = { status: 'idle' };
-/** The input the panel last gave the fill: its exclusions and its sizing. */
 let fillInput: HaulingFillScanInput | null = null;
 const fillFind = vi.fn();
 const fillMore = vi.fn();
@@ -143,7 +141,6 @@ vi.mock('./useHaulingFillScan', async () => {
       const lane = input.laneKey;
       const [asked, setAsked] = useState<string | null>(null);
       return {
-        // A new lane is idle until asked again, like the real hook.
         state: asked === lane ? fillState : { status: 'idle' },
         find: () => {
           fillFind();
@@ -175,7 +172,6 @@ vi.mock('./useHubJumps', () => ({
 
 let phone = false;
 vi.mock('@/lib/useIsPhone', () => ({ useIsPhone: () => phone }));
-/** The panel's measured width (rem): every `useElementNarrowerThan` reads it. jsdom measures nothing, so wide by default. */
 let panelRem = Infinity;
 vi.mock('@/lib/useElementNarrowerThan', () => ({
   useElementNarrowerThan: (rems: readonly number[]) => [
@@ -196,7 +192,6 @@ vi.mock('@/sde/loadMarketSde', () => ({
 
 const { HaulingPanel } = await import('./HaulingPanel');
 
-/** The link as the panel last wrote it, read back by `linkParam`. */
 function LocationSpy() {
   return (
     <output data-testid="link" hidden>
@@ -243,7 +238,6 @@ beforeEach(() => {
   jumpCalls.length = 0;
   phone = false;
   panelRem = Infinity;
-  // Hydrated, so a value one test remembers never leaks into the next through storage.
   useHaulingFilterPref.setState({ hydrated: true, value: DEFAULT_HAULING_FILTER });
   useHaulingBudget.setState({ hydrated: true, value: null });
 });
@@ -258,7 +252,6 @@ describe('HaulingPanel rows select, the rail shows the detail', () => {
     const user = userEvent.setup();
     const { actions } = renderPanel();
     expect(screen.queryByRole('button', { name: /more actions/i })).toBeNull();
-    // The name is the row's handle, not a link.
     expect(screen.queryByRole('link', { name: 'Damage Control II' })).toBeNull();
 
     await user.click(row());
@@ -317,7 +310,6 @@ describe('HaulingPanel rows select, the rail shows the detail', () => {
         fetchedAt: 0,
       },
     };
-    // 70 Damage Control II at 100 each: nothing left for the second.
     useHaulingBudget.setState({ hydrated: true, value: 7_000 });
     renderPanel();
     expect(screen.getByText('1 of 2 in the trip')).toBeInTheDocument();
@@ -351,7 +343,6 @@ describe('HaulingPanel table', () => {
     }
     expect(screen.queryByRole('columnheader', { name: /ISK\/m³/ })).toBeNull();
     expect(screen.queryByRole('columnheader', { name: /^Margin/ })).toBeNull();
-    // 70 units (a week of sales), 350 m³, Profit with the margin under it.
     expect(row()).toHaveTextContent('Sells most days');
     expect(row()).toHaveTextContent('350');
     expect(row()).toHaveTextContent(/\+[\d,]+.*% margin/);
@@ -363,7 +354,6 @@ describe('HaulingPanel table', () => {
     renderPanel('from=jita&to=amarr&mode=instant');
     expect(scanModes.at(-1)).toBe('instant');
     expect(screen.queryByRole('columnheader', { name: /^Days/ })).toBeNull();
-    // The realised buy-order price: 10 units sold at 130.
     expect(row()).toHaveTextContent('130.00');
     await user.click(row());
     expect(screen.getByText('Buy orders in Amarr')).toBeInTheDocument();
@@ -446,7 +436,6 @@ describe('HaulingPanel trip rail', () => {
       },
     });
     renderPanel();
-    // Damage Control II is a module: it fills the cargo hold, never the ammo hold.
     expect(
       screen.getByRole('progressbar', { name: 'Cargo hold: 300 of 300 cubic metres used' })
     ).toBeInTheDocument();
@@ -460,7 +449,6 @@ describe('HaulingPanel trip rail', () => {
   });
 });
 
-/** The fill once its batches stopped, with `rows` found. */
 const fillDone = (
   rows: ListHaulingScanRow[],
   reason: Extract<HaulingFillScanState, { status: 'ready' }>['reason'] = 'nothing-left'
@@ -479,7 +467,6 @@ describe('HaulingPanel fill the free space', () => {
     };
     renderPanel();
     expect(fillFind).not.toHaveBeenCalled();
-    // 1,000 m³ less Damage Control II's 350.
     expect(screen.getByText(/fit the free 650 m³/)).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Find items to fill it' }));
     expect(fillFind).toHaveBeenCalledOnce();
@@ -493,7 +480,6 @@ describe('HaulingPanel fill the free space', () => {
     setCargo(1000);
     renderPanel();
     expect([...fillInput!.excludeIds()]).toEqual([2048]);
-    // 200 m³ of the 650 free: one line, from this batch.
     expect(fillInput!.measure([FILL_ROW], new Set([4051]))).toEqual({
       freeM3: 450,
       capacityM3: 1000,
@@ -523,7 +509,6 @@ describe('HaulingPanel fill the free space', () => {
   it('sizes only rows the user’s filters let through', async () => {
     setCargo(1000);
     renderPanel('from=jita&to=amarr&margin=90');
-    // Filtered out, it is no row of the batch either: the batch counts as empty.
     expect(fillInput!.measure([FILL_ROW], new Set([4051]))).toMatchObject({
       freeM3: 1000,
       newLines: 0,
@@ -551,13 +536,11 @@ describe('HaulingPanel fill the free space', () => {
 
     expect(row(/Nitrogen Fuel Block/)).toHaveTextContent('Added from Planetary Infrastructure');
     expect(bringBox('Nitrogen Fuel Block')).toHaveValue('40');
-    // The plan already shipped stays as it was.
     expect(bringBox()).toHaveValue('70');
     expect(screen.getByText('2 of 2 in the trip')).toBeInTheDocument();
     expect(
       screen.getByText('Added 1 item · +200 m³ · 450 m³ still free', { selector: 'p' })
     ).toBeInTheDocument();
-    // Nothing is left on the lane: no Find more.
     expect(screen.queryByRole('button', { name: 'Find more' })).toBeNull();
 
     await user.click(screen.getByRole('button', { name: 'Hauling actions' }));
@@ -597,7 +580,6 @@ describe('HaulingPanel fill the free space', () => {
   it('offers no Find more while Max spend binds: more items could not be bought', async () => {
     const user = userEvent.setup();
     setCargo(1000);
-    // Damage Control II takes 7,000 ISK; 1,000 is left for the fill.
     useHaulingBudget.setState({ hydrated: true, value: 8_000 });
     fillState = fillDone([FILL_ROW], 'budget');
     renderPanel();
@@ -609,7 +591,6 @@ describe('HaulingPanel fill the free space', () => {
   it('sizes the ticked items again: unticking one frees its room for the rest', async () => {
     const user = userEvent.setup();
     setCargo(1000);
-    // Two of 500 m³ each for the 650 m³ free: the second gets only what is left.
     const big = (typeId: number, name: string, price: number): ListHaulingScanRow => ({
       ...FILL_ROW,
       typeId,
@@ -654,7 +635,6 @@ describe('HaulingPanel fill the free space', () => {
     act(() => info!.refresh());
     expect(fillReset).toHaveBeenCalledOnce();
     expect(screen.queryByRole('row', { name: /Nitrogen Fuel Block/ })).toBeNull();
-    // Add's pins go with the rows: nothing is left edited for Fill my hold to undo.
     await user.click(screen.getByRole('button', { name: 'Hauling actions' }));
     expect(screen.getByRole('menuitem', { name: 'Fill my hold' })).toHaveAttribute(
       'aria-disabled',
@@ -731,7 +711,6 @@ describe('HaulingPanel on a phone', () => {
 
     await user.click(row());
     const sheet = screen.getByRole('dialog', { name: 'Damage Control II' });
-    // The item's ⋮ rides in the sheet's title row, once.
     expect(
       within(sheet).getAllByRole('button', { name: 'More actions for Damage Control II' })
     ).toHaveLength(1);
@@ -869,7 +848,6 @@ describe('HaulingPanel data age (#3534)', () => {
   });
 });
 
-/** Buys at 5,000 ISK at the origin; sells well enough to pass the other filters. */
 const DEAR_ROW: ListHaulingScanRow = {
   ...SCAN_ROW,
   typeId: 3001,
@@ -912,7 +890,6 @@ describe('HaulingPanel filters: Max price per item and Max spend', () => {
     expect(linkParam('maxprice')).toBe('1000');
     expect(useHaulingFilterPref.getState().value.maxprice).toBe(1_000);
     expect(screen.getByRole('button', { name: 'Filters (1 active)' })).toBeInTheDocument();
-    // Cleared: no limit, gone from the link and from storage.
     await user.clear(screen.getByRole('textbox', { name: 'Max price per item' }));
     await user.keyboard('{Enter}');
     expect(row(/Expensive Widget/)).toBeInTheDocument();
@@ -927,7 +904,6 @@ describe('HaulingPanel filters: Max price per item and Max spend', () => {
     await user.click(row());
     await user.click(screen.getByRole('button', { name: 'Filters' }));
     const field = screen.getByRole('textbox', { name: 'Max price per item' });
-    // `250m` passes through 2 ISK, which would hide every row.
     await user.type(field, '250m');
     expect(linkParam('maxprice')).toBeNull();
     expect(row()).toHaveAttribute('aria-current', 'true');
@@ -935,7 +911,6 @@ describe('HaulingPanel filters: Max price per item and Max spend', () => {
     await user.tab();
     expect(linkParam('maxprice')).toBe('250000000');
     expect(row()).toHaveAttribute('aria-current', 'true');
-    // Enter commits too.
     await user.clear(field);
     await user.type(field, '1000');
     expect(row(/Expensive Widget/)).toBeInTheDocument();
@@ -967,7 +942,7 @@ describe('HaulingPanel filters: Max price per item and Max spend', () => {
     const field = screen.getByRole('textbox', { name: 'Max price per item' });
     await user.type(field, '1.5b{Enter}');
     expect(field).toHaveValue('1.5b');
-    expect(linkParam('maxprice')).toBe('1500000000'); // 2.01 × 1e6 is 2009999.99… in floating point: it still commits the whole figure, and the text stays.
+    expect(linkParam('maxprice')).toBe('1500000000');
     await user.clear(field);
     await user.type(field, '2.01m');
     await user.tab();
@@ -1015,7 +990,6 @@ describe('HaulingPanel filters: Max price per item and Max spend', () => {
     expect(field).toHaveAccessibleDescription(/For the whole trip/);
     await user.type(field, '1000');
     await user.tab();
-    // 100 ISK a unit: 1,000 ISK buys 10.
     expect(bringBox()).toHaveValue('10');
     expect(useHaulingBudget.getState().value).toBe(1_000);
     expect(linkParam('spend')).toBe('1000');
@@ -1035,7 +1009,6 @@ describe('HaulingPanel filters: Max price per item and Max spend', () => {
   it('on a phone, Max spend in the filter sheet commits without an Apply step', async () => {
     phone = true;
     panelRem = 20;
-    // jsdom's `matchMedia` never matches; the filter sheet needs the narrow query to.
     stubViewport(NARROW_QUERY);
     setCargo(100_000);
     const user = userEvent.setup();

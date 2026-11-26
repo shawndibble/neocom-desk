@@ -41,7 +41,6 @@ interface CharacterCardProps {
   character: CharacterRecord;
   stats: CharacterSortStats | undefined;
   queue: QueueInfo | undefined;
-  /** Whether this Character's `characterNotTraining` alert is on — false only for its one opt-out (issue #1731). */
   notTrainingAlertEnabled: boolean;
   groups: readonly CharacterGroup[];
   groupId: string | null;
@@ -52,14 +51,9 @@ interface CharacterCardProps {
   onToggleStar: (characterId: number) => void;
   onMoveToGroup: (characterId: number, groupId: string | null) => void;
   onRemove: (characterId: number, name: string) => void;
-  /** Score and title, from the roster's one batched read; undefined until loaded. */
   achievement: AchievementParts | null | undefined;
 }
 
-/**
- * A corp or alliance name, plain: a roster row or card selects the Character,
- * so its Show Info links live in the selected Character's header (§6c).
- */
 export function AffiliationName({ name }: { name: string | null | undefined }) {
   const { t } = useTranslation();
   return <>{name || t('common.unknown')}</>;
@@ -81,18 +75,10 @@ export function CharacterCard({
   onRemove,
   achievement,
 }: CharacterCardProps) {
-  // Own entry, not the page's whole map: a fetch for another card leaves this one alone.
   const info = usePublicInfo((state) => state.byCharacterId[character.characterId]);
   const { t } = useTranslation();
-  // One badge for the whole card, not one per stat (that was the actual
-  // complaint — three "Xm ago"s in a row): the oldest of whichever fields
-  // this character has cached, so the card never overstates its freshness.
   const lastSynced = characterLastSynced(stats, queue);
 
-  // Pointer convenience for the whole card; the name button stays the keyboard
-  // control. React events bubble out of portals (the group Select's menu), so
-  // only DOM descendants count, never a control, and never the end of a
-  // drag-select (the app sits beside the EVE client for copy/paste).
   const handleCardClick = (event: MouseEvent<HTMLLIElement>) => {
     const target = event.target;
     if (!(target instanceof Element) || !event.currentTarget.contains(target)) return;
@@ -119,8 +105,6 @@ export function CharacterCard({
         <RowTappableContext.Provider value>
           <div className="flex flex-wrap items-start gap-2">
             <div className="flex min-w-40 flex-1 items-start gap-3">
-              {/* Pointer convenience: the name below is the keyboard and screen-reader
-              control, so this avatar target stays out of both. */}
               <button
                 type="button"
                 tabIndex={-1}
@@ -136,12 +120,6 @@ export function CharacterCard({
                 />
               </button>
               <span className="min-w-0">
-                {/* The dot rides the name's own line, not a corner of the card:
-                it needs no room of its own, so the identity block loses
-                nothing to make space for it. `min-w-0` on this row (not just
-                the outer `span`) is what lets the name still truncate instead
-                of pushing the dot off — and shrinking the name never touches
-                the corp/alliance lines below, which are separate rows. */}
                 <span className="flex min-w-0 flex-wrap items-center gap-x-1.5">
                   <button
                     type="button"
@@ -175,14 +153,7 @@ export function CharacterCard({
                 <AchievementLine parts={achievement} />
               </span>
             </div>
-            {/* Group and remove: the card's own controls, not part of the
-            name/corp/alliance identity block, so they sit at the top right
-            rather than crowding the stat row below. */}
             <div className="flex shrink-0 items-center gap-2">
-              {/* Filled when starred, outline when not — the state is on the glyph
-              as well as in the accent `pressed` treatment, so it survives a
-              reader who can't tell the two colours apart. The label says which
-              way the press goes, not just which card it belongs to. */}
               <IconButton
                 icon={<Icon.Pin weight={starred ? 'fill' : 'light'} />}
                 label={t(starred ? 'characters.unstar' : 'characters.star', {

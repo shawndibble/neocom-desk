@@ -1,20 +1,3 @@
-/**
- * One tile on the Overview: a header (the title, which is the link to the
- * widget's page, a character scope chip, a settings button) over a body that is one of the five Widget
- * States.
- *
- * The body is a Number, a Chart or a Table, and **the headline number is always
- * on screen**: the Table view carries it as a line above its rows, the Chart
- * view above its chart (with the table beside it at Large and Full), and a kind
- * with no chart falls back to the Number. The Number view is only a number:
- * never a mini chart or a sparkline.
- * Every state is drawn for real rather than collapsing to blank: a widget that
- * vanishes when it has nothing to say cannot be told from one that failed to
- * load.
- *
- * No view-cyclers in the header: view switching lives in the settings menu, so
- * a stray click changes nothing.
- */
 import { useEffect, useState, type MouseEvent, type ReactElement, type ReactNode } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -68,25 +51,12 @@ import {
 
 interface WidgetProps {
   widget: WidgetModel;
-  /** The pilot is customizing: a dashed edge; the controls arrive as `headerStart` and `editControls`. */
   editing?: boolean;
-  /**
-   * Wraps the card in its right-click menu (`WidgetMenu`) and, with it, puts the ⋮ in the header and
-   * makes the card a click-through to the widget's page; absent in the Gallery's preview.
-   */
   menu?: (card: ReactElement, to: string | null) => ReactElement;
-  /** Before the title in the header: the drag handle while customizing on desktop. */
   headerStart?: ReactNode;
-  /** A strip under the body while customizing: size, move and remove. */
   editControls?: ReactNode;
-  /** Draw this sample instead of the live read: the Gallery's inert preview. */
   previewView?: KindView;
-  /** The Gallery's preview already sits under the kind's name: draw the body alone, no header. */
   hideHeader?: boolean;
-  /**
-   * Draw the title as the link would look (with its caret) but as plain text: the
-   * signed-out landing page's demo, where every destination is a route the visitor cannot reach.
-   */
   inertTitle?: boolean;
 }
 
@@ -96,10 +66,6 @@ const SECONDARY_TONE = {
   caution: 'text-warning',
 } as const;
 
-/**
- * What a click on the card leaves alone: a control or link (with or without a target of its own),
- * an open menu or dialog, a chart. A table row with no target of its own is plain space.
- */
 const CARD_CLICK_IGNORES =
   'a[href], button, input, textarea, select, label, summary, [role="button"], [role="link"], [role="tab"], [role="menuitem"], [role="menuitemradio"], [role="menuitemcheckbox"], [role="dialog"], [data-card-click-ignore]';
 
@@ -109,7 +75,6 @@ const DIRECTION_GLYPH = {
   flat: Icon.Decrease,
 } as const;
 
-/** The one line under the headline: a glyph for a direction, then text, on one line at every size. */
 function SecondaryLine({ secondary }: { secondary: NumberSecondary }) {
   const Glyph = secondary.direction ? DIRECTION_GLYPH[secondary.direction] : null;
   return (
@@ -125,7 +90,6 @@ function SecondaryLine({ secondary }: { secondary: NumberSecondary }) {
   );
 }
 
-/** Rings beside the figure: one with the figure, or several (each named) in its place. */
 function NumberRings({ rings }: { rings: NonNullable<NumberModel['rings']> }) {
   return (
     <ul className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
@@ -143,7 +107,6 @@ function NumberRings({ rings }: { rings: NonNullable<NumberModel['rings']> }) {
 function NumberBody({ model, dimmed = false }: { model: NumberModel; dimmed?: boolean }) {
   const toned = model.tone !== 'clear';
   const rings = model.rings ?? [];
-  // Several rings say it all (one per faction): they stand in for the figure.
   if (rings.length > 1) {
     return (
       <div className="grid gap-1.5 px-3 py-2.5">
@@ -212,7 +175,6 @@ function NumberBody({ model, dimmed = false }: { model: NumberModel; dimmed?: bo
   );
 }
 
-/** The Table view: the headline, then the kind's table at this size's rows and columns. */
 function TableViewBody({
   view,
   size,
@@ -224,13 +186,11 @@ function TableViewBody({
   size: WidgetModel['size'];
   title: string;
   paging: TableBodyProps['paging'];
-  /** The landing demo has no page to go to: its rows draw no links. */
   inert: boolean;
 }) {
   const table = tableOf(view);
   return (
     <div>
-      {/* The headline stays on screen in every view; its secondary line is the table's job here. */}
       <NumberBody
         model={{ ...view.number, secondary: undefined, notes: undefined, link: undefined }}
       />
@@ -248,13 +208,6 @@ function TableViewBody({
   );
 }
 
-/**
- * The Chart view: the headline stays on screen above the chart (a Small chart
- * still shows its value), the chart's caption and hidden text summary below.
- * At Large and Full the table sits beside the chart (stacked below it on a
- * phone), with no toggle: the View menu is the only switcher. A kind with no
- * chart for this data falls back to the Number, never a blank.
- */
 function ChartBody({
   view,
   size,
@@ -290,14 +243,12 @@ function ChartBody({
   );
 }
 
-/** The fixed scope readout (DESIGN §6c): this widget reads every Character on the device. */
 function AllCharactersReadout({ compact }: { compact: boolean }) {
   const total = useRosterNames()?.size;
   if (!total) return null;
   return <CharacterScopeReadout scope="all" total={total} compact={compact} />;
 }
 
-/** The fixed scope readout for a widget on one corporation (the Corp Board). */
 function CorporationReadout({
   corporationId,
   compact,
@@ -315,11 +266,6 @@ function CorporationReadout({
   );
 }
 
-/**
- * Corp Board: a kind that reads one corporation, through the header Character, under a scope
- * that asks for several (All) or for another corporation. It asks which, so the card never
- * shows one corporation's figure under a heading that says otherwise.
- */
 function OneCorporationBody({
   title,
   wanted,
@@ -356,14 +302,12 @@ function OneCorporationBody({
   );
 }
 
-/** The same readout in its "Name only" form: All was asked for, but this kind reads one Character. */
 function HeaderCharacterReadout({ characterId }: { characterId: number }) {
   const name = useRosterNames()?.get(characterId);
   if (name === undefined) return null;
   return <CharacterScopeReadout scope="one" characterId={characterId} characterName={name} />;
 }
 
-/** `minHeight` holds the body's settled height, so the board does not jump when the data lands. */
 function Skeleton({ minHeight }: { minHeight: number }) {
   const { t } = useTranslation();
   const bar = 'block animate-pulse rounded-xs bg-line motion-reduce:animate-none';
@@ -376,11 +320,6 @@ function Skeleton({ minHeight }: { minHeight: number }) {
   );
 }
 
-/**
- * The live read lives in its own component so the Gallery's preview, which
- * supplies its own sample view, renders `WidgetFrame` directly and so never
- * starts a live builder per previewed kind.
- */
 export function Widget(props: WidgetProps) {
   return props.previewView ? (
     <WidgetFrame {...props} view={props.previewView} />
@@ -398,15 +337,10 @@ function LiveWidget(props: WidgetProps) {
     widget,
     board.id === 'corp'
   );
-  // The kind's declared settings pick what counts; the rest are ignored (`viewSettings.ts`).
   const view = useWidgetView(widget.kind, scope.scopeAll, widget, scope.corporationId);
   return <WidgetFrame {...props} view={view} rememberHeight />;
 }
 
-/**
- * Remembers the body's settled height under `key` (see `skeletonHeight.ts`)
- * while `active`, so the next load's skeleton stands as tall as this one ended.
- */
 function useRememberHeight(key: string, active: boolean) {
   const [node, setNode] = useState<HTMLDivElement | null>(null);
   useEffect(() => {
@@ -433,7 +367,6 @@ function WidgetFrame({
   rememberHeight = false,
 }: Omit<WidgetProps, 'previewView'> & {
   view: KindView;
-  /** A live widget: remember its settled body height for the next load's skeleton. */
   rememberHeight?: boolean;
 }) {
   const { t } = useTranslation();
@@ -443,7 +376,6 @@ function WidgetFrame({
   const { setRowsPerPage } = edit;
   const characterId = useActiveCharacter((state) => state.activeCharacterId);
   const now = useTicker(OVERVIEW_TICK_MS);
-  // The scope it is read with, so a widget saved on All that reads one corporation draws no chip.
   const board = useWidgetBoard();
   const scope = scopePresentation(
     widget.kind,
@@ -452,10 +384,8 @@ function WidgetFrame({
     board.id === 'corp'
   );
   const ownCorporationId = useActiveCorporationId();
-  // One corporation is asked for, and it is not the header Character's: there is nothing to read.
   const asksCorporation =
     scope.needsOneCorporation === true &&
-    // Until the header Character's corporation is known there is nothing to compare with.
     (scope.wantedCorporationId === undefined ||
       (ownCorporationId !== null && scope.wantedCorporationId !== ownCorporationId));
   const { state, showLastGood, reauthNote } = resolveWidget(view.status);
@@ -463,32 +393,23 @@ function WidgetFrame({
   const navigate = useNavigate();
   const sizeKey = heightKey(widget, characterId, isPhone);
   const drawn = state === 'ok' || state === 'empty';
-  // A view that draws (or reads empty) while one of its first reads is still out (the Wallet's
-  // balance before its journal) is not at its height yet: it keeps the skeleton's reserve until
-  // the read lands.
   const settling = rememberHeight && drawn && view.settling === true;
-  // Only a settled body is worth standing the next skeleton at: a short error or permission
-  // prompt is a passing state, not this widget's height.
   const measureRef = useRememberHeight(sizeKey, rememberHeight && drawn && !settling);
   const reserved = () =>
     (rememberHeight ? rememberedBodyHeight(sizeKey) : undefined) ??
     estimatedBodyHeight(widget, isPhone);
 
-  // The grid only draws kinds it knows; a widget rendered alone without one has no title to show.
   if (!kind) return null;
   const keys = widgetKeys(kind, widget.show);
   const title = widget.title ?? t(keys.titleKey);
   const endpoints = endpointsOf(widget.kind, widget);
   const grantTarget = view.grantCharacterId ?? characterId;
-  // The landing page's demo (`inertTitle`) and the Gallery's preview (no menu) have no page to go to.
   const cardTo = menu !== undefined && !inertTitle && !editing ? view.to : null;
   const onCardClick = (event: MouseEvent<HTMLElement>) => {
     if (cardTo === null || event.defaultPrevented) return;
     if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-    // A portaled menu, tooltip or modal bubbles here through React, but is not on the card.
     if (!(event.target instanceof Element) || !event.currentTarget.contains(event.target)) return;
     if (event.target.closest(CARD_CLICK_IGNORES) !== null) return;
-    // A drag that selects text ends in a click.
     if (window.getSelection()?.toString()) return;
     navigate(cardTo);
   };
@@ -554,7 +475,6 @@ function WidgetFrame({
     body = (
       <div className="grid gap-2 p-3 text-sm">
         <b>{view.emptyMessage ?? t(keys.emptyMessageKey)}</b>
-        {/* What the kind is for, so a new pilot's empty card explains itself. */}
         {!view.emptyHealthy && (
           <span className="text-text-dim">{view.emptyHint ?? t(kind.descKey)}</span>
         )}
@@ -585,7 +505,6 @@ function WidgetFrame({
       );
   }
 
-  // A lapsed grant over saved data: the figures stay, with a small note to log in again.
   if (reauthNote && grantTarget !== null && endpoints.length > 0) {
     body = (
       <>
@@ -682,7 +601,6 @@ function WidgetFrame({
             ))}
           <span className="flex-1" />
           {menu && (
-            // A card is not a row: the row tips wait for the first real table row.
             <RowMoreActions
               label={t('overview.widgets.settingsFor', { title })}
               focusTarget
@@ -692,7 +610,6 @@ function WidgetFrame({
         </div>
       )}
       <div className="flex-1" style={settling ? { minHeight: reserved() } : undefined}>
-        {/* Measured, not the stretched `flex-1` box: a row's tallest widget sets the others' height. */}
         <div ref={measureRef}>{body}</div>
       </div>
       {editControls}

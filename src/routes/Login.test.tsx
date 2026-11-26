@@ -6,7 +6,7 @@ import '@/i18n';
 import { db } from '@/db';
 import { SCOPES } from '@/esi/scopes';
 import { assignLocation } from '@/app/navigation';
-import { AUTHORIZED_APPS_URL, DISCORD_URL, REPO_URL } from '@/lib/links';
+import { AUTHORIZED_APPS_URL, DISCORD_URL, REPO_URL, YOUTUBE_CHANNEL_URL } from '@/lib/links';
 import { PLAY_STORE_PACKAGE } from '@/lib/playStoreApp';
 import { LANDING_SHELL_ATTR, LANDING_SHELL_ID } from '@/app/landingShell';
 import { takeLoginReturnTo } from '@/auth/loginReturnTo';
@@ -14,14 +14,6 @@ import { Login } from './Login';
 
 vi.mock('@/app/navigation', () => ({ assignLocation: vi.fn() }));
 
-/**
- * Every read scope in the Base Grant, against the words that disclose it.
- * The scopes accordion's own coverage is pinned in `scopeGroups.test.ts`; this
- * map stays hand-maintained on purpose: only a person can decide how
- * a new scope should be described to someone deciding whether to grant it.
- * Two scopes may share a phrase where the disclosure honestly is the same
- * (`read_clones`/`read_implants`), but a scope may never be absent.
- */
 const READ_ONLY_PHRASES: Record<string, string> = {
   'esi-skills.read_skills.v1': 'skills and training queue',
   'esi-skills.read_skillqueue.v1': 'skills and training queue',
@@ -46,8 +38,6 @@ const READ_ONLY_PHRASES: Record<string, string> = {
   'esi-location.read_location.v1': 'current location',
   'esi-location.read_ship_type.v1': 'the ship you are flying',
   'esi-fittings.read_fittings.v1': 'in-game fittings',
-  // In the Base Grant since #6102; a Character's Corp Roles decide which of
-  // the corporation reads ever run.
   'esi-characters.read_corporation_roles.v1': 'your corporation roles',
   'esi-wallet.read_corporation_wallets.v1': 'corporation wallets',
   'esi-corporations.read_divisions.v1': 'corporation divisions',
@@ -73,7 +63,6 @@ const READ_ONLY_PHRASES: Record<string, string> = {
   'esi.activity.char:read': 'Campaign Objectives you pressed Participate on',
 };
 
-/** The write scopes (opt-in, not in the Base Grant) — their disclosure goes in the "It writes only when you act" trust card, not the read sentence, which it would otherwise contradict. */
 const WRITE_SCOPE_PHRASES: Record<string, string> = {
   'esi-mail.organize_mail.v1': 'flags it as read in EVE',
   'esi-calendar.respond_calendar_events.v1': 'sends your response',
@@ -83,8 +72,6 @@ const WRITE_SCOPE_PHRASES: Record<string, string> = {
   'esi-ui.open_window.v1': 'opens a window in the client',
 };
 
-// The Base Grant is reads only; the write scopes are the opt-in "Write to EVE"
-// Permissions, disclosed in the trust card but not asked for at sign-in.
 const BASE_GRANT_PHRASES: Record<string, string> = READ_ONLY_PHRASES;
 
 function renderLogin(url: string | { pathname: string; state?: unknown } = '/login') {
@@ -171,7 +158,6 @@ describe('Login', () => {
       })
     ).toBeInTheDocument();
     expect(screen.getByText('Neocom Desk')).toBeInTheDocument();
-    // The closing call to action mounts just after the hero (`useBelowFold`).
     await screen.findByRole('contentinfo');
     const buttons = screen.getAllByRole('button', { name: /log in with eve online/i });
     expect(buttons.length).toBeGreaterThanOrEqual(2);
@@ -181,7 +167,6 @@ describe('Login', () => {
     const { container } = renderLogin();
     await screen.findByRole('contentinfo');
 
-    // Panel headers match 'banner' in jsdom; only a header outside <main> is one in a browser.
     const main = container.querySelector('main');
     expect(screen.getAllByRole('banner').some((el) => !main?.contains(el))).toBe(true);
     expect(screen.getByRole('contentinfo')).not.toBeNull();
@@ -197,99 +182,65 @@ describe('Login', () => {
     );
   });
 
-  it('leads with the questions the app answers', async () => {
+  it('leads with the areas of the app, each question under its job', async () => {
     renderLogin();
     expect(
-      await screen.findByRole('heading', { name: /questions you'd alt-tab for/i })
+      await screen.findByRole('heading', { name: /one desk for every job you do in eve/i })
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('heading', { name: /which order is quietly losing isk/i })
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole('heading', { name: /is this blueprint worth building/i })
+      screen.getByRole('heading', { name: /cheapest one without crossing lowsec/i })
     ).toBeInTheDocument();
   });
 
-  it('pairs every question with a screenshot, each with alt text, lazily loaded', async () => {
+  it('gives the screenshot alt text and loads it lazily', async () => {
     renderLogin();
-    const grid = within(
-      await screen.findByRole('region', { name: /questions you'd alt-tab for/i })
+    const areas = within(
+      await screen.findByRole('region', { name: /one desk for every job you do in eve/i })
     );
-    const images = grid.getAllByRole('img');
-    // One capture per tile, and one tile per heading.
-    expect(images).toHaveLength(grid.getAllByRole('heading', { level: 3 }).length);
-    expect(images).toHaveLength(9);
-    expect(new Set(images.map((image) => image.getAttribute('src'))).size).toBe(9);
-    for (const image of images) {
-      expect(image.getAttribute('alt')).toBeTruthy();
-      expect(image).toHaveAttribute('loading', 'lazy');
-      expect(image.getAttribute('src')).toMatch(/^\/screenshots\/[a-z-]+\.webp$/);
-    }
+    const image = within(areas.getByRole('tabpanel')).getByRole('img');
+    expect(image.getAttribute('alt')).toBeTruthy();
+    expect(image).toHaveAttribute('loading', 'lazy');
+    expect(image.getAttribute('src')).toMatch(/^\/screenshots\/[a-z-]+\.webp$/);
   });
 
   it('enlarges a screenshot in a dialog when it is clicked', async () => {
     const user = userEvent.setup();
     renderLogin();
-    // The features showcase opens on the same capture, so scope to the questions grid.
-    const grid = within(
-      await screen.findByRole('region', { name: /questions you'd alt-tab for/i })
+    const areas = within(
+      await screen.findByRole('region', { name: /one desk for every job you do in eve/i })
     );
-    await user.click(grid.getByRole('button', { name: /enlarge: a build plan for an orca/i }));
-    const dialog = await screen.findByRole('dialog', { name: /build plans with profit/i });
+    await user.click(areas.getByRole('button', { name: /enlarge: the market page/i }));
+    const dialog = await screen.findByRole('dialog', { name: /a live order book/i });
     expect(within(dialog).getByRole('img')).toHaveAttribute(
       'src',
-      '/screenshots/desktop-build-plan.webp'
+      '/screenshots/desktop-market.webp'
     );
   });
 
-  // The catalog is the page's claim about what shipped, and it silently rotted
-  // once before: the eight rows it listed predated Moon Mining, Corporation,
-  // Notifications and the Open Orders worklist. This pins the rows that exist,
-  // so renaming or dropping one becomes a deliberate two-file edit instead of
-  // a silent drift. It deliberately does NOT catch the failure that caused the
-  // rot — a new route shipping with no row here still fails nothing, because
-  // nothing enumerates the app's routes and not every route earns a row. The
-  // consent list below is the half that *can* be derived, and is.
-  it('tabs the feature catalog by area and names every surface that ships today', async () => {
+  it('tabs the feature catalog by job and names every surface that ships today', async () => {
     renderLogin();
-    // Scoped to the section: "Clones" and "Market" also appear elsewhere on the
-    // page, so an unscoped query matches more than one node.
-    const section = within(await screen.findByRole('region', { name: /every tool, by area/i }));
+    const section = within(
+      await screen.findByRole('region', { name: /one desk for every job you do in eve/i })
+    );
     const user = userEvent.setup();
 
-    // Each feature is a tab's own name or an "Also includes" chip in that tab's panel.
-    // A chip that only repeats its tab's name (Industry, Corporation, Alerts) is not shown.
     const covered: Record<string, string[]> = {
-      Industry: [],
-      'Market & orders': ['Market', 'Open Orders', 'Wallet', 'Assets'],
-      Skills: ['Ships', 'Clones', 'Travel'],
-      'Planetary & mining': ['Planetary Industry', 'Mining'],
-      Corporation: ['Corp Tax Book', 'SRP'],
-      Mail: ['Mail & Calendar', 'Contracts', 'Contacts & Standings', 'Communities'],
-      Alerts: ['Notifications'],
+      Trade: ['Market', 'Open Orders', 'Wallet', 'Assets', 'Contracts'],
+      Build: ['Industry', 'Mining', 'Planetary Industry'],
+      Fly: ['Skills', 'Ships', 'Clones', 'Travel'],
+      'Run a corp': ['Corporation', 'Corp Tax Book', 'SRP', 'Communities'],
+      'Stay in touch': ['Mail & Calendar', 'Contacts & Standings'],
     };
-    const seen: string[] = [];
-    for (const [tab, features] of Object.entries(covered)) {
+    for (const [tab, pages] of Object.entries(covered)) {
       await user.click(section.getByRole('tab', { name: tab }));
       const panel = within(section.getByRole('tabpanel'));
-      for (const feature of features) {
-        expect(panel.getByText(feature)).toBeInTheDocument();
-        seen.push(feature);
-      }
-      if (features.length === 0) expect(panel.queryByText('Also includes')).toBeNull();
-      else expect(panel.getByText('Also includes')).toBeInTheDocument();
-      // The tab's own name is never repeated as a chip.
-      expect(panel.queryByRole('listitem', { name: tab })).toBeNull();
-      seen.push(tab);
+      for (const page of pages) expect(panel.getByText(page)).toBeInTheDocument();
     }
-    // 16 chips; the other 4 catalog rows (Industry, Corporation, Alerts, Skills) are named by their tab.
-    expect(seen.filter((name) => !(name in covered))).toHaveLength(16);
-    for (const row of ['Industry', 'Corporation', 'Alerts', 'Skills']) expect(seen).toContain(row);
   });
 
   it('has no How it works section or header link any more', async () => {
     renderLogin();
-    await screen.findByRole('region', { name: /questions you'd alt-tab for/i });
+    await screen.findByRole('region', { name: /one desk for every job you do in eve/i });
     expect(screen.queryByRole('region', { name: /how it works/i })).toBeNull();
     expect(
       within(screen.getByRole('navigation', { name: /page sections/i })).queryByRole('link', {
@@ -298,76 +249,48 @@ describe('Login', () => {
     ).toBeNull();
   });
 
-  /*
-   * The hero preview is a mockup of the Overview, and it rotted silently
-   * once: the triage-board redesign deleted `overview.queue`,
-   * `overview.notifications`, `overview.training` and `overview.finishes`, and
-   * because i18next renders a missing key as the key itself, the signed-out
-   * landing page printed the literal string `overview.queue` at visitors. Every
-   * test in this file still passed.
-   *
-   * So two things are pinned. The first is that the preview speaks the board's
-   * own vocabulary, which is what stops it drifting into a layout the app does
-   * not have. The second is the general guard: no unresolved key may reach the
-   * page at all — that is the assertion that would have caught the original
-   * failure, and it catches the next one wherever on this page it happens.
-   */
-  it("previews the Overview widget grid using the widgets' own labels", async () => {
+  it('numbers the sections as the header lists them, Areas first', async () => {
     renderLogin();
-    const preview = within(await screen.findByRole('group', { name: /logged-in view/i }));
-
-    // The header row: the Next deadline button and the alerts bell with its count.
-    expect(preview.getByText('Next')).toBeInTheDocument();
-    expect(preview.getByText('Customize')).toBeInTheDocument();
-    expect(preview.getByRole('button', { name: /alerts, 5 waiting/i })).toBeInTheDocument();
-
-    // The grid: the app's own Widgets, loaded as a chunk of their own, each titled as the real one is.
-    for (const title of [
-      'Hauling',
-      'Below-market contracts',
-      'Price watch',
-      'Planetary',
-      'Wallet',
-      'Profit',
-      'Training',
-      'Open orders',
-    ]) {
-      expect(await preview.findByRole('region', { name: title })).toBeInTheDocument();
-    }
-    expect(preview.getByText('48M')).toBeInTheDocument();
-    expect(preview.getByRole('button', { name: /data updated/i })).toBeInTheDocument();
-
-    // The fixed board is gone: no summary strip cells, no folded alerts row.
-    expect(preview.queryByText('Training now')).not.toBeInTheDocument();
-    expect(preview.queryByText('13 unread')).not.toBeInTheDocument();
+    await screen.findByRole('contentinfo');
+    const nav = within(screen.getByRole('navigation', { name: /page sections/i }));
+    expect(nav.getAllByRole('link').map((link) => link.textContent)).toEqual([
+      'Areas',
+      'Away',
+      'Tour',
+      'Trust',
+      'Community',
+      'FAQ',
+    ]);
+    expect(screen.getByText('01 · Areas')).toBeInTheDocument();
+    expect(screen.getByText('06 · FAQ')).toBeInTheDocument();
   });
 
-  it('opens sample alerts from the demo bell, and the demo links nowhere', async () => {
-    const user = userEvent.setup();
+  it('sells the whole app in the hero and under it', async () => {
     renderLogin();
-    const preview = within(await screen.findByRole('group', { name: /logged-in view/i }));
+    await screen.findByRole('contentinfo');
+    expect(screen.getByText(/one desk beside the game for every character you fly/i)).toBeVisible();
+    expect(screen.getByRole('list', { name: 'At a glance' })).toBeInTheDocument();
+    expect(screen.getByText('Industry · PI · Corp')).toBeInTheDocument();
+    expect(screen.getByText('Alerts · game closed')).toBeInTheDocument();
+  });
 
-    await user.click(preview.getByRole('button', { name: /alerts, 5 waiting/i }));
-    const panel = await screen.findByRole('dialog');
-    expect(within(panel).getByText('Order undercut')).toBeInTheDocument();
-    expect(within(panel).getAllByRole('listitem')).toHaveLength(5);
-
-    // A signed-out visitor cannot reach any page the real Widgets link to.
-    expect(preview.queryAllByRole('link')).toHaveLength(0);
+  it('shows the alerts section and the tour with its more-videos link', async () => {
+    renderLogin();
+    expect(
+      await screen.findByRole('heading', { name: /it keeps watching while eve is closed/i })
+    ).toBeInTheDocument();
+    const tour = within(screen.getByRole('region', { name: /watch it work/i }));
+    expect(tour.getByRole('button', { name: /watch the full tour \(5:40\)/i })).toBeInTheDocument();
+    expect(tour.getByRole('link', { name: /more walkthroughs on youtube/i })).toHaveAttribute(
+      'href',
+      YOUTUBE_CHANNEL_URL
+    );
   });
 
   it('renders no unresolved i18n keys anywhere on the page', async () => {
     const { container } = renderLogin();
-    await screen.findByRole('group', { name: /logged-in view/i });
+    await screen.findByRole('contentinfo');
 
-    // An i18next miss renders the key verbatim. Real copy on this page never
-    // contains a dotted path under one of the app's namespaces, so anything
-    // matching is a key that failed to resolve.
-    //
-    // Deliberately no leading : `textContent` runs the DOM's text together,
-    // so the real failure arrived as "...1,234,567,890.12 ISKoverview.queue2m
-    // ago..." — no word boundary in front of the key at all. An anchored
-    // pattern here passes against the very bug this test exists to catch.
     const leaked = (container.textContent ?? '').match(
       /(?:overview|login|skills|notifications|common|nav|settings|market|industry)\.[a-zA-Z][\w.]*/g
     );
@@ -453,7 +376,6 @@ describe('Login', () => {
 
   it('scrolls a cold load straight to the section its hash names', async () => {
     const scrollIntoView = vi.spyOn(Element.prototype, 'scrollIntoView');
-    // The hook reads the hash off the address bar, as BrowserRouter's would be.
     window.history.replaceState({}, '', '/login#login-faq');
     try {
       renderLogin('/login#login-faq');
@@ -476,7 +398,7 @@ describe('Login', () => {
 
   it('never calls the app read-only, since the Base Grant carries write scopes', async () => {
     const { container } = renderLogin();
-    await screen.findByRole('group', { name: /logged-in view/i });
+    await screen.findByRole('contentinfo');
     expect(container.textContent ?? '').not.toMatch(
       /read-only access|it never writes|read-only, and/i
     );
@@ -493,13 +415,6 @@ describe('Login', () => {
     }
   });
 
-  // The guard that matters. Asserting today's phrases appear would only
-  // document the copy; this pins it to `esi/registry.ts`, which is where the
-  // Base Grant actually comes from. The prose had already fallen behind —
-  // it was silently omitting the mining ledger, blueprints, current location
-  // and corporation roles — and an incomplete consent disclosure is the worst
-  // defect this page can carry. Registering a new ungrouped endpoint now
-  // fails here until someone decides how to disclose its scope.
   it('discloses every scope in the Base Grant, and nothing it no longer asks for', () => {
     expect(new Set(Object.keys(BASE_GRANT_PHRASES))).toEqual(new Set(SCOPES));
     for (const scope of Object.keys(WRITE_SCOPE_PHRASES)) expect(SCOPES).not.toContain(scope);
@@ -520,14 +435,6 @@ describe('Login', () => {
     await user.click(firstButton);
     expect(screen.getAllByRole('status').length).toBeGreaterThan(0);
 
-    // The press starts an async chain — a Dexie read, then a `crypto.subtle`
-    // PKCE digest — that ends in `assignLocation`. Asserting the spinner is
-    // the whole point of this test, so it deliberately does not await that
-    // chain's *effect*; but leaving it in flight makes it land during the
-    // next test, after `beforeEach` has cleared the mock, and that test then
-    // counts two navigations instead of one. Settling it here keeps the press
-    // inside the test that made it — this was the intermittent
-    // "expected 1, got 2" in `builds a PKCE authorize URL` below.
     await waitFor(() => expect(assignLocation).toHaveBeenCalledTimes(1));
   });
 
@@ -541,8 +448,6 @@ describe('Login', () => {
       'IntersectionObserver',
       class {
         constructor(cb: typeof report) {
-          // The header's observer is the first one built; the reveal and demo
-          // observers constructed after it must not replace it.
           if (!captured) report = cb;
           captured = true;
           this.mine = report === cb;
@@ -559,7 +464,6 @@ describe('Login', () => {
       const name = { name: /log in with eve online/i };
       await screen.findByRole('contentinfo');
       const before = screen.getAllByRole('button', name).length;
-      // Only the hero's wrapper is watched: the closing call to action does not hide the header's button.
       expect(observed).toHaveLength(1);
       expect(within(screen.getByRole('banner')).queryByRole('button', name)).toBeNull();
       act(() => report([{ target: observed[0], isIntersecting: false }]));

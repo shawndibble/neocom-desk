@@ -1,8 +1,3 @@
-/**
- * Under the Shared Moon Pop event (issue #6225): every corporation sharing moon pops with the
- * pilot, each with a Mute checkbox. A muted corporation stays listed after its pops end, so it
- * can always be unmuted. The list belongs to the account, not to a Character.
- */
 import { useTranslation } from 'react-i18next';
 import { Checkbox } from '@/components/ui';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
@@ -17,7 +12,6 @@ import {
 } from './preferences';
 import { loadSharedPopsCached, sharingCorporationLabel } from './sharedPopsCache';
 
-/** The sharing corporations, plus any already muted, with their names (best-effort). */
 async function loadSharing(): Promise<{ ids: number[]; names: ReadonlyMap<number, string> }> {
   const pops = await loadSharedPopsCached();
   const muted = mutedSharedPopCorporations(useNotificationPreferences.getState().value);

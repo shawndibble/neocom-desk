@@ -7,12 +7,6 @@ import { Facts, StatNote, StatRow, StatRows } from './StatFacts';
 import { joinDetail } from './statKit';
 import { fixed0, fixed1 } from '@/lib/fixedFormat';
 
-/**
- * Mining: each miner type (with its crystal) and mining drone stack, what
- * they mine a cycle and a second, the total an hour, the residue expected on
- * top, and how soon the ore hold — or the cargo hold, on a hull without one —
- * fills.
- */
 export function MiningFacts({
   stats,
   typeName,

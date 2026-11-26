@@ -2,7 +2,6 @@ import { FitGoalModal } from '../FitGoalModal';
 import { MilestoneModal } from '../MilestoneModal';
 import type { useMilestones } from '../useMilestones';
 
-/** The fit-goal picker and the Plan Milestone name dialog, driven by `useMilestones`. */
 export function PlanMilestoneDialogs({
   milestones,
 }: {

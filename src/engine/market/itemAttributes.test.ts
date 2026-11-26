@@ -37,7 +37,7 @@ describe('groupItemAttributes', () => {
     const groups = groupItemAttributes(
       [
         { attribute_id: 9, value: 1200 },
-        { attribute_id: 99999, value: 42 }, // unpublished / unnamed — no dictionary entry
+        { attribute_id: 99999, value: 42 },
       ],
       DICTIONARY
     );
@@ -202,7 +202,6 @@ describe('groupItemAttributes', () => {
       { omitSkillRequirementRows: true }
     );
     expect(groups.some((g) => g.category === 'Required Skills')).toBe(false);
-    // A non-skill attribute in the same payload still renders normally.
     expect(groups.flatMap((g) => g.attributes).some((a) => a.attributeId === 128)).toBe(true);
   });
 });
@@ -298,8 +297,8 @@ describe('collectAttributeIdReferences', () => {
           { attribute_id: 137, value: 483 },
           { attribute_id: 1298, value: 25 },
           { attribute_id: 1632, value: 11 },
-          { attribute_id: 9, value: 1200 }, // a real unit — not a reference
-          { attribute_id: 99999, value: 7 }, // no dictionary entry
+          { attribute_id: 9, value: 1200 },
+          { attribute_id: 99999, value: 7 },
         ],
         DICTIONARY
       )

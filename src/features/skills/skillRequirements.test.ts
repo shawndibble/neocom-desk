@@ -85,7 +85,6 @@ describe('buildSkillRequirements', () => {
   });
 
   it('marks a prereq planned when the plan trains it only on the way to another entry', () => {
-    // Frigate I needs Spaceship Command III, which the plan schedules ahead of it.
     const result = buildSkillRequirements(catalog, new Map(), 2, [
       { skillTypeID: 2, targetLevel: 1 },
     ]);
@@ -126,7 +125,7 @@ describe('buildSkillRequirements', () => {
   it('falls back to #typeID when a referenced skill has no SDE name', () => {
     const withGap = catalogOf(
       [engineSkill({ typeID: 1 }), engineSkill({ typeID: 2, prereqs: [{ typeID: 1, level: 1 }] })],
-      [sdeSkill({ typeID: 2, name: 'Frigate' })] // typeID 1 missing from bySkillTypeID
+      [sdeSkill({ typeID: 2, name: 'Frigate' })]
     );
     const result = buildSkillRequirements(withGap, new Map(), 2);
     expect(result?.prereqs).toEqual([

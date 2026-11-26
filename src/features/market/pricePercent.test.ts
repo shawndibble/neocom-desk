@@ -21,11 +21,6 @@ describe('isValidPricePercent', () => {
     expect(isValidPricePercent(MAX_PRICE_PERCENT + 1)).toBe(false);
   });
 
-  /**
-   * The guard also runs over values pulled from another device, which may
-   * have been written by an older build — `lib/useSyncedSetting.ts` re-parses
-   * for exactly this reason, so it has to reject non-numbers too.
-   */
   it('rejects values that are not finite numbers', () => {
     expect(isValidPricePercent(Number.NaN)).toBe(false);
     expect(isValidPricePercent(Number.POSITIVE_INFINITY)).toBe(false);

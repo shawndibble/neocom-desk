@@ -1,12 +1,3 @@
-/**
- * The public contract offers job for the GitHub Actions runner
- * (`scripts/public-data/contract-offers.mjs`, `.github/workflows/public-data-contract-offers.yml`).
- * It replaces the `syncPublicContractOffers` Cloud Function: same archive join, same R2 objects
- * (`contract-offers/`, the courier snapshot). The four records the function kept in Firestore
- * (archive fingerprint, type hashes, offers state, courier state) live in R2 objects under
- * `contract-offers-state/`, read through the S3 API so a skip never sees a stale CDN copy.
- * Touches no Firestore.
- */
 import { measureContractTypeChanges, type ContractTypeHashes } from './contractTypeChanges.js';
 import {
   accumulateRequestedSide,
@@ -49,11 +40,9 @@ export interface PublicContractOffersDeps {
   get: R2Get;
   put: R2Put;
   now?: () => number;
-  /** Test seam: the archive fetch (loaded lazily, it pulls in the tar and bzip2 readers). */
   archive?: ArchiveModule;
 }
 
-/** A state read that fails is "cannot tell": a full re-upload is the worst case, never a failed run. */
 async function readState<T>(get: R2Get, key: string): Promise<T | null> {
   try {
     return (await get(key)) as T | null;
@@ -67,7 +56,6 @@ function writeState(put: R2Put, key: string, value: unknown): Promise<void> {
   return put(key, JSON.stringify(value), STATE_HEADERS);
 }
 
-/** Folds a thrown error (a state write, say) into a failed outcome so the other snapshot still publishes. */
 async function settle(publish: () => Promise<R2PublishOutcome>): Promise<R2PublishOutcome> {
   try {
     return await publish();
@@ -128,12 +116,6 @@ async function publishCouriers(
   return outcome;
 }
 
-/**
- * Publishes EVE Ref's public-contracts snapshot to R2; false when the archive has not changed
- * since the last complete publish. The fingerprint is read before the download and stored only
- * after a complete publish, so a refresh landing in between (or a failed publish) is picked up
- * next run. Throws when a publish failed.
- */
 export async function publishPublicContractOffers(
   deps: PublicContractOffersDeps
 ): Promise<boolean> {
@@ -152,8 +134,6 @@ export async function publishPublicContractOffers(
   const eligibleContracts = new Map<string, EligibleContract>();
   const rows: PublicContractOfferRow[] = [];
   const courierRows: PublicCourierContractRow[] = [];
-  // An entry per contract asking for something in return; `contract_items.csv` is one stream, so a
-  // requested line can arrive before or after the offered one. Fold as it passes, patch `rows` after.
   const requestedSide = emptyRequestedSide();
   let outstandingCourierContracts = 0;
 
@@ -179,8 +159,6 @@ export async function publishPublicContractOffers(
   applyRequestedSide(rows, requestedSide);
   applyLineCounts(rows);
 
-  // Outstanding against published courier rows is the only tell of rows dropped for a blank
-  // endpoint, reward or volume (EVE Ref leaving a column empty); both counts share one gate.
   console.info('Contract offers sync', {
     eligibleContracts: eligibleContracts.size,
     rowCount: rows.length,
@@ -189,7 +167,6 @@ export async function publishPublicContractOffers(
   });
   eligibleContracts.clear();
 
-  // Telemetry only: how many types change per publish. A failure must not fail the publish.
   let typeHashes: ContractTypeHashes | null = null;
   try {
     const stored = await readState<{ hashes?: ContractTypeHashes }>(deps.get, TYPE_HASHES_R2_KEY);
@@ -202,7 +179,6 @@ export async function publishPublicContractOffers(
   }
 
   const lastSyncedAt = now();
-  // Courier first: one small object, so a slow offers upload cannot starve it of the time budget.
   const courier = await settle(() => publishCouriers(deps, courierRows, lastSyncedAt));
   const offers = await settle(() => publishOffers(deps, rows, lastSyncedAt));
   if (typeHashes !== null) {

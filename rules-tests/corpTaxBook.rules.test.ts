@@ -17,8 +17,6 @@ import {
 } from 'firebase/firestore';
 import { characterAuth, createRulesEnv } from './testEnv';
 
-// Corp Tax Book (issue #4061, ADR 0023). A mistake here leaks one corp's
-// mining ledger to another, or lets a demoted officer keep reading it.
 let env: RulesTestEnvironment;
 
 const CORP = 'corps/98000001';
@@ -58,7 +56,6 @@ beforeEach(async () => {
     await setDoc(doc(db, `${CORP}/observed/a`), { uid: 'char:2', characterId: 2, quantity: 5 });
     await setDoc(doc(db, `${CORP}/observed/b`), { uid: 'char:3', characterId: 3, quantity: 7 });
     await setDoc(doc(db, `${CORP}/payments/p1`), { uid: 'char:2', amount: 1 });
-    // An alt's donation: its Miner's other characters do not read it (no copied readers).
     await setDoc(doc(db, `${CORP}/payments/p2`), {
       uid: 'char:8',
       minerId: 'm1',
@@ -70,13 +67,10 @@ beforeEach(async () => {
       verifyToken: 't',
     });
     await setDoc(doc(db, `${CORP}/statementLinks/s1`), { verifyToken: 't' });
-    // Late notices, their links and the Running accounts, a Miner's readable with its snapshot
-    // (decision 20261120-235011).
     await setDoc(doc(db, `${CORP}/lateNotices/n1`), { minerId: 'm1', uids: ['char:2', 'char:9'] });
     await setDoc(doc(db, `${CORP}/lateNoticeLinks/n1`), { token: 't' });
     await setDoc(doc(db, `${CORP}/accounts/m1`), { minerId: 'm1', snapshot: {}, uids: ['char:2'] });
     await setDoc(doc(db, `${CORP}/accounts/m3`), { minerId: 'm3', snapshot: {}, uids: ['char:3'] });
-    // No snapshot yet: no readers but the officers.
     await setDoc(doc(db, `${CORP}/accounts/m4`), { minerId: 'm4', owed: 1 });
     await setDoc(
       doc(db, `${CORP}/officers/char:6`),
@@ -86,7 +80,6 @@ beforeEach(async () => {
     await setDoc(doc(db, `${CORP}/miners/m1`), { uids: ['char:2'], characterIds: [2] });
     await setDoc(doc(db, `${CORP}/audit/e1`), { action: 'sync' });
     await setDoc(doc(db, `${CORP}/extractions/x1`), { moonId: 1 });
-    // A moon owner's Extraction (#6097) is tagged with its corporation; same officer-only read.
     await setDoc(doc(db, `${CORP}/extractions/x2`), { moonId: 2, sourceCorporationId: 98000002 });
     await setDoc(doc(db, `${CORP}/moonDocs/x1`), { extractionId: 'x1', minerCount: 1 });
     await setDoc(doc(db, `${CORP}/readModels/minerList`), { schema: 1, miners: [] });

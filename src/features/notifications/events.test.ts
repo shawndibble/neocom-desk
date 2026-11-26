@@ -123,17 +123,6 @@ describe('NOTIFICATION_EVENTS', () => {
     );
   });
 
-  /**
-   * The issue's explicit ask: "Both channels on by default is right here,
-   * but express it deliberately... so the contrast with the EVE-type default
-   * is intentional and documented" (issue #299). This is that contrast, made
-   * executable rather than only prose in a comment: every corp event reads
-   * both-on from a character with no stored preference at all, on the same
-   * "absence means enabled" path every other ordinary event uses
-   * (`eventSelection.ts`) — never `eveNotification`'s per-type
-   * feed-on/browser-off default, which numerous, mostly-informational types
-   * need and these five rare, high-stakes ones do not.
-   */
   it('defaults both channels on for a corp event with no stored preference, unlike an EVE type', () => {
     const corpEventIds = NOTIFICATION_EVENTS.filter((e) => e.corpCapability !== undefined).map(
       (e) => e.id
@@ -150,19 +139,10 @@ describe('NOTIFICATION_EVENTS', () => {
       expect(isEventEnabledFor({}, eventId, 'browser'), eventId).toBe(true);
       expect(isEventEnabledFor({}, eventId, 'feed'), eventId).toBe(true);
     }
-    // The contrast: an EVE-native type with no stored preference defaults to
-    // feed-on/browser-off, not both-on.
     expect(isEveTypeEnabledFor({}, 'BillOutOfMoneyMsg', 'browser')).toBe(false);
     expect(isEveTypeEnabledFor({}, 'BillOutOfMoneyMsg', 'feed')).toBe(true);
   });
 
-  /**
-   * priceAlertTriggered (issue #680) needs no ESI OAuth scope at all —
-   * pricing is the public Fuzzwork aggregate path and the Quickbar list is
-   * local Dexie data — so it is the one event this catalog leaves `scope`
-   * unset for, rather than borrowing an unrelated scope as a fake gate
-   * (`20260909-192510-quickbar-price-alerts-re-arm-key-hub-price.md`).
-   */
   it('gives priceAlertTriggered no scope, since it needs no ESI grant', () => {
     const event = NOTIFICATION_EVENTS.find((e) => e.id === 'priceAlertTriggered');
     expect(event?.scope).toBeUndefined();

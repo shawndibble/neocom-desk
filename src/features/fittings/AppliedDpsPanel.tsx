@@ -1,8 +1,3 @@
-/**
- * The Applied DPS stats section (issue #1546): the Target Profile picker, an
- * optional second Fitting to overlay, the raw-vs-applied summary, and the
- * lazily loaded graphs. Raw DPS never moves with the profile; applied does.
- */
 import { lazy, Suspense, useMemo } from 'react';
 import { guarded } from '@/app/routeChunks';
 import { useTranslation } from 'react-i18next';
@@ -87,7 +82,6 @@ function OverlayPicker({ overlay }: { overlay: OverlayFitting }) {
   );
 }
 
-/** The applied-DPS inputs, with the unheated ones beside them under "Overheat all". */
 interface AppliedFigures {
   applied: AppliedDpsInputs;
   unheated: AppliedFigures | null;
@@ -102,14 +96,10 @@ export function AppliedDpsPanel({
   overlay,
 }: {
   applied: AppliedDpsInputs;
-  /** Under "Overheat all", the same inputs unheated — the summary reads heated only where heat changed it. */
   unheatedApplied?: AppliedDpsInputs | null;
-  /** Active turrets/launchers with no charge loaded — why `applied.weapons` may be empty. */
   chargelessWeaponCount: number;
-  /** A spool weapon is fitted: its figures here are fully spooled. */
   hasSpoolWeapons?: boolean;
   targetProfiles: TargetProfiles;
-  /** Absent where there's no Character to have saved Fittings (the Fitting Share Code view). */
   overlay?: OverlayFitting;
 }) {
   const { t } = useTranslation();
@@ -140,8 +130,6 @@ export function AppliedDpsPanel({
     unheated: unheatedApplied ? { applied: unheatedApplied, unheated: null } : null,
   };
   const maxRange = graphMaxRange(overlayResult ? [applied, overlayResult.applied] : [applied]);
-  // Each side at its own best range, as the summary would read it; worked out
-  // once per input set rather than on every render (and every HeatFigure pass).
   const summaries = useMemo(() => {
     const read = (inputs: AppliedDpsInputs) => {
       const atRange = bestRange(appliedDpsVsRange(inputs, target, maxRange));

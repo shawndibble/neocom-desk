@@ -19,8 +19,6 @@ vi.mock('@/features/contractSearch/characterRegion', () => ({
   loadCharacterRegionId: (characterId: number) => loadCharacterRegionId(characterId),
 }));
 
-// The jump graph is a route concern with its own tests; here it would only
-// add an async settle to every case.
 vi.mock('@/features/route/localRoute', () => ({
   localJumpCountsForRoutes: vi.fn(async () => ({ kind: 'unknown' })),
 }));
@@ -38,14 +36,11 @@ function endpoint(regionId: number, name: string): CourierEndpoint {
     regionId,
     security: 0.9459,
     space: 'highsec',
-    // A plain named NPC station with gates: nothing here is about the scam
-    // markers (#944), so both ends stay unremarkable.
     resolution: 'station',
     hasStargates: true,
   };
 }
 
-/** One haul out of The Forge — so The Forge is the only origin region on offer. */
 const ROWS: readonly CourierRouteRow[] = [
   {
     contractId: 1,
@@ -65,11 +60,6 @@ const REGION_NAMES = new Map([
   [DOMAIN, 'Domain'],
 ]);
 
-/**
- * Phone width, where `FilterBar` swaps the inline row for a sheet — a modal
- * that unmounts on close, unlike the pointer-width row.
- */
-/** Every `FilterBar` keeps its controls behind the funnel, so open it first. */
 async function openFilters(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByRole('button', { name: /^Filters/ }));
 }
@@ -84,7 +74,6 @@ function renderBoard(characterId = CHARACTER_ID, initialEntries: string[] = ['/'
 
 const myRegionButton = () => screen.getByRole('button', { name: 'From my region' });
 
-/** The shortcut is a row inside the From region picker: open the picker first if it is closed. */
 async function pressMyRegion(user: ReturnType<typeof userEvent.setup>) {
   if (!screen.queryByRole('button', { name: 'From my region' })) {
     await user.click(screen.getByRole('combobox', { name: 'From region' }));
@@ -95,8 +84,6 @@ async function pressMyRegion(user: ReturnType<typeof userEvent.setup>) {
 beforeEach(() => {
   loadCharacterRegionId.mockReset();
   vi.mocked(localJumpCountsForRoutes).mockResolvedValue({ kind: 'unknown' });
-  // Pre-hydrated to no restriction: a change one case makes (e.g. the region
-  // shortcut) must never leak into the next as a remembered default (issue #1719).
   useCourierFilterPref.setState({ value: DEFAULT_COURIER_FILTER, hydrated: true });
 });
 
@@ -180,8 +167,6 @@ describe('CourierResults "From my region" shortcut', () => {
   });
 
   it('asks once however fast it is pressed twice', async () => {
-    // Deferred on purpose: an implementation with no in-flight guard passes a
-    // test whose mock has already settled by the second click.
     let release: (regionId: number) => void = () => {};
     loadCharacterRegionId.mockReturnValue(
       new Promise<number | null>((resolve) => {
@@ -217,7 +202,6 @@ describe('CourierResults "From my region" shortcut', () => {
   });
 
   it('never sets a region the dropdown has no option for, and says why', async () => {
-    // The character is in Domain; no haul in the snapshot starts there.
     loadCharacterRegionId.mockResolvedValue(DOMAIN);
     const user = userEvent.setup();
     renderBoard();
@@ -231,8 +215,6 @@ describe('CourierResults "From my region" shortcut', () => {
   });
 
   it('goes quietly unavailable when the location cannot be resolved', async () => {
-    // What a character whose grant predates the location scope gets: a 403 the
-    // loader reports as `null`, never a re-auth banner.
     loadCharacterRegionId.mockResolvedValue(null);
     const user = userEvent.setup();
     renderBoard();
@@ -243,8 +225,6 @@ describe('CourierResults "From my region" shortcut', () => {
     await waitFor(() =>
       expect(screen.getByRole('button', { name: 'From my region' })).toBeDisabled()
     );
-    // A reason, not a banner: a dead control with no explanation reads as broken. Waited for: the
-    // button disables a render before both places that say why have the text.
     await waitFor(() =>
       expect(screen.getAllByText('Your current location is unavailable')).toHaveLength(2)
     );
@@ -253,8 +233,6 @@ describe('CourierResults "From my region" shortcut', () => {
   });
 
   it('keeps the answer when the filter bar is collapsed and reopened', async () => {
-    // `FilterBar` unmounts its controls on collapse, so an answer held inside
-    // the control itself would be re-asked — and re-charged — on every reopen.
     loadCharacterRegionId.mockResolvedValue(THE_FORGE);
     const user = userEvent.setup();
     renderBoard();
@@ -262,8 +240,8 @@ describe('CourierResults "From my region" shortcut', () => {
     await pressMyRegion(user);
     await waitFor(() => expect(loadCharacterRegionId).toHaveBeenCalledTimes(1));
 
-    await openFilters(user); // collapse
-    await openFilters(user); // reopen
+    await openFilters(user);
+    await openFilters(user);
     await pressMyRegion(user);
 
     expect(loadCharacterRegionId).toHaveBeenCalledTimes(1);
@@ -284,7 +262,6 @@ describe('CourierResults "From my region" shortcut', () => {
       </MemoryRouter>
     );
 
-    // The previous character's "no hauls start there" must not survive them.
     await waitFor(() => expect(myRegionButton()).toBeEnabled());
     await pressMyRegion(user);
     await waitFor(() =>
@@ -315,7 +292,6 @@ describe('CourierResults "From my region" shortcut', () => {
 
 const AMARR_SYSTEM = 30002187;
 
-/** Amarr, as its own system: `endpoint()` above puts Jita at both ends. */
 function amarr(): CourierEndpoint {
   return {
     ...endpoint(DOMAIN, 'Amarr VIII'),
@@ -340,12 +316,6 @@ function laneRow(contractId: number, reward: number, volume: number): CourierRou
   };
 }
 
-/**
- * A lane with a going rate: `corpusGoingRate` refuses a median under twenty
- * rates, so twenty ordinary hauls set it and one small parcel pays far above
- * it — the bait shape the over-rate marker exists for. Two more hauls on a
- * second lane (Amarr → Jita), so a board has more than one lane to count.
- */
 const ORDINARY_LANE = Array.from({ length: 20 }, (_, index) =>
   laneRow(100 + index, 10_000_000 + index * 100_000, 10_000)
 );
@@ -357,7 +327,6 @@ const RETURN_LANE: CourierRouteRow[] = [200, 201].map((contractId) => ({
 }));
 const LANE_ROWS = [...ORDINARY_LANE, BAIT, ...RETURN_LANE];
 
-/** Every haul 9 jumps, so the board has distances and the corpus a median. */
 function knownJumps() {
   vi.mocked(localJumpCountsForRoutes).mockImplementation(async (routes) => ({
     kind: 'known',
@@ -386,8 +355,6 @@ describe('CourierResults route cell', () => {
     );
     const route = within(screen.getAllByRole('row')[1]).getAllByRole('cell')[0];
 
-    // Rounded the way the game shows it (0.9459 → 0.9), then the region.
-    // jsdom's `textContent` has no layout spacing, so adjacency is the order.
     expect(route.textContent).toMatch(/Jita0\.9The Forge/);
     expect(route.textContent).toMatch(/Amarr1\.0Domain/);
     expect(route).not.toHaveTextContent('Highsec');
@@ -475,11 +442,9 @@ describe('CourierResults ISK/jump cell', () => {
       return row as HTMLElement;
     });
     const multiple = within(baitRow).getByText(/x going rate$/);
-    // Not colour alone: the flagged multiple carries a glyph and a screen-reader label.
     expect(multiple.querySelector('svg')).not.toBeNull();
     expect(within(multiple).getByText('Over rate')).toHaveClass('sr-only');
 
-    // An ordinary haul on the same lane carries the multiple with neither.
     const ordinaryRow = document.querySelector('tr[data-row-key="100"]') as HTMLElement;
     const ordinary = within(ordinaryRow).getByText(/x going rate$/);
     expect(ordinary.querySelector('svg')).toBeNull();
@@ -517,9 +482,7 @@ describe('CourierResults on a phone', () => {
 
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
     expect(toggle).toHaveTextContent('21 hauls · The Forge → Domain');
-    // 60M over 9 jumps — the group's maximum, whatever the members sort by.
     await waitFor(() => expect(toggle).toHaveTextContent(/6\.7M \/J best/));
-    // Collapsed means not rendered: none of the lane's hauls is a row yet.
     expect(document.querySelector('tr[data-row-key="999"]')).toBeNull();
   });
 
@@ -527,10 +490,8 @@ describe('CourierResults on a phone', () => {
     renderLanes();
     const toggle = await laneToggle();
 
-    // A folded lane must never hide the scam signal inside it.
     await waitFor(() => expect(within(toggle).getByText('Over rate')).toBeInTheDocument());
     expect(within(toggle).getByText('Over rate').className).toMatch(/warning/);
-    // The return lane pays the going rate, so its header carries no marker.
     const back = screen.getByRole('button', { name: /^Amarr.*→ Jita/ });
     expect(within(back).queryByText('Over rate')).not.toBeInTheDocument();
   });
@@ -545,7 +506,6 @@ describe('CourierResults on a phone', () => {
   });
 
   it('counts hauls and lanes over every row the filters kept', async () => {
-    // 60 hauls on one lane plus the two-haul return lane.
     const many = Array.from({ length: 60 }, (_, index) =>
       laneRow(1_000 + index, 10_000_000, 10_000)
     );
@@ -576,10 +536,8 @@ describe('CourierResults on a phone', () => {
       </MemoryRouter>
     );
 
-    // No pre-grouping cap on phone: the lane's true count shows immediately.
     expect(await laneToggle()).toHaveTextContent('60 hauls');
     expect(screen.getByRole('button', { name: /^Amarr.*→ Jita/ })).toHaveTextContent('2 hauls');
-    // Nothing left to reveal, so the cap-lifting control has no reason to show.
     expect(screen.queryByRole('button', { name: /^Show all/ })).not.toBeInTheDocument();
   });
 });
@@ -629,14 +587,9 @@ describe('CourierResults remembered filter (issue #1719)', () => {
     await openFilters(user);
     await user.type(screen.getByLabelText('Max collateral'), '1');
 
-    // `routeQuery` has no field on the stored shape at all — see `courierFilterPref.ts`.
     expect(useCourierFilterPref.getState().value).not.toHaveProperty('routeQuery');
     expect(useCourierFilterPref.getState().value).not.toHaveProperty('pref');
   });
-
-  // Which field an edit reaches, and that an untouched one never crosses
-  // between the URL and the remembered filter, is `useRememberedUrlParams`'
-  // own contract — tested in `lib/useUrlState.test.tsx`.
 });
 
 describe('CourierResults ISK filters', () => {
@@ -654,7 +607,6 @@ describe('CourierResults ISK filters', () => {
     renderBoard();
     await openFilters(user);
     const field = screen.getByRole('textbox', { name: 'Min reward' });
-    // The one haul pays 5,000,000: 10m excludes it, 5m keeps it.
     await user.type(field, '10m');
     expect(screen.queryAllByText(/Jita/)).toHaveLength(0);
     await user.clear(field);

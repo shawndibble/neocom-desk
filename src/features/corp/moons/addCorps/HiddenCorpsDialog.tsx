@@ -5,11 +5,6 @@ import { CorpRow } from './CorpRow';
 
 const k = (key: string) => `corpTaxBook.moons.addCorps.hidden.${key}`;
 
-/**
- * Opened only from the picker's "Hidden corps (N)" button, never shown on the
- * page: a corp dismissed with "Don't ask again" stays out of the banner and the
- * picker until it is added back here.
- */
 export function HiddenCorpsDialog({
   corps,
   onAdd,

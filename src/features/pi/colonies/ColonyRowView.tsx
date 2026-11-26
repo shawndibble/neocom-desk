@@ -50,7 +50,6 @@ function Meter({
 }: {
   fraction: number | null;
   tone: 'success' | 'warning' | 'danger' | 'accent';
-  /** The part of the track the colony loses to a stall, drawn as a faint fill after the bar. */
   rest?: 'stall';
 }) {
   const fill = {
@@ -74,7 +73,6 @@ function Meter({
   );
 }
 
-/** A translated line whose `<isk/>` slot is an `IskAmount` (shorthand, exact on hover/focus/screen reader). */
 function iskTrans(
   t: TFunction,
   i18nKey: string,
@@ -91,11 +89,6 @@ function iskTrans(
   );
 }
 
-/**
- * `label` sits inside a Button, where a focusable `IskAmount` cannot go, so it
- * keeps shorthand and `labelGain` carries the figure for the exact reveal.
- * `note` is plain text and renders the figure as `IskAmount`.
- */
 function actionText(
   action: PrimaryAction,
   t: TFunction
@@ -259,18 +252,9 @@ function FaultTags({ tags, planetName }: { tags: readonly FaultTag[]; planetName
   );
 }
 
-/**
- * The row grid from `lg`: colony, extractors, storage, next step, ⋮. The ⋮
- * column has a fixed width so `ColonyListHeader`'s labels sit over the cells. At 1024
- * Colony gets the width Next step (a button and a note) doesn't need.
- */
 const ROW_GRID =
   'lg:grid-cols-[minmax(0,16rem)_minmax(0,1fr)_minmax(0,1fr)_9rem_2.25rem] min-[82rem]:grid-cols-[minmax(0,17rem)_minmax(0,1fr)_minmax(0,1fr)_13rem_2.25rem]';
 
-/**
- * A column's label and help. In a row (`inRow`) the list header shows both from `lg`,
- * so the row keeps the label for screen readers only; below `lg` the row shows both.
- */
 function ColumnLabel({
   label,
   help,
@@ -291,7 +275,6 @@ function ColumnLabel({
   );
 }
 
-/** Column labels, once above the rows from `lg`; a narrower row is a stacked card that labels its own cells. */
 export function ColonyListHeader({ haulHours }: { haulHours: number }) {
   const { t } = useTranslation();
   return (
@@ -321,19 +304,13 @@ export interface ColonyRowViewProps {
   productNames: ReadonlyMap<number, string>;
   schematicNames: ReadonlyMap<number, string>;
   expanded: boolean;
-  /** Called with `row.key`: one stable handler serves every row, so `memo` holds. */
   onToggle: (key: string) => void;
   onExpand: (key: string) => void;
-  /** The one filled button on the page: the first row, when its action is real. */
   primary: boolean;
-  /** The active Character's colony: it has a Plan card to link to. */
   own: boolean;
-  /** Another Character's colony: a menu entry that makes them the active Character. */
   switchTo?: { name: string; characterId: number };
-  /** Stable handler for `switchTo`; called with its `characterId`. */
   onSwitch?: (characterId: number) => void;
   haulLabel: string;
-  /** Pulse the row: the colony an Overview row's `?highlight=` named. Own colonies only. */
   highlighted?: boolean;
 }
 
@@ -345,7 +322,6 @@ const BUTTON_VARIANT: Record<CheckStatus, 'danger' | 'accent' | 'ghost'> = {
   healthy: 'accent',
 };
 
-/** Memoised: a list of these re-renders only the rows whose props changed. */
 export const ColonyRowView = memo(function ColonyRowView(props: ColonyRowViewProps) {
   const { row, planet, detail, pi, nowMs, planetName, expanded } = props;
   const { t } = useTranslation();
@@ -453,7 +429,6 @@ export const ColonyRowView = memo(function ColonyRowView(props: ColonyRowViewPro
           {t('pi.altColonies.switchTo', { name: props.switchTo.name })}
         </MenuItem>
       )}
-      {/* The product name opens its PI detail (§6c "Entities", Overrides): Market and Show info move here. */}
       {shownProductId !== null && productName !== null && (
         <>
           <ViewInMarketMenuItem typeId={shownProductId} />
@@ -473,9 +448,6 @@ export const ColonyRowView = memo(function ColonyRowView(props: ColonyRowViewPro
       <RowActionsMenu name={planetName} items={menu} linksKeepBrowserMenu>
         <div
           {...holdGuard.handlers}
-          // A pointer convenience: the real controls are the toggle button, the
-          // action and the ⋮ menu. A click on a link or button inside is theirs,
-          // and a finger lifting off a hold that opened the menu is the menu's.
           onClick={(event) => {
             if (holdGuard.swallowClick(event)) return;
             const target = event.target as HTMLElement;
@@ -485,7 +457,6 @@ export const ColonyRowView = memo(function ColonyRowView(props: ColonyRowViewPro
           }}
           className={`relative grid cursor-pointer gap-x-4 gap-y-2 px-3 py-2 hover:bg-panel-2 lg:py-3 lg:items-start ${ROW_GRID}`}
         >
-          {/* Inside the trigger's div: the trigger needs a DOM child, and the menu's portal stays out of the tap context. */}
           <RowTappableContext.Provider value>
             <div className="flex min-w-0 items-start gap-2.5 max-lg:pr-11">
               <button
@@ -503,13 +474,11 @@ export const ColonyRowView = memo(function ColonyRowView(props: ColonyRowViewPro
               <div className="min-w-0 space-y-1">
                 <h3 className="flex flex-wrap items-baseline gap-x-2 text-sm leading-tight font-semibold">
                   <SystemLink systemId={row.systemId}>{planetName}</SystemLink>
-                  {/* A stopped colony's red bar, time and Restart button say so; the word stays for screen readers only. */}
                   <span className={stopped ? 'sr-only' : 'text-xs font-normal'}>
                     <span className="sr-only">{t('piColonies.statusLabel')} </span>
                     <StatusWord status={row.status} />
                   </span>
                 </h3>
-                {/* Inline text, not flex: a long name wraps by word and the type stays on its last line. */}
                 <p className="min-w-0 text-xs text-text-dim">
                   {(extractorProductId !== null || outputId !== null) && (
                     <span className="mr-1.5 inline-flex items-center gap-x-1.5 align-middle">
@@ -550,7 +519,6 @@ export const ColonyRowView = memo(function ColonyRowView(props: ColonyRowViewPro
                   {extractorRight}
                 </span>
               </div>
-              {/* No extractors, no bar: an empty track would read as "empty". */}
               {extractor.expiryMs !== null && (
                 <Meter fraction={stopped ? 1 : extractor.remainingFraction} tone={extractorTone} />
               )}
@@ -576,7 +544,6 @@ export const ColonyRowView = memo(function ColonyRowView(props: ColonyRowViewPro
                   {storageRight}
                 </span>
               </div>
-              {/* Bar only when storage fills before the haul: a full "fine" bar looks full, an unknown one empty. */}
               {storageFraction !== null && (
                 <Meter
                   fraction={storageFraction}

@@ -317,10 +317,8 @@ describe('loadUniverseType', () => {
     await db.esiCache.put({ characterId: 0, key: 'universeType:9899', value: type, fetchedAt: 42 });
     server.use(http.get(`${ESI_BASE_URL}/universe/types/9899`, () => HttpResponse.error()));
 
-    // A lapsed game constant is served at once while the refresh runs behind it…
     expect((await loadUniverseType(9899))?.data).toEqual(type);
 
-    // …and once that refresh has failed, the next read says it is a fallback.
     await vi.waitFor(async () => {
       expect(await loadUniverseType(9899)).toEqual({
         data: type,
@@ -332,11 +330,6 @@ describe('loadUniverseType', () => {
   });
 
   it('retries once on a transient failure with nothing cached, rather than silently returning null', async () => {
-    // No batch to fall back to here (unlike typeNames.ts's POST
-    // /universe/names): a single implant type type failing used to drop
-    // that implant's name (reads "#12345") and its whole attribute bonus
-    // (the character's sheet then looks "impossible" instead of merely
-    // under-read) with nothing on screen saying why.
     let requests = 0;
     server.use(
       http.get(`${ESI_BASE_URL}/universe/types/10209`, () => {
@@ -373,15 +366,6 @@ describe('loadUniverseType', () => {
   });
 
   it('is not poisoned by typeNames.ts caching a plain string under the same-looking key', async () => {
-    // typeNames.ts (features/character/typeNames.ts) resolves item names for
-    // Wallet/Orders/Assets/Corp/Clones and caches each one as a plain string
-    // under `type:${id}` in the same esiCache table. Visiting any of those
-    // views for this same implant type before Skills.tsx ever loaded it live
-    // used to leave `db.esiCache` at key `type:10209` holding a bare string —
-    // loadUniverseType read it back as `CachedResult<UniverseType>`, so
-    // `.data.name` and `.data.dogma_attributes` were both `undefined` even
-    // though the row was "fresh". loadUniverseType now writes under
-    // `universeType:${id}` instead, so the two caches can't collide.
     await db.esiCache.put({
       characterId: 0,
       key: 'type:10209',
@@ -408,14 +392,6 @@ describe('loadUniverseType', () => {
   });
 
   it('collapses concurrent lookups of the same typeId onto one live ESI call (issue #405 batching)', async () => {
-    // #405 asks that implant type lookups be batched rather than one ESI call
-    // per implant. There's no ESI batch endpoint returning full type +
-    // dogma_attributes data (only POST /universe/names, names only), so the
-    // achievable version of that ask is: two callers racing on the SAME
-    // typeId (e.g. Skills.tsx and loadImplantBonuses both wanting 10209 at
-    // once) must not issue two live requests. cache.ts's `withDedupe`
-    // already collapses this for any STALE_AFTER.static key — this locks
-    // that guarantee in for universeType specifically.
     let requests = 0;
     server.use(
       http.get(`${ESI_BASE_URL}/universe/types/10209`, async () => {

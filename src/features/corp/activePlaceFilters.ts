@@ -8,7 +8,6 @@ import type { LedgerLabels } from '@/features/corp/assetLedgerView';
 import type { ActiveFilter } from '@/components/ui';
 import type { Translate } from '@/lib/translate';
 
-/** The by-item filters' draft: the three the funnel holds (search, group-by and Below target sit outside it). */
 export interface PlaceFilter {
   loc: number | null;
   div: number | null;
@@ -16,11 +15,6 @@ export interface PlaceFilter {
   bp: BlueprintKind;
 }
 
-/**
- * The funnel's filters that are on, as `FilterBar` pills: where first, then
- * what. A place reads as its chip name ("Efa"), as the ledger's chips do, so a
- * long station name does not crowd out the other pills.
- */
 export function activePlaceFilters(
   filter: PlaceFilter,
   {

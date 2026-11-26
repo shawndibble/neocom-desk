@@ -12,16 +12,9 @@ const NO_HITS: readonly WarAgainstMe[] = [];
 
 export interface WarsAgainstAccount {
   wars: readonly WarAgainstMe[];
-  /** How many distinct corporations the account's Characters are in. */
   corporations: number;
 }
 
-/**
- * The wars still running against any corporation (or alliance) the account's
- * Characters are in: the active Character's own first, then the rest, each
- * newest first with the active ones ahead of any not yet started. Empty while
- * loading, offline, or while no corporation is known yet.
- */
 export function useWarsAgainstMe(characterId: number): WarsAgainstAccount {
   const now = useNow();
   const infoById = usePublicInfo((state) => state.byCharacterId);
@@ -36,7 +29,6 @@ export function useWarsAgainstMe(characterId: number): WarsAgainstAccount {
     void loadPublicInfo(characterId);
   }, [characterId, loadPublicInfo]);
 
-  // The alliance comes from public info; one batched read covers every other Character.
   const otherIds = characters
     .map((character) => character.characterId)
     .filter((id) => id !== characterId);
@@ -52,7 +44,6 @@ export function useWarsAgainstMe(characterId: number): WarsAgainstAccount {
         if (!cancelled) setListed(next.length === 0 ? NONE : next);
       });
     load();
-    // A page left open must neither keep a stale list nor miss a new one.
     const timer = setInterval(load, ACTIVE_WARS_POLL_MS);
     return () => {
       cancelled = true;
@@ -60,8 +51,6 @@ export function useWarsAgainstMe(characterId: number): WarsAgainstAccount {
     };
   }, []);
 
-  // A war-declared Alert asks ESI for the newest wars, so the banner does not
-  // wait for the next sweep; the sweep's list covers pilots with no Alerts.
   useEffect(() => {
     if (!noticed) return;
     let cancelled = false;
@@ -79,7 +68,6 @@ export function useWarsAgainstMe(characterId: number): WarsAgainstAccount {
 
   const wars = useMemo(() => {
     if (recent.length === 0) return listed;
-    // The fresher read of a war wins over the list's copy.
     const byId = new Map(listed.map((war) => [war.id, war]));
     for (const war of recent) byId.set(war.id, war);
     return [...byId.values()];
@@ -90,7 +78,6 @@ export function useWarsAgainstMe(characterId: number): WarsAgainstAccount {
     const byCorp = new Map<number, WarEntityIds>();
     for (const id of [characterId, ...othersKey.split(',').filter(Boolean).map(Number)]) {
       const info = infoById[id];
-      // The stored record knows the corporation without a fetch; public info adds the alliance.
       const corporationId = info?.corporationId ?? storedCorp.get(id);
       if (corporationId === undefined) continue;
       const known = byCorp.get(corporationId);
@@ -98,7 +85,6 @@ export function useWarsAgainstMe(characterId: number): WarsAgainstAccount {
         byCorp.set(corporationId, { corporationId, allianceId: info?.allianceId });
       else known.allianceId ??= info?.allianceId;
     }
-    // Map order is insertion order: the active Character's corporation stays first.
     return [...byCorp.values()];
   }, [characterId, characters, othersKey, infoById]);
 

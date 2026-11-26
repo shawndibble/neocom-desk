@@ -11,15 +11,15 @@ import type { DscanRow } from './parsePilotPaste';
 
 const SHIP = 6;
 const INFO: Record<number, DscanTypeInfo> = {
-  1: { groupId: 543, categoryId: SHIP }, // Mackinaw (Exhumer)
-  2: { groupId: 941, categoryId: SHIP }, // Orca
-  3: { groupId: 100, categoryId: 18 }, // Combat drone
-  4: { groupId: 26, categoryId: SHIP }, // Cruiser
-  5: { groupId: 28, categoryId: SHIP }, // Industrial
-  6: { groupId: 832, categoryId: SHIP }, // Logistics
-  7: { groupId: 547, categoryId: SHIP }, // Carrier
-  8: { groupId: 1657, categoryId: 65 }, // Citadel
-  9: { groupId: 29, categoryId: SHIP }, // Capsule
+  1: { groupId: 543, categoryId: SHIP },
+  2: { groupId: 941, categoryId: SHIP },
+  3: { groupId: 100, categoryId: 18 },
+  4: { groupId: 26, categoryId: SHIP },
+  5: { groupId: 28, categoryId: SHIP },
+  6: { groupId: 832, categoryId: SHIP },
+  7: { groupId: 547, categoryId: SHIP },
+  8: { groupId: 1657, categoryId: 65 },
+  9: { groupId: 29, categoryId: SHIP },
 };
 
 const row = (typeId: number, distanceKm: number | null, name = '', typeName = ''): DscanRow => ({
@@ -30,7 +30,6 @@ const row = (typeId: number, distanceKm: number | null, name = '', typeName = ''
 });
 
 describe('roleOfType', () => {
-  // One line per pinned group id, so a wrong id fails by name.
   const cases: [string, number, number, string][] = [
     ['Exhumer', 543, SHIP, 'industrial'],
     ['Mining Barge', 463, SHIP, 'industrial'],
@@ -164,8 +163,6 @@ describe('laneOffset', () => {
 describe('ORE hulls', () => {
   const read = <T>(file: string): T => JSON.parse(readFileSync(`public/data/${file}`, 'utf8')) as T;
 
-  // ORE builds no combat ship, but some hulls share a group with combat ones
-  // (the Pioneer is a Destroyer), so those are pinned by type id.
   it.each([
     ['Pioneer', 89240, 420],
     ['Pioneer Consortium Issue', 89647, 420],
@@ -189,9 +186,8 @@ describe('ORE hulls', () => {
     expect(roleOfType({ typeId: 1, groupId: 5087, categoryId: SHIP }, '')).toBeNull();
   });
 
-  // Fails when CCP adds an ORE hull: pin its type id above.
   it('files every ORE hull in the Ship Tree under industrial or transport', () => {
-    const ORE = 500014; // ORE faction id
+    const ORE = 500014;
     const tree = read<{ ships: { typeID: number; name: string; factionID: number }[] }>(
       'shipTree.json'
     );

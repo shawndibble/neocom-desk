@@ -1,8 +1,3 @@
-/**
- * Stage 2 sandbox data: contracts, mail, calendar, contacts, and the names that make every
- * generated id read as a person or corporation instead of "Unknown 91000003". Plugged into
- * `installPersonalEsi` (personalEsi.ts), which owns the route registration.
- */
 import playerGroups from './playerGroups.json' with { type: 'json' };
 import {
   CHARACTER_ID,
@@ -29,11 +24,9 @@ const PILOTS = [
   'Juno Castellan',
 ];
 const CORPS = ['Hedion Haulers', 'Sebiestor Salvage', 'Pator Mining Co', 'Outer Ring Traders'];
-/** First id of the generated pilots (the wallet journal's counterparties use the same range). */
 const PILOT_BASE = 91_000_000;
 const CORP_BASE = 92_000_000;
 
-/** id -> display name for POST /universe/names; every generated id the sandbox shows. */
 export function nameFor(
   id: number
 ): { name: string; category: 'character' | 'corporation' | 'alliance' | 'station' } | undefined {
@@ -45,10 +38,8 @@ export function nameFor(
     return { name: PILOTS[id - PILOT_BASE], category: 'character' };
   if (id >= CORP_BASE && id < CORP_BASE + CORPS.length)
     return { name: CORPS[id - CORP_BASE], category: 'corporation' };
-  // The Player-groups fixture (playerGroups.json), corp members and outside alts alike.
   const grouped = [...playerGroups.corp, ...playerGroups.outside].find((f) => f.id === id);
   if (grouped) return { name: grouped.name, category: 'character' };
-  // The Corp Tax Book seed's characters (scripts/dev/seed-corp-tax-book.mjs).
   if (id === 90_000_002) return { name: 'Dev Member', category: 'character' };
   if (id === 90_000_003) return { name: 'Dev Guest', category: 'character' };
   if (id >= 90_001_000 && id < 90_001_100)
@@ -135,7 +126,6 @@ export function mailHeaders() {
     subject: `${MAIL_SUBJECTS[i % MAIL_SUBJECTS.length]}${i >= 8 ? ` (${i})` : ''}`,
     timestamp: iso(-(i * 7 + 1) * HOUR_MS),
     is_read: i % 3 !== 0,
-    // Real ESI system label ids: 1 Inbox, 2 Sent, 4 Corp, 8 Alliance.
     labels: [i % 4 === 0 ? 2 : i % 5 === 0 ? 4 : 1],
     recipients:
       i % 6 === 5
@@ -229,7 +219,6 @@ export function contacts() {
   });
 }
 
-/** Newest first, as ESI returns it; the last entry is the corp the Character is in now. */
 export function corporationHistory() {
   return [
     { record_id: 400, corporation_id: CORPORATION_ID, start_date: iso(-120 * DAY_MS) },

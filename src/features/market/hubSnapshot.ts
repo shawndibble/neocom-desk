@@ -1,27 +1,12 @@
-/**
- * The daily hub-station prices the mining pages value a mined day at
- * (docs/context/decisions/20261019-091155-mining-prices-read-the-open-prices.md):
- * the Open Prices `syncMarketOpenPrices` publishes to R2, one object per type
- * (`marketOpenPrices.ts`), read for every type a page prices. The same objects
- * draw Price History's Buy and Sell lines, so the mining pages and the chart
- * agree on a day's price and share one read.
- *
- * A station day feeds the tax ledgers' `saved` tier (`priceBasis.ts`).
- *
- * Never fails a caller: a type with no object (404), a failed read and a
- * malformed object all count as no days, and the tier chain falls further back.
- */
 import { DEFAULT_TRADE_HUB, type TradeHub } from '@/market/hubs';
 import type { OpenPriceSeries } from '@/engine/market/priceHistoryOpen';
 import type { SidePrices } from '@/engine/miningTax/priceBasis';
 import { loadStoredOpenPrices } from './marketOpenPrices';
 
 export interface HubSnapshotRange {
-  /** The hub station's end-of-day prices, by date then type id. */
   saved: Map<string, Map<number, SidePrices>>;
 }
 
-/** The series' prices on index `i`, or undefined when neither side has one. */
 function dayAt(series: OpenPriceSeries | undefined, i: number): SidePrices | undefined {
   const buy = series?.buy[i] ?? null;
   const sell = series?.sell[i] ?? null;
@@ -39,10 +24,6 @@ function put(
   day.set(typeId, prices);
 }
 
-/**
- * Every day in `[startDate, endDate]` (inclusive) that `typeIds` have a price
- * at `hub`. Reads one object per type, in parallel.
- */
 export async function loadHubSnapshotRange(
   startDate: string,
   endDate: string,

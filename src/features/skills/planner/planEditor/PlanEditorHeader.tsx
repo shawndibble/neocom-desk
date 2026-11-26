@@ -9,7 +9,6 @@ import type { usePlanAssumptions } from './usePlanAssumptions';
 import type { usePlanHeaderStats } from './usePlanHeaderStats';
 import type { PlanScheduleResult } from './usePlanSchedule';
 
-/** The plan header: totals, remap-savings chip, next milestone and the What-If lens comparison. */
 export function PlanEditorHeader({
   plan,
   schedule,

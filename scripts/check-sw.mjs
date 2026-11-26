@@ -1,14 +1,3 @@
-// Fails the build when the Service Worker bundle won't evaluate as a classic
-// script. The app registers `sw.js` without `type: 'module'`, so any module
-// syntax that reaches it — `import.meta` from Vite's preload helper, pulled in
-// by a dynamic `import()` anywhere in `src/sw.ts`'s import graph — is a
-// SyntaxError. The browser then reports only "ServiceWorker script evaluation
-// failed", no worker ever registers, and every notification and Web Push
-// silently stops. That shipped once, unnoticed for days, because the desktop
-// page still had a constructor fallback. Parsing only: a worker that throws at
-// runtime still passes.
-//
-// Usage: node scripts/check-sw.mjs [path]   (default: dist/sw.js)
 import fs from 'node:fs';
 import vm from 'node:vm';
 

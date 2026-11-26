@@ -36,7 +36,6 @@ const POLICY: PlannerPolicy = {
 };
 const BOOKS: PriceBooks = { ask: {}, bid: {}, salesTaxPct: 0 };
 
-/** Every P1 at one bid, so each colony has a priced Baseline. */
 function pricedBooks(overrides: Record<number, number> = {}): PriceBooks {
   const bid: Record<number, number> = {};
   for (const [id, s] of Object.entries(pi.schematics))
@@ -45,7 +44,6 @@ function pricedBooks(overrides: Record<number, number> = {}): PriceBooks {
   return { ask: bid, bid, salesTaxPct: 0 };
 }
 
-/** A colony yielding every P0 its planet type can, at `rate` per ECU. */
 function colony(planetId: number, planetType: PlanetType, cc = 5, rate = 6000): PlannerColony {
   const row = pi.infrastructure.commandCenterUpgrades[cc];
   return {
@@ -73,7 +71,6 @@ function plan(
   return planGoals({ goals, colonies, policy, books }, pi);
 }
 
-/** A goal at `perHour`, expressed per day the way the pilot types it. */
 const goal = (typeId: number, perHour: number): Goal => ({ typeId, unitsPerDay: perHour * 24 });
 
 describe('planGoals — demand', () => {
@@ -83,7 +80,6 @@ describe('planGoals — demand', () => {
       [colony(1, 'barren'), colony(2, 'storm'), colony(3, 'gas')]
     );
     const water = result.demand.filter((line) => line.typeId === WATER);
-    // 20 Water/h each is half a basic apiece; together exactly one.
     expect(water).toEqual([expect.objectContaining({ tier: 1, unitsPerHour: 40, factories: 1 })]);
   });
 
@@ -110,7 +106,6 @@ describe('planGoals — factory host', () => {
     expect(result.flows).toEqual([
       { from: 1, to: 'hub', typeId: REACTIVE_METALS, tier: 1, unitsPerHour: 40 },
     ]);
-    // 40/h × 0.19 m3 × 168 h.
     expect(result.hauling.m3PerWeek).toBeCloseTo(40 * 0.19 * 168);
   });
 
@@ -118,7 +113,6 @@ describe('planGoals — factory host', () => {
     const result = plan([goal(WETWARE_MAINFRAME, 1)], [colony(1, 'lava'), colony(2, 'gas')]);
     expect(result.factoryHost).toBeNull();
     expect(result.shortfalls).toContainEqual({ kind: 'no-factory-host', facility: 'highTech' });
-    // A type gap blocks it too, so its chain is listed as blocked.
     expect(result.demand.find((l) => l.typeId === WETWARE_MAINFRAME)).toMatchObject({
       source: 'blocked',
       madeFraction: 0,
@@ -126,8 +120,6 @@ describe('planGoals — factory host', () => {
   });
 
   it('hosts on the colony whose extraction is least needed, not the lowest id', () => {
-    // Ionic Solutions comes off gas and storm only; temperate yields neither,
-    // so its extraction is the least needed — and it still makes its own Water.
     const result = plan(
       [goal(COOLANT, 5)],
       [colony(1, 'gas'), colony(2, 'storm'), colony(3, 'temperate')]
@@ -138,7 +130,6 @@ describe('planGoals — factory host', () => {
       slots: [{ p0TypeId: AQUEOUS_LIQUIDS, ecus: 1 }],
       factories: { advanced: 1 },
     });
-    // Its own Water never leaves the planet; the Electrolytes are shipped in.
     expect(result.flows).toContainEqual({
       from: 3,
       to: 3,
@@ -163,7 +154,6 @@ describe('planGoals — factory host', () => {
   });
 
   it('breaks a scarcity tie on the smaller Baseline the host gives up', () => {
-    // Two temperates, same score; the slower one forfeits less.
     const result = plan(
       [goal(COOLANT, 5)],
       [colony(1, 'gas'), colony(4, 'temperate'), colony(5, 'temperate', 5, 3000)],
@@ -182,7 +172,6 @@ describe('planGoals — factory host', () => {
   });
 
   it('flags a host whose factories overrun its Command Center', () => {
-    // CC0's 1675 tf cannot carry even the Launchpad's 3600; the extractors are fine.
     const result = plan(
       [goal(COOLANT, 5)],
       [colony(1, 'gas'), colony(2, 'storm'), colony(3, 'temperate', 0)]
@@ -190,12 +179,10 @@ describe('planGoals — factory host', () => {
     expect(result.shortfalls).toContainEqual(
       expect.objectContaining({ kind: 'host-over-budget', planetId: 3 })
     );
-    // Nothing gets made, so the second pass needs no host and touches nothing.
     expect(result.factoryHost).toBeNull();
     expect(result.assignments.every((a) => a.role !== 'extract' && a.role !== 'factory')).toBe(
       true
     );
-    // Factories that cannot be built make nothing, so nothing is shipped or priced off them.
     expect(result.achieved).toEqual([{ typeId: COOLANT, unitsPerHour: 0, fraction: 0 }]);
     expect(result.flows.filter((f) => f.from === 3 || f.to === 3)).toEqual([]);
     expect(result.demand.find((l) => l.typeId === COOLANT)?.source).toBe('short');
@@ -219,7 +206,6 @@ describe('planGoals — extraction and shortfalls', () => {
   });
 
   it('calls a budget gap when the colonies that could yield it are full', () => {
-    // Two ECUs on one P0 make 72 P1/h; the other 48 are short, in P0 units.
     const result = plan([goal(REACTIVE_METALS, 120)], [colony(1, 'barren')]);
     expect(result.assignments[0].slots).toMatchObject([{ p0TypeId: BASE_METALS, ecus: 2 }]);
     expect(result.shortfalls).toEqual([
@@ -260,9 +246,6 @@ describe('planGoals — extraction and shortfalls', () => {
   });
 
   it('assigns the scarcest P0 first', () => {
-    // Ionic Solutions only comes off gas; Base Metals off gas or lava. Taking
-    // Base Metals first onto the gas colony at two ECUs would leave Ionic
-    // Solutions short.
     const result = plan(
       [goal(REACTIVE_METALS, 72), goal(2390, 72)],
       [colony(1, 'gas'), colony(2, 'lava')]
@@ -275,10 +258,6 @@ describe('planGoals — extraction and shortfalls', () => {
   });
 
   it('ships only what the scarcest input allows, and releases extraction nothing consumes', () => {
-    // Coolant at 10/h needs 80 Electrolytes and 80 Water. Storm is the only
-    // Ionic Solutions source and two ECUs make 72 of the 80, so Coolant runs at
-    // 90%. The first pass sized Water for 80 across three temperates; the
-    // second, at 9/h, needs 72 — the host's own ECU plus one more.
     const result = plan(
       [goal(COOLANT, 10)],
       [colony(1, 'storm'), colony(2, 'temperate'), colony(3, 'temperate'), colony(4, 'temperate')]
@@ -300,14 +279,12 @@ describe('planGoals — extraction and shortfalls', () => {
     expect(waterToHost).toBeCloseTo(72);
     expect(result.surplusP1).toEqual([{ typeId: WATER, unitsPerHour: expect.closeTo(8, 6) }]);
     expect(result.assignments.find((a) => a.planetId === 4)?.role).toBe('idle');
-    // The shortfall still describes the goal as asked for.
     expect(result.shortfalls).toEqual([
       expect.objectContaining({ kind: 'budget-gap', p0TypeId: IONIC_SOLUTIONS }),
     ]);
   });
 
   it('retargets nothing for a goal that reaches zero: every colony keeps its Baseline', () => {
-    // No temperate yields Ionic Solutions, so Coolant is a type gap and makes nothing.
     const books = pricedBooks();
     const result = plan(
       [goal(COOLANT, 5)],
@@ -333,7 +310,6 @@ describe('planGoals — extraction and shortfalls', () => {
   });
 
   it('fills a used colony’s spare slot with its best-selling P1', () => {
-    // One ECU covers the goal; the second P0 slot sells Precious Metals.
     const result = plan(
       [goal(REACTIVE_METALS, 40)],
       [colony(1, 'barren')],
@@ -359,12 +335,6 @@ describe('planGoals — extraction and shortfalls', () => {
   });
 });
 
-/**
- * The e2e fixture (`e2e/support/piColonies.ts`) as `goalPlannerModel` turns
- * it into `PlannerColony` values: budgets from each CC level, link cost from
- * each colony's own measured hop, heads read off its ECUs, rates measured
- * where it extracts and the pilot's own mean elsewhere.
- */
 function fixtureColonies(): PlannerColony[] {
   const OWN_MEAN = 12_033;
   const make = (
@@ -437,7 +407,6 @@ function fixtureColonies(): PlannerColony[] {
   ];
 }
 
-/** The e2e hub: flat per tier, bid at 95% of the ask. */
 function fixtureBooks(): PriceBooks {
   const unit = [5, 760, 14_000, 100_000, 1_900_000];
   const ask: Record<number, number> = {};
@@ -460,7 +429,6 @@ describe('planGoals — the plan describes itself consistently', () => {
       POLICY,
       fixtureBooks()
     );
-    // Robotics needs Toxic Metals and Chiral Structures, which no fixture planet yields.
     expect(result.shortfalls.map((s) => [s.kind, 'p0TypeId' in s ? s.p0TypeId : null])).toEqual([
       ['type-gap', 2272],
       ['type-gap', 2306],
@@ -473,8 +441,6 @@ describe('planGoals — the plan describes itself consistently', () => {
       },
       { typeId: ROBOTICS, unitsPerHour: 0, fraction: 0 },
     ]);
-    // The blocked goal's whole chain is still in the demand — what Robotics
-    // needs — marked blocked, made by nothing.
     const blocked = result.demand.filter((l) => l.source === 'blocked');
     expect(blocked.map((l) => l.typeId)).toEqual(
       expect.arrayContaining([ROBOTICS, 9836, 3689, 2398, 2399, 2400, 2401, BASE_METALS])
@@ -484,11 +450,9 @@ describe('planGoals — the plan describes itself consistently', () => {
       tier: 3,
       unitsPerHour: expect.closeTo(30 / 24, 6),
     });
-    // Coolant's own lines are untouched by it.
     expect(result.demand.filter((l) => l.typeId === COOLANT)).toEqual([
       expect.objectContaining({ source: 'made', madeFraction: expect.closeTo(1, 6) }),
     ]);
-    // Nothing extracts for the blocked goal.
     const extracted = result.assignments
       .filter((a) => a.role === 'extract' || a.role === 'factory')
       .flatMap((a) => a.slots.map((s) => s.p0TypeId));
@@ -496,9 +460,6 @@ describe('planGoals — the plan describes itself consistently', () => {
   });
 
   it('never calls a rationed input a budget gap while a colony could yield more of it', () => {
-    // Coolant at 10/h: storm is the only Ionic Solutions source and makes 72
-    // of 80, so Coolant runs at 90%. Water is rationed to 72 by that, not
-    // short — the temperates have room for more.
     const result = plan(
       [goal(COOLANT, 10)],
       [colony(1, 'storm'), colony(2, 'temperate'), colony(3, 'temperate'), colony(4, 'temperate')]
@@ -548,8 +509,6 @@ describe('planGoals — the plan describes itself consistently', () => {
 
 describe('planGoals — the layout a colony runs today', () => {
   it("marks an assignment on today's extraction as runningToday, even where the model puts it over budget", () => {
-    // colonyCapacity's case: CC4, two 8-head ECUs on Base Metals, which the
-    // model puts over Powergrid although the colony runs it.
     const jita: PlannerColony = {
       ...colony(1, 'barren', 4, 12_133),
       headsPerExtractor: 8,
@@ -574,8 +533,6 @@ describe('planGoals — the layout a colony runs today', () => {
 
 describe('planGoals — stability against what colonies run today', () => {
   it('keeps Water on the colony that extracts it today rather than starting it elsewhere', () => {
-    // e2e fixture: Jita IV runs one measured ECU on Aqueous Liquids; X-7OMU III
-    // runs nothing. A Water goal must not move it to the unbuilt colony.
     const result = plan([goal(WATER, 40)], fixtureColonies(), POLICY, fixtureBooks());
     const role = (id: number) => result.assignments.find((a) => a.planetId === id)!;
     expect(role(40009080)).toMatchObject({
@@ -602,8 +559,6 @@ describe('planGoals — stability against what colonies run today', () => {
 
 describe('planGoals — what a gap can be fixed with', () => {
   it('names the colonies a budget gap could retarget, leaving out ones already maxed on that P0', () => {
-    // Noble Metals only comes off the Barren, which it fills; the gas colony
-    // runs two ECUs on Base Metals and still falls 72/h short.
     const result = plan(
       [goal(PRECIOUS_METALS, 72), goal(REACTIVE_METALS, 144)],
       [colony(1, 'barren'), colony(2, 'gas')]
@@ -629,7 +584,6 @@ describe('planGoals — what a gap can be fixed with', () => {
     );
     const blocked = result.demand.filter((l) => l.source === 'blocked');
     expect(blocked.length).toBeGreaterThan(0);
-    // Robotics needs Heavy Metals (Toxic Metals) and Non-CS Crystals (Chiral Structures).
     for (const line of blocked) expect(line.blockedBy).toEqual([2272, 2306]);
     expect(result.demand.filter((l) => l.source !== 'blocked').every((l) => !l.blockedBy)).toBe(
       true

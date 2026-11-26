@@ -53,7 +53,6 @@ describe('loadCorporationIndustryJobs', () => {
     expect(row?.value).toEqual([JOB]);
   });
 
-  /** Issue #293's guarantee, exercised on a real corp read: the key is per corporation. */
   it('never serves one corporation rows under another', async () => {
     await db.esiCache.put({
       characterId: CHAR_ID,
@@ -62,8 +61,6 @@ describe('loadCorporationIndustryJobs', () => {
       fetchedAt: STALE_FETCHED_AT,
     });
 
-    // The new corp is offline: a bare `industryJobs` key would have handed
-    // back the old corp's rows. The corp id is part of the key, so this misses.
     server.use(http.get(jobsUrl(OTHER_CORP_ID), () => HttpResponse.error()));
     const result = await loadCorporationIndustryJobs(CHAR_ID, OTHER_CORP_ID);
 
@@ -77,9 +74,6 @@ describe('loadCorporationIndustryJobs', () => {
 
     const result = await loadCorporationIndustryJobs(CHAR_ID, CORP_ID);
 
-    // CCP gates this endpoint on in-game roles server-side, so a 403 is not
-    // something logging in again can fix — a ReauthBanner over it is exactly
-    // the lock-the-user-can-never-open failure GLOSSARY.md round 35 forbids.
     expect(result.needsReauth).toBe(false);
     expect(result.cached).toBeNull();
   });

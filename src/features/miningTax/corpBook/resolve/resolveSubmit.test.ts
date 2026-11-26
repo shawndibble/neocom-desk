@@ -79,7 +79,6 @@ describe('resolve submits', () => {
     );
   });
 
-  // The old fallback sent the whole day as a quantity dispute: a bill the member never questioned.
   it('never falls back to a whole-day quantity dispute when nothing differs', async () => {
     await expect(
       tellNotOwed(
@@ -96,7 +95,6 @@ describe('resolve submits', () => {
     expect(mailer.sendTaxQuestionMail).not.toHaveBeenCalled();
   });
 
-  // Every transfer found in the wallet: credited at once, so there is no one to mail.
   it('sends no mail when the book credits the proof itself', async () => {
     store.declareCorpTaxBookPayment.mockResolvedValueOnce({
       declarationId: 'x',

@@ -1,9 +1,3 @@
-/**
- * Vetting callable answers for the sandbox. Every vetting read is a server-computed callable that
- * first verifies an EVE access token with CCP, which a fake token cannot pass, so the browser
- * answers them here (`vettingAnswer`, wired to the `vettingCall` route in moons-sandbox.local.ts).
- * Shapes: functions/src/vettingEngine.ts. Read-only: nothing a page changes is saved.
- */
 import {
   CHARACTER_ID,
   CHARACTER_NAME,
@@ -128,7 +122,6 @@ const PARTIES = [
   { id: 92_000_003, name: 'Pator Mining Co', category: 'corporation' as const },
 ];
 
-/** Flags in severity order; a review shows the first `flags` of them (warning-only ones skip the critical). */
 function flagsFor(summary: VettingReviewSummary, characterId: number): VettingFlag[] {
   const catalog: VettingFlag[] = [
     {
@@ -282,7 +275,7 @@ function rawRows(reviewId: string, source: string): VettingRawPage {
         };
       case 'skills':
         return { characterId: pilot, at: null, what: '', skillId: 3380, level: 1 + (i % 5) };
-      default: // history
+      default:
         return {
           characterId: pilot,
           at: iso((i + 1) * 200),
@@ -337,7 +330,6 @@ function memberStatus(): VettingStatus {
   };
 }
 
-/** The JSON for a vetting action, or undefined when the sandbox does not answer it. */
 export function vettingAnswer(action: string, data: Record<string, unknown>): unknown | undefined {
   switch (action) {
     case 'getVettingOverviewCallable':

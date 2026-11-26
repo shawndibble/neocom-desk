@@ -1,11 +1,3 @@
-/**
- * The Market Trend widget's builder: the widget's items (its own picks, else
- * the Quickbar's first) at its Trade Hubs (its own picks, else the pilot's
- * Market hub) as a table of latest daily average with 7 and 30 day change, and
- * as lines indexed to 0% at the start of the widget's range so a 5 ISK mineral
- * and a 5M ISK PLEX share one scale. Daily averages only (ESI's `average`), the same series
- * Price History's "average" choice draws. Pure, like every builder.
- */
 import {
   alignTrendSeries,
   indexToStart,
@@ -28,28 +20,23 @@ const D = 'overview.widgets.data.marketTrend';
 const C = 'overview.widgets.chart.marketTrend';
 const W = 'overview.widgets.marketTrend';
 const MARKET_PATH = '/market/browser';
-/** Ranges long enough that daily noise zigzags: their lines plot a trailing average instead. */
 const SMOOTH_FROM_DAYS = 30;
 const SMOOTH_WINDOW = 7;
 const COLORS: ChartColor[] = ['accent', 's1', 's2', 's3', 's4', 's5'];
 
-/** `+12.4%` / `-3.0%`: the sign is part of the text, so colour is never the only cue. */
 export function trendText(change: number | null): string {
   if (change === null) return UNKNOWN;
   const pct = change * 100;
   return `${pct > 0 ? '+' : ''}${pct.toFixed(1)}%`;
 }
 
-/** A line as drawn: the read, labelled with its hub when the widget compares several. */
 type TrendLine = MarketTrendSeries & { label: string };
 
 interface ResolvedTrend {
   hubName: string;
-  /** Every drawn line is a global-market item, so the hubs do not describe where it is priced. */
   allGlobal: boolean;
   lines: TrendLine[];
   omitted: number;
-  /** A pick the feed has not read yet, so the view waits rather than draw a part. */
   pending: boolean;
 }
 
@@ -81,7 +68,6 @@ function resolveTrend(
   };
 }
 
-/** The newest day with a real price: a zero-average row is a day nothing traded, not a price. */
 const latestAverage = (item: MarketTrendSeries): number | null =>
   item.points
     .filter(isPricedDay)
@@ -93,7 +79,6 @@ export const marketTrend: Builder = (feeds, { t, range, trendItems, trendHubs })
   const raw = feed?.data ?? null;
   if (!raw) return blank(MARKET_PATH, statusOf(feed));
   const resolved = resolveTrend(raw, { trendItems, trendHubs });
-  // A failed reload leaves the old read without the new picks: that is an error, not a spinner.
   if (resolved.pending) {
     return blank(MARKET_PATH, statusOf(feed, { loading: !feed?.error, hasData: false }));
   }
@@ -117,7 +102,6 @@ export const marketTrend: Builder = (feeds, { t, range, trendItems, trendHubs })
   const names = (flag: (i: TrendLine) => boolean) => data.items.filter(flag).map((i) => i.label);
   const missing = names((i) => !i.points.some(isPricedDay) && !i.failed);
   const failedNames = names((i) => i.failed);
-  // Said wherever the lines are, so a pick that cannot be drawn is never just absent.
   const notes = [
     ...(failedNames.length > 0
       ? [t(`${C}.noteFailed`, { count: failedNames.length, lines: failedNames.join(', ') })]
@@ -182,17 +166,13 @@ export const marketTrend: Builder = (feeds, { t, range, trendItems, trendHubs })
 
   const volumes = data.items.map((i) => new Map(i.points.map((p) => [p.date, p.volume])));
   const rel = (v: number) => v / 100 - 1;
-  // One line is already readable, so only a crowd of lines gets the trailing average.
   const smoothed = range >= SMOOTH_FROM_DAYS && plotted.length > 1;
   const lastOf = (values: (number | null)[]) => values.filter((v) => v !== null).at(-1) ?? null;
-  // Percent change per day; a long range draws its trailing average so the tooltip (raw) keeps the real day.
   const lineValues = (values: (number | null)[]) => {
     const pct = values.map((v) => (v === null ? null : rel(v) * 100));
     if (!smoothed) return pct;
-    // The average bridges nothing: a day with no price stays a gap, and a line stops where its data does.
     return trailingAverage(pct, SMOOTH_WINDOW).map((v, k) => (pct[k] === null ? null : v));
   };
-  // What each line ends on as drawn, so the legend and summary agree with the picture.
   const drawn = indexed.map(lineValues);
   const chart: ChartModel = {
     kind: 'lines',

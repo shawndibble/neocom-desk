@@ -74,37 +74,16 @@ import { useOverlayFitting } from '@/features/fittings/useOverlayFitting';
 import { useTargetProfiles } from '@/features/fittings/targetProfiles';
 import { COARSE_POINTER_QUERY, useMediaQuery } from '@/lib/useMediaQuery';
 
-/**
- * The Fittings section (scope decision `20260924-215855`).
- *
- * With nothing open it is a Start screen: pick a hull to fit from scratch,
- * or Load / open an existing Fitting. With a Fitting open it is the editor:
- * a header (a Fittings menu to open another, then this one's identity and
- * controls), the headline numbers, then three columns as in the game's own
- * window: the module browser (the Add panel), the Ring or List, and the
- * stats sections. Too narrow for all three, the browser becomes a slide-out
- * from the left, opened by an empty slot or "+ Add module"; narrower still
- * (below desktop) it is the mobile layout — Fitting / Stats tabs, Add as a
- * sheet. On a pointer, browser items drag straight onto the Ring.
- */
 export function Fittings() {
   const { pathname, search } = useLocation();
   const redirectTo = fittingsRedirect(pathname, search);
   return redirectTo === null ? <FittingsPage /> : <Navigate to={redirectTo} replace />;
 }
 
-/**
- * A right slide-over (the Pilot or Situation panel, 25rem; any right one) takes its width off the
- * page where there is room for the nav, the panel and all three columns (browser,
- * Ring at its 29rem floor, stats) at once; narrower it covers the stats as before.
- * 26rem is `SlideOver`'s 25rem cap plus a 1rem gutter, as in `Wallet`; change them together.
- */
 const RIGHT_PANEL_ROOM = 'min-[115rem]:[body:has([data-slide-over=right])_&]:pr-[26rem]';
 
 function FittingsPage() {
   const { t } = useTranslation();
-  // Opening Fittings online is intent to use it offline later: fetch the
-  // engine now instead of waiting for the idle warm (gated inside).
   useEffect(() => {
     void import('@/sde/warmLazySde')
       .then(({ warmFittingAssets }) => warmFittingAssets())
@@ -116,35 +95,23 @@ function FittingsPage() {
   const isDesktop = useIsDesktop();
   const isPhone = useIsPhone();
   const threeColumns = useMediaQuery(THREE_COLUMN_QUERY);
-  // The HTML5 drag gate follows the input, not just the width: a touch laptop
-  // is wide, but a long-press there belongs to the row menu, not a drag.
   const coarsePointer = useMediaQuery(COARSE_POINTER_QUERY);
   const addMode = addModeFor(threeColumns, isDesktop);
   const [target, setTarget] = useState<AddTarget | null>(null);
-  // The slide-out or sheet Add panel is open (the docked one always is).
-  // Opened by an empty slot, or by "+ Add module" — which works before the
-  // ship data (and so the empty slots) exists.
   const [addOpen, setAddOpen] = useState(false);
-  // What the last add did, read out by the sr-only status (the browser stays open beside the Ring).
   const [added, setAdded] = useState({ message: '', n: 0 });
   const setAddedMessage = (message: string) => setAdded((a) => ({ message, n: a.n + 1 }));
   const storedView = useFittingViewPreference((state) => state.value);
   const viewHydrated = useHydratedStore(useFittingViewPreference);
   const setView = useFittingViewPreference((state) => state.setValue);
   const view = resolveFittingView(storedView, isPhone);
-  // Phone Ring: the rack whose slots sheet is open (scope decision `20260924-205720`).
   const [rackSheet, setRackSheet] = useState<FittingSlotKind | 'drone' | null>(null);
-  // The module dialog's variations start folded: a tap on a module is
-  // mostly for its state and ammo.
   const [variationsOpen, setVariationsOpen] = useState(false);
   const [mutationOpen, setMutationOpen] = useState(false);
   const [affectedOpen, setAffectedOpen] = useState(false);
-  // The filled slot whose module panel is open.
   const [moduleSlot, setModuleSlot] = useState<{ slot: FittingSlotKind; slotIndex: number } | null>(
     null
   );
-  // The Fittings menu's dialog, and the Fitting it was opened over: opening
-  // any other Fitting from it closes it (adjusted during render, not in an effect).
   const [library, setLibrary] = useState<LibraryAction | null>(null);
   const [libraryOver, setLibraryOver] = useState<Fitting | null>(null);
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
@@ -173,12 +140,7 @@ function FittingsPage() {
     activeCharacterId,
     workspace.savedId !== null && savedRecord?.id === workspace.savedId ? savedRecord : null
   );
-  // The page's Item Actions — here only Show info (the Fitting editor's menu
-  // has no Add to Quickbar or Build Plan): a List name click or a menu's
-  // "Show info" opens the page's Item Detail modal.
   const pageItemActions = usePageItemActions({ activeCharacterId, lazyBlueprints: true });
-  // Bumped on a successful Save to EVE so In-game Fittings remounts and
-  // refetches, picking up the fitting that just landed (or the overwrite).
   const [inGameFittingsKey, setInGameFittingsKey] = useState(0);
 
   const { fitting, stats, edit } = workspace;
@@ -192,17 +154,11 @@ function FittingsPage() {
     setView,
     edit,
   });
-  // Warm the module browser's hull check in the background once the ship data,
-  // pilot and catalogue are in, so opening Add (or changing hull) needn't wait.
-  // The panel's own call finds the memoized results.
   useHullFit(context, fitting?.shipTypeId ?? null, true);
   if (library !== null && fitting !== libraryOver) {
     setLibrary(null);
     closeAdd();
   }
-  // The Add panel's open state and target belong to one layout tier and one
-  // hull: a resize into another tier, or a different hull, starts it closed
-  // rather than popping a stale sheet or slide-out aimed at an old slot.
   const hullTypeId = fitting?.shipTypeId ?? null;
   const [addScope, setAddScope] = useState({ mode: addMode, hull: hullTypeId });
   if (addScope.mode !== addMode || addScope.hull !== hullTypeId) {
@@ -211,17 +167,15 @@ function FittingsPage() {
   }
   const slotCounts = stats?.slotCounts ?? null;
   const dronesShown = fitting !== null && showsDrones(stats, fitting.drones.length);
-  // Removing a droneless hull's last (pasted) drone takes the Drones rack
-  // away, so a browser still aimed at it lets go.
   if (target?.kind === 'drone' && !dronesShown) setTarget(null);
-  // Module results only line up with the Fitting they were calculated for.
   const moduleResults = workspace.currentStats?.modules ?? null;
-  // The catalogue carries no tactical modes (an Affected-by source can be one).
   const typeName = (typeId: number) => {
     const name = catalogue?.types[String(typeId)]?.name;
     if (name !== undefined) return name;
     const mode = tacticalModeKind(typeId);
-    return mode !== undefined ? t(`fittings.mode.kind.${mode}`) : `#${typeId}`;
+    return mode !== undefined
+      ? t(`fittings.mode.kind.${mode}`)
+      : catalogueTypeName(catalogue, typeId);
   };
 
   const charges = useChargeLoading({
@@ -231,7 +185,6 @@ function FittingsPage() {
     context,
     edit,
   });
-  // The cargo item whose quantity dialog is open.
   const [cargoQuantityFor, setCargoQuantityFor] = useState<number | null>(null);
   const selectTarget = useCallback(
     (next: AddTarget | null) => {
@@ -280,7 +233,6 @@ function FittingsPage() {
     setLibrary(action);
   }
 
-  /** The Fitting as a click on the module would leave it — same slot choice as `handleAdd` — for the Add panel's hover preview. */
   function previewAdd(f: Fitting, typeId: number, rack: CandidateRack): Fitting | null {
     if (rack === 'drone' || slotCounts === null) return null;
     const slotIndex =
@@ -300,9 +252,6 @@ function FittingsPage() {
     }
     if (slotCounts === null) return;
     const count = slotCounts[rack];
-    // The browser stays on the rack's next empty slot, so a row of modules
-    // goes in one click each. An item for another rack (fits-this-slot off)
-    // goes in that rack's first free slot and leaves the chosen one be.
     const onTarget = target?.kind === 'slot' && target.slot === rack;
     const after: { target: AddTarget | null; slotIndex: number | null } = {
       target,
@@ -341,17 +290,12 @@ function FittingsPage() {
     else selectTarget({ kind: 'slot', slot, slotIndex });
   }
 
-  /**
-   * Opens a fitted module's dialog. A slot tap leads with its state and ammo,
-   * variations folded; the menu's Variations entry opens them unfolded.
-   */
   function openModuleDialog(slot: FittingSlotKind, slotIndex: number, withVariations: boolean) {
     setModuleSlot({ slot, slotIndex });
     setVariationsOpen(withVariations);
     setMutationOpen(false);
   }
 
-  /** From a phone sheet (a rack's or the drones'): one sheet at a time, so the Add sheet takes over. */
   function selectTargetFromSheet(next: AddTarget) {
     setRackSheet(null);
     selectTarget(next);
@@ -414,7 +358,6 @@ function FittingsPage() {
     edit((f) => swapModuleType(f, moduleSlot.slot, moduleSlot.slotIndex, typeId));
   }
   const targetProfiles = useTargetProfiles();
-  // Improve's "See all in What to train": the stats column takes the request and clears it.
   const [whatToTrainRequested, setWhatToTrainRequested] = useState(false);
   const improve = useImproveDrawer({
     workspace,
@@ -429,7 +372,6 @@ function FittingsPage() {
     openMakeItFit: makeItFit.open,
     showWhatToTrain: () => setWhatToTrainRequested(true),
   });
-  // Improve and the Add browser share the left of the page: the last one opened wins.
   const { docked: improveDocked, close: closeImprove } = improve;
   const opened = useRef({ add: addOpen, improve: improveDocked });
   useEffect(() => {
@@ -448,13 +390,9 @@ function FittingsPage() {
 
   const startHull = (hull: StartHull) =>
     void workspace.openFitting(newFitting(hull.typeId, hull.name));
-  // Reopening the Fitting already open changes nothing to close on, so an
-  // explicit open closes the Fittings menu's dialog itself.
   const closeLibrary = () => setLibrary(null);
 
   if (fitting === null) {
-    // The Start screen renders the header and the Ships tabs itself: it owns
-    // the In-game data age and refresh. A broken Fitting Share Code opens its Import.
     return (
       <FittingStartScreen
         workspace={workspace}
@@ -469,7 +407,6 @@ function FittingsPage() {
     );
   }
 
-  // The docked browser is always there; the others open on demand.
   const addButton =
     addMode === 'docked' ? undefined : (
       <Button size="sm" className={tappableRowClassName} onClick={() => selectTarget(null)}>
@@ -531,10 +468,7 @@ function FittingsPage() {
     />
   );
 
-  // Under the name: the hull, unless the Fitting is simply named after it,
-  // and whether this is a saved Fitting.
   const hullName = typeName(fitting.shipTypeId);
-  // The open slide-out takes 26rem off the page, too little for the one-row header.
   const {
     addMode: layoutAddMode,
     addOpen: layoutAddOpen,
@@ -550,15 +484,9 @@ function FittingsPage() {
     .join(' · ');
 
   return (
-    // The open slide-out pushes the page aside rather than covering it, so
-    // every Ring slot stays a drop target. (It can't get out of the way
-    // mid-drag instead: moving or hiding a drag's source element cancels it.)
     <ItemActionsProvider page={pageItemActions}>
       <FittingItemActionsProvider value={itemActions}>
         <RuleBreakFlags.Provider value={ruleBreaks.flagged}>
-          {/* Capped and centred, so a wide screen gets even gutters rather than an empty Ring
-        panel (scope decision `20261016-171349`). */}
-          {/* Pushed (the Add slide-out): from the panel's edge, not centred, so a wide screen leaves no gap beside it. */}
           <div
             className={`max-w-[120rem] space-y-3 ${pushed ? 'pl-[26rem]' : 'mx-auto'} ${RIGHT_PANEL_ROOM}`}
           >
@@ -584,13 +512,10 @@ function FittingsPage() {
                 {t('fittings.load.tooLargeToShare')} {t('fittings.load.tooLargeToShareDraft')}
               </p>
             )}
-            {/* Only a Load that opened a Fitting describes this one; a failed Load's
-          warnings stay with the Load card that reported them. */}
             {workspace.lastLoad?.kind === 'fitting' && <LoadWarnings load={workspace.lastLoad} />}
             <LiveStatus data-testid="fitting-added-status" announceKey={added.n}>
               {added.message}
             </LiveStatus>
-            {/* What the last charge load did: "loaded 3 of 4, cargo ran out". */}
             <p role="status" className="text-xs text-text-dim empty:hidden">
               {charges.message}
             </p>

@@ -1,16 +1,6 @@
-/**
- * Where a mail's quoted history starts: the dashed separator a Reply appends
- * (`quoteMailBody`, the same rule the EVE client writes) when a `From:` line
- * follows it, or the "On <when>, <who> wrote:" line and `>` lines another
- * client left. The reader folds from that line on. A `>` block followed by
- * new writing is an inline reply, which stays open.
- */
-
-// Looser than QUOTE_SEPARATOR (mail.ts) on purpose: the EVE client's own rule is also accepted.
 const SEPARATOR = /^-{8,}\s*$/;
 const ATTRIBUTION = /^On .+ wrote:\s*$/;
 
-/** Index of the first line of the trailing quote, or null when the mail has none. */
 export function trailingQuoteStart(
   lines: readonly string[],
   markers: readonly string[] = ['>']

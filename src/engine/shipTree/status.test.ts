@@ -3,8 +3,6 @@ import type { MasteryMap, ShipTreeShip } from '@/sde/types';
 import type { Attributes, EngineSkill, TrainedSkill } from '@/engine/types';
 import { hullStatuses } from './status';
 
-// A and B: intelligence/memory, rank 1. At 20 in every attribute that is
-// 20 + 20/2 = 30 SP/min, so a level I (250 SP) takes 500s.
 const skill = (typeID: number): EngineSkill => ({
   typeID,
   name: `S${typeID}`,
@@ -99,7 +97,6 @@ describe('hullStatuses', () => {
       '1': [tier(A), tier(A), tier(B), tier(C), tier(C)],
     };
     const s = statuses([ship(1, [{ skillTypeID: A, level: 1 }])], masteries, { [A]: 1, [C]: 1 });
-    // Tier III (B) is unmet, so IV and V don't count even though C is trained.
     expect(s.get(1)?.mastery).toBe(2);
   });
 

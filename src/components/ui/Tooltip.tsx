@@ -17,22 +17,13 @@ import { cx } from '@/lib/cx';
 import { usePortalContainer } from './portalContainer';
 import { HOLD_MS, HOLD_SLOP_PX, TooltipHoldContext } from './tooltipHold';
 
-/** Generous bound on a device's touchend→click echo delay; the tests confirm a later, real click still closes the tooltip normally once this expires. */
 const TOUCH_CLICK_ECHO_MS = 700;
 
-/** Hover wait before a bubble opens, so a pointer passing over a trigger doesn't pop one. Focus and touch skip it. */
 export const TOOLTIP_HOVER_DELAY_MS = 400;
-/** After a bubble closes, the window in which the next trigger opens with no wait (moving along a toolbar). */
 const TOOLTIP_SKIP_DELAY_MS = 300;
 
 const InsideTooltipProvider = createContext(false);
 
-/**
- * App-root timing for every `Tooltip` under it (§6c): hover waits, and one
- * shared Radix provider lets a neighbouring trigger open at once. A `Tooltip`
- * outside it (a test, a story) opens on hover immediately. A bubble that
- * unmounts while open never tells Radix, so the next hover skips the wait once.
- */
 export function TooltipProvider({ children }: { children: ReactNode }) {
   return (
     <InsideTooltipProvider.Provider value={true}>
@@ -46,18 +37,11 @@ export function TooltipProvider({ children }: { children: ReactNode }) {
   );
 }
 
-/** Radix needs a provider; a `Tooltip` with no `TooltipProvider` above brings its own, with no wait. */
 function ProviderUnlessShared({ children }: { children: ReactNode }) {
   if (useContext(InsideTooltipProvider)) return children;
   return <TooltipPrimitive.Provider delayDuration={0}>{children}</TooltipPrimitive.Provider>;
 }
 
-/**
- * Whether the latest input was a pointer press rather than a key. jsdom has no
- * `:focus-visible`, and the browser's own heuristic is invisible to a
- * controlled `open`, so track it: a focus that follows a tap or click is not
- * keyboard navigation.
- */
 const inputModality = { pointer: false };
 let modalityTracked = false;
 function trackInputModality() {
@@ -80,61 +64,13 @@ function trackInputModality() {
 }
 
 interface TooltipProps {
-  /**
-   * Tooltip content. Usually one line of plain language, where a literal `
-`
-   * renders as a line break (`whitespace-pre-line`) — for a rare second line
-   * like a formula's numbers.
-   *
-   * A node is for the rare bubble that must lead with something the reader
-   * cannot miss (the industry materials table's make-or-buy verdict, bold over
-   * its reasoning), never for laying out a panel: 14rem of undismissable,
-   * unscrollable hover is the wrong home for a list, and on touch it is only
-   * reachable by long-press.
-   *
-   * Nullish, `false` or empty renders just the trigger — same tree, same DOM
-   * position, no bubble — so a caller whose tooltip only sometimes has
-   * something to say (`NeedsConnection`) can keep its control mounted instead
-   * of swapping the wrapper in and out, which would drop focus.
-   */
   content: ReactNode;
-  /** Single focusable trigger element (button, etc.) — tooltip reveals on hover or focus. */
   children: ReactElement<{ className?: string }>;
-  /**
-   * Touch triggers whose only job is explaining: a plain tap reveals the
-   * tooltip (and taps again to hide it), instead of a touch-and-hold. Leave
-   * off whenever the tap itself does something — the tap belongs to that
-   * action, and touch-and-hold stays the way to read the tooltip.
-   */
   openOnTap?: boolean;
-  /** Extra classes merged onto the trigger element, e.g. `w-full` so a full-width trigger stays full-width. */
   className?: string;
-  /** Preferred side of the trigger (`top` default; Radix still flips it on a collision). `bottom` for a trigger in a stack of rows, so the bubble does not cover the row above. */
   side?: 'top' | 'bottom';
 }
 
-/**
- * Accessible tooltip built on Radix's `Tooltip` primitive (docs/adr/0008):
- * placement is collision-aware — Radix flips side and shifts along its axis
- * so the bubble never renders partially off-screen, and it portals to
- * `document.body` so a clipping scroll container can't cut it off either.
- *
- * Radix's own pointer handling ignores touch, so touch reveals the tooltip
- * via our own state, OR'd into Radix's controlled `open`: a touch-and-hold by
- * default, a plain tap under `openOnTap`. Revealing never calls
- * `preventDefault`, so a trigger's own tap action, or an ancestor's click
- * handler (a table row, say), still fires.
- *
- * Radix's `Trigger` closes on *any* click, and a real device echoes a
- * compatibility `click` a moment after `touchend` — so an `openOnTap` bubble
- * would open and immediately flash shut. `suppressEchoedClose` intercepts
- * that echo through `composeEventHandlers`'s own extension point (it skips
- * Radix's close when `event.preventDefault()` was already called), so only
- * Radix's close is swallowed — the click itself still bubbles normally.
- * A touch-revealed tooltip has no timeout — it stays up to be read, until
- * something dismisses it: a tap outside, a scroll, Escape, or another tap on
- * an `openOnTap` trigger.
- */
 export function Tooltip({
   content,
   children,
@@ -142,22 +78,14 @@ export function Tooltip({
   className = '',
   side = 'top',
 }: TooltipProps) {
-  // Off inside a row menu, whose touch-and-hold is the menu's (see `tooltipHold.ts`).
   const holdOpens = useContext(TooltipHoldContext);
-  // Inside a `Modal` this is the dialog's own body; everywhere else it is null,
-  // which Radix reads as "portal to document.body" — see `portalContainer.ts`.
-  // A `<dialog>` opened with `showModal()` sits in the browser's top layer,
-  // which no `z-index` can reach, so a body-portalled bubble renders behind
-  // the modal that triggered it.
   const container = usePortalContainer();
   const [hoverOpen, setHoverOpen] = useState(false);
   const [touchOpen, setTouchOpen] = useState(false);
   const longPressTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const touchOrigin = useRef<{ x: number; y: number } | null>(null);
   const touchDragged = useRef(false);
-  /** `undefined` between touch sequences, so the first handler of a sequence wins the capture. */
   const openAtTouchStart = useRef<boolean | undefined>(undefined);
-  /** `null` until a tap opens the tooltip; then the echoed click has a deadline to beat. */
   const touchOpenedAt = useRef<number | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const hasContent =
@@ -168,11 +96,6 @@ export function Tooltip({
     clearTimeout(longPressTimer.current);
   }
 
-  /**
-   * A second tap has to close the bubble, and the pointerdown that dismisses
-   * it fires before `touchstart` — so read the open state at whichever of the
-   * two arrives first, before any dismissal can rewrite it.
-   */
   function captureOpenState() {
     if (openAtTouchStart.current !== undefined) return;
     openAtTouchStart.current = touchOpen;
@@ -237,20 +160,11 @@ export function Tooltip({
     forceClose();
   }
 
-  /**
-   * Radix's controllable state drops a close matching the `open` it last rendered: open+close
-   * in one tick (a modal returning then retaking focus) left the bubble up, eating the modal's
-   * first Escape. Clearing our own state closes it regardless.
-   */
   function forceClose() {
     setHoverOpen(false);
     setTouchOpen(false);
   }
 
-  /**
-   * A menu item's tooltip sits above the menu in Radix's layer stack, so Escape would close only
-   * it. Close it, then re-send Escape once (tooltip gone, so no loop) to close the menu too.
-   */
   function handleEscape() {
     if (!triggerRef.current?.closest('[role="menu"]')) return;
     forceClose();
@@ -260,29 +174,17 @@ export function Tooltip({
     );
   }
 
-  /** The browser took the gesture over (a scroll, usually) — no touchend is coming. */
   function handleTouchCancel() {
     touchDragged.current = true;
     endTouchSequence();
   }
 
-  /**
-   * Every dismissal Radix knows about — Escape, scroll, a tap outside, another
-   * tooltip, a hybrid device's mouse leaving — arrives here. Clearing the
-   * touch reveal too keeps a timeout-free bubble from getting stuck open.
-   */
   function handleOpenChange(open: boolean) {
     if (open && isNonKeyboardFocusOpen()) return;
     setHoverOpen(open);
     if (!open) setTouchOpen(false);
   }
 
-  /**
-   * Radix opens on any focus, including a dialog handing focus back to its
-   * trigger on close — which pops the bubble over whatever sits beside it.
-   * Only keyboard-driven focus should open it (`:focus-visible` semantics); a
-   * hovering mouse still does, since its focus is not what opened it.
-   */
   function isNonKeyboardFocusOpen() {
     const el = triggerRef.current;
     return !!el && !mouseHovering.current && document.activeElement === el && inputModality.pointer;
@@ -311,8 +213,6 @@ export function Tooltip({
   return (
     <ProviderUnlessShared>
       <TooltipPrimitive.Root
-        // No content, no bubble: a caller keeps one stable tree and passes
-        // nothing while it has nothing to say.
         open={(hoverOpen || touchOpen) && hasContent}
         onOpenChange={handleOpenChange}
       >
@@ -328,8 +228,6 @@ export function Tooltip({
           onTouchCancel={handleTouchCancel}
           onClick={suppressEchoedClose}
           onBlur={forceClose}
-          // A tap opens this bubble, so a clickable table row must leave the
-          // tap to it rather than open the row too (see DataTable).
           data-row-control={openOnTap ? '' : undefined}
         >
           {trigger}
@@ -353,18 +251,13 @@ export function Tooltip({
 }
 
 interface InfoTooltipProps {
-  /** Accessible name for the trigger button, e.g. "About Material Efficiency". */
   label: string;
-  /** One-line plain-language tooltip content; a node only to bold a caveat (see `Tooltip`). */
   content: ReactNode;
-  /** `accent` tints the trigger like the value it annotates; default is the dim glyph. */
   tone?: 'dim' | 'accent';
-  /** `info` draws an "i" instead of "?": a note on a value, not jargon to explain. */
   glyph?: 'help' | 'info';
   className?: string;
 }
 
-/** Small "?" (or "i") icon button + Tooltip, for labeling jargon next to a heading/label that isn't itself focusable. */
 export function InfoTooltip({
   label,
   content,
@@ -374,8 +267,6 @@ export function InfoTooltip({
 }: InfoTooltipProps) {
   return (
     <Tooltip content={content} openOnTap>
-      {/* A 16px circle in a 24px button (WCAG 2.5.8, §3's floor) whose negative margin keeps the
-          16px footprint. Never a pseudo-element hit area (§6c). */}
       <button
         type="button"
         aria-label={label}

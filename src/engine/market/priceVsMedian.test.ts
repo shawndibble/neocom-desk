@@ -9,14 +9,12 @@ import {
 import { historyPoint as point } from './__fixtures__/priceHistory';
 import { DAY_MS } from '@/lib/age';
 
-/** 2026-10-16 12:00 UTC. */
 const NOW = Date.parse('2026-10-16T12:00:00Z');
 
 function isoDaysAgo(days: number): string {
   return new Date(NOW - days * DAY_MS).toISOString().slice(0, 10);
 }
 
-/** One point a day for `days` full days ending yesterday, all at `average`. */
 function flatDays(days: number, average: number, startAgo = 1) {
   return Array.from({ length: days }, (_, i) => point({ date: isoDaysAgo(startAgo + i), average }));
 }

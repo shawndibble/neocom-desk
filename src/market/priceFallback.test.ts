@@ -165,7 +165,6 @@ describe('fetchAggregatesWithFallback', () => {
     expect(mocks.getMarketOrders).not.toHaveBeenCalled();
     expect(out.prices.get(1)).toEqual({ sellMin: 4, buyMax: 3, sellVolume: 12, buyVolume: 7 });
     expect(out.prices.get(2)).toEqual(none);
-    // Only a priced type is "stale": a type with no orders reads "no price", never both.
     expect([...out.stale]).toEqual([1]);
     expect(out.fromSnapshot).toBe(true);
   });

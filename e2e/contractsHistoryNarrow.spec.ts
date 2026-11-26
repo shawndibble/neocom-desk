@@ -1,12 +1,3 @@
-/**
- * Contracts History's detail opener on a phone (issue #1641).
- *
- * The History table has no row click: the Type/title button in each stacked
- * card's first line is the only visible way to open a contract's detail. A
- * bare text button is one line tall (~16px), well under the 36px touch floor;
- * the button now takes the touch tier below `md` and reverts to its one-line
- * height from `md` up. jsdom lays nothing out, so only a real render can pin it.
- */
 import { test, expect, PHONE } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 import { CHARACTER_ID } from './support/fixtureData';
@@ -47,9 +38,6 @@ const CONTRACTS = [
 test.describe('contracts history — detail opener', () => {
   test.beforeEach(async ({ page }) => {
     await signInAndGoto(page);
-    // Opening a detail fetches its items, which the list's `contracts*` glob
-    // doesn't cover (`*` stops at a `/`): unmocked, whichever contract sorts
-    // first (the three tie on issue date) could reach the real ESI.
     await page.route(
       `https://esi.evetech.net/characters/${CHARACTER_ID}/contracts/*/items*`,
       (route) => route.fulfill({ status: 200, contentType: 'application/json', body: '[]' })
@@ -85,7 +73,6 @@ test.describe('contracts history — detail opener', () => {
       page,
     }) => {
       await page.goto('./contracts/history');
-      // The three fixtures were issued together, so they share one day.
       const headers = page.locator('tr.dt-group-header');
       await expect(headers).toHaveCount(1);
       await expect(headers.first()).toContainText('3 contracts');
@@ -110,8 +97,6 @@ test.describe('contracts history — detail opener', () => {
     });
   });
 
-  // Issue #3960: at 768px the full desktop table measured 922px and dragged
-  // the whole page sideways. The table scrolls inside its own wrapper instead.
   for (const width of [390, 768, 1024, 1280]) {
     test.describe(`at ${width}px`, () => {
       test.use({ viewport: { width, height: 800 } });

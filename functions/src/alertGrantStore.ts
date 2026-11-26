@@ -1,6 +1,3 @@
-// Firestore side of the Alerts Grant (issue #3753, ADR 0020): `alertGrants/{characterId}`,
-// function-only (firestore.rules denies every client). Logic lives in alertGrant.ts.
-
 import { FieldValue, type Firestore, type QueryDocumentSnapshot } from 'firebase-admin/firestore';
 import {
   SsoRefreshError,
@@ -25,18 +22,14 @@ import type { RunStats } from './runStats.js';
 
 export const ALERT_GRANTS_COLLECTION = 'alertGrants';
 
-/** Grants per page of the due listing (issue #5236). */
 export const DUE_PAGE_SIZE = 300;
 
-/** Firestore side of the poller (issue #3756): see `PollerStore` for the contract. */
 export function firestorePollerStore(
   db: Firestore,
   deps: {
     key: () => Buffer;
     refresh: (clientId: string, refreshToken: string) => Promise<RefreshedTokens>;
-    /** Counters for this run's log line (issue #5144): in-memory, never written. */
     stats?: RunStats;
-    /** Shared with the nearby phase so a registration is read once per run. */
     registrations?: RegistrationReader;
   }
 ): PollerStore {
@@ -58,19 +51,8 @@ export function firestorePollerStore(
         stats?.add('firestoreWrites');
       }
     });
-  // The store lives for one poll run. The listing already read every active
-  // grant in full, so `refresh` starts from that copy instead of reading each
-  // doc again; the rotated-token write below still re-reads it in its
-  // transaction, so a re-grant since the listing is never overwritten. The
-  // copy can be minutes old by the end of a run: a grant the user deleted
-  // meanwhile is still tried once, but deleting it also revoked the token at
-  // SSO, so that refresh fails and every write stays guarded on the old blob.
   const listed = new Map<number, AlertGrantDoc>();
   return {
-    // Pages of the grants due now (`nextPollAt <= now`, index status + nextPollAt).
-    // A grant with no `nextPollAt` never matches that, so once a day every active
-    // grant is read, the missing ones are treated as due and stamped `0`: a grant
-    // saved before the field, or by a function version without it, is never lost.
     async listDue(nowMs) {
       const active: ListedGrant[] = [];
       const take = (d: QueryDocumentSnapshot) => {
@@ -115,11 +97,6 @@ export function firestorePollerStore(
       await guardedUpdate(characterId, guard, { nextPollAt: atMs });
     },
 
-    // SSO rotates the token, so the SSO call must not run inside a retryable
-    // transaction (a retry would redeem the already-rotated token and look like
-    // invalid_grant). Read, call SSO once, then write the rotated token back in
-    // a transaction that re-reads the doc: if a re-grant replaced the token in
-    // the meantime, the rotated one is discarded instead of overwriting it.
     async refresh(characterId) {
       let grant = listed.get(characterId);
       listed.delete(characterId);
@@ -168,8 +145,6 @@ export function firestorePollerStore(
       };
     },
 
-    // Poller writes are guarded on the token it refreshed with: a re-grant that
-    // landed during the ESI/FCM calls keeps its fresh state.
     async patch(characterId, guard, state) {
       await guardedUpdate(characterId, guard, state);
     },
@@ -194,7 +169,6 @@ export function firestorePollerStore(
     },
 
     async dropMailScope(characterId, guard, scopes) {
-      // The mail state goes with the scope: asking for mail again starts unmarked.
       await guardedUpdate(characterId, guard, {
         scopes,
         mailHighWaterId: FieldValue.delete(),

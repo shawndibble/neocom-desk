@@ -24,12 +24,6 @@ export interface ContactCounts {
   type: Record<ContactKind, number>;
 }
 
-/**
- * `ContactsFilter` plus the Across tab's own criterion, so `FilterBar`'s value
- * (issue #1282) can hold "Only disagreements" the same way it holds every
- * other chip. Local to this bar: `ContactsFilter` itself stays the Character tab's
- * type, with no across-only field grafted on for one consumer.
- */
 type ContactsBarValue = ContactsFilter & { disagreementsOnly: boolean };
 
 interface ContactsFilterBarProps {
@@ -40,18 +34,9 @@ interface ContactsFilterBarProps {
   disagreementsOnly: boolean;
   onDisagreementsOnlyChange: (value: boolean) => void;
   disagreementCount: number;
-  /** The active tab's column picker, drawn beside the filter trigger. */
   actions?: ReactNode;
 }
 
-/**
- * Search plus a chip per contact type and per standing category. Both groups
- * show every member with its count, zeros included — so "you have no alliance
- * contacts" is on screen rather than inferred from a missing chip. Shared by
- * both tabs (issue #1282's picker is per-tab, in `actions`); the Across tab
- * adds its own "disagreements only" chip, since that criterion means nothing
- * on the Character tab.
- */
 export function ContactsFilterBar({
   filter,
   onChange,

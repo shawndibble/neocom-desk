@@ -1,8 +1,3 @@
-/**
- * The Stock tab's small dialogs: name a market (rename), delete one,
- * add items to one by searching for each, or by pasting a whole list the way
- * Appraisal takes a paste.
- */
 import { useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, FieldError, LiveStatus, Modal, TextArea, TextInput } from '@/components/ui';
@@ -87,7 +82,6 @@ export function DeleteStockListDialog({
   name: string;
   onConfirm: () => void;
   onClose: () => void;
-  /** Where focus goes when the ⋮ that opened this is gone with the list (the last one). */
   returnFocusFallback: () => HTMLElement | null;
 }) {
   const { t } = useTranslation();
@@ -117,11 +111,6 @@ export function DeleteStockListDialog({
   );
 }
 
-/**
- * "Add items": search the market catalogue for one item at a time, give it a
- * quantity, Add. The dialog stays open for the next item, saying what was
- * added, so building a market list is a run of search-type-Enter.
- */
 export function AddStockItemDialog({
   listName,
   onAdd,
@@ -226,11 +215,6 @@ export function AddStockItemDialog({
   );
 }
 
-/**
- * "Paste a list": one item per line with the quantity to keep listed, in
- * any format the Appraisal reads (an inventory copy, `Name x 40`, `40 Name`).
- * A pasted item already on the list takes the new quantity.
- */
 export function PasteStockItemsDialog({
   listName,
   onAdd,
@@ -247,7 +231,6 @@ export function PasteStockItemsDialog({
   const [submits, setSubmits] = useState(0);
   const [busy, setBusy] = useState(false);
   const [empty, setEmpty] = useState(false);
-  // The item catalogue is a lazy download; offline it may be missing.
   const [catalogueFailed, setCatalogueFailed] = useState(false);
   const fieldRef = useRef<HTMLTextAreaElement>(null);
   const describedBy = [unmatched.length > 0 && `${id}-unmatched`, empty && `${id}-error`]
@@ -321,7 +304,6 @@ export function PasteStockItemsDialog({
             {t('stockTargets.add.unmatched', { count: unmatched.length })}
           </p>
         )}
-        {/* Always mounted, so a repeat of the same message is announced too (DESIGN.md §7). */}
         <LiveStatus announceKey={submits}>
           {unmatched.length > 0 && t('stockTargets.add.unmatched', { count: unmatched.length })}
         </LiveStatus>

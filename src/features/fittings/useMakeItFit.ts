@@ -1,9 +1,3 @@
-/**
- * "Make it fit" for the open Fitting (`findFitSwaps`): every fitted module's
- * and rig's meta siblings are recalculated whole under the same evaluator the
- * page's stats come from, priced at the pilot's Trade Hub. Runs only while
- * `enabled`, so a closed dialog costs nothing.
- */
 import { useEffect, useMemo, useState } from 'react';
 import type { FittingStats } from '@/engine/fittings/types';
 import { findFitSwaps, type FitSwap, type FitSwapsResult } from '@/engine/fittings/makeItFit';
@@ -17,11 +11,8 @@ import type { VariantEvaluator } from './useFittingEvaluation';
 import { yieldToEventLoop } from './yieldToEventLoop';
 
 export interface MakeItFitState {
-  /** Null while calculating. */
   result: FitSwapsResult | null;
-  /** The calculation threw; there is no result to show. */
   failed: boolean;
-  /** The open Fitting's stats as they stand, for each option's change list. */
   before: FittingStats | null;
 }
 

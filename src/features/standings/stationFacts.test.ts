@@ -11,13 +11,13 @@ const station = (
 ): NpcStationEntry => ({ id, name: `s${id}`, systemId, ownerCorporationId, ownerFactionId });
 
 const STATIONS = [
-  station(60003760, 30000142, JITA_NAVY, 500001), // Jita 4-4, Caldari Navy
-  station(2, 30000142, JITA_NAVY, 500001), // same system
+  station(60003760, 30000142, JITA_NAVY, 500001),
+  station(2, 30000142, JITA_NAVY, 500001),
   station(3, 30000144, JITA_NAVY, 500001),
-  station(4, 30000200, 1000002, 500001), // CBD, same faction
-  station(60005686, 30002053, 1000057, 500002), // Hek VIII, Boundless Creation
-  station(60004588, 30002510, 1000049, 500002), // Rens VI, Brutor Tribe
-  station(5, 30000300), // owner unknown
+  station(4, 30000200, 1000002, 500001),
+  station(60005686, 30002053, 1000057, 500002),
+  station(60004588, 30002510, 1000049, 500002),
+  station(5, 30000300),
 ];
 
 describe('corporationStationFacts', () => {

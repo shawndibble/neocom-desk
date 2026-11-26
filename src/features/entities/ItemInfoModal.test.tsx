@@ -18,8 +18,6 @@ vi.mock('@/sde/loadSde', () => ({
   loadPi: vi.fn(async () => ({ schematics: {}, raw: [] })),
   loadSkillAttributeModifiers: vi.fn(async () => ({})),
 }));
-// ItemDetailModal reads the baked type-info shard first. Mocked rather than
-// fetched (`onUnhandledRequest: 'error'`); null sends it to the ESI handlers below.
 vi.mock('@/sde/loadTypeInfo', () => ({ loadTypeInfo: vi.fn(async () => null) }));
 vi.mock('@/features/industry/blueprintCatalog', async (importOriginal) => {
   const entries: BlueprintCatalogEntry[] = [
@@ -72,6 +70,7 @@ const server = setupServer(
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 afterAll(() => server.close());
 afterEach(async () => {
+  server.resetHandlers();
   await db.esiCache.clear();
 });
 beforeEach(() => useItemInfoModalStore.setState({ request: null, staged: null }));
@@ -111,6 +110,18 @@ describe('ItemInfoModal with the real Item Detail', () => {
     await waitFor(() => expect(probe.search).toBe('?info=type-587'));
     await screen.findByRole('heading', { name: 'Rifter' });
     expect(screen.getByRole('dialog')).toBeInTheDocument();
+  });
+
+  it('looks the name up when the caller only had the #id fallback', async () => {
+    server.use(
+      http.post(`${ESI_BASE_URL}/universe/names`, () =>
+        HttpResponse.json([{ id: 34, name: 'Tritanium', category: 'inventory_type' }])
+      )
+    );
+    renderPage();
+    act(() => useItemInfoModalStore.getState().show({ typeId: 34, itemName: '#34' }));
+    await screen.findByRole('heading', { name: 'Tritanium' });
+    expect(screen.queryByRole('heading', { name: '#34' })).not.toBeInTheDocument();
   });
 
   it('Close closes in one press and Back in one pop', async () => {

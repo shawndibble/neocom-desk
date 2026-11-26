@@ -22,7 +22,6 @@ describe('reliableSellPrice', () => {
   });
 
   it('prices at the average instead when the cheapest order is a troll price', () => {
-    // Miasmos Quafe Ultramarine Edition: a sell order at 1000x what it trades for.
     expect(reliableSellPrice(100_000, 100)).toEqual({ price: 100, capped: true });
   });
 

@@ -15,13 +15,6 @@ import {
 import type { PayeeEntityKind } from './payees';
 
 const SEARCH_ENDPOINTS = ['getCharacterSearch'] as const;
-/**
- * The Payee form's Name box: typed text, with suggestions of the characters,
- * corporations and alliances it could be (narrowed by `kinds`). Picking one
- * verifies the Payee; the Payee form looks a typed name up on Save and saves
- * nothing that isn't someone in EVE. Without the search permission the
- * suggestions are the exact-name matches only, which need no scope.
- */
 export function PayeeNameField({
   id,
   characterId,
@@ -35,29 +28,21 @@ export function PayeeNameField({
   kinds,
 }: {
   id: string;
-  /** Whose token the search runs under; null with nobody logged in, which leaves the public exact-name matches. */
   characterId: number | null;
   value: string;
   onChange: (name: string) => void;
   onPick: (match: PayeeEntityMatch) => void;
-  /** Overrides the Payee form's placeholder. */
   placeholder?: string;
-  /** Names the box when no `<label htmlFor>` does. */
   ariaLabel?: string;
-  /** On the wrapper, e.g. to size it in a row. */
   className?: string;
-  /** The box's size; `sm` beside other `sm` controls in a row. */
   size?: 'sm' | 'md';
-  /** Only suggestions of these kinds; absent offers all three. */
   kinds?: readonly PayeeEntityKind[];
 }) {
   const { t } = useTranslation();
   const canSearch = useEndpointsGranted(SEARCH_ENDPOINTS) === true && characterId !== null;
   const [suggestions, setSuggestions] = useState<PayeeEntityMatch[]>([]);
   const [open, setOpen] = useState(false);
-  // Only the user's typing asks ESI; a picked or seeded name is already settled.
   const typing = useRef(false);
-  // Only the newest search may write results: ESI can answer out of order.
   const latest = useRef(0);
   const trimmed = value.trim();
   const shown =
@@ -83,7 +68,6 @@ export function PayeeNameField({
           if (ticket === latest.current) setSuggestions(hits);
         })
         .catch(() => {
-          // A failed suggestion lookup leaves the typed name; Save looks it up itself.
           if (ticket === latest.current && !controller.signal.aborted) setSuggestions([]);
         });
     }, LOOKUP_DEBOUNCE_MS);
@@ -161,7 +145,6 @@ export function PayeeNameField({
                 i === combo.activeIndex && `bg-panel-2 ${activeOptionClassName}`
               )}
               onMouseEnter={() => combo.setHighlight(i)}
-              // Keeps the input focused — a plain click would blur it first and close the list.
               onMouseDown={(e) => {
                 e.preventDefault();
                 choose(match);

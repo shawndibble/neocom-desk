@@ -169,7 +169,6 @@ describe('liveSources.fetch', () => {
     cached: { data, fetchedAt: new Date(DAY1), fromCache: false, truncated: false },
     needsReauth: false,
   });
-  // A hung call: the loader answers with the expired row, not flagged `fromCache`.
   const lieFi = <T>(data: T) => ({
     cached: {
       data,

@@ -1,16 +1,3 @@
-// Per-pull moon docs (issue #5256, ADR 0032): one doc per Extraction in
-// `corps/{id}/moonDocs/{extractionId}`, built from the raw structure-and-date rows. Shadow
-// mode: nothing reads the docs yet.
-//
-// The doc stores inputs, never time-derived state: no "ready", "fractured" or "expired", and
-// no tax. Every book is a Running account (decision 20261120-235011): nothing freezes a pull's
-// tax, and the server holds no prices, so the device prices every day. What is stored is what a
-// moon page needs to read in one go: the chunk's make-up and where it came from, the ore mined
-// across every row in the pull window (rows no charge covers included), and who mined it.
-//
-// Pure and dependency-free: src/engine/corpTaxBook/moonDocs.test.ts imports it to prove the
-// mined totals equal the client engine's `minedDuringExtraction`.
-
 import {
   chunkMinedPct,
   DEFAULT_EXPIRY_HOURS,
@@ -23,10 +10,6 @@ import { lockDateFor } from './corpTaxBookCheckpoint.js';
 import { HOUR_MS, utcDay } from './timeConstants.js';
 
 export const MOON_DOCS = 'moonDocs';
-/**
- * Bump when a field's meaning changes; the verifier then rewrites every doc, and a client built
- * for another schema reads the rows instead. 2: no frozen tax (decision 20261120-235011).
- */
 export const MOON_DOC_SCHEMA = 2;
 
 type Data = Record<string, unknown>;
@@ -38,7 +21,6 @@ export interface OreQty {
 
 export type ChunkSource = 'notification' | 'survey' | 'unknown';
 
-/** A pull's doc, as stored (plus a server `updatedAt` the writer adds). */
 export interface MoonDoc {
   schema: number;
   extractionId: string;
@@ -46,30 +28,19 @@ export interface MoonDoc {
   moonId: number;
   startedAt: string;
   chunkArrivalAt: string;
-  /** ISO instants; null when the Extraction's dates do not parse. */
   fracturedAt: string | null;
   expiresAt: string | null;
   cancelled: boolean;
-  /** Where the chunk's make-up came from. A linked survey's rocks live client-side, so it reads as `survey` with no lines. */
   chunk: { source: ChunkSource; oreLines: OreQty[] };
   surveyId: string | null;
-  /** Ore mined at the structure from the fracture day through the expiry day, per type. */
   mined: OreQty[];
-  /** Share of the chunk mined, 0-100; null without a make-up. Needs the fracture time to mean anything. */
   minedPct: number | null;
   minerCount: number;
-  /** Per Miner, the ore of every row in the window (a Miner is a grouping id, or `solo:<characterId>`). */
   miners: { minerId: string; oreLines: OreQty[] }[];
-  /**
-   * @deprecated Always 0 from schema 2: a pull's tax is never frozen on a Running account. Kept
-   * only so a client reading schema-1 docs still compiles; it goes when that client does.
-   */
   frozenTax: number;
-  /** @deprecated Always 0 from schema 2 (`frozenTax`). */
   frozenLines: number;
 }
 
-/** Engine `fractureAndExpiry`, as the dates it covers. Null when the dates do not parse. */
 export function pullWindow(
   x: Pick<MirrorExtraction, 'structureId' | 'naturalDecayTime' | 'laserFiredAt'>,
   expiryHours: Readonly<Record<string, number>>
@@ -87,25 +58,17 @@ export function pullWindow(
 const sorted = (m: Map<number, number>): OreQty[] =>
   [...m].map(([typeId, quantity]) => ({ typeId, quantity })).sort((a, b) => a.typeId - b.typeId);
 
-/** An Extraction doc's stored fields beyond the mirror: the notification's ore and a linked survey. */
 export interface StoredExtraction extends MirrorExtraction {
   oreLines?: OreQty[];
   surveyId?: string;
 }
 
-/** What every pull's doc reads besides its own rows. */
 export interface MoonRules {
   expiryHours: Readonly<Record<string, number>>;
-  /** @deprecated Ignored from schema 2: no tax is frozen. Accepted until the client's schema-1 tests go. */
   statements?: readonly Data[];
-  /** A Character's Miner (grouping docs); a Character in none is `solo:<id>`. */
   minerOf: (characterId: number, date: string) => string;
 }
 
-/**
- * One pull's doc. `rows` may hold the structure's rows beyond the window; the window is
- * applied here, so the result equals the engine's whatever the caller loaded.
- */
 export function computeMoonDoc(
   x: StoredExtraction,
   rows: readonly ObservedRow[],
@@ -128,11 +91,9 @@ export function computeMoonDoc(
 
   const notified = (x.oreLines ?? []).map((l) => ({ typeId: l.typeId, quantity: l.quantity }));
   const surveyId = typeof x.surveyId === 'string' ? x.surveyId : null;
-  // Source order (D13): a moon drill notification (started, else finished or fractured), then a linked survey.
   const source: ChunkSource =
     notified.length > 0 ? 'notification' : surveyId !== null ? 'survey' : 'unknown';
 
-  // A notification names only base ores: a variant mined counts against its base ore's line.
   const minedPct = notified.length > 0 ? chunkMinedPct(notified, sorted(mined)) : null;
 
   return {
@@ -158,7 +119,6 @@ export function computeMoonDoc(
   };
 }
 
-/** The fields a stored doc and a recompute are compared on (all but the server's `updatedAt`). */
 export function moonDocDiffers(stored: Data | undefined, fresh: MoonDoc): boolean {
   if (!stored) return true;
   const held = { ...stored };
@@ -179,17 +139,11 @@ function sortKeys(v: unknown): unknown {
 
 export interface MoonDocPlan {
   writes: MoonDoc[];
-  /** Docs whose Extraction is gone. */
   deletes: string[];
   checked: number;
-  /** Stored docs that differed from the recompute (not new ones): drift the verifier reports. */
   mismatches: { extractionId: string }[];
 }
 
-/**
- * Recomputes `wanted` pulls (or every pull) and says which docs to write. `rowsOf` returns a
- * structure's rows; a caller reads each structure once.
- */
 export function planMoonDocs(
   extractions: readonly StoredExtraction[],
   existing: ReadonlyMap<string, Data>,
@@ -217,12 +171,6 @@ export function planMoonDocs(
   return plan;
 }
 
-/**
- * The docs the nightly pass rebuilds (decision 20261120-235011): a pull whose window reaches the
- * lock date can still change; one wholly before it is locked, and is rebuilt only when its
- * doc is missing or on another schema. `held` maps each stored doc to its schema; a doc whose pull
- * is gone is checked too, so it is deleted. Nothing re-reads the rows of a locked pull.
- */
 export function moonDocsToCheck(
   extractions: readonly StoredExtraction[],
   held: ReadonlyMap<string, unknown>,
@@ -243,7 +191,6 @@ export function moonDocsToCheck(
   return out;
 }
 
-/** Whether two pulls at one structure cover the same day (the assumption the verifier checks, ADR 0032). */
 export function overlappingPulls(
   extractions: readonly object[],
   expiryHours: Readonly<Record<string, number>>

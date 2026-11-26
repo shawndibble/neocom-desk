@@ -1,11 +1,6 @@
 import type { CsvColumn, CsvTranslate } from '@/lib/csv';
 import { ownedBlueprintQuantity, type OwnedBlueprintRow } from './ownedBlueprints';
 
-/**
- * Export columns for Build Opportunities' "All owned" view, in the table's
- * order. A BPO's runs are blank (unlimited, not a count); an unranked
- * blueprint's ISK/hour is blank, never "Unknown".
- */
 export function ownedBlueprintsCsvColumns(
   t: CsvTranslate,
   locationLabel: (row: OwnedBlueprintRow) => string | null

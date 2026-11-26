@@ -64,7 +64,6 @@ describe('searchPlaces', () => {
   it('lists prefix matches first, then shorter names, and stops at the limit', () => {
     const found = searchPlaces('ba', index, 5);
     expect(found.map((p) => p.text)).toEqual(['Badivefi, Khanid']);
-    // A prefix beats a mid-name match; then the shorter name.
     expect(searchPlaces('d', index, 5).map((p) => p.text)).toEqual([
       'Domain (region)',
       'Khanid (region)',

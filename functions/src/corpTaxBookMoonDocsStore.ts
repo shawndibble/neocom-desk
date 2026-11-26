@@ -1,11 +1,3 @@
-// Firestore side of the per-pull moon docs (issue #5256, ADR 0032). The maths is in
-// corpTaxBookMoonDocs.ts; this loads a pull's rows and writes the docs that changed. A refresh
-// failure is logged and swallowed, never thrown into the sync or edit that caused it; the nightly
-// pass repairs it.
-//
-// Reads stay bounded (decision 20261120-235011): a pull is rebuilt from its own rows (each row
-// carries its `extractionId`), and the nightly pass rebuilds only the pulls that can still change.
-
 import { utcDay } from './timeConstants.js';
 import { FieldValue, type Firestore, type WriteBatch } from 'firebase-admin/firestore';
 import { commitInBatches, type BatchOp } from './commitInBatches.js';
@@ -28,7 +20,6 @@ const book = (db: Firestore, corporationId: number) =>
 const sub = (db: Firestore, corporationId: number, name: string) =>
   book(db, corporationId).collection(name);
 
-/** The book's Extractions and per-structure expiry: what every pull's window rests on. */
 async function loadPulls(db: Firestore, corporationId: number) {
   const [bookDoc, extractionSnap] = await Promise.all([
     book(db, corporationId).get(),
@@ -40,10 +31,6 @@ async function loadPulls(db: Firestore, corporationId: number) {
   };
 }
 
-/**
- * The rows of each wanted pull: by its `extractionId` once the book's rows are stamped, else
- * every row of its structure (a book the stamp backfill has not reached yet).
- */
 async function rowsOfPulls(
   db: Firestore,
   corporationId: number,
@@ -73,7 +60,6 @@ async function rowsOfPulls(
   return (structureId) => rows.get(structureId) ?? [];
 }
 
-/** Recomputes the docs of `scope` pulls and writes the ones that changed. */
 export async function reconcileMoonDocs(
   db: Firestore,
   corporationId: number,
@@ -104,7 +90,6 @@ export async function reconcileMoonDocs(
     const ops: BatchOp[] = [
       ...plan.writes.map((doc) => {
         const ref = sub(db, corporationId, MOON_DOCS).doc(doc.extractionId);
-        // A legacy Extraction doc may lack a field; `set` throws on undefined and would fail the batch.
         const data = Object.fromEntries(
           Object.entries({ ...doc, updatedAt: FieldValue.serverTimestamp() }).filter(
             ([, v]) => v !== undefined
@@ -122,11 +107,6 @@ export async function reconcileMoonDocs(
   return plan;
 }
 
-/**
- * The nightly pass over a book's moon docs: rebuilds the pulls that can still gain rows, and any
- * doc missing, on another schema or whose pull is gone (`moonDocsToCheck`), and reports pulls
- * that overlap. A closed pull's rows are never read again.
- */
 export async function verifyMoonDocs(
   db: Firestore,
   corporationId: number,
@@ -142,7 +122,6 @@ export async function verifyMoonDocs(
   return { plan, overlaps: overlappingPulls(pulls.extractions, pulls.expiryHours) };
 }
 
-/** Brings the docs of these pulls in line after rows or an edit moved them. Best effort. */
 export async function refreshMoonDocs(
   db: Firestore,
   corporationId: number,

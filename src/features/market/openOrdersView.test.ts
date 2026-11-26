@@ -62,7 +62,6 @@ describe('buildOpenOrdersView', () => {
       row(3, 'belowFloor', { iskTiedUp: 300, isBuyOrder: true }),
     ];
     expect(buildOpenOrdersView(rows, EMPTY_OPEN_ORDERS_FILTER).matchingIskTiedUp).toBe(1300);
-    // It follows the funnel: only the sell side matched, so the buy order's ISK is not in it.
     expect(
       buildOpenOrdersView(rows, { ...EMPTY_OPEN_ORDERS_FILTER, side: 'sell' }).matchingIskTiedUp
     ).toBe(1000);

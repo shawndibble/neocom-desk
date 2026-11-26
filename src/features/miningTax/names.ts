@@ -1,11 +1,9 @@
-/** Solar-system and ore-type name resolution for the Moon Mining Tax ledger (issue #523). */
 import { loadSystemNameAndSecurity } from '@/features/character/systemSecurity';
 import { loadOreFormNames } from './oreForm';
 import type { MoonMiningTaxRow } from './snapshot';
 
 export interface MiningTaxNames {
   systemNames: Map<number, string>;
-  /** Absent for a system that failed to resolve — distinct from a legitimate 0.0 (nullsec). */
   systemSecurity: Map<number, number>;
   typeNames: Map<number, string>;
 }
@@ -33,7 +31,6 @@ export async function resolveRowNames(
   return { systemNames, systemSecurity, typeNames };
 }
 
-/** A system's resolved name, or `#id` when it failed to resolve. */
 export function systemLabel(systemNames: ReadonlyMap<number, string>, id: number): string {
   return systemNames.get(id) ?? `#${String(id)}`;
 }

@@ -28,7 +28,7 @@ import { LandingShellOffLandingRelease } from './landingShell';
 import { DocumentTitleTracker } from './DocumentTitleTracker';
 import { StaleStoresReloader } from './StaleStoresReloader';
 import { ReloadPrompt } from './ReloadPrompt';
-import './installApp'; // registers the beforeinstallprompt listener at boot
+import './installApp';
 import { BootScreen } from './BootScreen';
 import { ROUTER_BASENAME } from './routerPath';
 import { Spinner, TooltipProvider } from '@/components/ui';
@@ -40,6 +40,7 @@ import { InfoModals } from './InfoModals';
 import { AuthFailureRedirect } from './AuthFailureNotice';
 import { LegacyPathRedirect } from './LegacyPathRedirect';
 import { AlertsRedirect } from './AlertsRedirect';
+import { SkillsIndexRedirect } from './SkillsIndexRedirect';
 import type { AppRoutePath } from './routeScopes';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useNumberFormat } from '@/lib/numberFormat';
@@ -47,15 +48,8 @@ import { requestPersistenceWhenInstalled } from '@/lib/persistStorage';
 import { checkStorageAtRisk } from '@/features/settings/storageAtRisk';
 import { useCharacterCountOrLoading } from '@/features/character/useCharacters';
 
-// Wire authenticated ESI calls to stored tokens once, at module load
-// (`appWiring.tsx`), and queue the active Character's reads first.
 configureAppEsi();
 
-// Code-split routes (`routeChunks.ts`). Login, Callback and NotFound stay
-// eager above: a signed-out cold load can land on them before any choice.
-// The signed-in shell is split so a first visit to /login skips it, and
-// preloaded at boot for a returning user (`bootShellPreload.ts`) —
-// `preloadedLazy` then renders it with no fallback frame once it is in.
 const Layout = preloadedLazy(routeChunks.loadLayout);
 const Overview = preloadedLazy(routeChunks.loadOverview);
 const Characters = lazy(routeChunks.loadCharacters);
@@ -103,12 +97,6 @@ const CorpTaxBookVerify = lazy(routeChunks.loadCorpTaxBookVerify);
 const CorpTaxBookRemoveNow = lazy(routeChunks.loadCorpTaxBookRemoveNow);
 const ErrorProbe = lazy(routeChunks.loadErrorProbe);
 
-/**
- * Suspense fallback for the lazy routes outside `Layout` (`/share/fitting`,
- * `/share/:shareId`, `/error`). Feature routes suspend inside `Layout`'s own
- * boundary instead, so the shell stays up. Not `BootScreen`: that one reports
- * a boot stall after ten seconds, and a slow chunk is not a stalled boot.
- */
 function RouteFallback() {
   const { t } = useTranslation();
   return (
@@ -118,22 +106,8 @@ function RouteFallback() {
   );
 }
 
-/**
- * `<Routes>` with Sentry's route-pattern reporting layered on, so a navigation
- * transaction is named `/skills/plans/:planId` rather than one distinct
- * transaction per plan id. Wrapped once, at the top level only — a nested
- * `<Routes>` must stay unwrapped. Inert unless `instrument.ts` found a DSN.
- */
 const SentryRoutes = withSentryReactRouterV7Routing(Routes);
 
-/**
- * `Layout`, loaded as its own chunk (`preloadedLazy`). While it is still on
- * the way the fallback is the screen `RequireCharacter` was just showing, so
- * the hand-off does not jump — without a `gate`, because a slow download is
- * not a stalled boot and the boot recovery would only restart it. A chunk that
- * fails shows the Reload screen, and navigating retries it: the boundary
- * resets on the path, and `preloadedLazy` does not cache the failure.
- */
 function SignedInShell() {
   const location = useLocation();
   return (
@@ -145,40 +119,23 @@ function SignedInShell() {
   );
 }
 
-/**
- * Every feature route, keyed by path. `satisfies Record<AppRoutePath, ...>` is
- * what makes a route without a scope declaration a *compile* error, in both
- * directions. Do not hand-write a literal route element for a feature route
- * below — it would slip past both checks; `routeScopes.test.ts` scans this
- * file's source to keep that honest.
- */
 const ROUTE_ELEMENTS = {
   '/characters': <Characters />,
   '/overview': <Overview />,
-  // Retired page: the bell's panel replaced it, so this just opens that.
   '/alerts': <AlertsRedirect />,
-  // The Skills section opens on planning: /skills is an index that redirects,
-  // so the rail's own link (and any existing bookmark) lands on the plan list
-  // while the trained view keeps a URL of its own.
-  '/skills': <Navigate to="/skills/plans" replace />,
+  '/skills': <SkillsIndexRedirect />,
   '/skills/trained': <Skills />,
   '/skills/plans': <SkillPlans />,
   '/skills/plans/:planId': <SkillPlanEditor />,
-  // Retired page: Compare is a drawer over Trained now (`legacyPaths.ts`).
   '/skills/compare': <LegacyPathRedirect />,
   '/skills/certificates': <SkillCertificates />,
   '/industry': <Industry />,
   '/industry/plans/:planId': <IndustryPlanPage />,
   '/industry/groups/:groupId': <IndustryGroupPage />,
-  // A tabbed page (`pageTabs.ts`): the Fittings tab, the editor below it and
-  // the Ship Tree are all this one route.
   '/ships': <Ships />,
   '/ships/fittings/compare': <FittingCompare />,
   '/market': <Market />,
   '/wallet': <Wallet />,
-  // LP Store is a Wallet tab (it was a Market tab before; `PAGE_LEGACY_LOCATIONS`
-  // sends `/market/lp-store` here). Its oldest paths, under `/wallet/loyalty`,
-  // redirect for good.
   '/wallet/lp-store': <LoyaltyStore />,
   '/wallet/lp-store/:corporationId': <LoyaltyStore />,
   '/wallet/loyalty': <LegacyPathRedirect />,
@@ -186,7 +143,6 @@ const ROUTE_ELEMENTS = {
   '/mining': <MoonMiningTax />,
   '/clones': <Clones />,
   '/planetary-industry': <PlanetaryIndustry />,
-  // The Advisor tab retired; the old path redirects for good.
   '/planetary-industry/advisor': <LegacyPathRedirect />,
   '/employment-history': <EmploymentHistory />,
   '/corp': <Corp />,
@@ -205,40 +161,23 @@ const ROUTE_ELEMENTS = {
   '/calendar': <Calendar />,
   '/communities': <Communities />,
   '/contracts': <Contracts />,
-  // The BPC search moved into Industry's tab strip; the old path stays as a
-  // redirect so bookmarks and any link already in the wild still land on it.
   '/bpc-contracts': <Navigate to={industryTabHref('sourcing')} replace />,
   '/contacts': <Contacts />,
   '/travel': <Travel />,
-  // Pilot Lookup is the Travel tab `/travel/pilot`; its short-lived own page redirects there.
   '/pilot-lookup': <LegacyPathRedirect />,
   '/settings': <Settings />,
-  // Shortcuts, FAQ and Help left Settings for their own page; the old paths redirect for good.
   '/settings/shortcuts': <LegacyPathRedirect />,
   '/settings/faq': <LegacyPathRedirect />,
   '/settings/help': <LegacyPathRedirect />,
   '/help': <Help />,
 } satisfies Record<AppRoutePath, ReactElement>;
 
-// `Object.entries` widens the key back to `string`; the union is the point.
 const FEATURE_ROUTES = Object.entries(ROUTE_ELEMENTS) as [AppRoutePath, ReactElement][];
 
-/**
- * Index gate: an active Character -> /overview, characters but none picked ->
- * /characters, none at all -> /login.
- *
- * Overview is what the rail opens with and what a returning user came back
- * for; the character list is a place you go to switch or add one, so landing
- * there every time made every visit start with a step. Waits on the
- * active-character store as well as the count — deciding before hydration
- * resolves would send a returning user to /characters, which Overview's own
- * guard would then have to send back.
- */
 function Root() {
   const characterCount = useCharacterCountOrLoading();
   const hydrated = useActiveCharacter((state) => state.hydrated);
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
-  // A landing section's hash (`/#login-faq`) survives the hop to the page that has it.
   const { hash } = useLocation();
   if (characterCount === undefined || !hydrated) return <BootScreen gate="root" />;
   if (characterCount === 0) return <Navigate to={{ pathname: '/login', hash }} replace />;
@@ -247,40 +186,23 @@ function Root() {
 
 const NO_CHARACTER_IDS: number[] = [];
 
-/**
- * Boot wiring and the Dexie/store subscriptions that go with it. Its own
- * component, rendering nothing, so a character change re-renders only this and
- * not the `<BrowserRouter>` tree (and its route table) below.
- */
 function AppEffects() {
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
-  // The state every page reads: the active Character, its view snapshots, the
-  // device preferences and the auth-failure subscription (`appWiring.tsx`).
   useAppStateHydration();
 
-  // Same wiring as the auth-failure signal, for the activity log (issue #32).
   useEffect(() => subscribeToEsiActivity(), []);
 
-  // And again for a blocked IndexedDB upgrade — the one Dexie failure that
-  // never surfaces as an error, so it needs reporting to exist at all.
   useEffect(() => subscribeToUpgradeBlockedReports(), []);
   useEffect(() => reloadOnDatabaseWipe(), []);
   useEffect(() => scheduleCachePrune(), []);
   useEffect(() => scheduleLazySdeWarm(), []);
-  // An installed app is where the browser agrees to keep the data; a device
-  // set up in a tab, or by import, may never have asked since (persistStorage.ts).
   useEffect(() => {
     void requestPersistenceWhenInstalled()
       .then(() => checkStorageAtRisk())
       .catch(() => undefined);
   }, []);
-  // Back online: drop held failures, re-read, sync, warm what was skipped.
   useEffect(() => startReconnectRecovery(), []);
 
-  // Fire-and-forget, on app start (once hydration resolves an active character)
-  // and every character switch, in the first idle slot so it does not compete
-  // with the first route's render (`bootSync.ts`). Errors (offline, no Firebase
-  // config) are swallowed — surfaced instead via subscribeSyncStatus.
   useEffect(() => {
     if (activeCharacterId === null || !isSyncConfigured()) return;
     return scheduleBootSync(activeCharacterId, (id) => {
@@ -288,34 +210,18 @@ function AppEffects() {
     });
   }, [activeCharacterId]);
 
-  // The above covers the active Character at boot. This covers the rest of
-  // them, and covers a tab that has been open long enough for another device
-  // to have changed something — see backgroundSync.ts.
-  // One query serves the three consumers and the shell hint below. No default:
-  // `undefined` is "not read yet", which must not clear the hint.
   const readIds = useLiveQuery(() => db.characters.toCollection().primaryKeys());
   const characterIds = readIds ?? NO_CHARACTER_IDS;
   useBackgroundSync(characterIds, activeCharacterId);
-  // Proves the stored Characters as one Player for corporations' grouping (once per load).
   usePlayerClaim(characterIds);
-  // Keeps what Characters share with their Communities current (issue #3600).
   usePublishSharedLibraries(characterIds, activeCharacterId);
-  // Marks Request Pledges delivered from finished contracts (issue #3809).
   useSyncRequestDeliveries(characterIds, activeCharacterId);
 
-  // Keeps `bootShellPreload.ts`'s hint in step with Dexie, so the next cold
-  // load knows to fetch the signed-in shell early.
   const characterCount = readIds?.length;
   useEffect(() => {
     if (characterCount !== undefined) writeSignedInShellHint(characterCount > 0);
   }, [characterCount]);
 
-  // Same shape, for API-derived data: warm every granted surface into Dexie at
-  // boot so a later page opens from cache rather than the network. Cancelled on
-  // character switch so a slow run cannot keep spending requests for a
-  // character the user has already left. Deferred to an idle slot and loaded
-  // as its own chunk (`bootPrefetch.ts`), so it neither weighs on the startup
-  // bundle nor races the visible route's own reads.
   useEffect(() => {
     if (activeCharacterId === null) return;
     return scheduleBootPrefetch(activeCharacterId);
@@ -325,10 +231,6 @@ function AppEffects() {
 }
 
 export function App() {
-  // Formatters read the number format when they run rather than subscribing,
-  // so a change would leave what is on screen in the old format. Keying the
-  // routes on the resolved format remounts them once, when the format changes
-  // (picking the format already in use does nothing).
   const numberStyle = useNumberFormat((state) => state.value);
 
   return (
@@ -346,12 +248,8 @@ export function App() {
               <Route path="/" element={<Root />} />
               <Route path="/login" element={<Login />} />
               <Route path="/callback" element={<Callback />} />
-              {/* Below: a logged-in Character, then the route's own scopes. */}
               <Route element={<RequireCharacter />}>
                 <Route element={<SignedInShell />}>
-                  {/* A tabbed page (`pageTabs.ts`) mounts once at `<path>/*`, so
-                  its tabs are one route instance: switching tab keeps the
-                  page mounted, and none of the tables above gain an entry. */}
                   {FEATURE_ROUTES.map(([path, element]) => (
                     <Route
                       key={path}
@@ -361,30 +259,14 @@ export function App() {
                   ))}
                 </Route>
               </Route>
-              {/* A Fitting Share Code opened with no session (#1544) — it must
-              open with no Character, so it sits outside
-              RequireCharacter/ScopeGate. A
-              visitor with a Character never sees it: FittingShared redirects
-              straight into the editor instead. routeScopes.test.ts asserts
-              this exemption is deliberate. */}
               <Route path="/share/fitting" element={<FittingShared />} />
-              {/* A Share Link (`/s/<id>`), for any share type — same
-              exemption. `/share/<id>` is the old spelling of the same link
-              (ids minted before the short key), kept so links already sent
-              still open; the literal `/share/fitting` above outranks it. */}
               <Route path="/s/:shareId" element={<SharedLink />} />
-              {/* A Survey start link and the page that builds one: no login either. */}
               <Route path="/survey" element={<SurveyStart />} />
-              {/* A corp's apply link: an applicant has no account, and signs each character in on the page. */}
               <Route path="/apply/:corpId" element={<Apply />} />
-              {/* The invite link: a signed-out visitor sees what it is for before logging in. */}
               <Route path="/communities/join/:code" element={<CommunityJoin />} />
               <Route path="/share/:shareId" element={<SharedLink />} />
-              {/* A late notice's verify link (#4066): read-only, no login, the token is the credential. */}
               <Route path="/corp-tax-book/verify/:token" element={<CorpTaxBookVerify />} />
-              {/* The payee's "Remove now" link in a removal mail (#4520): signs in on the page. */}
               <Route path="/corp-tax-book/remove-now/:code" element={<CorpTaxBookRemoveNow />} />
-              {/* Undisclosed Sentry probe — see routes/ErrorProbe.tsx. */}
               <Route path="/error" element={<ErrorProbe />} />
               <Route path="*" element={<NotFound />} />
             </SentryRoutes>

@@ -1,7 +1,6 @@
 import type { OpenOrderRow } from '../openOrdersModel';
 import { DAY_MS } from '@/lib/age';
 
-/** A healthy, uncomplicated sell order of Tritanium at Jita 4-4 — override only what a test is about. */
 export function openOrderRow(overrides: Partial<OpenOrderRow> = {}): OpenOrderRow {
   return {
     orderId: 101,

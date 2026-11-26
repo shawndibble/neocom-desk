@@ -1,8 +1,3 @@
-// Public ESI reads Shared Pops need (issue #6223): which corporation and alliance each Character
-// is in, and the book corporation's alliance. No token, no scope; same identification headers as
-// every other ESI call (esiClient.ts). Affiliations are cached a few minutes per Character so a
-// Calendar refresh or a notification sweep does not ask again.
-
 import { ESI_BASE, esiGet } from './esiClient.js';
 import { throwForEsi } from './esiThrow.js';
 import { chunk } from './chunk.js';
@@ -12,17 +7,13 @@ export interface Affiliation {
   allianceId: number | null;
 }
 
-/** Each Character's corporation and alliance; a Character ESI does not answer for is left out. */
 export type AffiliationLookup = (
   characterIds: readonly number[]
 ) => Promise<Map<number, Affiliation>>;
 
-/** A corporation's alliance, or null outside one. */
 export type CorporationAllianceLookup = (corporationId: number) => Promise<number | null>;
 
-/** How long one Character's affiliation is trusted (ESI itself caches the endpoint for an hour). */
 export const AFFILIATION_CACHE_MS = 5 * 60_000;
-/** ESI's limit on ids per affiliation request. */
 const AFFILIATION_BATCH = 1000;
 
 export function esiAffiliations(

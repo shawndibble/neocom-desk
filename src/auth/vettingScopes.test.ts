@@ -20,7 +20,6 @@ describe('VETTING_SCOPES', () => {
   });
 
   it('is exactly what the server demands of a vetting token', () => {
-    // Read as text: the functions package is not part of this module graph.
     const serverSource = readFileSync('functions/src/vettingScopes.ts', 'utf8');
     const serverScopes = [...serverSource.matchAll(/['"](esi-[a-z_.-]+\.v\d+)['"]/g)].map(
       (match) => match[1]

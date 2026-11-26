@@ -206,7 +206,6 @@ describe('evidenceWhatKey', () => {
   it('knows the rows the checks produce and nothing else', () => {
     expect(evidenceWhatKey('player_donation')).toBe('vetting.what.player_donation');
     expect(evidenceWhatKey('member')).toBe('vetting.what.member');
-    // A word ESI adds later is never shown raw.
     expect(evidenceWhatKey('some_new_ref_type')).toBe('vetting.what.other');
   });
 });
@@ -234,7 +233,6 @@ describe('missingChecks', () => {
     const checks = assessment({
       checks: [{ check: 'undeclaredCharacter', state: 'missing', missingFor: [2] }],
     });
-    // Nothing says which of the check's sources is missing: every one the engine lists.
     expect(missingChecks(checks, [{ characterId: 2, name: 'Mira Vell' }])).toEqual([
       {
         check: 'undeclaredCharacter',

@@ -1,10 +1,4 @@
 #!/usr/bin/env node
-// `npm run ui:catalog [Name]`: the component catalogue as compact text.
-//
-// No name: every documented component with its one-line summary. With a name:
-// its props, summary and story ids. Source is Storybook's components manifest
-// for this worktree's code, cached by HEAD + dirty files so a repeat call is
-// near-instant (see .cache/ui-catalog.json).
 
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -34,7 +28,6 @@ if (args.length > 1) {
 
 const git = (...a) => execFileSync('git', a, { cwd: root, encoding: 'buffer', maxBuffer: 1 << 28 });
 
-/** HEAD + every tracked/untracked change: same key means same code. */
 const codeKey = () => {
   const hash = createHash('sha1').update(git('rev-parse', 'HEAD')).update(git('diff', 'HEAD'));
   const untracked = git('ls-files', '--others', '--exclude-standard', '-z')
@@ -45,9 +38,7 @@ const codeKey = () => {
     hash.update(file);
     try {
       hash.update(readFileSync(join(root, file)));
-    } catch {
-      // vanished mid-run
-    }
+    } catch {}
   }
   return hash.digest('hex');
 };
@@ -59,9 +50,7 @@ const loadManifest = async () => {
   try {
     const cached = JSON.parse(readFileSync(cacheFile, 'utf8'));
     if (cached.key === key) return cached.manifest;
-  } catch {
-    // no cache yet
-  }
+  } catch {}
   const manifest = await withStorybook(async (base) => {
     const res = await fetch(`${base}/manifests/components.json`);
     if (!res.ok) throw new Error(`components manifest: HTTP ${res.status}`);

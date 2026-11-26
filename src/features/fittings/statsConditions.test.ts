@@ -52,7 +52,6 @@ describe('useProjectedSources', () => {
       projection: { buffs: [{ id: 12, value: 25 }], effects: [] },
     };
     useProjectedSources.getState().setSources([source]);
-    // A re-render of the same Character keeps them.
     useActiveCharacter.setState({ activeCharacterId: 1 });
     expect(useProjectedSources.getState().sources).toEqual([source]);
     useActiveCharacter.setState({ activeCharacterId: 2 });

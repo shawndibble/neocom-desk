@@ -7,20 +7,11 @@ import type { BpoOffer } from './bpoAvailability';
 
 interface BpoBadgeProps {
   bpo: BpoOffer;
-  /** `bpoMayBeCheaper` for this row's own offer — highlights the badge. */
   mayBeCheaper: boolean;
-  /** Station name of the BPO, `null` when unresolved (e.g. a player structure). */
   locationName: string | null;
   regionName: string;
 }
 
-/**
- * "A BPO is for sale too" on a BPC Sourcing row (issue #1241). The visible
- * text stays short so it never widens the Item column; price and location
- * live in the tooltip, one per line, and in the accessible name. Its tap
- * only explains (`openOnTap`), so it is stopped from reaching the row, whose
- * own tap opens the contract.
- */
 export function BpoBadge({ bpo, mayBeCheaper, locationName, regionName }: BpoBadgeProps) {
   const { t } = useTranslation();
   const where = locationName ?? regionName;
@@ -44,8 +35,6 @@ export function BpoBadge({ bpo, mayBeCheaper, locationName, regionName }: BpoBad
   }
 
   return (
-    // Static label with a tooltip: no box (§6c). The wrapper stops the tap
-    // reaching the row, whose own tap opens the contract.
     <span onClick={stop} onKeyDown={stop} className="inline-flex max-w-full min-w-0">
       <HintText
         content={details}

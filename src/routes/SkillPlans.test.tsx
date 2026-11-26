@@ -49,8 +49,6 @@ describe('SkillPlans Optimize queue', () => {
     const user = userEvent.setup({ delay: null });
     renderSkillsRoutes();
 
-    // A phone (jsdom's default) offers it in the New plan menu. The item is
-    // disabled until the queue loads, so reopen the menu until it enables.
     const optimizeItem = () =>
       screen.getByRole('menuitem', { name: 'From your skill queue, optimized' });
     await waitFor(async () => {
@@ -86,8 +84,6 @@ describe('SkillPlans Optimize queue', () => {
     const user = userEvent.setup({ delay: null });
     renderSkillsRoutes();
 
-    // Re-queried on every poll, never held: the menu can remount its items
-    // while the page's inputs settle, and a held reference then goes stale.
     const optimizeItem = () =>
       screen.getByRole('menuitem', { name: 'From your skill queue, optimized' });
     await user.click(await screen.findByRole('button', { name: 'More ways to start a plan' }));
@@ -131,7 +127,6 @@ describe('SkillPlans CRUD', () => {
   });
 
   it('imports a cleanly pasted skill plan into a new plan with no dialog, and offers Undo', async () => {
-    // What GlobalPasteRouter navigates with: react-router keeps location state under `usr`.
     window.history.replaceState(
       { usr: { skillPlanImportText: 'Gunnery V' }, key: 'paste', idx: 0 },
       '',
@@ -149,13 +144,9 @@ describe('SkillPlans CRUD', () => {
       return all;
     });
     await waitFor(() => expect(window.location.pathname).toBe(`/skills/plans/${stored[0].id}`));
-    // The import lands "Gunnery V" as one row; once the Character's trained skills
-    // arrive the editor splits it into one row per level (I-V). Wait for that, or
-    // the split can land after Undo and write the rows back over it.
     await waitFor(async () => {
       expect((await db.skillPlans.get(stored[0].id))?.entries).toHaveLength(5);
     });
-    // Spent: a reload must not import again or make a second plan.
     await waitFor(() => expect((window.history.state as { usr: unknown }).usr).toBeNull());
 
     await user.click(await screen.findByRole('button', { name: /undo/i }));
@@ -243,12 +234,8 @@ describe('SkillPlans CRUD', () => {
 
     expect(screen.queryByRole('dialog', { name: 'Delete' })).not.toBeInTheDocument();
     expect(await screen.findByRole('button', { name: 'Undo' })).toBeInTheDocument();
-    // Pending: the write waits for the toast.
     expect(markPlanDeletedMock).not.toHaveBeenCalled();
 
-    // Closing the toast commits it. Deletes MUST go through markPlanDeleted
-    // (records a tombstone) — a plain Dexie delete would let the remote copy
-    // resurrect it on next sync.
     await user.keyboard('{Escape}');
     await waitFor(() => expect(markPlanDeletedMock).toHaveBeenCalledWith(CHAR_ID, 'plan-1'));
   });
@@ -308,13 +295,10 @@ describe('SkillPlans: the section title survives opening a plan', () => {
 
 describe('SkillPlans layout: side by side list + editor (#158)', () => {
   it('shows one column at a time on narrow screens, with a back control that returns to the list', async () => {
-    // jsdom's default `window.matchMedia` (vitest.setup.ts) never matches,
-    // so this already runs as a narrow viewport.
     const user = userEvent.setup({ delay: null });
     await db.skillPlans.add(seedPlan());
     renderSkillsRoutes();
 
-    // The rail leads on a phone: the plan row and the one Accelerator row, then the queue.
     expect(await screen.findByRole('button', { name: 'New plan' })).toBeInTheDocument();
     expect(await screen.findByRole('button', { name: /^Accelerator/ })).toBeInTheDocument();
     expect(screen.queryByRole('region', { name: 'Attributes' })).not.toBeInTheDocument();
@@ -323,10 +307,6 @@ describe('SkillPlans layout: side by side list + editor (#158)', () => {
     await user.click(await screen.findByText('Test plan'));
     await screen.findByText('Your entries');
 
-    // The editor's sidebar — the plan list and, below it, the plan's tools —
-    // is not built at all below `lg`: the tools move into the single column
-    // as a collapsed disclosure, and rendering the list hidden beside them
-    // would keep a live Dexie subscription alive for a pane nobody can see.
     expect(screen.queryByRole('link', { name: 'Test plan' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /plan tools/i })).toBeInTheDocument();
     expect(await screen.findByRole('link', { name: 'Back to plans' })).toBeInTheDocument();
@@ -344,7 +324,6 @@ describe('SkillPlans layout: side by side list + editor (#158)', () => {
     await db.skillPlans.add(seedPlan());
     renderSkillsRoutes();
 
-    // Desktop keeps the Attributes panel (with Optimize queue) and no phone Accelerator row.
     expect(await screen.findByRole('heading', { name: 'Attributes' })).toBeInTheDocument();
     expect(await screen.findByRole('button', { name: 'Optimize queue' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^Accelerator/ })).not.toBeInTheDocument();
@@ -352,10 +331,6 @@ describe('SkillPlans layout: side by side list + editor (#158)', () => {
     await user.click(await screen.findByRole('link', { name: /^Test plan/ }));
     await screen.findByText('Your entries');
 
-    // `find`, not `get`: 'Your entries' first renders on the very tick the
-    // catalog arrives and `PlanEditor` replaces the loading layout, which
-    // remounts `PlanListPane` in that slot — so the list is momentarily a
-    // spinner at exactly the moment the editor appears.
     const listPanel = (await screen.findByRole('link', { name: /^Test plan/ })).closest('section');
     expect(listPanel).not.toHaveClass('hidden');
     expect(screen.queryByRole('link', { name: 'Back to plans' })).not.toBeInTheDocument();
@@ -363,7 +338,6 @@ describe('SkillPlans layout: side by side list + editor (#158)', () => {
 });
 
 describe('SkillPlans: current attributes beside the plan list', () => {
-  // Full labels and the remap note are the desktop rail; a phone gets one short line.
   beforeEach(() => {
     stubViewport(() => true);
   });
@@ -371,8 +345,6 @@ describe('SkillPlans: current attributes beside the plan list', () => {
     (await screen.findByRole('heading', { name: 'Attributes' })).closest('section')!;
 
   it("shows the character's attributes from ESI, not the planner's placeholder defaults", async () => {
-    // Distinct from usePlanEditorData's DEFAULT_ATTRIBUTES (20/20/20/20/19),
-    // which the pane would otherwise present as the character's own sheet.
     server.use(
       http.get(`https://esi.evetech.net/characters/${CHAR_ID}/attributes`, () =>
         HttpResponse.json({
@@ -395,8 +367,6 @@ describe('SkillPlans: current attributes beside the plan list', () => {
 
   it('adds the implant bonus on top of the base attribute, as the trained view does', async () => {
     server.use(
-      // Attribute-enhancer implant: ESI's attribute values already include it,
-      // so the chip reads base + bonus = effective.
       http.get(`https://esi.evetech.net/characters/${CHAR_ID}/implants`, () =>
         HttpResponse.json([9899])
       ),
@@ -407,7 +377,7 @@ describe('SkillPlans: current attributes beside the plan list', () => {
           description: '',
           group_id: 300,
           published: true,
-          dogma_attributes: [{ attribute_id: 178, value: 3 }], // +3 perception
+          dogma_attributes: [{ attribute_id: 178, value: 3 }],
         })
       ),
       http.get(`https://esi.evetech.net/characters/${CHAR_ID}/attributes`, () =>
@@ -445,7 +415,6 @@ describe('SkillPlans: an injected accelerator under Attributes', () => {
     (await screen.findByRole('heading', { name: 'Attributes' })).closest('section')!;
 
   it('lets the pilot set the time left on a detected accelerator without opening a plan', async () => {
-    // +3 on every attribute over a legal 99-point sheet: an injected accelerator.
     server.use(
       http.get(`https://esi.evetech.net/characters/${CHAR_ID}/attributes`, () =>
         HttpResponse.json({
@@ -476,9 +445,6 @@ describe('SkillPlans: an injected accelerator under Attributes', () => {
 
 describe('SkillPlans editor: the same attributes, on the route they are costed on', () => {
   it("shows the character's current attributes in the editor's tools pane, dated", async () => {
-    // Distinct from usePlanEditorData's DEFAULT_ATTRIBUTES (20/20/20/20/19),
-    // so this proves ESI's own read reached the editor and not the fallback
-    // sheet computeSchedule falls back to.
     server.use(
       http.get(`https://esi.evetech.net/characters/${CHAR_ID}/attributes`, () =>
         HttpResponse.json({
@@ -500,7 +466,6 @@ describe('SkillPlans editor: the same attributes, on the route they are costed o
     expect(within(section).getByText('INT')).toBeInTheDocument();
     expect(within(section).getByText('25')).toBeInTheDocument();
     expect(section.querySelector('time')).not.toBeNull();
-    // The what-if lens is not in this section: it sits in the closed Assumptions row.
     expect(within(section).queryByLabelText('What-if implants')).toBeNull();
     await openAssumptions();
     expect(screen.getByLabelText('What-if implants')).toBeInTheDocument();
@@ -511,7 +476,6 @@ describe('SkillPlans: cached data notice', () => {
   it('says nothing while every read is live', async () => {
     renderSkillsRoutes();
     expect(await screen.findByRole('button', { name: 'New plan' })).toBeInTheDocument();
-    // Both reads have landed once they are saved.
     await waitFor(async () => {
       expect(await db.esiCache.get([CHAR_ID, 'skills'])).toBeDefined();
       expect(await db.esiCache.get([CHAR_ID, 'skillqueue'])).toBeDefined();
@@ -524,7 +488,6 @@ describe('SkillPlans: cached data notice', () => {
       characterId: CHAR_ID,
       key: 'skills',
       value: emptySkillsPayload,
-      // A minute over, so the shared 30 s ticker being a little behind still reads 5 h.
       fetchedAt: Date.now() - 5 * HOUR_MS - 60_000,
     });
     server.use(

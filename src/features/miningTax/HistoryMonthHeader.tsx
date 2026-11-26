@@ -1,7 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { formatIsk } from '@/lib/isk';
 
-/** A History month's fold row: which month, how many entries, what was paid in it. */
 export function HistoryMonthHeader({
   month,
   count,

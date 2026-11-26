@@ -27,7 +27,6 @@ describe('useAutoClaimDonations', () => {
     expect(claim).toHaveBeenCalledWith(7, 9, 'a');
     expect(claim).toHaveBeenCalledWith(7, 9, 'b');
     expect(result.current.failed.size).toBe(0);
-    // The same donations still listed before the reload lands are not claimed again.
     rerender({ v: view(['a', 'b']) });
     expect(claim).toHaveBeenCalledTimes(2);
   });

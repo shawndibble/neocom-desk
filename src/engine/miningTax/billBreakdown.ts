@@ -1,17 +1,10 @@
-/**
- * The per-ore arithmetic behind a Tax bill (issue #2832): what unit price,
- * from which source, produced each line. Pure shapes only — the row detail
- * renders it and turns it into the text a pilot pastes to the landlord.
- */
 import type { TaxPriceSource } from './priceBasis';
 import type { OreLine } from './types';
 
 export interface BillBreakdownInput {
   oreLines: readonly OreLine[];
-  /** Per-unit buy price by raw typeId; 0 or absent = unpriced. */
   unitPrices: ReadonlyMap<number, number>;
   sources: ReadonlyMap<number, TaxPriceSource>;
-  /** Per-ore total overrides ("Edit ore values individually"), by typeId. */
   oreLineValues?: Readonly<Record<number, number>>;
   taxPct: number;
 }
@@ -22,7 +15,6 @@ export interface BillBreakdownLine {
   unitPrice: number | undefined;
   source: TaxPriceSource;
   lineValue: number;
-  /** True when the line value is a hand-edited total, not quantity x unit price. */
   overridden: boolean;
 }
 

@@ -1,5 +1,3 @@
-/** Sample data for the Moon owner archive mockups (#6298). All names invented. */
-
 export const OWNER = 'Ashfall Mining Collective';
 export const ACCOUNTING = 'Brass Meridian Logistics';
 
@@ -47,7 +45,6 @@ export const MINED: MinedRow[] = [
   },
 ];
 
-/** Why a station is offered for archive; `null` = nothing to offer. */
 export type OfferReason = 'gone' | 'idle' | null;
 
 export interface Station {
@@ -59,7 +56,6 @@ export interface Station {
   lastExtraction: string;
   lastMined: string;
   offer: OfferReason;
-  /** Days since the last Extraction, shown in the idle hint. */
   idleDays?: number;
   archivedBy?: string;
   archivedOn?: string;

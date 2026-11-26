@@ -1,20 +1,3 @@
-/**
- * The Gallery: "Add a widget". A 460px drawer on the right on a desktop, a
- * bottom sheet on a phone.
- *
- * The header stays put (title, a one-line count, search and ONE scrolling row
- * of category chips) while the list scrolls under it. Under All the list is
- * grouped by category in catalogue order; under a single category, or a
- * search, it is one flat list. Each item is a card: the kind's name and its
- * action, one line of description, small badges for the views it supports and
- * its default size, and, on a desktop, a preview: the widget's body (no
- * repeated title) at its default size and view, drawing sample figures, made
- * inert (no focus, no clicks, hidden from assistive tech, no network).
- *
- * Adding on a desktop keeps the drawer open and the card says "Added" for a
- * moment, so the click has feedback; on a phone the sheet covers the page, so
- * it closes and lets the pilot see what they added.
- */
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useEffect, useId, useMemo, useRef, useState, type RefObject } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -54,14 +37,11 @@ interface GalleryProps {
   onClose: () => void;
 }
 
-/** The drawer's width, and the wide "Browse all" layout's: most of the page, so the board's left edge stays in view. */
 const COMPACT_WIDTH = 'max-w-[460px]';
 const BROWSE_WIDTH = 'max-w-[min(80vw,88rem)]';
 
-/** How long the "Added" confirmation stays on a card. */
 export const ADDED_MS = 2200;
 
-/** How wide the preview draws a kind's default size inside its frame: a share of a row would be a sliver at drawer width. */
 const PREVIEW_WIDTH: Record<WidgetSize, string> = {
   S: 'w-[13.75rem]',
   M: 'w-[19rem]',
@@ -80,7 +60,6 @@ function previewView(kind: WidgetKindDef, t: TFunction): WidgetView {
 
 function Preview({ kind, preset }: { kind: WidgetKindDef; preset?: GalleryPreset }) {
   const { t } = useTranslation();
-  // A preset previews its own sample, in its own view and size, not its kind's.
   const sampleKey = preset?.sample ?? kind.id;
   const size = preset?.init.size ?? kind.defaultSize;
   const view = useMemo(() => sampleView(sampleKey, t), [sampleKey, t]);
@@ -90,7 +69,6 @@ function Preview({ kind, preset }: { kind: WidgetKindDef; preset?: GalleryPreset
   }, [kind, preset, sampleKey, t]);
   if (!view || !widget) return null;
   return (
-    // Inert: a picture of the widget, not one. Nothing in it takes focus or a click.
     <div
       aria-hidden="true"
       inert
@@ -127,7 +105,6 @@ function GalleryItem({
   full: boolean;
   isPhone: boolean;
   showPreview: boolean;
-  /** Already on the board: quieter, so what is still missing stands out. */
   dim: boolean;
   justAdded: boolean;
   onAdd: (kind: string) => void;
@@ -136,17 +113,14 @@ function GalleryItem({
   const board = useWidgetBoard();
   const title = t(kind.titleKey);
   const soon = kind.availability === 'comingSoon';
-  // The status line is always mounted so a screen reader hears its text change.
   let status = '';
   if (justAdded) status = t('overview.gallery.added');
   else if (count > 0) status = t(boardKey(board, 'gallery.onBoard'), { count });
   let action = null;
-  if (soon) {
-    // Nothing to press: the badge beside the name says why.
-  } else if (full) {
-    action = <span className="text-xs text-text-dim">{t('overview.gallery.limit')}</span>;
-  } else {
-    action = (
+  if (!soon) {
+    action = full ? (
+      <span className="text-xs text-text-dim">{t('overview.gallery.limit')}</span>
+    ) : (
       <Button
         variant="ghost"
         size={isPhone ? 'md' : 'sm'}
@@ -210,7 +184,6 @@ function GalleryItem({
   );
 }
 
-/** A preset: adds the kind's widget with some settings already chosen (`galleryPresets.ts`). Listed with its kind's card. */
 function PresetItem({
   kind,
   preset,
@@ -279,13 +252,11 @@ function GalleryBody({
   subtitle,
 }: {
   isPhone: boolean;
-  /** The wide "Browse all" layout (a desktop only mode): rail, grid, Featured, filters. */
   browse: boolean;
   onToggleBrowse: () => void;
   onDone: () => void;
   onAdded: () => void;
   searchRef: RefObject<HTMLInputElement | null>;
-  /** The count line: the drawer carries it in its title bar, so only the sheet draws it here. */
   subtitle: string;
 }) {
   const { t } = useTranslation();
@@ -316,9 +287,7 @@ function GalleryBody({
     if (presets.length === 0) return own;
     return `${own} ${presets.map((p) => t(`overview.gallery.presets.${p.id}.title`)).join(' ')}`;
   });
-  // "Not on your board" only narrows the wide layout: the drawer keeps listing everything.
   const hidingUsed = browse && unusedOnly;
-  // A kind with presets stays listed: its presets add a second widget, which is the point of a preset.
   const kept = new Set([...addedHere, ...PRESET_KINDS]);
   const shown = hidingUsed ? notOnBoard(matching, counts, kept) : matching;
   const catCounts = categoryCounts(shown, board);
@@ -343,7 +312,6 @@ function GalleryBody({
     timer.current = setTimeout(() => setJustAdded(null), ADDED_MS);
   };
 
-  // A search that names a preset shows that preset; one that matches the kind itself shows them all.
   const presetsFor = (kind: WidgetKindDef) => {
     const presets = presetsOf(kind.id);
     const needle = query.trim().toLowerCase();
@@ -388,7 +356,6 @@ function GalleryBody({
       ? 'grid grid-cols-[repeat(auto-fill,minmax(13rem,1fr))] gap-2'
       : 'grid gap-2';
 
-  // Featured leads the wide layout's All view; its kinds are not repeated below it.
   const featured = browse && category === 'all' && !query.trim() ? featuredKinds(board, shown) : [];
   const featuredIds = new Set(featured.map((kind) => kind.id));
 
@@ -500,7 +467,6 @@ function GalleryBody({
             {t('overview.gallery.done')}
           </Button>
         </div>
-        {/* A rail from lg up; narrower, one row of chips above the list, as in the drawer. */}
         <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-4 p-3 lg:grid-cols-[15rem_minmax(0,1fr)] lg:gap-8">
           <div
             role="group"
@@ -517,7 +483,6 @@ function GalleryBody({
 
   return (
     <>
-      {/* Pinned: the sheet's scroller pads its edges (hence the negative margins), the drawer's does not. */}
       <div
         className={cx(
           'sticky z-10 grid grid-cols-[minmax(0,1fr)] gap-2.5 border-b border-line bg-panel px-3 pb-2.5',
@@ -535,7 +500,6 @@ function GalleryBody({
             </Button>
           </div>
         )}
-        {/* One row that scrolls sideways: a wrapped block of chips is three ragged lines. */}
         <div
           role="group"
           aria-label={t('overview.gallery.categoriesLabel')}
@@ -555,16 +519,12 @@ export function Gallery({ open, onClose }: GalleryProps) {
   const board = useWidgetBoard();
   const isPhone = useIsPhone();
   const searchRef = useRef<HTMLInputElement>(null);
-  // A desktop opens wide: the drawer is one press of Quick add away.
   const [browse, setBrowse] = useState(true);
   const title = t('overview.gallery.title');
   const subtitle = t(boardKey(board, 'gallery.subtitle'), {
     onBoard: edit.layout.widgets.length,
   });
   if (isPhone) {
-    // No auto-focus on the search box here: on a phone it would raise the keyboard over the sheet.
-    // The sheet covers the page, so the Undo toast and the new widget's flash would sit
-    // behind it: closing on Add lets the pilot see what they added.
     return (
       <Modal open={open} onClose={onClose} title={title} placement="sheet-full">
         <GalleryBody
@@ -576,7 +536,6 @@ export function Gallery({ open, onClose }: GalleryProps) {
           searchRef={searchRef}
           subtitle={subtitle}
         />
-        {/* The sheet's one primary action: rows only add, this closes. */}
         <div className="sticky -bottom-3 -mx-3 -mb-3 border-t border-line bg-panel p-3">
           <Button variant="primary" size="md" className="w-full" onClick={onClose}>
             {t('overview.gallery.done')}

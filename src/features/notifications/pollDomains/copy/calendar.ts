@@ -4,12 +4,6 @@ import { assertProjectionWording, type PushCopy } from '@/engine/projection';
 import { type DomainCopy, type NoNames, fired } from './shared';
 
 export interface CalendarNames {
-  /**
-   * When a newly-added event starts, already formatted in the pilot's chosen
-   * clock — a lookup because that clock is a stored preference. Absent when
-   * the fire carries no usable instant: the body then drops the clause
-   * rather than printing "Invalid Date".
-   */
   readonly when?: string;
 }
 
@@ -36,11 +30,6 @@ export const calendarCopy: DomainCopy<CalendarFire, CalendarNames> & {
           : fired('calendarEventStarting', 'body', { character, event: fire.title }),
     };
   },
-  /**
-   * Names the event where the snapshot knows it. A baseline persisted before
-   * the title was recorded falls back to the unnamed copy rather than pushing
-   * a sentence with a hole in it.
-   */
   push: (fire, character) => {
     assertProjectionWording('calendarEventStarting', 'assert');
     return fire.title === undefined

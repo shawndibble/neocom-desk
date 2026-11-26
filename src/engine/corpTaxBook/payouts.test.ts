@@ -41,7 +41,6 @@ const payout = (
 
 const base = { since: '2026-10-01' };
 
-/** One moon owner (corporation 9999) paid through payee 77. */
 function reconcileOutgoing(input: {
   payouts: (FeederPayout & { id: string })[];
   outgoing: OutgoingDonation[];
@@ -111,7 +110,6 @@ describe('outgoingDonationsFromJournal', () => {
           first_party_id: 9,
           second_party_id: 77,
         },
-        // A move between the corporation's own divisions is not a payment to anyone.
         {
           id: 6,
           date: '2026-10-18T10:00:00Z',

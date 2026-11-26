@@ -129,7 +129,6 @@ describe('Customize', () => {
 
     await user.click(screen.getByRole('button', { name: 'Cancel' }));
     expect(seen.current).toEqual(START);
-    // Cancel also drops the toast: its Undo would now point behind the snapshot.
     expect(screen.queryByRole('button', { name: 'Undo' })).toBeNull();
   });
 
@@ -232,7 +231,6 @@ describe('Widget menu', () => {
     await user.click(screen.getByRole('menuitemradio', { name: 'Table' }));
     expect(seen.current.widgets[0].view).toBe('table');
 
-    // Mail has no Chart view.
     await user.click(screen.getByRole('button', { name: 'Settings for Mail' }));
     expect(screen.queryByRole('menuitemradio', { name: 'Chart' })).toBeNull();
     await user.keyboard('{Escape}');

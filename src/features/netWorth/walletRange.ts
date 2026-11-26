@@ -1,8 +1,3 @@
-/**
- * Device-local: how many days the Wallet's Balance tab shows, for the Worth
- * chart and ISK flow alike (one page setting, picked in the page header).
- * Every range slices data already loaded, so none costs more than another.
- */
 import { createLocalSetting } from '@/lib/useLocalSetting';
 
 export const WALLET_RANGES = ['7', '30', '90'] as const;

@@ -1,16 +1,3 @@
-/**
- * A pilot's, corporation's or alliance's zKillboard stats, in parts: stat
- * tiles, the Snuggly↔Dangerous and Solo↔Gang meters, and the ships used most
- * on kills. `ZkillStatsSection` assembles them for Pilot Lookup / the Show
- * Info Character tab (`PilotProfileView`); the Corporation and Alliance tabs
- * lay the same parts out around their own facts. The meters quote
- * zKillboard's own scales, ends and all (decision `20261002-145207`), and are
- * filled along a gray-to-red ramp by how far they reach (`20261009-092214`, which replaces
- * `20261002-163430`'s green-or-red-by-side).
- *
- * zKillboard sends the same body for either kind of id (`parsePilotStats`);
- * only the no-history wording names which one it is.
- */
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -35,10 +22,6 @@ const termClassName = `flex items-center gap-1.5 ${eyebrowClassName}`;
 
 const TONE_CLASS = { positive: 'text-isk-pos', negative: 'text-isk-neg' } as const;
 
-/**
- * One row of label/value tiles. `className` sets the columns; the default
- * puts every tile on one line from `md` up and wraps to three on a phone.
- */
 export function StatTiles({ items, className }: { items: StatTileItem[]; className?: string }) {
   const { t } = useTranslation();
   return (
@@ -69,11 +52,6 @@ export function StatTiles({ items, className }: { items: StatTileItem[]; classNa
   );
 }
 
-/**
- * What to show instead of the stats while they load, when zKillboard could
- * not be reached, or when it has no kill or loss for this id; null once the
- * stats are in.
- */
 export function ZkillStatsStatus({
   stats,
   subject,
@@ -81,7 +59,6 @@ export function ZkillStatsStatus({
 }: {
   stats: PilotStatsResult | null;
   subject: 'pilot' | 'corporation' | 'alliance';
-  /** Offered on a zKillboard failure; absent where the host has no way to reload. */
   onRetry?: () => void;
 }): ReactNode {
   const { t } = useTranslation();
@@ -111,11 +88,6 @@ export function ZkillStatsStatus({
   return null;
 }
 
-/**
- * The line under the figures: where they come from once they are in, or why
- * they are not — next to the "—" tiles it explains rather than at the foot of
- * the tab.
- */
 export function ZkillStatsNote({
   stats,
   subject,
@@ -130,12 +102,6 @@ export function ZkillStatsNote({
   return <ZkillStatsStatus stats={stats} subject={subject} />;
 }
 
-/**
- * The pilot's all-time figures as one line (kills, losses, ISK destroyed and
- * lost, solo kills) and where zKillboard states them from, or the reason there
- * are none yet. The meters and the hulls they fly are drawn by the profile
- * around it; the Corporation and Alliance tabs keep their tiles.
- */
 export function ZkillStatsSection({
   stats,
   onRetry,
@@ -148,7 +114,6 @@ export function ZkillStatsSection({
     stats === null ? 'busy' : stats.kind === 'failed' ? 'failed' : 'ok',
     null
   );
-  // One wrapper in every state, so focus on Retry has somewhere to stay while the stats load.
   const wrap = (children: ReactNode) => (
     <div ref={resultRef} tabIndex={-1} className="outline-none">
       {children}
@@ -201,13 +166,6 @@ export function ZkillStatsSection({
   );
 }
 
-/**
- * "How they fight": danger, fleet size, and kills against losses in one card.
- * Three narrow columns by default (a phone, the Corporation and Alliance
- * tabs), stacked as full-width rows when the pilot profile has room to put the
- * card beside the kill chart (`@3xl/profile`). Nothing when zKillboard sent no
- * ratio and there is no record.
- */
 export function ZkillRatioMeters({ stats }: { stats: PilotStats }) {
   const { t } = useTranslation();
   const killer = killerRatio(stats);
@@ -266,13 +224,6 @@ export function ZkillRatioMeters({ stats }: { stats: PilotStats }) {
   );
 }
 
-/**
- * One of zKillboard's 0-100 ratios as a two-ended meter. The fill takes its
- * colour from how far along the scale it reaches (`ratioMeterColor`: gray,
- * blue, green, then warm only past half, never the verdict's red); the readout
- * stays plain text and names the end the value leans to in words, so nothing
- * rests on the colour.
- */
 function RatioMeter({
   label,
   help,
@@ -285,7 +236,6 @@ function RatioMeter({
   help: string;
   low: string;
   high: string;
-  /** zKillboard's own 0-100 figure, towards `high`. */
   value: number;
   valueText: (rounded: number) => string;
 }) {
@@ -293,7 +243,6 @@ function RatioMeter({
   const clamped = Math.min(100, Math.max(0, value));
   const rounded = Math.round(clamped);
   const text = valueText(rounded);
-  // Narrow: each meter spans the three rows of the shared grid, so the bars line up across columns even when a label wraps.
   return (
     <div className="row-span-3 grid min-w-0 grid-rows-subgrid gap-y-1.5 @3xl/profile:row-span-1 @3xl/profile:grid-rows-none">
       <div className="flex flex-col gap-0.5 @3xl/profile:flex-row @3xl/profile:items-baseline @3xl/profile:justify-between @3xl/profile:gap-x-2">
@@ -305,7 +254,6 @@ function RatioMeter({
             className="normal-case"
           />
         </span>
-        {/* Narrow: the figure alone, as the bar's number; wide: the words too. aria-valuetext has both. */}
         <span className="text-base font-semibold text-text tabular-nums @3xl/profile:hidden">
           {rounded}%
         </span>
@@ -339,10 +287,6 @@ function RatioMeter({
   );
 }
 
-/**
- * The hulls flown most on kills, ranked: icon, name, and a bar sized against
- * the top hull so the spread reads at a glance, the count at the right.
- */
 export function ZkillTopShips({ ships }: { ships: PilotTopShip[] }) {
   const { t } = useTranslation();
   const [names, setNames] = useState<Map<number, string>>(new Map());

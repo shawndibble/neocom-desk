@@ -131,7 +131,6 @@ describe('useKindViews', () => {
       vi.useFakeTimers({ toFake: ['Date'], now: Date.UTC(2026, 9, 11, 12) });
       const store = createFeedStore();
       const fetchedAt = new Date(Date.UTC(2026, 9, 11, 11));
-      // Fuel runs out at 22:00 tonight in Los Angeles, which is already the next EVE day.
       store.set('structures', {
         data: {
           structures: [

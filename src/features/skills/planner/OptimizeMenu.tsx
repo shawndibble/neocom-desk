@@ -11,7 +11,6 @@ import {
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 
-/** One Optimize menu entry — a shared shape (label, hint, disabled, handler) instead of near-identical `DropdownMenuItem` blocks. */
 export interface OptimizeMenuItem {
   key: string;
   label: string;
@@ -22,20 +21,13 @@ export interface OptimizeMenuItem {
 }
 
 interface OptimizeMenuProps {
-  /** In display order; the first is the default ("Optimize for me") and is set apart by a separator. */
   items: readonly OptimizeMenuItem[];
   disabled: boolean;
 }
 
-/**
- * One Optimize control replacing three stacked buttons: "Optimize for me"
- * leads as the default item, single modes stay below it.
- */
 export function OptimizeMenu({ items, disabled }: OptimizeMenuProps) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
-  // Ties each item's `aria-label` (the mode name) to its hint span via
-  // `aria-describedby`, so the "why" still reaches screen readers.
   const hintId = useId();
   return (
     <DropdownMenu open={open} onOpenChange={(next) => setOpen(next && !disabled)}>
@@ -53,18 +45,12 @@ export function OptimizeMenu({ items, disabled }: OptimizeMenuProps) {
       <DropdownMenuContent align="start" className="w-64">
         {items.map((item, index) => (
           <Fragment key={item.key}>
-            {/* Separates "Optimize for me" (the default) from the
-                three single modes below it. */}
             {index === 1 && <DropdownMenuSeparator />}
             <DropdownMenuItem
               aria-label={item.label}
               aria-describedby={`${hintId}-${item.key}`}
-              // Closes the menu itself before invoking its handler, so
-              // Radix's own close doesn't race the Modal's focus grab —
-              // same fix as the Export menu's onSelect workaround.
               onSelect={(event) => {
                 event.preventDefault();
-                // Stays focusable; its hint line below says what it does.
                 if (item.disabled) return;
                 setOpen(false);
                 item.onSelect();

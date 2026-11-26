@@ -16,7 +16,6 @@ const ctx: BuildContext = {
   range: 30,
 };
 
-// 12235 is a large tower (40 blocks/hour); 20060 a small one (10); 1 is unknown to the table.
 const LARGE = 12235;
 const SMALL = 20060;
 
@@ -124,7 +123,6 @@ describe('corpStarbases', () => {
         )
       )
     );
-    // 10 h of fuel read 5 h ago leaves 5 h.
     expect(view.table?.rows[0]?.cells[3]).toContain('"duration":"5h 0m"');
   });
 
@@ -163,7 +161,6 @@ describe('per-tower read time', () => {
       { fetchedAt: new Date(NOW - 2 * DAY_MS) }
     );
     const [fresh, stale] = toBoardStarbases(feed, NOW);
-    // 100 hours of fuel from each tower's own read.
     expect(fresh?.fuelExpiresMs).toBe(NOW + 100 * HOUR_MS);
     expect(stale?.fuelExpiresMs).toBe(NOW - 2 * DAY_MS + 100 * HOUR_MS);
     const view = build(ok(feed));

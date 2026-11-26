@@ -12,7 +12,6 @@ describe('concordRate', () => {
     for (const factionId of [500009, 500014, 500015, 500017, 500018, 500019]) {
       expect(concordRate({ id: 1000, factionId })).toEqual({ rate: 0.4, basis: 'assumed' });
     }
-    // Sisters of EVE converts, though its faction also holds two corps that do not.
     expect(concordRate({ id: 1000130, factionId: 500016 })).toEqual({
       rate: 0.4,
       basis: 'assumed',

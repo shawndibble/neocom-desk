@@ -15,6 +15,7 @@ import {
   corpPayeeId,
   corporationOfPayee,
   isBookRow,
+  ownEntryRowOf,
   isCorpPayeeId,
   personalEntriesOf,
 } from './corpRows';
@@ -80,6 +81,7 @@ const overlay = (over: Partial<PersonalOverlay> = {}): PersonalOverlay => ({
   conflicted: new Map(),
   labels: new Map(),
   books: [],
+  closedDays: [],
   ...over,
 });
 
@@ -99,7 +101,6 @@ describe('buildDisplayRows', () => {
       nameOf
     );
     expect(partly[0].row.unassignedOreLines).toEqual([{ typeId: ZEO, quantity: 600 }]);
-    // What the books took is kept, for a new Assignment to remember (it grows back in otherwise).
     expect(partly[0].row.bookTakenOreLines).toEqual([{ typeId: ZEO, quantity: 400 }]);
     const wholly = buildDisplayRows(
       [mined('2026-10-17')],
@@ -107,6 +108,23 @@ describe('buildDisplayRows', () => {
       nameOf
     );
     expect(wholly).toEqual([]);
+  });
+
+  it('offers ore released from a corp Assignment that no book took as unassigned', () => {
+    const key = `${ME}:2026-10-17:30003838`;
+    const row = mined('2026-10-17', {
+      assignments: [{ ...assigned('bmw'), oreLines: [{ typeId: ZEO, quantity: 600 }] }],
+      unassignedOreLines: [],
+      releasedOreLines: [{ typeId: ZEO, quantity: 400 }],
+    });
+    const free = buildDisplayRows([row], overlay(), nameOf).filter((d) => !d.assignment);
+    expect(free[0]?.row.unassignedOreLines).toEqual([{ typeId: ZEO, quantity: 400 }]);
+    const taken = buildDisplayRows(
+      [row],
+      overlay({ takenFromFree: new Map([[key, [{ typeId: ZEO, quantity: 400 }]]]) }),
+      nameOf
+    ).filter((d) => !d.assignment);
+    expect(taken).toEqual([]);
   });
 
   it('hides the rows of a Payee that is the corporation, the book row stands in for them', () => {
@@ -193,12 +211,10 @@ describe('buildDisplayRows', () => {
     expect(billed.assignment?.taxOwed).toBe(15_000);
     expect(billed.row.characterName).toBe('Kestrel Vane');
     expect(isBookRow(billed)).toBe(true);
-    // A conflict needs a decision but is not owed; paid and dismissed settle into History.
     expect(byId.c.status).toBe('needs-review');
     expect(byId.c.assignment?.taxOwed).toBe(0);
     expect(byId.p.status).toBe('paid');
     expect(byId.d.status).toBe('dismissed');
-    // An open day's estimate is owed now, in Open, at its estimated figure.
     expect(byId.e.status).toBe('outstanding');
     expect(byId.e.assignment?.taxOwed).toBe(9_000);
   });
@@ -267,7 +283,6 @@ describe('corpPayeeAliases', () => {
     expect(aliases.size).toBe(0);
   });
 
-  // A Payee missing its link on this device is still the corporation when named exactly as it.
   it('points the book Payee at an unlinked Payee named exactly as the corporation', () => {
     const aliases = corpPayeeAliases([stored('label')], [virtual]);
     expect(aliases.get(virtual.id)).toBe('label');
@@ -434,5 +449,31 @@ describe('ore a Corp Tax Book took off an entry (releasedTypeIds)', () => {
     expect(out.takenFromFree.get(`${ME}:2026-10-17:${SYSTEM}`)).toEqual([
       { typeId: ZEO, quantity: 51189 },
     ]);
+  });
+});
+
+describe('ownEntryRowOf', () => {
+  const key = `${ME}:2026-10-18:30003838`;
+  const estimate = { characterId: ME, date: '2026-10-18', solarSystemId: 30003838 } as BookRowView;
+
+  it("is the member's own row an open day's estimate stands in for, to edit or split", () => {
+    const row = {
+      ...mined('2026-10-18'),
+      unassignedOreLines: [],
+      assignments: [
+        { ...assigned('bmw'), id: 'a1', date: '2026-10-18' },
+        { ...assigned('ashfall'), id: 'a2', date: '2026-10-18' },
+      ],
+    };
+    const out = ownEntryRowOf(
+      [row],
+      overlay({ absorbed: new Map([[key, new Set(['a1'])]]) }),
+      estimate
+    );
+    expect(out?.assignment?.id).toBe('a1');
+  });
+
+  it('is none when the book took no Assignment of that day', () => {
+    expect(ownEntryRowOf([mined('2026-10-18')], overlay({}), estimate)).toBeUndefined();
   });
 });

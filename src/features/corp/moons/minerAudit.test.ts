@@ -15,7 +15,6 @@ describe('isMinerAuditEntry', () => {
     expect(isMinerAuditEntry({ noticeId: 'n1' }, of)).toBe(true);
     expect(isMinerAuditEntry({ statementId: 'n1' }, of)).toBe(true);
     expect(isMinerAuditEntry({ paymentId: 'p1' }, of)).toBe(true);
-    // An officer's answer names only the declaration or the dispute.
     expect(isMinerAuditEntry({ declarationId: 'x1', resolution: 'rejected' }, of)).toBe(true);
     expect(isMinerAuditEntry({ disputeId: 'd1', reason: 'kept' }, of)).toBe(true);
   });

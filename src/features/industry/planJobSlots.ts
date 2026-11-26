@@ -1,10 +1,3 @@
-/**
- * Joins a Build Plan's (or group's) job tree to the character's real job-slot
- * data: one scheduled job per node on the free slots of its pool, sub-jobs in
- * parallel, and when the whole tree is done if started now. Silent (`null`)
- * whenever slot data isn't known — no industry-jobs scope, no cached skills —
- * never a false "0 free".
- */
 import { useEffect, useMemo, useState } from 'react';
 import {
   scheduleJobsAcrossCharacters,
@@ -32,31 +25,19 @@ import type { BlueprintCatalog, BlueprintCatalogEntry } from './blueprintCatalog
 import { loadCharacterBlueprints } from './data';
 import { loadCharacterIndustryJobs } from './jobs';
 
-/** The category a plan's own top-level job draws from. */
 export function categoryForActivity(activity: IndustryActivity): JobSlotCategory {
   return activity === 'reaction' ? 'reaction' : 'manufacturing';
 }
 
-/** What a job is to the reader: the item the plan (or a group member) makes, a manufactured part, or a reaction. */
 export type PlanJobKind = 'final' | 'part' | 'reaction';
 
 export interface PlanJobNode extends ScheduleNode {
   kind: PlanJobKind;
-  /** The blueprint this job runs, when the catalog knows it: who can run it. */
   blueprintTypeID?: number;
   activity?: IndustryActivity;
   blueprintSkills?: readonly BlueprintSkillRequirement[];
 }
 
-/**
- * One schedule node per job in a plan's tree: the plan's own job (id
- * `<prefix>0`) and every sub-build beneath it, each depending on the
- * sub-builds among its own inputs. A typeID built in two branches is two jobs,
- * as the cost engine prices it. A node past its blueprint's max production
- * limit is several sibling jobs (`jobRuns`, largest first; `seconds` is the
- * largest one's), all consuming the same sub-jobs. `prefix` keeps ids apart
- * across a group's members.
- */
 export function planJobNodes(
   plan: {
     activity: IndustryActivity;
@@ -132,24 +113,12 @@ export function planJobNodes(
   return nodes;
 }
 
-/** What `assignCharacters` needs to know about one Character. */
 export interface LaneCharacter {
   characterId: number;
   modifiers: CharacterModifiers;
-  /** Blueprint type IDs this Character owns (any copy). */
   blueprintTypeIDs: ReadonlySet<number>;
 }
 
-/**
- * Marks which Characters can run each job and how long it takes them. A job
- * is in reach of a Character who owns its blueprint, or of everyone when a
- * corp-owned copy counts (`corpBlueprintTypeIDs`); when nobody listed has it
- * (an assumed, unowned blueprint) it stays with the plan Character, so no job
- * is ever dropped. A Character's time is the node's seconds (baked from the
- * plan Character's skills) rescaled by the ratio of the two Characters'
- * skill-and-implant multipliers; facility, rig and TE terms are the same for
- * both.
- */
 export function assignCharacters(
   nodes: readonly PlanJobNode[],
   characters: readonly LaneCharacter[],
@@ -191,11 +160,6 @@ export interface PlanLane {
   stages: PlanStage[];
 }
 
-/**
- * One lane per Character the schedule gives jobs to, in the order they first
- * work; empty unless two or more Characters share the plan, so a
- * single-Character plan draws no lanes.
- */
 export function planLanes(schedule: JobSchedule, nodes: readonly PlanJobNode[]): PlanLane[] {
   const kindOf = new Map(nodes.map((n) => [n.id, n.kind]));
   const byCharacter = new Map<number, Map<number, PlanStage>>();
@@ -224,7 +188,6 @@ export interface PlanStage {
   counts: Record<PlanJobKind, number>;
 }
 
-/** The schedule's stages counted by kind: "Now: 4 reactions · Wed 09:00: 6 parts · …". */
 export function planStages(schedule: JobSchedule, nodes: readonly PlanJobNode[]): PlanStage[] {
   const kindOf = new Map(nodes.map((n) => [n.id, n.kind]));
   return schedule.stages.map((stage) => {
@@ -234,7 +197,6 @@ export function planStages(schedule: JobSchedule, nodes: readonly PlanJobNode[])
   });
 }
 
-/** A Character's job-slot skills, queue-corrected; null when skills aren't known (never a guessed zero). */
 export async function loadJobSlotSkills(
   characterId: number,
   nowMs: number
@@ -250,15 +212,9 @@ export async function loadJobSlotSkills(
 
 export interface PlanJobSlotData {
   characters: ScheduleCharacter[];
-  /** When the jobs and skills were read: the schedule's "now". */
   loadedAtMs: number;
 }
 
-/**
- * Every given Character's slot data, or null while loading / when any one
- * Character's jobs (or skills) scope was never granted — so the caller
- * renders nothing at all rather than a schedule that ignores a Character.
- */
 export function usePlanJobSlots(characterIds: readonly number[]): PlanJobSlotData | null {
   const key = idSetKey(characterIds);
   const [loaded, setLoaded] = useState<(PlanJobSlotData & { key: string }) | null>(null);
@@ -281,9 +237,7 @@ export function usePlanJobSlots(characterIds: readonly number[]): PlanJobSlotDat
         );
         if (cancelled || characters.some((c) => c === null)) return;
         setLoaded({ key, characters: characters as ScheduleCharacter[], loadedAtMs: nowMs });
-      } catch {
-        // Unknown slot data reads as "no line", never a guessed zero.
-      }
+      } catch {}
     })();
     return () => {
       cancelled = true;
@@ -294,7 +248,6 @@ export function usePlanJobSlots(characterIds: readonly number[]): PlanJobSlotDat
   return loaded && loaded.key === key ? loaded : null;
 }
 
-/** Type IDs of the blueprints each Character owns; a Character whose list can't be read owns none. */
 function useOwnedBlueprintTypeIDs(
   characterIds: readonly number[]
 ): ReadonlyMap<number, ReadonlySet<number>> | null {
@@ -328,21 +281,11 @@ function useOwnedBlueprintTypeIDs(
 export interface PlanScheduleResult {
   schedule: JobSchedule;
   stages: PlanStage[];
-  /** One per Character when two or more share the plan; empty for a single Character. */
   lanes: PlanLane[];
   nowMs: number;
-  /** Sub-jobs are timed at TE 0; the line only notes it when there are some. */
   hasSubJobs: boolean;
 }
 
-/**
- * The tree scheduled across every Character on this device: each job goes to
- * a Character with its blueprint in reach and a free slot. Null while any
- * Character's slot data is unknown (the caller falls back to job time and
- * draws no line). With one Character it is that Character's slots alone.
- * `corpBlueprints` are the corp-owned copies in play (the plan's Corp Assets
- * toggle on); they are in reach of every Character.
- */
 export function usePlanSchedule(
   planCharacterId: number | null,
   nodes: readonly PlanJobNode[],
@@ -351,8 +294,6 @@ export function usePlanSchedule(
   const characters = useCharacters();
   const characterIds = useMemo(
     () =>
-      // No Characters read yet (the live query's empty first answer): wait, so a
-      // multi-Character user never sees a line that ignores their other Characters.
       planCharacterId === null || characters.length === 0
         ? []
         : [
@@ -365,9 +306,6 @@ export function usePlanSchedule(
   const data = usePlanJobSlots(characterIds);
   const owned = useOwnedBlueprintTypeIDs(multi ? characterIds : NO_IDS);
   const modifiers = useCharacterModifiersByCharacter(multi ? characterIds : NO_IDS);
-  // Scheduled from when the slot data was read, not a ticking clock: the
-  // done-by is absolute either way, and a per-minute tick would re-render the
-  // whole plan page.
   return useMemo(() => {
     if (!data || nodes.length === 0 || planCharacterId === null) return null;
     let scheduled: readonly PlanJobNode[] = nodes;

@@ -245,7 +245,6 @@ describe('Add my other corps on the page', () => {
       CORPS[2]!.corporationId,
       CORPS[0]!.corporationId,
     ]);
-    // A grant again changes no coverage: the run asks for none.
     expect(run.coverageFrom).toBeUndefined();
     await userEvent.click(screen.getByRole('button', { name: 'Log in as Dax Orlen with EVE' }));
     expect(beginOwnCorpGrantLogin).toHaveBeenCalledWith({
@@ -283,7 +282,6 @@ describe('Add my other corps on the page', () => {
     expect(beginOwnCorpGrantLogin).not.toHaveBeenCalled();
     const next = await screen.findByRole('button', { name: 'Log in as Dax Orlen with EVE' });
     expect(next).toBeEnabled();
-    // In the dialog's note and again in the Needs you list behind it.
     expect(screen.getAllByText(/different CEO now/i).length).toBeGreaterThanOrEqual(1);
     await userEvent.click(next);
     expect(beginOwnCorpGrantLogin).toHaveBeenCalledTimes(1);
@@ -331,7 +329,6 @@ describe('closed-app alerts chained into the run', () => {
       await screen.findByRole('heading', { name: 'Corp 1 of 1: one more approval for alerts' })
     ).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Approve alerts as Mira Soltane' }));
-    // The handler plans the step from Dexie before it leaves for EVE; the click doesn't wait.
     await waitFor(() =>
       expect(beginAlertsLogin).toHaveBeenCalledWith(mira.ceoCharacterId, {
         nearby: false,

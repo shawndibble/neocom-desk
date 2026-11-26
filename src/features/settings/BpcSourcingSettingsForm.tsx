@@ -10,7 +10,6 @@ import { usePageHubs } from '@/features/market/pageHubs';
 import { CheckboxField, SettingsFormLoading } from './settingsFields';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 
-/** BPC Sourcing's settings: Settings → Industry, and the BPC Sourcing tab's settings modal. */
 export function BpcSourcingSettingsForm() {
   const { t } = useTranslation();
   const hideAuctions = useBpcHideAuctionsDefault((state) => state.value);
@@ -26,7 +25,6 @@ export function BpcSourcingSettingsForm() {
   return (
     <div className="space-y-4">
       <Fields variant="form">
-        {/* The Industry page hub: Global unless the pilot gave Industry its own. */}
         <Field label={t('settings.bpcMarketHubLabel')} note={t('settings.bpcMarketHubHint')}>
           <HubField area="industry" side="buy" label={t('settings.bpcMarketHubLabel')} />
         </Field>

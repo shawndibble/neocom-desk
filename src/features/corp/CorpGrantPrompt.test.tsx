@@ -33,7 +33,6 @@ const mockedBeginLogin = vi.mocked(beginEveLogin);
 const CHARACTER_ID = 42;
 const OTHER_CHARACTER_ID = 77;
 const ALL_CORP_SCOPES = [...scopesForGroup('corp')];
-/** Holds only the scope that unlocks the roles read itself — every test below is about what happens once a role is known. */
 const ROLES_SCOPE = ESI_REGISTRY.getCharacterRoles.scope;
 
 function rolesResolvingTo(roles: readonly string[]): StatusResult<CharacterCorporationRoles> {
@@ -72,8 +71,6 @@ describe('CorpGrantPrompt — when it appears', () => {
   });
 
   it('names the corporation generically when nothing has loaded its name yet', async () => {
-    // The name is borrowed from whatever already fetched it; this banner must
-    // never fire an ESI read of its own to fill in a nicety.
     render(<CorpGrantPrompt />);
     await waitFor(() => expect(prompt()).toBeInTheDocument());
     expect(screen.getByText(/your corporation/i)).toBeInTheDocument();
@@ -92,11 +89,6 @@ describe('CorpGrantPrompt — when it appears', () => {
     expect(prompt()).not.toBeInTheDocument();
   });
 
-  /**
-   * Issue #4058: an Accountant whose grant predates the mining scope is
-   * `ready` with that scope in `missingScopes`. Nothing reads the mining
-   * ledger yet, so the once-only offer is kept for the surface that will.
-   */
   it('stays away for a ready Accountant missing only the mining-ledger scope', async () => {
     mockedGrantedScopes.mockReturnValue([
       ROLES_SCOPE,
@@ -118,11 +110,6 @@ describe('CorpGrantPrompt — when it appears', () => {
   });
 });
 
-/**
- * AC 5, and the reason this component exists at all rather than a nag: at most
- * once per Character per device. A prompt that keeps coming back is the same
- * consent bloat the ticket exists to prevent, wearing a different hat.
- */
 describe('CorpGrantPrompt — asked at most once', () => {
   it('is gone for good after Not now, and persists that across a remount', async () => {
     const { unmount } = render(<CorpGrantPrompt />);
@@ -164,11 +151,6 @@ describe('CorpGrantPrompt — asked at most once', () => {
   });
 });
 
-/**
- * Issue #331: the corp group can grow (it did, in round 41), and a dismissal
- * recorded against a narrower group must not silently suppress the prompt
- * forever once the group widens past it.
- */
 describe('CorpGrantPrompt — re-offered when the group grows (issue #331)', () => {
   it('re-offers a Character who dismissed a narrower version of the group', async () => {
     const narrowerScopes = ALL_CORP_SCOPES.slice(0, -1);

@@ -63,9 +63,7 @@ function order(
   };
 }
 
-/** Undercut at the station: Fuzzwork's cheapest seller (450) beats 500. */
 const UNDERCUT = order({ order_id: 101, type_id: 34, price: 500 });
-/** Expiring in days, nobody else at the station. */
 const EXPIRING = order({
   order_id: 201,
   type_id: 36,
@@ -141,7 +139,6 @@ beforeEach(async () => {
     trained: new Map(),
     effective: new Map(),
   } as unknown as CorrectedSkills);
-  // Click time: a rival now sits at 449, the player's own order beside it.
   vi.mocked(loadRegionCompetition).mockImplementation(async (_regionId, typeId) => ({
     competitors:
       typeId === 34
@@ -180,7 +177,6 @@ beforeEach(async () => {
 
 afterEach(() => configureClipboard(null));
 
-/** The headline's quiet line, which the work-through ends. */
 function summaryLine() {
   return screen.getByText(/ISK tied up in them/).closest('p') as HTMLElement;
 }
@@ -213,7 +209,6 @@ describe('Open Orders work through', () => {
 
     await user.click(within(dialog).getByRole('button', { name: 'Next' }));
 
-    // The same dialog element carries on: no close and reopen between orders.
     expect(screen.getByRole('dialog')).toBe(dialog);
     expect(await within(dialog).findByRole('heading', { name: 'Mexallon' })).toBeInTheDocument();
     expect(within(dialog).getByText('2 of 2')).toBeInTheDocument();

@@ -11,8 +11,6 @@ import { SNAPSHOT_SOURCES } from '../eventEntries';
 import { is, shapeGuard } from '../snapshotShape';
 import { defineDomain } from './defineDomain';
 
-/* Stock Targets: below-target alert ----------------------------------------- */
-
 const isStockAlertEntry = shapeGuard<StockAlertEntry>({
   listId: is.string,
   listName: is.string,
@@ -25,23 +23,12 @@ const isStockAlertEntry = shapeGuard<StockAlertEntry>({
   inJobs: is.optional(is.number),
 });
 
-/**
- * The one Character the lists' alerts are filed under. Stock Lists are
- * account-wide and count every Character's orders, so polling them under each
- * Character would fire one alert per Character for a single empty shelf. The
- * lowest id with the orders scope is stable for as long as the roster is.
- */
 async function stockAlertOwner(): Promise<number | null> {
   const scope = ESI_REGISTRY.getCharacterOrders.scope;
   const ids = (await characterIdsWithScopes([scope])).sort((a, b) => a - b);
   return ids[0] ?? null;
 }
 
-/**
- * A market's listed amount of an item dropping to Low or Out (issue #3521),
- * counted from the cached order and asset lists only — never a live fetch
- * inside the poll.
- */
 export const stockTargetDomain = defineDomain<
   StockAlertEntry,
   StockAlertSnapshot,

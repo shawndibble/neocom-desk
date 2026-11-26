@@ -1,17 +1,3 @@
-/**
- * `TurnInBreakdown` (issue #6705): the modal for a pile of items worth turning
- * in (the Appraisal's Turn in total). Items are grouped by **Item Trader**
- * (each empire's War HQ), each group with its subtotal, Set destination to the
- * trader's system and Copy list (EVE multibuy text, as the Appraisal's copy
- * lists), and each item with the Participate state of its objective.
- *
- * Without Military Campaigns (or a Character) there is no Participate column:
- * one caveat line above the groups says it pays only after Participate, with
- * the `GrantCellMark` by it while the Permission is missing.
- *
- * Never a predicted close date, a token count or "multiples of N" advice.
- * `TurnInBreakdownView` is the modal with every read made, for stories.
- */
 import { useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, DataTable, LiveStatus, Modal, type DataTableColumn } from '@/components/ui';
@@ -40,7 +26,6 @@ import type { TurnInOfferDetail } from './useTurnIns';
 
 const countFormat = createNumberFormat({ maximumFractionDigits: 0 });
 
-/** One item of the pile; `note` is a line from the surface under its figure ("+1.4M over Sell now"). */
 export interface TurnInBreakdownItem extends TurnInPileItem<TurnInOfferDetail> {
   note?: ReactNode;
 }
@@ -48,7 +33,6 @@ export interface TurnInBreakdownItem extends TurnInPileItem<TurnInOfferDetail> {
 type Line = TurnInPileLine<TurnInOfferDetail> & { note?: ReactNode };
 type Group = TurnInTraderGroup<TurnInOfferDetail> & { lines: Line[] };
 
-/** A group's system name: every line shares the trader's system. */
 function systemNameOf(group: Group): string | null {
   return group.lines[0]?.offer.systemName ?? null;
 }
@@ -56,7 +40,6 @@ function systemNameOf(group: Group): string | null {
 function CopyListButton({ group }: { group: Group }) {
   const { t } = useTranslation();
   const { copied, flash } = useCopyFeedback<'copied' | 'failed'>(2000);
-  // Bumped on every copy, so a second "Copied" is read out again.
   const [copies, setCopies] = useState(0);
   const result =
     copied === 'copied'
@@ -105,16 +88,11 @@ export interface TurnInBreakdownViewProps {
   open: boolean;
   onClose: () => void;
   items: readonly TurnInBreakdownItem[];
-  /** Per item (the Participate column), or one caveat line for the pile. */
   participate: PileParticipate;
-  /** Each objective's answer, for the column. */
   stateOf: (objectiveId: string) => ParticipateState | undefined;
   characterName: string;
-  /** The Military Campaigns `GrantCellMark`, by the caveat. */
   participateMark?: ReactNode;
-  /** Set destination for one group (`TurnInDestination`). */
   destinationFor: (group: Group) => ReactNode;
-  /** One line from the surface under the intro ("Items worth more handed in than sold now."). */
   surfaceLine?: ReactNode;
 }
 
@@ -195,8 +173,6 @@ export function TurnInBreakdownView({
     ],
     [t, perItem, stateOf]
   );
-  // The pile-wide "press Participate" line only when it is true of every row: over a mixed
-  // pile it read as if the Participating rows were not (each row's cell says its own state).
   const states = pile.groups.flatMap((g) => g.lines.map((l) => stateOf(l.offer.objectiveId)));
   const noneParticipating =
     perItem && states.includes('notParticipating') && !states.includes('participating');
@@ -257,13 +233,11 @@ export interface TurnInBreakdownProps {
   open: boolean;
   onClose: () => void;
   items: readonly TurnInBreakdownItem[];
-  /** Whose Participate, cap and waypoints: the active Character when omitted, `null` for none. */
   characterId?: number | null;
   characterName?: string;
   surfaceLine?: ReactNode;
 }
 
-/** The pile's turn-in modal, wired up. */
 export function TurnInBreakdown({
   characterId,
   characterName,
@@ -273,7 +247,6 @@ export function TurnInBreakdown({
   const character = useTurnInCharacter(characterId);
   const participate = useTurnInParticipate(character, characterName);
   const { participation } = participate;
-  // The Character's own contribution counts against its per-Character cap.
   const counted = useMemo(
     () =>
       items.map((item) => ({

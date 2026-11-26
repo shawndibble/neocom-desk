@@ -1,8 +1,3 @@
-/**
- * The Corp Tax Book export (#4946), a sheet per record type. Any officer who can open the book
- * can export it: the same reads the book makes, re-read at the press so a copy taken just before
- * a delete is current.
- */
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
@@ -14,7 +9,6 @@ import { WorkbookDownloadButton } from '../WorkbookDownloadButton';
 import { bookExportSheets } from './bookExport';
 import { useBook } from './useBook';
 
-/** The newest audit entries the export carries; the log is never read whole. */
 const EXPORT_AUDIT_LIMIT = 2000;
 
 function useExportBook(): () => Promise<WorkbookDownload> {
@@ -53,7 +47,6 @@ function useExportBook(): () => Promise<WorkbookDownload> {
       names,
       t
     );
-    // A read that comes back at the cap may have more behind it, so the file is marked partial.
     return downloadWorkbook('corp-tax-book', sheets, {
       qualifier: ticker,
       truncated: audit.length >= EXPORT_AUDIT_LIMIT,
@@ -89,7 +82,6 @@ function ExportBlock({
   );
 }
 
-/** "Export the book" on the settings' Access tab, above Delete the book. */
 export function ExportBookSection() {
   const { t } = useTranslation();
   return (
@@ -101,10 +93,6 @@ export function ExportBookSection() {
   );
 }
 
-/**
- * The Delete the book confirmation's offer to keep a copy. Delete never requires it, but holds
- * while a copy is being read, so the file is never cut short by the delete.
- */
 export function ExportFirst({ onBusyChange }: { onBusyChange?: (busy: boolean) => void }) {
   const { t } = useTranslation();
   return (

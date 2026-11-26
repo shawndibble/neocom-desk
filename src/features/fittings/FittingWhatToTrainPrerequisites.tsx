@@ -14,22 +14,13 @@ import type { FitCheckRow } from '@/features/skills/ships/fitCheckRows';
 import { SkillRow } from '@/features/skills/SkillRow';
 
 export interface WhatToTrainPrerequisitesProps {
-  /** "Industrial Reconfiguration IV": the level the card is about. */
   skill: string;
-  /** Every skill the level needs trained first, and the skill itself, in training order. */
   rows: readonly FitCheckRow[];
-  /** The highest level the target Skill Plan trains each skill to, so a row it already trains says so. */
   plannedLevels: ReadonlyMap<number, number>;
-  /** The target Skill Plan's entries, for the Skill Detail popover a skill name opens. */
   planEntries?: readonly PlanEntry[];
   totalSeconds: number;
 }
 
-/**
- * "incl. prerequisites", opened: the skills a level can't be had without,
- * each with its time, as the Mastery card lists a hull's. Read-only — Add to
- * plan on the row already puts the prerequisites in ahead of the level.
- */
 export function WhatToTrainPrerequisites({
   skill,
   rows,

@@ -6,12 +6,6 @@ export interface GroupMaterialConsumer {
   quantity: number;
 }
 
-/**
- * The plans of a Build Group that need `typeID`, and how much each needs: its
- * share of the Group Rollup's row, read from each member's own material table
- * (`tableMaterials`) so the shares add up to the row total. Plans, not jobs,
- * are the consumers here; members keep their order.
- */
 export function groupMaterialConsumers(
   members: readonly BuildGroupMember[],
   typeID: number

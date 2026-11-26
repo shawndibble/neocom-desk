@@ -1,19 +1,3 @@
-/**
- * Build Group header vs. its member plans, on a phone: a member row is
- * deliberately indented under its group (`PlanRow`'s `pl-6` vs `GroupHeader`'s
- * `px-2` — 16px of nesting, by design). That 16px held at desktop width, but
- * `GroupHeader`'s expand toggle is a real `IconButton size="sm"`
- * (`size-9 md:size-7` — DESIGN.md §3's touch tier, 36px on a phone) while
- * `PlanRow`'s drag handle was a plain button with no responsive sizing of its
- * own (a fixed 28px everywhere) — so the two only matched by coincidence at
- * `md` and up, and the nesting indent shrank to 8px on a phone instead of the
- * same 16px desktop shows. The fix gives the drag handle the same
- * `size-9 md:size-7` box, so the indent is the identical 16px at every width.
- *
- * A group and a plan inside it are seeded directly into IndexedDB — group
- * existence lives in the `sync.industryBuildGroups` setting, membership on
- * the plan's own `buildGroupId` (`buildGroups.ts`).
- */
 import type { Page } from '@playwright/test';
 import { test, expect, PHONE, DESKTOP } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
@@ -22,7 +6,6 @@ import { CHARACTER_ID } from './support/fixtureData';
 const GROUP_ID = 'g1';
 const GROUP_NAME = 'Test Group';
 const PLAN_NAME = 'Grouped Plan';
-/** `pl-6` (24px) minus `GroupHeader`'s own `px-2` (8px) — the deliberate nesting indent. */
 const EXPECTED_INDENT_PX = 16;
 
 async function seedGroupedPlan(page: Page): Promise<void> {
@@ -63,7 +46,6 @@ async function seedGroupedPlan(page: Page): Promise<void> {
   );
 }
 
-/** The member row's name minus the group header's own name — the nesting indent, in px. */
 async function measureIndent(page: Page): Promise<number> {
   const toggle = page.getByRole('button', { name: `Show or hide the plans in ${GROUP_NAME}` });
   await expect(toggle).toBeVisible();
@@ -111,8 +93,6 @@ test('Profit sort button hit area spans 44px at 390px (#3680)', async ({ page })
   const box = (await sort.boundingBox())!;
   const cx = box.x + box.width / 2;
   const cy = box.y + box.height / 2;
-  // The hit area is a `::after` box, so the button's own box stays small;
-  // hit-test just inside 22px above and below its centre instead.
   for (const dy of [-21, 21]) {
     const hitsSort = await sort.evaluate(
       (el, [x, y]) => el.contains(document.elementFromPoint(x, y)),

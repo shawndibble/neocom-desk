@@ -1,9 +1,3 @@
-/**
- * The pilot's Target Profiles (issue #1546): the custom list and which
- * profile is selected, as two synced settings — the same split, and for the
- * same reason, as `damageProfiles.ts`. The selection is global, not per
- * Fitting, and stays out of the `?f=` Fitting Share Code.
- */
 import { useTranslation } from 'react-i18next';
 import {
   CUSTOM_TARGET_PROFILE_ID_PREFIX,
@@ -34,7 +28,6 @@ export const useSelectedTargetProfileId = createSyncedSetting<string>({
   parse: parseSelectedTargetProfileId,
 });
 
-/** A profile's display name: a built-in's translated name, a custom one's own. */
 export function useTargetProfileName(): (profile: NamedTargetProfile) => string {
   const { t } = useTranslation();
   return (profile) => {

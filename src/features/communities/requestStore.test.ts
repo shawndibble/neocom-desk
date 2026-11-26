@@ -6,15 +6,11 @@ const fire = vi.hoisted(() => ({
   sets: [] as unknown[],
   deletes: 0,
   docs: [] as { id: string; data: Record<string, unknown>; requestId?: string }[],
-  /** Documents `getDoc` finds by path; anything else falls back to `stored`. */
   byPath: {} as Record<string, Record<string, unknown>>,
-  /** How many times the transaction callback runs: a retry re-reads the document. */
   attempts: 1,
   reads: [] as string[],
   wheres: [] as unknown[][],
-  /** Runs before each retry's read, as another device's write would. */
   beforeRetry: null as null | (() => void),
-  /** The next getDocs fails as a query whose index is not deployed does. */
   missingIndex: false,
   stamps: [] as Record<string, unknown>[],
   stampFails: false,
@@ -88,7 +84,6 @@ const session = vi.hoisted(() => ({ current: 0, log: [] as string[] }));
 vi.mock('@/sync/syncAuth', () => ({
   ensureSignedIn: async (characterId: number) => {
     session.log.push(`signin ${characterId}`);
-    // Signing in takes a moment, and swaps the session once it lands.
     await new Promise((resolve) => setTimeout(resolve, 5));
     session.current = characterId;
     return `char:${characterId}`;
@@ -149,7 +144,6 @@ describe('updateMyPledge', () => {
   it('re-applies the change to the fresh document when the transaction retries', async () => {
     fire.stored = { lines: { 0: { quantity: 100, delivered: 0, contractIds: [] } } };
     fire.attempts = 2;
-    // Another device marks 60 delivered between the first attempt and the retry.
     fire.beforeRetry = () => {
       fire.stored = { lines: { 0: { quantity: 100, delivered: 60, contractIds: [9] } } };
     };
@@ -173,11 +167,9 @@ describe('the Firebase session', () => {
   it('is never swapped under a Pledge write by another Character’s read', async () => {
     fire.stored = { lines: { 0: { quantity: 100, delivered: 0, contractIds: [] } } };
     const write = updateMyPledge(1, 'c1', 'r1', (lines) => lines);
-    // The background sweep starts reading as another Character while the write signs in.
     const read = loadRequests(2, 'c1');
     await Promise.all([write, read]);
     expect(fire.reads).toEqual(['write as 1', 'read as 2']);
-    // The board stamp is written after the Pledge, in its own session.
     expect(session.log).toEqual(['signin 1', 'signin 2', 'signin 1']);
   });
 });

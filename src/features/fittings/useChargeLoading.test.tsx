@@ -22,7 +22,6 @@ const catalogue = {
 
 const profile: PilotProfile = { skillLevels: new Map(), implantTypeIds: [], boosterTypeIds: [] };
 
-// The engine's size check says no to the one oversized charge; each launcher holds 1.2 m3.
 const engine = fakeDogmaEngine({
   checkCharges: (_ship, _module, ids) => new Set(ids.filter((id) => id !== OVERSIZED)),
   moduleChargeCapacity: () => 1.2,
@@ -77,7 +76,6 @@ describe('useChargeLoading', () => {
   it('loads from cargo a full load per module (capacity over volume), and says the cargo ran out', () => {
     const { result, after } = setup();
     act(() => result.current.load(HEAVY, { fromCargo: true }));
-    // 1.2 m3 / 0.03 m3 = 40 a launcher: 40 then the last 20.
     expect(after().modules.map((m) => m.chargeTypeId)).toEqual([HEAVY, HEAVY, undefined]);
     expect(after().cargo).toEqual([]);
     expect(result.current.message).toBe('Loaded Scourge Heavy Missile into 2 modules.');
@@ -127,7 +125,6 @@ describe('useChargeLoading', () => {
   });
 
   it('counts only the modules this load reached when the cargo runs out', () => {
-    // Three launchers take it; one already holds it; 50 in the hold fill one more (40) and part of a third.
     const three: Fitting = {
       ...fitting,
       modules: [

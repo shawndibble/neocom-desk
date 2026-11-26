@@ -12,12 +12,6 @@ export type MyRefine =
   | { status: 'idle' | 'loading' | 'signedOut' | 'failed' }
   | { status: 'ready'; items: AppraisalItem[]; setup: RefiningSetup };
 
-/**
- * A Shared Appraisal's refine figures at the visitor's own skills and Refining
- * Setup, still at the sharer's mineral prices. Reads nothing until `enabled`
- * (the visitor opened the breakdown): the reprocessing data is 1.4 MB and most
- * visitors only look. `signedOut` means no active Character, so no skills.
- */
 export function useMyRefine(view: AppraisalShareView | null, enabled: boolean): MyRefine {
   const characterId = useActiveCharacter((state) => state.activeCharacterId);
   const hydrated = useActiveCharacter((state) => state.hydrated);
@@ -28,7 +22,6 @@ export function useMyRefine(view: AppraisalShareView | null, enabled: boolean): 
     setup: RefiningSetup;
     items: AppraisalItem[];
   } | null>(null);
-  // Keyed to what failed, so a later view, Character or setup starts clean instead of staying failed.
   const [failedFor, setFailedFor] = useState<{
     view: AppraisalShareView;
     characterId: number;
@@ -39,7 +32,6 @@ export function useMyRefine(view: AppraisalShareView | null, enabled: boolean): 
     if (enabled && !hydrated) void useActiveCharacter.getState().hydrate();
   }, [enabled, hydrated]);
 
-  // By value, so a setup read again with the same numbers does not restart the load.
   const { stationRate, taxRate } = refining.setup;
   const setup = useMemo<RefiningSetup>(() => ({ stationRate, taxRate }), [stationRate, taxRate]);
   useEffect(() => {
@@ -59,7 +51,6 @@ export function useMyRefine(view: AppraisalShareView | null, enabled: boolean): 
           items: itemsWithMyRefine(view, { reprocessing, modifiers, refining: setup }),
         });
       } catch (error) {
-        // Offline or a failed skill read: the shared numbers stay on screen and the button says why.
         captureException(error);
         if (!cancelled) setFailedFor({ view, characterId, setup });
       }

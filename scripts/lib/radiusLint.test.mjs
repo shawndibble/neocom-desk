@@ -1,11 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { ESLint } from 'eslint';
 
-/**
- * Pins the `no-restricted-syntax` selectors that keep rectangles on the house
- * `rounded-xs` radius (DESIGN.md §3, issue #4540). A regex selector that never
- * fires lints clean, so this runs the real config against fixtures.
- */
 const eslint = new ESLint();
 
 async function radiusErrors(source, filePath = 'src/features/fixture.tsx') {

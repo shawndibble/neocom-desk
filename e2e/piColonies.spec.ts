@@ -1,12 +1,3 @@
-/**
- * PI Colonies, the daily check: what is stopped, running out or full, what to
- * do about it, and when to log in next.
- *
- * Playwright rather than jsdom for the layout claims (no sideways scroll at
- * 390px, 36px touch targets), which only a real layout engine can tell.
- * `PI_SHOTS=<dir>` also writes full-page screenshots there, for the side by
- * side with `docs/design/pi-tabs/ref/`.
- */
 import type { Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
@@ -24,7 +15,6 @@ const JITA_I = 40009077;
 const JITA_IV = 40009080;
 const JITA_V = 40009082;
 
-/** One colony stopped, one expiring today, one with a factory nothing feeds, the rest running. */
 const DAILY: ColonyVariants = {
   [JITA_I]: { expiresInHours: 6, installedHoursAgo: 66 },
   [JITA_IV]: { expiresInHours: -3, installedHoursAgo: 75 },
@@ -39,7 +29,6 @@ async function openColonies(page: Page, variants: ColonyVariants = DAILY): Promi
   await expect(page.getByRole('heading', { name: "Today's check" })).toBeVisible({
     timeout: 20_000,
   });
-  // Rows are in once every colony has a status.
   await expect(page.locator('[data-colony-status]')).toHaveCount(4);
 }
 
@@ -53,7 +42,6 @@ test.describe('PI Colonies, the daily check', () => {
     await page.setViewportSize(DESKTOP);
     await openColonies(page);
 
-    // The stopped colony is the next thing, and it is due now.
     await expect(page.getByText(/^Restart Jita IV/)).toBeVisible();
     await expect(page.getByText('Log in next')).toBeVisible();
 
@@ -114,8 +102,6 @@ test.describe('PI Colonies, the daily check', () => {
       row.getByRole('button', { name: /^More actions for / }),
       row.locator('button', { hasText: /Restart|Haul|Fix|Add|Details/ }).first(),
     ]) {
-      // boundingBox() doesn't wait: a control still rendering, or re-rendered between the
-      // visibility check and the read, reads as null. Polled, so a re-render is retried.
       await expect(control).toBeVisible();
       await expect
         .poll(async () => (await control.boundingBox())?.height ?? 0)
@@ -229,9 +215,7 @@ test.describe('PI Colonies, the daily check', () => {
       has: page.getByRole('button', { name: 'Switch to Vela Arrano' }),
     });
     await expect(group.locator('time')).toBeVisible();
-    // The read is a day old.
     await expect(page.getByText(/Updated 1d ago/)).toBeVisible();
-    // Its own figure, labelled as outside the plan.
     await expect(group.getByText(/Makes ~/)).toBeVisible();
     await expect(group.getByText('not in your plan')).toBeVisible();
     await shot(page, 'colonies-alts-desk');

@@ -2,7 +2,6 @@ import { NO_EXPLORE } from '../explore';
 import { NO_MODULE_FIGURES } from '../moduleFigures';
 import type { FittingStats, HoldStats } from '../types';
 
-/** Every hold empty: spread into a test's `holds` so a new hold lands here once. */
 export const NO_HOLDS: HoldStats = {
   cargo: 0,
   fleetHangar: 0,
@@ -17,11 +16,6 @@ export const NO_HOLDS: HoldStats = {
   infrastructureHold: 0,
 };
 
-/**
- * The FittingStats fields a test about something else doesn't care about,
- * at neutral values — spread into a fixture so a new stats field lands here
- * once rather than in every test's literal.
- */
 export function neutralExtendedStats(): Pick<
   FittingStats,
   | 'capacitorBudget'
@@ -99,7 +93,6 @@ function layer(hp: number) {
   };
 }
 
-/** A whole, plain combat fit's stats: 100 DPS, 1,000 EHP, 200 m/s, a stable capacitor. */
 export function baseFittingStats(): FittingStats {
   return {
     cpuUsed: 0,

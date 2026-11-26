@@ -23,9 +23,6 @@ vi.mock('@/features/market/orderBook', () => ({
   getOrderBook: vi.fn(),
   ORDER_BOOK_FANOUT_CONCURRENCY: 4,
 }));
-// A plan whose blueprint is in the catalog loads its BPC Sourcing offers and
-// invention market. Unmocked, those hit fuzzwork and ESI for real; a stalled
-// response on CI held the row loading past waitFor's budget.
 vi.mock('./blueprintPurchaseOffers', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./blueprintPurchaseOffers')>();
   return {
@@ -137,12 +134,6 @@ beforeEach(() => {
 
 describe('useComparedBuildResults', () => {
   it('returns nothing for an empty plan list', () => {
-    // Catalog is hoisted out of the render callback: a fresh object identity
-    // on every render would keep retriggering the fetch effect below (it
-    // depends on `catalog` by reference, same as `BuildPlanDetail.tsx`'s
-    // snapshot effect assumes a stable catalog reference from its caller) —
-    // setting `rows` to a new `[]` triggers a re-render that would otherwise
-    // recreate the catalog forever.
     const catalog = catalogWith([]);
     const { result } = renderHook(() =>
       useComparedBuildResults({ plans: [], catalog, ...baseArgs })
@@ -166,7 +157,6 @@ describe('useComparedBuildResults', () => {
 
     const { result } = renderHook(() => useComparedBuildResults({ plans, catalog, ...baseArgs }));
 
-    // Synchronous placeholder rows before any fetch settles.
     expect(result.current).toHaveLength(2);
     expect(result.current.every((row) => row.loading)).toBe(true);
 
@@ -194,8 +184,6 @@ describe('useComparedBuildResults', () => {
         error: null,
       },
     ]);
-    // Both plans sit at the same hub, so one batched request set prices
-    // them both — not one snapshot load per plan (issue #628).
     expect(mockedSnapshots).toHaveBeenCalledTimes(1);
     const requests = mockedSnapshots.mock.calls[0]?.[0] ?? [];
     expect(requests).toHaveLength(2);
@@ -203,7 +191,7 @@ describe('useComparedBuildResults', () => {
   });
 
   it('reports a plan whose blueprint is missing from the catalog as unresolved, without dropping it', async () => {
-    const catalog = catalogWith([]); // blueprintTypeID 100 not in the catalog
+    const catalog = catalogWith([]);
     const plans = [plan({ id: 'a', name: 'Orphan plan' })];
 
     const { result } = renderHook(() => useComparedBuildResults({ plans, catalog, ...baseArgs }));
@@ -218,9 +206,6 @@ describe('useComparedBuildResults', () => {
 
   it("reports one plan's market-snapshot failure without affecting the other plan's row", async () => {
     const catalog = catalogWith([entry({ blueprintTypeID: 100 }), entry({ blueprintTypeID: 200 })]);
-    // Two hubs, so each plan is priced by its own fetch: batching unions
-    // per hub, and one hub going down must not take the other hub's plan
-    // down with it (issue #453).
     const plans = [
       plan({ id: 'a', name: 'Failing plan', blueprintTypeID: 100, hubId: 'jita' }),
       plan({ id: 'b', name: 'Fine plan', blueprintTypeID: 200, hubId: 'amarr' }),
@@ -247,9 +232,6 @@ describe('useComparedBuildResults', () => {
   });
 
   it('reports the failure on every plan sharing the failed hub, dropping none of them', async () => {
-    // The shape batching actually created: same-hub plans await one shared
-    // fetch, so they fail together. Each still gets its own row with its own
-    // error rather than vanishing from the comparison (issue #453).
     const catalog = catalogWith([entry({ blueprintTypeID: 100 })]);
     const plans = [
       plan({ id: 'a', name: 'Plan A', hubId: 'jita' }),
@@ -312,8 +294,6 @@ describe('useComparedBuildResults', () => {
   );
 
   it("prices each row at its own plan's material price basis", async () => {
-    // Compare has to agree with the plan's own detail panel: a buy-basis plan
-    // shown beside a sell-basis one must not quietly quote both at sell.
     mockedSnapshots.mockImplementation((requests) =>
       requests.map(() =>
         Promise.resolve({
@@ -326,8 +306,6 @@ describe('useComparedBuildResults', () => {
       )
     );
     const catalog = catalogWith([entry({ blueprintTypeID: 100 })]);
-    // Distinct run counts, because `computeBuildPlan` is handed a Pick of the
-    // record that carries no id — runs is what tells the two calls apart.
     const plans = [
       plan({ id: 'sell', name: 'Sell basis', runs: 5 }),
       plan({ id: 'buy', name: 'Buy basis', runs: 9, materialPriceBasis: 'buy' }),
@@ -340,7 +318,6 @@ describe('useComparedBuildResults', () => {
       mockedCompute.mock.calls.map(([args]) => [args.plan.runs, args.materialPrices])
     );
     expect(byRuns.get(5)).toEqual({ 34: 5 });
-    // The highest buy order plus an untrained Character's 3% placement fee (#6167).
     expect(byRuns.get(9)?.[34]).toBeCloseTo(4.12);
   });
 
@@ -387,9 +364,6 @@ describe('useComparedBuildResults', () => {
     };
     mockedSnapshots.mockImplementation((requests) =>
       requests.map(() =>
-        // hubPrices[100] is the blueprint's own typeID — the BPO's ordinary
-        // sell price, the fallback tier when nothing is owned and BPC
-        // Sourcing has no listing.
         Promise.resolve({
           hubPrices: { 100: 500 },
           hubBuyPrices: {},
@@ -404,7 +378,6 @@ describe('useComparedBuildResults', () => {
     const { result } = renderHook(() => useComparedBuildResults({ plans, catalog, ...baseArgs }));
     await waitFor(() => expect(result.current[0]?.loading).toBe(false));
 
-    // No BPC Sourcing listing: the tier falls back to the snapshot's BPO price.
     expect(mockedOffers).toHaveBeenCalledWith(1, expect.anything(), [100]);
     const call = mockedCompute.mock.calls[0]?.[0];
     expect(call?.blueprintAcquisition).toMatchObject({
@@ -445,7 +418,6 @@ describe('useComparedBuildResults', () => {
   });
 
   it("reads a plan with owned materials on the plan page's sell-value basis, so the list and the page agree", async () => {
-    // 100 owned Tritanium sell into a 10 ISK buy order: ~1,000 ISK forgone.
     const owned: BuildResult = {
       ...RESULT,
       profit: 435,
@@ -475,7 +447,6 @@ describe('useComparedBuildResults', () => {
     );
     await waitFor(() => expect(result.current[0]?.loading).toBe(false));
 
-    // Building is worth less than just selling what you hold: a loss, as on the page.
     expect(result.current[0]?.result?.profit).toBeLessThan(0);
     expect(result.current[0]?.result?.profit).toBeLessThan(owned.profit ?? 0);
   });
@@ -519,8 +490,6 @@ describe('useComparedBuildResults', () => {
 
   describe('group Depth Prices (issue #3993)', () => {
     const JITA_STATION = 60003760;
-    // Each member buys 6 Tritanium; 1,000 are listed, so neither reaches 1%
-    // alone and the group's 12 does.
     const bought: BuildResult = {
       ...RESULT,
       materials: [
@@ -573,11 +542,9 @@ describe('useComparedBuildResults', () => {
 
       expect(mockedOrderBook).toHaveBeenCalledTimes(1);
       expect(mockedOrderBook).toHaveBeenCalledWith(10000002, 34);
-      // 10 at 4 + 2 at 6, over 12.
       const priced = mockedCompute.mock.calls.filter(([args]) => args.materialPrices?.[34] !== 4);
       expect(priced.length).toBeGreaterThan(0);
       for (const [args] of priced) expect(args.materialPrices?.[34]).toBeCloseTo(52 / 12);
-      // The walk rides on each row, for the group buy table's Still-to-buy line.
       expect(result.current[0]?.depth?.get(34)).toMatchObject({ need: 12, covered: true });
     });
 
@@ -624,7 +591,6 @@ describe('useComparedBuildResults', () => {
       { initialProps: { ...baseArgs, plans, catalog, pricingInputs: unhydrated } }
     );
 
-    // Hydrate must resolve first (see hook comment above).
     expect(result.current.every((row) => row.loading)).toBe(true);
     expect(mockedSnapshots).not.toHaveBeenCalled();
 
@@ -658,8 +624,6 @@ describe('useComparedBuildResults', () => {
     const { result } = renderHook(() => useComparedBuildResults({ plans, catalog, ...baseArgs }));
     await waitFor(() => expect(result.current.every((row) => !row.loading)).toBe(true));
 
-    // Folded into the one batched call — a second call the same tick would
-    // race the first on a cold cache and fetch everything twice.
     expect(mockedSnapshots).toHaveBeenCalledTimes(1);
     const batch = mockedSnapshots.mock.calls[0]![0];
     expect(batch.filter((r) => r.activity === 'reaction')).toEqual([

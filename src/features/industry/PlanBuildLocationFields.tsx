@@ -45,7 +45,6 @@ interface PlanBuildLocationFieldsProps {
   movePlan: (patch: PlanPatch) => void;
 }
 
-/** The plan's own Build Location: place picker, facility, system, rigs, tax, cost index, trade hub and price basis. */
 export function PlanBuildLocationFields({
   plan,
   activity,
@@ -89,9 +88,6 @@ export function PlanBuildLocationFields({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {/* Only facilities that can actually run this plan's
-                          activity — an Athanor can't manufacture, a Raitaru
-                          can't react (issue #460). */}
               {Object.values(FACILITY_PRESETS)
                 .filter((f) => f.activity === activity)
                 .map((f) => (
@@ -112,9 +108,6 @@ export function PlanBuildLocationFields({
               buildSystemId: system?.id,
               buildSystemName: system?.name,
               ...clearedBuildLocation,
-              // The band follows the system, so naming one settles the
-              // rig multiplier too. An unreachable ESI leaves the plan
-              // with the band it had rather than a guessed one.
               ...(system === null
                 ? { security: hub.security }
                 : system.security !== null
@@ -126,9 +119,6 @@ export function PlanBuildLocationFields({
       </BuildLocationPicker>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-        {/* Only a player structure has rig slots or an owner-set tax, so an
-                    NPC station shows neither rather than showing them dead. Both
-                    are already cleared on the plan when the facility changes. */}
         {facilityPreset.structure && (
           <PlanRigFitField
             fit={resolveRigFit(plan)}
@@ -150,9 +140,6 @@ export function PlanBuildLocationFields({
                 content={t('industry.facilityTaxTooltip')}
               />
             </span>
-            {/* Commits on blur/Enter, like Runs: a per-keystroke write
-                        round-trips IndexedDB and re-resolves the whole plan, so
-                        a controlled field lagged and could drop characters. */}
             <SourcingInput
               id="build-plan-facility-tax"
               value={plan.facilityTaxPct ?? 0}
@@ -165,9 +152,6 @@ export function PlanBuildLocationFields({
           </div>
         )}
 
-        {/* Only where ESI has no index for the Build location (J-Space) or
-                    the pilot has already typed one: elsewhere ESI's figure is right
-                    and a field would only invite overriding it. */}
         {(costIndexMissing || plan.costIndexOverridePct !== undefined) && (
           <div className="flex flex-col gap-1 text-xs">
             <span className="flex items-center gap-1">
@@ -192,7 +176,6 @@ export function PlanBuildLocationFields({
               }
               parse={(raw) => {
                 const parsed = parseCostIndexPct(raw);
-                // Blank clears, unreadable keeps what was there.
                 return parsed === undefined ? plan.costIndexOverridePct : (parsed ?? undefined);
               }}
               onCommit={(costIndexOverridePct) => update({ costIndexOverridePct })}
@@ -224,10 +207,6 @@ export function PlanBuildLocationFields({
           </Select>
         </label>
 
-        {/* Sits under Trade hub because it names a side of that hub's
-                    order book, not a separate place. Materials only — the
-                    product stays on lowest sell, which is what buying it
-                    outright costs (GLOSSARY.md, Acquisition Verdict). */}
         <div className="flex flex-col gap-1 text-xs">
           <span className="flex items-center gap-1">
             <label htmlFor="build-plan-material-price-basis">
@@ -255,9 +234,6 @@ export function PlanBuildLocationFields({
           </Select>
         </div>
 
-        {/* Blank = the hub's lowest sell. A number the pilot typed replaces
-            it everywhere the product is valued, with the accent as the "you
-            set this" cue and a revert beside it, like a material price. */}
         <div className="flex flex-col gap-1 text-xs">
           <span className="flex items-center gap-1">
             <label htmlFor="build-plan-sale-price">{t('industry.salePrice')}</label>
@@ -276,7 +252,6 @@ export function PlanBuildLocationFields({
               placeholder={t('industry.salePricePlaceholder')}
               mine={plan.productSalePrice !== undefined}
               parse={(raw) => {
-                // Blank clears; unreadable or non-positive keeps what was there.
                 if (raw.trim() === '') return undefined;
                 const value = unmaskNumber(raw);
                 return value !== undefined && value > 0 ? value : plan.productSalePrice;

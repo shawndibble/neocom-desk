@@ -1,8 +1,3 @@
-/**
- * The wallet journal's shared hooks and constants, for `/wallet` and
- * `/corp/wallet` alike — the table itself is `WalletJournalTable.tsx`. Apart
- * so that file exports only a component (fast refresh).
- */
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { DataTableColumn } from '@/components/ui';
@@ -26,9 +21,7 @@ import { formatIsk } from '@/lib/isk';
 import { useTimeZone } from '@/lib/timeFormat';
 import { splitTimestamp } from '@/lib/timestamp';
 
-/** The journal's default order, newest first. */
 export const JOURNAL_SORT = { columnId: 'date', direction: 'desc' } as const;
-/** Every sortable journal column, for `useUrlSort` to validate `?journal.sort=` against. */
 export const JOURNAL_SORT_COLUMN_IDS = [
   'date',
   'character',
@@ -39,22 +32,17 @@ export const JOURNAL_SORT_COLUMN_IDS = [
   'balance',
 ];
 
-/** The one spelling of an item id from a resolved-names map; an unresolved id reads as `Type #id`. */
 export function typeNameLookup(names: ReadonlyMap<number, string>): (typeId: number) => string {
   return (typeId) => names.get(typeId) ?? `Type #${typeId}`;
 }
 
-/** Filter a journal, then memoize the result and the ref types its dropdown offers. */
 export function useJournalFilterResult(
   journal: readonly JournalRow[],
   filter: WalletJournalFilter
 ): {
   filteredJournal: JournalRow[];
-  /** Filtered by date range and text only: the ref-type breakdown ignores the ref-type filter. */
   breakdownJournal: JournalRow[];
-  /** Filtered by ref type, date range and text but not party: the By party list keeps every party. */
   partyBreakdownJournal: JournalRow[];
-  /** Filtered by ref type and text but not date: the chart draws its own date axis. */
   chartJournal: JournalRow[];
   refTypeOptions: string[];
 } {
@@ -94,19 +82,12 @@ export function useJournalFilterResult(
   return { filteredJournal, breakdownJournal, partyBreakdownJournal, chartJournal, refTypeOptions };
 }
 
-/**
- * One column set for both journals — ESI returns the same schema for each —
- * built per journal only because each links its lines to its own fills.
- */
 export function useJournalColumnsBuilder(): (
   linkFor: (entry: JournalLine) => WalletTransactionCommon | undefined,
   nameFor: (typeId: number) => string,
   miningTaxEntriesFor?: (entry: JournalLine) => readonly MiningTaxEntryLink[] | undefined,
-  /** Set in the multi-Character view: adds a Character column. */
   characterNameFor?: (characterId: number) => string,
-  /** Set on the corp journal: adds a Player column, who did it. */
   playerNameFor?: (entry: JournalRow) => string,
-  /** Set on the personal journal: lets an insurance payout line open the loss it paid for. */
   lossCharacterFor?: (entry: JournalRow) => number | undefined
 ) => DataTableColumn<JournalRow>[] {
   const { t } = useTranslation();
@@ -162,7 +143,6 @@ export function useJournalColumnsBuilder(): (
           width: COL_DATETIME,
           className: 'whitespace-nowrap text-text-dim max-sm:px-1',
           headerClassName: 'max-sm:px-1',
-          // Date over time on a phone, freeing width for Description; one line from `sm` up.
           render: (entry) => {
             const { date, time } = splitTimestamp(new Date(entry.date), timeZone);
             const body = date.trimEnd();
@@ -180,7 +160,6 @@ export function useJournalColumnsBuilder(): (
         {
           id: 'refType',
           header: t('wallet.refType'),
-          // Wraps onto two lines on a phone so Amount stays on screen; one line from `sm` up.
           width: '24ch',
           className: 'max-sm:px-1 sm:truncate',
           headerClassName: 'max-sm:px-1',
@@ -191,7 +170,7 @@ export function useJournalColumnsBuilder(): (
         {
           id: 'description',
           header: t('wallet.description'),
-          // Wraps in its cell on a phone, capped so Amount stays inside the viewport.
+          minWidth: '32ch',
           className:
             'max-sm:max-w-40 max-sm:whitespace-normal max-sm:px-1 [overflow-wrap:anywhere]',
           headerClassName: 'max-sm:px-1',

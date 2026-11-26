@@ -25,7 +25,6 @@ vi.mock('virtual:pwa-register/react', () => ({
   }),
 }));
 
-// Title/Score load on the first export-menu open; answered at once here.
 vi.mock('@/features/character/achievement', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/features/character/achievement')>()),
   loadCharacterAchievement: vi.fn(async () => null),
@@ -40,7 +39,6 @@ vi.mock('@/sde/loadSde', () => ({
 
 installContactsHarness();
 
-/** The page header's export button › Download CSV (jsdom has no hover intent). */
 async function exportCsv(menuName: string) {
   const user = userEvent.setup({ delay: null });
   fireEvent.pointerDown(screen.getByRole('button', { name: menuName }), {
@@ -52,7 +50,6 @@ async function exportCsv(menuName: string) {
   await waitFor(() => expect(vi.mocked(download.downloadTextFile)).toHaveBeenCalled());
 }
 
-/** Opens and closes the export menu, then waits out the Title/Score load it starts. */
 async function armExport(menuName: string) {
   fireEvent.pointerDown(screen.getByRole('button', { name: menuName }), {
     button: 0,
@@ -77,8 +74,6 @@ describe('CSV export (issue #2164)', () => {
     const [filename, content] = spy.mock.calls[0];
     expect(filename).toMatch(/^neocom-contacts-\d{4}-\d{2}-\d{2}\.csv$/);
     expect(content).toContain('Good Friend');
-    // The standing tag replaces the printed number on screen, but the CSV
-    // still carries the raw value the table sorts on.
     expect(content).toContain('10');
   });
 
@@ -150,8 +145,6 @@ describe('CSV export (issue #2164)', () => {
     const [filename, content] = spy.mock.calls[0];
     expect(filename).toMatch(/^neocom-contacts-across-\d{4}-\d{2}-\d{2}\.csv$/);
     expect(content).toContain('Good Friend');
-    // Every contact appears on the Across tab, held by one character or the
-    // other — Bad Alliance is only ever on the main, but it is still a row.
     expect(content).toContain('Bad Alliance');
   });
 
@@ -203,7 +196,6 @@ describe('Contacts standing tag (issue #403)', () => {
     expect(
       within(goodRow as HTMLElement).getByRole('img', { name: 'Excellent standing (10)' })
     ).toBeInTheDocument();
-    // The bar and the printed number it replaces are both gone.
     expect(within(goodRow as HTMLElement).queryByText('10')).toBeNull();
   });
 

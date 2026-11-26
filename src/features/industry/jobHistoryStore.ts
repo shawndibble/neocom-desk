@@ -1,15 +1,8 @@
-/**
- * Dexie side of the Job History (issue #2866): folds each fetch's delivered
- * jobs into `industryJobHistory`, one row per Character, so a job stays
- * listed after ESI stops returning it. Removed with the Character
- * (`removeCharacter.ts`).
- */
 import { captureException } from '@sentry/react';
 import { db } from '@/db';
 import type { IndustryJob } from '@/esi/endpoints';
 import { mergeJobHistory } from './jobHistory';
 
-/** Tail of each Character's write chain: overlapping loads merge one after another, so a stale read can't overwrite a newer write. */
 const writeChains = new Map<number, Promise<void>>();
 
 async function writeHistory(
@@ -28,17 +21,10 @@ async function writeHistory(
       fetchedAt: now,
     });
   } catch (error) {
-    // History is a bonus on top of the active list; a Dexie failure must not
-    // take the list (or every alert reading it) down.
     captureException(error);
   }
 }
 
-/**
- * Dismiss (or restore) one delivered job: it stops counting as "not logged"
- * but stays in History (issue #2991). Serialised with the fetch writes so a
- * concurrent merge can't drop it. Resolves false when the write failed.
- */
 export function setJobDismissed(
   characterId: number,
   jobId: number,

@@ -1,9 +1,3 @@
-/**
- * The Corp Tax Book's officer dialogs (#4056 steps 5-9, #4063): every one is a
- * `Modal` (a sheet on a phone) that says who it is logged as, runs one edit
- * through `useBook().edit` (`editBook`, role re-checked live on the server)
- * and shows the refusal's mapped reason when it refuses.
- */
 import { useTimeZone } from '@/lib/timeFormat';
 import { useId, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -50,10 +44,6 @@ export function Label({ text, children }: { text: ReactNode; children: ReactNode
   );
 }
 
-/**
- * `Label`'s look for a group that names itself (a `SegmentedControl` with its own `label`): a
- * `<label>` around buttons would add its text to the first button's name, so it is read twice.
- */
 export function GroupLabel({ text, children }: { text: ReactNode; children: ReactNode }) {
   return (
     <div className="space-y-1">
@@ -65,8 +55,6 @@ export function GroupLabel({ text, children }: { text: ReactNode; children: Reac
   );
 }
 
-/** The longest note the server keeps on a payment (`recordPayment`'s `note`). */
-
 interface ShellProps {
   open: boolean;
   onClose: () => void;
@@ -74,19 +62,12 @@ interface ShellProps {
   confirmLabel: string;
   canConfirm: boolean;
   run: () => Promise<void>;
-  /** A destructive confirm (§6c): the confirm button is `danger`, not `primary`. */
   danger?: boolean;
-  /**
-   * The "logged under your name" footer note: `true` says it is logged with the reason the
-   * dialog asks for, `'plain'` is for a dialog that asks for none, `false` drops the note.
-   */
   showLogged?: boolean | 'plain';
-  /** The field focus starts in, instead of the dialog body. */
   initialFocusRef?: RefObject<HTMLElement | null>;
   children: ReactNode;
 }
 
-/** Modal + confirm button + busy state + the server's refusal. */
 export function DialogShell({
   open,
   onClose,
@@ -105,7 +86,6 @@ export function DialogShell({
   const reasonId = useId();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // Any typing in the body: closing by Escape, Back or a stray click then asks first.
   const [touched, setTouched] = useState(false);
   const confirm = async () => {
     if (!canConfirm || busy) return;
@@ -120,7 +100,6 @@ export function DialogShell({
       setBusy(false);
     }
   };
-  // Said once the pilot has typed and Confirm is still off, so a disabled button is never mute.
   const needsReason = touched && !canConfirm;
   return (
     <Modal
@@ -191,10 +170,6 @@ export function Effect({ children }: { children: ReactNode }) {
   );
 }
 
-/**
- * One reason, one action: Dismiss, Reject declaration, Write off and Reverse
- * dismissal are all this with different words and a different `run`.
- */
 export function ReasonDialog({
   open,
   onClose,
@@ -214,9 +189,7 @@ export function ReasonDialog({
   reasonLabel: string;
   confirmLabel: string;
   effect?: ReactNode;
-  /** False holds the action back whatever the reason says (the intro says why). */
   canConfirm?: boolean;
-  /** A second REQUIRED field (keeping a bill: what the member should do next), sent as `run`'s 2nd argument. */
   nextStep?: { label: string; hint: string };
   run: (reason: string, nextStep: string) => Promise<void>;
 }) {
@@ -246,13 +219,6 @@ export function ReasonDialog({
   );
 }
 
-/**
- * Record payment: ISK that reached the corporation outside the wallet journal. It shows,
- * before confirming, which days the ISK pays or part-pays, oldest first, and what is owed or
- * held after (the Miner's own Running account). When the wallet holds Unmatched donations it also offers
- * to match one of them instead: that assigns the donation to this Miner, so the same ISK is
- * never recorded twice.
- */
 export function RecordPaymentDialog({
   open,
   onClose,
@@ -268,17 +234,7 @@ export function RecordPaymentDialog({
   miner: MinerRow;
   minerName: string;
   defaultAmount: number;
-  /**
-   * A fixed id for the hand-recorded payment, e.g. one derived from the declaration it
-   * confirms: a retry, or a second officer, then finds it already recorded instead of
-   * recording the ISK twice, and goes on to `onRecorded`.
-   */
   paymentId?: string;
-  /**
-   * The Declaration this payment confirms. The server resolves it in the same write as the
-   * payment or the donation match, so whichever officer lands first wins and the other is
-   * refused (`already-resolved`): the ISK is never counted twice.
-   */
   declarationId?: string;
   onRecorded?: () => Promise<void>;
 }) {
@@ -289,11 +245,9 @@ export function RecordPaymentDialog({
   const [payer, setPayer] = useState(String(miner.mainCharacterId));
   const today = utcDay();
   const startDate = view.input.startDate;
-  // Nothing is dated before the lock date (decision 20261120-235011, "a lock date").
   const lockDate = lockDateFor(today);
   const earliest = startDate > lockDate ? startDate : lockDate;
   const [date, setDate] = useState(today);
-  // The officer's note on a payment by hand ("handed over in person"): the Miner reads it too.
   const [note, setNote] = useState('');
   const donations = useMemo(
     () =>
@@ -367,7 +321,6 @@ export function RecordPaymentDialog({
               ...(declarationId ? { declarationId } : {}),
             });
           } catch (e) {
-            // Already recorded under this fixed id: an earlier try landed, so carry on.
             if (paymentId === undefined || callableErrorReason(e) !== 'payment-exists') throw e;
           }
         }
@@ -454,7 +407,6 @@ export function RecordPaymentDialog({
   );
 }
 
-/** Mark not tax: all or part of a donation was not a tax payment (e.g. a buyback). */
 export function MarkNotTaxDialog({
   open,
   onClose,
@@ -539,10 +491,6 @@ export function MarkNotTaxDialog({
   );
 }
 
-/**
- * A payment's row menu: move it to another Miner, or off every Miner (Unmatched), for a donation
- * the book placed wrongly (`reassignPayment`). An officer's placement stands over the book's match.
- */
 export function ReassignPaymentDialog({
   open,
   onClose,
@@ -554,7 +502,6 @@ export function ReassignPaymentDialog({
   onClose: () => void;
   payment: { id: string; minerId: string; amount: number; at: string };
   fromName: string;
-  /** Whose account it counts toward now. */
   minerName: string;
 }) {
   const zone = useTimeZone();
@@ -615,7 +562,6 @@ export function ReassignPaymentDialog({
   );
 }
 
-/** Needs-you: link an Unmatched donation to a Miner. */
 export function AssignDonationDialog({
   open,
   onClose,

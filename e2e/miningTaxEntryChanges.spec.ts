@@ -1,8 +1,3 @@
-/**
- * What a pilot still shapes per Mining Ledger Entry (decision 20261120-235011): dismiss it (won't
- * pay), change its tax %, or split it between Payees. Each changes what the Payee's Running
- * account bills, so the owed figure follows. Personal data only (Dexie): the main suite.
- */
 import type { Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
 import { CHARACTER_ID } from './support/fixtureData';
@@ -21,7 +16,6 @@ const DAYS = [6, 5, 4];
 const OWED = DAYS.length * DAY_TAX;
 const owedTo = (page: Page, name: string) => page.getByRole('group', { name });
 
-/** Rook is owed three days; Bram is a second Payee the pilot can split a day to. */
 async function openTab(page: Page) {
   const data = rookOwed(CHARACTER_ID, DAYS);
   data.payees!.push(
@@ -36,7 +30,6 @@ async function openTab(page: Page) {
   await expect(owedTo(page, ROOK.name)).toContainText(isk(OWED));
 }
 
-/** The ⋮ menu of the newest day's row. */
 async function rowMenu(page: Page, item: string) {
   await page
     .getByRole('button', { name: /^More actions for .* in Jita$/ })

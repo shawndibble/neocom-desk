@@ -1,17 +1,3 @@
-/**
- * The Charge Picker's data: for each weapon group (every fitted module of
- * one type that takes charges), every charge it takes with its figures for
- * this Fitting — the dogma engine's DPS, range and damage split with the
- * charge loaded, the pilot's missing skills, the Trade Hub's sell price and
- * what the cargo holds. The arithmetic on top lives in
- * `engine/fittings/chargeChoice.ts`.
- *
- * Mounted only where the picker shows (the Add panel's Charges tab, a
- * weapon's "Change charge" menu), so the engine pays one calculation per
- * charge only while someone is looking — memoized per hull, pilot and the
- * rest of the Fitting, so loading one of the group's own charges doesn't
- * recalculate the list.
- */
 import { useCallback, useMemo } from 'react';
 import { factionName, type ChargeChoice, type ChargeTier } from '@/engine/fittings/chargeChoice';
 import type {
@@ -29,24 +15,17 @@ import type { FittingContext } from './fittingContext';
 import type { FittingCatalogue } from './useFittingCatalogue';
 import { useKeyedLoad } from '@/lib/useAsyncLoad';
 
-/** The SDE meta groups (public/data/market/variations.json) a charge's tier reads off. */
 const META_GROUP_TECH2 = 2;
 const META_GROUP_FACTION = 4;
 
 export interface WeaponChargeGroup {
   moduleTypeId: number;
   slot: FittingSlotKind;
-  /** How many of the module are fitted. */
   count: number;
-  /** Charges loaded in them now. */
   loaded: ReadonlySet<number>;
-  /** Some charge deals damage: the picker. */
   isWeapon: boolean;
-  /** Its charges inject capacitor: the cap booster guide. Neither (scripts, paste…): a plain list. */
   isCapBooster: boolean;
-  /** Its charges are mining crystals: the crystal guide. */
   isMiner: boolean;
-  /** Every charge the module takes, by name. */
   choices: ChargeChoice[];
 }
 
@@ -59,7 +38,6 @@ interface BuildInput {
   catalogue: Pick<FittingCatalogue, 'types' | 'variations'>;
 }
 
-/** Each charge's `ChargeChoice`: its tier and type group from the SDE variations, its figures from the engine. */
 export function buildChargeChoices({
   typeIds,
   stats,
@@ -134,12 +112,6 @@ function weaponGroupsOf(
   return [...byType.values()];
 }
 
-/**
- * What the engine's figures for one group depend on: everything in the
- * Fitting except the group's own charges (which `compareCharges` replaces)
- * and the cargo, and what it is worked out under (`ChargeBasis`) — its pilot
- * is the cache's own key.
- */
 function engineKey(fitting: Fitting, moduleTypeId: number, basis?: ChargeBasis): string {
   return JSON.stringify({
     ...fitting,
@@ -194,17 +166,13 @@ function engineFigures(
 
 interface UseChargeChoicesParams {
   fitting: Fitting | null;
-  /** Null while the engine, pilot or catalogue loads. */
   context: FittingContext | null;
   moduleResults: readonly FittingModuleResult[] | null;
-  /** Only this module type's group; every group when absent. */
   moduleTypeId?: number;
 }
 
 export interface ChargeChoicesResult {
-  /** Null while the engine or the Fitting's results aren't ready. */
   groups: WeaponChargeGroup[] | null;
-  /** Hub prices still loading: every price reads null until then. */
   pricesLoading: boolean;
 }
 

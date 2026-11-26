@@ -6,19 +6,12 @@ import { fixed0, fixed1, fixedFormat } from '@/lib/fixedFormat';
 
 const REPAIR_LAYERS: readonly (keyof LocalRepair)[] = ['shield', 'armor', 'hull'];
 
-/** A signed rate: "+" for what the capacitor gains, "−" (a true minus) for what it loses. */
 function signed(value: number, digits: number): string {
   const magnitude = fixedFormat(digits)(Math.abs(value));
   if (Number(magnitude) === 0) return magnitude;
   return value < 0 ? `−${magnitude}` : `+${magnitude}`;
 }
 
-/**
- * Local tank under Defense, one fact each: every repairer layer at burst,
- * passive shield regeneration, each ancillary repairer with paste and dry,
- * and the whole tank burst beside sustained in EHP/s — the sustained figure
- * being our own estimate (`engine/fittings/tank.ts`), so it says so.
- */
 export function TankFacts({
   stats,
   typeName,
@@ -51,7 +44,6 @@ export function TankFacts({
       id: `ancillary-${index}`,
       label: typeName(row.typeId),
       value: figure((s) => {
-        // The same repairer unheated: the ancillary rows line up.
         const same = s.tank.ancillary[index] ?? row;
         return t('fittings.stats.tank.ancillary', {
           loaded: fixed1(same.loaded),
@@ -94,7 +86,6 @@ export function TankFacts({
   );
 }
 
-/** Capacitor under its section: what refills it at peak against what the running modules take. */
 export function CapacitorFacts({ stats }: { stats: FittingStats }) {
   const { t } = useTranslation();
   const budget = stats.capacitorBudget;
@@ -173,10 +164,6 @@ export function CapacitorFacts({ stats }: { stats: FittingStats }) {
   );
 }
 
-/**
- * The one tank figure the Ring shows under its CPU / powergrid readouts: the
- * sustained tank in EHP/s. Nothing until the stats are in.
- */
 export function SustainedTankReadout({
   stats,
   className = '',

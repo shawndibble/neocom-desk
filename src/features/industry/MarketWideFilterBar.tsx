@@ -25,17 +25,10 @@ import { DEFAULT_SALES_SHARE, SALES_SHARE_OPTIONS } from './salesSharePref';
 interface MarketWideFilterBarProps {
   filter: MarketWideFilterState;
   onChange: (next: MarketWideFilterState) => void;
-  /** Rows no Character on the account can build, shown as the skill chip's count. */
   gatedCount: number;
-  /** Rows the filters leave, for the phone sheet's done button; omitted before a scan. */
   resultCount?: number;
 }
 
-/**
- * The funnel sits in the title bar beside Scan, at Scan's own size, in every
- * state: below `md` it opens `FilterBar`'s sheet, with a pointer a popover
- * off the funnel — a box unfolding beneath it would open inside the bar.
- */
 export function MarketWideFilterBar({
   filter,
   onChange,
@@ -53,8 +46,6 @@ export function MarketWideFilterBar({
       pointerSurface="popover"
     >
       {(draft, setDraft) => (
-        // Two controls per row in the phone sheet so it stays short; the
-        // chips sit together on the last row. `lg:contents` leaves the popover as it was.
         <div className="grid w-full grid-cols-2 gap-3 lg:contents">
           <FilterField label={t('industry.marketOpportunitiesFilters.maxBuildCost')}>
             <Select
@@ -164,7 +155,6 @@ export function MarketWideFilterBar({
   );
 }
 
-/** One labelled multi-select dropdown over a closed set — BPC Sourcing's filter groups, reused. */
 function FilterMultiSelect<V extends string>({
   label,
   members,

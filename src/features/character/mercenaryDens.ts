@@ -1,13 +1,3 @@
-/**
- * Fetch + cache layer for a Character's Mercenary Dens (issue #4791): the den
- * list, one detail read per den, and the tactical operations list with one
- * read per operation. ESI has character routes only, so the Overview widget
- * fans out over every stored Character.
- *
- * Nothing unread is shown as fine: a den whose detail fails stays as an
- * unknown row, an operations read with any gap is unknown rather than "none",
- * and a Character whose reads fail is `failed`, not "needs permission".
- */
 import {
   conditionalFetch,
   loadWithCacheStatus,
@@ -43,36 +33,24 @@ export interface MercenaryDenRow extends Den {
   planetId: number;
   planetName: string | null;
   systemId: number | null;
-  /** Null when the den's detail could not be read. */
   infomorphs: number | null;
   developmentLevel: number | null;
-  /** 0–100 within the level; null when the detail could not be read. */
   developmentAmount: number | null;
   anarchyAmount: number | null;
-  /** The corporation owning the skyhook the den sits on. */
   skyhookOwnerId: number | null;
-  /** False when the operations scope or any operation read is missing: unknown, not "none". */
   operationsRead: boolean;
 }
 
 export interface MercenaryDensWidgetData {
   rows: MercenaryDenRow[];
-  /** Characters holding the den scope whose grant ESI still honours. */
   granted: number[];
-  /** Of those, the ones whose den list could not be read (and had no cache). */
   failed: number[];
-  /** Jumps from the header Character's Current System, by system id. */
   jumps: Map<number, number>;
   systemNames: Map<number, string>;
-  /** Skyhook owner corporation names, by id; an unresolved id is absent. */
   ownerNames: Map<number, string>;
   fetchedAt: Date | null;
 }
 
-/**
- * One cached read per id under the fan-out cap. A read that throws or finds
- * nothing maps to null, so the caller can tell "unreadable" from "absent".
- */
 async function loadEach<Id extends number | string, T>(
   characterId: number,
   ids: readonly Id[],
@@ -94,7 +72,6 @@ async function loadEach<Id extends number | string, T>(
   return results;
 }
 
-/** Every open-or-done operation, or null when the list or any one of them could not be read. */
 async function loadOperations(characterId: number): Promise<CharacterMercenaryOperation[] | null> {
   const { fetchLive, conditional } = conditionalFetch((options) =>
     getCharacterMercenaryOperations(characterId, options)
@@ -116,7 +93,6 @@ async function loadOperations(characterId: number): Promise<CharacterMercenaryOp
     const operations = reads.flatMap((op) => (op ? [op.data] : []));
     return operations.length === reads.length ? operations : null;
   } catch {
-    // A failed operations read leaves the column unknown; it never fails the widget.
     return null;
   }
 }
@@ -173,7 +149,6 @@ async function loadCharacterDens(
   return { characterId, characterName, status: 'read', dens, operations, reads };
 }
 
-/** Planet name and system for each planet; one that cannot be read keeps its id only. */
 async function planetInfo(
   planetIds: readonly number[]
 ): Promise<Map<number, { name: string; systemId: number }>> {
@@ -182,9 +157,7 @@ async function planetInfo(
     try {
       const data = await loadPlanetInfoRow(planetId);
       if (data) info.set(planetId, { name: data.name, systemId: data.system_id });
-    } catch {
-      // The row keeps its timers and loses only its name.
-    }
+    } catch {}
   });
   return info;
 }
@@ -220,13 +193,10 @@ function toRow(
   };
 }
 
-/** What the alerts and the Calendar read of one den: no names, operations or jumps. */
 export interface CharacterDenState {
   denId: number;
   planetId: number;
-  /** The reinforcement exit; null when not reinforced or the detail could not be read. */
   reinforcedUntilMs: number | null;
-  /** 0–100 within the level; null when the detail could not be read. */
   anarchyAmount: number | null;
   anarchyLevel: number | null;
 }
@@ -234,11 +204,6 @@ export interface CharacterDenState {
 export type CharacterDenStates =
   { status: 'read'; dens: CharacterDenState[]; fetchedAt: Date } | { status: 'reauth' | 'failed' };
 
-/**
- * One Character's dens through the same cached reads as the widget, minus its
- * extras (operations, jumps, names): the poll domain and the Calendar need
- * timers and anarchy only. A thrown read is `failed`, never an empty list.
- */
 export async function loadCharacterDenStates(characterId: number): Promise<CharacterDenStates> {
   try {
     const entry = await loadCharacterDens(characterId, '', false);
@@ -259,10 +224,6 @@ export async function loadCharacterDenStates(characterId: number): Promise<Chara
   }
 }
 
-/**
- * Every stored Character's dens. A read that found nothing for anyone and had
- * nothing cached throws, so the widget keeps its last value and offers Retry.
- */
 export async function loadMercenaryDensWidget(
   characterId: number
 ): Promise<MercenaryDensWidgetData> {
@@ -273,7 +234,6 @@ export async function loadMercenaryDensWidget(
   );
   const { entries } = await fanOutAllCharacters<CharacterDens>({
     scope: DEN_SCOPE,
-    // A thrown read is that Character's failure, not a skip: it holds the scope.
     load: ({ characterId: id, name }) =>
       loadCharacterDens(id, name, operationScope.has(id)).catch(() => ({
         characterId: id,
@@ -301,7 +261,6 @@ export async function loadMercenaryDensWidget(
   const [jumps, systems, ownerNames] = await Promise.all([
     jumpsFromCurrent(characterId, systemIds),
     import('@/sde/solarSystems').then((m) => m.loadSolarSystemsById()).catch(() => null),
-    // A name is a nicety in the modal; a failed lookup leaves the id unnamed.
     resolveNames(ownerIds).catch(() => new Map<number, string>()),
   ]);
   const systemNames = new Map<number, string>();
@@ -320,14 +279,6 @@ export async function loadMercenaryDensWidget(
   };
 }
 
-/**
- * One Character's dens as rows, for the Calendar's den clocks: the same reads
- * as the widget, without the other Characters, jumps or owner names. `cached`
- * is null when the list could not be read or the den scope was never granted;
- * `needsReauth` only when the scope was granted and ESI refused it. Mercenary
- * dens is an opt-in Permission, so a grant without it is "off", never a
- * reauth (issue #5997).
- */
 export async function loadCharacterDenRows(
   characterId: number
 ): Promise<StatusResult<MercenaryDenRow[]>> {

@@ -4,9 +4,6 @@ import { spBetween, timeToTrain, trainingRate } from '@/engine/skills/sp';
 import { placeRemaps, MAX_SUPPORTED_REMAPS } from '@/engine/optimizer/placeRemaps';
 import type { AttributeName, Attributes, EngineSkill, PlanStep } from '@/engine/types';
 
-// Counts the segment pricings `placeRemaps` asks `bestAttributes` for. The
-// "stays fast" tests assert on these instead of a wall-clock budget: the work
-// done is the same on every machine, while elapsed time swings with CI load.
 const pricing = vi.hoisted(() => ({ calls: 0 }));
 vi.mock('@/engine/optimizer/bestAttributes', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/engine/optimizer/bestAttributes')>();
@@ -55,12 +52,11 @@ describe('placeRemaps', () => {
 
   it('uses current attributes as one segment when remapCount is 0', () => {
     const skills = skillMap(skill(1, 'perception', 'willpower'));
-    const steps = levels(1, 1); // 250 SP
+    const steps = levels(1, 1);
     const result = placeRemaps(steps, skills, { remapCount: 0, currentAttributes: CURRENT });
     expect(result.segments).toHaveLength(1);
     expect(result.segments[0]).toMatchObject({ startIndex: 0, endIndex: 0 });
     expect(result.segments[0].attributes).toEqual(CURRENT);
-    // 250 SP at 20 + 20/2 = 30 SP/min -> 500 s
     expect(result.totalSeconds).toBeCloseTo(500, 9);
     expect(result.currentSeconds).toBeCloseTo(500, 9);
     expect(result.savingsSeconds).toBeCloseTo(0, 9);
@@ -84,14 +80,13 @@ describe('placeRemaps', () => {
       skill(1, 'perception', 'willpower'),
       skill(2, 'intelligence', 'memory')
     );
-    const steps = [...levels(1, 3), ...levels(2, 3)]; // 8000 SP each phase
+    const steps = [...levels(1, 3), ...levels(2, 3)];
     const result = placeRemaps(steps, skills, { remapCount: 2, currentAttributes: CURRENT });
     expect(result.segments).toHaveLength(2);
     expect(result.segments[0]).toMatchObject({ startIndex: 0, endIndex: 2 });
     expect(result.segments[1]).toMatchObject({ startIndex: 3, endIndex: 5 });
     expect(result.segments[0].attributes.perception).toBe(27);
     expect(result.segments[1].attributes.intelligence).toBe(27);
-    // Each phase: 8000 SP at 37.5 SP/min = 12800 s. Current rate 30 -> 16000 s each.
     expect(result.totalSeconds).toBeCloseTo(25600, 6);
     expect(result.currentSeconds).toBeCloseTo(32000, 6);
     expect(result.savingsSeconds).toBeCloseTo(6400, 6);
@@ -162,8 +157,6 @@ describe('placeRemaps', () => {
     ];
     const result = placeRemaps(steps, skills, { remapCount: 2, currentAttributes: CURRENT });
 
-    // Brute force: optional current-attributes prefix [0, p) at no remap
-    // cost, then 1 or 2 remapped segments over the rest.
     const currentSecondsFor = (slice: PlanStep[]): number => {
       let seconds = 0;
       for (const step of slice) {
@@ -209,25 +202,17 @@ describe('placeRemaps', () => {
     expect(steps).toHaveLength(200);
     pricing.calls = 0;
     const result = placeRemaps(steps, skills, { remapCount, currentAttributes: CURRENT });
-    // Work, not wall-clock: the DP prices only the chosen segments (one per
-    // remap), while the O(R^2) grid it replaced priced every candidate cell.
-    expect(pricing.calls).toBeGreaterThan(0); // the spy is wired up
+    expect(pricing.calls).toBeGreaterThan(0);
     expect(pricing.calls).toBeLessThanOrEqual(remapCount + 1);
     expect(result.segments.length).toBeGreaterThanOrEqual(1);
-    // Up to `remapCount` remapped segments plus an optional prefix.
     expect(result.segments.length).toBeLessThanOrEqual(remapCount + 1);
     expect(result.savingsSeconds).toBeGreaterThan(0);
   });
 });
 
-// Regression for the live-review contradiction (UX-REVIEW #2): a real
-// character's ESI attributes already include implant bonuses, so the baseline
-// fed as `currentAttributes` can sit outside the 17..27 remap search space.
-// The optimizer must never return a plan slower than those current attributes.
 import { computeSchedule } from '@/engine/schedule';
 
 describe('placeRemaps never beats itself with the current attributes', () => {
-  // Mixed attribute pairs, multi-level steps — shaped like a real plan.
   const skills = skillMap(
     skill(1, 'perception', 'willpower'),
     skill(2, 'intelligence', 'memory', 3),
@@ -249,11 +234,6 @@ describe('placeRemaps never beats itself with the current attributes', () => {
     willpower: 4,
     charisma: 4,
   };
-  // ESI-style values: implant bonuses baked in (sum 139 > 99, unreachable by
-  // remap). Every pair trains faster on these than on any legal allocation
-  // (max reachable rate with +4 implants is 31 + 25/2 = 43.5), so no split —
-  // not even a remap on a late segment after a current-attributes prefix —
-  // can help.
   const inflated: Attributes = {
     intelligence: 29,
     memory: 27,
@@ -295,8 +275,6 @@ describe('placeRemaps never beats itself with the current attributes', () => {
   });
 
   it('still remaps when the current attributes are a reachable allocation', () => {
-    // Legal remap spread (sum 99, each 17..27): the optimizer can only match
-    // or beat it, and here the plan is perception-heavy so it must beat it.
     const reachable: Attributes = {
       intelligence: 27,
       memory: 21,
@@ -314,16 +292,12 @@ describe('placeRemaps never beats itself with the current attributes', () => {
   });
 });
 
-// Leading current-attributes segment: with N remaps the optimizer may train a
-// prefix on the CURRENT attributes (no remap spent) and remap mid-plan. The
-// single-remap case answers "where do I remap".
 describe('placeRemaps leading current-attributes segment', () => {
   it('N=1: trains the early int/mem phase on current attributes and remaps mid-plan', () => {
     const skills = skillMap(
       skill(1, 'intelligence', 'memory'),
       skill(2, 'perception', 'willpower')
     );
-    // Current attributes are already optimal for the int/mem phase.
     const current: Attributes = {
       intelligence: 27,
       memory: 21,
@@ -331,29 +305,21 @@ describe('placeRemaps leading current-attributes segment', () => {
       willpower: 17,
       charisma: 17,
     };
-    const steps = [...levels(1, 3), ...levels(2, 3)]; // 8000 SP each phase
+    const steps = [...levels(1, 3), ...levels(2, 3)];
     const result = placeRemaps(steps, skills, { remapCount: 1, currentAttributes: current });
 
     expect(result.segments).toHaveLength(2);
-    // Segment 0: the current-attributes prefix, no remap spent.
     expect(result.segments[0]).toMatchObject({ startIndex: 0, endIndex: 2, remap: false });
     expect(result.segments[0].attributes).toEqual(current);
-    // Segment 1: the single remap, placed mid-plan for the per/wil phase.
     expect(result.segments[1]).toMatchObject({ startIndex: 3, endIndex: 5, remap: true });
     expect(result.segments[1].attributes.perception).toBe(27);
     expect(result.segments[1].attributes.willpower).toBe(21);
-    // Both phases at the optimal 37.5 SP/min: 8000/37.5 min each.
     expect(result.totalSeconds).toBeCloseTo(2 * (8000 / 37.5) * 60, 6);
     expect(result.totalSeconds).toBeLessThanOrEqual(result.currentSeconds);
     expect(result.savingsSeconds).toBeCloseTo(result.currentSeconds - result.totalSeconds, 6);
   });
 
   it('N=1: is a pure function of its inputs, whatever ran before it (#3074)', () => {
-    // CI's 42338 s here (#3074) was a JIT miscompile, not shared state: see
-    // the single-remap fast path in placeRemaps.ts, which has the flags that
-    // reproduce it. This pins the contract: repeated calls, calls interleaved
-    // with other remap counts and clone states, and a frozen input must all
-    // agree to the last bit.
     const skills = skillMap(
       skill(1, 'intelligence', 'memory'),
       skill(2, 'perception', 'willpower')
@@ -419,8 +385,7 @@ describe('placeRemaps leading current-attributes segment', () => {
       }
       return seconds;
     };
-    // Brute force: prefix [0, cut) on current attributes + one remap for the rest.
-    let best = bestAttributes(steps, skills).seconds; // remap at start
+    let best = bestAttributes(steps, skills).seconds;
     for (let cut = 1; cut <= steps.length; cut++) {
       const t =
         currentSecondsFor(steps.slice(0, cut)) +
@@ -432,16 +397,6 @@ describe('placeRemaps leading current-attributes segment', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Single-remap (remapCount === 1) fast path.
-//
-// remapCount === 1 is the case GLOSSARY.md calls out ("train a leading segment
-// on current attributes, then remap at the optimizer-chosen point") and the
-// prefilled default in the UI. Only the last DP column is reachable with one
-// allocation, so the answer is an O(R) suffix scan over pair-run edges rather
-// than the O(R^2) segment grid. These tests pin that the fast path is an exact
-// substitute for the general DP, not an approximation.
-// ---------------------------------------------------------------------------
 import {
   aggregateSpByPair,
   bestAttributesForPairs,
@@ -450,11 +405,6 @@ import {
 import type { Implants } from '@/engine/types';
 import type { PlaceRemapsResult } from '@/engine/optimizer/placeRemaps';
 
-/**
- * Independent specification of "one remap, placed anywhere": enumerate every
- * pair-run edge, train the prefix on the current attributes, remap once for
- * the whole suffix, keep the cheapest. Tie-break: the EARLIEST edge wins.
- */
 function referenceSingleRemap(
   steps: readonly PlanStep[],
   skills: ReadonlyMap<number, EngineSkill>,
@@ -472,7 +422,6 @@ function referenceSingleRemap(
     };
   }
 
-  // Pair runs + per-run baseline on the current attributes.
   const runs: { startStep: number; endStep: number; pair: string; seconds: number }[] = [];
   let currentSeconds = 0;
   steps.forEach((step, index) => {
@@ -567,7 +516,6 @@ function referenceSingleRemap(
   };
 }
 
-/** Deterministic PRNG so generated plan shapes are reproducible. */
 function mulberry32(seed: number): () => number {
   let a = seed;
   return () => {
@@ -588,11 +536,6 @@ const ALL_PAIRS: [AttributeName, AttributeName][] = [
   ['memory', 'charisma'],
 ];
 
-/**
- * Plan with `runs` pair runs. `stepsPerRun > 1` exercises multi-step runs
- * (segment boundaries must still land on run edges); distinct ranks keep the
- * segment-signature memo from collapsing the work.
- */
 function generatePlan(
   runCount: number,
   seed: number,
@@ -623,10 +566,6 @@ function generatePlan(
   return { steps, skills };
 }
 
-/**
- * Seconds to train `steps` on one fixed attribute spread. The reference below
- * needs a cost function that shares nothing with the DP under test.
- */
 function trainSeconds(
   steps: readonly PlanStep[],
   skills: ReadonlyMap<number, EngineSkill>,
@@ -644,19 +583,13 @@ function trainSeconds(
 }
 
 describe('placeRemaps general DP', () => {
-  /**
-   * Every way to cut the plan into a current-attributes prefix plus at most
-   * `remaps` remapped segments, over STEP boundaries rather than run edges —
-   * a strictly wider search than the DP does, so it cannot miss an optimum
-   * the DP finds, and it shares no code with it.
-   */
   function bruteForce(
     steps: readonly PlanStep[],
     skills: ReadonlyMap<number, EngineSkill>,
     remaps: number
   ): number {
     const n = steps.length;
-    let best = trainSeconds(steps, skills, CURRENT); // spend no remap at all
+    let best = trainSeconds(steps, skills, CURRENT);
     for (let i = 0; i <= n; i++) {
       const prefix = trainSeconds(steps.slice(0, i), skills, CURRENT);
       if (i === n) continue;
@@ -686,7 +619,6 @@ describe('placeRemaps general DP', () => {
         const result = placeRemaps(steps, skills, { remapCount, currentAttributes: CURRENT });
         expect(result.totalSeconds).toBeCloseTo(bruteForce(steps, skills, remapCount), 3);
 
-        // Segments tile the plan exactly, in order.
         let next = 0;
         for (const segment of result.segments) {
           expect(segment.startIndex).toBe(next);
@@ -702,8 +634,6 @@ describe('placeRemaps general DP', () => {
   }
 
   it('spends a second remap only when it earns its place', () => {
-    // A plan of one attribute pair has one optimal spread, so the DP must
-    // report the single segment rather than pad out to `remapCount`.
     const skills = skillMap(skill(1, 'perception', 'willpower', 5));
     const steps = levels(1, 5);
     const result = placeRemaps(steps, skills, { remapCount: 3, currentAttributes: CURRENT });
@@ -798,7 +728,6 @@ describe('placeRemaps single-remap fast path', () => {
           implants: variant.implants,
         });
 
-        // Field-for-field, bit-for-bit: placement, attributes and durations.
         expect(actual.segments).toEqual(expected.segments);
         expect(actual.totalSeconds).toBe(expected.totalSeconds);
         expect(actual.currentSeconds).toBe(expected.currentSeconds);
@@ -808,13 +737,10 @@ describe('placeRemaps single-remap fast path', () => {
   }
 
   it('picks the earliest run edge among equal-cost placements', () => {
-    // Ties between distinct placements are float-exact coincidences, so this
-    // asserts the rule over generated data: whichever edges tie, the chosen
-    // one is the first minimiser.
     for (let seed = 1; seed <= 12; seed++) {
       const { steps, skills } = generatePlan(9, seed, seed % 3 === 0 ? 2 : 1);
       const expected = referenceSingleRemap(steps, skills, CURRENT);
-      if (expected.chosenRunIndex < 0) continue; // no-remap case
+      if (expected.chosenRunIndex < 0) continue;
       const min = Math.min(...expected.edgeTotals);
       const earliestMinimiser = expected.edgeTotals.findIndex((t) => t === min);
       expect(expected.chosenRunIndex).toBe(earliestMinimiser);
@@ -894,8 +820,6 @@ describe('placeRemaps single-remap fast path', () => {
   });
 
   it('leaves the remapCount >= 2 path on the general DP', () => {
-    // Three distinct attribute phases: two remaps must beat one, and the DP
-    // must still be able to return more segments than the fast path can.
     const skills = skillMap(
       skill(1, 'intelligence', 'memory'),
       skill(2, 'perception', 'willpower'),
@@ -918,14 +842,11 @@ describe('placeRemaps single-remap fast path', () => {
   });
 
   it('stays linear in pair runs: 200 runs with one remap', () => {
-    // Counts segment pricings rather than elapsed time: the suffix scan
-    // prices one segment per run edge (R of them), where the O(R^2) grid
-    // priced every (i, j) cell. Machine speed can't move this number.
     const { steps, skills } = generatePlan(200, 4242);
     pricing.calls = 0;
     const result = placeRemaps(steps, skills, { remapCount: 1, currentAttributes: CURRENT });
     expect(result.segments.length).toBeGreaterThanOrEqual(1);
-    expect(pricing.calls).toBeGreaterThan(0); // the spy is wired up
+    expect(pricing.calls).toBeGreaterThan(0);
     expect(pricing.calls).toBeLessThanOrEqual(steps.length);
   });
 });
@@ -948,10 +869,6 @@ describe('placeRemaps with Boosters', () => {
   };
 
   it('does not let a short extra Booster make the answer worse, at every supported remap count', () => {
-    // Two Boosters with different expiries are now credited piecewise, each
-    // for its own lifetime, so adding a short extra Booster on top of a long
-    // one must never cost more than the long one alone — at any remap count
-    // the planner evaluates, not just remapCount 1.
     const long = { bonus, expiresAt: after(5_000_000) };
     const short = { bonus: { charisma: 3 }, expiresAt: after(60) };
     for (let remapCount = 1; remapCount <= MAX_SUPPORTED_REMAPS; remapCount++) {
@@ -981,8 +898,6 @@ describe('placeRemaps with Boosters', () => {
   });
 
   it('makes the no-remap baseline faster, because the Booster speeds training up', () => {
-    // currentSeconds is what the savings figure is measured against. If it
-    // ignored the Booster the app would advertise savings it cannot deliver.
     const blind = placeRemaps(steps, skills, { remapCount: 1, currentAttributes: CURRENT });
     const withBooster = placeRemaps(steps, skills, {
       remapCount: 1,
@@ -993,20 +908,12 @@ describe('placeRemaps with Boosters', () => {
   });
 
   it('reports, for every segment, the time computeSchedule says that segment takes', async () => {
-    // The load-bearing check. Each segment starts where the previous one
-    // ended, so its remaining Booster life differs — training its own steps on
-    // its own attributes, with the Booster shifted by that offset, must take
-    // exactly the seconds it reported. Blind segment costs fail this.
     const { computeSchedule } = await import('@/engine/schedule');
     const planSeconds = placeRemaps(steps, skills, {
       remapCount: 1,
       currentAttributes: CURRENT,
     }).currentSeconds;
 
-    // Expiry fractions chosen so that later segments — not just the first —
-    // begin while the Booster is still live. At 0.1 only segment one straddles
-    // it, which would let a bug that ignores each segment's own start offset
-    // pass unnoticed.
     for (const fraction of [0.1, 0.5, 0.9]) {
       const boosters = [{ bonus, expiresAt: after(planSeconds * fraction) }];
       for (const remapCount of [1, 2, 3]) {
@@ -1047,14 +954,10 @@ describe('placeRemaps with Boosters', () => {
   });
 
   it('gives the same answer at remapCount 1 whether or not the DP path runs', () => {
-    // The reason both paths had to change together: remapCount is a 0..5 user
-    // input, so a Booster-aware fast path beside a blind DP would change the
-    // answer with the count.
     const boosters = [{ bonus, expiresAt: after(20000) }];
     const opts = { currentAttributes: CURRENT, booster: { boosters, startDate: START } };
     const one = placeRemaps(steps, skills, { ...opts, remapCount: 1 });
     const many = placeRemaps(steps, skills, { ...opts, remapCount: 3 });
-    // More remaps can only help; it must never be worse than the single-remap answer.
     expect(many.totalSeconds).toBeLessThanOrEqual(one.totalSeconds + 1e-6);
   });
 
@@ -1091,11 +994,6 @@ describe('placeRemaps with Boosters', () => {
   });
 
   it('stays fast at 300 steps with a Booster starting mid-plan', () => {
-    // A far-future expiry (well past every plausible finish) with a
-    // mid-plan startsAt makes almost every DP start call
-    // `bestAttributesAtBoundaries`, which is the case the piecewise-start
-    // rewrite risks slowing down: walking every step for a segment that
-    // never actually sees the Booster lapse.
     const { steps: genSteps, skills: genSkills } = generatePlan(300, 7331);
     pricing.calls = 0;
     const result = placeRemaps(genSteps, genSkills, {
@@ -1106,42 +1004,18 @@ describe('placeRemaps with Boosters', () => {
         startDate: START,
       },
     });
-    // Elapsed time failed this on a shared CI runner (3.08 s against a 3 s
-    // bound, test-shard 4, 2026-09-25) with nothing wrong, so count pricings
-    // instead. Every pricing here is a walk over a segment's steps, which is
-    // what a rewrite walking every step per segment would multiply.
     expect(result.segments.length).toBeGreaterThanOrEqual(1);
-    // Measured 22; a per-step walk per segment would be in the thousands.
-    expect(pricing.calls).toBeGreaterThan(0); // the spy is wired up
+    expect(pricing.calls).toBeGreaterThan(0);
     expect(pricing.calls).toBeLessThan(200);
   });
 });
 
-/**
- * Characterization, not a fail-first regression: `placeRemaps` is CORRECT in
- * every row below and no production file in `src/engine/optimizer/` changes
- * for this bug. What the table pins down is the *consequence* of handing it a
- * baseline outside EVE's 17..27 / total-99 space — it keeps the current
- * attributes and reports zero savings, exactly as its contract says it must,
- * and there is nothing in its inputs left that could explain why. That is the
- * reason the fix lives in `engine/attributeBaseline.ts`, at the point the
- * baseline is derived, and the reason this block must keep passing unchanged:
- * if it ever stops, someone has taught the optimizer to prefer an allocation
- * it cannot reach.
- *
- * The plan is the reported one — Complex Ore Processing V + Amarr Dreadnought V,
- * ranks and attribute pairs as the SDE snapshot has them — with the prereq
- * expansion left out, so the savings here are smaller than the 21.9 days the
- * user's full plan showed. The four rows' structure is the content.
- */
 describe('a baseline outside EVE’s legal attribute space', () => {
-  // public/data/skills.json: rank 11 memory/intelligence, rank 12 perception/willpower.
   const COMPLEX_ORE_PROCESSING = skill(60380, 'memory', 'intelligence', 11);
   const AMARR_DREADNOUGHT = skill(20525, 'perception', 'willpower', 12);
   const planSkills = skillMap(COMPLEX_ORE_PROCESSING, AMARR_DREADNOUGHT);
   const planSteps = [...levels(60380, 5), ...levels(20525, 5)];
 
-  /** The user's real sheet: 17 + 26 + 22 + 17 + 17 = 99. */
   const LEGAL_BASE: Attributes = {
     intelligence: 17,
     memory: 26,
@@ -1149,7 +1023,6 @@ describe('a baseline outside EVE’s legal attribute space', () => {
     willpower: 17,
     charisma: 17,
   };
-  /** The same sheet as ESI reported it, once a +12 accelerator is baked in: 159. */
   const ACCELERATED_BASE: Attributes = {
     intelligence: 29,
     memory: 38,
@@ -1190,10 +1063,6 @@ describe('a baseline outside EVE’s legal attribute space', () => {
     expect(result.segments.some((segment) => segment.remap)).toBe(false);
   });
 
-  // The user's own observation, and the one that proves the asymmetry: a
-  // bonus added to every attribute alike cannot change WHERE a remap belongs,
-  // because it shifts every candidate by the same amount. It only looks like
-  // it does when it is added to the baseline and not to the candidates.
   it('places the remap in the same place whether or not the accelerator is modelled', () => {
     const blind = run(LEGAL_BASE, false);
     const modelled = run(LEGAL_BASE, true);
@@ -1204,17 +1073,10 @@ describe('a baseline outside EVE’s legal attribute space', () => {
   });
 
   it('still reports zero when the accelerator is counted in the baseline AND modelled', () => {
-    // The pre-fix state of the app: ESI's inflated sheet plus the What-If
-    // Booster control, i.e. the +12 applied twice.
     expect(run(ACCELERATED_BASE, true).savingsSeconds).toBe(0);
   });
 
   it('trains a memory/intelligence skill at the rate the game shows', () => {
-    // MEM 26 base + 4 implant + 12 accelerator = 42; INT 17 + 0 + 12 = 29.
-    // 42 + 29/2 = 56.5 SP/min, pinned against the live client. The whole
-    // chain has to produce it, not just `trainingRate`: the accelerator must
-    // reach the schedule through the Booster mechanism and the baseline must
-    // stay at 26/17.
     const [step] = computeSchedule(
       [{ skillTypeID: 60380, level: 1 }],
       {
@@ -1229,9 +1091,6 @@ describe('a baseline outside EVE’s legal attribute space', () => {
   });
 
   it('costs the remainder of a plan that outlives the accelerator at the unboosted rate', () => {
-    // 13d17h45m of accelerator against a plan far longer than that: the tail
-    // has to fall back to 26 + 4 / 17, or a bonus with a fortnight left is
-    // priced as if it lasted the whole plan.
     const scheduled = computeSchedule(
       planSteps,
       {
@@ -1249,25 +1108,14 @@ describe('a baseline outside EVE’s legal attribute space', () => {
       planSkills
     );
     const lastUnboosted = unboosted[unboosted.length - 1];
-    // Faster than no accelerator at all, but nowhere near the fully-boosted
-    // rate: the bonus only covers the first ~13 days.
     expect(last.cumulativeSeconds).toBeLessThan(lastUnboosted.cumulativeSeconds);
     expect(last.cumulativeSeconds).toBeGreaterThan(lastUnboosted.cumulativeSeconds * 0.9);
   });
 });
 
-// ---------------------------------------------------------------------------
-// timedRemap: the yearly remap comes back on a cooldown. When it's still on
-// cooldown, the feature layer feeds one extra allocation plus a
-// `notBeforeSeconds` floor (#1404) — the LAST allocation may not start
-// before that many seconds into the plan, because in EVE the player chooses
-// which remap to spend and the later one is always the one held back for the
-// cooldown. Bonus remaps (every earlier allocation) stay free to place
-// anywhere.
-// ---------------------------------------------------------------------------
 describe('placeRemaps timedRemap (yearly remap cooldown)', () => {
   const skills = skillMap(skill(1, 'perception', 'willpower'), skill(2, 'intelligence', 'memory'));
-  const steps = [...levels(1, 3), ...levels(2, 3)]; // exactly 2 pair-runs
+  const steps = [...levels(1, 3), ...levels(2, 3)];
 
   it('omitting timedRemap changes no existing result (remapCount 1)', () => {
     const withTimedZero = placeRemaps(steps, skills, {
@@ -1283,9 +1131,6 @@ describe('placeRemaps timedRemap (yearly remap cooldown)', () => {
   });
 
   it('remapCount 1: disqualifying the first run edge forces the remap onto the next one', () => {
-    // Only two run edges exist (i=0, i=1). Setting notBeforeSeconds to
-    // exactly the elapsed time at i=1 rules out i=0 (prefix 0 < T) while
-    // leaving i=1 legal (prefix == T, not < T).
     const prefixAtEdge1 = placeRemaps(steps.slice(0, 3), skills, {
       remapCount: 0,
       currentAttributes: CURRENT,
@@ -1327,9 +1172,6 @@ describe('placeRemaps timedRemap (yearly remap cooldown)', () => {
       ],
       startDate: START,
     };
-    // The elapsed time (WITH the Booster live) to reach edge i=1 — the same
-    // axis a real cooldown-end offset is measured on, so this is the
-    // boundary case: exactly satisfies i=1, still rules out i=0.
     const prefixAtEdge1Boosted = placeRemaps(steps.slice(0, 3), skills, {
       remapCount: 0,
       currentAttributes: CURRENT,
@@ -1347,11 +1189,6 @@ describe('placeRemaps timedRemap (yearly remap cooldown)', () => {
   });
 
   it('remapCount 2: falls back to a single unconstrained remap when the timed slot has nowhere to go', () => {
-    // With exactly 2 runs and remapCount 2, the only possible second-segment
-    // start is the boundary after run 0. Ruling that out with notBeforeSeconds
-    // set past the whole plan leaves the DP's k=2 row infeasible, so the
-    // fewest-segments search must fall back to the (unconstrained) k=1 row —
-    // the same answer remapCount 1 gives alone.
     const total = placeRemaps(steps, skills, {
       remapCount: 0,
       currentAttributes: CURRENT,
@@ -1372,7 +1209,7 @@ describe('placeRemaps timedRemap (yearly remap cooldown)', () => {
       const { steps: genSteps, skills: genSkills } = generatePlan(6, seed, 2);
       const base = placeRemaps(genSteps, genSkills, { remapCount: 2, currentAttributes: CURRENT });
       const remapSegments = base.segments.filter((s) => s.remap);
-      if (remapSegments.length === 0) continue; // nothing to constrain against
+      if (remapSegments.length === 0) continue;
       const lastRemap = remapSegments[remapSegments.length - 1];
       const lastIndex = base.segments.indexOf(lastRemap);
       const startElapsed = base.segments.slice(0, lastIndex).reduce((acc, s) => acc + s.seconds, 0);
@@ -1384,7 +1221,7 @@ describe('placeRemaps timedRemap (yearly remap cooldown)', () => {
         timedRemap: { notBeforeSeconds },
       });
       const constrainedRemaps = constrained.segments.filter((s) => s.remap);
-      if (constrainedRemaps.length === 0) continue; // fell back to no remap, also legal
+      if (constrainedRemaps.length === 0) continue;
       const lastConstrained = constrainedRemaps[constrainedRemaps.length - 1];
       const constrainedStart = constrained.segments
         .slice(0, constrained.segments.indexOf(lastConstrained))
@@ -1394,9 +1231,6 @@ describe('placeRemaps timedRemap (yearly remap cooldown)', () => {
   });
 
   it('remapCount 2: a single-run plan (fewer runs than requested remaps) is not gated at all', () => {
-    // Only one pair-run exists, so `maxSegments` collapses to 1 even though
-    // remapCount is 2 — there's no structural "second slot" for the floor to
-    // bind, and the one real slot is a bonus remap, not the timed one.
     const skills = skillMap(skill(1, 'perception', 'willpower', 3));
     const steps = levels(1, 5);
     const total = placeRemaps(steps, skills, {
@@ -1407,7 +1241,6 @@ describe('placeRemaps timedRemap (yearly remap cooldown)', () => {
     const result = placeRemaps(steps, skills, {
       remapCount: 2,
       currentAttributes: CURRENT,
-      // Would disqualify the only edge if the floor wrongly applied here.
       timedRemap: { notBeforeSeconds: total },
     });
     expect(result.totalSeconds).toBeCloseTo(unconstrained.totalSeconds, 6);
@@ -1431,8 +1264,6 @@ describe('placeRemaps clone state', () => {
   });
 
   it('costs every Alpha segment the way computeSchedule does, with a Booster live', async () => {
-    // Baseline and remapped branches must both see the Alpha rate — one side
-    // at Omega would report savings that do not exist.
     const { computeSchedule } = await import('@/engine/schedule');
     const START = new Date('2026-08-30T00:00:00Z');
     const after = (seconds: number) => new Date(START.getTime() + seconds * 1000);

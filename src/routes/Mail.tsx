@@ -63,17 +63,10 @@ const MAIL_FILTER_PARAMS = { search: SEARCH_PARAM, hideRead: HIDE_READ_PARAM };
 
 interface MailViewProps {
   scope: CharacterFilterValue;
-  /** The mail a widget row linked to; it opens once its row has loaded. */
   openTarget: MailOpenTarget | null;
-  /**
-   * The This/All picker (with per-Character unread), given the names "All"
-   * leaves out (no mail grant, not synced) and whether the scope's mail is
-   * still loading. It hides itself when there is one Character to offer.
-   */
   scopeControl: (state: { missingNames?: readonly string[]; loading: boolean }) => ReactNode;
 }
 
-/** Mail's two-pane client for one scope: list beside reading pane, the list scrolls on its own, the reading pane grows with the page (docs/context/decisions/20261012-161659-mail-reading-pane-scrolls-with-the-page-not.md). */
 function MailView({ scope, scopeControl, openTarget }: MailViewProps) {
   const { t } = useTranslation();
   const isAll = scope === 'all';
@@ -83,16 +76,6 @@ function MailView({ scope, scopeControl, openTarget }: MailViewProps) {
     { cacheKey: isAll ? 'mail-all' : 'mail' }
   );
 
-  // Which folders the list shows. Remembered across visits and device-wide
-  // (`mailFolderPref.ts`) — a deliberate promotion from the in-memory,
-  // per-character tab memory this replaces. That tier was fine for a tab:
-  // forgetting it put you back on All, which hid nothing. A folder filter
-  // whose whole point is "stop showing me Sent" has not granted the request
-  // if it forgets by the next reload.
-  // An array all the way through, not a Set at the point of use: Dexie stores
-  // plain structured-cloneable values, so the stored shape is an array either
-  // way, and at four possible members a linear scan beats the two hooks it
-  // takes to keep a memoised Set's identity stable.
   const folders = useMailFolders((state) => state.value);
   const setFolders = useMailFolders((state) => state.setValue);
   useHydratedStore(useMailFolders);
@@ -102,12 +85,8 @@ function MailView({ scope, scopeControl, openTarget }: MailViewProps) {
     );
   }
 
-  // New Mail compose (full-pane on a phone, inline in the reading pane on a
-  // wide screen) and the one-line notice it leaves behind.
   const [newMailOpen, setNewMailOpen] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
-  // Whichever Compose button is on screen (header on a wide screen, floating
-  // on a phone); focus returns to it when the composer closes.
   const composeButtonRef = useRef<HTMLButtonElement>(null);
   const composerWasOpenRef = useRef(false);
   useEffect(() => {
@@ -132,29 +111,18 @@ function MailView({ scope, scopeControl, openTarget }: MailViewProps) {
     replyButtonRef,
     forwardButtonRef,
   } = useMailSelection(isDesktop);
-  // Read, unread and deleted mail this session, applied instantly on selection
-  // or action so the list never waits on the network. In memory only: the
-  // cached headers are patched by `mail.ts`, so a reload agrees.
   const readState = useMailReadState();
   const { locallyReadKeys, locallyUnreadKeys, deletedKeys, markLocalRead } = readState;
 
-  // Short-lived view state (ADR 0015): survives a reload, absent when default.
   const [filters, setFilters] = useUrlParams(MAIL_FILTER_PARAMS);
   const { search, hideRead } = filters;
   const setSearch = (value: string) => setFilters({ search: value });
   const setHideRead = (value: boolean) => setFilters({ hideRead: value });
-  // Debounced separately from `search` (matches Assets.tsx/Market.tsx/
-  // SkillPicker.tsx's own search debounce, issue #416): the input stays
-  // instantly responsive, only the filter over potentially hundreds of
-  // headers below waits out the debounce.
   const [debouncedSearch, setDebouncedSearch] = useDebouncedValue(search);
   const online = useOnline();
 
-  // The pilot's Local/EVE-time preference, the same way Contracts,
-  // Notifications and Clones thread it into their own timestamps.
   const timeZone = useTimeZone();
   const weekStart = useCalendarWeekStart((state) => state.value);
-  // Minute clock, so a list left open past midnight moves its mail out of Today.
   const now = useNow();
 
   const owners = data?.owners ?? NO_OWNERS;
@@ -170,11 +138,8 @@ function MailView({ scope, scopeControl, openTarget }: MailViewProps) {
     handleLoadMore,
     refetchOwnerHeaders,
   } = useMailPaging(data, owners, ownerById);
-  // The first mailbox stands in for the whole view in the empty state: with
-  // none cached anywhere there is nothing better to say about it.
   const headersResult = owners[0]?.headersResult ?? null;
   const offline = owners.some((o) => o.headersResult?.fromCache);
-  // The oldest read governs: a view is only as fresh as its stalest mailbox.
   const fetchedAt = owners.reduce<Date | null>((oldest, o) => {
     const at = o.headersResult?.fetchedAt;
     return at && (oldest === null || at < oldest) ? at : oldest;
@@ -210,7 +175,6 @@ function MailView({ scope, scopeControl, openTarget }: MailViewProps) {
   );
   const organize = useMailOrganize({
     owners,
-    // Only what the list shows: a mail a later filter hides is never acted on unseen.
     rows: cappedRows,
     readState,
     selectedKey,
@@ -220,27 +184,18 @@ function MailView({ scope, scopeControl, openTarget }: MailViewProps) {
   const selectedRow = rows.find((row) => row.key === selectedKey) ?? null;
   const selectedHeader = selectedRow?.header ?? null;
   const selectedOwner = selectedRow ? ownerById.get(selectedRow.ownerId) : undefined;
-  // The open mail's mailbox is gone (character switch, scope flip, a refresh
-  // that dropped it): close it rather than read someone else's body into it.
   if (selected !== null && data !== null && !ownerById.has(selected.ownerId)) selectMail(null);
 
-  /**
-   * A recipient's display name. A mailing list resolves through the
-   * mailboxes' own lists rather than `/universe/names`, which cannot
-   * resolve a list id at all (see `namePartyIds`).
-   */
   function resolveRecipientName(r: { recipient_id: number; recipient_type: string }): string {
     return r.recipient_type === 'mailing_list'
       ? (mailingListNames.get(r.recipient_id) ?? t('mail.mailingList'))
       : (names.get(r.recipient_id) ?? t('mail.unknownRecipient'));
   }
 
-  /** A header's recipients as display names. */
   function recipientNames(header: MailHeader): string[] {
     return (header.recipients ?? []).map(resolveRecipientName);
   }
 
-  /** The same recipients, cut to one name plus a count — a list row has one line for them. */
   function recipientSummary(header: MailHeader): string {
     const all = recipientNames(header);
     if (all.length === 0) return t('mail.unknownRecipient');
@@ -248,14 +203,11 @@ function MailView({ scope, scopeControl, openTarget }: MailViewProps) {
     return t('mail.recipientMore', { name: all[0], count: all.length - 1 });
   }
 
-  /** After a successful Reply/Forward/New Mail send: close any compose box, refetch that mailbox's headers. */
   function handleSent(ownerId: number) {
     setComposeKind(null);
     void refetchOwnerHeaders(ownerId);
   }
 
-  // `?open=` opens that mail as a row click would, once its row has loaded.
-  // Adjusted during render, not in an effect: the selection is plain state.
   const [openedFor, setOpenedFor] = useState<MailOpenTarget | null>(null);
   const openWanted = openTarget;
   if (openWanted !== null && openedFor !== openWanted) {
@@ -273,7 +225,6 @@ function MailView({ scope, scopeControl, openTarget }: MailViewProps) {
   useEffect(() => {
     if (openedFor === null || !selectedRow || selectedRow.header.is_read) return;
     void markMailReadOnEsi(selectedRow.ownerId, selectedRow.header.mail_id);
-    // Once per opened target; later selections go through `openRow`.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openedFor]);
 
@@ -295,10 +246,6 @@ function MailView({ scope, scopeControl, openTarget }: MailViewProps) {
   function openRow(row: MailRow, button: HTMLButtonElement) {
     selectMailFromRow({ ownerId: row.ownerId, mailId: row.header.mail_id }, button);
     markLocalRead(row.key);
-    // Gated on ESI's flag, not the row's `isRead` (which also covers local
-    // state) — a failed write must get another chance on every reopen, not
-    // just the next reload. A mail the pilot marked unread this session counts
-    // as unread here, though the loaded header still says read.
     if (!row.header.is_read || locallyUnreadKeys.has(row.key)) {
       void markMailReadOnEsi(row.ownerId, row.header.mail_id);
     }
@@ -310,7 +257,6 @@ function MailView({ scope, scopeControl, openTarget }: MailViewProps) {
   }
   function showRead() {
     setHideRead(false);
-    // The pressed button unmounts with the empty state; land on the filter row (Hide read is next).
     searchInputRef.current?.focus();
   }
   function closeNewMail(reason: NewMailCloseReason) {
@@ -323,11 +269,7 @@ function MailView({ scope, scopeControl, openTarget }: MailViewProps) {
     handleSent(composeCharacterId);
   }
 
-  // The composer takes the reader's place on a wide screen.
   const newMailInline = newMailOpen && isDesktop;
-  // One element for every branch below: with no mail to list (an empty or
-  // unreadable mailbox) the composer stands in for the empty state, so Compose
-  // still works for a pilot who has nothing yet.
   const newMailPanel = newMailInline ? (
     <Panel className="min-w-0">
       <NewMailComposer
@@ -381,7 +323,6 @@ function MailView({ scope, scopeControl, openTarget }: MailViewProps) {
         data?.skipped
           .filter((c) => !c.granted)
           .map((c) => (
-            // Shown only while that Character's stored grant really lacks the mail scope.
             <GrantNote
               key={c.characterId}
               characterId={c.characterId}
@@ -394,8 +335,6 @@ function MailView({ scope, scopeControl, openTarget }: MailViewProps) {
       {loading && !data ? (
         <Spinner block="page" label={t('common.loading')} />
       ) : needsReauth && (!headersResult || rows.length === 0) ? (
-        // A lapsed grant with no saved mail: the full banner. With saved mail
-        // the list stays and a small note sits above it.
         <>
           {newMailPanel}
           <GrantBanner characterId={activeCharacterId} endpoints={['getCharacterMailHeaders']} />
@@ -421,7 +360,6 @@ function MailView({ scope, scopeControl, openTarget }: MailViewProps) {
             />
           )}
           {offline && <CachedNotice withBadge fetchedAt={fetchedAt} />}
-          {/* Opening a mail marks it read in EVE only with this Permission (Write to EVE, off by default). */}
           <GrantNote
             compact
             endpoints={['putCharacterMail']}
@@ -441,10 +379,6 @@ function MailView({ scope, scopeControl, openTarget }: MailViewProps) {
             />
           )}
 
-          {/* `mb-0`: the dialog and toast after this block render nothing in
-          flow, but they still make the grid a non-last child, so the page's
-          `space-y-4` adds a bottom margin that pushes the page past the
-          viewport the sticky list pane is sized to. */}
           <div className="mb-0 grid grid-cols-1 gap-4 lg:grid-cols-[22rem_minmax(0,1fr)] lg:items-start xl:grid-cols-[24rem_minmax(0,1fr)]">
             <MailListPane
               visible={isDesktop || selectedKey === null}
@@ -492,11 +426,6 @@ function MailView({ scope, scopeControl, openTarget }: MailViewProps) {
 
             <Panel
               className={readerVisible ? 'min-w-0' : 'hidden'}
-              // The folder the open mail sits in, not a repeat of the select
-              // hint the empty body already renders — that string used to
-              // appear twice on the same panel at once. A phone leaves it
-              // out: the pilot just came from that folder's list, and the
-              // header needs the room for Back and the actions.
               title={
                 selectedHeader === null || !isDesktop ? undefined : t(TAB_LABEL_KEY[selectedTab])
               }
@@ -510,9 +439,6 @@ function MailView({ scope, scopeControl, openTarget }: MailViewProps) {
                   />
                 ) : undefined
               }
-              // On a phone the date and the "for" owner move down into the
-              // From/To block (`MailReaderBody`): they describe the mail, and
-              // here they wrapped onto two lines.
               meta={
                 isDesktop && (selectedHeader?.timestamp || (isAll && selectedRow)) ? (
                   <span className="flex items-center gap-2 text-xs text-text-dim">
@@ -596,7 +522,6 @@ function MailView({ scope, scopeControl, openTarget }: MailViewProps) {
                 onSent={handleSent}
               />
               {!isDesktop && selectedRow !== null && composeKind === null && (
-                // Sticky above the bottom nav (5rem, as the Compose button) so Reply is always in reach.
                 <div className="sticky bottom-[calc(5rem+env(safe-area-inset-bottom))] z-20 -mx-3 mt-4 -mb-3 flex gap-2 border-t border-line bg-panel p-3">
                   <Button
                     ref={replyButtonRef}
@@ -630,7 +555,6 @@ function MailView({ scope, scopeControl, openTarget }: MailViewProps) {
         />
       )}
       {!isDesktop && !newMailOpen && selectedKey === null && (
-        // 5rem clears the bottom nav (Layout's `<nav>`, which has no shared height token).
         <div className="fixed right-4 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-30">
           <Button ref={composeButtonRef} variant="primary" size="sm" onClick={openNewMail}>
             <Icon.MailCompose size={Icon.ICON_SIZE.sm} /> {t('mail.compose')}
@@ -643,7 +567,6 @@ function MailView({ scope, scopeControl, openTarget }: MailViewProps) {
         body={t('mail.deleteBody', { count: organize.deleteTargets?.length ?? 1 })}
         actionLabel={t('mail.deleteAction', { count: organize.deleteTargets?.length ?? 1 })}
         cancelLabel={t('common.cancel')}
-        // A deleted row's menu is gone with it: focus goes to the search box instead of the page top.
         returnFocusFallback={() => searchInputRef.current}
         failedLabel={t('mail.deleteFailed')}
         onConfirm={organize.confirmDelete}
@@ -654,12 +577,6 @@ function MailView({ scope, scopeControl, openTarget }: MailViewProps) {
   );
 }
 
-/**
- * Mail: This character or All characters (issue #2867). The scope picker is the
- * shared `CharacterFilterControl` (#2846); the choice is remembered device-wide
- * like the folder selection, and a `scope` URL param overrides it for one view.
- * `MailView` is keyed on the scope so each one loads on its own snapshot.
- */
 export function Mail() {
   const { t } = useTranslation();
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
@@ -675,8 +592,6 @@ export function Mail() {
       key={scope}
       scope={scope}
       openTarget={openTarget}
-      // Always the control, so the header's one-line lock never flips; with one
-      // Character (`characterCount` 1) it renders nothing.
       scopeControl={({ missingNames, loading }) => (
         <CharacterFilterControl
           activeCharacterId={activeCharacterId}

@@ -38,7 +38,6 @@ async function stats(ship: string, rack: Rack, drones: string[] = []): Promise<F
     shipTypeId: id(ship),
     modules: (Object.entries(rack) as [FittingSlotKind, string[]][]).flatMap(([slot, names]) =>
       names.map((entry, slotIndex) => {
-        // `Module + Charge` loads a charge.
         const [name, charge] = entry.split(' + ');
         return {
           slot,
@@ -55,7 +54,6 @@ async function stats(ship: string, rack: Rack, drones: string[] = []): Promise<F
   return computeFittingStats(fitting, pilot, undefined, undefined, { overheated: false });
 }
 
-/** The keys a swap names, with the figure each went from and to. */
 function named(before: FittingStats, after: FittingStats) {
   return Object.fromEntries(
     swapChanges(before, after).map(({ change }) => [change.key, [change.before, change.after]])
@@ -70,7 +68,6 @@ describe('swap figures through the real engine', () => {
     const changes = named(slow, fast);
     expect(changes.droneSpeed?.[1]).toBeGreaterThan(changes.droneSpeed?.[0] ?? Infinity);
     expect(named(slow, slow)).toEqual({});
-    // A fit without drones never shows one.
     const bare = await stats('Vexor', rack('Drone Navigation Computer I'));
     expect(named(bare, bare).droneSpeed).toBeUndefined();
   });

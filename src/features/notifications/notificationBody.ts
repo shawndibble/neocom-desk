@@ -2,13 +2,6 @@ function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-/**
- * Most `notifications.fired.*` bodies say the Character's name themselves —
- * leading ("Name: …", "Name's …", "Name has …") or, for legacy `marketOrderFilled`
- * alone, trailing ("… from Name."). The old Alerts row's name column beside the
- * body already says it once; this strips whichever form the body used so the
- * row doesn't say it twice.
- */
 export function dedupeCharacterName(body: string, name: string | null): string {
   if (!name) return body;
 

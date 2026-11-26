@@ -1,16 +1,7 @@
-/**
- * The live `serverInputsFor` (issue #5121): what the server needs, per
- * Character, to push the polled server events. Read from the same places the
- * Foreground Poller reads them, so the server diffs the same targets at the
- * same hub: the Quickbar's price targets and the Trade Hub it prices at
- * (`pollDomains/priceAlerts.ts`), and each nearby alert's jump limit (issue
- * #5122). The community events need nothing.
- */
 import { currentHub, targetedQuickbarItems } from './pollDomains/priceAlerts';
 import { currentThresholds } from './pollDomains/shared';
 import type { ServerEventInputs, ServerPushedEventId } from './serverEvents';
 
-/** The server's bounds (`functions/src/serverEvents.ts`); it drops what exceeds them. */
 const MAX_PRICE_ALERTS = 100;
 const MAX_NAME_LENGTH = 200;
 
@@ -33,7 +24,6 @@ export async function readServerInputs(
       }));
     }
   }
-  // The N the server counts nearby alerts within (issue #5122).
   if (events.includes('incursionNearby')) {
     inputs.incursionNearbyJumps = (await currentThresholds(characterId)).incursionNearbyJumps;
   }

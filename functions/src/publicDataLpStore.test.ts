@@ -177,7 +177,6 @@ describe('publishLpStoreVolume', () => {
     expect(JSON.parse(gunzipSync(forge[1] as Buffer).toString())).toEqual({
       lastSyncedAt: NOW,
       days: 28,
-      // 28 days x 60 units / 28 days; type 35 never traded, so it is absent.
       perDay: { 34: 60 },
     });
     const domain = put.mock.calls.find((c) => c[0] === 'lp-store-volume/10000043.json')!;
@@ -209,7 +208,6 @@ describe('publishLpStoreVolume', () => {
       lastSyncedAt: NOW,
       asOf: '2026-10-24',
       days: 28,
-      // 28 trading days x 60 units; the newest folded day is the 22nd.
       types: { 34: [1680, 28, 84, 5, '2026-10-22', 5, 4] },
     });
   });

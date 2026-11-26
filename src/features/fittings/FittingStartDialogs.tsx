@@ -1,8 +1,3 @@
-/**
- * The two ways to start a Fitting that aren't in the list: from a hull, and
- * Import. The Start screen opens them from its buttons, the open editor from
- * its Fittings menu, so both get the same dialogs.
- */
 import { useTranslation } from 'react-i18next';
 import { useTouchContext } from '@/lib/useMediaQuery';
 import { Modal } from '@/components/ui';
@@ -28,20 +23,17 @@ export function NewFromHullDialog({
 }) {
   const { t } = useTranslation();
   return (
-    // `page`: two panes side by side from `md`, full screen and one pane at a time on a phone.
     <Modal open={open} onClose={onClose} title={t('fittings.start.newTitle')} placement="page">
       <HullPicker catalogue={catalogue} onStart={onStart} onOpenPopular={onOpenPopular} />
     </Modal>
   );
 }
 
-/** The Load card (EFT, links, killmails, EVE XML), as a bare dialog body or on its own. */
 export function ImportFittingCard({
   workspace,
   onOpened,
 }: {
   workspace: FittingLibrarySource;
-  /** A Fitting the card listed (an EVE XML file's) was opened. */
   onOpened?: () => void;
 }) {
   const { t } = useTranslation();
@@ -74,7 +66,6 @@ export function ImportFittingDialog({
   open: boolean;
   onClose: () => void;
   workspace: FittingLibrarySource;
-  /** A Fitting the card listed (an EVE XML file's) was opened. */
   onOpened?: () => void;
 }) {
   const { t } = useTranslation();

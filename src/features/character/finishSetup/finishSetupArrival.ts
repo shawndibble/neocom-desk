@@ -1,8 +1,3 @@
-/**
- * What "Finish setting up" shows on arriving at a page (issue #6103): a fresh
- * offer worked out from what the device knows, or the running chain with EVE's
- * return (router state) recorded against its current approval.
- */
 import {
   currentApproval,
   recordApproval,
@@ -17,7 +12,6 @@ import { loadStillToApprove } from './loadStillToApprove';
 
 export type ArrivalState = Partial<OwnCorpGrantCallbackState & AlertsCallbackState> | null;
 
-/** What EVE's return says about the chain's current approval; null when it is about something else. */
 export function arrivalResult(chain: FinishSetupChain, state: ArrivalState): ApprovalResult | null {
   const cur = currentApproval(chain);
   if (!cur || !state) return null;
@@ -50,7 +44,6 @@ export type FinishSetupView = { offering: boolean; chain: FinishSetupChain };
 
 let lastOffer: { offeredAt: number | undefined; view: FinishSetupView } | null = null;
 
-/** The step to show here, or null for none (an empty offer is cleared). */
 export async function finishSetupViewOnArrival(
   state: ArrivalState
 ): Promise<FinishSetupView | null> {
@@ -64,7 +57,6 @@ export async function finishSetupViewOnArrival(
     return { offering: false, chain };
   }
   const { characterId } = saved;
-  // Worked out once per offer, not on every navigation while it is on screen (an ESI read).
   if (lastOffer && lastOffer.offeredAt === saved.offeredAt) return lastOffer.view;
   const found = await loadStillToApprove(characterId).catch(() => null);
   if (!found || found.items.length === 0) {

@@ -33,7 +33,6 @@ const DATA: InventionData = {
         ],
       },
     },
-    // Copies only: no invention row.
     3000: { copyTime: 600 },
   },
   decryptors: {
@@ -116,9 +115,7 @@ describe('inventionQuoteFor', () => {
   it('prices the attempt from datacores, the copy job and the invention fee', () => {
     const result = inventionQuoteFor(T2_BP, context())!;
     expect(result.skills).toEqual({ science: [4, 4], encryption: 3 });
-    // Copy: 2% × (100 × 10) = 20, × (5% + 0.25% + 4%) = 1.85.
     expect(result.quote.copyJobFee).toBeCloseTo(1.85, 6);
-    // Invention: 2% × (1,000 × 1,000) = 20,000, × (10% + 0.25% + 4%) = 2,850.
     expect(result.quote.inventionJobFee).toBeCloseTo(2_850, 6);
     expect(result.quote.attemptCost).toBeCloseTo(4_376_000 + 1.85 + 2_850, 6);
     expect(result.quote.tiers).toHaveLength(2);

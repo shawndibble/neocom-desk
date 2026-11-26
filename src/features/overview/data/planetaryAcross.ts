@@ -1,8 +1,3 @@
-/**
- * The Planetary widget on All characters: each Character's board (`loadPlanetaryBoard`)
- * regrouped as one, so the batches are the account's errands: one trip per time an extractor
- * runs dry, whichever Character owns the colony. Pure, so it is tested apart from the reads.
- */
 import { groupColoniesIntoBatches } from '@/engine/pi/colonyBatches';
 import type { BoardColony, PlanetaryBoardData } from './boardData';
 

@@ -1,5 +1,3 @@
-// Needs you on a one-Miner page (#6206, #6207): a scoped read claims the core and the ledger, so
-// the disputes and the uncounted donations it lists come from that read, not from nowhere.
 import type { ReactNode } from 'react';
 import { renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -38,7 +36,6 @@ vi.mock('firebase/firestore/lite', () => ({
 vi.mock('@/sync/firebaseApp', () => ({ getSyncFirestore: () => ({}) }));
 vi.mock('@/sync/syncAuth', () => ({ ensureSignedIn: vi.fn().mockResolvedValue(undefined) }));
 vi.mock('@/auth/session', () => ({ getValidAccessToken: vi.fn() }));
-// No Statement run is due: only the read's own items count.
 vi.mock('@/engine/corpTaxBook/bookView', async (orig) => ({
   ...(await orig<typeof import('@/engine/corpTaxBook/bookView')>()),
   planStatementRuns: () => [],
@@ -74,7 +71,6 @@ beforeEach(async () => {
     by: 1,
     at: '2026-09-13T00:00:00Z',
   });
-  // Division 3: the book reads division 1 only.
   store.set(`${BOOK}/meta/uncounted`, {
     donations: [
       { id: 'u1', refId: 1, division: 3, characterId: 1, amount: 5, at: '2026-09-13T00:00:00Z' },

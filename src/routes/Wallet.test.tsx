@@ -16,7 +16,6 @@ import {
 
 vi.mock('@/app/loginFlow', () => ({ beginEveLogin: vi.fn().mockResolvedValue(undefined) }));
 
-// Wraps the real read so a test can see what it was asked for, or make it throw.
 vi.mock('@/features/character/walletJournalAll', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/features/character/walletJournalAll')>();
   return { ...actual, loadAllCharactersJournals: vi.fn(actual.loadAllCharactersJournals) };
@@ -43,9 +42,6 @@ vi.mock('@/sde/loadSde', () => ({
 
 installWalletHarness({ warmApp: true });
 
-// The App wiring: the URL reaches the page, and the legacy Market LP Store
-// paths, which only App's route table owns, land on Wallet's tab. Every other
-// scenario renders the route on its own (`renderWalletRoute`).
 describe('Wallet in the App', () => {
   it('shows the balance tab by default, from mocked ESI', async () => {
     render(<App />);
@@ -76,7 +72,6 @@ describe('Wallet', () => {
     renderWalletRoute();
     expect(await screen.findByText('EverMarks')).toBeInTheDocument();
     expect(await screen.findByText('250')).toBeInTheDocument();
-    // The per-corporation list is the LP Store tab's, not Balance's.
     expect(screen.queryByRole('table', { name: 'Loyalty Points' })).not.toBeInTheDocument();
     expect(screen.queryByText('Caldari Navy')).not.toBeInTheDocument();
   });
@@ -105,16 +100,12 @@ describe('Wallet', () => {
   it('explains EverMarks with an info tooltip beside the label', async () => {
     renderWalletRoute();
     const label = await screen.findByText('EverMarks');
-    // The glyph is a sibling of the label text, not a tooltip parked elsewhere
-    // on the panel — that adjacency is the whole point of the affordance.
     const trigger = within(label.closest('p') as HTMLElement).getByRole('button', {
       name: 'About EverMarks',
     });
 
     fireEvent.pointerMove(trigger);
 
-    // Radix's first hover in a session goes through its own open delay
-    // (zeroed, but still a real timer), so this waits rather than reads.
     expect(await screen.findByRole('tooltip')).toHaveTextContent(
       /Paragon, the in-game cosmetics store/
     );
@@ -125,7 +116,6 @@ describe('Wallet', () => {
     renderWalletRoute();
     await user.click(await screen.findByRole('tab', { name: 'Journal' }));
     const rows = await screen.findAllByRole('row');
-    // header + 2 entries, newest (2026-08-02) first
     expect(rows).toHaveLength(3);
     expect(screen.getByText('Bounty')).toBeInTheDocument();
     expect(screen.getByText('Donation')).toBeInTheDocument();
@@ -167,7 +157,6 @@ describe('Wallet', () => {
     renderWalletRoute();
     const link = await screen.findByRole('link', { name: /Tritanium/ });
     expect(link.getAttribute('href')).toContain('info=type-34');
-    // The bounty line has no fill behind it, so it names no item.
     const bountyRow = document.querySelector('[data-row-key="1"]') as HTMLElement;
     expect(within(bountyRow).queryByRole('link')).not.toBeInTheDocument();
   });
@@ -216,7 +205,6 @@ describe('Wallet', () => {
     renderWalletRoute();
     const link = await screen.findByRole('link', { name: 'Transactions' });
     expect(link).toHaveAttribute('href', '/market/history');
-    // Rests in the accent colour so it reads as a link (issue #2019).
     expect(link).toHaveClass('text-accent');
   });
 
@@ -273,10 +261,6 @@ describe('Wallet', () => {
       expect(screen.getByRole('link', { name: /Wallet/ })).toHaveAttribute('href', '/wallet');
     });
 
-    // `ScopeGate` judges the active Character's grant, which holds the wallet
-    // scope, so the page renders; the named Character's journal read is what
-    // ESI refuses (the 403 a token without the scope gets), and that refusal
-    // is what draws the Journal's grant note.
     it('shows the grant note for a Character without the wallet scope', async () => {
       await seedSecond();
       await db.tokens.update(92, { scopes: [] });

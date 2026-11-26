@@ -9,13 +9,6 @@ import {
   type TabSharing,
 } from './sharingSummary';
 
-/**
- * Each content tab's sharing line. The blueprint choice and the Fittings
- * switch are read on this device; the Fittings and Skill plans counts come
- * from the tab's own list through `onFittingsMine` / `onPlansMine`, so the
- * line costs no read that leaves the device. `refreshKey` rereads the local
- * part (bumped as My sharing closes).
- */
 export function useTabSharing(characterId: number, communityId: string, refreshKey: number) {
   const [blueprints, setBlueprints] = useState<BlueprintSharing | null>(null);
   const [fittingsAll, setFittingsAll] = useState(false);
@@ -35,7 +28,6 @@ export function useTabSharing(characterId: number, communityId: string, refreshK
         setBlueprints(blueprintSharing(share));
         setFittingsAll(all !== null);
       },
-      // The line then holds My sharing alone, as it does while loading.
       () => {}
     );
     return () => {
@@ -62,7 +54,6 @@ export function useTabSharing(characterId: number, communityId: string, refreshK
   return { sharing, onFittingsMine, onPlansMine };
 }
 
-/** Reports how many of a loaded list's items this Character shares (the tab's sharing line). */
 export function useReportMineCount(
   items: readonly { ownerUid: string }[] | null,
   myUid: string,

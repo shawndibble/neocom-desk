@@ -22,7 +22,6 @@ interface Call {
 
 type Answer = { status?: number; body?: unknown; headers?: Record<string, string> };
 
-/** A fetch that answers from `route` and records what it was asked, and how many at once. */
 function fakeFetch(route: (call: Call) => Answer | undefined) {
   const calls: Call[] = [];
   const seen = { active: 0, mostAtOnce: 0 };
@@ -47,7 +46,6 @@ function fakeFetch(route: (call: Call) => Answer | undefined) {
   return { impl, calls, seen };
 }
 
-// A 420/429 holds every reader back for a while: no test inherits another's.
 beforeEach(resetVettingEsiBackoff);
 
 const sheet = { name: 'Me', corporation_id: 98000001, birthday: '2015-01-01T00:00:00Z' };
@@ -117,7 +115,6 @@ describe('esiVettingReader.readCharacter', () => {
       expect(call.headers['X-Compatibility-Date']).toBe(ESI_COMPATIBILITY_DATE);
       expect(call.headers['X-User-Agent']).toMatch(/Neocom Desk/);
     }
-    // The token goes to the scoped read only.
     expect(calls.find((call) => call.path.endsWith('/skills/'))?.headers.Authorization).toBe(
       'Bearer tok'
     );
@@ -173,7 +170,6 @@ describe('esiVettingReader.readCharacter', () => {
       return publicRoutes(call);
     });
     const { input, raw } = await esiVettingReader(impl).readCharacter(ME, 'tok', VETTING_SCOPES);
-    // One request at a time, in a fixed order.
     expect(seen.mostAtOnce).toBe(1);
     expect(calls.map((call) => call.path.replace(`/characters/${ME}`, ''))).toEqual([
       '/',
@@ -193,7 +189,6 @@ describe('esiVettingReader.readCharacter', () => {
     ]);
     expect(input.dealings.filter((d) => d.source === 'mail')).toHaveLength(53);
     expect(JSON.stringify(input)).not.toContain('secret subject');
-    // Every row comes back as a raw row, uncapped by the checks' filters; mail has no subject.
     expect(raw.wallet.map((row) => row.amount)).toEqual([-1, 2]);
     expect(raw.mail).toHaveLength(53);
     expect(raw.mail[0]).toEqual({
@@ -206,7 +201,6 @@ describe('esiVettingReader.readCharacter', () => {
     expect(JSON.stringify(raw)).not.toContain('secret subject');
     expect(raw.contact).toEqual([]);
     expect(raw.skills).toEqual([]);
-    // Headers only: no mail is ever opened.
     expect(calls.some((call) => /\/mail\/\d+/.test(call.path))).toBe(false);
   });
 
@@ -292,7 +286,6 @@ describe('esiVettingReader backoff', () => {
     expect(await reasonOf(reader().corporation(98000001))).toBe('esi-backoff');
     expect(calls).toHaveLength(1);
 
-    // Another reader, as the next call makes: refused without a request.
     limited = false;
     now = T0 + 29_999;
     expect(await reasonOf(reader().corporation(98000001))).toBe('esi-backoff');
@@ -345,11 +338,9 @@ describe('esiVettingReader lookups', () => {
       category: 'character',
     });
     expect(calls.every((call) => call.method === 'POST')).toBe(true);
-    // [90..93] and [90, 91] are refused; 90 alone is fine, so 91 is not asked for.
     expect(calls.map((call) => call.body)).toEqual([[90, 91, 92, 93], [90, 91], [92, 93], [90]]);
   });
 
-  /** A `/universe/names/` that 404s any batch holding one of `bad`. */
   function naming(bad: (id: number) => boolean) {
     const fake = fakeFetch((call) => {
       const ids = call.body as number[];

@@ -1,8 +1,3 @@
-/**
- * Corp projects on a phone, in the shape of the Opportunities cards: checkbox,
- * item and a facts line, the profit as the right-hand hero, the blueprint line
- * underneath. A tap opens the working in place.
- */
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Checkbox } from '@/components/ui';

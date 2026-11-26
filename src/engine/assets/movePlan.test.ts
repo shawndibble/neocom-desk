@@ -45,8 +45,8 @@ const plan = (assets: ConsolidationAsset[], hulls: readonly MoveHull[] = HULLS) 
 describe('planMove', () => {
   it('totals and trips for a mixed list, grouped by pickup location', () => {
     const result = plan([
-      asset({ itemId: 1, typeId: 35, quantity: 600 }), // 1200 m3 at A
-      asset({ itemId: 2, typeId: 34, quantity: 5000, locationId: B }), // 50 m3 at B
+      asset({ itemId: 1, typeId: 35, quantity: 600 }),
+      asset({ itemId: 2, typeId: 34, quantity: 5000, locationId: B }),
       asset({ itemId: 3, typeId: SHIP, isSingleton: true, locationId: B }),
     ]);
     expect(result.totals).toMatchObject({
@@ -55,14 +55,14 @@ describe('planMove', () => {
       characters: 1,
       shipsToFly: 1,
       unknownVolumeCount: 0,
-      trips: 2, // a haul loads at one pickup only
+      trips: 2,
     });
     expect(result.perCharacter[0].pickups.map((p) => p.locationId)).toEqual([A, B]);
     expect(result.perCharacter[0].pickups[1].ships).toEqual([{ itemId: 3, typeId: SHIP }]);
   });
 
   it('suggests the fewest trips and lists every hull best first', () => {
-    const result = plan([asset({ itemId: 1, typeId: 35, quantity: 600 })]); // 1200 m3
+    const result = plan([asset({ itemId: 1, typeId: 35, quantity: 600 })]);
     expect(result.suggested?.hull.typeId).toBe(1);
     expect(result.comparison.map((o) => [o.hull.typeId, o.trips])).toEqual([
       [1, 1],
@@ -74,7 +74,7 @@ describe('planMove', () => {
 
   it('prefers the smaller hull when trips tie', () => {
     const result = plan(
-      [asset({ itemId: 1, typeId: 35, quantity: 100 })], // 200 m3
+      [asset({ itemId: 1, typeId: 35, quantity: 100 })],
       [hull(1, 5000), hull(4, 400)]
     );
     expect(result.suggested?.hull.typeId).toBe(4);
@@ -133,7 +133,7 @@ describe('planMove', () => {
 
   it('never suggests or compares a hull the pilot cannot fly', () => {
     const hulls = [hull(1, 5000, false, false), hull(4, 400)];
-    const result = plan([asset({ itemId: 1, typeId: 35, quantity: 600 })], hulls); // 1200 m3
+    const result = plan([asset({ itemId: 1, typeId: 35, quantity: 600 })], hulls);
     expect(result.suggested?.hull.typeId).toBe(4);
     expect(result.comparison.map((o) => o.hull.typeId)).toEqual([4]);
     expect(
@@ -166,7 +166,6 @@ describe('planMove', () => {
   });
 
   describe('haul packing', () => {
-    // Mastodon-like: 4,500 cargo + 50,000 fleet hangar.
     const mastodon: MoveHull = {
       typeId: 12747,
       name: 'Mastodon',
@@ -189,7 +188,7 @@ describe('planMove', () => {
             name: 'Alice',
             assets: [
               asset({ itemId: 9, typeId: PRAXIS, isSingleton: true }),
-              asset({ itemId: 10, typeId: 35, quantity: 2000 }), // 4,000 m3
+              asset({ itemId: 10, typeId: 35, quantity: 2000 }),
               ...extra,
             ],
           },
@@ -216,7 +215,7 @@ describe('planMove', () => {
     });
 
     it('ranks a hull that leaves a unit behind below one that carries everything', () => {
-      const small = hull(1, 30_000); // one 30k hold: a 50k packaged ship never fits
+      const small = hull(1, 30_000);
       const result = praxisPlan([small, mastodon]);
       expect(result.suggested?.hull.typeId).toBe(12747);
       const bad = result.comparison.find((o) => o.hull.typeId === 1)!;
@@ -232,7 +231,7 @@ describe('planMove', () => {
     });
 
     it('a packed ship too big for the hauler must be flown: flagged, not left behind', () => {
-      const small = hull(1, 30_000); // 50k packaged never fits a 30k hold
+      const small = hull(1, 30_000);
       const result = praxisPlan([small]);
       const option = result.suggested!;
       expect(option.tooBigCount).toBe(1);
@@ -249,7 +248,7 @@ describe('planMove', () => {
       expect(result.suggested?.hull.typeId).toBe(12747);
       expect(result.comparison.map((o) => [o.hull.typeId, o.trips + o.tooBigCount])).toEqual([
         [12747, 1],
-        [1, 2], // 1 haul for the loose stock + 1 forced flight
+        [1, 2],
       ]);
     });
 
@@ -285,7 +284,7 @@ describe('planMove', () => {
 });
 
 describe('planMove hauler override', () => {
-  const stock = [asset({ itemId: 1, typeId: 35, quantity: 600 })]; // 1200 m3
+  const stock = [asset({ itemId: 1, typeId: 35, quantity: 600 })];
   const withOverride = (haulerOverride: Parameters<typeof planMove>[0]['haulerOverride']) =>
     planMove({
       destinationLocationIds: new Set([DEST]),
@@ -366,7 +365,7 @@ describe('planMove with a max ISK per haul', () => {
           characterId: 1,
           name: 'Alice',
           assets: [
-            asset({ itemId: 1, typeId: 35, quantity: 10 }), // 20 m3
+            asset({ itemId: 1, typeId: 35, quantity: 10 }),
             asset({ itemId: 2, typeId: 36, quantity: 1 }),
           ],
         },
@@ -394,7 +393,7 @@ describe('planMove with a max ISK per haul', () => {
 
   it('splits into more hauls under a limit and reports over-limit units apart from unfit', () => {
     const r = run(300, PRICES);
-    expect(r.totals.trips).toBe(4); // 10 x 100 ISK in hauls of 3,3,3,1
+    expect(r.totals.trips).toBe(4);
     expect(r.active?.unfitCount).toBe(0);
     expect(r.active?.overLimitCount).toBe(1);
     expect(r.active?.pickups[0].overLimit).toEqual([

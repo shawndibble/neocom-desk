@@ -96,7 +96,6 @@ describe('installFixtureFetch', () => {
 
   it('names the request that keeps an unmounted story busy past the deadline', async () => {
     const stop = installFixtureFetch([{ path: '/poll', respond: () => ({ body: 1 }) }]);
-    // The story was fetching when it unmounted, so its table is not quiet yet.
     await fetch('https://esi.evetech.net/poll');
     stop();
     const poll = setInterval(() => void fetch('https://esi.evetech.net/poll'), 100);

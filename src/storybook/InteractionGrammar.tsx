@@ -8,6 +8,7 @@ import { plainTextActionClassName } from '@/components/ui/plainTextActionClassNa
 import { Pill } from '@/components/ui/Pill';
 import { AddPreviewReadout } from '@/features/fittings/AddPreviewReadout';
 import { NeedsLoginAction } from '@/features/character/NeedsLoginAction';
+import { TourVideoLink } from '@/features/landing/TourVideo';
 import { useNeedsLogin } from '@/stores/authFailure';
 import { useState, type ReactNode } from 'react';
 import { Chart } from '@/features/overview/widgets/charts/Chart';
@@ -75,7 +76,6 @@ const SAMPLE_ROWS = [
   { id: 3, name: 'Merlin' },
 ];
 
-/** One cue: its DESIGN.md §6c rule name above, the real component below. */
 function Cue({ rule, note, children }: { rule: string; note?: string; children: ReactNode }) {
   return (
     <div className="space-y-1.5 rounded-xs border border-line bg-panel p-3">
@@ -86,17 +86,13 @@ function Cue({ rule, note, children }: { rule: string; note?: string; children: 
   );
 }
 
-/** A Character's dead login, as its row shows it (`NeedsLoginAction`). */
 function NeedsLoginSample() {
-  // Seeded before the action mounts: marked as hydrated, its own read never
-  // starts, so the stored (empty) list cannot replace the sample.
   useState(() => useNeedsLogin.setState({ value: [SAMPLE_CHARACTER_ID], hydrated: true }));
   return <NeedsLoginAction characterId={SAMPLE_CHARACTER_ID} name="Ada Vance" />;
 }
 
 const SAMPLE_CHARACTER_ID = 1;
 
-/** A tab bar whose roster tab carries its count (the Community page's Members). */
 function TabCountSample({ k }: { k: (key: string) => string }) {
   const tabsId = useTabsId();
   const [tab, setTab] = useState('content');
@@ -119,7 +115,6 @@ function TabCountSample({ k }: { k: (key: string) => string }) {
   );
 }
 
-/** A menu item that opens a dialog, opened only once the menu has closed (`useOpenAfterMenu`). */
 function MenuOpensDialogSample({ k }: { k: (key: string) => string }) {
   const [open, setOpen] = useState(false);
   const afterMenu = useOpenAfterMenu();
@@ -155,12 +150,6 @@ function Group({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
-/**
- * Every row of DESIGN.md §6c's cue vocabulary and the shared states, built from
- * the real primitives so drift shows up beside its rule. Needs a Router
- * (entity links). Hover, pressed and focus can't be forced on real components:
- * the labels say how to trigger each one.
- */
 export function InteractionGrammar() {
   const { t } = useTranslation();
   const k = (key: string) => t(`interactionGrammar.${key}`);
@@ -210,6 +199,9 @@ export function InteractionGrammar() {
             {k('samples.addToCalendar')}
             <ExternalMark />
           </Button>
+        </Cue>
+        <Cue rule={k('rules.mediaDialog')}>
+          <TourVideoLink video="industry" />
         </Cue>
       </Group>
 
@@ -620,7 +612,6 @@ export function InteractionGrammar() {
               <OfflineStrip>{t('offline.banner')}</OfflineStrip>
             </Cue>
             <Cue rule={k('rules.needsConnection')} note={k('notes.needsConnection')}>
-              {/* The live guard (dims when this browser goes offline), then the same look held still. */}
               <NeedsConnection>
                 <Button>{k('samples.signIn')}</Button>
               </NeedsConnection>

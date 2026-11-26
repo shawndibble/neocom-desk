@@ -1,9 +1,3 @@
-/**
- * "Show me how" for one recipe, shaped for drawing: the pins to build, the
- * Command Center it needs, and what a week of running it yields. All of it
- * comes from the recommendation model's layout for the recipe, so the steps,
- * the meter and the ISK figure are never two answers.
- */
 import type { RecipeFit, RecipeRank } from '@/engine/pi/planRecipes';
 import type { PinCounts } from '@/engine/pi/types';
 import type { PiData } from '@/sde/types';
@@ -17,7 +11,6 @@ export interface HowToItem {
 
 export interface HowToFactoryLine {
   kind: 'basic' | 'advanced' | 'highTech';
-  /** How many factories of this kind the layout builds. */
   count: number;
   makes: HowToItem[];
 }
@@ -26,7 +19,6 @@ export interface HowTo {
   launchpads: number;
   storage: number;
   extractors: HowToItem[];
-  /** Heads on each extractor, as the fit assumed; null when the layout does not say. */
   headsPerExtractor: number | null;
   factories: HowToFactoryLine[];
   fit: RecipeFit | null;
@@ -34,7 +26,6 @@ export interface HowTo {
   m3PerWeek: number;
 }
 
-/** "1 extractor + 2 basic factories": the caption under a recipe's name. */
 export function setupParts(pins: PinCounts): {
   extractors: number;
   basic: number;

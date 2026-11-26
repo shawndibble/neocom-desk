@@ -1,26 +1,12 @@
-/**
- * The Compare drawer is fixed over the page bottom, so the page must reserve
- * real space for it (issue #3351, WCAG 2.4.11 Focus Not Obscured): the last
- * focusable element, focused, sits above the drawer's top edge. Asserted on
- * rendered boxes at desktop and phone width.
- */
 import type { Page } from '@playwright/test';
 import { test, expect, PHONE, DESKTOP } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 
-/**
- * Fills the Compare Set the way the Market Browser does now that the tree
- * leaf has no menu: the item's Variations tab, "Compare". The set holds the
- * whole variation group, so the handle reads `Compare (N)`.
- */
 async function fillCompareSet(page: Page) {
   await signInAndGoto(page);
-  // Empty order books: each variation row prices itself from its own book.
   await page.route(/\/markets\/\d+\/orders/, (route) =>
     route.fulfill({ status: 200, contentType: 'application/json', body: '[]' })
   );
-  // Every compared variation reads `/universe/types/{id}`; the shared mock
-  // only carries a few fixture types.
   await page.route(/\/universe\/types\/\d+$/, async (route) => {
     const typeId = Number(/\/universe\/types\/(\d+)$/.exec(route.request().url())![1]);
     await route.fulfill({
@@ -52,7 +38,6 @@ async function clearance(page: Page) {
   );
 }
 
-/** Focuses the last tabbable element inside `main`, returns its bottom and the drawer top. */
 async function lastFocusBottomAndDrawerTop(page: Page) {
   return page.evaluate(async () => {
     const main = document.querySelector('main')!;
@@ -85,8 +70,6 @@ for (const [name, viewport] of [
     await page.setViewportSize(viewport);
     await fillCompareSet(page);
     await expect(page.getByRole('button', { name: HANDLE })).toBeVisible();
-    // Phone: the open drawer is a full-screen sheet over an inert page, so
-    // check the handle-only state there.
     if (name === 'phone') await page.keyboard.press('Escape');
     expect(await clearance(page)).not.toBe('');
     const { bottom, drawerTop } = await lastFocusBottomAndDrawerTop(page);

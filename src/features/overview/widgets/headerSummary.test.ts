@@ -50,7 +50,6 @@ describe('fetchBreakdown', () => {
 
   it('is empty with nothing drawn', () => {
     expect(fetchBreakdown([])).toEqual([]);
-    // The first widget of a kind names the row, Show included.
     expect(
       fetchBreakdown([
         { kind: 'wallet', show: 'flow', view: { fetchedAt: null } },

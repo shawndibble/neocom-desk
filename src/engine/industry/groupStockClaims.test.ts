@@ -7,7 +7,6 @@ const PYERITE = 35;
 const JITA = 60003760;
 const AMARR = 60008494;
 
-/** 10,000 Tritanium: 6,000 in Jita, 4,000 in Amarr. 500 Pyerite in Jita. */
 const STOCK: DetectedOwnedStockMap = new Map([
   [
     TRITANIUM,
@@ -101,8 +100,6 @@ describe('groupStockClaims', () => {
   });
 
   it('counts a partly overlapping claim only up to the stock both scopes see', () => {
-    // A sees everything and claims 9,000; B sees only Jita's 6,000. At most
-    // 6,000 of A's claim can be stock B would draw on.
     const a = member('a', { [TRITANIUM]: 9_000 });
     const b = member('b', {}, only(JITA));
     expect(groupStockClaims(b, [a, b], STOCK)(TRITANIUM)).toEqual({
@@ -120,8 +117,6 @@ describe('groupStockClaims', () => {
   });
 
   it("counts only the part of this plan's Have its scoped stock could cover", () => {
-    // B typed 5,000 against Jita's 500 Pyerite; A claims 100 of it. Only 500
-    // of B's Have can collide with A, so the group is 100 over, not 4,600.
     const a = member('a', { [PYERITE]: 100 });
     const b = member('b', { [PYERITE]: 5_000 });
     expect(groupStockClaims(b, [a, b], STOCK)(PYERITE)?.overClaim).toBe(100);

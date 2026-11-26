@@ -1,8 +1,3 @@
-/**
- * The words the Map speaks about a product, in one place: the tile's tooltip,
- * its accessible name and the detail panel all read the same sentence, so what
- * a sighted pointer user sees and what a screen reader hears cannot drift.
- */
 import type { TFunction } from 'i18next';
 import type { PlanetType } from '@/engine/pi/goalTypes';
 import { formatIsk } from '@/lib/isk';
@@ -14,18 +9,15 @@ export const planetName = (t: TFunction, type: PlanetType): string => t(`pi.plan
 
 export const tierName = (t: TFunction, tier: MapTier): string => t(`piMap.tier.${tier}.name`);
 
-/** "Refined (P2)". */
 export const tierWithCode = (t: TFunction, tier: MapTier): string =>
   t('piMap.tierWithCode', { name: tierName(t, tier), tier });
 
-/** Each verdict glyph's colour: board, phone list, legend and help all draw it this way. */
 export const VERDICT_TONE = {
   '▲': 'text-success',
   '≈': 'text-text-dim',
   '▼': 'text-danger',
 } as const;
 
-/** The ▲ ≈ ▼ glyph a figure carries, or null when it has no verdict to show. */
 export function verdictGlyph(figure: ProductFigure): '▲' | '≈' | '▼' | null {
   if (figure.kind !== 'ranked') return null;
   if (figure.isReference || figure.verdict === 'same') return '≈';
@@ -34,14 +26,8 @@ export function verdictGlyph(figure: ProductFigure): '▲' | '≈' | '▼' | nul
   return null;
 }
 
-/**
- * "Better than Proteins, the simplest product on Ice planets", or why there is
- * no comparison. `name` stands in for the compared product's name (a `{name}`
- * token, for a caller that links it).
- */
 export function comparisonSentence(t: TFunction, figure: ProductFigure, name?: string): string {
   if (figure.kind !== 'ranked') {
-    // The chain estimate's own sentence follows and says what the figure is.
     if (figure.chain || figure.whatIf) return t('piMap.unranked.tierChain');
     return t(`piMap.unranked.${figure.reason}`);
   }
@@ -51,12 +37,6 @@ export function comparisonSentence(t: TFunction, figure: ProductFigure, name?: s
   return t(`piMap.cmp.${figure.verdict}`, { name: name ?? figure.versus.name, type });
 }
 
-/**
- * "About 717,234 ISK a day from one Barren planet", a P3/P4's chain estimate
- * sentence, or null when there is no figure.
- * Whole ISK, not shorthand: the tile and the phone row show the shorthand, and
- * this sentence is where their exact figure lives (tooltip, accessible name).
- */
 export function figureSentence(t: TFunction, figure: ProductFigure): string | null {
   if (figure.kind !== 'ranked') {
     if (figure.whatIf) {
@@ -84,7 +64,6 @@ export function figureSentence(t: TFunction, figure: ProductFigure): string | nu
     : sentence;
 }
 
-/** What a screen reader hears for a product tile: name, tier, comparison, figure, and its marks. */
 export function productAccessibleName(
   t: TFunction,
   product: MapProduct,

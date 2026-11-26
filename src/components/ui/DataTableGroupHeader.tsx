@@ -4,17 +4,13 @@ import { focusRingInsetClassName, rowInteractiveClassName } from './controlStyle
 import * as Icon from './icons';
 
 interface DataTableGroupHeaderProps {
-  /** Cells the header row spans: the caller's columns plus the trailing ones. */
   colSpan: number;
   expanded: boolean;
-  /** Receives the *effective* `expanded`, so a default-expanded group closes in one tap. */
   onToggle: () => void;
-  /** Off a phone an all-widths fold takes a table row's height, not a card's. */
   allWidths?: boolean;
   children: ReactNode;
 }
 
-/** The fold row above a `DataTable` group's member rows. */
 export function DataTableGroupHeader({
   colSpan,
   expanded,

@@ -1,9 +1,3 @@
-// The ESI reads behind nearby alerts (issue #5122, ADR 0028): one Character's location
-// under its Alerts Grant, and the two public lists, read once per poll run. Same
-// etiquette as the other poller reads (esiClient.ts): the shared headers, and a classified
-// result so the poller never reads a status code — 403 is "this grant cannot read the
-// location", 420/429 stop the run, a low budget stops it after this call.
-
 import { ESI_ROOT, esiGet } from './esiClient.js';
 import type { IncursionListing, RaidableSkyhook } from './nearbyAlerts.js';
 import { isRecord } from './guards.js';
@@ -47,7 +41,6 @@ async function getJson(
   }
 }
 
-/** `GET /characters/{id}/location` (scope `esi-location.read_location.v1`). */
 export async function fetchCharacterLocation(
   characterId: number,
   accessToken: string,
@@ -81,7 +74,6 @@ function isSkyhook(v: unknown): v is RaidableSkyhook {
   );
 }
 
-/** `GET /incursions` (public). */
 export async function fetchIncursions(
   fetchImpl: typeof fetch = fetch
 ): Promise<PublicListResult<IncursionListing>> {
@@ -91,7 +83,6 @@ export async function fetchIncursions(
   return { kind: 'ok', value: res.body.filter(isIncursion), budgetLow: res.budgetLow };
 }
 
-/** `GET /skyhooks/raidable` (public): `{ skyhooks: [...] }`. */
 export async function fetchRaidableSkyhooks(
   fetchImpl: typeof fetch = fetch
 ): Promise<PublicListResult<RaidableSkyhook>> {

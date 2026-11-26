@@ -1,16 +1,9 @@
-/**
- * Each Character's newest Net Worth Snapshot as one total, for a place that
- * shows a single number per Character (the Characters table). Pure; layers an
- * older row lacks read as 0, as everywhere else (`layerValues`).
- */
 import { LAYER_IDS, layerValues, netWorthOf, type LayerValues } from './series';
 import type { NetWorthSnapshotRow } from './snapshot';
 
 export interface LatestNetWorth {
-  /** UTC day of the snapshot: it is only as fresh as the last day the app was open. */
   day: string;
   layers: LayerValues;
-  /** Every layer summed. */
   total: number;
 }
 

@@ -11,7 +11,7 @@ import {
 
 const ZEOLITES = 45490;
 const COMPRESSED_ZEOLITES = 62463;
-const VELDSPAR = 1230; // no compressed pairing seeded — prices as itself
+const VELDSPAR = 1230;
 const DATE = '2026-09-04';
 
 const pricesMock = vi.hoisted(() => {
@@ -192,7 +192,7 @@ describe('loadUnitPricesOnDate', () => {
     const SYLVITE = 45491;
     sdeMock.loadCompressedOreTypeIds.mockResolvedValue({
       [ZEOLITES]: COMPRESSED_ZEOLITES,
-      [SYLVITE]: COMPRESSED_ZEOLITES, // contrived, but exercises the dedupe path
+      [SYLVITE]: COMPRESSED_ZEOLITES,
     });
     pricesMock.getHubPrices.mockResolvedValue(
       new Map([[COMPRESSED_ZEOLITES, { sellMin: 1444, buyMax: 1343, sellVolume: 0, buyVolume: 0 }]])
@@ -291,7 +291,6 @@ describe('hubForPayee', () => {
 });
 
 describe('loadDatedUnitPricesByHub', () => {
-  /** Distinct buy prices per station, so a test can tell the two order books apart. */
   function buyMaxByStation(priceByStationId: Record<number, number>) {
     return (hub: TradeHub, typeIds: number[]) =>
       Promise.resolve(
@@ -332,8 +331,6 @@ describe('loadDatedUnitPricesByHub', () => {
 
     const { byHubAndDate } = await loadDatedUnitPricesByHub([ZEOLITES], ['hek'], [DATE]);
 
-    // Two hubs, one lookup each — the default is loaded even though no Payee
-    // named it, since unassigned ore is still valued at Jita.
     expect(pricesMock.getHubPrices).toHaveBeenCalledTimes(2);
     expect(byHubAndDate.get('hek')?.get(DATE)?.get(ZEOLITES)).toBe(900);
     expect(byHubAndDate.get('jita')?.get(DATE)?.get(ZEOLITES)).toBe(1343);
@@ -350,15 +347,12 @@ describe('loadDatedUnitPricesByHub', () => {
   });
 
   it('reports what could not be priced per hub (union across dates), and as a union overall', async () => {
-    // Hek quotes nothing for this ore; Jita does.
     pricesMock.getHubPrices.mockImplementation(buyMaxByStation({ [JITA.stationId]: 1343 }));
 
     const { unpricedByHub, unpriced } = await loadDatedUnitPricesByHub([ZEOLITES], ['hek'], [DATE]);
 
     expect([...(unpricedByHub.get('hek') ?? [])]).toEqual([ZEOLITES]);
     expect(unpricedByHub.get('jita')?.size).toBe(0);
-    // The union is only the "is there anything to say" gate — the banner
-    // names the hub, so Jita is never blamed for Hek's empty order book.
     expect([...unpriced]).toEqual([ZEOLITES]);
   });
 
@@ -376,9 +370,6 @@ describe('loadDatedUnitPricesByHub', () => {
   it('prices every date the ledger needs, independently', async () => {
     const OTHER_DATE = '2026-09-05';
     hubSnapshotMock.loadHubSnapshotRange.mockResolvedValue({
-      // Keyed by the Compressed type_id — the server snapshot prices the
-      // tradeable compressed item, same as `resolvePricesForHubAcrossDates`
-      // looks it up.
       saved: new Map([
         [DATE, new Map([[COMPRESSED_ZEOLITES, { buy: 100, sell: 110 }]])],
         [OTHER_DATE, new Map([[COMPRESSED_ZEOLITES, { buy: 200, sell: 210 }]])],
@@ -452,11 +443,8 @@ describe('moonOwnerPricesAtHubOnDate (#4621)', () => {
     const data = await loadDatedUnitPricesByHub([ZEOLITES], ['jita'], [DATE, '2026-09-05'], true, {
       moonOwner: true,
     });
-    // The miner's line takes the live buy for want of a saved one.
     expect(pricesAtHubOnDate(data, 'jita', DATE).get(ZEOLITES)).toBe(1343);
-    // The moon owner's figure is the saved sell, as the server prices its page.
     expect(moonOwnerPricesAtHubOnDate(data, 'jita', DATE).get(ZEOLITES)).toBe(900);
-    // Nothing saved that day: 0 (unpriced), never the live book.
     expect(moonOwnerPricesAtHubOnDate(data, 'jita', '2026-09-05').get(ZEOLITES)).toBe(0);
   });
 

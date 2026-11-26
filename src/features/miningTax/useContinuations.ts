@@ -10,9 +10,7 @@ import { findSessionContinuations, type SessionContinuation } from './sessionCon
 export type TaxToast = { message: string; onUndo?: () => void } | null;
 
 interface UseContinuationsInput {
-  /** Whether the snapshot has loaded — automatic mode waits for it. */
   hasData: boolean;
-  /** The ledger rows the Character filter lets through. */
   rows: readonly DisplayRow[];
   allDisplayRows: readonly DisplayRow[];
   payeeById: ReadonlyMap<string, PayeeRecord>;
@@ -21,11 +19,6 @@ interface UseContinuationsInput {
   setToast: (toast: TaxToast) => void;
 }
 
-/**
- * "Continue yesterday's session" offers (issue #523 follow-up): finding them,
- * continuing one (with Undo), keeping one separate, and the automatic mode
- * that continues each new offer without asking.
- */
 export function useContinuations({
   hasData,
   rows,
@@ -42,8 +35,6 @@ export function useContinuations({
   const setDismissedContinuations = useDismissedContinuations((state) => state.setValue);
   useHydratedStore(useAutoContinueSessions, useDismissedContinuations);
 
-  // Offers on screen when automatic mode was switched on — "next time" means
-  // they stay offers rather than being continued the moment the box is ticked.
   const [autoSkip, setAutoSkip] = useState<ReadonlySet<string>>(new Set());
   const [continuing, setContinuing] = useState(false);
 
@@ -53,11 +44,6 @@ export function useContinuations({
     [rows, dismissedContinuations]
   );
 
-  /**
-   * Continues one session, offering Undo in a toast. `false` when nothing was
-   * written: its Payee is gone, the day was claimed meanwhile (the refresh
-   * shows what exists), or the write failed (the toast says so).
-   */
   async function continueSession(continuation: SessionContinuation): Promise<boolean> {
     const payee = payeeById.get(continuation.payeeId);
     if (!payee) return false;
@@ -85,9 +71,6 @@ export function useContinuations({
     return true;
   }
 
-  // The automatic-mode effect must not re-run when `continueSession`'s closure
-  // changes (it reads `payeeById`/`pricesFor`/`t`/`refresh`) — only when the
-  // offers do. Reading it through a ref keeps it current without that.
   const continueSessionRef = useRef(continueSession);
   useEffect(() => {
     continueSessionRef.current = continueSession;
@@ -102,8 +85,6 @@ export function useContinuations({
     }
   }
 
-  // Automatic mode: continue each new offer once, without asking. The ref
-  // keeps a rerender from re-firing a continuation before the refresh lands.
   const autoContinuedRef = useRef<Set<string>>(new Set());
   useEffect(() => {
     if (!autoContinue || !hasData) return;
@@ -115,8 +96,6 @@ export function useContinuations({
     void (async () => {
       for (const c of fresh) {
         const continued = await continueSessionRef.current(c);
-        // Not continued: bring the offer back as a card so the pilot can retry
-        // or choose, rather than it vanishing until the next page load.
         if (!continued) setAutoSkip((previous) => new Set(previous).add(c.next.key));
       }
     })();
@@ -127,7 +106,6 @@ export function useContinuations({
     void setAutoContinue(next);
   }
 
-  /** "Keep separate", remembered — pruned to entries still in the ledger so the list can't grow forever. */
   function keepSeparate(continuation: SessionContinuation) {
     const present = new Set(allDisplayRows.map((dr) => dr.key));
     void setDismissedContinuations([

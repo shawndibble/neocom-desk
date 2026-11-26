@@ -29,7 +29,7 @@ describe('loyaltyOfferProfit literal vector', () => {
 
 describe('loyaltyOfferProfit', () => {
   it('prices a simple (non-blueprint) offer: revenue net of market fees, minus ISK cost and required items', () => {
-    const revenue = 8 * 1_800; // 8 probes at 1,800 ISK each
+    const revenue = 8 * 1_800;
     const input: LoyaltyOfferProfitInput = {
       iskCost: 96_000,
       lpCost: 4_800,
@@ -55,7 +55,6 @@ describe('loyaltyOfferProfit', () => {
   });
 
   it('nets a blueprint offer against the manufacturing build cost, not just the ISK sticker price', () => {
-    // Astero BPC: LP+ISK buys the copy; building it still costs materials + job fee.
     const revenue = 26_000_000;
     const input: LoyaltyOfferProfitInput = {
       iskCost: 12_000_000,
@@ -107,7 +106,6 @@ describe('loyaltyOfferProfit', () => {
     const order = loyaltyOfferProfit({ ...base, liquidationBasis: 'order' });
     const instant = loyaltyOfferProfit({ ...base, liquidationBasis: 'instant' });
 
-    // Same sales tax either way — the fee that differs is the broker fee.
     expect(instant.salesTax).toBeCloseTo(order.salesTax ?? 0, 6);
     expect(instant.salesTax).toBeCloseTo(salesTax(revenue, 5), 6);
     expect(instant.brokerFee).toBe(0);
@@ -136,9 +134,6 @@ describe('loyaltyOfferProfit', () => {
   });
 
   it('charges the 100 ISK broker-fee floor once per redemption, even on a cheap high-volume offer', () => {
-    // 100 units of a 20 ISK trash item: 2,000 ISK of revenue. The percentage
-    // broker fee would be ~30 ISK, so the 100 ISK per-order floor dominates —
-    // and it bites once for the whole stack, not once per unit.
     const revenue = 100 * 20;
     const result = loyaltyOfferProfit({
       iskCost: 0,
@@ -156,7 +151,6 @@ describe('loyaltyOfferProfit', () => {
   });
 
   it('flips a thin-margin offer from profitable to loss-making once fees apply', () => {
-    // Gross profit is +1,000 ISK; fees on 100,000 ISK of revenue exceed that.
     const revenue = 100_000;
     const result = loyaltyOfferProfit({
       iskCost: 99_000,

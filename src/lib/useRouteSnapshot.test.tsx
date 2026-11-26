@@ -19,10 +19,6 @@ interface Deferred {
   resolve: (value: string) => void;
 }
 
-/**
- * A loader that never settles on its own: every call is parked so the test can
- * resolve them out of order, which is how a stale response is manufactured.
- */
 function deferredLoader() {
   const calls: Deferred[] = [];
   const load = (characterId: number, signal: RouteSnapshotSignal): Promise<string> =>
@@ -62,7 +58,7 @@ describe('useRouteSnapshot', () => {
     const load = vi.fn(async () => 'data-a');
     const { result } = renderHook(() => useRouteSnapshot(load));
 
-    setCharacter(null); // hydrated, but nobody is logged in
+    setCharacter(null);
     await Promise.resolve();
     expect(load).not.toHaveBeenCalled();
     expect(result.current.loading).toBe(true);
@@ -94,8 +90,6 @@ describe('useRouteSnapshot', () => {
 
     act(() => result.current.refresh());
     expect(result.current.refreshCount).toBe(1);
-    // The previous refresh's snapshot is stamped with the old key, so the view
-    // goes back to loading rather than showing pre-refresh data as current.
     expect(result.current.loading).toBe(true);
     expect(result.current.data).toBeNull();
 
@@ -113,7 +107,6 @@ describe('useRouteSnapshot', () => {
     act(() => result.current.refresh());
     await waitFor(() => expect(calls).toHaveLength(2));
 
-    // The pre-refresh load finally answers: it is for `91:0`, we are on `91:1`.
     await act(async () => calls[0].resolve('stale'));
     expect(result.current.data).toBeNull();
     expect(result.current.loading).toBe(true);
@@ -130,7 +123,6 @@ describe('useRouteSnapshot', () => {
     await act(async () => calls[0].resolve('character-a-data'));
     expect(result.current.data).toBe('character-a-data');
 
-    // Character A's snapshot is still the only one in state, stamped `91:0`.
     setCharacter(CHAR_B);
     expect(result.current.data).toBeNull();
     expect(result.current.loading).toBe(true);
@@ -156,8 +148,6 @@ describe('useRouteSnapshot', () => {
   });
 
   it('discards a cancelled response even when its key came round again', async () => {
-    // Switching away and back re-uses the request key, so the stamp alone
-    // cannot tell the two loads apart — this is the case `cancelled` covers.
     const { calls, load } = deferredLoader();
     const { result } = renderHook(() => useRouteSnapshot(load));
     setCharacter(CHAR_A);
@@ -193,9 +183,6 @@ describe('useRouteSnapshot', () => {
   });
 
   it('surfaces a rejecting loader instead of spinning forever', async () => {
-    // The failure mode this guards: no stamp means `loading` never clears, and
-    // every route disables its Refresh button while loading — so the view is
-    // unrecoverable without a page reload.
     const boom = new Error('offline');
     const { result } = renderHook(() => useRouteSnapshot(() => Promise.reject(boom)));
     setCharacter(CHAR_A);
@@ -222,8 +209,6 @@ describe('useRouteSnapshot', () => {
   });
 
   it('does not show a stale snapshot when the character returns to a previous one', async () => {
-    // A -> B -> A. Keying on `characterId:refreshCount` repeats on the return,
-    // so A's first snapshot would read as current for A's second load.
     const { result } = renderHook(() => useRouteSnapshot((id) => Promise.resolve(`data-${id}`)));
     setCharacter(CHAR_A);
     await waitFor(() => expect(result.current.data).toBe(`data-${CHAR_A}`));
@@ -231,15 +216,12 @@ describe('useRouteSnapshot', () => {
     setCharacter(CHAR_B);
     setCharacter(CHAR_A);
 
-    // Back on A with a load in flight: must report loading, not A's old data.
     expect(result.current.loading).toBe(true);
     expect(result.current.data).toBeNull();
     await waitFor(() => expect(result.current.data).toBe(`data-${CHAR_A}`));
   });
 
   it('resets refreshCount when the character changes', async () => {
-    // Wallet picks its offline copy off this: "refresh failed" vs "offline".
-    // A new character's first load is an initial load, not a refresh.
     const { result } = renderHook(() => useRouteSnapshot((id) => Promise.resolve(id)));
     setCharacter(CHAR_A);
     await waitFor(() => expect(result.current.loading).toBe(false));
@@ -247,16 +229,12 @@ describe('useRouteSnapshot', () => {
     act(() => result.current.refresh());
     await waitFor(() => expect(result.current.refreshCount).toBe(1));
 
-    // The character switch is synchronous, but it also kicks off CHAR_B's
-    // load — an already-resolved promise whose `.then` still needs a
-    // microtask flush, or its state update lands outside `act`.
     await act(async () => setCharacter(CHAR_B));
     expect(result.current.refreshCount).toBe(0);
   });
 
   it('does not re-run the load when only the loader identity changes', async () => {
     const inner = vi.fn(async (characterId: number) => `data-${characterId}`);
-    // Inline arrow: a fresh loader identity on every render must not re-fetch.
     const { result, rerender } = renderHook(() => useRouteSnapshot((id) => inner(id)));
     setCharacter(CHAR_A);
     await waitFor(() => expect(result.current.data).toBe(`data-${CHAR_A}`));
@@ -278,8 +256,6 @@ describe('useRouteSnapshot', () => {
       expect(result.current.data).toBe('first');
 
       act(() => result.current.refresh());
-      // Unlike the default behaviour, `data` does not go back to null —
-      // only `loading` reports the refresh is in flight.
       expect(result.current.loading).toBe(true);
       expect(result.current.data).toBe('first');
 
@@ -335,15 +311,12 @@ describe('useRouteSnapshot', () => {
 
       act(() => result.current.refresh());
       await waitFor(() => expect(result.current.error).toBe(boom));
-      // The failed refresh clears `loading` (Refresh is re-enabled) but must
-      // not blank out the last data that did load successfully.
       expect(result.current.data).toBe('first');
     });
   });
 
   describe('prop-supplied character (second case, alongside the active-character store)', () => {
     it('loads for the prop character immediately, without waiting on store hydration', async () => {
-      // Store never hydrates in this test — a prop-supplied character must not depend on it.
       const load = vi.fn(async (characterId: number) => `data-${characterId}`);
       const { result } = renderHook(() => useRouteSnapshot(load, CHAR_A));
 
@@ -394,13 +367,10 @@ describe('useRouteSnapshot cacheKey', () => {
     await waitFor(() => expect(first.result.current.data).toBe('data-a'));
     first.unmount();
 
-    // The second mount's own load is parked, so anything on screen can only
-    // have come from the retained snapshot.
     const { calls, load: parked } = deferredLoader();
     const second = renderHook(() => useRouteSnapshot(parked, undefined, { cacheKey: 'demo' }));
 
     expect(second.result.current.data).toBe('data-a');
-    // `loading` stays honest — a load really is in flight, and Refresh reads it.
     expect(second.result.current.loading).toBe(true);
 
     act(() => calls[0].resolve('data-a2'));
@@ -418,7 +388,7 @@ describe('useRouteSnapshot cacheKey', () => {
       await waitFor(() => expect(first.result.current.data).toBe('data-a'));
       first.unmount();
       await flushRouteSnapshotWrites();
-      resetRouteSnapshots(); // the reload: memory gone, Dexie kept
+      resetRouteSnapshots();
 
       const { load: parked } = deferredLoader();
       const second = renderHook(() => useRouteSnapshot(parked, undefined, { cacheKey: 'demo' }));
@@ -484,9 +454,6 @@ describe('useRouteSnapshot cacheKey', () => {
     });
     const second = renderHook(() => useRouteSnapshot(failing, undefined, { cacheKey: 'demo' }));
     await waitFor(() => expect(second.result.current.error).toBeInstanceOf(Error));
-    // Same contract `staleWhileRevalidate` already had for a failed refresh:
-    // the error is reported and the views branch on it first, so the rows are
-    // never presented as the fresh answer.
     expect(second.result.current.data).toBe('data-a');
   });
   describe('publish (early partial snapshot)', () => {

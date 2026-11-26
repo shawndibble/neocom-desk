@@ -10,7 +10,6 @@ import { formatCount } from '@/lib/formatCount';
 import { useTimeZone } from '@/lib/timeFormat';
 import { formatDateOnly } from '@/lib/timestamp';
 
-/** "What it cost you" once a cost basis is known: build run or wallet buys, fees, floor. */
 export function CostLedger({
   row,
   costBasis,
@@ -59,12 +58,6 @@ export function CostLedger({
             />
           </>
         )}
-        {/*
-          Per unit, not per run — the pivot from the batch totals above to the
-          per-unit figures below. `unitCost` is exactly `totalCost /
-          runQuantity` (orderCostBasis.ts); 2 decimals to match the floor rows
-          it feeds into, not the 0-decimal batch totals above it.
-        */}
         <LedgerRow
           label={t('market.orders.costPerUnit')}
           value={`${formatMarketIsk(costBasis.unitCost)} ISK`}
@@ -85,11 +78,6 @@ export function CostLedger({
             <p>{t('market.orders.walletBasisNoBuyFee')}</p>
           </div>
         )}
-        {/*
-          The two fee lines sum with cost per unit to exactly the relist floor
-          below — `relistFees` in `orderDetailView.ts` says why they are read
-          that way.
-        */}
         {relistFees && (
           <>
             <LedgerRow
@@ -103,12 +91,6 @@ export function CostLedger({
           </>
         )}
         {floorShown !== null && (
-          // Only ONE floor is ever shown as a ledger number (design
-          // decision): `floor.fill` — what leaving the order alone would net
-          // once it sells — appears only in the prose below, which is the one
-          // place the smaller number is the answer to something. The ledger
-          // math itself still sums to the exact `row.floor.relist`, never the
-          // rounded figure.
           <LedgerRow
             label={t('market.orders.floorLabel')}
             tooltip={t('market.orders.floorHelp')}
@@ -160,7 +142,6 @@ function LedgerRow({
 }: {
   label: string;
   value: ReactNode;
-  /** Explains the label's term, as a "?" after it. */
   tooltip?: string;
 }) {
   const { t } = useTranslation();

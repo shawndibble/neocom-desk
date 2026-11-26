@@ -14,7 +14,6 @@ function scan(minutes: number, ...rocks: [string, number][]): SurveyScan {
   return { at: T0 + minutes * MINUTE_MS, rocks: rocks.map(([ore, volume]) => ({ ore, volume })) };
 }
 
-/** A scan whose rocks carry the scanner's ISK value: [ore, volume, isk]. */
 function iskScan(minutes: number, ...rocks: [string, number, number][]): SurveyScan {
   return {
     at: T0 + minutes * MINUTE_MS,
@@ -38,7 +37,6 @@ describe('summarizeSurvey', () => {
   });
 
   it('computes percent, mined per interval and ETA at the recent pace', () => {
-    // 1000 -> 700 over 5 min, then 700 -> 400 over 5 min: 1 m3/s each
     const s = summarizeSurvey([
       scan(0, ['Sylvite', 1000]),
       scan(5, ['Sylvite', 700]),
@@ -72,10 +70,10 @@ describe('summarizeSurvey', () => {
   it('pace is volume-weighted over the last two intervals only (three scans)', () => {
     const s = summarizeSurvey([
       scan(0, ['A', 10_000]),
-      scan(10, ['A', 4_000]), // fast first interval, outside the last two
-      scan(11, ['A', 3_940]), // 60 m3 in 60 s
-      scan(12, ['A', 3_880]), // 60 m3 in 60 s
-      scan(14, ['A', 3_640]), // 240 m3 in 120 s
+      scan(10, ['A', 4_000]),
+      scan(11, ['A', 3_940]),
+      scan(12, ['A', 3_880]),
+      scan(14, ['A', 3_640]),
     ])!;
     expect(s.pace).toBeCloseTo((60 + 240) / 180, 6);
   });
@@ -87,7 +85,6 @@ describe('summarizeSurvey', () => {
   });
 
   it('matches rocks between scans: a shrunk rock is mined, a new rock extends the field', () => {
-    // The 500 rock is mined down to 100, and a fresh 300 rock of another ore comes into range.
     const s = summarizeSurvey([
       scan(0, ['A', 500], ['A', 400]),
       scan(5, ['A', 400], ['A', 100], ['B', 300]),
@@ -118,7 +115,6 @@ describe('summarizeSurvey', () => {
   });
 
   it('falls back to the biggest ISK first when no ore has a unit price, with the value of each ore', () => {
-    // Veldspar 20 rocks worth 10M, Scordite 5 rocks worth 25M, Pyroxeres 15 rocks worth 12M.
     const rocks = (ore: string, count: number, each: number): [string, number, number][] =>
       Array.from({ length: count }, () => [ore, 100, each]);
     const s = summarizeSurvey([
@@ -172,7 +168,6 @@ describe('summarizeSurvey', () => {
   });
 
   it('ignores a stale repaste of an earlier scan, even with a newer scan in between', () => {
-    // A, then B, then A again (a pilot pastes what was still on their clipboard).
     const a: [string, number][] = [
       ['X', 500],
       ['X', 300],
@@ -294,7 +289,6 @@ describe('ISK per ore and ISK mined', () => {
   });
 
   it("values m3 mined at the earlier scan's ISK per m3, per ore", () => {
-    // A: 10 ISK/m3, B: 2 ISK/m3. A loses 40 m3 (400), B loses 50 m3 (100).
     const s = summarizeSurvey([
       iskScan(0, ['A', 100, 1000], ['B', 100, 200]),
       iskScan(5, ['A', 60, 600], ['B', 50, 100]),

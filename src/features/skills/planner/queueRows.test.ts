@@ -52,8 +52,6 @@ describe('summarizeEntryQueue', () => {
   });
 
   it('carries the levels it actually trains, which start above an already-trained level rather than at I', () => {
-    // "Caldari Carrier V" on a character already at III: the plan queues IV
-    // and V only, so the row must label itself IV–V and not I–V (#254).
     const scheduled = [step(1, 4, 400, 400), step(1, 5, 500, 900)];
     const info = summarizeEntryQueue([entry(1, 5)], [2], scheduled, alwaysKnown);
     expect(info.get(entryId(entry(1, 5)))?.summary.steps.map((s) => s.level)).toEqual([4, 5]);
@@ -61,7 +59,6 @@ describe('summarizeEntryQueue', () => {
 
   it('an already-trained entry (empty range) carries the previous cumulative forward with zero seconds', () => {
     const scheduled = [step(1, 1, 100, 100)];
-    // entry 1 owns steps[0:1], entry 2 (already trained) owns steps[1:1] (empty)
     const info = summarizeEntryQueue([entry(1), entry(2)], [1, 1], scheduled, alwaysKnown);
     expect(info.get(entryId(entry(2)))).toEqual({
       summary: { seconds: 0, cumulativeSeconds: 100, steps: [], stepIndices: [] },
@@ -79,8 +76,6 @@ describe('summarizeEntryQueue', () => {
   });
 
   it("a later entry whose prereq re-trains an earlier entry's skill to a higher level owns those extra steps itself", () => {
-    // Entry 1 targets skill A at I; entry 2 (skill B) needs A at III as a prereq.
-    // boundaries: entry 1 -> 1 (owns A:1), entry 2 -> 4 (owns A:2, A:3 as prereq rows, then B:1).
     const scheduled = [
       step(1, 1, 10, 10),
       step(1, 2, 10, 20),
@@ -104,7 +99,6 @@ describe('summarizeEntryQueue', () => {
   it('an entry whose skill is unknown to the catalog contributes zero steps without consuming a boundary', () => {
     const scheduled = [step(1, 1, 100, 100)];
     const isKnown = (skillTypeID: number) => skillTypeID !== 999;
-    // entryBoundaries only covers the known entry (skillTypeID 1).
     const info = summarizeEntryQueue([entry(999), entry(1)], [1], scheduled, isKnown);
     expect(info.get(entryId(entry(999)))).toEqual({
       summary: { seconds: 0, cumulativeSeconds: 0, steps: [], stepIndices: [] },
@@ -178,7 +172,7 @@ describe('buildMergedRows', () => {
     const entries = [entry(1), entry(2)];
     const scheduled = [step(1, 1, 100, 100), step(2, 1, 50, 150)];
     const queue = summarizeEntryQueue(entries, [1, 2], scheduled, alwaysKnown);
-    const rows = buildMergedRows(entries, [1], queue); // marker between entry 1 and 2
+    const rows = buildMergedRows(entries, [1], queue);
     expect(rows.map((r) => r.kind)).toEqual(['entry', 'marker', 'entry']);
     expect(rows[1]).toEqual({ kind: 'marker', id: markerRowId(0), markerIndex: 0 });
   });
@@ -227,7 +221,7 @@ describe('placeBandHeaders', () => {
     const entries = [entry(1), entry(2)];
     const scheduled = [step(1, 1, 10, 10), step(9, 1, 50, 60), step(2, 1, 100, 160)];
     const queue = summarizeEntryQueue(entries, [1, 3], scheduled, alwaysKnown);
-    const rows = buildMergedRows(entries, [1], queue); // marker between entry 1 and 2
+    const rows = buildMergedRows(entries, [1], queue);
     const bandsAt = priorities([
       [entryId(entries[0]), 'high'],
       [entryId(entries[1]), 'low'],
@@ -321,9 +315,6 @@ describe('buildMergedRows precomputedRows (#408: no duplicate row-build pass)', 
     const entries = [entry(1), entry(2)];
     const scheduled = [step(1, 1, 100, 100), step(2, 1, 100, 200)];
     const queue = summarizeEntryQueue(entries, [1, 2], scheduled, alwaysKnown);
-    // Deliberately inconsistent with `entries`/`markers` (reversed order) —
-    // if buildMergedRows ignored this and rebuilt its own rows internally,
-    // the output would come back in entries' original order instead.
     const precomputed = [...buildRows(entries, undefined)].reverse();
     const rows = buildMergedRows(entries, undefined, queue, precomputed);
     expect(rows.map((r) => r.id)).toEqual(precomputed.map((r) => r.id));

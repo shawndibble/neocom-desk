@@ -210,10 +210,8 @@ describe('NpcInfoView, a corporation', () => {
     expect(list).toHaveClass('whitespace-nowrap');
     const rows = [...list.children];
     expect(rows).toHaveLength(2);
-    // 3% - 0.3% * 4 = 1.80%; minus 0.03 * 5 + 0.02 * 6 = 1.53%.
     expect(rows[0]).toHaveTextContent('Broker fee at Jita 4-41.80% 1.53% saves 0.27%');
     expect(rows[0]!.querySelector('s')).toHaveTextContent('1.80%');
-    // 5% * (1 - 0.15 * 6) = 0.5%.
     expect(rows[1]).toHaveTextContent('Reprocessing tax5.0% ~0.5% saves ~4.5%');
     expect(
       within(card).getByText('Broker fee uses your base standings and Broker Relations 4.')

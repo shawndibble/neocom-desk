@@ -1,13 +1,3 @@
-/**
- * The bar above the grid while a board is being customized: how many of
- * the 30 widgets are used, the ways to add (Add widget, Start from a role),
- * Reset behind an inline "Reset the layout?" question, and Cancel / Done.
- *
- * Cancel puts back the layout as it was when Customize began; Done keeps it.
- * Reset is an Undo-able change, so its confirmation is one inline question
- * rather than a dialog: asking twice (a dialog, then a toast) for a change that
- * can be undone would be heavier than the change.
- */
 import { useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui';
@@ -16,14 +6,7 @@ import { boardKey, useWidgetBoard } from './board';
 import { useOverviewEdit } from './editContext';
 import { MAX_WIDGETS } from './layout';
 
-export function CustomizeBar({
-  onAdd,
-  onRoles,
-}: {
-  onAdd: () => void;
-  /** Start from a role; absent on a board with no roles (the Corp Board). */
-  onRoles?: () => void;
-}) {
+export function CustomizeBar({ onAdd, onRoles }: { onAdd: () => void; onRoles?: () => void }) {
   const { t } = useTranslation();
   const board = useWidgetBoard();
   const edit = useOverviewEdit();
@@ -32,9 +15,7 @@ export function CustomizeBar({
   const resetRef = useRef<HTMLButtonElement>(null);
   const addRef = useRef<HTMLButtonElement>(null);
   const askId = useId();
-  // Focus follows the swap: onto Keep when the question appears, back onto Reset when dismissed.
   const returnToReset = useRef(false);
-  // After a confirmed Reset the widgets are replaced, so the pilot is put back on Add widget.
   const returnToAdd = useRef(false);
 
   useEffect(() => {

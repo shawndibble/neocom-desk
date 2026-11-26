@@ -1,23 +1,11 @@
-/**
- * The palette's row budget: which sections lead, and how many rows each
- * shows. Pure. Every provider still answers with up to `GROUP_LIMIT` rows;
- * this decides how many of them fit on screen at once.
- */
 import { searchKey } from '@/lib/tokenSearch';
 import { GROUP_LIMIT } from './types';
 import type { PaletteGroup } from './usePaletteSearch';
 
-/** Rows a section shows while other sections also match. */
 export const COLLAPSED_ROWS = 3;
 
 const WORD_BOUNDARY = /[^\p{L}\p{N}]/u;
 
-/**
- * 0 exact, 1 the label or one of its words starts with the query, 2 substring,
- * 3 matched on something other than the label. A word start ranks with a
- * prefix: "Industry › Opportunities" is as strong a hit for "opp" as any name
- * that begins with it, and the provider order then breaks the tie.
- */
 export function matchTier(label: string, query: string): number {
   const q = searchKey(query.trim());
   const l = searchKey(label);
@@ -36,11 +24,6 @@ function bestTier(group: PaletteGroup, query: string): number {
   return Math.min(...group.results.map((result) => matchTier(result.label, query)));
 }
 
-/**
- * Ready sections, strongest match first (ties by provider order). A loading
- * or failed section keeps the slot it had, so one pending never reshuffles
- * the others; a ready section landing late can still rank above the rest.
- */
 export function rankGroups(groups: readonly PaletteGroup[], query: string): PaletteGroup[] {
   const ready = groups
     .filter((group) => group.status === 'ready' && group.results.length > 0)
@@ -53,10 +36,6 @@ export function rankGroups(groups: readonly PaletteGroup[], query: string): Pale
   );
 }
 
-/**
- * Rows to render per section id: everything for a sole match or an expanded
- * section, `COLLAPSED_ROWS` for the rest.
- */
 export function visibleRowCounts(
   groups: readonly PaletteGroup[],
   expanded: ReadonlySet<string>
@@ -73,7 +52,6 @@ export function visibleRowCounts(
   );
 }
 
-/** "4", or "6+" once the provider stopped at its cap. */
 export function groupCountLabel(count: number): string {
   return count >= GROUP_LIMIT ? `${GROUP_LIMIT}+` : String(count);
 }

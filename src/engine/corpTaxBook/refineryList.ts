@@ -1,22 +1,13 @@
-/**
- * Refineries from Extractions (issue #6348): players know a moon by its refinery's name, so the
- * Refineries tab has one row per refinery (`structureId`), and its page is keyed the same way
- * (archive is stored per refinery, and one moon can have several refineries over time).
- */
 import type { ExtractionRow } from './bookView';
 import type { ExtractionState } from './extraction';
 
 export interface RefineryListRow {
   structureId: number;
-  /** The moon of the refinery's newest Extraction. */
   moonId: number;
-  /** The moon owner whose refinery it is; absent means the book's own corporation. */
   sourceCorporationId?: number;
   extractionCount: number;
   states: Partial<Record<ExtractionState, number>>;
-  /** The soonest chunk still to pop. */
   nextPopAt?: string;
-  /** The latest chunk that popped (not cancelled, not still to come). */
   lastPopAt?: string;
   tax: number;
 }
@@ -24,7 +15,6 @@ export interface RefineryListRow {
 export const newestFirst = (a: ExtractionRow, b: ExtractionRow) =>
   b.startedAt.localeCompare(a.startedAt);
 
-/** The soonest chunk still to pop, and the latest that popped (not cancelled, not still to come). */
 export function popBounds(rows: readonly ExtractionRow[]): {
   nextPopAt?: string;
   lastPopAt?: string;
@@ -43,7 +33,6 @@ export function popBounds(rows: readonly ExtractionRow[]): {
   };
 }
 
-/** One row per refinery that has an Extraction, in no particular order (the table sorts). */
 export function refineryListRows(extractions: readonly ExtractionRow[]): RefineryListRow[] {
   const byRefinery = new Map<number, ExtractionRow[]>();
   for (const x of extractions) {
@@ -71,7 +60,6 @@ export function refineryListRows(extractions: readonly ExtractionRow[]): Refiner
   });
 }
 
-/** One refinery's Extractions, newest first. */
 export function refineryExtractions(
   extractions: readonly ExtractionRow[],
   structureId: number
@@ -79,10 +67,6 @@ export function refineryExtractions(
   return extractions.filter((x) => x.structureId === structureId).sort(newestFirst);
 }
 
-/**
- * The refinery an old moon link (`/corp/moons/moons/:moonId`) opens: the one of the moon's
- * newest Extraction. Undefined when the book holds no Extraction at that moon.
- */
 export function newestRefineryOnMoon(
   extractions: readonly ExtractionRow[],
   moonId: number

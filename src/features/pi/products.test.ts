@@ -9,10 +9,10 @@ const pi = JSON.parse(
   readFileSync(resolve(process.cwd(), 'public/data/pi.json'), 'utf8')
 ) as PiData;
 
-const BROADCAST_NODE = 2867; // P4
-const TRANSMITTER = 9840; // P2
-const AQUEOUS_LIQUIDS = 2268; // P0 raw resource — extracted, never made
-const TRITANIUM = 34; // not planetary at all
+const BROADCAST_NODE = 2867;
+const TRANSMITTER = 9840;
+const AQUEOUS_LIQUIDS = 2268;
+const TRITANIUM = 34;
 
 describe('productOptions', () => {
   it('offers every planetary commodity a factory can make, and nothing else', () => {

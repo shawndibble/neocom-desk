@@ -53,12 +53,10 @@ const HOLE: RouteStep = {
 const BRIDGE: RouteStep = { kind: 'bridge', gate: { fromId: UEDAMA, toId: THERA, name: 'gate' } };
 const WAYPOINT_SCOPE = 'esi-ui.write_waypoint.v1';
 
-/** A leg flown by gate, its last step taken as `last` says. */
 function leg(systems: number[], last: RouteStep = { kind: 'gate' }): RouteSafetyLeg {
   return {
     from: systems[0],
     to: systems[systems.length - 1],
-    // Only `systemId` and `entry` matter here: the rows are read for how the trip is flown.
     rows: systems.map((systemId, index) => ({
       systemId,
       entry: index === 0 ? null : index === systems.length - 1 ? last : { kind: 'gate' },
@@ -135,7 +133,6 @@ describe('SetWaypoints', () => {
 
   it('sets waypoints only to a wormhole entrance, and says where to pick up', async () => {
     await seed([{ id: ONE, name: 'Pilot One', scopes: [WAYPOINT_SCOPE] }]);
-    // Uedama → Thera is tagged a hole jump, as the trip assembly tags it.
     show([leg([JITA, PERIMETER, UEDAMA, THERA], HOLE)]);
 
     const button = await screen.findByRole('button', { name: 'Set waypoints in game' });
@@ -156,7 +153,6 @@ describe('SetWaypoints', () => {
 
   it('sets waypoints only to a bridge entrance, naming it a bridge', async () => {
     await seed([{ id: ONE, name: 'Pilot One', scopes: [WAYPOINT_SCOPE] }]);
-    // A stand-in Ansiblex from Uedama: the step is a bridge, not a hole.
     show([leg([JITA, PERIMETER, UEDAMA, THERA], BRIDGE)]);
 
     const button = await screen.findByRole('button', { name: 'Set waypoints in game' });
@@ -180,7 +176,6 @@ describe('SetWaypoints', () => {
       await screen.findByText("Pilot One hasn't granted Autopilot waypoints")
     ).toBeInTheDocument();
     expect(screen.queryByText(/log in again/i)).not.toBeInTheDocument();
-    // `aria-disabled`, not `disabled`: the reason stays reachable in a tooltip.
     expect(screen.getByRole('button', { name: 'Set waypoints in game' })).toHaveAttribute(
       'aria-disabled',
       'true'
@@ -233,7 +228,6 @@ describe('SetWaypoints', () => {
     first.unmount();
     show([leg([JITA, PERIMETER])]);
     expect(await screen.findByText('facts')).toBeInTheDocument();
-    // The flag hydrates from Dexie after the first paint.
     await waitFor(() =>
       expect(screen.queryByRole('button', { name: 'Set waypoints in game' })).toBeNull()
     );

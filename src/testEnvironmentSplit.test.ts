@@ -2,13 +2,6 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-/**
- * `.test.ts` files run under `node`; only `*.dom.test.ts` gets jsdom (see
- * `DOM_TS_TESTS` in vite.config.ts), or a file that opts in with a
- * `// @vitest-environment jsdom` docblock. A plain `.test.ts` that mounts a
- * hook would otherwise fail with a confusing missing-`document` error, so name
- * the mistake here instead.
- */
 const JSDOM_DOCBLOCK = /@vitest-environment\s+jsdom/;
 const MOUNTS_INTO_DOM = /from ['"]@testing-library\/react['"]/;
 

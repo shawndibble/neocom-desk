@@ -2,7 +2,6 @@ import { HOUR_MS } from '@/lib/age';
 import { describe, it, expect } from 'vitest';
 import { stillRunning, type CalendarRetentionEntry } from './calendarRetention';
 
-/** 2026-09-08 14:00 local, whatever zone the test host runs in. */
 const TODAY_2PM = new Date(2026, 8, 8, 14, 0, 0).getTime();
 
 function entry(id: number, startMs: number): CalendarRetentionEntry {
@@ -35,8 +34,6 @@ describe('stillRunning', () => {
   });
 
   it('drops an event that has not started yet and vanished — that is a real cancellation', () => {
-    // ESI keeps returning events until they start, so one missing while still
-    // upcoming was deleted in game. Retaining it would show a cancelled event.
     expect(stillRunning([entry(1, TODAY_2PM + HOUR_MS)], [], TODAY_2PM)).toEqual([]);
   });
 

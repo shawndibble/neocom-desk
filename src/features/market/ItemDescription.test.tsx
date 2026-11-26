@@ -4,7 +4,6 @@ import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { ItemDescription } from './ItemDescription';
 
-/** jsdom lays nothing out; stand in a clamped paragraph taller than its box. */
 function stubOverflow(scrollHeight: number, clientHeight: number) {
   vi.spyOn(HTMLElement.prototype, 'scrollHeight', 'get').mockReturnValue(scrollHeight);
   vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(clientHeight);

@@ -1,10 +1,3 @@
-/**
- * The compose box's own behaviour, with the ESI send, draft store, contacts
- * and recipient search all mocked. `engine/mail.test.ts` owns the
- * reply-all/quoting/prefixing logic itself — what matters here is that this
- * component wires it up: which defaults populate, which chip is pinned,
- * what a Send click actually calls.
- */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { act, render, screen, waitFor, fireEvent, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -143,7 +136,6 @@ describe('Reply defaults', () => {
 
     await screen.findByText('Sender Sal');
     expect(screen.getByText('CC Cara')).toBeInTheDocument();
-    // The reading character itself (id CHAR_ID) is excluded from reply-all.
     expect(screen.queryByText('Unknown')).not.toBeInTheDocument();
 
     expect(screen.queryByRole('button', { name: 'Remove Sender Sal' })).not.toBeInTheDocument();
@@ -155,7 +147,6 @@ describe('Reply defaults', () => {
     await screen.findByText('Sender Sal');
 
     expect(screen.getByLabelText('Subject')).toHaveValue('RE: Ratting fleet up');
-    // The quote is folded out of the editor, where the pilot types above it.
     expect(screen.getByLabelText('Message')).toHaveValue('');
     expect(screen.queryByText(/Original body text/)).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: /Show quoted text/ }));
@@ -339,7 +330,6 @@ describe('a saved draft', () => {
     const user = userEvent.setup();
     renderBox('reply');
 
-    // Reply-all defaults haven't landed yet — loadDraft is still pending.
     expect(screen.getByLabelText('Subject')).toHaveValue('');
     await user.type(screen.getByLabelText('Subject'), 'My own subject');
 
@@ -470,7 +460,6 @@ describe('sending', () => {
     await user.click(send);
     expect(sendMail).not.toHaveBeenCalled();
     expect(screen.getByText('Your draft is saved.')).toBeInTheDocument();
-    // Local actions are untouched: the draft fields still take input.
     expect(screen.getByLabelText('Subject')).toBeEnabled();
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeEnabled();
   });

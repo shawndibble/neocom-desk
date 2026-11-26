@@ -70,14 +70,11 @@ async function openGallery({
   render(<Host initial={initial} board={board} />);
   await user.click(screen.getByRole('button', { name: 'Add widget' }));
   const dialog = await screen.findByRole('dialog', { name: 'Add a widget' });
-  // A desktop opens in Browse all; most cases here are about the drawer, one Quick add away.
   if (!isPhone && !wide)
     await user.click(within(dialog).getByRole('button', { name: 'Quick add' }));
   return { user, dialog };
 }
 
-// One input event for the whole string: `user.type` re-renders every card's
-// preview once per keystroke, which is the cost, not the thing under test.
 async function enter(user: ReturnType<typeof userEvent.setup>, field: HTMLElement, text: string) {
   await user.click(field);
   await user.paste(text);
@@ -88,8 +85,6 @@ const itemOf = (dialog: HTMLElement, title: string) =>
 
 const SUBTITLE = '3 on your Overview';
 
-// The worker's first Gallery render is cold (lazy previews, i18n, React
-// warm-up) and would land on the first test; pay it once here.
 beforeAll(async () => {
   await openGallery();
   cleanup();
@@ -116,7 +111,6 @@ describe('Gallery', () => {
       'Combat and raids',
       'Messages and schedule',
     ]);
-    // A category on its own is one flat list: no headings.
     await user.click(within(dialog).getByRole('button', { name: /^Character/ }));
     expect(within(dialog).queryAllByRole('heading', { level: 3 })).toHaveLength(0);
     expect(within(dialog).getByText('Training')).toBeInTheDocument();
@@ -167,7 +161,6 @@ describe('Gallery', () => {
     expect(
       within(item).getByRole('button', { name: 'Add another Open orders' })
     ).toBeInTheDocument();
-    // The drawer stays open on a desktop.
     expect(screen.getByRole('dialog', { name: 'Add a widget' })).toBeInTheDocument();
   });
 
@@ -178,12 +171,10 @@ describe('Gallery', () => {
     }
     await user.click(within(dialog).getByRole('button', { name: 'Add PLEX price' }));
     expect(within(itemOf(dialog, 'PLEX price')).getByRole('status')).toHaveTextContent('Added');
-    // The plain card counts the widget (it is an Item prices widget) but can still add a plain one.
     const plain = itemOf(dialog, 'Item prices');
     expect(
       within(plain).getByRole('button', { name: 'Add another Item prices' })
     ).toBeInTheDocument();
-    // A second add of the same preset is allowed.
     await user.click(within(dialog).getByRole('button', { name: 'Add PLEX price' }));
   });
 
@@ -208,7 +199,6 @@ describe('Gallery', () => {
       view: 'chart',
       size: 'M',
     });
-    // A Show names its widget itself: no stored title.
     expect('title' in widgets.at(-1)!).toBe(false);
   });
 
@@ -246,7 +236,6 @@ describe('Gallery', () => {
 
   it('counts a kind added again once the confirmation fades', async () => {
     const { dialog } = await openGallery();
-    // Only the confirmation's timer is faked, and installed after the dialog is open.
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     try {
       fireEvent.click(within(dialog).getByRole('button', { name: 'Add another Mail' }));

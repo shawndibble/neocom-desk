@@ -28,9 +28,6 @@ vi.mock('@/app/loginFlow', () => ({ beginEveLogin: vi.fn().mockResolvedValue(und
 const loadCharacterSkillQueue =
   vi.fn<(characterId: number) => Promise<CachedResult<SkillQueueEntry[]> | null>>();
 
-// Skills to buy prices its list at the hub: Skill A (10) sells for 1.5M, Skill B
-// (20) has no sell orders, so the row's total and its "without a price" note
-// both have something to say.
 vi.mock('@/market/prices', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/market/prices')>()),
   getHubPricesWithStatus: vi.fn(async (_hub: unknown, ids: readonly number[]) => ({
@@ -67,10 +64,6 @@ function skill(overrides: Partial<SkillType> & Pick<SkillType, 'typeID' | 'name'
   };
 }
 
-// Two independent, single-level skills in different attribute pairs so
-// suggestReorder (which groups by priority then attribute pair) actually
-// changes the order: the 'high' priority Skill B group sorts before the
-// 'normal' priority Skill A group.
 const SKILLS: SkillType[] = [
   skill({ typeID: 10, name: 'Skill A', primaryAttr: 'intelligence', secondaryAttr: 'memory' }),
   skill({ typeID: 20, name: 'Skill B', primaryAttr: 'perception', secondaryAttr: 'willpower' }),
@@ -107,8 +100,6 @@ const ATTRIBUTES: Attributes = {
 };
 const IMPLANTS: Implants = {};
 
-// ESI's own reading, distinct from ATTRIBUTES above (the scheduler's base
-// sheet) so a test can tell which one the tools pane put on screen.
 const ATTRIBUTES_RESULT: CachedResult<CharacterAttributes> = {
   data: { intelligence: 24, memory: 23, perception: 22, willpower: 25, charisma: 21 },
   fetchedAt: new Date('2025-01-01T00:00:00Z'),
@@ -129,22 +120,11 @@ const PLAN: SkillPlanRecord = {
   updatedAt: 0,
 };
 
-/**
- * `PlanEditor` is a controlled component: everything it persists — entries,
- * markers, the remap count, and the two lenses the plan is costed under
- * (What-If Implants, Booster) — lives on the `plan` prop, and an edit is a
- * patch the owner writes back. The route does that through Dexie, and the
- * updated record returns via `useLiveQuery`; this harness does the same
- * synchronously, so a control the user just moved reads back the way it does
- * in the app instead of snapping to a frozen prop.
- */
 function renderEditor(
   onUpdate = vi.fn(),
   overrides: Partial<ComponentProps<typeof PlanEditor>> = {}
 ) {
   const { plan: initialPlan = PLAN, ...rest } = overrides;
-  // Stands in for a write landing from elsewhere (another device's sync),
-  // which can change the plan while one of this editor's Modals is open.
   const control: { replacePlan?: (next: (current: SkillPlanRecord) => SkillPlanRecord) => void } =
     {};
 
@@ -153,10 +133,6 @@ function renderEditor(
     useEffect(() => {
       control.replacePlan = setPlan;
     }, []);
-    // Stands in for the route's PageHeader actions slot: PlanEditor portals
-    // Import/Export into it, so a test needs a mounted node to portal into
-    // (queries still find the portaled content — Testing Library's `screen`
-    // queries `document.body`, not this component's own subtree).
     const [headerActionsEl, setHeaderActionsEl] = useState<HTMLDivElement | null>(null);
     return (
       <>
@@ -174,10 +150,6 @@ function renderEditor(
           listPane={<div data-testid="plan-list-pane" />}
           headerActionsContainer={headerActionsEl}
           {...rest}
-          // After the spread, not before: the write-back is this harness's
-          // whole point, and an `overrides.onUpdate` would otherwise turn it
-          // off silently. Tests observe the patches through the `onUpdate` spy
-          // this closes over instead.
           onUpdate={(patch) => {
             onUpdate(patch);
             setPlan((current) => ({ ...current, ...patch, updatedAt: current.updatedAt + 1 }));
@@ -200,34 +172,24 @@ function renderEditor(
   };
 }
 
-/** Exposes wherever `navigate()` lands, for the Market cross-link tests below. */
 function LocationProbe() {
   const location = useLocation();
   return <div data-testid="location-probe">{location.pathname + location.search}</div>;
 }
 
-/** The five per-slot What-If inputs, in INT/MEM/PER/WIL/CHA order. */
 function bonusInputValues(): string[] {
   return ['Intelligence', 'Memory', 'Perception', 'Willpower', 'Charisma'].map(
     (attribute) => screen.getByLabelText<HTMLInputElement>(`${attribute} implant bonus`).value
   );
 }
 
-/** Open the What-If Implants picker and choose an option by name. */
 async function chooseWhatIf(user: ReturnType<typeof userEvent.setup>, option: string) {
   await user.click(screen.getByRole('combobox', { name: 'What-if implants' }));
   await user.click(await screen.findByRole('option', { name: option }));
 }
 
-/** A clone wearing an unmatched set — the case a uniform "+N" cannot say. */
 const FITTED: Implants = { perception: 4, memory: 3 };
 
-/**
- * jsdom's default `window.matchMedia` (vitest.setup.ts) never matches, so
- * every test here runs below `lg` unless it opts in — which is where the
- * tools pane is a collapsed disclosure.
- */
-/** Import > From skill queue: the header's Import menu, then its queue item. */
 async function importFromQueue(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByRole('button', { name: 'Import' }));
   await user.click(screen.getByRole('menuitem', { name: 'From skill queue' }));
@@ -237,37 +199,25 @@ async function openTools(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByRole('button', { name: /plan tools/i }));
 }
 
-/**
- * The Assumptions disclosure (Alpha, What-if implants, Booster, Skill
- * injectors) is closed by default, one level inside Plan tools.
- */
 async function openAssumptions(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByRole('button', { name: /^assumptions/i }));
 }
 
-/** Opens the Actions section's "Optimize" dropdown and clicks one of its mode items (#1411). */
 async function clickOptimizeMode(user: ReturnType<typeof userEvent.setup>, name: string) {
   await user.click(screen.getByRole('button', { name: 'Optimize' }));
   await user.click(screen.getByRole('menuitem', { name }));
 }
 
-/**
- * The tools-pane section a heading titles. `closest('section')`, not
- * `parentElement`: a heading now shares a flex row with its section's
- * optional right-aligned actions (the Attributes section's `DataAgeBadge`).
- */
 function sectionFor(title: string): HTMLElement {
   const section = screen.getByRole('heading', { name: title }).closest('section');
   if (!section) throw new Error(`expected a section for "${title}"`);
   return section as HTMLElement;
 }
 
-/** Runs `body` with `matchMedia` reporting a `lg`+ viewport, which lasts to the end of the test. */
 function withDesktopViewport(body: () => void) {
   stubViewport(() => true);
   body();
 }
-// A typed-in accelerator lives in Dexie (shared with the Characters table), so one test's must not leak into the next.
 beforeEach(async () => {
   await db.characterAccelerators.clear();
 });
@@ -293,16 +243,11 @@ describe('PlanEditor tools pane', () => {
     const actions = sectionFor('Actions');
     const attributesSection = sectionFor('Attributes');
 
-    // Actions: one Optimize dropdown plus Add remap marker — the three
-    // separate mode buttons (#1411) are gone.
     expect(within(actions).getByRole('button', { name: 'Optimize' })).toBeInTheDocument();
     expect(within(actions).getByRole('button', { name: 'Add remap marker' })).toBeInTheDocument();
     for (const name of ['Optimize remaps', 'Optimize at my markers', 'Suggest reorder']) {
       expect(within(actions).queryByRole('button', { name })).toBeNull();
     }
-    // No free-typed remap count: with no ESI attributes (this harness's
-    // default `remapInfo={null}`), the read-only summary falls back to the
-    // plan's stored `remapCount`.
     expect(within(actions).getByText(/^Remaps: 1 /)).toBeInTheDocument();
 
     await user.click(within(actions).getByRole('button', { name: 'Optimize' }));
@@ -317,19 +262,11 @@ describe('PlanEditor tools pane', () => {
     }
     await user.keyboard('{Escape}');
 
-    // Attributes: the sheet every estimate is costed against, then the two
-    // what-if lenses over it — which change the numbers, not the plan.
     expect(within(attributesSection).getByText('INT')).toBeInTheDocument();
-    // The lenses live one level in, under the closed-by-default Assumptions
-    // row, not in the Attributes section.
     expect(within(attributesSection).queryByLabelText('What-if implants')).toBeNull();
     expect(screen.getByLabelText('What-if implants')).toBeInTheDocument();
-    // No accelerator configured, so the Booster section is its empty state:
-    // just the affordance to add one.
     expect(screen.getByRole('button', { name: 'Add accelerator' })).toBeInTheDocument();
 
-    // Import/Export: plan-level file operations, now icon buttons portaled
-    // into the route's page header rather than a tools-pane section.
     for (const name of ['Import', 'Export']) {
       expect(screen.getByRole('button', { name })).toBeInTheDocument();
       expect(within(actions).queryByRole('button', { name })).toBeNull();
@@ -343,8 +280,6 @@ describe('PlanEditor tools pane', () => {
 
     for (const name of ['Optimize', 'Add remap marker']) {
       const button = screen.getByRole('button', { name });
-      // The visible label *is* the accessible name — no aria-label standing in
-      // for a glyph, as the icon-only mobile strip (#224) used to need.
       expect(button).not.toHaveAttribute('aria-label');
       expect(button.textContent).toBe(name);
       expect(button.className).toContain('w-full');
@@ -357,7 +292,6 @@ describe('PlanEditor tools pane', () => {
 
     for (const name of ['Import', 'Export']) {
       const button = screen.getByRole('button', { name });
-      // A visible text label, not an aria-label standing in for a glyph.
       expect(button).not.toHaveAttribute('aria-label');
       expect(button.textContent).toBe(name);
     }
@@ -439,8 +373,6 @@ describe('PlanEditor tools pane', () => {
   it('keeps the entry list out of the tools pane, so the plan itself stays the main column', () => {
     renderEditor();
 
-    // Collapsed on a narrow viewport, the tools cost a single row and the
-    // entry list is still rendered and reachable without expanding anything.
     expect(screen.getByRole('button', { name: /plan tools/i })).toHaveAttribute(
       'aria-expanded',
       'false'
@@ -554,15 +486,10 @@ describe('PlanEditor tools pane', () => {
     const dialog = screen.getByRole('dialog', { name: 'Optimize remaps' });
     expect(within(dialog).getByText(/^Remapping saves/)).toBeInTheDocument();
     expect(within(dialog).getByText('Segment 1')).toBeInTheDocument();
-    // The beside-the-button confirmation (#222) still fires alongside the
-    // Modal, same as "Suggest reorder"'s toast + Modal pairing.
     expect(within(sectionFor('Actions')).getByRole('status')).toHaveTextContent(/^Saves/);
 
     await user.click(within(dialog).getByRole('button', { name: 'Accept' }));
 
-    // Skill A (intelligence/memory) and Skill B (perception/willpower) are
-    // different pairs, so a single remap is worth spending on the second —
-    // the marker lands right before it, at entry-list position 1.
     expect(onUpdate).toHaveBeenCalledWith({ markers: [1], markerAttributes: [] });
     expect(screen.queryByRole('dialog')).toBeNull();
   });
@@ -618,15 +545,11 @@ describe('PlanEditor tools pane', () => {
     await clickOptimizeMode(user, 'Optimize for me');
 
     const dialog = screen.getByRole('dialog', { name: 'Optimize for me' });
-    // The new order, same as "Suggest reorder"'s own preview: high-priority
-    // Skill B first.
-    // Each skill shows once in Current and once in Optimized.
     expect(within(dialog).getAllByText('Skill B I')).toHaveLength(2);
     expect(within(dialog).getAllByText('Skill A I')).toHaveLength(2);
     expect(within(dialog).getByText(/^Total /)).toBeInTheDocument();
     expect(within(dialog).getByText(/^Current · /)).toBeInTheDocument();
     expect(within(dialog).getByText(/^Optimized · /)).toBeInTheDocument();
-    // Skill B jumps ahead of Skill A: Current says where it goes, Optimized says it moved up.
     expect(within(dialog).getByText('moves to 1')).toBeInTheDocument();
     expect(within(dialog).getByText('Moved up 1 place')).toBeInTheDocument();
 
@@ -634,13 +557,10 @@ describe('PlanEditor tools pane', () => {
 
     expect(onUpdate).toHaveBeenCalledTimes(1);
     const [patch] = onUpdate.mock.calls[0];
-    // The reorder half, same result "Suggest reorder" alone produces.
     expect(patch.entries).toEqual([
       { skillTypeID: 20, targetLevel: 1, priority: 'high' },
       { skillTypeID: 10, targetLevel: 1 },
     ]);
-    // The remap half: one marker placed against the reordered entries, not
-    // the plan's original order.
     expect(Array.isArray(patch.markers)).toBe(true);
     expect(patch.markerAttributes).toEqual([]);
     expect(screen.queryByRole('dialog')).toBeNull();
@@ -648,7 +568,6 @@ describe('PlanEditor tools pane', () => {
 
   it('"Optimize for me" says there is nothing to gain instead of listing a reshuffle that saves no time', async () => {
     const user = userEvent.setup();
-    // One skill, on a sheet already remapped for its attributes: no order or remap helps.
     const plan = { ...PLAN, entries: [{ skillTypeID: 10, targetLevel: 1 }] };
     const attributes: Attributes = {
       intelligence: 27,
@@ -722,10 +641,6 @@ describe('PlanEditor tools pane', () => {
     const dialog = screen.getByRole('dialog', { name: 'Optimize remaps' });
     await user.click(within(dialog).getByRole('button', { name: 'Accept' }));
 
-    // remapInstruction's own format: five "XXX N" terms joined by " / ",
-    // which only a marker row's attribute spread renders — asserting it
-    // appeared here means the row already gave way to the spread instead of
-    // sitting on the plain divider until a second, separate optimize click.
     const entriesPanel = screen.getByRole('heading', { name: 'Your entries' }).closest('section')!;
     expect(
       within(entriesPanel).getByText(/^([A-Z]{3} \d+)( \/ [A-Z]{3} \d+){4}$/)
@@ -756,10 +671,6 @@ describe('PlanEditor tools pane', () => {
   });
 
   it("costs the plan's total training time and finish date per marker segment, not just the savings badge (#1232)", async () => {
-    // Skill A (intelligence/memory) trains on the flat attributes either way.
-    // Skill B (perception/willpower) sits after a marker with a manual
-    // override favouring perception, so it must train faster than a flat
-    // read of ATTRIBUTES would give it — and the header total must show that.
     const override: Attributes = {
       intelligence: 19,
       memory: 19,
@@ -770,8 +681,6 @@ describe('PlanEditor tools pane', () => {
     renderEditor(vi.fn(), {
       plan: { ...PLAN, markers: [1], markerAttributes: [override] },
     });
-    // A: 250 SP at 20 + 20/2 = 30 SP/min -> 500s. B: 250 SP at 27 + 21/2 =
-    // 37.5 SP/min -> 400s. Total 900s = 15m, not the flat-attributes 1000s = 16m40s.
     const summary = screen.getAllByText('Projected finish')[0].closest('section')!;
     expect(within(summary).getByText('15m')).toBeInTheDocument();
     expect(within(summary).queryByText('16m')).not.toBeInTheDocument();
@@ -784,9 +693,6 @@ describe('PlanEditor tools pane', () => {
     await openTools(user);
 
     expect(screen.queryByRole('dialog')).toBeNull();
-    // Standing, before any click: a plan carrying a marker says what that
-    // marker saves without being asked. The Modal below is where the spread
-    // is accepted, not where the figure is first disclosed.
     expect(within(sectionFor('Actions')).getByText(/^Saves/)).toBeInTheDocument();
 
     await clickOptimizeMode(user, 'Use my remap markers');
@@ -797,8 +703,6 @@ describe('PlanEditor tools pane', () => {
 
     await user.click(within(dialog).getByRole('button', { name: 'Accept' }));
 
-    // The plan's own marker (position 1) round-trips back through the same
-    // segments-to-markers conversion "Optimize remaps" uses.
     expect(onUpdate).toHaveBeenCalledWith({ markers: [1], markerAttributes: [] });
     expect(screen.queryByRole('dialog')).toBeNull();
   });
@@ -819,7 +723,6 @@ describe('PlanEditor tools pane', () => {
 
   it('opens the Optimize at my markers Modal even with no savings, offering only Close', async () => {
     const user = userEvent.setup();
-    // A marker at the very end of the entry list delimits nothing to remap.
     const { onUpdate } = renderEditor(vi.fn(), {
       plan: { ...PLAN, markers: [PLAN.entries.length] },
     });
@@ -842,20 +745,12 @@ describe('PlanEditor tools pane', () => {
   });
 
   it("shows a marker's target attributes on first mount too, not only after an explicit optimize click", () => {
-    // A plan reopened fresh (a reload, or the plan synced onto another
-    // device) has no in-memory "Optimize at my markers" result yet — the
-    // marker's attributes must still resolve from `plan.markers` itself, not
-    // sit on the plain divider until that button is clicked once by hand.
     renderEditor(vi.fn(), { plan: { ...PLAN, markers: [1] } });
 
     expect(screen.getByText(/^([A-Z]{3} \d+)( \/ [A-Z]{3} \d+){4}$/)).toBeInTheDocument();
   });
 
   describe('manual remap marker attributes', () => {
-    // Sums to 99 (17+17+27+21+17), unlike the module's default ATTRIBUTES
-    // fixture (20 x 5 = 100) — legal from the moment the modal opens, so
-    // Save doesn't start disabled and these tests aren't also exercising the
-    // allocator's clamping (RemapMarkerModal.test.tsx already covers that).
     const LEGAL_ATTRIBUTES: Attributes = {
       intelligence: 17,
       memory: 17,
@@ -864,13 +759,6 @@ describe('PlanEditor tools pane', () => {
       charisma: 17,
     };
 
-    // Position 2 == PLAN.entries.length: a marker after the last entry, same
-    // as "Add remap marker" places one. optimizeAtMarkers gives that trailing
-    // position no segment to remap (nothing follows it to speed up), so the
-    // row starts on the plain "Remap marker" divider — the case a manual
-    // override actually has something to add, unlike a marker mid-plan,
-    // which the sibling describe block above already shows resolving to a
-    // computed spread on its own.
     it('opens the editor seeded from the base sheet for a marker nothing has set yet, and Save persists the override', async () => {
       const user = userEvent.setup();
       const { onUpdate } = renderEditor(vi.fn(), {
@@ -882,9 +770,6 @@ describe('PlanEditor tools pane', () => {
       const dialog = screen.getByRole('dialog', { name: 'Remap marker attributes' });
       expect(within(dialog).getByLabelText('Perception')).toHaveValue(27);
 
-      // Intelligence and memory both sit at the 17 floor already, so the 3
-      // points intelligence gains have to come off willpower (21), the only
-      // other attribute with room above the floor.
       const intelligence = within(dialog).getByLabelText<HTMLInputElement>('Intelligence');
       const willpower = within(dialog).getByLabelText<HTMLInputElement>('Willpower');
       await user.clear(intelligence);
@@ -900,7 +785,6 @@ describe('PlanEditor tools pane', () => {
         ],
       });
       expect(screen.queryByRole('dialog')).toBeNull();
-      // The label is gone now that this marker has a spread to show instead.
       expect(screen.queryByText('Remap marker')).not.toBeInTheDocument();
       expect(screen.getByText('PER 27 / INT 20 / WIL 18 / MEM 17 / CHA 17')).toBeInTheDocument();
     });
@@ -928,7 +812,6 @@ describe('PlanEditor tools pane', () => {
         attributes: LEGAL_ATTRIBUTES,
       });
 
-      // The override already renders as the marker's spread, not the divider.
       expect(screen.getByText('PER 27 / WIL 21 / INT 17 / MEM 17 / CHA 17')).toBeInTheDocument();
       await user.click(
         screen.getByRole('button', { name: 'PER 27 / WIL 21 / INT 17 / MEM 17 / CHA 17' })
@@ -938,20 +821,11 @@ describe('PlanEditor tools pane', () => {
 
       await user.click(within(dialog).getByRole('button', { name: 'Clear override' }));
       expect(onUpdate).toHaveBeenCalledWith({ markerAttributes: [null] });
-      // No optimizer result covers this marker, so clearing the override
-      // drops it back to the plain divider rather than a different spread.
       expect(screen.getByText('Remap marker')).toBeInTheDocument();
     });
   });
 
   it('gives two markers that delimit the same optimizer step the same attribute display, not one shifted onto the wrong segment', async () => {
-    // Skill C sits between markers 0 and 1 already trained to its target
-    // level, so it contributes zero steps: entry positions 1 (before C) and
-    // 2 (before B) land on the identical step index, which optimizeAtMarkers
-    // dedupes into one remap segment. Marker 2 (before D) is a later,
-    // distinct step. Indexing the remapped segments by marker ordinal
-    // (rather than by the step index each marker actually sits at) would
-    // read marker 1 off the wrong (D's) segment and leave marker 2 with none.
     const localSkills: SkillType[] = [
       skill({ typeID: 10, name: 'Skill A', primaryAttr: 'intelligence', secondaryAttr: 'memory' }),
       skill({ typeID: 30, name: 'Skill C', primaryAttr: 'intelligence', secondaryAttr: 'memory' }),
@@ -999,9 +873,6 @@ describe('PlanEditor tools pane', () => {
 
     await clickOptimizeMode(user, 'Use my remap markers');
 
-    // remapInstruction's own format: five "XXX N" terms joined by " / ",
-    // which only a marker row's attribute spread (never an attribute-pair
-    // badge or a band header) matches.
     const entriesPanel = screen.getByRole('heading', { name: 'Your entries' }).closest('section')!;
     const attributeTexts = within(entriesPanel)
       .getAllByText(/^([A-Z]{3} \d+)( \/ [A-Z]{3} \d+){4}$/)
@@ -1013,16 +884,6 @@ describe('PlanEditor tools pane', () => {
   });
 });
 
-/**
- * Regression for a real report: "Optimize for me" placed two Remap Markers
- * one skill apart with identical target attributes — a wasted remap. Skill B
- * needs Skill A at II, but B isn't itself perception/willpower, so
- * `suggestReorder` can separate A's implicit prereq steps from B's own step
- * in an order no entry list can represent (prereqs always expand next to
- * their dependent). `placeRemaps` then costed a two-remap split that could
- * never be saved as proposed, and the entry-snap it forces at Accept can
- * re-price the second segment onto the same spread as the first.
- */
 describe('"Optimize for me" never previews or writes a redundant remap (real report)', () => {
   const PW_SKILLS: SkillType[] = [
     skill({
@@ -1072,9 +933,6 @@ describe('"Optimize for me" never previews or writes a redundant remap (real rep
     id: 'plan-pw',
     characterId: 1,
     name: 'PW plan',
-    // One row per level already (reorder.ts's rule) — a single "I-V" entry
-    // would trip the plan's own one-time auto-split effect and fire an extra
-    // onUpdate this test isn't about.
     entries: [
       { skillTypeID: 42, targetLevel: 1 },
       { skillTypeID: 43, targetLevel: 1 },
@@ -1096,15 +954,12 @@ describe('"Optimize for me" never previews or writes a redundant remap (real rep
     await clickOptimizeMode(user, 'Optimize for me');
 
     const dialog = screen.getByRole('dialog', { name: 'Optimize for me' });
-    // The whole point of the fix: a second segment that would just repeat
-    // the first's spread never gets previewed as a real second remap.
     expect(within(dialog).getAllByText('New remap marker.')).toHaveLength(1);
 
     await user.click(within(dialog).getByRole('button', { name: 'Accept' }));
 
     expect(onUpdate).toHaveBeenCalledTimes(1);
     const [patch] = onUpdate.mock.calls[0];
-    // Exactly what the preview showed — one marker, not two.
     expect(patch.markers).toHaveLength(1);
   });
 });
@@ -1144,12 +999,8 @@ describe('PlanEditor tools pane placement', () => {
 
     const toggle = screen.getByRole('button', { name: /plan tools/i });
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
-    // Nothing inside the tools pane is mounted while collapsed — the whole
-    // tool set costs one row, where it used to cost three panels.
     expect(screen.queryByRole('button', { name: 'Optimize' })).toBeNull();
     expect(screen.queryByLabelText('What-if implants')).toBeNull();
-    // Import/Export portals to the page header, not the tools pane — on
-    // screen regardless of the disclosure's state.
     expect(screen.getByRole('button', { name: 'Import' })).toBeInTheDocument();
   });
 
@@ -1157,8 +1008,6 @@ describe('PlanEditor tools pane placement', () => {
     withDesktopViewport(() => {
       renderEditor();
 
-      // No disclosure toggle at all: the sidebar has the room, so the tools
-      // are simply there.
       expect(screen.queryByRole('button', { name: /^plan tools$/i })).toBeNull();
       expect(screen.getByRole('heading', { name: 'Plan tools' })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Optimize' })).toBeInTheDocument();
@@ -1179,7 +1028,6 @@ describe('PlanEditor Assumptions disclosure', () => {
     const toggle = screen.getByRole('button', { name: /^assumptions/i });
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
     expect(toggle).toHaveTextContent('Defaults');
-    // Closed: none of the four blocks it holds is mounted.
     expect(screen.queryByLabelText('Alpha clone')).toBeNull();
     expect(screen.queryByLabelText('What-if implants')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Add accelerator' })).toBeNull();
@@ -1217,8 +1065,6 @@ describe('PlanEditor Assumptions disclosure', () => {
 
   it('does not claim an Accelerator the scheduler is not applying', async () => {
     const user = userEvent.setup();
-    // A detected in-game accelerator prefills a row with no expiry, which is
-    // costed as none; the closed row must not say otherwise.
     renderEditor(vi.fn(), {
       attributeBaseline: {
         kind: 'accelerated',
@@ -1256,14 +1102,12 @@ describe('PlanEditor Skills to buy placement', () => {
     const user = userEvent.setup();
     renderEditor();
 
-    // Plan tools stays collapsed; the row is on screen anyway.
     expect(screen.getByRole('button', { name: /plan tools/i })).toHaveAttribute(
       'aria-expanded',
       'false'
     );
     const row = await screen.findByRole('button', { name: /^skills to buy.*1\.5M ISK/i });
     expect(row).toHaveAttribute('aria-expanded', 'false');
-    // Closed, the row says how complete that total is.
     expect(screen.getByText('1 priced · 1 without a price')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /copy multibuy list/i })).toBeNull();
 
@@ -1274,7 +1118,6 @@ describe('PlanEditor Skills to buy placement', () => {
     expect(
       screen.getByText('1 skill without a price is left out of the total.')
     ).toBeInTheDocument();
-    // Plan tools is untouched, and holds no second copy of the list.
     expect(screen.getByRole('button', { name: /plan tools/i })).toHaveAttribute(
       'aria-expanded',
       'false'
@@ -1301,9 +1144,6 @@ describe('PlanEditor: the attributes every estimate is costed against', () => {
     expect(within(section).getByText('INT')).toBeInTheDocument();
     expect(within(section).getByText('24')).toBeInTheDocument();
     expect(within(section).getByText('25')).toBeInTheDocument();
-    // `attributes` (what computeSchedule runs on) is all 20s here, and falls
-    // back to placeholder numbers when ESI can't be read — presenting it as
-    // the character's own sheet is exactly the mistake to avoid.
     expect(within(section).queryByText('20')).toBeNull();
   });
 
@@ -1334,9 +1174,6 @@ describe('PlanEditor: the attributes every estimate is costed against', () => {
     await user.click(screen.getByRole('combobox', { name: 'What-if implants' }));
     await user.click(await screen.findByRole('option', { name: '+5' }));
 
-    // The lens re-costs the plan; it does not rewrite the character. "Current
-    // attributes" has to keep meaning current, or the page has no honest
-    // reading of the pilot left on it.
     expect(within(section).getByText('22 base + 3 implant = 25')).toBeInTheDocument();
   });
 
@@ -1368,8 +1205,6 @@ describe('PlanEditor: the attributes every estimate is costed against', () => {
       'aria-expanded',
       'false'
     );
-    // No second always-open block above the entry list — the plan still leads
-    // the page, and the attributes cost the same one tap as every other tool.
     expect(screen.queryByRole('heading', { name: 'Attributes' })).toBeNull();
     expect(screen.queryByText('INT')).toBeNull();
   });
@@ -1383,15 +1218,12 @@ describe('PlanEditor: the attributes every estimate is costed against', () => {
       const section = within(sidebar).getByRole('heading', { name: 'Attributes' });
       expect(section).toBeInTheDocument();
       expect(within(sidebar).getByText('24')).toBeInTheDocument();
-      // Still one tools panel, not a fourth peer panel beside it.
       expect(within(sidebar).getAllByRole('heading', { name: 'Plan tools' })).toHaveLength(1);
     });
   });
 });
 
 describe('PlanEditor prereq promotion', () => {
-  // Skill D needs Skill A at II, so a plan holding only D renders two dimmed
-  // prereq rows (A I, A II) ahead of it.
   const PREREQ_SKILLS: SkillType[] = [
     SKILLS[0],
     skill({ typeID: 40, name: 'Skill D', prereqs: [{ skillTypeID: 10, level: 2 }] }),
@@ -1454,7 +1286,6 @@ describe('PlanEditor prereq promotion', () => {
 });
 
 describe('PlanEditor grouping toggle (#115)', () => {
-  // The pick is a device-wide setting, so one test's regrouping must not leak into the next.
   beforeEach(() => {
     useGroupingMode.setState({ value: DEFAULT_GROUPING_MODE, hydrated: false });
   });
@@ -1523,12 +1354,6 @@ describe('PlanEditor what-if implants', () => {
     await openAssumptions(user);
     await chooseWhatIf(user, 'Custom');
 
-    // Measured: five fields across a 294px sidebar leaves a 29.6px content
-    // box each, and Chrome's hover/focus spin buttons take about half of it
-    // and shove the digit left — so the hovered cell falls out of alignment
-    // with the other four. jsdom has no layout, so the class is the only
-    // thing a unit test can hold on to; the rule and the reasoning are in
-    // src/styles/index.css.
     for (const attribute of ['Intelligence', 'Memory', 'Perception', 'Willpower', 'Charisma']) {
       expect(screen.getByLabelText(`${attribute} implant bonus`)).toHaveClass('field-no-spinner');
     }
@@ -1683,14 +1508,6 @@ describe('PlanEditor booster market link (issue #407)', () => {
   });
 });
 
-/**
- * A cerebral accelerator is baked into the attributes ESI reports and comes
- * back out arithmetically (`engine/attributeBaseline.ts`). What the editor
- * owes the user is legibility: the correction is prefilled into the Booster
- * control they already know, editable, and the one field the app cannot read —
- * the expiry — is called out rather than invented.
- */
-
 const seedAccelerator = (bonus: number, expiresAt: number) =>
   db.characterAccelerators.put({
     id: '1',
@@ -1713,7 +1530,6 @@ describe('a cerebral accelerator detected in the ESI sheet', () => {
     await openTools(user);
     await openAssumptions(user);
 
-    // Once, beside the heading: not again as a Bonus row.
     expect(screen.getByText('+12 detected')).toBeInTheDocument();
     expect(screen.queryByText('+12')).toBeNull();
     expect(screen.queryByLabelText('Bonus')).toBeNull();
@@ -1763,11 +1579,6 @@ describe('a cerebral accelerator detected in the ESI sheet', () => {
   });
 });
 
-/**
- * The lenses every number on this page is costed under are part of the plan,
- * not of the session: a plan reopened on a different lens quotes different
- * training times than the ones its owner left it showing.
- */
 describe('PlanEditor persists the lenses the plan is costed under', () => {
   it('saves a What-If Implants preset onto the plan', async () => {
     const user = userEvent.setup();
@@ -1822,7 +1633,6 @@ describe('PlanEditor persists the lenses the plan is costed under', () => {
     await user.click(screen.getByRole('button', { name: 'Add accelerator' }));
 
     expect(screen.getByLabelText('Days')).toBeInTheDocument();
-    // The accelerator belongs to the Character, never to the plan.
     expect(onUpdate).not.toHaveBeenCalled();
   });
 
@@ -1836,8 +1646,6 @@ describe('PlanEditor persists the lenses the plan is costed under', () => {
     const before = Date.now();
     await user.type(screen.getByLabelText('Days'), '3');
 
-    // An instant, because it syncs to devices that will read it later. It is the
-    // Character's accelerator now, not a plan row, so the Characters table sees it too.
     await waitFor(async () => {
       const saved = await db.characterAccelerators.get('1');
       expect(saved?.expiresAt).toBeGreaterThanOrEqual(before + 3 * DAY_MS);
@@ -1853,7 +1661,6 @@ describe('PlanEditor persists the lenses the plan is costed under', () => {
     await openTools(user);
     await openAssumptions(user);
 
-    // Set, the values read as text until clicked.
     expect(await screen.findByRole('button', { name: /^Edit bonus/ })).toHaveTextContent('6');
     expect(screen.getByRole('button', { name: /^Edit time left/ })).toHaveTextContent(
       /2d 5h \d+m$/
@@ -1861,7 +1668,6 @@ describe('PlanEditor persists the lenses the plan is costed under', () => {
   });
 
   it('does not erase a saved expiry when a box is cleared to be retyped', async () => {
-    // The data-loss path: emptying a box to retype it is not an answer.
     const user = userEvent.setup();
     await seedAccelerator(3, Date.now() + 5 * DAY_MS);
     renderEditor();
@@ -1931,10 +1737,6 @@ describe('PlanEditor persists the lenses the plan is costed under', () => {
 });
 
 describe('a character with no accelerator', () => {
-  // The normal state, and a total no-op: nothing stored, nothing detected, so
-  // the list is empty and only "Add accelerator" shows — the same as
-  // "detection fires on a clean sheet" would look, which is the way this fix
-  // breaks, hence asserting it on its own rather than as a corollary above.
   it.each([
     ['a legal sheet', { kind: 'legal' as const, attributes: ATTRIBUTES }],
     ['ESI not read yet', null],
@@ -1967,8 +1769,6 @@ describe('an attribute sheet nothing explains', () => {
 
     expect(screen.getByText(/attributes look wrong/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Copy debug info' })).toBeInTheDocument();
-    // No accelerator was recovered, so nothing is prefilled either — the
-    // list stays empty, same as the no-accelerator case above.
   });
 });
 
@@ -1976,20 +1776,12 @@ describe('splitting a plan into one row per level', () => {
   const MULTI_LEVEL = { ...PLAN, entries: [{ skillTypeID: 10, targetLevel: 3 }], markers: [1] };
 
   it('writes the split on open once the trained levels are known', async () => {
-    // What the split writes (rows, markers carried along) is splitByLevel's,
-    // tested in skillPlanEdit.test.ts; this only checks the editor fires it.
     const { onUpdate } = renderEditor(vi.fn(), { plan: MULTI_LEVEL });
 
     await waitFor(() => expect(onUpdate).toHaveBeenCalledTimes(1));
   });
 
   it("rewrites nothing until the character's trained levels are actually known", async () => {
-    // The empty map is also what stands in before /skills has been read at
-    // all — on a fresh device, offline with no cache, or with an expired
-    // token. Splitting against it cuts rows for levels the character already
-    // has, and those rows train nothing, so no later split can remove them:
-    // a correct plan would be rewritten into a permanently wrong one without
-    // the user touching anything.
     const { onUpdate } = renderEditor(vi.fn(), {
       plan: MULTI_LEVEL,
       trainedSkillsKnown: false,
@@ -2058,10 +1850,6 @@ describe('removing an entry (undo toast, no confirmation)', () => {
 
 describe('yearly remap on cooldown (#1404)', () => {
   it('shows the savings badge for a plan whose only remap is the on-cooldown yearly one', () => {
-    // The bug this regresses: 0 bonus remaps, yearly on cooldown, and the
-    // default plan.remapCount of 0 used to hide the badge entirely — even
-    // though the yearly remap, honoring its cooldown, has real savings to
-    // report.
     const remapInfo: RemapAvailability = {
       available: 0,
       bonus: 0,
@@ -2083,8 +1871,6 @@ describe('derived remap budget summary, no manual override (#1412)', () => {
       yearlyReady: true,
       cooldownUntil: null,
     };
-    // A stale stored value (5) the optimizer must not honor now that live
-    // ESI data is available — only the offline-fallback path reads it.
     renderEditor(vi.fn(), { plan: { ...PLAN, remapCount: 5 }, remapInfo });
     await openTools(user);
 
@@ -2171,7 +1957,6 @@ describe('queue import into a non-empty plan asks Append or Replace (#1402)', ()
     await screen.findByText(/in-game queue has 1 skill/i);
     await user.click(screen.getByRole('button', { name: 'Replace plan' }));
 
-    // Clearing the Remap Markers with it is replaceWithImport's (skillPlanEdit.test.ts).
     expect(onUpdate).toHaveBeenCalledWith(
       expect.objectContaining({ entries: [{ skillTypeID: 20, targetLevel: 3 }] })
     );
@@ -2191,8 +1976,6 @@ describe('queue import into a non-empty plan asks Append or Replace (#1402)', ()
 
     await user.click(screen.getByRole('button', { name: 'Undo' }));
 
-    // That the snapshot restores the plan exactly is replaceWithImport's
-    // (skillPlanEdit.test.ts); this checks Undo dispatches it.
     expect(onUpdate).toHaveBeenLastCalledWith(
       expect.objectContaining({ entries: originalPlan.entries })
     );
@@ -2225,9 +2008,6 @@ describe('queue import into a non-empty plan asks Append or Replace (#1402)', ()
     await screen.findByText(/in-game queue has 1 skill/i);
     await user.click(screen.getByRole('button', { name: 'Append' }));
 
-    // The Append confirmation must not carry the earlier Replace's Undo —
-    // clicking it would silently revert everything since, including this
-    // Append (#1402).
     expect(screen.queryByRole('button', { name: 'Undo' })).not.toBeInTheDocument();
   });
 
@@ -2261,9 +2041,6 @@ describe('queue import into a non-empty plan asks Append or Replace (#1402)', ()
 
     await importFromQueue(user);
 
-    // Switched to a different plan while the fetch for plan-1 is still in
-    // flight — this component has no key={plan.id} at the route, so the same
-    // instance stays mounted and just re-renders with new props.
     replacePlan(() => ({ ...PLAN, id: 'plan-2' }));
     onUpdate.mockClear();
 
@@ -2272,8 +2049,6 @@ describe('queue import into a non-empty plan asks Append or Replace (#1402)', ()
       await Promise.resolve();
     });
 
-    // Neither the choice Modal (which would let Append/Replace merge plan-1's
-    // fetch into plan-2's entries) nor any write ever lands (#1402).
     expect(screen.queryByText(/in-game queue has/i)).not.toBeInTheDocument();
     expect(onUpdate).not.toHaveBeenCalled();
   });
@@ -2282,18 +2057,14 @@ describe('queue import into a non-empty plan asks Append or Replace (#1402)', ()
 describe('Clone State (#1233)', () => {
   it('flags every level above the Alpha skill cap once the Character is set to Alpha', async () => {
     const user = userEvent.setup();
-    // Own Character id: the store is module-global, so this keeps the Alpha
-    // answer from leaking into any other test's Character.
     renderEditor(vi.fn(), { characterId: 1233 });
     await openTools(user);
     await openAssumptions(user);
 
-    // Omega by default: nothing is flagged.
     const toggle = screen.getByLabelText<HTMLInputElement>('Alpha clone');
     expect(toggle.checked).toBe(false);
     expect(screen.queryAllByRole('img', { name: 'Above the Alpha skill cap' })).toHaveLength(0);
 
-    // Neither fixture skill carries an Alpha cap, so both levels are flagged.
     await user.click(toggle);
     expect(toggle.checked).toBe(true);
     expect(screen.getAllByRole('img', { name: 'Above the Alpha skill cap' })).toHaveLength(2);
@@ -2318,7 +2089,6 @@ describe('Plan Milestones (GLOSSARY.md)', () => {
       milestones: [expect.objectContaining({ name: 'Fly Loki', skillTypeID: 10, level: 1 })],
     });
     expect(screen.queryByRole('dialog')).toBeNull();
-    // The row itself shows the badge, and the header promotes it to "next".
     expect(screen.getAllByText('Fly Loki').length).toBeGreaterThan(0);
   });
 

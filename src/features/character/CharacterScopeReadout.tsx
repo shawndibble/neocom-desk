@@ -1,13 +1,3 @@
-/**
- * The fixed form of the scope readout (issue #2846): says on screen whose
- * data a cross-Character surface shows, where the pilot cannot change it. Same
- * icon and words as the choosable form, which is `CharacterFilterControl`
- * (its label carries the same count) — unboxed here, because nothing is
- * clickable.
- *
- * `all` with `missing` names is the partial case: "All characters · 3 of 4"
- * plus a warning icon, and a tooltip naming who is left out.
- */
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { cx } from '@/lib/cx';
 import { useTranslation } from 'react-i18next';
@@ -21,10 +11,6 @@ export type CharacterScopeReadoutProps = (
   | { scope: 'corp'; division: string }
   | { scope: 'corporation'; name: string }
 ) & {
-  /**
-   * Just the glyph, with the words as its accessible name and tooltip: for a
-   * header with no room to spell the scope out (a Small widget's title bar).
-   */
   compact?: boolean;
 };
 

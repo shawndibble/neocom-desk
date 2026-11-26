@@ -3,7 +3,6 @@ import { Button, LiveStatus, Panel } from '@/components/ui';
 import { useApplyUpdate, useUpdateStatusLine } from './useUpdateState';
 import { ActionResult } from '@/features/settings/settingsFields';
 
-/** Settings → App & backup: the update state, then the button that applies it. */
 export function UpdatePanel() {
   const { t } = useTranslation();
   const { status, line } = useUpdateStatusLine();

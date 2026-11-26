@@ -84,58 +84,11 @@ import { caretColumn, dayColumns, paymentColumns } from './corpTaxBookColumns';
 import { MINING_PARAMS, MOONS_PARAMS, PHONE_GLOBALS, isk, queueCounts } from './corpTaxBookFormat';
 import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
 
-/**
- * Corp Tax Book, the merged option (#4056), built on option A after Shawn's
- * review of A, B and C.
- *
- * One story throughout: today is 18 Oct 2026 14:00 EVE, an officer synced the
- * book at 12:00 (2h ago), so every day through 17 Oct is Billable. The Aug
- * Late notices went out on 1 Sep (due 15 Sep); the Sep Late notices are about to
- * be sent; Oct is open.
- *
- * `/corp/moons` keeps D21's three tabs. Every drill-down is a page of its own
- * with a labelled crumb back, never an in-place expansion (a moon can have
- * dozens of miners):
- *
- * - **Extractions** leads with the chunk timeline; a timeline row or a table
- *   row opens the moon's page. A collapsed strip under the tabs carries the
- *   sync age and any loud gap in the records (D9).
- * - **Miners** puts the Needs you cards above the sortable Miners table; a row
- *   opens the Miner's page, which also carries the Miner's activity feed.
- * - **Dialogs** (steps 5 to 9): Dismiss, Record payment, Mark not tax on the
- *   Miner page, and Reject declaration and Assign a donation from Needs you.
- * - **Late notices** is a Check, Send, Done run that carries EVE's mail-limit
- *   notice; "Preview mail" opens the full per-line mail in a dialog. Write-offs
- *   (tolerance, lines recorded after payment) show under the periods table.
- * - The **progress chip** in the page header opens the queue as a popover; on
- *   a phone it is an icon button with a percent badge (always shown) that
- *   opens the same queue as a sheet. The page header's Activity button opens
- *   the book's audit log.
- * - The member's **personal Tax tab** is today's page (header, Attention
- *   strip, balances, filters, Open table, History by month, row detail) with
- *   the corp-book states added to its Status pills; the book diff opens as a
- *   dialog from the row detail.
- * - The **guest verify page** puts what was mined and payments on the left,
- *   Balance due, Terms and Stop reminders on the right; on a phone Balance due
- *   and Terms come first.
- *
- * New components in this mockup: `ExtractionTimeline`, `NeedsYouQueue`,
- * `LateNoticeRun`, `LateNoticeMailPreview`, `MailQueueChip` (with its phone
- * percent badge), `CorpBookDiff`, `CorpBookSyncNote`. The personal tab's new
- * Status pill values (Pending corp record, Billed, Sent waiting for the corp,
- * Conflict, Unattributed, Dismissed by corp) extend the existing
- * `StatusPill`. Everything else is an existing primitive, the real
- * `OwedBalances`, `PriceBreakdownCard` and `AttentionStrip`, or the officer
- * dialogs built from the form primitives.
- */
-
 const PHONE = PHONE_GLOBALS;
 
 function Page({ children }: { children: ReactNode }) {
   return <div className="mx-auto max-w-page space-y-4 px-4 py-4">{children}</div>;
 }
-
-// ---------------------------------------------------------------- Extractions
 
 const extractionColumns: DataTableColumn<Extraction>[] = [
   {
@@ -224,8 +177,6 @@ function ExtractionsF() {
     </Page>
   );
 }
-
-// ---------------------------------------------------------------- Moon detail
 
 const cycleColumns: DataTableColumn<MoonCycle>[] = [
   { id: 'fractured', header: 'Fractured', render: (row) => row.fractured },
@@ -369,8 +320,6 @@ function MoonDetailF() {
   );
 }
 
-// ---------------------------------------------------------------- Miners
-
 const minerColumns: DataTableColumn<Miner>[] = [
   {
     id: 'miner',
@@ -483,8 +432,6 @@ function MinersF({ chip, dialog }: { chip?: QueueItem[]; dialog?: MinersDialog }
     </Page>
   );
 }
-
-// ---------------------------------------------------------------- Miner detail
 
 type MinerDialog = 'dismiss' | 'record' | 'nottax';
 
@@ -654,8 +601,6 @@ function MinerDetailF({ dialog }: { dialog?: MinerDialog }) {
   );
 }
 
-// ---------------------------------------------------------------- Late notices
-
 const periodColumns: DataTableColumn<StatementPeriod>[] = [
   {
     id: 'period',
@@ -709,10 +654,6 @@ const periodColumns: DataTableColumn<StatementPeriod>[] = [
   },
   { id: 'issued', header: 'Issued', render: (row) => row.issued },
 ];
-
-// ---------------------------------------------------------------- Queue
-
-// ---------------------------------------------------------------- Timeline
 
 const FROM = -20;
 const TO = 27;
@@ -799,8 +740,6 @@ function ExtractionTimeline() {
     </NewComponent>
   );
 }
-
-// ---------------------------------------------------------------- Needs you
 
 function QueueCard({
   tone,
@@ -893,8 +832,6 @@ function NeedsYouQueue() {
     </NewComponent>
   );
 }
-
-// ---------------------------------------------------------------- Late notice run
 
 type RunStep = 'check' | 'send' | 'sending' | 'done';
 
@@ -1006,8 +943,6 @@ function LateNoticeRun({ step, queue }: { step: RunStep; queue: QueueItem[] }) {
   );
 }
 
-// ---------------------------------------------------------------- Mail preview
-
 function LateNoticeMailPreview() {
   const m = VARRO_MAIL_STATEMENT;
   return (
@@ -1063,7 +998,6 @@ function LateNoticeMailPreview() {
     </NewComponent>
   );
 }
-// ---------------------------------------------------------------- Late notices page
 
 function LateNoticesF({
   step,
@@ -1126,13 +1060,6 @@ function LateNoticesF({
   );
 }
 
-// ---------------------------------------------------------------- Chip + queue
-
-/**
- * Phone form of the chip: an icon button whose percent badge shows in every
- * state (100% when done). Failures add a second, warning badge with their
- * count, never a check mark in place of the percent.
- */
 function PhoneChipButton({ items }: { items: QueueItem[] }) {
   const c = queueCounts(items);
   const percent = Math.round(((c.sent + c.failed) / c.total) * 100);
@@ -1215,8 +1142,6 @@ function ChipF({ items, open }: { items: QueueItem[]; open?: boolean }) {
   );
 }
 
-// ---------------------------------------------------------------- Stories
-
 const meta = {
   title: 'mockups/CorpTaxBookFinal',
   tags: ['!manifest'],
@@ -1242,100 +1167,62 @@ const bare = (render: () => ReactElement, phone = false): Story => ({
   ...(phone ? { globals: PHONE } : {}),
 });
 
-/** @summary 1 · Extractions: the chunk timeline (a row opens the moon's page), then the sortable table. New component: ExtractionTimeline. */
 export const Extractions = corp(() => <ExtractionsF />);
-/** @summary 1 · Extractions, phone. */
 export const ExtractionsPhone = corp(() => <ExtractionsF />, true);
 
-/** @summary 2 · Moon detail page: this extraction, who mined it, past cycles. */
 export const MoonDetail = corp(() => <MoonDetailF />);
-/** @summary 2 · Moon detail, phone. */
 export const MoonDetailPhone = corp(() => <MoonDetailF />, true);
 
-/** @summary 3 · Miners: Needs you cards above the table, overdue first. New component: NeedsYouQueue. */
 export const Miners = corp(() => <MinersF />);
-/** @summary 3 · Miners, phone. */
 export const MinersPhone = corp(() => <MinersF />, true);
 
-/** @summary 4 · Miner detail page: Days, Payments, Dismissals, Mail. */
 export const MinerDetail = corp(() => <MinerDetailF />);
-/** @summary 4 · Miner detail, phone. */
 export const MinerDetailPhone = corp(() => <MinerDetailF />, true);
 
-/** @summary 5 · Dismiss dialog for two ticked days. */
 export const DismissDays = corp(() => <MinerDetailF dialog="dismiss" />);
-/** @summary 5 · Dismiss dialog, phone: a bottom sheet. */
 export const DismissDaysPhone = corp(() => <MinerDetailF dialog="dismiss" />, true);
 
-/** @summary 6 · Record payment dialog (a manual Tax Payment, credited oldest debt first). */
 export const RecordPayment = corp(() => <MinerDetailF dialog="record" />);
-/** @summary 6 · Record payment, phone. */
 export const RecordPaymentPhone = corp(() => <MinerDetailF dialog="record" />, true);
 
-/** @summary 7 · Mark not tax dialog: part of a donation was a buyback, so the debt reopens by that amount. */
 export const MarkNotTax = corp(() => <MinerDetailF dialog="nottax" />);
-/** @summary 7 · Mark not tax, phone. */
 export const MarkNotTaxPhone = corp(() => <MinerDetailF dialog="nottax" />, true);
 
-/** @summary 8 · Reject declaration dialog from Needs you: reason required, a fresh 14 days. */
 export const RejectDeclaration = corp(() => <MinersF dialog="reject" />);
-/** @summary 8 · Reject declaration, phone. */
 export const RejectDeclarationPhone = corp(() => <MinersF dialog="reject" />, true);
 
-/** @summary 9 · Assign a donation dialog from Needs you (an Unmatched donation to a Miner). */
 export const AssignDonation = corp(() => <MinersF dialog="assign" />);
-/** @summary 9 · Assign a donation, phone. */
 export const AssignDonationPhone = corp(() => <MinersF dialog="assign" />, true);
 
-/** @summary 10 · Late notices: the Sep 2026 run at Check, periods and write-offs below. New component: LateNoticeRun. */
 export const LateNotices = corp(() => <LateNoticesF step="check" />);
-/** @summary 10 · Late notices, phone. */
 export const LateNoticesPhone = corp(() => <LateNoticesF step="check" />, true);
 
-/** @summary 11 · Preview mail: the short Late notice mail (date, refinery, mined value, tax, total, code, verify link), in a dialog. New component: LateNoticeMailPreview. */
 export const PreviewMail = corp(() => <LateNoticesF step="check" preview />);
-/** @summary 11 · Preview mail, phone: a full-height sheet. */
 export const PreviewMailPhone = corp(() => <LateNoticesF step="check" preview />, true);
 
-/** @summary 12 · Send: step 2 of the run with EVE's mail limit, "19 mails take about 4 minutes". */
 export const SendNotice = corp(() => <LateNoticesF step="send" />);
-/** @summary 12 · Send, phone. */
 export const SendNoticePhone = corp(() => <LateNoticesF step="send" />, true);
 
-/** @summary 13 · Progress chip in the page header while sending, here on the Miners tab. New component: MailQueueChip. */
 export const ProgressChip = corp(() => <MinersF chip={QUEUE_RUNNING} />);
-/** @summary 13 · Progress chip, phone: an icon button with a percent badge, plus a warning badge for failures. */
 export const ProgressChipPhone = corp(() => <MinersF chip={QUEUE_RUNNING} />, true);
 
-/** @summary 14 · Queue: the chip's popover, sent, paused, waiting, failed with Retry / Open in EVE. */
 export const Queue = corp(() => <LateNoticesF step="sending" queueOpen />);
-/** @summary 14 · Queue, phone: the same list as a full-height sheet. */
 export const QueuePhone = corp(() => <LateNoticesF step="sending" queueOpen />, true);
 
-/** @summary 15 · Queue done: the run at Done, the one failure still retryable. */
 export const QueueDone = corp(() => <LateNoticesF step="done" queue={QUEUE_DONE} queueOpen />);
-/** @summary 15 · Queue done, phone. */
 export const QueueDonePhone = corp(
   () => <LateNoticesF step="done" queue={QUEUE_DONE} queueOpen />,
   true
 );
 
-/** @summary 16 · Member's Tax tab as it is today (Open, History by month), plus the corp-book Status pills and Safe to pay note. New component: CorpBookSyncNote. */
 export const PersonalTab = mining(() => <PersonalF />);
-/** @summary 16 · Personal Tax tab, phone. */
 export const PersonalTabPhone = mining(() => <PersonalF />, true);
 
-/** @summary 17 · Row detail (today's modal) for a Billed day: the book's terms, the dispute, Compare with the book. */
 export const PersonalRowDetail = mining(() => <PersonalF detail />);
-/** @summary 17 · Row detail, phone. */
 export const PersonalRowDetailPhone = mining(() => <PersonalF detail />, true);
 
-/** @summary 18 · Compare with the book: the diff dialog over the row detail. New component: CorpBookDiff. */
 export const PersonalBookDiff = mining(() => <PersonalF detail diff />);
-/** @summary 18 · Book diff, phone. */
 export const PersonalBookDiffPhone = mining(() => <PersonalF detail diff />, true);
 
-/** @summary 19 · Guest verify page: lines (with price date, source and rate) and payments left; Balance due, Terms, Stop reminders right. */
 export const GuestVerify = bare(() => <VerifyF />);
-/** @summary 19 · Guest verify, phone: Balance due and Terms above the lines. */
 export const GuestVerifyPhone = bare(() => <VerifyF />, true);

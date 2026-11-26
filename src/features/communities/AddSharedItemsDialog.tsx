@@ -6,20 +6,12 @@ import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { namedLike, needleOf, ROW_LIMIT } from './shareLists';
 
-/** One thing the Member could add: its key, its name, and a dim note after it (an "In game" mark, a skill count). */
 export interface AddableItem {
   key: string;
   name: string;
   note?: ReactNode;
 }
 
-/**
- * Where a Member adds Fittings or Skill plans to what they share with a
- * Community: every one not shared yet, searchable, with Share on each row.
- * Each Share acts at once and the row leaves the list; the tab behind is the
- * list of what is shared. The shape of `AddBlueprintsDialog`'s blueprint list,
- * for the content types that have no locations.
- */
 export function AddSharedItemsDialog({
   open,
   onClose,
@@ -36,14 +28,10 @@ export function AddSharedItemsDialog({
   onClose: () => void;
   title: string;
   searchLabel: string;
-  /** The per-row button's label. */
   shareLabel: string;
-  /** Shown when everything is already shared. */
   nothingToAdd: string;
-  /** A way forward when there is nothing to add (a link to make one). */
   nothingAction?: ReactNode;
   items: readonly AddableItem[];
-  /** A failure from the last Share; shown in here, since the page behind is inert while the dialog is open. */
   notice: string | null;
   onShare: (key: string) => void;
 }) {
@@ -91,7 +79,6 @@ export function AddSharedItemsDialog({
                         else shareButtons.current.delete(item.key);
                       }}
                       onClick={() => {
-                        // Sharing removes this row: focus moves to a neighbour, else the search.
                         const near = [rows[index + 1], rows[index - 1]].map(
                           (other) => () => (other ? shareButtons.current.get(other.key) : null)
                         );

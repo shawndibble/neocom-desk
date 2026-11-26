@@ -2,43 +2,15 @@ import { useTranslation } from 'react-i18next';
 import { formatAge } from '@/lib/age';
 import { useTicker } from '@/lib/ticker';
 
-/** The same shared 30 s clock `DataAgeBadge` reads, so the two never disagree. */
 const TICK_MS = 30_000;
 
 interface CachedNoticeProps {
-  /**
-   * When the data on screen was fetched (a `Date`, or epoch ms), or null when
-   * the loader does not know. Null drops the age and keeps the sentence.
-   */
   fetchedAt?: Date | number | null;
-  /**
-   * The data is cached because a refresh was just attempted and failed (the
-   * Refresh button was pressed), not because the app is offline. Says so.
-   */
   refreshFailed?: boolean;
-  /**
-   * The page header also shows a `DataAgeBadge` (md and up), which already says
-   * the data is cached and how old it is, so this line is only the phone
-   * fallback: hidden from `md`. A failed refresh still shows, the badge can't
-   * say that.
-   */
   withBadge?: boolean;
   className?: string;
 }
 
-/**
- * The line a view shows above its content while that content is a cached read:
- * "Showing cached data · 3h ago". Unlike `DataAgeBadge` it is not hidden below
- * `md`: the badge is header chrome that a phone drops, and this is the one
- * place a phone is told the figures may be old. Render it only while the
- * result is `fromCache`; it keeps no state of its own.
- *
- * Deliberately not `role="status"`: it mounts together with its text, which a
- * screen reader would not announce. The shell's `OfflineBanner` announces the
- * change of connection.
- *
- * @summary "Showing cached data · 3h ago" line for a cached read, at every width (the phone answer to the md-hidden DataAgeBadge).
- */
 export function CachedNotice({
   fetchedAt = null,
   refreshFailed = false,

@@ -1,8 +1,3 @@
-/**
- * "Buy ore instead": a plan's mineral shortfall as compressed ore bought at the
- * plan's hub and refined, against buying the minerals. The refining facility is
- * stated, and shares the synced structure rate with the Assets ore dialog.
- */
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -73,9 +68,7 @@ export function BuyOreDialog({
   open: boolean;
   onClose: () => void;
   hub: TradeHub;
-  /** The plan's mineral shortfall (units to buy per mineral type id). */
   needs: Readonly<Record<number, number>>;
-  /** What buying those minerals costs as the plan prices them; null when unpriced. */
   mineralsTotal: number | null;
 }) {
   const { t } = useTranslation();
@@ -83,8 +76,6 @@ export function BuyOreDialog({
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
   const { setup: refiningSetup } = useRefiningSetup();
   const [ordering, setOrdering] = useState<OreOrdering>('cost');
-  // Keyed on the inputs they were built for, so a changed hub or shortfall never
-  // reads the previous load's prices while the new one is in flight.
   const [loaded, setLoaded] = useState<{ key: string; data: BuyOreData } | null>(null);
   const [walked, setWalked] = useState<{
     key: string;
@@ -124,7 +115,6 @@ export function BuyOreDialog({
           unitVolume: types[String(compressedId)]?.volume ?? 0,
         });
       }
-      // Every mineral an ore refines into, so leftover byproducts are priced too.
       const ids = [
         ...new Set([
           ...wanted,
@@ -149,7 +139,6 @@ export function BuyOreDialog({
     return () => {
       cancelled = true;
     };
-    // `needsKey` stands for `needs`: a new object with the same content must not reload.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, needsKey, hub, activeCharacterId, attempt, fail, clear]);
 
@@ -175,8 +164,6 @@ export function BuyOreDialog({
     [data, ores, ordering, needsKey]
   );
 
-  // The route's units, walked through each ore's order book at the hub, so
-  // the total is what buying that many costs rather than the lowest sell.
   const purchaseKey = route ? route.purchases.map((p) => `${p.typeId}:${p.units}`).join(',') : '';
   useEffect(() => {
     if (!route || route.purchases.length === 0) return;
@@ -193,13 +180,11 @@ export function BuyOreDialog({
     return () => {
       cancelled = true;
     };
-    // `purchaseKey` stands for `route.purchases`.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hub, purchaseKey, inputKey]);
 
   const depth =
     walked?.key === `${inputKey}|${purchaseKey}` && walked.depth !== 'failed' ? walked.depth : null;
-  // A failed walk falls back to the lowest sell, as the plan's own prices do.
   const walkSettled =
     !route || route.purchases.length === 0 || walked?.key === `${inputKey}|${purchaseKey}`;
   const underfilled =
@@ -211,7 +196,6 @@ export function BuyOreDialog({
     },
     [depth]
   );
-  // The facility's fee on the minerals the route refines, paid on top of the ore itself.
   const refiningFee =
     route && data
       ? reprocessingTaxOn(route.refined, data.mineralBuyPrices, refiningSetup.taxRate)
@@ -229,7 +213,6 @@ export function BuyOreDialog({
         })
       : null;
 
-  // Minerals cheaper: no ore list to offer.
   const recommendOre = !!comparison?.recommendOre && !underfilled;
   const showRoute = !comparison || recommendOre;
   const name = (id: number) => data?.names.get(id) ?? `#${id}`;

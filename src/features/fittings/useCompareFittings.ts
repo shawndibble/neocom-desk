@@ -1,12 +1,3 @@
-/**
- * Decodes each compare slot's Fitting Share Code into a Fitting. An invalid
- * code becomes its own error slot rather than failing the whole page — a
- * stranger's mis-typed URL shouldn't blank the other two fittings. Decoded
- * slots are cached per code, so adding a third fitting doesn't re-decode
- * the first two — which also keeps their `Fitting` object reference stable
- * across renders, letting `useCompareStats`/`useCompareCanFly` skip
- * recomputing them too.
- */
 import { useEffect, useRef, useState } from 'react';
 import {
   decodeFittingShare,
@@ -32,12 +23,8 @@ async function decodeSlot(code: string): Promise<CompareSlot> {
   return { code, fitting, shareError: null };
 }
 
-/** One decoded slot per code, in the same order; `null` while a code's decode is in flight. */
 export function useCompareFittings(codes: readonly string[]): readonly (CompareSlot | null)[] {
   const cacheRef = useRef(new Map<string, CompareSlot>());
-  // The effect below reconciles against the cache immediately after mount;
-  // starting from all-null (rather than reading the ref during render) keeps
-  // this hook off `react-hooks/refs`.
   const [slots, setSlots] = useState<readonly (CompareSlot | null)[]>(() => codes.map(() => null));
 
   useEffect(() => {

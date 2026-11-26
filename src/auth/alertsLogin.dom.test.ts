@@ -30,7 +30,6 @@ function jwt(characterId: number, scp: string[]): string {
   return `${b64url(JSON.stringify({ alg: 'RS256' }))}.${b64url(JSON.stringify(payload))}.sig`;
 }
 
-/** Which Character SSO "returns" for the next code exchange. */
 let returnedCharacterId = 111;
 
 mswServer(

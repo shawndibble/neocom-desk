@@ -18,7 +18,6 @@ describe('ThreatBadge', () => {
 
   it('names what it measures for a screen reader', () => {
     render(<ThreatBadge level="inactive" />);
-    // One short word on screen, the full wording for a screen reader.
     expect(screen.getByText('Threat: No recent kills')).toBeTruthy();
     expect(screen.getByText('Quiet')).toHaveAttribute('aria-hidden', 'true');
   });

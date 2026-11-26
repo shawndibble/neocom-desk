@@ -1,23 +1,3 @@
-/**
- * What each domain says in one line: a widget's note, and its list rows.
- *
- * A domain gets a single line to state its case. That line is not a shortened
- * card: a card can afford three counts and let the reader weigh them, a line
- * has to pick the one fact that decides whether to tap it. So each function here ranks the same
- * way its `boardSeverity.ts` sibling does and prints the worst true thing —
- * the ISK you owe over the entries nobody has assigned, the jobs waiting to be
- * delivered over the ones still running.
- *
- * **Three states, never two.** A read that has not landed, a grant that has
- * lapsed, and a genuinely quiet domain all arrive here as an empty list, and
- * printing "Nothing running" for the first two is exactly the silence the
- * old card board was rebuilt to remove. Every function takes its domain's nullable
- * snapshot rather than the array inside it, so it can tell them apart at all.
- *
- * Strings, not keys: resolved through the caller's `t` the way
- * `alertGroupLabel` is, because a row that returned a key would leave each
- * call site to remember which of these need a `count` and which do not.
- */
 import type { StockBoardData } from '@/features/stockTargets/stockBoard';
 import { formatIskCompact } from '@/lib/isk';
 import { isJobDone } from '@/features/industry/jobs';
@@ -45,22 +25,9 @@ import type {
 } from './boardData';
 import type { Translate } from '@/lib/translate';
 
-/**
- * The narrow slice of i18next's `t` these need: a key, and interpolations that
- * are counts or already-formatted strings.
- */
-
 const CHECKING = 'overview.board.checking';
 const REAUTH = 'overview.board.reauth';
 
-/**
- * Orders: what is below cost, else how many need work at all.
- *
- * `needsAttentionCount` rather than the sum of the card's three tiles — those
- * count *problems* and an order can carry two, which is the right figure for
- * three tiles side by side and the wrong one for a row that is telling you how
- * many orders to go and fix.
- */
 export function ordersSummary(
   t: Translate,
   rows: readonly OpenOrderRow[] | null,
@@ -72,14 +39,12 @@ export function ordersSummary(
   if (counts.belowFloor > 0) return t('overview.board.belowFloor', { count: counts.belowFloor });
   const needsWork = needsAttentionCount(rows);
   if (needsWork > 0) return t('overview.board.ordersMeta', { count: needsWork });
-  // "Nothing needs work" would claim a check that never ran.
   const unchecked = notCheckedCount(rows);
   return unchecked > 0
     ? t('overview.board.ordersNotChecked', { count: unchecked })
     : t('overview.board.ordersClear');
 }
 
-/** Mining tax: what is owed, else what has not been worked out yet. */
 export function miningTaxSummary(t: Translate, data: MiningTaxBoardData | null): string {
   if (data === null) return t(CHECKING);
   if (data.needsReauth) return t(REAUTH);
@@ -90,13 +55,6 @@ export function miningTaxSummary(t: Translate, data: MiningTaxBoardData | null):
     : t('overview.board.miningSettled');
 }
 
-/**
- * Planetary: the worst reset run, named the way the card names it.
- *
- * Ranked by severity rather than read off the front of the list —
- * `groupColoniesIntoBatches` orders by clock, and the batch that stopped six
- * hours ago sorts behind one ending in three.
- */
 export function planetarySummary(t: Translate, data: PlanetaryBoardData | null): string {
   if (data === null) return t(CHECKING);
   if (data.needsReauth) return t(REAUTH);
@@ -105,7 +63,6 @@ export function planetarySummary(t: Translate, data: PlanetaryBoardData | null):
   return t(`overview.board.batch.${worst.kind}`, { count: worst.colonies.length });
 }
 
-/** Industry: what is waiting to be delivered, else what is still running. */
 export function industrySummary(
   t: Translate,
   data: IndustryBoardData | null,
@@ -121,7 +78,6 @@ export function industrySummary(
     : t('overview.board.industryIdle');
 }
 
-/** The soonest contract on a clock, named for the strip and the card's footer. Null when nothing qualifies. */
 export function contractsDeadlineNote(t: Translate, data: ContractsBoardData): string | null {
   const { soonest } = data.summary;
   if (soonest === null) return null;
@@ -134,7 +90,6 @@ export function contractsDeadlineNote(t: Translate, data: ContractsBoardData): s
   return data.route === null ? note : `${note} · ${data.route}`;
 }
 
-/** Contracts: hauls in flight and the clock on them, else a listing about to lapse, else the outstanding count, else nothing. */
 export function contractsSummary(
   t: Translate,
   data: ContractsBoardData | null,

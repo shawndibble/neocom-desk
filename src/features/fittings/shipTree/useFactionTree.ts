@@ -1,7 +1,3 @@
-/**
- * One faction's tree as both views read it: classes, hulls per class, the
- * per-class rules bound to the pilot, and the layout (map geometry, ladder Ω chips).
- */
 import { useMemo } from 'react';
 import { hullCountsFor, hullsByClass, layoutShipTree } from '@/engine/shipTree/layout';
 import { classNeedsOmega, classUnlocked, parentEmpires } from '@/engine/shipTree/rules';
@@ -17,7 +13,6 @@ export interface FactionTree {
   group: (classId: number) => ShipTreeGroup | undefined;
   unlocked: (classId: number) => boolean;
   needsOmega: (classId: number) => boolean;
-  /** [bottom, top] parent empires for a pirate class; [] otherwise. */
   parentEmpires: (classId: number) => readonly number[];
   layout: ShipTreeLayout;
 }

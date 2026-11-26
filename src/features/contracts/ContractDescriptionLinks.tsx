@@ -12,12 +12,6 @@ function hostOf(href: string): string {
   }
 }
 
-/**
- * One button per link in the description. Issuers put an off-site page there
- * (a doc, a price sheet), and the description is plain text, so a link in it
- * is not clickable on its own. The button names the host it leaves for, since
- * the contract's issuer wrote the URL, not us. Renders nothing without a link.
- */
 export function ContractDescriptionLinks({ description }: { description: string | undefined }) {
   const { t } = useTranslation();
   const links = useMemo(() => contractDescriptionLinks(description), [description]);

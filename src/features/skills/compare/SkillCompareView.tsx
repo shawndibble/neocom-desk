@@ -21,20 +21,15 @@ export interface CompareCharacter {
 }
 
 interface SkillCompareViewProps {
-  /** The columns drawn, in order. */
   characters: readonly CompareCharacter[];
   baselineId: number | null;
-  /** Rows to list, grouped by skill group. */
   rows: readonly ComparisonRow[];
-  /** Rows the characters agree on, held back behind one collapsed line. Empty when none are held back. */
   identicalRows?: readonly ComparisonRow[];
-  /** One card per skill instead of a character-by-skill table. */
   phone?: boolean;
 }
 
 const DELTA_TEXT_CLASS = 'tabular-nums whitespace-nowrap text-xs';
 
-/** The delta against the baseline: a signed number or a word, never colour alone (DESIGN §1, §6c). */
 function Delta({ delta }: { delta: LevelDelta }) {
   const { t } = useTranslation();
   switch (delta.kind) {
@@ -69,7 +64,6 @@ function Delta({ delta }: { delta: LevelDelta }) {
   }
 }
 
-/** A character's level of one skill: five pips, the number, and, off the baseline, how it stands against it. */
 function LevelCell({
   level,
   baselineLevel,
@@ -88,7 +82,6 @@ function LevelCell({
   );
 }
 
-/** The band's net lead or deficit for one character, summed over its listed skills. */
 function BandNet({ net }: { net: number }) {
   const { t } = useTranslation();
   if (net === 0) return null;
@@ -133,7 +126,6 @@ function ColumnHeader({
   );
 }
 
-/** A skill name cell stays put while the character columns scroll sideways. */
 const PINNED_SKILL_CELL = 'sticky left-0 z-10 bg-panel';
 
 function BandTable({
@@ -247,7 +239,6 @@ function BandCards({
   );
 }
 
-/** One quiet line that reveals the rows every compared character agrees on, in the same columns. */
 function IdenticalToggle({
   count,
   expanded,
@@ -275,12 +266,6 @@ function IdenticalToggle({
   );
 }
 
-/**
- * The comparison itself: skills grouped in bands, each character's level as
- * five pips with its standing against the baseline character. A table with
- * pinned avatar headers on desktop; one card per skill on a phone, where a
- * wide matrix would scroll sideways with the column headers off screen.
- */
 export function SkillCompareView({
   characters,
   baselineId,

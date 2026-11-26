@@ -1,7 +1,3 @@
-/**
- * "View route" beside a "Set destination" button: same destination, opened in
- * Route Safety from the Character's current system.
- */
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui';
 import { useViewRoute } from '@/features/route/useViewRoute';

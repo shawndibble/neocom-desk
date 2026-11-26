@@ -23,7 +23,6 @@ function bar(over: Record<string, unknown> = {}) {
   );
 }
 
-/** Reason lines the pilot can see: `<p>` text, as opposed to the sr-only descriptions. */
 const visibleReasons = (c: HTMLElement) => c.querySelectorAll('p');
 
 describe('SelectionToolbar', () => {
@@ -44,7 +43,6 @@ describe('SelectionToolbar', () => {
     );
     const bar = container.firstElementChild as HTMLElement;
     expect(bar.className).toMatch(/\bbg-panel-2\b/);
-    // A `/NN` alpha suffix on the background utility would make it see-through.
     expect(bar.className).not.toMatch(/\bbg-[\w-]+\/\d+/);
   });
 
@@ -73,7 +71,6 @@ describe('SelectionToolbar', () => {
     const combineReason = container.querySelector('p')?.textContent;
     rerender(bar({ combine: { ok: false, reason: 'too-few' } as never, dismissCount: 0 }));
     expect(visibleReasons(container)).toHaveLength(1);
-    // Combine outranks Dismiss.
     expect(container.querySelector('p')?.textContent).toBe(combineReason);
     rerender(bar({ dismissCount: 0, canSelectAll: false }));
     expect(visibleReasons(container)).toHaveLength(1);

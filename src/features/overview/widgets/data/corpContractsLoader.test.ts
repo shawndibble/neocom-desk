@@ -18,7 +18,6 @@ import { loadCorpContracts } from './corpFeedLoaders';
 const NOW = Date.parse('2026-10-20T12:00:00Z');
 const iso = (ms: number) => new Date(ms).toISOString();
 
-/** What ESI really sends on day 2: accepted courier stays `outstanding`, offer window long past. */
 const acceptedCourier: Contract = {
   contract_id: 7,
   issuer_id: 1,

@@ -1,8 +1,3 @@
-/**
- * The SigV4 reads and uploads to Cloudflare R2's S3-compatible API. Kept free of
- * relative runtime imports so the one-off backfill script can load it under
- * plain Node type stripping (see marketOpenPrices.ts).
- */
 import { AwsClient } from 'aws4fetch';
 
 export type R2Put = (
@@ -36,7 +31,6 @@ export function createR2Put(config: R2Config): R2Put {
   };
 }
 
-/** Reads one object as parsed JSON: `null` when it does not exist, a throw on any other failure. */
 export type R2Get = (key: string) => Promise<unknown | null>;
 
 export function createR2Get(config: R2Config): R2Get {
@@ -49,7 +43,6 @@ export function createR2Get(config: R2Config): R2Get {
   };
 }
 
-/** The R2 connection of a runner job, from its environment; throws naming every missing setting. */
 export function r2ConfigFromEnv(env: Record<string, string | undefined>): R2Config {
   const missing = ['R2_ENDPOINT', 'R2_BUCKET', 'R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY'].filter(
     (name) => !env[name]

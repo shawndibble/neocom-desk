@@ -49,7 +49,6 @@ const choices = [
     boostsPerLoad: 4,
     capacitor: stable(38),
   }),
-  // Cheaper than the Tech I 400, injects more and holds the capacitor higher.
   booster(32006, 'Navy Cap Booster 400', 110, {
     injection: 400,
     gjPerSecond: 30,
@@ -92,7 +91,6 @@ describe('CapBoosterGuide', () => {
       picks.getByRole('button', { name: /Smallest stable.*Navy Cap Booster 400/ })
     ).toBeTruthy();
     expect(picks.getByRole('button', { name: /Most GJ\/s.*Cap Booster 800/ })).toBeTruthy();
-    // 110 ISK / 400 GJ beats 300 / 800 and 120 / 400; the 200 is cheaper per GJ but runs dry.
     expect(picks.getByRole('button', { name: /Most GJ\/s/ })).toHaveAttribute(
       'aria-pressed',
       'true'
@@ -118,7 +116,6 @@ describe('CapBoosterGuide', () => {
     const t1 = screen.getByRole('button', { name: /^Cap Booster 400,/ });
     expect(t1).toHaveClass('opacity-50');
     expect(t1).toHaveTextContent('Navy Cap Booster 400 does as much for less');
-    // The label replaces the row's text, so it carries the reason too.
     expect(t1).toHaveAccessibleName(/, Navy Cap Booster 400 does as much for less$/);
   });
 

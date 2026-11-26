@@ -24,7 +24,6 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllGlobals());
 
-/** The per-type objects read; the shard probe before each (a 404 until shards publish) is not counted. */
 const typeObjectsRead = () =>
   fetchMock.mock.calls.map(([u]) => String(u)).filter((u) => !u.includes('/shards/'));
 
@@ -51,7 +50,6 @@ describe('loadHubSnapshotRange', () => {
     expect(typeObjectsRead()).toEqual([openPricesUrl(34), openPricesUrl(35)]);
     expect(result.saved.get('2026-09-24')?.get(34)).toEqual({ buy: 3.6, sell: 3.8 });
     expect(result.saved.get('2026-09-24')?.get(35)).toEqual({ buy: null, sell: 7 });
-    // Neither side priced at the station that day: no day at all.
     expect(result.saved.has('2026-09-25')).toBe(false);
     expect(result.saved.has('2026-09-23')).toBe(false);
   });

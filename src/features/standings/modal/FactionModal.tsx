@@ -1,7 +1,3 @@
-/**
- * The shared info modal's view of an NPC faction (`?info=faction-<id>`): no
- * tabs, one view. Mounted by `PublicInfoModal`; lazy-loaded.
- */
 import { useTranslation } from 'react-i18next';
 import { Modal } from '@/components/ui';
 import { Pill } from '@/components/ui/Pill';

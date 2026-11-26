@@ -30,7 +30,6 @@ const feed = (orders: CorporationOrder[], over: Partial<CorpOrdersFeed> = {}): C
   orders,
   typeNames: new Map([[34, 'Tritanium']]),
   stationNames: new Map([[STATION, 'Jita IV - Moon 4']]),
-  // Best rival sells at 90: a sell order at 100 is undercut.
   stationPrices: new Map([[`${STATION}:34`, { sellMin: 90, buyMax: 50 } as never]]),
   issuerNames: new Map([
     [7, 'Efa Astrahus'],

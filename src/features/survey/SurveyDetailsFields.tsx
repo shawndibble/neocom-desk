@@ -1,12 +1,3 @@
-/**
- * The three details a Survey can carry, as one form: where it is mined, who
- * collects the moon tax and at what rate, and the starter's notes. Shared by the
- * `/survey` page (which builds a start link from them) and the public result page
- * for the device that started the Survey (which stores them on it), so the two
- * look and behave alike. Controlled: the caller owns the values and what a change
- * does. Works with no Character: systems and NPC stations are searched from local
- * data, and the payee box falls back to the public name lookups.
- */
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Field, Fields, TextArea, TextInput } from '@/components/ui';
@@ -35,18 +26,14 @@ export function SurveyDetailsFields({
   payeeName: string;
   rateText: string;
   notes: string;
-  /** Null with nobody logged in. */
   characterId: number | null;
-  /** Replaces the default line under Location. */
   placeNote?: ReactNode;
-  /** The line under the moon tax boxes. */
   payeeNote?: ReactNode;
   onPlace: (place: SurveyPlace | null) => void;
   onPayeeName: (name: string) => void;
   onPayeePick: (match: PayeeEntityMatch) => void;
   onRate: (text: string) => void;
   onNotes: (text: string) => void;
-  /** Focus left the form: the moment to store what changed. A pick stores through its own callback. */
   onCommit?: () => void;
 }) {
   const { t } = useTranslation();

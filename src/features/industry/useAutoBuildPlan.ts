@@ -29,21 +29,6 @@ interface AutoBuildPlanInput {
   update: (patch: PlanPatch) => void;
 }
 
-/**
- * Auto Build (issue #695) for one plan: its tree depth and the one-shot bulk
- * write, plus the toast's Undo state.
- *
- * `autoBuildMaxDepth` is the plan's actual tree depth, independent of whether
- * live prices have loaded — depth discovery never prices anything, so gating
- * it on `makeOrBuyContext` (null until `pricesReady`) would leave Apply
- * disabled during a slow price fetch for no reason. Built from
- * `reactionPlanFacilityContext`, not the price-resolved Reaction Location in
- * `makeOrBuyContext`: that one stays `undefined` until its own market
- * snapshot lands, which would understate this plan's depth for as long as
- * that fetch is in flight whenever a Reaction Location is configured.
- * `autoBuildDepthContext` is the same seam `autoBuildGroup.ts`'s per-member
- * depth walk uses.
- */
 export function useAutoBuildPlan({
   plan,
   blueprint,
@@ -57,7 +42,6 @@ export function useAutoBuildPlan({
   accountSkills,
   update,
 }: AutoBuildPlanInput) {
-  // The build-here list a strategy change replaced, for the toast's Undo.
   const [strategyUndo, setStrategyUndo] = useState<{
     previous: number[];
     built: number;
@@ -80,23 +64,10 @@ export function useAutoBuildPlan({
     reactionPlanFacilityContext,
   ]);
 
-  /**
-   * A one-shot bulk write, not a persistent policy (docs/context/decisions).
-   * Fully replaces `buildHere` — re-running with different settings, or the
-   * same ones again, overwrites whatever craft/buy choices were there before,
-   * including hand-picked ones. Always walks this plan's whole tree
-   * (`autoBuildMaxDepth`) — the single-plan control offers no depth choice.
-   * Craft Scope is `craftScopeList` (issue #698) — the same answer the manual
-   * toggle and the recursive engine use, so an Auto Build pass never marks a
-   * material the plan itself would then ignore. Planetary is still reserved.
-   */
   function applyAutoBuild(options: { strategy: BuildStrategy }) {
     if (!blueprint || !makeOrBuyContext) return;
     const picked = autoBuildHere(blueprint, resolvedMe, {
       recipeFor,
-      // Account-wide (issue #1231): a material nobody on the account can
-      // build is forced to buy regardless of cost — same `accountSkills` the
-      // sub-build marker uses.
       ctx: { ...makeOrBuyContext, accountSkills },
       depth: autoBuildMaxDepth,
       runs: plan.runs,

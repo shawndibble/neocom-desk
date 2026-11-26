@@ -1,11 +1,3 @@
-/**
- * Build Opportunities' "All owned" view (issue #2335): every blueprint the
- * selected Character(s) own — reactions and unrankable ones included — as a
- * browsable library, with the corporation's blueprints behind a toggle for a
- * Character that can read them. Mounted by `OpportunitiesPanel`, which owns
- * the blueprint load, the Character filter and the ranked rows this view
- * borrows ISK/hour from.
- */
 import { COL_QUANTITY, COL_SMALL_NUMBER } from '@/components/ui/dataTableWidths';
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
@@ -87,7 +79,6 @@ const NO_ASSETS: ReadonlyMap<number, CharacterAsset> = new Map();
 const NO_BLUEPRINTS: readonly CharacterBlueprint[] = [];
 const NO_ISK: ReadonlyMap<string, number | null> = new Map();
 
-/** Location names are resolved per (Character asking, location id). */
 const locationKey = (characterId: number, locationId: number) => `${characterId}:${locationId}`;
 
 interface OwnedBlueprintsPanelProps {
@@ -95,17 +86,12 @@ interface OwnedBlueprintsPanelProps {
   activeCharacterId: number;
   ownedByCharacter: ReadonlyMap<number, readonly CharacterBlueprint[]>;
   characterNames: ReadonlyMap<number, string>;
-  /** Opportunities' ranked rows — where a blueprint's ISK/hour comes from. */
   rankedRows: readonly OpportunityRow[];
   ownedStockSnapshot: OwnedStockSnapshot;
   loading: boolean;
-  /** Desktop's plain title; unset below `lg`, where `leading`'s view picker stands in for it. */
   title?: string;
-  /** The phone view picker that doubles as the title (see `OpportunitiesPanel`). */
   leading?: ReactNode;
-  /** The view toggle, Character filter and data age, shared with the ranked view. */
   meta: ReactNode;
-  /** Ranked pricing's progress / manual Refresh — the ISK/hour column fills from it. */
   pricingActions: ReactNode;
   onStartPlan: (entry: BlueprintCatalogEntry, seed?: OpportunityPlanSeed) => Promise<boolean>;
 }
@@ -138,8 +124,6 @@ export function OwnedBlueprintsPanel({
   const corp = useCorpOwnedBlueprints();
   const corpBlueprints = corp.available && includeCorp ? corp.blueprints : NO_BLUEPRINTS;
 
-  // Built without ISK/hour first, so ranked pricing landing batch by batch
-  // only re-stamps that one field and never re-derives placements below.
   const baseRows = useMemo(
     () =>
       buildOwnedBlueprintRows({
@@ -157,7 +141,6 @@ export function OwnedBlueprintsPanel({
     );
     return baseRows.map((row) => ({ ...row, iskPerHour: iskPerHourById.get(row.id) ?? null }));
   }, [baseRows, rankedRows]);
-  // Ranked's dimmed reaction rows (issue #5990): the same instruction here, not "Unknown".
   const needsReactionLocation = useMemo(
     () => new Set(rankedRows.filter((row) => row.reactionLocation).map((row) => row.candidate.id)),
     [rankedRows]
@@ -167,10 +150,6 @@ export function OwnedBlueprintsPanel({
     [rows, kind, activity, search]
   );
 
-  // Where each blueprint sits: containers walked up through the owner's
-  // cached assets. Corp blueprints have no cached corp assets here, so a
-  // containered one falls back to "In container"; its hangar location is
-  // resolved through the active Character, who is the one with corp access.
   const assetsByCharacter = useMemo(() => {
     const map = new Map<number, ReadonlyMap<number, CharacterAsset>>();
     for (const source of ownedStockSnapshot.sources) {
@@ -196,8 +175,6 @@ export function OwnedBlueprintsPanel({
   }, [baseRows, assetsByCharacter, activeCharacterId]);
 
   const [locationNames, setLocationNames] = useState<ReadonlyMap<string, string | null>>(new Map());
-  // Each location is asked for once and committed as it lands, so one slow
-  // structure lookup never holds back the rest.
   const requestedLocations = useRef(new Set<string>());
   useEffect(() => {
     let active = true;
@@ -222,7 +199,6 @@ export function OwnedBlueprintsPanel({
     };
   }, [placements]);
 
-  /** Null while a name is still resolving. */
   const locationLabel = useCallback(
     (row: OwnedBlueprintRow): string | null => {
       const entry = placements.get(row.id);
@@ -246,14 +222,12 @@ export function OwnedBlueprintsPanel({
     columns: csvColumns,
   });
 
-  // The plan a row opens is seeded with what its ISK/hour was priced with, so the two agree.
   const seedById = useMemo(
     () => new Map(rankedRows.map((row) => [row.candidate.id, row] as const)),
     [rankedRows]
   );
   const startRowPlan = (row: OwnedBlueprintRow, entry: BlueprintCatalogEntry) =>
     onStartPlan(entry, seedById.get(row.id));
-  // A row click is the Start plan button's action (a blueprint with no catalog entry has none).
   const startPlanFromRow = useRowStartPlan(
     (row: OwnedBlueprintRow) =>
       row.catalogEntry ? startRowPlan(row, row.catalogEntry) : Promise.resolve(false),
@@ -350,7 +324,6 @@ export function OwnedBlueprintsPanel({
       id: 'iskPerHour',
       header: t('industry.iskPerHour'),
       align: 'right',
-      // `IskAmount` compact figure ("999.99B"); the exact one rides its tooltip.
       width: '12ch',
       className: 'tabular-nums whitespace-nowrap',
       sortValue: OWNED_BLUEPRINT_SORT_VALUE.iskPerHour,
@@ -363,7 +336,6 @@ export function OwnedBlueprintsPanel({
     {
       id: 'action',
       header: '',
-      // The Start plan button, "Starting plan…" while busy.
       width: '18ch',
       render: (row) => {
         const entry = row.catalogEntry;
@@ -382,8 +354,6 @@ export function OwnedBlueprintsPanel({
     OwnedBlueprintsColumnId,
     DataTableColumn<OwnedBlueprintRow>
   >;
-  // The sort ids come from every column, so a URL sort on a hidden column is
-  // kept (the table just shows unsorted) and applies again once it's shown.
   const shownColumns = columns.filter(
     (column) =>
       !(OWNED_BLUEPRINTS_COLUMN_IDS as readonly string[]).includes(column.id) ||
@@ -404,8 +374,6 @@ export function OwnedBlueprintsPanel({
   ];
 
   const filterValue = { kind, activity, includeCorp };
-  // Below `lg` the kind filter sits inline above the cards, not in the sheet,
-  // so it is no pill there: the control above the cards already shows it.
   const activeFilters: ActiveFilter<typeof filterValue>[] = [];
   if (isDesktop && kind !== 'all')
     activeFilters.push({

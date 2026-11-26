@@ -1,16 +1,3 @@
-/**
- * The Military Campaigns Overview widget's read (issue #6709): every stored
- * Character's Participate answers (`loadMilitaryCampaignsOverview`), the
- * Active turn-in offers, and the turn-in items each Character holds, read
- * from the same cached asset list the Assets page uses (`loadCharacterAssets`).
- *
- * A campaign or objective the baked SDE file does not know yet (one that
- * started after the last bake) is left out by the engines, never a crash; it
- * shows from the next bake.
- *
- * A Turn-in Reward is never a price (scope decision 20261123-164921): the
- * widget's "waiting to turn in" figure stays out of every total but its own.
- */
 import { loadGrantedScopes } from '@/app/grantedScopes';
 import { db } from '@/db';
 import { ESI_REGISTRY } from '@/esi/registry';
@@ -33,42 +20,31 @@ import {
   type TurnInOfferDetail,
 } from './useTurnIns';
 
-/** Where one Character stands on the Military Campaigns Permission. */
 export interface CampaignWidgetCharacter {
   characterId: number;
   name: string;
-  /** `needsPermission`: no Military Campaigns grant; `failed`: granted, but its read failed with nothing cached. */
   status: 'ok' | 'needsPermission' | 'failed';
 }
 
-/** One line of the widget: an objective a Character Participates in, or a turn-in for items it holds. */
 export interface CampaignWidgetRow {
   key: string;
   characterId: number;
   characterName: string;
   objectiveId: string;
-  /** The objective's own title ("Mine Pyroxeres"). */
   title: string;
-  /** The running campaign's faction; null when the SDE named none. */
   factionId: number | null;
-  /** Community progress against the target, 0..1. */
   filled: number;
-  /** The Character pressed Participate: its contribution and what it has paid. */
   joined: { contributed: number; isk: number; lp: number } | null;
-  /** The objective takes an item the Character holds, or one it has joined with an Active offer. */
   turnIn: {
     typeId: number;
     name: string;
-    /** Units held across the Character's assets; 0 for a joined objective it holds none for. */
     held: number;
-    /** What turning in what it holds pays (ISK plus LP at LP Value), capped as `turnInReward` caps it. */
     reward: number;
     offer: TurnInOfferDetail;
   } | null;
 }
 
 export interface MilitaryCampaignsWidgetData {
-  /** Every campaign ESI lists that the SDE knows, Active first. */
   campaigns: CampaignCompletion[];
   characters: CampaignWidgetCharacter[];
   rows: CampaignWidgetRow[];
@@ -76,23 +52,14 @@ export interface MilitaryCampaignsWidgetData {
   fromCache: boolean;
 }
 
-/** One Character's reads, as `campaignWidgetRows` needs them (none joined without the Permission). */
 export interface CampaignCharacterReads {
   characterId: number;
   name: string;
   participating: readonly ParticipatingObjective[];
-  /** The Character's contribution to an objective it joined, for a turn-in's per-Character cap. */
   contributedTo: (objectiveId: string) => number | null;
-  /** Units held by type, only the types an Active offer takes. */
   held: ReadonlyMap<number, number>;
 }
 
-/**
- * The widget's rows, pure: each joined objective (any type), and a turn-in row
- * for each held item an Active objective takes. A joined turn-in objective the
- * Character also holds items for is one row, not two. Each Character's rows
- * put those with items to hand in first (by what they pay), then the rest by title.
- */
 export function campaignWidgetRows(
   characters: readonly CampaignCharacterReads[],
   offers: ReadonlyMap<number, TurnInOfferDetail>,
@@ -150,10 +117,6 @@ export function campaignWidgetRows(
   });
 }
 
-/**
- * The item types the rows name: every held type, and the item each joined
- * objective takes (a joined turn-in with nothing held still names its item).
- */
 export function turnInTypeIds(
   characters: readonly CampaignCharacterReads[],
   offers: ReadonlyMap<number, TurnInOfferDetail>
@@ -170,17 +133,14 @@ export function turnInTypeIds(
   return ids;
 }
 
-/** Rows with items to hand in come first. */
 const heldRank = (row: CampaignWidgetRow) => (row.turnIn && row.turnIn.held > 0 ? 0 : 1);
 
-/** Units held by type, for the types in `wanted` only; none when the assets cannot be read. */
 async function heldTypes(
   characterId: number,
   wanted: ReadonlySet<number>
 ): Promise<Map<number, number>> {
   const held = new Map<number, number>();
   if (wanted.size === 0) return held;
-  // A Character without the assets scope, or whose list cannot be read, holds nothing we can see.
   const { cached } = await loadCharacterAssets(characterId).catch(() => ({ cached: null }));
   for (const asset of cached?.data ?? []) {
     if (wanted.has(asset.type_id)) {
@@ -192,12 +152,6 @@ async function heldTypes(
 
 const JOINED_SCOPE = ESI_REGISTRY.getCharacterMilitaryCampaignObjectives.scope;
 
-/**
- * The public campaign state could not be read. With no Character granted
- * Military Campaigns, that is the answer the pilot can act on: every Character
- * reads `needsPermission`, so the widget asks for the grant rather than
- * offering Retry. Otherwise it throws, keeping the last good read and Retry.
- */
 async function unreadState(
   stored: readonly { characterId: number; name: string }[]
 ): Promise<MilitaryCampaignsWidgetData> {
@@ -218,17 +172,9 @@ async function unreadState(
   };
 }
 
-/**
- * Every stored Character's campaign rows. `characterId` is the header
- * Character, whose Market hub the LP is counted at. Throws when the public
- * campaign state cannot be read and nothing is cached (unless no Character is
- * granted: see `unreadState`), so the widget keeps its last good read and
- * offers Retry.
- */
 export async function loadMilitaryCampaignsWidget(
   characterId: number
 ): Promise<MilitaryCampaignsWidgetData> {
-  // The shared state first: every per-Character read below then finds it cached.
   const [state, file, stored, hubId] = await Promise.all([
     loadCampaignState(),
     loadMilitaryCampaigns(),
@@ -238,7 +184,6 @@ export async function loadMilitaryCampaignsWidget(
   if (state === null) return unreadState(stored);
   const hub = getTradeHub(hubId) ?? DEFAULT_TRADE_HUB;
   const [offers, overviews] = await Promise.all([
-    // No offers (the LP rates failed) is a widget without turn-in rows, not a failed one.
     loadTurnInOffers(hub).catch(() => null),
     Promise.all(
       stored.map((character) =>
@@ -260,9 +205,6 @@ export async function loadMilitaryCampaignsWidget(
         name: character.name,
         status: kind === 'ok' ? 'ok' : kind === 'needsPermission' ? 'needsPermission' : 'failed',
       };
-      // A Character without Military Campaigns still holds turn-in items: those rows count,
-      // with its Participate unknown (its TurnInDetail says it pays only after Participate).
-      // A Character whose own read failed shows nothing (the widget notes it).
       if (!overview || (overview.participating === null && kind !== 'needsPermission')) return;
       reads[i] = {
         characterId: character.characterId,

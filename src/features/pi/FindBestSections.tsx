@@ -1,14 +1,3 @@
-/**
- * "Find the best thing to build": the planet-type toggles, the controls and
- * the ranked recipe cards, drawn from `FindBestView`. No figure is computed
- * here; components format and translate what the view model hands them.
- *
- * Cues follow DESIGN.md §6c: item names open their PI Product Detail
- * (`PiProductLink`); the planet-type
- * chips toggle with `aria-pressed`; "Show me how" expands in place with a
- * caret and `aria-expanded`; what a what-if planet unlocks is labelled, never
- * colour alone.
- */
 import { Pill } from '@/components/ui/Pill';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { formatCount } from '@/lib/formatCount';
@@ -38,8 +27,6 @@ function useTypeName() {
   return (type: PlanetType) => t(`pi.planetType.${type}`);
 }
 
-// --- Planet types ----------------------------------------------------------------------
-
 export function PlanetTypesPanel({
   hasColonies,
   coloniesUnknown = false,
@@ -51,7 +38,6 @@ export function PlanetTypesPanel({
   onWhatIf,
 }: {
   hasColonies: boolean;
-  /** The colony read failed: none are shown because they are unknown, not because there are none. */
   coloniesUnknown?: boolean;
   colonyCount: number;
   toggles: readonly TypeToggle[];
@@ -128,8 +114,6 @@ export function PlanetTypesPanel({
   );
 }
 
-// --- Controls ---------------------------------------------------------------------------
-
 export type FindBestMode = 'picks' | 'all';
 
 export function FindBestControls({
@@ -183,8 +167,6 @@ export function FindBestControls({
   );
 }
 
-// --- Recipe cards -----------------------------------------------------------------------
-
 const STATE_TEXT: Record<TypeState, string> = {
   have: 'text-success',
   whatif: 'text-warning',
@@ -213,7 +195,6 @@ function HostMark({
     STATE_TEXT[state]
   );
   if (state !== 'find') return <span className={className}>{inner}</span>;
-  // "Find one" is the way in to Show me how, whose step 1 is the planet finder.
   return (
     <Button
       size="sm"
@@ -400,19 +381,16 @@ export function RecipeListPanel({
   emptyHint,
 }: {
   cards: readonly RecipeCardView[];
-  /** Rank of the first card under the "Add a planet to unlock" divider, if any. */
   addDividerBefore: number | null;
   hubName: string;
   priceSource: string;
   estimate: boolean;
   openId: number | null;
   onToggle: (typeId: number) => void;
-  /** Open the card's Show me how (never closes it), at step 1. */
   onFind: (typeId: number) => void;
   renderOpen: (card: RecipeCardView, panelId: string) => ReactNode;
   banner: ReactNode;
   unpricedCount: number;
-  /** Why nothing ranks, when the pilot's own toggles are not the reason. */
   emptyHint: string;
 }) {
   const { t } = useTranslation();
@@ -451,7 +429,6 @@ export function RecipeListPanel({
                     onToggle={() => onToggle(card.recipe.typeId)}
                     onFind={() => {
                       onFind(card.recipe.typeId);
-                      // Already open: bring step 1 back into view and focus.
                       if (open) {
                         const el = document.getElementById(panelId);
                         el?.scrollIntoView?.({ block: 'nearest' });

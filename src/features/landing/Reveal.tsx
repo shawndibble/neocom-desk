@@ -2,16 +2,6 @@ import { useEffect, useRef, type CSSProperties, type ElementType, type ReactNode
 import { cx } from '@/lib/cx';
 import { canAnimate } from './motion';
 
-/**
- * Fades and slides its children in the first time they scroll into view.
- *
- * Content is visible by default. Only once an effect has confirmed the element
- * sits below the fold (and motion is allowed and IntersectionObserver exists)
- * does it get `data-reveal="hidden"`; the observer then flips it to `shown`
- * once. Above-the-fold elements are never hidden, so they cannot flash. The
- * transition itself lives in `index.css` behind `prefers-reduced-motion`.
- * `index` staggers siblings through the `--lp-delay` custom property.
- */
 export function Reveal({
   as: Tag = 'div',
   index = 0,

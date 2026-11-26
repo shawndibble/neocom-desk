@@ -1,9 +1,3 @@
-/**
- * The search settings: one line summing them up that opens the controls
- * (reach, budget, defense, rigs and officer modules). Beside it sits the
- * Skills trigger, and under it the Skills panel, both filled by the free
- * sections through `ImproveSkillsSlotContext`.
- */
 import { useTranslation } from 'react-i18next';
 import { Caret, Checkbox, IskInput, SegmentedControl } from '@/components/ui';
 import { Collapse } from '@/components/ui/Collapse';
@@ -24,17 +18,14 @@ import { ImproveJobChoice } from './ImproveJobChoice';
 interface Props {
   goal: ImproveGoal;
   settings: ImproveSettings;
-  /** The settings' own expansion, and the "More" group inside them. */
   settingsOpen: boolean;
   settingsId: string;
   onToggleSettings: () => void;
   moreOpen: boolean;
   moreId: string;
   onToggleMore: () => void;
-  /** Skills share this area: its panel is filled by the free sections. */
   skillsOpen: boolean;
   skillsId: string;
-  /** Where the Skills trigger and panel are mounted, for the portals that fill them. */
   skillsTriggerRef: (element: HTMLElement | null) => void;
   skillsPanelRef: (element: HTMLElement | null) => void;
 }
@@ -140,11 +131,9 @@ export function ImproveSettingsPanel({
             <>
               <SegmentedControl<DefenseChoice>
                 label={t('fittings.improve.defenseLabel')}
-                // The fit's own side shows selected (Keep as is); the other side converts. A fit with no side also offers Either.
                 options={defenseOptions(settings.fittedSide ?? null).map((value) => ({
                   value,
                   label: t(`fittings.improve.defense.${value === 'keep' ? 'either' : value}`),
-                  // Upgrade swaps a module within its own type, so it can't change tank side.
                   ...(value !== 'keep' &&
                   value !== settings.fittedSide &&
                   settings.value.reach === 'upgrade'

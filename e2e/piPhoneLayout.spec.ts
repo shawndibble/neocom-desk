@@ -1,10 +1,3 @@
-/**
- * PI phone layout (#2696): the Plan "What matters more?" row, the header
- * strip's Sell at picker with a percent and the Map's Planets column head.
- * Bounding boxes, not screenshots, since only a real layout engine can tell
- * overlap. `PI_SHOTS=<dir>` also writes screenshots for the side by side with
- * `docs/design/pi-tabs/ref/`.
- */
 import type { Locator, Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
@@ -26,7 +19,6 @@ async function shot(page: Page, name: string): Promise<void> {
   if (dir) await page.screenshot({ path: `${dir}/${name}.png`, fullPage: true });
 }
 
-/** `boundingBox` doesn't wait, so wait for the element to render before measuring it. */
 async function box(locator: Locator) {
   await expect(locator).toBeVisible({ timeout: 20_000 });
   const b = await locator.boundingBox();
@@ -84,8 +76,6 @@ test.describe('PI phone layout', () => {
       const i = await box(info);
       const p = await box(planets);
       const r = await box(raw);
-      // The visible circle stays in its column; the button's 24px hit area (4px past the
-      // circle) may reach into the gutter, but never the next column.
       const c = await box(info.locator('span[aria-hidden="true"]'));
       expect(c.x + c.width).toBeLessThanOrEqual(p.x + p.width);
       expect(i.x + i.width).toBeLessThanOrEqual(r.x);

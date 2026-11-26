@@ -18,7 +18,6 @@ import {
 } from './corpTaxBookLateNotice.js';
 import { lateNoticeFromStatementDoc } from './corpTaxBookLateNoticeBackfill.js';
 
-/** A late notice as `issueStatement` stores it today, in `corps/{id}/statements`. */
 const storedNotice = {
   id: 'notice_2026-11-01_solo:9001_2026-11-18',
   minerId: 'solo:9001',
@@ -178,7 +177,6 @@ describe('lateNoticeStanding', () => {
 
   it('owes its share of a day it listed part of, and leaves a held day out', () => {
     const byDay = new Map([
-      // The notice listed 1M of a day that has since grown to 4M, 2M of it paid.
       ['2026-11-01', day({ tax: 4_000_000, credited: 2_000_000, remaining: 2_000_000 })],
       ['2026-11-03', day({ tax: 2_000_000, held: true, remaining: 2_000_000 })],
     ]);
@@ -199,13 +197,11 @@ describe('lateNoticeStanding', () => {
       ['2026-11-03', day({ tax: 2_000_000, held: true, remaining: 2_000_000 })],
     ]);
     expect(lateNoticeStanding(notice, byDay)).toMatchObject({ held: 2_000_000, settled: false });
-    // Every listed day held: nothing is due, yet nothing is paid.
     const allHeld = new Map([
       ['2026-11-01', day({ held: true })],
       ['2026-11-03', day({ tax: 2_000_000, held: true, remaining: 2_000_000 })],
     ]);
     expect(lateNoticeStanding(notice, allHeld)).toMatchObject({ due: 0, settled: false });
-    // A held day that is paid anyway does not stand in the way.
     byDay.set('2026-11-03', day({ tax: 2_000_000, held: true, remaining: 0, settled: true }));
     expect(lateNoticeStanding(notice, byDay).settled).toBe(true);
   });
@@ -225,7 +221,6 @@ describe('minerPaymentCode', () => {
 
 describe('paymentCode', () => {
   it('is the code a notice mailed before this module printed', () => {
-    // Pinned: a donation carrying an already-mailed code must still be recognised.
     expect(paymentCode('notice_2026-11-01_solo:9001_2026-11-18')).toBe('MTB32P85');
     expect(paymentCode('x')).toMatch(/^MT[0-9A-Z]{6}$/);
   });
@@ -269,7 +264,6 @@ describe('lateNoticeRefusal: two tabs never mail the same days', () => {
 
   it('refuses one inside the cooldown after the last notice', () => {
     expect(lateNoticeRefusal({ lines: [line('b')] }, earlier, 14, now)).toBe('notice-cooldown');
-    // A final notice closed an account: it starts no cooldown.
     expect(
       lateNoticeRefusal({ lines: [line('b')] }, [{ ...earlier[0], kind: 'final' }], 14, now)
     ).toBeNull();

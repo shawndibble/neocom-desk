@@ -12,7 +12,6 @@ import {
 import { LANDING_SHELL_ATTR, LANDING_SHELL_ID } from './landingShell';
 import shellSnapshot from '@/features/landing/landingShell.snapshot.html?raw';
 
-/** The shape Vite writes into the built `index.html` head. */
 const BUILT = `<!doctype html>
 <html><head>
 <script id="landing-shell-gate">/* gate */</script>
@@ -31,7 +30,6 @@ function loaderOf(html: string): string {
 }
 
 function runLoader(): void {
-  // Indirect eval: global scope, as a classic <script> runs.
   (0, eval)(loaderOf(deferEntryHtml(BUILT)));
 }
 
@@ -169,7 +167,6 @@ describe('the loader', () => {
     let emit: Emit | undefined;
     let disconnected = false;
 
-    /** Chromium's LCP observer, reduced to what the loader uses. */
     function stubLcpObserver(): void {
       emit = undefined;
       disconnected = false;

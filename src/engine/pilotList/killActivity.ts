@@ -1,49 +1,31 @@
-/**
- * What a pilot's kills say about where and how recently they fight (Pilot
- * Lookup's Local list). Pure: the kill list is fetched in
- * `src/lib/zkillboard.ts`; here it is only counted and dated.
- */
 import { DAY_MS } from '@/lib/age';
 export type KillSpace = 'highsec' | 'lowsec' | 'nullsec' | 'wormhole';
 
 export const KILL_SPACES: readonly KillSpace[] = ['highsec', 'lowsec', 'nullsec', 'wormhole'];
 
-/** How far back the per-space counts reach. */
 export const ACTIVITY_WINDOW_DAYS = 30;
 
-/** How many months the modal's chart spans. */
 export const CHART_MONTHS = 6;
 
-/** One kill the pilot took part in. `space` is null when zKillboard didn't say. */
 export interface KillRecord {
   timeMs: number;
   space: KillSpace | null;
   systemId: number | null;
-  /** The hull that died. */
   victimShipTypeId: number | null;
-  /** The hull this pilot flew on the kill. */
   ownShipTypeId: number | null;
-  /**
-   * How many pilots were on the killmail's attacker side, this one included.
-   * Absent on a history stored before this was read, and on a body with no attackers.
-   */
   attackerCount?: number | null;
 }
 
 export interface SpaceActivity {
-  /** Kills inside the window. */
   count: number;
-  /** The newest kill in this space, in any age; null when there is none. */
   lastMs: number | null;
 }
 
 export interface KillSummary {
   bySpace: Record<KillSpace, SpaceActivity>;
-  /** Kills inside the window, whatever the space. */
   recentCount: number;
 }
 
-/** The start of the window the per-space counts cover. */
 export function windowStart(nowMs: number): number {
   return nowMs - ACTIVITY_WINDOW_DAYS * DAY_MS;
 }
@@ -65,20 +47,13 @@ export function summarizeKills(kills: readonly KillRecord[], nowMs: number): Kil
   return { bySpace, recentCount };
 }
 
-/**
- * How old a newest kill can be and still be dated: about six months, the span
- * of the pilot's kill chart. "Last kill 390d ago" told the pilot nothing a
- * blank does not (issue #5668).
- */
 export const LAST_KILL_SHOWN_DAYS = 183;
 
-/** The newest kill's time if it is recent enough to date, else null. */
 export function shownLastKill(lastMs: number | null, nowMs: number): number | null {
   if (lastMs === null) return null;
   return nowMs - lastMs > LAST_KILL_SHOWN_DAYS * DAY_MS ? null : lastMs;
 }
 
-/** How loudly a kill's age is drawn: today, this week, older, or no kill. */
 export type AgeTone = 'fresh' | 'week' | 'old' | 'none';
 
 export function ageTone(lastMs: number | null, nowMs: number): AgeTone {
@@ -90,7 +65,6 @@ export function ageTone(lastMs: number | null, nowMs: number): AgeTone {
 }
 
 export interface MonthBucket extends Record<KillSpace, number> {
-  /** `YYYY-MM`, UTC. */
   key: string;
 }
 
@@ -98,7 +72,6 @@ function monthKey(date: Date): string {
   return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
 }
 
-/** The last `CHART_MONTHS` UTC months, oldest first, with kills counted by space. */
 export function monthlyBySpace(kills: readonly KillRecord[], nowMs: number): MonthBucket[] {
   const now = new Date(nowMs);
   const buckets: MonthBucket[] = [];
@@ -120,7 +93,6 @@ export interface ShipCount {
   count: number;
 }
 
-/** The most common hulls in a list of type ids, most first; unknowns are skipped. */
 export function topShips(ids: readonly (number | null)[], limit: number): ShipCount[] {
   const counts = new Map<number, number>();
   for (const id of ids) if (id !== null) counts.set(id, (counts.get(id) ?? 0) + 1);

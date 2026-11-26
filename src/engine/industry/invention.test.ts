@@ -10,11 +10,6 @@ import {
 } from './invention';
 import { FACILITY_PRESETS } from './types';
 
-// Hand-worked example (a Gyrostabilizer II-style module): base chance 34%,
-// both science skills at IV and the encryption skill at III, 8 + 8 datacores,
-// an 18,400 ISK copy job and a 525,600 ISK invention fee.
-//   chance  = 0.34 × (1 + (4 + 4)/30 + 3/40) = 0.456166…
-//   attempt = 8 × 285,000 + 8 × 262,000 + 18,400 + 525,600 = 4,920,000
 const ATTAINMENT = {
   typeID: 34202,
   name: 'Attainment Decryptor',
@@ -178,8 +173,6 @@ describe('inventionOffers', () => {
 
 describe('researchJobFee', () => {
   it('charges the job fee on 2% of one run’s estimated item value', () => {
-    // EIV = 10 × 1,000 + 5 × 2,000 = 20,000; 2% = 400.
-    // 400 × (5% index + 0.25% NPC tax + 4% SCC) = 37
     const fee = researchJobFee(
       {
         materials: [

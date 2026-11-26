@@ -30,7 +30,6 @@ const mockedGrant = vi.mocked(beginEveLogin);
 
 const CHARACTER_ID = 42;
 const ALL_CORP_SCOPES = [...scopesForGroup('corp')];
-/** What a Character signed in before #6102 holds: the Base Grant without the six formerly opt-in Permissions. */
 const PRE_6102_BASE = SCOPES.filter(
   (scope) => !FORMERLY_OPT_IN_GROUPS.some((group) => scopesForGroup(group).includes(scope))
 );
@@ -56,7 +55,6 @@ function renderPanel(url = '/settings/permissions') {
   );
 }
 
-/** The list item for one Permission, found by its label. */
 function row(label: string): HTMLElement {
   return screen.getByText(label, { selector: 'div' }).closest('li')!;
 }
@@ -122,7 +120,6 @@ describe('PermissionsPanel — every Permission', () => {
     mockedGrantedScopes.mockReturnValue([...PRE_6102_BASE]);
     mockedLoadRoles.mockReturnValue(new Promise(() => {}));
     renderPanel();
-    // The Write to EVE section is its own list below the reads; ordering is per list.
     const writeSection = screen.getByRole('region', { name: 'Write to EVE' });
     const items = screen.getAllByRole('listitem').filter((li) => !writeSection.contains(li));
     const states = items.map((li) => (within(li).queryByText('Not granted') ? 'missing' : 'other'));
@@ -139,7 +136,6 @@ describe('PermissionsPanel — every Permission', () => {
     const shown = screen
       .getAllByRole('listitem')
       .map((li) => li.querySelector('div > div')?.firstChild?.textContent);
-    // Reads in catalogue order, then the Write to EVE section's rows.
     const ordered = [
       ...SCOPE_GROUPS.filter((group) => !WRITE_GROUPS.includes(group)),
       ...WRITE_GROUPS,
@@ -277,7 +273,6 @@ describe('PermissionsPanel — granting several at once', () => {
     const selectNone = screen.getByRole('button', { name: 'Select none' });
     await userEvent.click(selectNone);
     expect(screen.queryByRole('button', { name: /^grant selected/i })).not.toBeInTheDocument();
-    // Nothing left to clear, yet the pressed button keeps focus (issue #3365).
     expect(selectNone).toHaveAttribute('aria-disabled', 'true');
     expect(document.activeElement).toBe(selectNone);
   });
@@ -292,10 +287,6 @@ describe('PermissionsPanel — granting several at once', () => {
   });
 });
 
-/**
- * The Corporation row keeps the old Corp access row's role awareness: a line
- * member is never offered a grant that unlocks nothing.
- */
 describe('PermissionsPanel — the Corporation row', () => {
   it('none: hidden, because granting would unlock nothing', async () => {
     mockedGrantedScopes.mockReturnValue(ALL_CORP_SCOPES);

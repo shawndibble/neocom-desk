@@ -1,11 +1,3 @@
-/**
- * The Corp projects view of the Build panel (issue #4786): open manufacture
- * projects of each selected Character's corporation, as a buyer with a fixed
- * reward. Each row is priced by the Build Plan "Add to Compare" would save
- * (`planForCorpProject`, resolved by `useComparedBuildResults`), so what a row
- * promises is what Compare shows. Desktop is a table whose rows open to the
- * working; a phone gets the Opportunities-style cards.
- */
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -50,7 +42,6 @@ import {
 import type { CharacterCorpProjects } from './useCorpProjects';
 
 interface CorpProjectsPanelProps {
-  /** Desktop's plain title; unset on a phone, where `leading`'s view picker stands in for it. */
   title?: string;
   leading?: ReactNode;
   meta: ReactNode;
@@ -66,11 +57,9 @@ interface CorpProjectsPanelProps {
   characterNames: ReadonlyMap<number, string>;
   hubFor: (characterId: number) => TradeHub;
   modifiersByCharacter: ReadonlyMap<number, CharacterModifiers>;
-  /** Saves the picked rows' plans and opens Build Plan Compare with them. */
   onAddToCompare: (plans: readonly BuildPlanRecord[]) => void;
 }
 
-/** One Character's plans, priced through the same resolution a Build Plan page runs. */
 function CharacterPricing({
   characterId,
   plans,
@@ -133,7 +122,6 @@ export function CorpProjectsPanel({
   const isDesktop = useIsDesktop();
   const [now] = useState(() => new Date());
 
-  // Whole-account stock of every material a listed project's blueprint needs.
   const stock = useMemo(() => {
     const typeIds = new Set<number>();
     for (const { projects } of entries) {
@@ -145,8 +133,6 @@ export function CorpProjectsPanel({
     return detectOwnedStock(ownedStockSnapshot.sources, typeIds);
   }, [entries, catalog, ownedStockSnapshot]);
 
-  // One plan per project the Character can still be paid for. Ids are stable so
-  // a re-render that rebuilds them does not restart pricing.
   const planned = useMemo(
     () =>
       entries.flatMap(({ characterId, projects }) =>
@@ -239,7 +225,6 @@ export function CorpProjectsPanel({
       header: t('industry.corpProjects.select'),
       phoneHidden: true,
       render: (row) => (
-        // The label is the 36px touch target on a coarse pointer, and keeps the click off the row's disclosure.
         <label className={touchCheckboxLabelClassName} onClick={(event) => event.stopPropagation()}>
           <Checkbox
             checked={selectedIds.has(row.id)}
@@ -270,8 +255,6 @@ export function CorpProjectsPanel({
     {
       id: 'blueprint',
       header: t('industry.corpProjects.blueprint'),
-      // Cheapest route first: owned, then a community offer, a bought copy, the amber assumption.
-      // Still pricing or unpriced has no source to rank, so it sinks.
       sortValue: (row) => (row.source ? SOURCE_RANK[row.source.kind] : undefined),
       sortFirst: 'asc',
       render: (row) => <BlueprintSourceCell row={row} />,

@@ -13,7 +13,6 @@ vi.mock('@/features/campaigns/useTurnIns', async (importOriginal) => ({
   useParticipation: () => ({ status: 'idle', data: undefined, retry: vi.fn() }),
 }));
 
-/** Only what the Sell column reads. */
 const row = (typeId: number, name: string) =>
   ({ typeId, name, price: 57_990, toHub: getTradeHub('jita') }) as unknown as HaulingViewRow;
 
@@ -53,7 +52,6 @@ describe('Hauling Sell column turn-in', () => {
       screen.getByRole('button', { name: 'Turn-in reward for Shield Failover Report' })
     );
     expect(onRowClick).not.toHaveBeenCalled();
-    // Not the headline's "~60K each turned in" again: what it pays over this sale price.
     expect(await screen.findByText('Pays ~2K each over selling here (57,990)')).toBeInTheDocument();
     expect(screen.queryByText(/Turn-in pays/)).not.toBeInTheDocument();
   });

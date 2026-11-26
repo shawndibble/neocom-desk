@@ -1,15 +1,3 @@
-/**
- * Maps one of ESI's saved In-game Fittings (`GET .../fittings/`, issue #1539)
- * onto the domain `Fitting` shape — the "In-game Fittings" half of #1532.
- * ESI's fitting item carries no charge or online/offline state (it is a
- * static loadout, not a live ship), so every resolved module loads `'active'`
- * and carries no `chargeTypeId` — the same "nothing left to say otherwise"
- * reasoning as `eftLoader.ts`'s EFT-paste modules. Fighter squadrons read
- * off `FighterTube*` (launched) and `FighterBay` (waiting). `ServiceSlot*`
- * (structures) has no rack this app models, so it goes to `unresolved`
- * rather than being dropped silently, same as `eftLoader.ts` — and the
- * result is a Load outcome like any other source's (`load.ts`).
- */
 import { fighterFlagState, fighterTubes, slotFlag, slotFromFlag } from './inventoryFlags';
 import type { LoadedFitting, LoadWarning } from './load';
 import {
@@ -35,11 +23,6 @@ export interface EsiCharacterFitting {
   items: EsiFittingItem[];
 }
 
-/**
- * The shape `postCharacterFitting` (`src/esi/endpoints/`) sends — named
- * locally so this module never imports the ESI layer (`src/engine` stays
- * fetch-free); structurally identical to that wrapper's `NewCharacterFitting`.
- */
 export interface NewEsiFitting {
   name: string;
   description: string;
@@ -47,7 +30,6 @@ export interface NewEsiFitting {
   items: EsiFittingItem[];
 }
 
-/** `FighterTube0` to `FighterTube4`: the most tubes any hull has. */
 const ESI_FIGHTER_TUBES = 5;
 
 export function esiFittingToFitting(esiFitting: EsiCharacterFitting): LoadedFitting {
@@ -94,15 +76,6 @@ export function esiFittingToFitting(esiFitting: EsiCharacterFitting): LoadedFitt
   };
 }
 
-/**
- * The reverse of `esiFittingToFitting`, for Save to EVE (#1540). `name` and
- * `description` are taken as given rather than read off `fitting.name` — the
- * Save to EVE dialog lets a pilot rename on the way out, and ESI has no field
- * for a Fitting's own description. Module state, charges and implants have no
- * home in ESI's item list, so they are dropped here exactly as
- * `esiFittingToFitting` above never produced them coming back — the UI is
- * what has to say so before saving, not this mapper.
- */
 export function fittingToEsiFitting(
   fitting: Fitting,
   name: string,
@@ -119,8 +92,6 @@ export function fittingToEsiFitting(
   for (const drone of fitting.drones) {
     items.push({ flag: 'DroneBay', quantity: drone.quantity, type_id: drone.typeId });
   }
-  // Launched squadrons take the tubes in order, as the engine sees them; ESI
-  // has five tubes, so a squadron past them waits in the bay.
   const fighters = fitting.fighters ?? [];
   const tubes = fighterTubes(fighters, ESI_FIGHTER_TUBES);
   fighters.forEach((fighter, index) => {

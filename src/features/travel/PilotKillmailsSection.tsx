@@ -1,8 +1,3 @@
-/**
- * Travel › Pilot Lookup's recent kills and losses (issue #2332): the newest
- * `PILOT_KILLMAIL_LIMIT` from zKillboard, each row expanding to the victim's
- * fit with Open in Fittings. A killmail is read only when its row expands.
- */
 import { ExternalLink } from '@/components/ui/ExternalLink';
 import { useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -28,7 +23,6 @@ import { KillmailBody, type Expanded, type TypeLabel } from './KillmailBody';
 import { loadKillmailFit } from './pilotKillmailFit';
 import { useTypeLabel } from './useTypeLabel';
 
-/** Every id a row's names come from: pilots, corporations and the system. */
 function nameIds(detail: KillmailDetail | null): number[] {
   const ids: number[] = [];
   if (detail === null) return ids;
@@ -45,7 +39,6 @@ export function PilotKillmailsSection({
   unknown = false,
 }: {
   characterId: number;
-  /** zKillboard's other reads failed: an empty list here is unknown, not "no kills". */
   unknown?: boolean;
 }) {
   const { t } = useTranslation();
@@ -55,7 +48,6 @@ export function PilotKillmailsSection({
   const [open, setOpen] = useState<ReadonlySet<number>>(new Set());
   const [names, setNames] = useState<ReadonlyMap<number, string>>(new Map());
   const typeLabel = useTypeLabel();
-  /** Killmails read or being read; a ref, so a quick double-click can't start a second read. */
   const reading = useRef(new Set<number>());
   const headingId = useId();
 
@@ -100,7 +92,6 @@ export function PilotKillmailsSection({
       else next.add(id);
       return next;
     });
-    // A read that landed or is landing is kept, so collapsing and re-expanding never refetches; a failed one retries.
     if (!opening || reading.current.has(id)) return;
     reading.current.add(id);
     setExpanded((current) => new Map(current).set(id, 'loading'));
@@ -205,7 +196,6 @@ function KillmailRow({
   const panelId = useId();
   const dash = '—';
 
-  // A pilot's name, else their corporation's, else (an NPC) the ship they flew.
   function partyName(party: KillmailParty | null): string {
     if (party === null) return dash;
     const byId = (id: number | null) => (id === null ? undefined : names.get(id));
@@ -255,8 +245,6 @@ function KillmailRow({
         <span className="text-text-dim">
           {detail?.systemId == null ? dash : (names.get(detail.systemId) ?? `#${detail.systemId}`)}
         </span>
-        {/* `flex-1` from zero width never forces a wrap, so a phone truncated a normal
-            name to ~9 characters (#2520): below `sm` it takes the last line of its own. */}
         <span className="min-w-0 flex-1 truncate max-sm:order-last max-sm:basis-full">
           <span className="text-text-dim">
             {t(

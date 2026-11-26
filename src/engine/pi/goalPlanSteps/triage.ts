@@ -1,13 +1,8 @@
-/**
- * Step 1 of `planGoals`: normalise the goals, then set aside those a
- * **type gap** blocks before anything is assigned. Step numbers follow the module header of `../goalPlan.ts`.
- */
 import type { PiData } from '@/sde/types';
 import { isP0 } from '../chain';
 import type { Goal, PlannerColony, PlannerPolicy, Shortfall } from '../goalTypes';
 import { madeNodes, rawOf, schematicOf } from './shared';
 
-/** Goals merged by type, zero-rate goals dropped, P0 goals refused. */
 export function normaliseGoals(goals: readonly Goal[], pi: PiData): Goal[] {
   const merged = new Map<number, number>();
   for (const g of goals) {
@@ -16,7 +11,6 @@ export function normaliseGoals(goals: readonly Goal[], pi: PiData): Goal[] {
     }
     if (g.unitsPerDay === 0) continue;
     if (isP0(g.typeId, pi)) {
-      // Every extraction slot refines on the spot; raw P0 is never a product.
       throw new Error(`goal ${g.typeId} is a P0; the planner plans P1 and above`);
     }
     merged.set(g.typeId, (merged.get(g.typeId) ?? 0) + g.unitsPerDay);
@@ -27,23 +21,12 @@ export function normaliseGoals(goals: readonly Goal[], pi: PiData): Goal[] {
 }
 
 export interface GoalTriage {
-  /** Goals nothing rules out up front. */
   live: Goal[];
-  /** Goals a type gap blocks: they make nothing, so nothing is extracted for them. */
   blocked: Goal[];
-  /** Per blocked goal, the P0s whose type gaps block it, ascending. */
   blockedBy: Map<Goal, number[]>;
   typeGaps: Shortfall[];
 }
 
-/**
- * Which goals can be planned at all. A P1 whose P0 no enabled colony's planet
- * type yields, and that the pilot will not buy, blocks every goal whose chain
- * needs it — a **type gap**. Those goals are dropped before anything is
- * assigned: nothing extracts for a product that cannot be finished, and no
- * budget gap is reported for its other inputs (fix the type gap first; they
- * reappear in the plan once it is fixed).
- */
 export function triageGoals(
   goals: readonly Goal[],
   colonies: readonly PlannerColony[],
@@ -52,7 +35,7 @@ export function triageGoals(
 ): GoalTriage {
   const buyP1 = policy.buyTiers.includes(1);
   const yieldable = (p0: number) => colonies.some((c) => c.ratePerEcu.has(p0));
-  const gapUnits = new Map<number, number>(); // p1 → P1 units/h the blocked goals wanted
+  const gapUnits = new Map<number, number>();
   const live: Goal[] = [];
   const blocked: Goal[] = [];
   const blockedBy = new Map<Goal, number[]>();
