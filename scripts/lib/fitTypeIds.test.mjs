@@ -11,6 +11,8 @@ const groups = new Map([
   [280, { name: 'General Freight', categoryID: 17 }],
   [1950, { name: 'Permanent SKIN', categoryID: 91 }],
   [1964, { name: 'Mutaplasmids', categoryID: 17 }],
+  [333, { name: 'Datacores', categoryID: 17 }],
+  [1304, { name: 'Decryptors', categoryID: 17 }],
 ]);
 
 const type = (groupID, published = true) => ({ groupID, published });
@@ -40,6 +42,15 @@ describe('fitTypeIds', () => {
       [3, type(280)],
     ]);
     expect([...fitTypeIds(types, groups)]).toEqual([47299]);
+  });
+
+  it('takes datacores and decryptors, which a fit carries in cargo', () => {
+    const types = new Map([
+      [20411, type(333)],
+      [34204, type(1304)],
+      [3, type(280)],
+    ]);
+    expect([...fitTypeIds(types, groups)].sort((a, b) => a - b)).toEqual([20411, 34204]);
   });
 
   it('skips unpublished types, other categories, and types with no known group', () => {
