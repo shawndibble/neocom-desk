@@ -13,7 +13,7 @@ const WRITE_ITEMS = ['mail', 'calendar', 'send', 'fitting', 'waypoints', 'window
 function TrustCard({ id, children }: { id: string; children: ReactNode }) {
   const { t } = useTranslation();
   return (
-    <Panel className="border-t-2 border-t-accent">
+    <Panel padded={false} className="border-t-2 border-t-accent px-5 py-5.5">
       <p className={cx(hudLabelClassName, 'text-[0.6875rem] text-accent')}>
         {t(`login.trust.${id}.eyebrow`)}
       </p>
