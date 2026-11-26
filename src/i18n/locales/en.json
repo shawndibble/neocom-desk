@@ -1341,7 +1341,9 @@
       "heading": "Makes it fit",
       "makesItFit": "Brings the Fitting under CPU or powergrid budget",
       "missing": "Needed to fly the ship or use its modules",
-      "inPlan": "In {{plan}}"
+      "inPlan": "In {{plan}}",
+      "budgetChange": "{{resource}} {{beforeUsed}} / {{beforeTotal}} → {{afterUsed}} / {{afterTotal}} {{unit}}",
+      "addAllLabel": "Add to plan: every skill this fit needs"
     },
     "whatToTrain": {
       "noCharacter": "Log in a Character to see which skill to train next for this fit.",

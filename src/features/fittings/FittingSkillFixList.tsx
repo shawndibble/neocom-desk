@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui';
+import { cx } from '@/lib/cx';
 import type { SkillFix } from '@/engine/fittings/skillFixes';
 import { scheduledSkillTargets } from '@/engine/fittings/skillGains';
 import { splitSharedSchedule } from '@/engine/fittings/sharedSchedule';
@@ -11,10 +12,14 @@ import { formatCountdown } from '@/lib/duration';
 import { buildFitCheckRows } from '@/features/skills/ships/fitCheckRows';
 import { WhatToTrainPrerequisites } from './FittingWhatToTrainPrerequisites';
 import { TrainRow } from './FittingTrainRow';
+import { STAT_DETAIL } from './statKit';
+import { budgetChangeLabel } from './makeItFitFreed';
 import type { ScheduleEntries } from './useModuleUpgrades';
 
+type FixInput = Pick<SkillFix, 'entries'> & Partial<Pick<SkillFix, 'before' | 'after'>>;
+
 interface Props {
-  fixes: readonly Pick<SkillFix, 'entries'>[];
+  fixes: readonly FixInput[];
   skills: ReadonlyMap<number, EngineSkill> | undefined;
   trainedSkills: ReadonlyMap<number, TrainedSkill>;
   scheduleEntriesFor: ScheduleEntries | null;
@@ -25,7 +30,7 @@ interface Props {
 }
 
 function fixSchedules(
-  fixes: readonly Pick<SkillFix, 'entries'>[],
+  fixes: readonly FixInput[],
   scheduleEntriesFor: ScheduleEntries | null,
   together: boolean
 ): (readonly ScheduledStep[] | null)[] {
@@ -80,6 +85,7 @@ export function SkillFixList({
         return (
           <TrainRow
             key={label}
+            detail={fix.before && fix.after ? budgetChangeLabel(fix.before, fix.after, t) : null}
             title={
               <p className="font-semibold">
                 {fix.entries.map((e) => (
@@ -135,5 +141,37 @@ export function SkillFixList({
         );
       })}
     </ul>
+  );
+}
+
+interface GroupProps extends Props {
+  reason: string;
+  addAll?: boolean;
+  className?: string;
+}
+
+export function SkillFixGroup({ reason, addAll = false, className, ...list }: GroupProps) {
+  const { t } = useTranslation();
+  const entries = list.fixes.flatMap((fix) => fix.entries);
+  const allPlanned = entries.every(
+    (e) => (list.plannedLevels.get(e.skillTypeID) ?? 0) >= e.targetLevel
+  );
+  const showAddAll = addAll && list.fixes.length > 1 && list.plan !== undefined && !allPlanned;
+  return (
+    <>
+      <div className={cx('flex items-center justify-between gap-3', className)}>
+        <p className={STAT_DETAIL}>{reason}</p>
+        {showAddAll && (
+          <Button
+            size="sm"
+            aria-label={t('fittings.skillFixes.addAllLabel')}
+            onClick={() => list.onAdd(entries)}
+          >
+            {t('fittings.whatToTrain.addAll')}
+          </Button>
+        )}
+      </div>
+      <SkillFixList {...list} />
+    </>
   );
 }

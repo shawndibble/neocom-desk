@@ -47,6 +47,27 @@ describe('findSkillFixes', () => {
     expect(fixes[0]!.after.cpuUsed).toBe(100);
   });
 
+  it('hands back the stats it started from beside each fix, single or bundled', async () => {
+    const before = stats(148);
+    const single = await findSkillFixes({
+      before,
+      candidates: [{ skillTypeId: 1, fromLevel: 0 }],
+      stats: cpuModel(148, { 1: 12 }, { 1: 0 }),
+    });
+    expect(single[0]!.before).toBe(before);
+
+    const bundled = await findSkillFixes({
+      before: stats(120),
+      candidates: [
+        { skillTypeId: 1, fromLevel: 0 },
+        { skillTypeId: 2, fromLevel: 0 },
+      ],
+      stats: cpuModel(120, { 1: 2, 2: 2 }, { 1: 0, 2: 0 }),
+    });
+    expect(bundled).toHaveLength(1);
+    expect(bundled[0]!.before.cpuUsed).toBe(120);
+  });
+
   it('builds on the level the pilot already has', async () => {
     const calc = cpuModel(110, { 1: 6 }, { 1: 2 });
     const fixes = await findSkillFixes({

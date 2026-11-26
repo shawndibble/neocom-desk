@@ -36,6 +36,24 @@ export const unitOf = (resource: Resource, t: Translate): string =>
 
 export const roundedAmount = (value: number): string => formatNumber(Math.round(value));
 
+export function budgetChangeLabel(
+  before: FittingStats,
+  after: FittingStats,
+  t: Translate
+): string | null {
+  const parts = overBudgets(before).map(({ resource, used, total }) =>
+    t('fittings.skillFixes.budgetChange', {
+      resource: t(`fittings.makeItFit.resourceName.${resource}`),
+      beforeUsed: roundedAmount(used),
+      beforeTotal: roundedAmount(total),
+      afterUsed: roundedAmount(usedOf(after, resource)),
+      afterTotal: roundedAmount(totalOf(after, resource)),
+      unit: unitOf(resource, t),
+    })
+  );
+  return parts.length > 0 ? parts.join(' · ') : null;
+}
+
 export function freedLabel(
   before: FittingStats | null,
   after: FittingStats,
