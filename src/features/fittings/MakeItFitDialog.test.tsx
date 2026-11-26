@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
@@ -132,6 +132,10 @@ const thermalResist = { key: 'shieldThermalResonance', before: 40, after: 34 };
 const inBudget = { cpuUsed: 90, cpuTotal: 100, powergridUsed: 0, powergridTotal: 100 };
 
 describe('MakeItFitDialog', () => {
+  afterEach(() => {
+    mocks.skillFixes = { fixes: null, failed: false };
+  });
+
   it('is titled after the budget whose Fix link opened it', () => {
     renderDialog([option(0, 10, [ehpDown])]);
     expect(screen.getByRole('dialog', { name: 'Fix CPU' })).toBeTruthy();
@@ -167,7 +171,6 @@ describe('MakeItFitDialog', () => {
     };
     renderDialog([option(0, 10, [ehpDown])], { characterId: 1 });
     expect(screen.getByText('CPU 148 / 100 → 90 / 100 tf')).toBeTruthy();
-    mocks.skillFixes = { fixes: null, failed: false };
   });
 
   it('offers no training without a Character', () => {
