@@ -389,14 +389,14 @@ export function WhatToTrainItem({
           >
             {row.name}
           </SkillLink>
+          <span className={cx(STAT_DETAIL, 'shrink-0')}>
+            {row.fromLevel > 0
+              ? t('fittings.whatToTrain.trained', { level: romanLevel(row.fromLevel) })
+              : t('fittings.whatToTrain.notTrained')}
+          </span>
         </span>
       }
-      detail={joinDetail([
-        row.fromLevel > 0
-          ? t('fittings.whatToTrain.trained', { level: romanLevel(row.fromLevel) })
-          : t('fittings.whatToTrain.notTrained'),
-        ...changes,
-      ])}
+      detail={joinDetail(changes)}
       status={
         plan &&
         plannedSpan !== null && (
