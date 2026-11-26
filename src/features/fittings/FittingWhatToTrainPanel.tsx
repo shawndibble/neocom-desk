@@ -196,7 +196,9 @@ function WhatToTrainRanking({
       )}
       {skillFixes.fixes && skillFixes.fixes.length > 0 && (
         <>
-          <p className={cx(STAT_DETAIL, missingFixes.length > 0 && 'pt-2')}>
+          <p
+            className={cx(STAT_DETAIL, missingFixes.length > 0 && 'mt-2 border-t border-line pt-2')}
+          >
             {t('fittings.skillFixes.makesItFit')}
           </p>
           <SkillFixList fixes={skillFixes.fixes} {...fixListProps} />
@@ -285,7 +287,7 @@ function WhatToTrainRanking({
         <StatNote>{t('fittings.whatToTrain.none')}</StatNote>
       )}
       {improves.length > 0 && (
-        <div className="space-y-1">
+        <div className={cx('space-y-1', hasFixes && 'mt-3')}>
           {hasFixes && <p className={STAT_EYEBROW_TYPE}>{t('fittings.whatToTrain.improvesFit')}</p>}
           <ul
             aria-label={t('fittings.stats.section.whatToTrain')}

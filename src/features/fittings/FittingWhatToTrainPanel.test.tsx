@@ -532,7 +532,7 @@ describe('FittingWhatToTrainPanel — over budget', () => {
     );
     expect(await screen.findAllByText(/Needed to fly the ship or use its modules/)).toHaveLength(1);
     expect(screen.getAllByText(/under CPU or powergrid budget/)).toHaveLength(1);
-    expect(screen.getAllByText('Add all')).toHaveLength(1);
+    expect(await screen.findAllByText('Add all')).toHaveLength(1);
     const bundle = screen.getByText('Add all').closest('li')!;
     expect(within(bundle).getByRole('link', { name: 'Gunnery' }).parentElement).toHaveClass(
       'block'
