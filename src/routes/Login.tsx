@@ -90,7 +90,7 @@ export function Login() {
       <main>
         <section className="relative isolate overflow-hidden">
           <LandingBackdrop tone="space" />
-          <div className="relative mx-auto grid max-w-page items-center gap-8 px-4 pt-8 pb-16 sm:px-6 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] lg:gap-12 lg:px-16 lg:py-20">
+          <div className="relative mx-auto grid max-w-page items-center gap-8 px-4 pt-8 pb-16 sm:px-6 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] lg:gap-12 lg:py-20">
             <HeroReticle className="lg:order-2" />
             <div className="flex flex-col items-center text-center lg:items-start lg:text-left">
               <p

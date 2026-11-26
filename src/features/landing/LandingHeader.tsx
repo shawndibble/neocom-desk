@@ -48,7 +48,7 @@ export function LandingHeader({
   const ctaOut = useAllOutOfView(ctaRefs);
   return (
     <header className="sticky top-0 z-30 border-b border-line bg-bg/95">
-      <div className="mx-auto flex max-w-[96rem] items-center gap-4 px-4 py-2 sm:px-6">
+      <div className="mx-auto flex max-w-page items-center gap-4 px-4 py-2 sm:px-6">
         <div className="flex items-center gap-2">
           <LogoMark className="size-7" />
           <span className="font-hud text-base font-bold tracking-wider whitespace-nowrap uppercase">
