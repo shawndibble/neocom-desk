@@ -47,7 +47,7 @@ export function TourVideoLink({
         <div className="mx-auto aspect-video w-full max-w-[calc((85dvh-5rem)*16/9)] bg-bg">
           <iframe
             src={promoEmbedUrl(youtubeId)}
-            title={title}
+            aria-label={title}
             {...EMBED_IFRAME_PROPS}
             className="block size-full"
           />

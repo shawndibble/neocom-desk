@@ -32,7 +32,7 @@ describe('TourVideoLink', () => {
     await user.click(screen.getByRole('button'));
 
     const dialog = screen.getByRole('dialog', { name: en.login.tourVideos[id].title });
-    const player = within(dialog).getByTitle(en.login.tourVideos[id].title);
+    const player = within(dialog).getByLabelText(en.login.tourVideos[id].title);
     expect(player.tagName).toBe('IFRAME');
     expect(player).toHaveAttribute('src', promoEmbedUrl(TOUR_VIDEOS[id].youtubeId));
 
