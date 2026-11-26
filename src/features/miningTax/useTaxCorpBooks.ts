@@ -6,6 +6,7 @@ import { useBookSystems } from '@/features/miningTax/corpBook/useBookSystems';
 import { useHiddenLeftCorps } from '@/features/miningTax/corpBook/leftCorpAck';
 import { useCorpBookView } from '@/features/miningTax/corpBook/useCorpBookView';
 import { useToleranceRecordChanges } from '@/features/miningTax/corpBook/useToleranceRecordChanges';
+import { useClosedDayFixes } from '@/features/miningTax/corpBook/useClosedDayFixes';
 import { heldPaymentKeys } from '@/engine/miningTax/payeeRunningAccount';
 import { PayeeRunningAccounts, withPaidStatus } from './payeeRunningAccounts';
 import { saveBilledElsewhere, saveBookOwned } from './paymentLinkStore';
@@ -133,6 +134,7 @@ export function useTaxCorpBooks(
     booksRead ? corpView : null,
     String(data?.fetchedAt?.getTime() ?? 'none')
   );
+  useClosedDayFixes(booksRead ? corpView : null, data ? accounts : null, onOwnershipStored);
   const bookSystems = useBookSystems(corpView, {
     names: data?.systemNames ?? NO_NAMES,
     security: data?.systemSecurity ?? NO_SECURITY,

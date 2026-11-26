@@ -81,6 +81,7 @@ const overlay = (over: Partial<PersonalOverlay> = {}): PersonalOverlay => ({
   conflicted: new Map(),
   labels: new Map(),
   books: [],
+  closedDays: [],
   ...over,
 });
 
@@ -107,6 +108,23 @@ describe('buildDisplayRows', () => {
       nameOf
     );
     expect(wholly).toEqual([]);
+  });
+
+  it('offers ore released from a corp Assignment that no book took as unassigned', () => {
+    const key = `${ME}:2026-10-17:30003838`;
+    const row = mined('2026-10-17', {
+      assignments: [{ ...assigned('bmw'), oreLines: [{ typeId: ZEO, quantity: 600 }] }],
+      unassignedOreLines: [],
+      releasedOreLines: [{ typeId: ZEO, quantity: 400 }],
+    });
+    const free = buildDisplayRows([row], overlay(), nameOf).filter((d) => !d.assignment);
+    expect(free[0]?.row.unassignedOreLines).toEqual([{ typeId: ZEO, quantity: 400 }]);
+    const taken = buildDisplayRows(
+      [row],
+      overlay({ takenFromFree: new Map([[key, [{ typeId: ZEO, quantity: 400 }]]]) }),
+      nameOf
+    ).filter((d) => !d.assignment);
+    expect(taken).toEqual([]);
   });
 
   it('hides the rows of a Payee that is the corporation, the book row stands in for them', () => {
