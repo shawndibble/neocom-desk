@@ -54,7 +54,7 @@ import type { ObservedMiningEntry } from './types';
 import type { HeldPayment } from './docShapes';
 import type { ClaimCheck, ClaimedTransfer, Declaration } from './overdue';
 import { disputeHold, disputeKindOf, type DisputeKind, type OreDispute } from './disputes';
-import { HOUR_MS } from '@/lib/age';
+import { HOUR_MS, MINUTE_MS } from '@/lib/age';
 
 /**
  * `settling`: ore the member listed for the corporation's own Payee beyond what the book recorded,
@@ -382,6 +382,12 @@ export interface BookRowView {
   overlap?: BookOverlap;
   /** A day the book has not billed yet: an estimate, or the part of one credit already paid. */
   open?: true;
+  /**
+   * An open day that is over, with the book's sync since then holding all the ore the member gave
+   * it: nothing more can arrive (the refinery log records no more than the member's own does), so
+   * the figure is final before the book bills it.
+   */
+  final?: true;
   correction?: BookCorrection;
   /** What the book forgave of the day: an officer's write-off, or a shortfall within the tolerance. */
   forgivenIsk?: number;
@@ -859,7 +865,7 @@ export function previewTakeover(
  * How long after a day closes (its grace included) ore the book lacks may still be the refinery
  * log catching up (decision 20261125-184957).
  */
-const SETTLE_MS = 6 * HOUR_MS;
+const SETTLE_MS = 20 * MINUTE_MS;
 
 /**
  * Whether the refinery log has caught up on a charge's day, so ore the book lacks is really
@@ -1314,6 +1320,13 @@ export function overlayCorpBooks(input: {
       // Ore the book has not placed yet goes, type by type, to the refinery that yields it: one
       // that recorded the type today, else the one in the system that last did (a moon's ore tells
       // its refinery apart). A type no refinery ever yielded the miner is a row of its own.
+      // Over, and the book's sync since then holds all of it: nothing more can arrive.
+      const dayOver = Date.parse(dayClosesAt(entry.date, 0));
+      const final =
+        left.length === 0 &&
+        Date.parse(now) >= dayOver &&
+        book.lastSyncedAt !== undefined &&
+        Date.parse(book.lastSyncedAt) >= dayOver;
       if (left.length > 0) {
         const history = book.observed
           .filter(
@@ -1377,6 +1390,7 @@ export function overlayCorpBooks(input: {
           id: `${book.corporationId}:${key}:estimate:${structureId ?? 'system'}`,
           state: 'estimate',
           open: true,
+          ...(final ? { final: true as const } : {}),
           oreLines: lines,
           estimatedValue: worth.estimatedValue,
           taxOwed: worth.taxOwed,

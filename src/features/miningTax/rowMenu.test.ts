@@ -128,4 +128,13 @@ describe('rowMenuActions', () => {
     } as unknown as DisplayRow['corp'];
     expect(ids(rowMenuActions(dr({ corp: settled, status: 'paid' })))).toEqual(['view']);
   });
+
+  it("offers Edit and Split on an open day's estimate: it is still the member's own entry", () => {
+    const corp = {
+      kind: 'row',
+      corpName: 'Corp',
+      view: { state: 'estimate', corporationId: 1, taxOwed: 100 },
+    } as unknown as DisplayRow['corp'];
+    expect(ids(rowMenuActions(dr({ corp })))).toEqual(['view', 'corpPay', 'edit', 'split']);
+  });
 });

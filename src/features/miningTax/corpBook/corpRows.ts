@@ -17,7 +17,7 @@ import { payeesOfBookCorporation } from '@/engine/miningTax/payeeCorporation';
 import { isUnpaidDefault } from '@/engine/miningTax/defaultSystems';
 import { addLines, minusLines } from '@/engine/miningTax/oreLines';
 import { entryKey } from '@/engine/miningTax/types';
-import { flatten, type DisplayRow } from '../groupRows';
+import { allMembers, flatten, type DisplayRow } from '../groupRows';
 import type { MoonMiningTaxRow } from '../snapshot';
 
 /** What a Tax-tab row knows about the Corp Tax Book it came from. */
@@ -235,4 +235,28 @@ export function personalEntriesOf(rows: readonly MoonMiningTaxRow[]): PersonalEn
         ...(isUnpaidDefault(a) ? { releasable: true } : {}),
       })),
   }));
+}
+
+/**
+ * An open day's estimate stands in for the member's own Assignment to the corporation, which the
+ * tab hides (`absorbed`): that row, so Edit and Split act on the member's own entry until the
+ * book bills the day. Undefined when the book took none of that day.
+ */
+export function ownEntryRowOf(
+  entries: readonly MoonMiningTaxRow[],
+  overlay: PersonalOverlay,
+  view: Pick<BookRowView, 'characterId' | 'date' | 'solarSystemId'>
+): DisplayRow | undefined {
+  const ids = overlay.absorbed.get(entryKey(view.characterId, view.date, view.solarSystemId));
+  if (!ids) return undefined;
+  // Every entry, so a joined group spanning other days opens whole, as its own row's Edit would.
+  return flatten(entries).find((dr) =>
+    allMembers(dr).some(
+      (m) =>
+        ids.has(m.assignment.id) &&
+        m.row.characterId === view.characterId &&
+        m.row.entry.date === view.date &&
+        m.row.entry.solarSystemId === view.solarSystemId
+    )
+  );
 }

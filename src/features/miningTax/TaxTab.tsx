@@ -50,6 +50,7 @@ import { dateRangeOf, taxOwedOf } from '@/features/miningTax/taxRowFormat';
 import { useContinuations } from '@/features/miningTax/useContinuations';
 import { useTaxDialogs, useTaxDialogSelector } from '@/features/miningTax/useTaxDialogs';
 import { NO_NAMES } from '@/lib/emptyCollections';
+import type { MoonMiningTaxRow } from '@/features/miningTax/snapshot';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { useMediaQuery } from '@/lib/useMediaQuery';
@@ -83,6 +84,9 @@ import { useTaxRows } from './useTaxRows';
 import { useTaxSelection } from './useTaxSelection';
 import { useTaxTables } from './useTaxTables';
 import { useTaxUrlFilters } from './useTaxUrlFilters';
+
+/** No ledger loaded yet: one empty list, so the dialogs' memos keep their inputs. */
+const NO_ENTRIES: readonly MoonMiningTaxRow[] = [];
 
 /**
  * Moon Mining ledger (issue #523): one continuously-filterable list, all
@@ -748,6 +752,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
         />
 
         <TaxDialogsHost
+          entries={ledger?.entries ?? NO_ENTRIES}
           store={store}
           actions={actions}
           hasData={Boolean(data)}

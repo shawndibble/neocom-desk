@@ -1751,11 +1751,11 @@ describe('overlayCorpBooks: a book takes the miner own Assignments by quantity (
       const early = (
         entries: PersonalEntry[],
         books: PersonalBook[],
-        now = '2026-10-18T03:00:00Z'
+        now = '2026-10-18T00:40:00Z'
       ) =>
         overlay(
           entries,
-          books.map((b) => ({ ...b, lastSyncedAt: '2026-10-18T01:00:00Z' })),
+          books.map((b) => ({ ...b, lastSyncedAt: '2026-10-18T00:35:00Z' })),
           now
         );
       const overListed = () =>
@@ -1815,12 +1815,12 @@ describe('overlayCorpBooks: a book takes the miner own Assignments by quantity (
         ]);
       });
 
-      it('settles six hours after the day closed, with no later ore', () => {
+      it('settles twenty minutes after the day closed, with no later ore', () => {
         expect(
-          statesOf(early([overListed()], [book({ ownPayeeIds: ['bmw'] })], '2026-10-18T06:29:59Z'))
+          statesOf(early([overListed()], [book({ ownPayeeIds: ['bmw'] })], '2026-10-18T00:49:59Z'))
         ).toEqual(['settling']);
         expect(
-          statesOf(early([overListed()], [book({ ownPayeeIds: ['bmw'] })], '2026-10-18T06:30:00Z'))
+          statesOf(early([overListed()], [book({ ownPayeeIds: ['bmw'] })], '2026-10-18T00:50:00Z'))
         ).toEqual(['conflict']);
       });
     });
@@ -2750,6 +2750,16 @@ describe("overlayCorpBooks: an open day's own-Payee ore is owed as an estimate",
     );
     expect(ofToday(closed).map((r) => r.state)).toEqual(['billed']);
     expect(closed.books[0].estimate).toBe(0);
+  });
+
+  it("is final once the day has ended and the book's sync since holds all of it", () => {
+    const after = { lastSyncedAt: '2026-10-19T00:10:00Z' };
+    const matched = overlay([today(30_000)], [withToday(30_000, after)], '2026-10-19T00:12:00Z');
+    expect(ofToday(matched).map((r) => [r.state, r.final])).toEqual([['estimate', true]]);
+    // Still mining that day, or the book short of it: not final.
+    expect(ofToday(overlay([today(30_000)], [withToday(30_000)]))[0].final).toBeUndefined();
+    const short = overlay([today(30_000)], [withToday(20_000, after)], '2026-10-19T00:12:00Z');
+    expect(ofToday(short)[0].final).toBeUndefined();
   });
 
   it('estimates nothing on an open day an officer already dismissed', () => {

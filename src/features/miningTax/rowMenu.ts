@@ -31,7 +31,9 @@ function corpRowActions(dr: DisplayRow): RowMenuAction[][] {
   const owing =
     (state === 'billed' || state === 'estimate') &&
     (dr.corp?.kind === 'row' ? (dr.corp.view.taxOwed ?? 0) > 0 : false);
-  return owing ? [[{ id: 'view' }, { id: 'corpPay' }]] : [[{ id: 'view' }]];
+  const lead: RowMenuAction[] = owing ? [{ id: 'view' }, { id: 'corpPay' }] : [{ id: 'view' }];
+  // An open day is still the member's own entry until the book bills it: edit it, or split it.
+  return state === 'estimate' ? [[...lead, { id: 'edit' }], [{ id: 'split' }]] : [lead];
 }
 
 /**

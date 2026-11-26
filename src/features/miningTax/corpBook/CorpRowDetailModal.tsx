@@ -3,7 +3,19 @@ import { useTimeZone } from '@/lib/timeFormat';
 import { dateTimeAt } from '@/features/corp/moons/moonsFormat';
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, InfoTooltip, Modal, ValueList, ValueRow } from '@/components/ui';
+import {
+  Button,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  IconButton,
+  InfoTooltip,
+  Modal,
+  ValueList,
+  ValueRow,
+} from '@/components/ui';
+import * as Icon from '@/components/ui/icons';
 import { SecurityValue } from '@/features/assets/assetBrowserRows';
 import { CharacterLink, SystemLink } from '@/features/entities';
 import { formatAge, MINUTE_MS } from '@/lib/age';
@@ -50,6 +62,10 @@ interface Props {
   onFixRecords?: () => void;
   /** Opens this Payee's ledger, which lists every payment and the days it paid. Absent: no link. */
   onOpenLedger?: () => void;
+  /** An open day: edits the member's own entry the estimate is made from. Absent: not offered. */
+  onEdit?: () => void;
+  /** An open day: splits the member's own entry between Payees. Absent: not offered. */
+  onSplit?: () => void;
 }
 
 /**
@@ -73,6 +89,8 @@ export function CorpRowDetailModal({
   onResolve,
   onFixRecords,
   onOpenLedger,
+  onEdit,
+  onSplit,
 }: Props) {
   const zone = useTimeZone();
   const { t } = useTranslation();
@@ -281,7 +299,9 @@ export function CorpRowDetailModal({
                 <p>{t('miningTax.corpBook.detail.reason', { reasons: view.dismissalReason })}</p>
               )}
               <p className="text-text-dim">
-                {t('miningTax.corpBook.detail.lockedShort', { corp: corp.corpName })}
+                {view.state === 'estimate' && onEdit
+                  ? t('miningTax.corpBook.detail.estimateOwn', { corp: corp.corpName })
+                  : t('miningTax.corpBook.detail.lockedShort', { corp: corp.corpName })}
               </p>
               {onResolve && resolvable && (
                 <div className="flex flex-wrap items-center gap-2">
@@ -353,6 +373,30 @@ export function CorpRowDetailModal({
               <Button variant="primary" onClick={onPay}>
                 {t('miningTax.settleUpAction')}
               </Button>
+            )}
+            {/* An open day is still the member's own entry: the same Edit and Split as any row. */}
+            {onEdit && (
+              <div className="flex">
+                <Button onClick={onEdit} className={onSplit ? 'rounded-r-none' : undefined}>
+                  {t('miningTax.detail.editAction')}
+                </Button>
+                {onSplit && (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <IconButton
+                        icon={<Icon.Expanded />}
+                        label={t('miningTax.detail.moreLabel')}
+                        className="-ml-px rounded-l-none"
+                      />
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onSelect={onSplit}>
+                        {t('miningTax.detail.splitAction')}
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
+              </div>
             )}
             <Button className="ml-auto" onClick={onClose}>
               {t('common.close')}

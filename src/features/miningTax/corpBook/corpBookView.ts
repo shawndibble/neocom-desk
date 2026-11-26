@@ -47,8 +47,10 @@ export interface CorpBookViewBook {
   pendingFrom?: string;
   /** The earliest day with ore still Settling (the refinery log catching up), when any is. */
   settlingFrom?: string;
-  /** The earliest open day owed at an estimate, when any is. */
+  /** The earliest open day owed at an estimate whose figure may still change, when any is. */
   estimateFrom?: string;
+  /** The latest open day whose estimate is already final (over, and the book holds all of it). */
+  finalThrough?: string;
 }
 
 export interface CorpClaim {
@@ -198,10 +200,18 @@ export function buildCorpBookView(
       .filter((r) => r.state === 'settling' && r.corporationId === loadedBook.corporationId)
       .map((r) => r.date)
       .sort()[0];
-    const estimateFrom = overlay.rows
-      .filter((r) => r.state === 'estimate' && r.corporationId === loadedBook.corporationId)
+    const estimates = overlay.rows.filter(
+      (r) => r.state === 'estimate' && r.corporationId === loadedBook.corporationId
+    );
+    const estimateFrom = estimates
+      .filter((r) => !r.final)
       .map((r) => r.date)
       .sort()[0];
+    const finalThrough = estimates
+      .filter((r) => r.final)
+      .map((r) => r.date)
+      .sort()
+      .at(-1);
     const ownRate = overlay.rows.find((r) => r.corporationId === loadedBook.corporationId)?.taxPct;
     const firstChar = loadedBook.characterIds[0];
     return {
@@ -219,6 +229,7 @@ export function buildCorpBookView(
       ...(pendingDates[0] !== undefined ? { pendingFrom: pendingDates[0] } : {}),
       ...(settlingFrom !== undefined ? { settlingFrom } : {}),
       ...(estimateFrom !== undefined ? { estimateFrom } : {}),
+      ...(finalThrough !== undefined ? { finalThrough } : {}),
     };
   });
   const claims: CorpClaim[] = ready.flatMap((book) =>
