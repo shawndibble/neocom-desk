@@ -281,7 +281,7 @@ export function useTaxColumns({
           const label = dr.assignment?.label
             ? labelWithoutSystem(dr.assignment.label, systemName(dr))
             : dr.corp?.kind === 'row' &&
-                dr.corp.view.state === 'estimate' &&
+                dr.corp.view.open === true &&
                 dr.corp.view.structureId === undefined
               ? // Ore no refinery has yielded the miner yet: said, not silently merged.
                 t('miningTax.corpBook.refineryNotRecorded')

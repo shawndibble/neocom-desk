@@ -2642,6 +2642,8 @@ describe("overlayCorpBooks: an open day's own-Payee ore is owed as an estimate",
   });
 
   it('puts ore the book has not placed at the refinery that last yielded that ore, else on a row of its own', () => {
+    /** An ore no refinery has ever yielded this miner. */
+    const NEW_ORE = 45492;
     const syl = (structureId: number, date: string, typeId = SYL) => ({
       ...observedToday(1),
       structureId,
@@ -2653,7 +2655,7 @@ describe("overlayCorpBooks: an open day's own-Payee ore is owed as an estimate",
       oreLines: [
         { typeId: ZEO, quantity: 30_000 },
         { typeId: SYL, quantity: 2_000 },
-        { typeId: 45492, quantity: 500 },
+        { typeId: NEW_ORE, quantity: 500 },
       ],
       freeOreLines: [],
       allocations: [
@@ -2664,7 +2666,7 @@ describe("overlayCorpBooks: an open day's own-Payee ore is owed as an estimate",
           oreLines: [
             { typeId: ZEO, quantity: 30_000 },
             { typeId: SYL, quantity: 2_000 },
-            { typeId: 45492, quantity: 500 },
+            { typeId: NEW_ORE, quantity: 500 },
           ],
           status: 'outstanding',
         },
@@ -2685,11 +2687,11 @@ describe("overlayCorpBooks: an open day's own-Payee ore is owed as an estimate",
     ).toEqual([
       [1000, 'Palomino Prospecting', [[ZEO, 30_000]]],
       [1002, 'SSG Qpef', [[SYL, 2_000]]],
-      [undefined, undefined, [[45492, 500]]],
+      [undefined, undefined, [[NEW_ORE, 500]]],
     ]);
   });
 
-  it('splits the day by the refineries the book saw, the rest to the one it saw most of', () => {
+  it('splits the day by the refineries the book saw, the rest of a type to the first that saw it', () => {
     const second = { ...observedToday(5_000), structureId: 1001 };
     const out = overlay(
       [today(30_000)],
