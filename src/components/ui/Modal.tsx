@@ -162,7 +162,7 @@ export function Modal({
             requestClose();
           pressBeganInside.current = false;
         }}
-        className={`fixed inset-0 overflow-hidden rounded-xs border border-line bg-panel p-0 text-text shadow-lg shadow-black/50 backdrop:bg-black/60 ${heightClass} ${dialogClass}`}
+        className={`fixed inset-0 overflow-hidden rounded-xs border border-line bg-panel p-0 text-left text-text shadow-lg shadow-black/50 backdrop:bg-black/60 ${heightClass} ${dialogClass}`}
       >
         {open && (
           <PortalContainerProvider value={portalContainer}>

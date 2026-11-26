@@ -2,14 +2,12 @@ import type { MiningTaxAssignmentRecord } from '@/db';
 import { db } from '@/db';
 import { planDefaultAssign } from '@/engine/miningTax/defaultSystems';
 import type { MiningLedgerEntry } from '@/engine/miningTax/types';
-import { computeAssignmentValue } from '@/engine/miningTax/valuation';
+import { autoAssignSlice } from './autoAssignSlice';
 import { loadDefaultOptOuts } from './defaultOptOuts';
-import { assign } from './ledgerActions';
 import { readCompressedOre } from './oreForm';
 import { loadPayees } from './payees';
 import { loadPayeeRunningAccounts } from './paymentLinkStore';
 import type { PayeeRunningAccounts } from './payeeRunningAccounts';
-import { hubForPayee, loadUnitPricesOnDate } from './pricing';
 
 export async function applyDefaultSystems(
   ledgers: readonly { characterId: number; entries: readonly MiningLedgerEntry[] }[],
@@ -33,26 +31,18 @@ export async function applyDefaultSystems(
       const payee = payees.find((p) => p.id === slice.payeeId);
       if (!payee) continue;
       try {
-        const { prices } = await loadUnitPricesOnDate(
-          slice.oreLines.map((line) => line.typeId),
-          hubForPayee(payee.hubId),
-          slice.date,
-          compressed
-        );
-        const value = computeAssignmentValue(slice.oreLines, prices, payee.defaultTaxPct);
-        const result = await assign({
+        const result = await autoAssignSlice({
           characterId: slice.characterId,
           date: slice.date,
           solarSystemId: slice.solarSystemId,
-          payeeId: payee.id,
+          payee,
           oreLines: slice.oreLines,
           entryOreLines: slice.entryOreLines,
           taxPct: payee.defaultTaxPct,
-          estimatedValue: value.estimatedValue,
-          taxOwed: value.taxOwed,
+          compressed,
           byDefault: true,
         });
-        if (result.ok) created.push(result.value);
+        if (result?.ok) created.push(result.value);
       } catch {}
     }
   }

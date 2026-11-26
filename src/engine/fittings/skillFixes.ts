@@ -9,6 +9,7 @@ export interface SkillFixCandidate {
 
 export interface SkillFix {
   entries: PlanEntry[];
+  before: FittingStats;
   after: FittingStats;
 }
 
@@ -82,6 +83,7 @@ export async function findSkillFixes({
     if (stopped || !found) return [];
     singles.push({
       entries: [{ skillTypeID: skill.skillTypeId, targetLevel: found.level }],
+      before,
       after: found.after,
     });
   }
@@ -100,7 +102,7 @@ export async function findSkillFixes({
     else levels.set(skill.skillTypeId, found.level);
     after = found.after;
   }
-  return [{ entries: entriesOf(), after }];
+  return [{ entries: entriesOf(), before, after }];
 }
 
 function sortEntries(entries: PlanEntry[]): PlanEntry[] {

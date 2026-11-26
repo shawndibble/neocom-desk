@@ -112,9 +112,9 @@ export function soldActionsColumn<Row extends ProductionRunSummary>(
         onSold={() => void sale.openPicker(r.run.id, r.run.productTypeID, 'sale')}
         onWatch={() => void sale.openPicker(r.run.id, r.run.productTypeID, 'watch')}
         onManual={() => sale.openManualSale(r.run.id)}
-        onLost={() => void runLoss.openLoss(r)}
+        onLost={() => runLoss.openLoss(r)}
         losses={r.losses}
-        onEditLoss={(loss) => void runLoss.openLoss(r, loss)}
+        onEditLoss={(loss) => runLoss.openLoss(r, loss)}
         onRemoveLoss={(loss) => runLoss.confirmRemoveLoss(loss.id)}
         onDelete={() => sale.confirmDeleteRun(r.run.id)}
         onRefresh={

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { IconButton } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { SKILL_IDS, type SkillLevels } from '@/engine/industry/types';
-import { runLoss } from '@/engine/industry/realizedProfit';
+import { lostUnitsCost } from '@/engine/industry/realizedProfit';
 import type { ResolvedStandings } from '@/engine/market/standings';
 import { formatIsk } from '@/lib/isk';
 import type { ProductionRunSummary } from './productionRunSummary';
@@ -38,17 +38,7 @@ export function RealizedProfitCell({ row, label, skills, standing }: RealizedPro
         accountingLevel={skills[SKILL_IDS.accounting] ?? 0}
         brokerRelationsLevel={skills[SKILL_IDS.brokerRelations] ?? 0}
         standing={standing}
-        netLoss={row.losses.reduce(
-          (sum, l) =>
-            sum +
-            runLoss({
-              totalCost: row.run.totalCost,
-              quantity: row.run.quantity,
-              quantityLost: l.quantity,
-              insurancePayout: l.insurancePayout,
-            }).netLoss,
-          0
-        )}
+        lostCost={lostUnitsCost(row.run.totalCost, row.run.quantity, row.quantityLost)}
       />
     </span>
   );

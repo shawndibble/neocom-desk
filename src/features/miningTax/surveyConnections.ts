@@ -1,5 +1,5 @@
-import { db, type MiningTaxAssignmentRecord, type MiningTaxOreLine } from '@/db';
-import { isUnpaidDefault } from '@/engine/miningTax/defaultSystems';
+import { db, type MiningTaxAssignmentRecord } from '@/db';
+import { autoAssignSlice } from './autoAssignSlice';
 import type { PayeeRunningAccounts } from './payeeRunningAccounts';
 import { loadPayeeRunningAccounts } from './paymentLinkStore';
 import {
@@ -8,16 +8,12 @@ import {
   planSurveyAutoAssign,
   updateSurveyConnection,
   type SurveyConnection,
-  type Takeover,
 } from '@/engine/miningTax/surveyConnection';
 import type { MiningLedgerEntry } from '@/engine/miningTax/types';
-import { computeAssignmentValue } from '@/engine/miningTax/valuation';
 import { createSyncedSetting } from '@/lib/useSyncedSetting';
-import { assign, releaseOre } from './ledgerActions';
 import { loadAllCharacterLedgers } from './ledger';
 import { readCompressedOre } from './oreForm';
 import { loadPayees } from './payees';
-import { hubForPayee, loadUnitPricesOnDate } from './pricing';
 import { reconcileAssignments } from './reconcile';
 import { loadManualMoonOreTypeIds } from './typeOverrides';
 import { loadMoonOreTypeIds, loadTypes } from '@/sde/loadSde';
@@ -116,52 +112,23 @@ export async function applySurveyConnections(
       const payee = payees.find((p) => p.id === slice.connection.payeeId);
       if (!payee) continue;
       try {
-        const { prices } = await loadUnitPricesOnDate(
-          slice.oreLines.map((line) => line.typeId),
-          hubForPayee(payee.hubId),
-          slice.date,
-          compressed
-        );
-        const value = computeAssignmentValue(slice.oreLines, prices, slice.connection.taxPct);
-        if (!(await takeOverFromDefaults(slice.takeovers, paid))) continue;
-        const result = await assign({
+        const result = await autoAssignSlice({
           characterId: slice.characterId,
           date: slice.date,
           solarSystemId: slice.solarSystemId,
-          payeeId: payee.id,
+          payee,
           oreLines: slice.oreLines,
           entryOreLines: slice.entryOreLines,
           taxPct: slice.connection.taxPct,
-          estimatedValue: value.estimatedValue,
-          taxOwed: value.taxOwed,
-          takesGrowth: true,
-          label: slice.label,
-          isPaid: (a) => paid.isPaid(a),
+          compressed,
+          ...(slice.label !== undefined ? { label: slice.label } : {}),
+          takeOver: { takeovers: slice.takeovers, paid },
         });
-        if (result.ok) created.push(result.value);
+        if (result?.ok) created.push(result.value);
       } catch {}
     }
   }
   return created;
-}
-
-async function takeOverFromDefaults(
-  takeovers: readonly Takeover[],
-  paid: PayeeRunningAccounts
-): Promise<boolean> {
-  const releases: { assignment: MiningTaxAssignmentRecord; after: MiningTaxOreLine[] }[] = [];
-  for (const takeover of takeovers) {
-    const assignment = await db.miningTaxAssignments.get(takeover.assignmentId);
-    if (!assignment || !isUnpaidDefault(paid.view(assignment))) {
-      continue;
-    }
-    releases.push({
-      assignment,
-      after: assignment.oreLines.filter((l) => !takeover.typeIds.includes(l.typeId)),
-    });
-  }
-  if (releases.length === 0) return true;
-  return (await releaseOre(releases, true)).ok;
 }
 
 export async function autoAssignFromSurveys(): Promise<MiningTaxAssignmentRecord[]> {

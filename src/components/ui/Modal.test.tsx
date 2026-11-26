@@ -28,6 +28,11 @@ async function open() {
 }
 
 describe('Modal', () => {
+  it('resets inherited text alignment so a modal opened from a right-aligned cell reads left to right', async () => {
+    const { dialog } = await open();
+    expect(dialog.className).toContain('text-left');
+  });
+
   it('Escape in a Modal opened inside another closes only the inner one', () => {
     const outerClose = vi.fn();
     const innerClose = vi.fn();

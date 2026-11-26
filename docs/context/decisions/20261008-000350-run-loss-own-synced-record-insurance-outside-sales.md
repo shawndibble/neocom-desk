@@ -1,6 +1,6 @@
 # Scope decisions — Run Loss: own synced record, insurance outside sales tax (issue #2851)
 
-_Recorded 2026-10-08 · issue #2851._
+_Recorded 2026-10-08 · issue #2851. The insurance parts are superseded by `20261125-221438-run-loss-carries-no-insurance.md`._
 
 - **A Run Loss is its own record (`productionLosses`), several per run, synced like a sale link.** A loss is not a sale link with a zero price: sale-link revenue is taxed and counts toward Units sold, a loss is neither. One document per loss keeps two devices' edits independent and lets "Remove loss" tombstone exactly one.
 - **Realized profit keeps charging the whole run cost.** A loss does not change that rule. It writes the lost units off Unsold cost and Open inventory value, and the insurance payout is added to profit after fees (no sales tax or broker fee on it). Worked example: 5 of 12 Rifters lost at 750,000 each with 1,500,000 insurance gives a net loss of 2,250,000 and Realized profit rises by the insurance only.

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
+  lostUnitsCost,
   realizedProfit,
-  runLoss,
   soldUnitsMargin,
   validateLossQuantity,
 } from '@/engine/industry/realizedProfit';
@@ -100,56 +100,14 @@ describe('soldUnitsMargin', () => {
   });
 });
 
-describe('realizedProfit insurance', () => {
-  const base = {
-    materialCost: 8_000_000,
-    jobFee: 1_000_000,
-    quantitySold: 0,
-    grossRevenue: 0,
-    accountingLevel: 0,
-    brokerFeeableRevenue: 0,
-    brokerRelationsLevel: 0,
-  };
-
-  it('is unchanged without an insurance payout', () => {
-    const r = realizedProfit(base);
-    expect(r.insurance).toBe(0);
-    expect(r.profit).toBe(-9_000_000);
-  });
-
-  it('adds the payout after fees, untaxed', () => {
-    const r = realizedProfit({ ...base, insurancePayout: 1_500_000 });
-    expect(r.insurance).toBe(1_500_000);
-    expect(r.salesTax).toBe(0);
-    expect(r.profit).toBe(-7_500_000);
-  });
-});
-
-describe('runLoss', () => {
-  it('writes off the lost units at the run cost per unit, net of insurance', () => {
-    const r = runLoss({
-      totalCost: 9_000_000,
-      quantity: 12,
-      quantityLost: 5,
-      insurancePayout: 1_500_000,
-    });
-    expect(r.writtenOffCost).toBe(3_750_000);
-    expect(r.insurance).toBe(1_500_000);
-    expect(r.netLoss).toBe(2_250_000);
-  });
-
-  it('handles no insurance', () => {
-    const r = runLoss({ totalCost: 9_000_000, quantity: 12, quantityLost: 12, insurancePayout: 0 });
-    expect(r.netLoss).toBe(9_000_000);
+describe('lostUnitsCost', () => {
+  it('writes the lost units off at the run cost per unit', () => {
+    expect(lostUnitsCost(9_000_000, 12, 5)).toBe(3_750_000);
   });
 
   it('caps the lost units at the run quantity and handles an empty run', () => {
-    expect(
-      runLoss({ totalCost: 100, quantity: 2, quantityLost: 9, insurancePayout: 0 }).writtenOffCost
-    ).toBe(100);
-    expect(
-      runLoss({ totalCost: 100, quantity: 0, quantityLost: 1, insurancePayout: 0 }).writtenOffCost
-    ).toBe(0);
+    expect(lostUnitsCost(100, 2, 9)).toBe(100);
+    expect(lostUnitsCost(100, 0, 1)).toBe(0);
   });
 });
 
