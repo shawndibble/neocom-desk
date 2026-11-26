@@ -11,7 +11,6 @@ export interface RealizedProfitInputs {
   brokerFeeableRevenue: number;
   brokerRelationsLevel: number;
   standing?: ResolvedStandings;
-  insurancePayout?: number;
 }
 
 export interface RealizedProfitResult {
@@ -21,7 +20,6 @@ export interface RealizedProfitResult {
   salesTax: number;
   brokerFee: number;
   netRevenue: number;
-  insurance: number;
   profit: number;
   marginPct: number | null;
 }
@@ -42,8 +40,7 @@ export function realizedProfit(inputs: RealizedProfitInputs): RealizedProfitResu
     inputs.standing?.feeDiscountFactor
   );
   const netRevenue = inputs.grossRevenue - salesTaxAmount - brokerFeeAmount;
-  const insurance = inputs.insurancePayout ?? 0;
-  const profit = netRevenue + insurance - totalCost;
+  const profit = netRevenue - totalCost;
 
   return {
     totalCost,
@@ -52,7 +49,6 @@ export function realizedProfit(inputs: RealizedProfitInputs): RealizedProfitResu
     salesTax: salesTaxAmount,
     brokerFee: brokerFeeAmount,
     netRevenue,
-    insurance,
     profit,
     marginPct: inputs.grossRevenue > 0 ? (profit / inputs.grossRevenue) * 100 : null,
   };
@@ -85,31 +81,9 @@ export function soldUnitsMargin(inputs: SoldUnitsMarginInputs): SoldUnitsMargin 
   };
 }
 
-function lostUnitsCost(totalCost: number, quantity: number, quantityLost: number): number {
+export function lostUnitsCost(totalCost: number, quantity: number, quantityLost: number): number {
   if (quantity <= 0) return 0;
   return (totalCost / quantity) * clamp(quantityLost, 0, quantity);
-}
-
-export interface RunLossInputs {
-  totalCost: number;
-  quantity: number;
-  quantityLost: number;
-  insurancePayout: number;
-}
-
-export interface RunLossResult {
-  writtenOffCost: number;
-  insurance: number;
-  netLoss: number;
-}
-
-export function runLoss(inputs: RunLossInputs): RunLossResult {
-  const writtenOffCost = lostUnitsCost(inputs.totalCost, inputs.quantity, inputs.quantityLost);
-  return {
-    writtenOffCost,
-    insurance: inputs.insurancePayout,
-    netLoss: writtenOffCost - inputs.insurancePayout,
-  };
 }
 
 export interface LossQuantityInputs {
