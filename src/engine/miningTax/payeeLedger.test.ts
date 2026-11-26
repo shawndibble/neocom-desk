@@ -5,6 +5,7 @@ import {
 } from '../corpTaxBook/minerRunningAccount';
 import type { TaxPayment } from '../corpTaxBook/payments';
 import { payeeLedger, type LedgerCharge, type PayeeLedgerSource } from './payeeLedger';
+import type { ToleranceRecordChange } from './recordChanges';
 
 const payment = (id: string, amount: number, at: string): TaxPayment => ({
   id,
@@ -110,6 +111,86 @@ describe('payeeLedger', () => {
       days: 1,
       oldest: '2026-10-03',
     });
+  });
+
+  it('shows a saved tolerance close-out as its own line in place of the computed write-off', () => {
+    const src = source(MINED, [
+      payment('p1', 1_000_000, '2026-10-02T12:00:00Z'),
+      payment('p2', 1_995_000, '2026-10-04T12:00:00Z'),
+    ]);
+    const closeOut: ToleranceRecordChange = {
+      id: 'tolerance:98000001:m1:2026-10-02',
+      reason: 'tolerance',
+      at: '2026-10-04T12:00:00Z',
+      date: '2026-10-02',
+      corporationId: 98000001,
+      minerId: 'm1',
+      closeOut: {
+        billed: 2_000_000,
+        paid: 1_995_000,
+        writtenOff: 5_000,
+        tolerancePct: 0.5,
+        paymentId: 'p2',
+      },
+    };
+    const ledger = payeeLedger({ ...src, recordChanges: [closeOut] });
+    expect(ledger.rows.some((r) => r.kind === 'writeOff')).toBe(false);
+    const at = ledger.rows.findIndex((r) => r.key === 'payment:p2');
+    expect(ledger.rows[at + 1]).toMatchObject({
+      kind: 'recordChange',
+      key: `recordChange:${closeOut.id}`,
+      date: '2026-10-04',
+      charged: 0,
+      paid: 5_000,
+      change: closeOut,
+    });
+    expect(ledger.rows.at(-1)!.balance).toBe(src.account.balance);
+  });
+
+  it('keeps a saved close-out after the day changes, without moving the balance', () => {
+    const src = source(MINED.slice(0, 1), [payment('p1', 600_000, '2026-10-02T12:00:00Z')]);
+    const ledger = payeeLedger({
+      ...src,
+      recordChanges: [
+        {
+          id: 'tolerance:98000001:m1:2026-10-01',
+          reason: 'tolerance',
+          at: '2026-10-02T12:00:00Z',
+          date: '2026-10-01',
+          corporationId: 98000001,
+          minerId: 'm1',
+          closeOut: { billed: 601_000, paid: 600_000, writtenOff: 1_000, tolerancePct: 0.5 },
+        },
+      ],
+    });
+    expect(ledger.rows.at(-1)).toMatchObject({ kind: 'recordChange', paid: 0, balance: 0 });
+  });
+
+  it('lists an Assignment change on its date without moving the balance', () => {
+    const src = source(MINED.slice(0, 1), [payment('p1', 600_000, '2026-10-02T12:00:00Z')]);
+    const ledger = payeeLedger({
+      ...src,
+      recordChanges: [
+        {
+          id: 'c1',
+          reason: 'autoFix',
+          at: '2026-10-01T23:00:00Z',
+          date: '2026-10-01',
+          assignments: [
+            {
+              assignmentId: 'a',
+              before: { payeeId: 'x', taxPct: 10, taxOwed: 600_000, oreLines: [] },
+              after: { payeeId: 'x', taxPct: 8, taxOwed: 480_000, oreLines: [] },
+            },
+          ],
+        },
+      ],
+    });
+    expect(ledger.rows.map((r) => [r.kind, r.date, r.charged, r.paid, r.balance])).toEqual([
+      ['charge', '2026-10-01', 600_000, 0, 600_000],
+      ['recordChange', '2026-10-01', 0, 0, 600_000],
+      ['payment', '2026-10-02', 0, 600_000, 0],
+    ]);
   });
 
   it('shows an officer write-off on its date with the days it forgave', () => {

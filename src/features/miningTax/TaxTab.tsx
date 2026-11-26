@@ -131,6 +131,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
     reloadCorpBooks,
     leftCorp,
     failedClaims,
+    recordChanges,
     systemNames,
     systemSecurity,
   } = useTaxCorpBooks(data, characters, activeCharacterId, refresh);
@@ -719,6 +720,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
           paymentSources={paymentSources}
           linkSuggestions={linkSuggestions}
           corpView={corpView}
+          recordChanges={recordChanges}
           reloadCorpBooks={reloadCorpBooks}
           onResolve={resolve.open}
           corpStateHint={corpStateHint}

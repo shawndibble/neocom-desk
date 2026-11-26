@@ -43,7 +43,7 @@ describe('PayeeLedgerPanel', () => {
     expect(rows.at(-1)).toHaveTextContent('Mined at Hakonen - Moon 4 Athanor');
     expect(screen.getByText('Late notice sent')).toBeInTheDocument();
     expect(screen.getByText('Written off by an officer')).toBeInTheDocument();
-    expect(screen.getByText('Shortfall forgiven')).toBeInTheDocument();
+    expect(screen.getByText('Closed within tolerance')).toBeInTheDocument();
     expect(within(table()).getByRole('columnheader', { name: 'Credited' })).toBeInTheDocument();
   });
 
@@ -73,6 +73,19 @@ describe('PayeeLedgerPanel', () => {
     expect(screen.getByText('Days it paid')).toBeInTheDocument();
     await user.click(screen.getAllByText('Mined at Hakonen - Moon 4 Athanor')[0]!);
     expect(screen.getByText('Zeolites')).toBeInTheDocument();
+  });
+
+  it('opens a saved tolerance close-out and an automatic change to show what they recorded', async () => {
+    const user = userEvent.setup();
+    renderPanel(CORP_BOOK_LEDGER);
+    await user.click(screen.getByText('Closed within tolerance'));
+    expect(screen.getByText(/no more than the book’s 0.5% tolerance/)).toBeInTheDocument();
+    expect(screen.getByText('Billed').parentElement).toHaveTextContent('5,500,000 ISK');
+    expect(screen.getByText('Written off').parentElement).toHaveTextContent('10,000 ISK');
+    await user.click(screen.getByText('Fixed automatically at close'));
+    expect(screen.getByText('Before').parentElement).toHaveTextContent('12%: 3,846,000 ISK');
+    expect(screen.getByText('After').parentElement).toHaveTextContent('10%: 3,205,000 ISK');
+    expect(screen.getByText('After').parentElement).toHaveTextContent('Bitumens');
   });
 
   it('unlinks a payment from its opened row, for a personal Payee only', async () => {
@@ -105,7 +118,7 @@ describe('PayeeLedgerPanel', () => {
     const user = userEvent.setup();
     renderPanel(CORP_BOOK_LEDGER);
     await user.click(screen.getByRole('button', { name: /filters/i }));
-    for (const name of ['Charges', 'Payments', 'Write-offs'])
+    for (const name of ['Charges', 'Payments', 'Write-offs', 'Automatic changes'])
       await user.click(screen.getByRole('button', { name }));
     expect(bodyRows()).toHaveLength(1);
     expect(bodyRows()[0]).toHaveTextContent('Late notice sent');
@@ -224,6 +237,17 @@ describe('PayeeLedgerPanel', () => {
 
 describe('ledgerCsvColumns', () => {
   const t = i18n.t.bind(i18n);
+  it('writes what a saved change recorded into its line', () => {
+    const what = ledgerCsvColumns(t)[1]!;
+    const lines = payeeLedger(CORP_BOOK_LEDGER)
+      .rows.filter((r) => r.kind === 'recordChange')
+      .map((r) => what.value(r));
+    expect(lines).toEqual([
+      'Closed within tolerance: 2026-10-03: billed 5,500,000 ISK, paid 5,490,000 ISK, 10,000 ISK written off (0.5% tolerance)',
+      'Fixed automatically at close: 2026-10-17: 12% 3,846,000 ISK → 10% 3,205,000 ISK',
+    ]);
+  });
+
   it('has a balance column on a normal ledger, none on an old history', () => {
     const balance = t('miningTax.ledger.column.balance');
     expect(ledgerCsvColumns(t).map((c) => c.header)).toContain(balance);

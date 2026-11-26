@@ -71,6 +71,8 @@ Registry (`src/sync/syncedCollections.ts:651`, order = sync order), remoteName -
 | `payees`                       | `payees`                            | delete                                 |
 | `fittings`                     | `fittings`                          | delete                                 |
 | `miningTaxAssignments`         | `miningTaxAssignments`              | delete                                 |
+| `miningTaxPaymentLinks`        | `miningTaxPaymentLinks`             | delete                                 |
+| `miningTaxRecordChanges`       | `miningTaxRecordChanges`            | delete                                 |
 | `notificationFeed` (kind feed) | `notificationFeed`                  | feed rows deleted in `removeCharacter` |
 | `settings` (kind settings)     | `settings` rows with `sync.` prefix | never deleted by removal               |
 

@@ -83,6 +83,7 @@ export interface PersonalBook {
   adjustments?: readonly Adjustment[];
   writeOffs?: readonly RecordedWriteOff[];
   toleranceExemptions?: readonly ToleranceExemption[];
+  dayTolerancePct?: number;
   minerPaidThrough?: ReadonlyMap<string, string>;
   checkpoints?: ReadonlyMap<string, RunningAccountCheckpoint>;
 }
@@ -374,6 +375,7 @@ function prepare(book: PersonalBook, entries: readonly PersonalEntry[], now: str
     ...(book.writeOffs ? { writeOffs: book.writeOffs } : {}),
     ...(book.disputes ? { disputes: book.disputes } : {}),
     ...(book.toleranceExemptions ? { toleranceExemptions: book.toleranceExemptions } : {}),
+    ...(book.dayTolerancePct !== undefined ? { dayTolerancePct: book.dayTolerancePct } : {}),
     ...(book.minerPaidThrough ? { minerPaidThrough: book.minerPaidThrough } : {}),
     ...(book.checkpoints ? { checkpoints: book.checkpoints } : {}),
     ...(book.feeders ? { feeders: book.feeders } : {}),

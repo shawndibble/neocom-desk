@@ -187,6 +187,7 @@ describe('restoring an existing-format backup file', () => {
     'productionLosses',
     'characterAccelerators',
     'miningTaxPaymentLinks',
+    'miningTaxRecordChanges',
   ]);
   const LEGACY_EXPECTED_RECORDS = Object.fromEntries(
     Object.entries(FULL_RECORDS)

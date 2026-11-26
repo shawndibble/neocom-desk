@@ -55,6 +55,11 @@ import { buildSettleUpReason } from '@/features/miningTax/groupRows';
 import { systemLabel } from '@/features/miningTax/names';
 import { madePaymentHref } from '@/features/miningTax/madePaymentHref';
 import { minerLedgerSource, openDayCharges } from '@/engine/corpTaxBook/minerLedgerSource';
+import {
+  recordChangesForBook,
+  recordChangesForPayee,
+  type RecordChange,
+} from '@/engine/miningTax/recordChanges';
 import { minerIdFor } from '@/engine/corpTaxBook/charges';
 import { pricesAtHubOnDate, type DatedUnitPrices } from '@/features/miningTax/pricing';
 import { RowDetailModal } from '@/features/miningTax/RowDetailModal';
@@ -136,6 +141,7 @@ export interface TaxDialogsHostProps {
   paymentSources: readonly MadePaymentSources[];
   linkSuggestions: ReturnType<typeof useLinkSuggestions>;
   corpView: CorpBookView | null;
+  recordChanges: readonly RecordChange[];
   reloadCorpBooks: () => void;
   onResolve: (target: ResolveTarget) => void;
   corpStateHint: ReturnType<typeof useCorpStateHint>;
@@ -181,6 +187,7 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
     paymentSources,
     linkSuggestions,
     corpView,
+    recordChanges,
     reloadCorpBooks,
     onResolve,
     corpStateHint,
@@ -567,8 +574,13 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
           : accounts.of(ledgerTarget.payeeId)) ??
         PayeeRunningAccount.build({ payeeId: ledgerTarget.payeeId, charges: [], links: [] });
       const byId = new Map(everyAssignment.map((a) => [a.id, a]));
+      const primary = accounts.primaryIdOf(ledgerTarget.payeeId);
       return {
         account: account.account,
+        recordChanges: recordChangesForPayee(
+          recordChanges,
+          (id) => accounts.primaryIdOf(id) === primary
+        ),
         charges: account.charges.map((c): LedgerCharge => {
           const a = byId.get(c.id);
           const place = a ? systemLabel(systemNames, a.solarSystemId) : undefined;
@@ -622,7 +634,11 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
       miner.minerId,
       (id) => systemLabel(systemNames, id)
     );
-    return { ...source, charges: [...source.charges, ...open] };
+    return {
+      ...source,
+      charges: [...source.charges, ...open],
+      recordChanges: recordChangesForBook(recordChanges, book.loaded.corporationId, miner.minerId),
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- characterNameOf reads trackedCharacters
   }, [
     ledgerTarget,
@@ -634,6 +650,7 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
     ledgerMinerId,
     trackedCharacters,
     allDisplayRows,
+    recordChanges,
   ]);
   const ledgerTitle =
     ledgerTarget?.kind === 'personal'

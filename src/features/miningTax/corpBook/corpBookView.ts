@@ -125,6 +125,7 @@ export function buildCorpBookView(
       ...(book.feeders ? { feeders: book.feeders } : {}),
       ...(book.adjustments ? { adjustments: book.adjustments } : {}),
       ...(book.toleranceExemptions ? { toleranceExemptions: book.toleranceExemptions } : {}),
+      ...(book.dayTolerancePct !== undefined ? { dayTolerancePct: book.dayTolerancePct } : {}),
       ...(book.minerPaidThrough ? { minerPaidThrough: book.minerPaidThrough } : {}),
       ...(book.writeOffs ? { writeOffs: book.writeOffs } : {}),
       ...(book.declarations ? { declarations: book.declarations } : {}),

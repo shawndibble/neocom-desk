@@ -92,6 +92,7 @@ export interface LoadedCorpBook {
   declarations?: Declaration[];
   disputes?: OreDispute[];
   toleranceExemptions?: ToleranceExemption[];
+  dayTolerancePct?: number;
   minerPaidThrough?: Map<string, string>;
   structureNames?: Record<number, string>;
 }

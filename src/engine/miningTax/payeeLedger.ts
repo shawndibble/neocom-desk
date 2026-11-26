@@ -7,6 +7,7 @@ import {
 import type { DayAmount, MinerRunningAccount } from '../corpTaxBook/minerRunningAccount';
 import { utcDayOf } from '../localDay';
 import { sum } from '../math';
+import type { RecordChange } from './recordChanges';
 import type { OreLine } from './types';
 
 export interface LedgerCharge {
@@ -68,10 +69,11 @@ export interface PayeeLedgerSource {
   marked?: readonly { id: string; at: string; date: string | null; amount: number }[];
   writeOffs?: readonly LedgerWriteOff[];
   notices?: readonly LedgerNotice[];
+  recordChanges?: readonly RecordChange[];
   notYetBilled?: { tax: number; days: number };
 }
 
-export type PayeeLedgerKind = 'charge' | 'payment' | 'writeOff' | 'notice';
+export type PayeeLedgerKind = 'charge' | 'payment' | 'writeOff' | 'notice' | 'recordChange';
 
 interface RowBase {
   key: string;
@@ -103,6 +105,7 @@ export type PayeeLedgerRow =
       reason?: string;
     })
   | (RowBase & { kind: 'notice'; notice: LedgerNotice; standing: LateNoticeStanding })
+  | (RowBase & { kind: 'recordChange'; change: RecordChange })
   | (RowBase & { kind: 'opening' });
 
 export type PayeeLedgerStatus =
@@ -139,6 +142,7 @@ export function payeeLedger(source: PayeeLedgerSource): PayeeLedger {
     ...markedRows(source),
     ...officerWriteOffRows(source),
     ...toleranceRows(source),
+    ...recordChangeRows(source),
     ...(source.notices ?? []).map((notice): Unbalanced => ({
       kind: 'notice',
       key: `notice:${notice.id}`,
@@ -156,7 +160,8 @@ export function payeeLedger(source: PayeeLedgerSource): PayeeLedger {
       a.date.localeCompare(b.date) ||
       Number(a.kind !== 'charge') - Number(b.kind !== 'charge') ||
       (a.at ?? '').localeCompare(b.at ?? '') ||
-      Number(a.kind === 'writeOff') - Number(b.kind === 'writeOff') ||
+      Number(a.kind === 'writeOff' || a.kind === 'recordChange') -
+        Number(b.kind === 'writeOff' || b.kind === 'recordChange') ||
       a.key.localeCompare(b.key)
   );
   let balance = 0;
@@ -324,10 +329,16 @@ function officerWriteOffRows({ account, writeOffs = [] }: PayeeLedgerSource): Un
   });
 }
 
-function toleranceRows({ account, payments = [] }: PayeeLedgerSource): Unbalanced[] {
+function closedOutDays(recordChanges: readonly RecordChange[] = []): Set<string> {
+  return new Set(recordChanges.flatMap((c) => (c.reason === 'tolerance' ? [c.date] : [])));
+}
+
+function toleranceRows({ account, payments = [], recordChanges }: PayeeLedgerSource): Unbalanced[] {
   const closing = new Map(payments.map((p) => [p.id, p]));
+  const saved = closedOutDays(recordChanges);
   const groups = new Map<string, { date: string; at?: string; days: DayAmount[] }>();
   for (const w of account.writtenOffDays(payments)) {
+    if (saved.has(w.date)) continue;
     const payment = w.paymentId === undefined ? undefined : closing.get(w.paymentId);
     const key = payment ? `tolerance:${payment.id}` : `tolerance:${w.date}`;
     const group =
@@ -348,4 +359,27 @@ function toleranceRows({ account, payments = [] }: PayeeLedgerSource): Unbalance
     paid: g.days.reduce((sum, d) => sum + d.amount, 0),
     days: g.days,
   }));
+}
+
+function recordChangeRows({
+  account,
+  payments = [],
+  recordChanges = [],
+}: PayeeLedgerSource): Unbalanced[] {
+  const live = new Map(account.writtenOffDays(payments).map((w) => [w.date, w.amount]));
+  const claimed = new Set<string>();
+  return recordChanges.map((change): Unbalanced => {
+    const writtenOff =
+      change.reason === 'tolerance' && !claimed.has(change.date) ? (live.get(change.date) ?? 0) : 0;
+    if (change.reason === 'tolerance') claimed.add(change.date);
+    return {
+      kind: 'recordChange',
+      key: `recordChange:${change.id}`,
+      date: utcDayOf(change.at),
+      at: change.at,
+      charged: 0,
+      paid: writtenOff,
+      change,
+    };
+  });
 }

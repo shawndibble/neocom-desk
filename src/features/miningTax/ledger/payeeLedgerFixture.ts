@@ -6,6 +6,7 @@ import type {
   LedgerWriteOff,
   PayeeLedgerSource,
 } from '@/engine/miningTax/payeeLedger';
+import type { RecordChange } from '@/engine/miningTax/recordChanges';
 
 const ZEOLITES = 45490;
 const SYLVITE = 45491;
@@ -31,6 +32,7 @@ function sample(input: {
   payments?: SamplePayment[];
   writeOffs?: LedgerWriteOff[];
   notices?: LedgerNotice[];
+  recordChanges?: RecordChange[];
 }): PayeeLedgerSource {
   const payments = input.payments ?? [];
   const account = MinerRunningAccount.build({
@@ -51,6 +53,7 @@ function sample(input: {
     payments: payments.map(({ id, at, from }) => ({ id, at, ...(from ? { from } : {}) })),
     ...(input.writeOffs ? { writeOffs: input.writeOffs } : {}),
     ...(input.notices ? { notices: input.notices } : {}),
+    ...(input.recordChanges ? { recordChanges: input.recordChanges } : {}),
   };
 }
 
@@ -100,6 +103,47 @@ export const CORP_BOOK_LEDGER: PayeeLedgerSource = sample({
   ],
   writeOffs: [
     { id: 'w1', at: '2026-11-08T12:00:00Z', amount: 1_000_000, reason: 'Fleet boost credit' },
+  ],
+  recordChanges: [
+    {
+      id: 'tolerance:98000001:sample:2026-10-03',
+      reason: 'tolerance',
+      at: '2026-10-05T19:42:00Z',
+      date: '2026-10-03',
+      corporationId: 98000001,
+      minerId: 'sample',
+      closeOut: {
+        billed: 5_500_000,
+        paid: 5_490_000,
+        writtenOff: 10_000,
+        tolerancePct: 0.5,
+        paymentId: 'p1',
+      },
+    },
+    {
+      id: 'autofix-1',
+      reason: 'autoFix',
+      at: '2026-10-18T00:05:00Z',
+      date: '2026-10-17',
+      corporationId: 98000001,
+      assignments: [
+        {
+          assignmentId: 'as-17',
+          before: {
+            payeeId: 'payee-corp',
+            taxPct: 12,
+            taxOwed: 3_846_000,
+            oreLines: [{ typeId: BITUMENS, quantity: 16_900 }],
+          },
+          after: {
+            payeeId: 'payee-corp',
+            taxPct: 10,
+            taxOwed: 3_205_000,
+            oreLines: [{ typeId: BITUMENS, quantity: 16_900 }],
+          },
+        },
+      ],
+    },
   ],
   notices: [
     {

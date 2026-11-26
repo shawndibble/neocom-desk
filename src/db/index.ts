@@ -23,6 +23,7 @@ import type {
   MiningLedgerHistoryRecord,
   MiningTaxAssignmentRecord,
   MiningTaxPaymentLinkRecord,
+  MiningTaxRecordChangeRecord,
   NetWorthSnapshotRecord,
   CharacterAcceleratorRecord,
   NotificationFeedRecord,
@@ -65,6 +66,7 @@ export const db = new Dexie('neocom') as Dexie & {
   fittings: EntityTable<FittingRecord, 'id'>;
   miningTaxAssignments: EntityTable<MiningTaxAssignmentRecord, 'id'>;
   miningTaxPaymentLinks: EntityTable<MiningTaxPaymentLinkRecord, 'id'>;
+  miningTaxRecordChanges: EntityTable<MiningTaxRecordChangeRecord, 'id'>;
   orderProblemSamples: EntityTable<OrderProblemSampleRecord, 'orderId'>;
   mailDrafts: EntityTable<MailDraftRecord, 'id'>;
   miningLedgerHistory: EntityTable<MiningLedgerHistoryRecord, 'characterId'>;
@@ -238,4 +240,8 @@ db.version(33).stores({
 
 db.version(34).stores({
   miningTaxPaymentLinks: 'id, characterId, payeeId',
+});
+
+db.version(35).stores({
+  miningTaxRecordChanges: 'id, characterId, corporationId',
 });

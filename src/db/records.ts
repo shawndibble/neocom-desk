@@ -15,6 +15,11 @@ import type { OrderProblemSample } from '@/engine/market/orderProblemHistory';
 import type { MiningLedgerRow } from '@/engine/miningTax/types';
 import type { PayeePaymentLink } from '@/engine/miningTax/payeeRunningAccount';
 import type {
+  AssignmentChange,
+  RecordChangeReason,
+  ToleranceCloseOut,
+} from '@/engine/miningTax/recordChanges';
+import type {
   Contract,
   ContractItem,
   IndustryJob,
@@ -235,6 +240,19 @@ export interface MiningTaxAssignmentRecord {
   payment?: MiningTaxPaymentInfo;
   rawOrePriced?: boolean;
   label?: string;
+  updatedAt: number;
+}
+
+export interface MiningTaxRecordChangeRecord {
+  id: string;
+  characterId: number;
+  reason: RecordChangeReason;
+  at: string;
+  date: string;
+  corporationId?: number;
+  minerId?: string;
+  closeOut?: ToleranceCloseOut;
+  assignments?: AssignmentChange[];
   updatedAt: number;
 }
 

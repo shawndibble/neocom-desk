@@ -5,6 +5,7 @@ import type {
   CharacterAcceleratorRecord,
   MiningTaxAssignmentRecord,
   MiningTaxPaymentLinkRecord,
+  MiningTaxRecordChangeRecord,
   PayeeRecord,
   PlanetRichnessRecord,
   ProductionLossRecord,
@@ -236,6 +237,31 @@ export const FULL_MINING_TAX_PAYMENT_LINK: Required<MiningTaxPaymentLinkRecord> 
   updatedAt: UPDATED_AT,
 };
 
+export const FULL_MINING_TAX_RECORD_CHANGE: Required<MiningTaxRecordChangeRecord> = {
+  id: 'tolerance:98000001:m1:2026-10-02',
+  characterId: 1,
+  reason: 'tolerance',
+  at: '2026-10-04T12:00:00Z',
+  date: '2026-10-02',
+  corporationId: 98000001,
+  minerId: 'm1',
+  closeOut: {
+    billed: 2_000_000,
+    paid: 1_995_000,
+    writtenOff: 5_000,
+    tolerancePct: 0.5,
+    paymentId: 'p2',
+  },
+  assignments: [
+    {
+      assignmentId: 'a1',
+      before: { payeeId: 'payee-1', taxPct: 10, taxOwed: 1_000, oreLines: [] },
+      after: null,
+    },
+  ],
+  updatedAt: UPDATED_AT,
+};
+
 export const FULL_RECORDS = {
   skillPlans: FULL_SKILL_PLAN,
   buildPlans: FULL_BUILD_PLAN,
@@ -252,4 +278,5 @@ export const FULL_RECORDS = {
   fittings: FULL_FITTING,
   miningTaxAssignments: FULL_MINING_TAX_ASSIGNMENT,
   miningTaxPaymentLinks: FULL_MINING_TAX_PAYMENT_LINK,
+  miningTaxRecordChanges: FULL_MINING_TAX_RECORD_CHANGE,
 } as const;

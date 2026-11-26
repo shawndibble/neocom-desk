@@ -18,6 +18,9 @@ vi.mock('@/features/miningTax/useMadePayments', () => ({
 vi.mock('@/features/miningTax/corpBook/useAutoClaimDonations', () => ({
   useAutoClaimDonations: () => ({ failed: [] }),
 }));
+vi.mock('@/features/miningTax/corpBook/useToleranceRecordChanges', () => ({
+  useToleranceRecordChanges: () => [],
+}));
 vi.mock('@/features/miningTax/corpBook/useBookSystems', () => ({
   useBookSystems: () => ({ names: new Map(), security: new Map() }),
 }));

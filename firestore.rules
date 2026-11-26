@@ -123,6 +123,17 @@ service cloud.firestore {
         allow delete: if isOwner();
       }
 
+      // A Record Change (issue #6765): write once. An update may re-stamp or tombstone it, never rewrite what it says.
+      match /miningTaxRecordChanges/{changeId} {
+        allow get: if isOwner() && hashMatches();
+        allow list: if isOwner();
+        allow create: if isOwner() && incomingHashMatches();
+        allow update: if isOwner() && hashMatches() && incomingHashMatches()
+          && (request.resource.data.deleted == true
+            || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['updatedAt', 'ownerHash']));
+        allow delete: if isOwner();
+      }
+
       // Communities membership index (issue #3596): one doc per Community
       // this Character belongs to, written only by the Community callables
       // (admin SDK). The Character may read its own; it backs the
