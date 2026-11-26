@@ -1339,7 +1339,7 @@
     },
     "skillFixes": {
       "heading": "Makes it fit",
-      "makesItFit": "Brings the Fitting under budget",
+      "makesItFit": "Brings the Fitting under CPU or powergrid budget",
       "missing": "Needed to fly the ship or use its modules",
       "inPlan": "In {{plan}}"
     },
@@ -1352,7 +1352,8 @@
       "rankBy": "Rank by",
       "improvesFit": "Improves fit",
       "withPrerequisites": "incl. prerequisites",
-      "addToPlan": "Add to plan",
+      "addToPlan": "Add",
+      "addAll": "Add all",
       "addLevel": "Add {{level}}",
       "addToPlanLabel": "Add to plan: {{skill}}",
       "newPlan": "New Skill Plan ({{name}})",
