@@ -8905,7 +8905,6 @@
       "ledgerAction": "Ledger",
       "moreActions": "More actions for {{payee}}",
       "corpBookTag": "Corp Tax Book",
-      "creditHint": "Paid ahead: new days of tax come out of this credit",
       "unassignedHint_one": "{{count}} entry has no Payee yet",
       "unassignedHint_other": "{{count}} entries have no Payee yet",
       "acrossPayees_one": "across {{count}} payee",

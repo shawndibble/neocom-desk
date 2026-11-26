@@ -67,7 +67,6 @@ export function OwedBalances({
   const { t } = useTranslation();
   const owed = balances.filter((b) => b.owed > 0);
   const owedTotal = owed.reduce((sum, b) => sum + b.owed, 0);
-  const credits = balances.filter((b) => b.owed <= 0 && b.credit > 0);
 
   const cardCount =
     owed.length + (unassigned.entryCount > 0 ? 1 : 0) + (unlinkedPaymentCount > 0 ? 1 : 0);
@@ -289,29 +288,6 @@ export function OwedBalances({
           )}
         </div>
       )}
-      {credits.map((balance) => (
-        <p
-          key={balance.payee.id}
-          className="flex flex-wrap items-baseline gap-x-2 text-xs text-text-dim"
-        >
-          <span className="font-semibold text-text">{balance.payee.name}</span>
-          <span className="text-isk-pos tabular-nums">{formatIsk(balance.credit, 0)} ISK</span>
-          <span>
-            {t('miningTax.owed.creditHint')}
-            {characterNameOf?.(balance) && ` · ${characterNameOf(balance)}`}
-          </span>
-          {onOpenLedger && (
-            <button
-              type="button"
-              className={textActionClassName('inline-flex')}
-              onClick={() => onOpenLedger(balance)}
-              aria-label={t('miningTax.ledger.openFor', { payee: balance.payee.name })}
-            >
-              {t('miningTax.owed.ledgerAction')}
-            </button>
-          )}
-        </p>
-      ))}
       {conflicts &&
         promptRow(
           'conflicts',
