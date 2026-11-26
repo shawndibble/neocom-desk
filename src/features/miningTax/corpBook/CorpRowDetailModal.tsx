@@ -40,6 +40,7 @@ import {
   unlinkedTarget,
   type ResolveTarget,
 } from './resolve/targets';
+import type { ClosedDayPlan } from '@/engine/corpTaxBook/closedDayFix';
 import type { CorpRowInfo } from './corpRows';
 import { formatCount } from '@/lib/formatCount';
 
@@ -56,6 +57,7 @@ interface Props {
   notice?: ReactNode;
   onResolve?: (target: ResolveTarget) => void;
   onFixRecords?: () => void;
+  closedConflict?: ClosedDayPlan;
   onOpenLedger?: () => void;
   onEdit?: () => void;
   onSplit?: () => void;
@@ -74,6 +76,7 @@ export function CorpRowDetailModal({
   notice,
   onResolve,
   onFixRecords,
+  closedConflict,
   onOpenLedger,
   onEdit,
   onSplit,
@@ -116,7 +119,7 @@ export function CorpRowDetailModal({
     facts.push([t('miningTax.corpBook.detail.factOriginal'), `${formatIsk(view.billed)} ISK`]);
   }
   const conflict = view.state === 'conflict';
-  const resolvable = rowTarget(view);
+  const resolvable = rowTarget(view, undefined, closedConflict);
   const unlinked = unlinkedTarget(view);
   const declaring =
     onResolve !== undefined &&

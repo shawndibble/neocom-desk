@@ -505,14 +505,7 @@ export function useTaxAttentionItems({
       id: `corp-also-billed:${a.corporationId}`,
       tone: 'warning',
       title: t('miningTax.corpBook.attention.alsoBilledTitle', { corp: a.corpName, payees }),
-      detail: (
-        <p>
-          {t('miningTax.corpBook.attention.alsoBilledDetail', {
-            payees,
-            action: t('miningTax.corpBook.overlap.letBill'),
-          })}
-        </p>
-      ),
+      detail: <p>{t('miningTax.corpBook.attention.alsoBilledDetail', { payees })}</p>,
       ...(target && {
         action: (
           <Button size="sm" onClick={() => openDetail(target)}>

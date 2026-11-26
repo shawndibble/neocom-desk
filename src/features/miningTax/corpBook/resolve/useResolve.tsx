@@ -1,6 +1,8 @@
 import { useMemo, useState, type ReactNode } from 'react';
-import type { BookRowView } from '@/engine/corpTaxBook/personal';
+import type { ClosedDayPlan } from '@/engine/corpTaxBook/closedDayFix';
 import type { MadePayment } from '../../paymentLinks';
+import { ClosedDayFixPreview } from '../ClosedDayConflict';
+import type { ConflictNames } from '../closedConflicts';
 import type { CorpBookView } from '../corpBookView';
 import { useNotPaying } from './notPaying';
 import { ProblemFacts } from './ProblemFacts';
@@ -15,7 +17,8 @@ interface Args {
   madePayments: readonly MadePayment[];
   linked: ReadonlySet<string>;
   onPay: (corporationId: number) => void;
-  onOpenDay: (row: BookRowView) => void;
+  onFixRecords: (plan: ClosedDayPlan) => void;
+  names: ConflictNames;
 }
 
 export function useResolve({
@@ -25,7 +28,8 @@ export function useResolve({
   madePayments,
   linked,
   onPay,
-  onOpenDay,
+  onFixRecords,
+  names,
 }: Args): {
   open: (target: ResolveTarget) => void;
   hidden: ReadonlySet<string>;
@@ -40,6 +44,7 @@ export function useResolve({
     const { problem } = target;
     const book = corpView?.books.find((b) => b.loaded.corporationId === problem.corporationId);
     const close = () => setTarget(null);
+    const plan = problem.kind === 'conflict' ? problem.plan : undefined;
     return (
       <ResolveDialog
         problem={problem}
@@ -67,18 +72,19 @@ export function useResolve({
         })}
         {...(target.paidSince !== undefined ? { paidSince: target.paidSince } : {})}
         {...(target.payeeName !== undefined ? { payeeName: target.payeeName } : {})}
-        facts={<ProblemFacts target={target} />}
+        facts={<ProblemFacts target={target} names={names} />}
         hideKey={target.hideKey}
         onHide={hide}
         onPay={() => {
           close();
           onPay(problem.corporationId);
         }}
-        {...(problem.kind === 'conflict' && problem.row
+        {...(plan
           ? {
+              fixPreview: <ClosedDayFixPreview plan={plan} names={names} />,
               onFixRecords: () => {
                 close();
-                onOpenDay(problem.row!);
+                onFixRecords(plan);
               },
             }
           : {})}
@@ -86,7 +92,18 @@ export function useResolve({
         onClose={close}
       />
     );
-  }, [target, corpView, nameOf, hide, onPay, onOpenDay, reloadCorpBooks, madePayments, linked]);
+  }, [
+    target,
+    corpView,
+    nameOf,
+    hide,
+    onPay,
+    onFixRecords,
+    names,
+    reloadCorpBooks,
+    madePayments,
+    linked,
+  ]);
   return {
     open: setTarget,
     hidden,

@@ -6,7 +6,8 @@ import { useBookSystems } from '@/features/miningTax/corpBook/useBookSystems';
 import { useHiddenLeftCorps } from '@/features/miningTax/corpBook/leftCorpAck';
 import { useCorpBookView } from '@/features/miningTax/corpBook/useCorpBookView';
 import { useToleranceRecordChanges } from '@/features/miningTax/corpBook/useToleranceRecordChanges';
-import { useClosedDayFixes } from '@/features/miningTax/corpBook/useClosedDayFixes';
+import { closedDayPlans, useClosedDayFixes } from '@/features/miningTax/corpBook/useClosedDayFixes';
+import type { ClosedDayPlan } from '@/engine/corpTaxBook/closedDayFix';
 import { useBookAutoAssign } from '@/features/miningTax/corpBook/useBookAutoAssign';
 import { heldPaymentKeys } from '@/engine/miningTax/payeeRunningAccount';
 import { PayeeRunningAccounts, withPaidStatus } from './payeeRunningAccounts';
@@ -16,6 +17,7 @@ import type { TaxSnapshot } from './taxSnapshot';
 import type { TrackedCharacter } from './snapshot';
 
 const NO_SECURITY: ReadonlyMap<number, number> = new Map();
+const NO_PLANS: readonly ClosedDayPlan[] = [];
 
 export function useTaxCorpBooks(
   data: TaxSnapshot | null,
@@ -136,6 +138,13 @@ export function useTaxCorpBooks(
     String(data?.fetchedAt?.getTime() ?? 'none')
   );
   useClosedDayFixes(booksRead ? corpView : null, data ? accounts : null, refreshLedger);
+  const closedConflicts = useMemo(
+    () =>
+      booksRead && corpView && data
+        ? closedDayPlans(corpView, accounts).filter((plan) => plan.state === 'conflict')
+        : NO_PLANS,
+    [booksRead, corpView, data, accounts]
+  );
   useBookAutoAssign(
     booksRead && booksKnown ? corpView : null,
     bookInput?.entries,
@@ -158,6 +167,7 @@ export function useTaxCorpBooks(
     leftCorp: { shownBooks, corpNameOf, hiddenLeft, hide: leftAck.hide, show: leftAck.show },
     failedClaims,
     recordChanges,
+    closedConflicts,
     systemNames: bookSystems.names,
     systemSecurity: bookSystems.security,
   };

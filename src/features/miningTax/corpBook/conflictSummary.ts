@@ -1,5 +1,7 @@
+import type { ClosedDayPlan } from '@/engine/corpTaxBook/closedDayFix';
 import type { BookRowView } from '@/engine/corpTaxBook/personal';
 import type { DisplayRow } from '../groupRows';
+import { closedConflictFor } from './closedConflicts';
 import { answeredByMember, isoDay } from './memberFlag';
 import { notPayingDayKey } from './resolve/notPaying';
 
@@ -10,18 +12,24 @@ export interface ConflictSummary {
   firstCorpName: string;
   firstResolvesOn: string;
   waiting: number;
+  closed: number;
 }
+
+const inClosedConflict = (closed: readonly ClosedDayPlan[], view: BookRowView) =>
+  (view.state === 'billed' || view.state === 'paid') &&
+  closedConflictFor(closed, view) !== undefined;
 
 const dayKey = (view: BookRowView) => `${view.characterId}:${view.date}:${view.solarSystemId}`;
 
 export function summarizeConflicts(
   rows: readonly DisplayRow[],
-  notPaying: ReadonlySet<string> = new Set()
+  notPaying: ReadonlySet<string> = new Set(),
+  closed: readonly ClosedDayPlan[] = []
 ): ConflictSummary | null {
   const conflicts = rows
     .flatMap((dr) =>
       dr.corp?.kind === 'row' &&
-      dr.corp.view.state === 'conflict' &&
+      (dr.corp.view.state === 'conflict' || inClosedConflict(closed, dr.corp.view)) &&
       !notPaying.has(
         notPayingDayKey(dr.corp.view.corporationId, dr.corp.view.characterId, dr.corp.view.date)
       )
@@ -47,6 +55,11 @@ export function summarizeConflicts(
     first: head.dr,
     firstCorpName: head.corp.corpName,
     firstResolvesOn: isoDay(head.corp.view.resolvesAt),
+    closed: new Set(
+      conflicts
+        .filter((c) => closedConflictFor(closed, c.corp.view) !== undefined)
+        .map((c) => dayKey(c.corp.view))
+    ).size,
   };
 }
 

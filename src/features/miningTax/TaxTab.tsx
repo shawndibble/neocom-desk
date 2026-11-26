@@ -22,7 +22,6 @@ import { useNotPaying } from '@/features/miningTax/corpBook/resolve/notPaying';
 import { QuietStatusLine } from '@/features/miningTax/corpBook/resolve/QuietStatusLine';
 import { conflictTarget, uncreditedTarget } from '@/features/miningTax/corpBook/resolve/targets';
 import { useResolve } from '@/features/miningTax/corpBook/resolve/useResolve';
-import type { BookRowView } from '@/engine/corpTaxBook/personal';
 import { heldPaymentKeys, type PayeePaymentLink } from '@/engine/miningTax/payeeRunningAccount';
 import { leftCorpBooksOf } from '@/features/miningTax/corpBook/leftCorpBooks';
 import {
@@ -39,12 +38,14 @@ import {
 } from '@/features/miningTax/corpBook/useCorpStateText';
 import { splitLedger } from '@/features/miningTax/ledgerSections';
 import { OwedBalances } from '@/features/miningTax/OwedBalances';
+import { summarizeConflicts } from '@/features/miningTax/corpBook/conflictSummary';
+import { fixClosedDay, undoClosedDayFix } from '@/features/miningTax/ledgerActions';
 import {
-  conflictSiblings,
-  summarizeConflicts,
-} from '@/features/miningTax/corpBook/conflictSummary';
-import { planTakeover } from '@/features/miningTax/corpBook/conflictTakeover';
-import { releaseOre, restoreAssignments } from '@/features/miningTax/ledgerActions';
+  closedConflictCorps,
+  closedConflictFor,
+  type ConflictNames,
+} from '@/features/miningTax/corpBook/closedConflicts';
+import type { ClosedDayPlan } from '@/engine/corpTaxBook/closedDayFix';
 import { TaxDialogsHost } from '@/features/miningTax/TaxDialogsHost';
 import { dateRangeOf, taxOwedOf } from '@/features/miningTax/taxRowFormat';
 import { useContinuations } from '@/features/miningTax/useContinuations';
@@ -132,6 +133,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
     leftCorp,
     failedClaims,
     recordChanges,
+    closedConflicts,
     systemNames,
     systemSecurity,
   } = useTaxCorpBooks(data, characters, activeCharacterId, refresh);
@@ -202,8 +204,8 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
 
   const { hidden: notPayingKeys } = useNotPaying();
   const conflicts = useMemo(
-    () => summarizeConflicts(characterFiltered, notPayingKeys),
-    [characterFiltered, notPayingKeys]
+    () => summarizeConflicts(characterFiltered, notPayingKeys, closedConflicts),
+    [characterFiltered, notPayingKeys, closedConflicts]
   );
   const quietUncredited = useCallback(
     (b: NonNullable<typeof corpView>['books'][number]) => {
@@ -302,49 +304,42 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
 
   const linkable = linkSuggestions;
 
-  const openBookDay = useCallback(
-    (row: BookRowView) => {
-      const target = allDisplayRows.find(
-        (dr) => dr.corp?.kind === 'row' && dr.corp.view.id === row.id
-      );
-      if (target) actions.openDetail(target);
-    },
-    [allDisplayRows, actions]
+  const conflictNames = useMemo(
+    (): ConflictNames => ({
+      payee: (id) => payeeById.get(id)?.name ?? t('miningTax.unknownPayee'),
+      corp: leftCorp.corpNameOf,
+      typeNames: data?.typeNames ?? NO_NAMES,
+    }),
+    [payeeById, leftCorp.corpNameOf, data?.typeNames, t]
   );
-  const takeoverOf = useCallback(
-    (row: BookRowView) =>
-      planTakeover(
-        row,
-        corpView ? conflictSiblings(corpView.overlay.rows, row) : [],
-        everyAssignment
-      ),
-    [corpView, everyAssignment]
-  );
-  const fixConflict = useCallback(
-    async (row: BookRowView) => {
-      const { steps } = takeoverOf(row);
-      if (steps.length === 0) return openBookDay(row);
-      const result = await releaseOre(
-        steps.map((step) => ({ assignment: step.assignment, after: step.after }))
-      );
+  const fixRecords = useCallback(
+    async (plan: ClosedDayPlan) => {
+      const opts = { corp: closedConflictCorps(plan, conflictNames), date: plan.date };
+      const result = await fixClosedDay(plan, 'fixMyRecords');
       if (!result.ok) return setToast({ message: t('miningTax.saveFailed') });
-      const originals = steps.map((step) => step.assignment);
       refresh();
+      const { change, originals, stale } = result.value;
+      if (stale) return setToast({ message: t('miningTax.corpBook.closedConflict.stale', opts) });
+      if (!change)
+        return setToast({ message: t('miningTax.corpBook.closedConflict.fixedToast', opts) });
       setToast({
-        message: t('miningTax.corpBook.conflict.fixedToast', {
-          corp: row.corpName,
-          date: row.date,
-        }),
-        onUndo: () => void restoreAssignments(originals).then(() => refresh()),
+        message: t('miningTax.corpBook.closedConflict.fixedToast', opts),
+        onUndo: () =>
+          void undoClosedDayFix(plan.characterId, change, originals).then((undone) => {
+            refresh();
+            setToast({
+              message: !undone.ok
+                ? t('miningTax.saveFailed')
+                : t(
+                    `miningTax.corpBook.closedConflict.${undone.value.stale ? 'undoStale' : 'undoneToast'}`,
+                    opts
+                  ),
+            });
+          }),
       });
     },
-    [takeoverOf, openBookDay, refresh, t]
+    [conflictNames, refresh, t]
   );
-  const quickFix = useMemo(() => {
-    const first = conflicts?.first.corp;
-    if (conflicts?.days !== 1 || first?.kind !== 'row') return undefined;
-    return takeoverOf(first.view).steps.length > 0 ? first.view : undefined;
-  }, [conflicts, takeoverOf]);
   const linkedKeys = useMemo(
     () => heldPaymentKeys(data?.paymentLinks ?? NO_LINKS),
     [data?.paymentLinks]
@@ -356,7 +351,8 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
     madePayments,
     linked: linkedKeys,
     onPay: actions.openCorpPay,
-    onOpenDay: fixConflict,
+    onFixRecords: (plan) => void fixRecords(plan),
+    names: conflictNames,
   });
   const quiet = useMemo(() => {
     const rows = corpView?.overlay.rows ?? [];
@@ -559,7 +555,6 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
                     onAssignNext={assignNext}
                     onReviewPayments={() => actions.openLinkPayment({})}
                     conflicts={conflicts}
-                    {...(quickFix ? { onFixConflicts: () => void fixConflict(quickFix) } : {})}
                     onReviewConflicts={() => {
                       const first = conflicts?.first.corp;
                       if (first?.kind !== 'row') return;
@@ -567,7 +562,8 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
                       resolve.open(
                         conflictTarget(
                           first.view,
-                          payeeId !== undefined ? payeeById.get(payeeId)?.name : undefined
+                          payeeId !== undefined ? payeeById.get(payeeId)?.name : undefined,
+                          closedConflictFor(closedConflicts, first.view)
                         )
                       );
                     }}
@@ -721,6 +717,9 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
           linkSuggestions={linkSuggestions}
           corpView={corpView}
           recordChanges={recordChanges}
+          closedConflicts={closedConflicts}
+          conflictNames={conflictNames}
+          onFixRecords={fixRecords}
           reloadCorpBooks={reloadCorpBooks}
           onResolve={resolve.open}
           corpStateHint={corpStateHint}
