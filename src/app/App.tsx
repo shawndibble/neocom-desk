@@ -40,6 +40,7 @@ import { InfoModals } from './InfoModals';
 import { AuthFailureRedirect } from './AuthFailureNotice';
 import { LegacyPathRedirect } from './LegacyPathRedirect';
 import { AlertsRedirect } from './AlertsRedirect';
+import { SkillsIndexRedirect } from './SkillsIndexRedirect';
 import type { AppRoutePath } from './routeScopes';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useNumberFormat } from '@/lib/numberFormat';
@@ -122,7 +123,7 @@ const ROUTE_ELEMENTS = {
   '/characters': <Characters />,
   '/overview': <Overview />,
   '/alerts': <AlertsRedirect />,
-  '/skills': <Navigate to="/skills/plans" replace />,
+  '/skills': <SkillsIndexRedirect />,
   '/skills/trained': <Skills />,
   '/skills/plans': <SkillPlans />,
   '/skills/plans/:planId': <SkillPlanEditor />,
