@@ -138,7 +138,7 @@ describe('CorpBookSyncNote', () => {
     );
     expect(
       screen.getByText(
-        'You owe Brass Meridian Logistics 766,000 ISK, including 666,000 ISK estimated for 18 Oct (Brass Meridian Logistics bills it once it closes, after 06:00 UTC on 19 Oct, and its next sync).'
+        'You owe 766,000 ISK. 666,000 ISK of it is 18 Oct, billed after 06:00 UTC on 19 Oct.'
       )
     ).toBeInTheDocument();
     // Not "safe to pay" beside a day that is not closed yet.
@@ -156,9 +156,7 @@ describe('CorpBookSyncNote', () => {
       />
     );
     expect(
-      screen.getByText(
-        "Includes 666,000 ISK estimated for 18 Oct: billed once it closes, after 06:00 UTC on 19 Oct and the book's next sync."
-      )
+      screen.getByText('666,000 ISK of it is 18 Oct, billed after 06:00 UTC on 19 Oct.')
     ).toBeInTheDocument();
   });
 

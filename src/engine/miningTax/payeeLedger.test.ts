@@ -235,6 +235,53 @@ describe('payeeLedger', () => {
   });
 });
 
+describe('payeeLedger: a day not billed yet', () => {
+  const today = charge('t', '2026-10-04', 300_000, { place: 'Refinery A', open: true });
+
+  it('lists it as a charge on its day, in the balance and in what is owed', () => {
+    const src = { ...source(MINED, []), charges: [...MINED, today] };
+    const ledger = payeeLedger(src);
+    expect(ledger.rows.at(-1)).toMatchObject({
+      date: '2026-10-04',
+      kind: 'charge',
+      charged: 300_000,
+      balance: 3_800_000,
+    });
+    expect(ledger.status).toEqual({
+      kind: 'owes',
+      amount: 3_800_000,
+      days: 4,
+      oldest: '2026-10-01',
+    });
+  });
+
+  it('is paid by credit ahead of every billed day', () => {
+    const paid = source(MINED, [payment('p1', 3_800_000, '2026-10-04T10:00:00Z')]);
+    const ledger = payeeLedger({ ...paid, charges: [...MINED, today] });
+    expect(ledger.rows.at(-1)?.balance).toBe(0);
+    expect(ledger.status).toEqual({ kind: 'paid', through: '2026-10-03' });
+    expect(ledger.credit).toBe(0);
+  });
+
+  it('counts only the open days credit has not covered', () => {
+    const tomorrow = charge('u', '2026-10-05', 200_000, { open: true });
+    const paid = source(MINED, [payment('p1', 3_900_000, '2026-10-05T10:00:00Z')]);
+    const ledger = payeeLedger({ ...paid, charges: [...MINED, today, tomorrow] });
+    expect(ledger.status).toEqual({ kind: 'owes', amount: 100_000, days: 1, oldest: '2026-10-05' });
+  });
+
+  it('owes only the open day once every billed day is paid', () => {
+    const paid = source(MINED, [payment('p1', 3_500_000, '2026-10-04T10:00:00Z')]);
+    const ledger = payeeLedger({ ...paid, charges: [...MINED, today] });
+    expect(ledger.status).toEqual({
+      kind: 'owes',
+      amount: 300_000,
+      days: 1,
+      oldest: '2026-10-04',
+    });
+  });
+});
+
 describe('payeeLedger: what an officer’s page needs (C3)', () => {
   it('shows a reversed correction struck through, with its reversal on the day it was undone', () => {
     const charges = [
