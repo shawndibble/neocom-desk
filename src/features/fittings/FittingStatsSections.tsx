@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui';
 import { useShipDataNeedsConnection } from './useDogmaEngineStatus';
@@ -187,8 +187,7 @@ export function FittingStatsSections({
   );
 
   const figure = makeFigure(stats);
-  const priceTypeIds = useMemo(() => price?.rows.map((row) => row.typeId) ?? [], [price]);
-  const priceTypeName = useResolvedTypeName(typeName, priceTypeIds);
+  const priceTypeName = useResolvedTypeName(typeName, price?.rows.map((row) => row.typeId) ?? []);
   const column = { t, section, figure, stats, placeholder, typeName };
   const damage = damageSections({
     ...column,

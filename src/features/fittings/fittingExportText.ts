@@ -9,6 +9,7 @@ import { fittingToShareInput } from '@/engine/fittings/shareMapper';
 import type { Fitting } from '@/engine/fittings/types';
 import { loadTypeNames } from '@/features/character/typeNames';
 import { FITTINGS_PATH } from './fittingRoutes';
+import { unnamedTypeName } from './useFittingCatalogue';
 import { eftAttributeNamesFor } from '@/features/abyssal/mutaplasmidData';
 
 export type FittingExportKind = 'permanentLink' | 'eft' | 'multibuy' | 'eveXml';
@@ -42,7 +43,7 @@ export async function exportFitting(
   }
 
   const names = await loadTypeNames([...fittingItemCounts(fitting, cloneImplants).keys()]);
-  const nameFor = (typeId: number) => names.get(typeId) ?? `Type ${typeId}`;
+  const nameFor = (typeId: number) => names.get(typeId) ?? unnamedTypeName(typeId);
   if (kind === 'eveXml') return fittingToEveXml(fitting, nameFor);
   return kind === 'eft'
     ? fittingToEft(fitting, nameFor, { attributeName: await eftAttributeNamesFor(fitting) })
