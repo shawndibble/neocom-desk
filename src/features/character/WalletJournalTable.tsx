@@ -215,7 +215,7 @@ function JournalFilterBar({
   );
 }
 
-const JOURNAL_TABLE_CARDS_REM = 43;
+const JOURNAL_TABLE_CARDS_REM = 62;
 
 interface JournalTableProps {
   filter: WalletJournalFilter;

@@ -170,6 +170,7 @@ export function useJournalColumnsBuilder(): (
         {
           id: 'description',
           header: t('wallet.description'),
+          minWidth: '32ch',
           className:
             'max-sm:max-w-40 max-sm:whitespace-normal max-sm:px-1 [overflow-wrap:anywhere]',
           headerClassName: 'max-sm:px-1',
