@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, FilterChip, InfoTooltip, Tooltip, TextInput } from '@/components/ui';
+import { tappableRowClassName } from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
 import type { MiningTaxPaymentMethod } from '@/db';
 import { SETTLE_FIELD_LABEL, SETTLE_METHODS } from './settleUpFields';
@@ -71,11 +72,16 @@ export function SettleInfoRow({
   note?: string;
 }) {
   return (
-    <div className="flex min-w-0 items-baseline gap-2 px-2 py-1.5">
+    <div className="flex min-w-0 items-center gap-2 px-2 py-1.5">
       <span className={SETTLE_ROW_LABEL}>{label}</span>
-      <span className="min-w-0 flex-1 text-xs break-words">
+      <span
+        className={cx(
+          'flex min-w-0 flex-1 flex-wrap items-center gap-x-2 text-xs break-words',
+          tappableRowClassName
+        )}
+      >
         <span className="font-semibold">{value}</span>
-        {note && <span className="ml-2 text-text-dim">{note}</span>}
+        {note && <span className="text-text-dim">{note}</span>}
       </span>
     </div>
   );
