@@ -1,6 +1,7 @@
 import type { SurveySummary } from '@/engine/survey/series';
 import { SurveyInfoEditor, SurveyInfoReadout, type InfoSurvey } from './SurveyInfoPanel';
 import type { SurveyInfoShare, SurveyTaxShare } from './surveyStore';
+import { SurveyPopLinkPrompt } from './SurveyPopLinkPrompt';
 import { useHasMoonOre } from './useHasMoonOre';
 
 export function SurveyInfoLine({
@@ -24,14 +25,25 @@ export function SurveyInfoLine({
   const connect = survey && { id: survey.id, expiresAt: survey.expiresAt, summary };
   if (owned) {
     return (
-      <SurveyInfoEditor
-        key={survey?.id}
-        characterId={characterId}
-        survey={survey}
-        connect={connect}
-        moon={moon}
-        onStored={onStored}
-      />
+      <>
+        {survey && moon && (
+          <SurveyPopLinkPrompt
+            key={survey.id}
+            surveyId={survey.id}
+            oreNames={summary.oreNames}
+            location={survey.info?.location ?? null}
+            owned
+          />
+        )}
+        <SurveyInfoEditor
+          key={survey?.id}
+          characterId={characterId}
+          survey={survey}
+          connect={connect}
+          moon={moon}
+          onStored={onStored}
+        />
+      </>
     );
   }
   return <SurveyInfoReadout info={info} tax={moon ? tax : null} connect={connect} />;

@@ -8020,6 +8020,16 @@
       "useManual": "Use \"{{name}}\" as a manual location",
       "searchingStructures": "Searching structures…"
     },
+    "popLink": {
+      "prompt": "Is this scan from {{title}} ({{corp}})? Linking it shows this Survey on that moon pop for everyone it is shared with.",
+      "pickPrompt": "Is this scan from one of these moon pops? Linking it shows this Survey on that pop for everyone it is shared with.",
+      "pick": "Choose a moon pop",
+      "option": "{{title}} ({{corp}})",
+      "link": "Link",
+      "notThisOne": "Not this one",
+      "notThese": "None of these",
+      "failed": "Couldn't link the moon pop. Try again."
+    },
     "changeOwner": {
       "open": "Change owner",
       "title": "Change owner",

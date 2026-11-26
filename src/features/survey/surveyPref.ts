@@ -17,6 +17,21 @@ export const useCurrentSurveyId = createLocalSetting<string | null>({
   parse: (raw) => (typeof raw === 'string' && isShareId(raw) ? raw : null),
 });
 
+const MAX_DISMISSED_POP_LINKS = 50;
+
+export const useDismissedPopLinks = createLocalSetting<string[]>({
+  key: 'miningSurveyPopLinkDismissed',
+  defaultValue: [],
+  parse: (raw) =>
+    Array.isArray(raw)
+      ? raw.filter((id): id is string => typeof id === 'string' && isShareId(id))
+      : null,
+});
+
+export function dismissPopLink(current: readonly string[], surveyId: string): string[] {
+  return [...current.filter((id) => id !== surveyId), surveyId].slice(-MAX_DISMISSED_POP_LINKS);
+}
+
 export const useDoneAtOverride = createLocalSetting<TimeFormat | null>({
   key: 'miningSurveyDoneAtClock',
   defaultValue: null,

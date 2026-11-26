@@ -10,8 +10,8 @@ import { sharedPopIsShown, type SharedPopEntry, type SharedPopSurvey } from './c
 
 export const SHARED_POPS_TTL_MS = 5 * MINUTE_MS;
 
-const readSharedPops = (nowMs: number): Promise<SharedPopView[]> =>
-  loadSharedPopsCached(nowMs, SHARED_POPS_TTL_MS);
+const readSharedPops = (nowMs: number, maxAgeMs: number): Promise<SharedPopView[]> =>
+  loadSharedPopsCached(nowMs, maxAgeMs);
 
 export interface SharedPopsRead {
   entries?: SharedPopEntry[];
@@ -54,10 +54,13 @@ async function readSurveyStates(
   return states;
 }
 
-export async function loadSharedPopsRead(nowMs: number): Promise<SharedPopsRead> {
+export async function loadSharedPopsRead(
+  nowMs: number,
+  maxAgeMs: number = SHARED_POPS_TTL_MS
+): Promise<SharedPopsRead> {
   let pops: SharedPopView[];
   try {
-    pops = await readSharedPops(nowMs);
+    pops = await readSharedPops(nowMs, maxAgeMs);
   } catch {
     return { corporations: [] };
   }

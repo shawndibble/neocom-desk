@@ -405,6 +405,39 @@ emulatorSuite('Shared Pops', () => {
     expect(after?.surveyId).toBe('def567');
   });
 
+  it('links only an unlinked pop when asked to, and never overwrites a live link', async () => {
+    await publishSharedPops(publishDeps(), BOOK);
+    const popId = `${BOOK}_1000_${Date.parse(START)}`;
+    const expiresAt = Timestamp.fromMillis(now + 24 * H);
+    await db.collection('shares').doc('abc234').set({ type: 'survey', expiresAt });
+    await db.collection('shares').doc('def567').set({ type: 'survey', expiresAt });
+    const linkedTo = async () =>
+      (await sharedPopsFor(readDeps(), [viewer(CORPMATE)])).find((p) => p.id === popId)?.surveyId;
+    await linkSharedPopSurvey(readDeps(), caller(CORPMATE), {
+      popId,
+      surveyId: 'abc234',
+      onlyIfUnlinked: true,
+    });
+    expect(await linkedTo()).toBe('abc234');
+    await expect(
+      linkSharedPopSurvey(readDeps(), caller(CORPMATE), {
+        popId,
+        surveyId: 'def567',
+        onlyIfUnlinked: true,
+      })
+    ).rejects.toMatchObject({ code: 'failed-precondition', message: 'already linked' });
+    expect(await linkedTo()).toBe('abc234');
+    await expect(
+      linkSharedPopSurvey(readDeps(), caller(CORPMATE), {
+        popId,
+        surveyId: 'abc234',
+        onlyIfUnlinked: true,
+      })
+    ).resolves.toEqual({ linked: true });
+    await linkSharedPopSurvey(readDeps(), caller(CORPMATE), { popId, surveyId: 'def567' });
+    expect(await linkedTo()).toBe('def567');
+  });
+
   it('republishes when an officer turns sharing off through the edit callable', async () => {
     await publishSharedPops(publishDeps(), BOOK);
     await editBookAs(
