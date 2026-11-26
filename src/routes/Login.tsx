@@ -12,7 +12,11 @@ import { CommunitySection } from '@/features/landing/CommunitySection';
 import { AwaySection } from '@/features/landing/AwaySection';
 import { FeatureShowcase } from '@/features/landing/FeatureShowcase';
 import { LandingFaq } from '@/features/landing/LandingFaq';
-import { LandingBackdrop, LandingSection } from '@/features/landing/LandingSection';
+import {
+  LandingBackdrop,
+  LandingSection,
+  LandingSplitSection,
+} from '@/features/landing/LandingSection';
 import { TrustSection } from '@/features/landing/TrustSection';
 import { useBelowFold } from '@/features/landing/useBelowFold';
 import { LandingHeader } from '@/features/landing/LandingHeader';
@@ -200,12 +204,21 @@ export function Login() {
             <LandingSection id="login-trust" heading={t('login.trustHeading')} tone="panel">
               <TrustSection />
             </LandingSection>
-            <LandingSection id="login-community" heading={t('login.communityHeading')} tone="space">
-              <CommunitySection />
-            </LandingSection>
-            <LandingSection id="login-faq" heading={t('login.faqHeading')} tone="panel">
-              <LandingFaq />
-            </LandingSection>
+            <LandingSplitSection
+              columns={[
+                {
+                  id: 'login-community',
+                  heading: t('login.communityHeading'),
+                  lead: t('login.communityLead'),
+                  children: <CommunitySection />,
+                },
+                {
+                  id: 'login-faq',
+                  heading: t('login.faqHeading'),
+                  children: <LandingFaq />,
+                },
+              ]}
+            />
 
             <section className="relative isolate overflow-hidden">
               <LandingBackdrop tone="space" />

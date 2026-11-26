@@ -4626,7 +4626,9 @@
   },
   "login": {
     "button": "Log in with EVE Online",
-    "permissionsHint": "Here is everything logging in grants, by area: what Neocom Desk reads, and the few things it can write. Open an area to see each permission and why it's needed.",
+    "permissionsBar": "Every permission, by area, with the reason it is needed.",
+    "permissionsOpen": "Open the full list",
+    "permissionsClose": "Hide the full list",
     "header": {
       "nav": "Page sections",
       "areas": "Areas",
@@ -4899,25 +4901,25 @@
       "reads": {
         "eyebrow": "Reads",
         "name": "Your characters, as far as you allow",
-        "desc": "Skills, wallet, assets, orders, contracts, industry, planets, mail and location. Corporation data only as far as your in-game corporation roles allow."
+        "desc": "Skills, wallet, assets, orders, contracts, industry, planets, mail and location. Corporation data only as far as your in-game roles allow."
       },
       "writes": {
         "eyebrow": "Writes",
-        "name": "It writes only when you act",
+        "name": "Only when you act",
         "items": {
-          "mail": "Opening a mail flags it as read in EVE.",
-          "calendar": "Answering a calendar invite sends your response.",
-          "send": "Mail you send goes out through your account.",
-          "fitting": "Saving a Fitting to EVE recreates it on the game's side.",
-          "waypoints": "Setting waypoints replaces your autopilot waypoints in the client.",
-          "window": "Open in EVE opens a window in the client."
+          "mail": "Mark a mail read",
+          "calendar": "Answer a calendar invite",
+          "send": "Send a mail you wrote",
+          "fitting": "Save a Fitting",
+          "waypoints": "Set waypoints",
+          "window": "Open a window in the client"
         },
-        "note": "Nothing else writes to EVE. It cannot move ISK."
+        "note": "It cannot move ISK."
       },
       "stays": {
         "eyebrow": "Stays",
         "name": "Your login stays on this device",
-        "desc": "Your login's refresh token lives in this device's own storage, never on our server or in a log. Remove a character and it goes with it. Two opt-in features keep their own narrow token on our server, only while they are on: Alerts when closed and a Corp Tax Book's Automatic sync. The FAQ below has the details."
+        "desc": "The refresh token lives in this device's storage, never on our server or in a log. Two opt-in features keep their own narrow token while on: Alerts when closed and Corp Tax Book sync."
       },
       "costs": {
         "eyebrow": "Costs",
@@ -4944,9 +4946,12 @@
       "revokeLink": "EVE's authorized apps page"
     },
     "communityHeading": "Bugs, ideas and chat",
+    "communityLead": "Built in the open by a player who uses it. Tell us what is missing.",
     "community": {
-      "body": "The Discord is where to report a bug, suggest an idea or just talk shop with other pilots who use Neocom Desk.",
-      "join": "Join Discord"
+      "discord": "Join the Discord",
+      "discordHint": "Chat, report a bug, suggest a feature",
+      "github": "View the source on GitHub",
+      "githubHint": "Free and open source"
     },
     "faqHeading": "Quick answers",
     "faq": {
