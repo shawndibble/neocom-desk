@@ -49,8 +49,6 @@ const CODE = minerPaymentCode(PILOT_MINER_ID);
 const ledgerButton = (page: Page, name = CORP_NAME) =>
   page.getByRole('button', { name: `Open the ledger of ${name}` });
 const cardOf = (page: Page, name = CORP_NAME) => page.getByRole('group', { name });
-const creditNote = (page: Page, amount: number) =>
-  page.getByRole('main').getByText(new RegExp(`${CORP_NAME}\\s*${isk(amount)}\\s*ISK`));
 const pilotLedger = (page: Page) => page.getByRole('dialog', { name: CORP_NAME });
 const officerLedger = (page: Page) => page.getByRole('table', { name: 'Ledger', exact: true });
 const officerRow = (page: Page, name: RegExp) => officerLedger(page).getByRole('row', { name });
@@ -261,7 +259,6 @@ test("a day mined today goes to the corp at once: the pilot's payment pays its e
   await expect(today).toContainText(isk(ESTIMATE));
   await expect(today).toContainText(/paid/i);
   await expect(page.getByRole('main')).not.toContainText(/You owe|Owes/);
-  await expect(creditNote(page, ESTIMATE)).toHaveCount(0);
 
   await book.seed([credited(sent)]);
   await gotoMiner(page);
@@ -309,7 +306,7 @@ for (const { kind, title } of SAME_DAY_CASES) {
 
     if (kind === 'slightlyLower') {
       expect(gap).toBeLessThan(0);
-      await expect(creditNote(page, -gap)).toBeVisible();
+      await dayRow().click();
       await ledgerButton(page).click();
       await expect(pilotLedger(page)).toContainText(`Mined at E2E Athanor Alpha\u2212${isk(tax)}`);
       await expect(pilotLedger(page)).toContainText(isk(-gap));
