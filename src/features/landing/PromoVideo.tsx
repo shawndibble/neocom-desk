@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { focusRingInsetClassName } from '@/components/ui/controlStyles';
 import { ICON_SIZE, PlayVideo } from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
-import { PROMO_VIDEO, promoEmbedUrl } from './promoVideoConfig';
+import { PROMO_VIDEO, promoEmbedUrl, EMBED_IFRAME_PROPS } from './promoVideoConfig';
 
 const POSTER = '/promo/promo-poster-1280.webp';
 const POSTER_SRCSET = '/promo/promo-poster-640.webp 640w, /promo/promo-poster-1280.webp 1280w';
@@ -26,9 +26,7 @@ export function PromoVideo({ plays, onPlay }: { plays: number; onPlay: () => voi
           ref={player}
           src={promoEmbedUrl(youtubeId)}
           aria-label={t('login.video.playerTitle')}
-          allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
-          allowFullScreen
-          referrerPolicy="strict-origin-when-cross-origin"
+          {...EMBED_IFRAME_PROPS}
           className="absolute inset-0 size-full"
         />
       ) : (

@@ -4,7 +4,12 @@ import { Modal } from '@/components/ui';
 import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import { ICON_SIZE, PlayVideo } from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
-import { TOUR_VIDEOS, promoEmbedUrl, type TourVideoId } from './promoVideoConfig';
+import {
+  TOUR_VIDEOS,
+  promoEmbedUrl,
+  EMBED_IFRAME_PROPS,
+  type TourVideoId,
+} from './promoVideoConfig';
 
 export function TourVideoLink({ video, className }: { video: TourVideoId; className?: string }) {
   const { t } = useTranslation();
@@ -27,9 +32,7 @@ export function TourVideoLink({ video, className }: { video: TourVideoId; classN
           <iframe
             src={promoEmbedUrl(youtubeId)}
             title={title}
-            allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
-            allowFullScreen
-            referrerPolicy="strict-origin-when-cross-origin"
+            {...EMBED_IFRAME_PROPS}
             className="block size-full"
           />
         </div>

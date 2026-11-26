@@ -5,6 +5,12 @@ export const PROMO_VIDEO = {
 
 export const PROMO_VIDEO_ANCHOR = 'login-video';
 
+export const EMBED_IFRAME_PROPS = {
+  allow: 'autoplay; encrypted-media; picture-in-picture; fullscreen',
+  allowFullScreen: true,
+  referrerPolicy: 'strict-origin-when-cross-origin',
+} as const;
+
 export function promoEmbedUrl(youtubeId: string): string {
   return `https://www.youtube-nocookie.com/embed/${encodeURIComponent(youtubeId)}?autoplay=1&rel=0&playsinline=1`;
 }
