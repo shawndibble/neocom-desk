@@ -48,7 +48,13 @@ export function CorpBookSyncNote({
   const { summary, corpName, loaded } = book;
   const synced = summary.lastSyncedAt;
   const ago = synced ? formatAge(Math.max(0, now - Date.parse(synced)), t) : null;
-  const closedThrough = summary.closedThrough;
+  // A day that is over and the book holds all of reads closed before the book bills it.
+  const finalThrough =
+    book.finalThrough !== undefined &&
+    (summary.closedThrough === undefined || book.finalThrough > summary.closedThrough)
+      ? book.finalThrough
+      : undefined;
+  const closedThrough = finalThrough ?? summary.closedThrough;
   // Shown on the Tax page and in the pay dialog alike (#6204): credit is money the member has.
   const credit = summary.credit > 0;
   // A running account (#6294) says where the member stands: paid through a day, or how far behind.
@@ -72,14 +78,19 @@ export function CorpBookSyncNote({
           ...estimateWords,
           amount: formatIsk((account?.owes?.amount ?? 0) + summary.estimate, 0),
         })
-      : showStanding && account?.owes
-        ? t('miningTax.corpBook.sync.behind', {
-            amount: formatIsk(account.owes.amount, 0),
-            count: account.owes.days,
-            date: shortDate(account.owes.oldest, i18n.language),
+      : showStanding && summary.estimate > 0
+        ? t('miningTax.corpBook.sync.owes', {
+            amount: formatIsk((account?.owes?.amount ?? 0) + summary.estimate, 0),
             corp: corpName,
           })
-        : null;
+        : showStanding && account?.owes
+          ? t('miningTax.corpBook.sync.behind', {
+              amount: formatIsk(account.owes.amount, 0),
+              count: account.owes.days,
+              date: shortDate(account.owes.oldest, i18n.language),
+              corp: corpName,
+            })
+          : null;
   // The balance an officer rolled over from another system, until they reverse it.
   // A note of where the account started, so it shows only while a balance is open: owing it, or
   // holding credit.

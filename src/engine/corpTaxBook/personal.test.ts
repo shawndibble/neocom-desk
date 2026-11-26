@@ -2752,6 +2752,16 @@ describe("overlayCorpBooks: an open day's own-Payee ore is owed as an estimate",
     expect(closed.books[0].estimate).toBe(0);
   });
 
+  it("is final once the day has ended and the book's sync since holds all of it", () => {
+    const after = { lastSyncedAt: '2026-10-19T00:10:00Z' };
+    const matched = overlay([today(30_000)], [withToday(30_000, after)], '2026-10-19T00:12:00Z');
+    expect(ofToday(matched).map((r) => [r.state, r.final])).toEqual([['estimate', true]]);
+    // Still mining that day, or the book short of it: not final.
+    expect(ofToday(overlay([today(30_000)], [withToday(30_000)]))[0].final).toBeUndefined();
+    const short = overlay([today(30_000)], [withToday(20_000, after)], '2026-10-19T00:12:00Z');
+    expect(ofToday(short)[0].final).toBeUndefined();
+  });
+
   it('estimates nothing on an open day an officer already dismissed', () => {
     const dismissed = withToday(30_000, {
       dismissals: [

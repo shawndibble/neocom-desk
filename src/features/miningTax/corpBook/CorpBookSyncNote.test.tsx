@@ -160,6 +160,25 @@ describe('CorpBookSyncNote', () => {
     ).toBeInTheDocument();
   });
 
+  it('calls a day that is over and the book holds all of safe to pay, before the book bills it', () => {
+    render(
+      <CorpBookSyncNote
+        book={book(
+          { estimate: 666_000, closedThrough: '2026-10-16' },
+          { finalThrough: '2026-10-17' }
+        )}
+        owedNow={666_000}
+        now={NOW}
+        showStanding
+      />
+    );
+    expect(
+      screen.getByText('Safe to pay — 17 Oct is closed (Brass Meridian Logistics synced 2h ago).')
+    ).toBeInTheDocument();
+    expect(screen.getByText('You owe Brass Meridian Logistics 666,000 ISK.')).toBeInTheDocument();
+    expect(screen.queryByText(/billed after/)).not.toBeInTheDocument();
+  });
+
   it('names the day still open and when it closes', () => {
     render(
       <CorpBookSyncNote book={book({}, { pendingFrom: '2026-10-18' })} owedNow={1} now={NOW} />

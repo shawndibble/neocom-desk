@@ -249,12 +249,14 @@ export function ownEntryRowOf(
 ): DisplayRow | undefined {
   const ids = overlay.absorbed.get(entryKey(view.characterId, view.date, view.solarSystemId));
   if (!ids) return undefined;
-  return flatten(
-    entries.filter(
-      (row) =>
-        row.characterId === view.characterId &&
-        row.entry.date === view.date &&
-        row.entry.solarSystemId === view.solarSystemId
+  // Every entry, so a joined group spanning other days opens whole, as its own row's Edit would.
+  return flatten(entries).find((dr) =>
+    allMembers(dr).some(
+      (m) =>
+        ids.has(m.assignment.id) &&
+        m.row.characterId === view.characterId &&
+        m.row.entry.date === view.date &&
+        m.row.entry.solarSystemId === view.solarSystemId
     )
-  ).find((dr) => allMembers(dr).some((m) => ids.has(m.assignment.id)));
+  );
 }

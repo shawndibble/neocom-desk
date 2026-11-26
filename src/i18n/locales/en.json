@@ -8361,6 +8361,7 @@
         "openingOwes": "Opening balance from the old system: you owe {{corp}} {{amount}} ISK.",
         "openingCredit": "Opening balance from the old system: {{corp}} holds {{amount}} ISK credit for you.",
         "settling": "{{date}} is still settling: {{corp}}'s refinery log hasn't caught up with all your mining that day (synced {{ago}}). Paying now pays only what is billed so far.",
+        "owes": "You owe {{corp}} {{amount}} ISK.",
         "owesWithEstimate": "You owe {{amount}} ISK. {{estimate}} ISK of it is {{date}}, billed after {{time}} UTC on {{closeDate}}.",
         "estimate": "{{amount}} ISK of it is {{date}}, billed after {{time}} UTC on {{closeDate}}.",
         "estimateHere": "{{amount}} ISK of it is {{date}}, billed after {{time}} UTC on {{closeDate}}.",

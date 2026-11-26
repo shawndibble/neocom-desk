@@ -519,11 +519,14 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
 
   /** The row menu's actions: View details opens the modal, the rest do what its buttons do. */
   function runMenuAction(action: RowMenuAction, row: DisplayRow) {
-    // An open day's estimate edits and splits the member's own entry it stands in for.
-    const dr =
-      (action.id === 'edit' || action.id === 'split') && estimateOwnRow(row)
-        ? estimateOwnRow(row)!
-        : row;
+    // An open day's estimate edits and splits the member's own entry it stands in for; never the
+    // book's own row, whose Assignment is not the member's to write.
+    const editing = action.id === 'edit' || action.id === 'split';
+    const own = editing ? estimateOwnRow(row) : undefined;
+    if (editing && row.corp?.kind === 'row' && !own) return;
+    // As on the detail: a joined entry is split by taking it out of its group first.
+    if (action.id === 'split' && own?.assignment?.groupId) return;
+    const dr = own ?? row;
     const grouped = dr.groupMembers !== undefined;
     switch (action.id) {
       case 'view':
