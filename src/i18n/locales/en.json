@@ -8407,6 +8407,7 @@
         "feeder-member": "rate for the moon owner's own members",
         "record": "correction for this day"
       },
+      "refineryNotRecorded": "refinery not recorded yet",
       "detail": {
         "lockedResolve": "Think one is wrong? Resolve it with {{corp}}.",
         "bookAndYou": "{{book}} (corp) · {{you}} (you)",

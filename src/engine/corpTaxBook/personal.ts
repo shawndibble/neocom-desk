@@ -1268,9 +1268,8 @@ export function overlayCorpBooks(input: {
   // 1b. A day the book has not closed: what the member listed for the corporation's own Payee is
   // owed to it now, as an estimate from the member's own live entry (the refinery log runs behind
   // it). Each refinery the book saw the miner at that day takes the ore it observed, priced and
-  // rated as the book will; the rest goes to the one it saw most of, else to the refinery the miner
-  // last mined at in that system. When the day closes the book bills it (step 1) and the estimate
-  // is gone, so nothing is counted twice.
+  // rated as the book will; the rest is placed type by type (below). When the day closes the book
+  // bills it (step 1) and the estimate is gone, so nothing is counted twice.
   for (const [key, entry] of entryByKey) {
     for (const p of prepared) {
       const { book } = p;
@@ -1293,27 +1292,39 @@ export function overlayCorpBooks(input: {
       const charges = p.open.filter((c) => ofEntry(c.entry));
       // An officer already dismissed the day: the book will not bill it, so nothing is estimated.
       if (charges.some((c) => c.dismissal)) continue;
-      const seen = p.pending.filter((x) => ofEntry(x.entry)).map((x) => x.observed);
+      // Lowest refinery id first, in both passes, so a tie always lands the same way.
+      const seen = p.pending
+        .filter((x) => ofEntry(x.entry))
+        .map((x) => x.observed)
+        .sort((a, b) => a.structureId - b.structureId);
       const byStructure = new Map<number | undefined, OreLine[]>();
       let left = sumLines(...own.map((a) => a.oreLines));
-      for (const o of [...seen].sort((a, b) => a.structureId - b.structureId)) {
+      for (const o of seen) {
         const lines = intersectLines(left, o.oreLines);
         if (lines.length === 0) continue;
         left = minusLines(left, lines);
         byStructure.set(o.structureId, sumLines(byStructure.get(o.structureId) ?? [], lines));
       }
+      // Ore the book has not placed yet goes, type by type, to the refinery that yields it: one
+      // that recorded the type today, else the one in the system that last did (a moon's ore tells
+      // its refinery apart). A type no refinery ever yielded the miner is a row of its own.
       if (left.length > 0) {
-        const most = [...seen].sort((a, b) => quantityOf(b.oreLines) - quantityOf(a.oreLines))[0];
-        const last = book.observed
+        const history = book.observed
           .filter(
             (o) =>
               o.characterId === entry.characterId &&
               o.solarSystemId === entry.solarSystemId &&
               o.date < entry.date
           )
-          .sort((a, b) => b.date.localeCompare(a.date))[0];
-        const to = most?.structureId ?? last?.structureId;
-        byStructure.set(to, sumLines(byStructure.get(to) ?? [], left));
+          .sort((a, b) => b.date.localeCompare(a.date));
+        const yields = (o: ObservedMiningEntry, typeId: number) =>
+          o.oreLines.some((l) => l.typeId === typeId);
+        for (const line of left) {
+          const to =
+            seen.find((o) => yields(o, line.typeId))?.structureId ??
+            history.find((o) => yields(o, line.typeId))?.structureId;
+          byStructure.set(to, sumLines(byStructure.get(to) ?? [], [line]));
+        }
       }
       const { prices, sources } = book.pricesOn(entry.date);
       // A refinery with no charge yet takes the member's own rate: one Payee, one rate a day.
