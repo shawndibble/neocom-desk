@@ -14,10 +14,11 @@ import {
 import {
   assignmentRecordChange,
   type AssignmentChange,
+  type AssignmentChangeReason,
   type AssignmentTerms,
   type RecordChange,
 } from '@/engine/miningTax/recordChanges';
-import { addLines, priceMap } from '@/engine/miningTax/oreLines';
+import { addLines, priceMap, sameLines } from '@/engine/miningTax/oreLines';
 import { computeAssignmentValue } from '@/engine/miningTax/valuation';
 import { scheduleSync } from '@/sync';
 import { removeTombstones, tombstoneKey } from '@/sync/localBookkeeping';
@@ -89,19 +90,13 @@ function failure(cause: unknown): LedgerActionFailure {
 
 async function commit<T>(
   characterIds: Iterable<number> | ((value: T) => Iterable<number>),
-  write: () => Promise<T>,
-  alsoRecordChanges = false
+  write: () => Promise<T>
 ): Promise<LedgerActionResult<T>> {
   let value: T;
   try {
     value = await db.transaction(
       'rw',
-      [
-        db.miningTaxAssignments,
-        db.payees,
-        db.settings,
-        ...(alsoRecordChanges ? [db.miningTaxRecordChanges] : []),
-      ],
+      [db.miningTaxAssignments, db.payees, db.settings, db.miningTaxRecordChanges],
       write
     );
   } catch (cause) {
@@ -406,16 +401,12 @@ export async function unlinkPayments(keys: readonly string[]): Promise<LedgerAct
   }
 }
 
-export type ClosedDayFixReason = 'autoFix' | 'fixMyRecords';
+export type ClosedDayFixReason = Extract<AssignmentChangeReason, 'autoFix' | 'fixMyRecords'>;
 
-const sameOre = (a: readonly MiningTaxOreLine[], b: readonly MiningTaxOreLine[]) => {
-  const x = addLines(a, []);
-  const y = addLines(b, []);
-  return (
-    x.length === y.length &&
-    x.every((l, i) => l.typeId === y[i]!.typeId && l.quantity === y[i]!.quantity)
-  );
-};
+export interface ClosedDayFixOutcome {
+  change: RecordChange | null;
+  stale: boolean;
+}
 
 const termsOf = (a: MiningTaxAssignmentRecord): AssignmentTerms => ({
   payeeId: a.payeeId ?? null,
@@ -423,6 +414,16 @@ const termsOf = (a: MiningTaxAssignmentRecord): AssignmentTerms => ({
   taxOwed: a.taxOwed,
   oreLines: addLines(a.oreLines, []),
 });
+
+const closedDayAssignmentId = (plan: ClosedDayPlan, payeeId: string) =>
+  `closed-day:${plan.characterId}:${plan.date}:${plan.solarSystemId}:${payeeId}`;
+
+const entryRecords = (plan: ClosedDayPlan) =>
+  db.miningTaxAssignments
+    .where('characterId')
+    .equals(plan.characterId)
+    .filter((a) => a.date === plan.date && a.solarSystemId === plan.solarSystemId)
+    .toArray();
 
 function stillPlanned(
   plan: ClosedDayPlan,
@@ -437,7 +438,7 @@ function stillPlanned(
     }
     const record = byId.get(fix.assignmentId);
     if (!record || !fix.before) return null;
-    if (record.taxPct !== fix.before.taxPct || !sameOre(record.oreLines, fix.before.oreLines))
+    if (record.taxPct !== fix.before.taxPct || !sameLines(record.oreLines, fix.before.oreLines))
       return null;
     out.set(fix, record);
   }
@@ -448,97 +449,87 @@ export async function fixClosedDay(
   plan: ClosedDayPlan,
   reason: ClosedDayFixReason,
   at: string = new Date().toISOString()
-): Promise<LedgerActionResult<RecordChange | null>> {
-  if (plan.fixes.length === 0) return { ok: true, value: null };
-  const bookOf = (fix: AssignmentFix) =>
-    plan.books.find((b) => b.corporationId === fix.corporationId);
+): Promise<LedgerActionResult<ClosedDayFixOutcome>> {
+  const stale = { ok: true as const, value: { change: null, stale: true } };
+  if (plan.fixes.length === 0) return { ok: true, value: { change: null, stale: false } };
   const bookPrices = (fix: AssignmentFix): ReleasePrices | undefined => {
-    const book = bookOf(fix);
+    const book = plan.books.find((b) => b.corporationId === fix.corporationId);
     return book
       ? { prices: priceMap({ ...book.unitPrices }), compressed: book.oreForm === 'compressed' }
       : undefined;
   };
-  let records: Map<AssignmentFix, MiningTaxAssignmentRecord> | null;
   let priced: Map<AssignmentFix, ReleasePrices>;
   try {
-    const stored = await db.miningTaxAssignments
-      .where('characterId')
-      .equals(plan.characterId)
-      .filter((a) => a.date === plan.date && a.solarSystemId === plan.solarSystemId)
-      .toArray();
-    records = stillPlanned(plan, stored);
-    if (!records) return { ok: true, value: null };
+    const records = stillPlanned(plan, await entryRecords(plan));
+    if (!records) return stale;
     priced = new Map(
       await Promise.all(
         plan.fixes.map(async (fix): Promise<[AssignmentFix, ReleasePrices]> => [
           fix,
-          bookPrices(fix) ?? (await loadReleasePrices(records!.get(fix)!, fix.after.oreLines)),
+          bookPrices(fix) ?? (await loadReleasePrices(records.get(fix)!, fix.after.oreLines)),
         ])
       )
     );
   } catch (cause) {
     return failure(cause);
   }
-  const held = records;
-  return commit(
-    [plan.characterId],
-    async () => {
-      const changes: AssignmentChange[] = [];
-      for (const fix of plan.fixes) {
-        const prices = priced.get(fix)!;
-        const record = held.get(fix);
-        if (!record) {
-          const value = computeAssignmentValue(fix.after.oreLines, prices.prices, fix.after.taxPct);
-          const created = withOreFormMarker<MiningTaxAssignmentRecord>(
-            {
-              id: crypto.randomUUID(),
-              characterId: plan.characterId,
-              date: plan.date,
-              solarSystemId: plan.solarSystemId,
-              payeeId: fix.payeeId,
-              oreLines: fix.after.oreLines,
-              taxPct: fix.after.taxPct,
-              estimatedValue: value.estimatedValue,
-              taxOwed: value.taxOwed,
-              status: 'outstanding',
-              releasedTypeIds: fix.releasedTypeIds,
-              updatedAt: Date.now(),
-            },
-            prices.compressed
-          );
-          await putAssignments([created]);
-          changes.push({ assignmentId: created.id, before: null, after: termsOf(created) });
-          continue;
-        }
-        const next: MiningTaxAssignmentRecord = {
-          ...record,
-          taxPct: fix.after.taxPct,
-          releasedTypeIds: [
-            ...new Set([...(record.releasedTypeIds ?? []), ...fix.releasedTypeIds]),
-          ],
-          ...(fix.corporationId !== undefined ? { status: 'outstanding' as const } : {}),
-        };
-        if (fix.corporationId !== undefined) delete next.reviewDiff;
-        const after = await releaseOreFromAssignment(next, fix.after.oreLines, prices);
-        changes.push({
-          assignmentId: record.id,
-          before: termsOf(record),
-          after: after ? termsOf(after) : null,
-        });
+  const result = await commit([plan.characterId], async () => {
+    const held = stillPlanned(plan, await entryRecords(plan));
+    if (!held) return null;
+    const changes: AssignmentChange[] = [];
+    for (const fix of plan.fixes) {
+      const prices = priced.get(fix)!;
+      const record = held.get(fix);
+      if (!record) {
+        const value = computeAssignmentValue(fix.after.oreLines, prices.prices, fix.after.taxPct);
+        const created = withOreFormMarker<MiningTaxAssignmentRecord>(
+          {
+            id: closedDayAssignmentId(plan, fix.payeeId),
+            characterId: plan.characterId,
+            date: plan.date,
+            solarSystemId: plan.solarSystemId,
+            payeeId: fix.payeeId,
+            oreLines: fix.after.oreLines,
+            taxPct: fix.after.taxPct,
+            estimatedValue: value.estimatedValue,
+            taxOwed: value.taxOwed,
+            status: 'outstanding',
+            releasedTypeIds: fix.releasedTypeIds,
+            updatedAt: Date.now(),
+          },
+          prices.compressed
+        );
+        await putAssignments([created]);
+        changes.push({ assignmentId: created.id, before: null, after: termsOf(created) });
+        continue;
       }
-      const only = plan.books.length === 1 ? plan.books[0] : undefined;
-      const change = assignmentRecordChange({
-        id: closedDayRecordChangeId(plan, reason),
-        reason,
-        at,
-        date: plan.date,
-        ...(only ? { corporationId: only.corporationId, minerId: only.minerId } : {}),
-        assignments: changes,
+      const own = fix.corporationId !== undefined;
+      const next: MiningTaxAssignmentRecord = {
+        ...record,
+        taxPct: fix.after.taxPct,
+        releasedTypeIds: [...new Set([...(record.releasedTypeIds ?? []), ...fix.releasedTypeIds])],
+        ...(own ? { status: 'outstanding' as const } : {}),
+      };
+      if (own) delete next.reviewDiff;
+      const after = await releaseOreFromAssignment(next, fix.after.oreLines, prices, true);
+      changes.push({
+        assignmentId: record.id,
+        before: termsOf(record),
+        after: after ? termsOf(after) : null,
       });
-      if (!change) return null;
-      await saveRecordChanges([{ characterId: plan.characterId, change }]);
-      return change;
-    },
-    true
-  );
+    }
+    const only = plan.books.length === 1 ? plan.books[0] : undefined;
+    const change = assignmentRecordChange({
+      id: closedDayRecordChangeId(plan, reason),
+      reason,
+      at,
+      date: plan.date,
+      ...(only ? { corporationId: only.corporationId, minerId: only.minerId } : {}),
+      assignments: changes,
+    });
+    if (change) await saveRecordChanges([{ characterId: plan.characterId, change }]);
+    return { change };
+  });
+  if (!result.ok) return result;
+  return result.value ? { ok: true, value: { change: result.value.change, stale: false } } : stale;
 }

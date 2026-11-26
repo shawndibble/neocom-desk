@@ -700,3 +700,41 @@ describe('MinerRunningAccount tolerance close-outs', () => {
     expect(short.toleranceCloseOuts.size).toBe(0);
   });
 });
+
+describe('MinerRunningAccount.moneyAppliedOn', () => {
+  const pay = (amount: number): TaxPayment => ({
+    id: 'p1',
+    minerId: 'm1',
+    characterId: 1,
+    amount,
+    at: '2026-11-03T10:00:00Z',
+    source: 'donation',
+  });
+  const days = [
+    { date: '2026-11-01', tax: 1_000 },
+    { date: '2026-11-02', tax: 1_000 },
+  ];
+
+  it('is true for a day a payment reached and false for one it did not', () => {
+    const account = MinerRunningAccount.build({ days, payments: [pay(500)] });
+    expect(account.moneyAppliedOn('2026-11-01')).toBe(true);
+    expect(account.moneyAppliedOn('2026-11-02')).toBe(false);
+  });
+
+  it('counts a stored Paid through as paid, but not an officer write-off', () => {
+    expect(
+      MinerRunningAccount.build({
+        days,
+        payments: [],
+        storedPaidThrough: '2026-11-01',
+      }).moneyAppliedOn('2026-11-01')
+    ).toBe(true);
+    expect(
+      MinerRunningAccount.build({
+        days,
+        payments: [],
+        writeOffs: [{ id: 'w1', amount: 1_000, at: '2026-11-03T00:00:00Z' }],
+      }).moneyAppliedOn('2026-11-01')
+    ).toBe(false);
+  });
+});

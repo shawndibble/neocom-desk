@@ -10,7 +10,7 @@ import {
 import type { LateNotice } from '../../../functions/src/corpTaxBookLateNotice';
 import type { Declaration } from './overdue';
 import type { OreDispute } from './disputes';
-import { planClosedDayFix } from './closedDayFix';
+import { planClosedDayFix as planWith, type ClosedDay } from './closedDayFix';
 
 const CORP = 98000001;
 const ME = 90000001;
@@ -2693,6 +2693,7 @@ describe("overlayCorpBooks: an open day's own-Payee ore is owed as an estimate",
 });
 
 describe('overlayCorpBooks closedDays', () => {
+  const planClosedDayFix = (day: ClosedDay) => planWith(day, new Set());
   const overListed = entry({
     oreLines: [{ typeId: ZEO, quantity: 50_000 }],
     freeOreLines: [],
@@ -2732,7 +2733,6 @@ describe('overlayCorpBooks closedDays', () => {
             share: [{ typeId: ZEO, quantity: 43_050 }],
             taxPct: 15,
             unitPrices: { [ZEO]: 148 },
-            hubId: 'jita',
             oreForm: 'compressed',
             moneyApplied: false,
           },
@@ -2774,6 +2774,32 @@ describe('overlayCorpBooks closedDays', () => {
       ]
     );
     expect(out.closedDays[0]!.books[0]!.moneyApplied).toBe(true);
+  });
+
+  it('offers no day the book bills at two rates', () => {
+    const line = (structureId: number, sourceCorporationId?: number) => ({
+      characterId: ME,
+      recordedCorporationId: CORP,
+      structureId,
+      date: '2026-10-17',
+      solarSystemId: SYSTEM,
+      oreLines: [{ typeId: ZEO, quantity: 20_000 }],
+      ...(sourceCorporationId !== undefined ? { sourceCorporationId } : {}),
+    });
+    const out = overlay(
+      [overListed],
+      [
+        book({
+          ownPayeeIds: ['bmw'],
+          observed: [line(1000, 98000077), line(2000)],
+          rates: [
+            { scope: 'corp', pct: 15, effectiveFrom: '2026-10-01' },
+            { scope: 'feeder', feederId: 98000077, pct: 5, effectiveFrom: '2026-10-01' },
+          ],
+        }),
+      ]
+    );
+    expect(out.closedDays).toEqual([]);
   });
 
   it('offers no open day', () => {

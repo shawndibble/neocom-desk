@@ -6,7 +6,6 @@ import {
   type ClosedDay,
   type ClosedDayPlan,
 } from '@/engine/corpTaxBook/closedDayFix';
-import { RESIDUE_ISK } from '@/engine/corpTaxBook/minerRunningAccount';
 import { isSyncConfigured } from '@/app/syncStatus';
 import { pullCursorKey } from '@/sync/localBookkeeping';
 import { MINING_TAX_ASSIGNMENTS } from '@/sync/syncedCollections';
@@ -22,10 +21,8 @@ export function paidIntoOf(day: ClosedDay, accounts: Accounts): Set<string> {
   return new Set(
     day.allocations.flatMap((a) => {
       if (a.id === undefined) return [];
-      const settled = (accounts.of(a.payeeId) ?? accounts.historyOf(a.payeeId))?.account.day(
-        day.date
-      );
-      return settled && settled.credited - settled.forgiven >= RESIDUE_ISK ? [a.id] : [];
+      const account = (accounts.of(a.payeeId) ?? accounts.historyOf(a.payeeId))?.account;
+      return account?.moneyAppliedOn(day.date) ? [a.id] : [];
     })
   );
 }
@@ -68,8 +65,8 @@ export function useClosedDayFixes(
       let fixed = false;
       for (const { plan, id } of due) {
         const result = await fixClosedDay(plan, 'autoFix');
-        if (!result.ok) forget([id]);
-        else if (result.value) fixed = true;
+        if (!result.ok || result.value.stale) forget([id]);
+        else if (result.value.change) fixed = true;
       }
       if (fixed) onFixed?.();
     })().catch(() => forget(due.map((d) => d.id)));

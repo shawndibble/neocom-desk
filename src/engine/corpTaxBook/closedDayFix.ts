@@ -1,6 +1,7 @@
 import type { OreLine } from '../miningTax/types';
+import { addLines, minusLines, sameLines } from '../miningTax/oreLines';
 import type { AssignmentChangeReason } from '../miningTax/recordChanges';
-import type { PersonalAllocation } from './personal';
+import { previewTakeover, type PersonalAllocation } from './personal';
 
 export interface ClosedDayBook {
   corporationId: number;
@@ -9,7 +10,6 @@ export interface ClosedDayBook {
   share: readonly OreLine[];
   taxPct: number;
   unitPrices: Readonly<Record<number, number>>;
-  hubId: string;
   oreForm: 'compressed' | 'raw';
   moneyApplied: boolean;
 }
@@ -59,19 +59,10 @@ const heldOf = (lines: readonly OreLine[]): Held => {
 };
 
 const linesOf = (held: Held): OreLine[] =>
-  [...held]
-    .filter(([, quantity]) => quantity > 0)
-    .map(([typeId, quantity]) => ({ typeId, quantity }))
-    .sort((a, b) => a.typeId - b.typeId);
-
-const sameLines = (a: Held, b: Held) => {
-  const x = linesOf(a);
-  const y = linesOf(b);
-  return (
-    x.length === y.length &&
-    x.every((l, i) => l.typeId === y[i]!.typeId && l.quantity === y[i]!.quantity)
+  addLines(
+    [...held].map(([typeId, quantity]) => ({ typeId, quantity })),
+    []
   );
-};
 
 const add = (held: Held, typeId: number, quantity: number) =>
   held.set(typeId, (held.get(typeId) ?? 0) + quantity);
@@ -82,10 +73,7 @@ function take(from: Held, typeId: number, want: number): number {
   return got;
 }
 
-export function planClosedDayFix(
-  day: ClosedDay,
-  paidInto: ReadonlySet<string> = new Set()
-): ClosedDayPlan {
+export function planClosedDayFix(day: ClosedDay, paidInto: ReadonlySet<string>): ClosedDayPlan {
   const books = [...day.books].sort((a, b) => a.corporationId - b.corporationId);
   const base = {
     characterId: day.characterId,
@@ -122,25 +110,32 @@ export function planClosedDayFix(
     }
   }
 
-  const others = allocations.filter((a) => bookOf(a) === undefined);
+  const isPaid = (a: PersonalAllocation & { id: string }) =>
+    a.status === 'paid' || paidInto.has(a.id);
+  const others = allocations
+    .filter((a) => bookOf(a) === undefined)
+    .sort((a, b) => Number(isPaid(a)) - Number(isPaid(b)));
   const created = new Map<ClosedDayBook, Held>();
   for (const b of books) {
     const own = ownOf(b);
     const payeeId = own[0]?.payeeId ?? b.ownPayeeIds[0];
     if (payeeId === undefined) continue;
     const into = own[0] ? held.get(own[0].id)! : new Map<number, number>();
+    const short: OreLine[] = [];
     for (const [typeId, quantity] of heldOf(b.share)) {
-      let need = quantity - ownTotal(b, typeId, own[0] ? undefined : into);
+      const need = quantity - ownTotal(b, typeId, own[0] ? undefined : into);
       if (need <= 0) continue;
       const got = take(free, typeId, need);
       add(into, typeId, got);
-      need -= got;
-      for (const a of others) {
-        if (need <= 0) break;
-        const moved = take(held.get(a.id)!, typeId, need);
-        add(into, typeId, moved);
-        need -= moved;
-      }
+      if (need > got) short.push({ typeId, quantity: need - got });
+    }
+    const steps = previewTakeover(
+      others.map((a) => ({ ...a, oreLines: linesOf(held.get(a.id)!) })),
+      short
+    );
+    for (const step of steps) {
+      held.set(others[step.index]!.id, heldOf(step.after));
+      for (const l of minusLines(step.before, step.after)) add(into, l.typeId, l.quantity);
     }
     if (!own[0] && linesOf(into).length > 0) created.set(b, into);
   }
@@ -157,7 +152,7 @@ export function planClosedDayFix(
     const empty = linesOf(after).length === 0;
     const taxPct = b && !empty ? b.taxPct : a.taxPct;
     const changed =
-      !sameLines(before, after) ||
+      !sameLines(linesOf(before), linesOf(after)) ||
       taxPct !== a.taxPct ||
       (b !== undefined && a.status === 'needs-review');
     if (!changed) continue;
@@ -190,9 +185,7 @@ export function planClosedDayFix(
     ...fixes.flatMap((f): ClosedDayBlocker[] => {
       if (f.assignmentId === null) return [];
       const a = byId.get(f.assignmentId)!;
-      return a.status === 'paid' || paidInto.has(a.id)
-        ? [{ kind: 'assignmentPaid', assignmentId: a.id }]
-        : [];
+      return isPaid(a) ? [{ kind: 'assignmentPaid', assignmentId: a.id }] : [];
     }),
     ...books
       .filter((b) => b.moneyApplied)

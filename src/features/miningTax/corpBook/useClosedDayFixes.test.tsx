@@ -40,7 +40,6 @@ const day: ClosedDay = {
       share: [{ typeId: ORE, quantity: 60 }],
       taxPct: 10,
       unitPrices: { [ORE]: 100 },
-      hubId: 'jita',
       oreForm: 'compressed',
       moneyApplied: false,
     },

@@ -925,11 +925,15 @@ export function overlayCorpBooks(input: {
     const waiting = prepared.some(
       (p) => p.open.some((c) => isEntry(c.entry)) || p.pending.some((x) => isEntry(x.entry))
     );
-    const settled = claiming.every((p) =>
-      chargesOf(p, key).every(
-        (c) => !c.dismissal && holdFor(c.charge.key, p.book.disputes ?? [], now) === undefined
-      )
-    );
+    const settled = claiming.every((p) => {
+      const here = chargesOf(p, key);
+      return (
+        new Set(here.map((c) => c.charge.taxPct)).size === 1 &&
+        here.every(
+          (c) => !c.dismissal && holdFor(c.charge.key, p.book.disputes ?? [], now) === undefined
+        )
+      );
+    });
     if (!waiting && settled)
       closedCandidates.push({
         entry,
@@ -1290,19 +1294,7 @@ function moneyAppliedTo(
       inFlightPayment(u, p.book.miners).minerId === minerId &&
       (u.covered.includes(date) || (u.at > date && account?.day(date)?.settled !== true))
   );
-  if (lost) return true;
-  if (!account) return false;
-  const pinned = account.input.storedPaidThrough;
-  if (pinned !== undefined && date <= pinned) return true;
-  const day = account.day(date);
-  if (!day) {
-    const cp = account.input.checkpoint;
-    return cp !== undefined && date <= cp.through;
-  }
-  const corrected = account.applications.corrections
-    .filter((d) => d.date === date)
-    .reduce((sum, d) => sum + d.amount, 0);
-  return day.credited - day.forgiven - corrected >= RESIDUE_ISK;
+  return lost || account?.moneyAppliedOn(date) === true;
 }
 
 function closedDayBook(
@@ -1320,11 +1312,9 @@ function closedDayBook(
     ownPayeeIds: p.book.ownPayeeIds ?? [],
     share,
     taxPct: main.charge.taxPct,
-    unitPrices: Object.assign({}, ...here.map((c) => c.charge.unitPrices)) as Record<
-      number,
-      number
-    >,
-    hubId: p.book.hubId,
+    unitPrices: Object.fromEntries(
+      here.flatMap((c) => Object.entries(c.charge.unitPrices))
+    ) as Record<number, number>,
     oreForm: p.book.oreForm,
     moneyApplied: moneyAppliedTo(p, minerId, date, uncredited),
   };

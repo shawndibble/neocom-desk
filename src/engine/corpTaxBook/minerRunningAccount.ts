@@ -242,6 +242,20 @@ export class MinerRunningAccount {
     return this.byDay.get(date);
   }
 
+  moneyAppliedOn(date: string): boolean {
+    const pinned = this.input.storedPaidThrough;
+    if (pinned !== undefined && date <= pinned) return true;
+    const day = this.byDay.get(date);
+    if (!day) {
+      const cp = this.input.checkpoint;
+      return cp !== undefined && date <= cp.through;
+    }
+    const corrected = this.applications.corrections
+      .filter((d) => d.date === date)
+      .reduce((sum, d) => sum + d.amount, 0);
+    return day.credited - day.forgiven - corrected >= RESIDUE_ISK;
+  }
+
   owedDays(): OwedDay[] {
     return [...this.byDay]
       .filter(([, d]) => !d.settled && !d.held && Math.round(d.remaining) > 0)

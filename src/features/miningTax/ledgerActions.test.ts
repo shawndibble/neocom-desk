@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { db, type MiningTaxAssignmentRecord, type PayeeRecord } from '@/db';
 import type { MiningLedgerEntry } from '@/engine/miningTax/types';
-import { planClosedDayFix, type ClosedDay } from '@/engine/corpTaxBook/closedDayFix';
+import { computeOwnership } from '@/engine/miningTax/ownership';
+import { planClosedDayFix as planWith, type ClosedDay } from '@/engine/corpTaxBook/closedDayFix';
 import { readTombstones, tombstoneKey } from '@/sync/localBookkeeping';
 import { MINING_TAX_ASSIGNMENTS, PAYEES } from '@/sync/syncedCollections';
 import { coalesceAssignments } from './coalesce';
@@ -597,6 +598,7 @@ describe('deletePayee', () => {
 });
 
 describe('fixClosedDay', () => {
+  const planClosedDayFix = (day: ClosedDay) => planWith(day, new Set());
   const CORP = 98000001;
   const dayOf = (
     allocations: MiningTaxAssignmentRecord[],
@@ -622,7 +624,6 @@ describe('fixClosedDay', () => {
         share: [{ typeId: ORE, quantity: share }],
         taxPct: 10,
         unitPrices: { [ORE]: 100 },
-        hubId: 'jita',
         oreForm: 'compressed',
         moneyApplied: false,
       },
@@ -652,6 +653,9 @@ describe('fixClosedDay', () => {
       status: 'outstanding',
     });
     expect(saved!.rawOrePriced).toBeUndefined();
+    const grown = computeOwnership([{ typeId: ORE, quantity: 130 }], await stored());
+    expect(grown.ownedLines.get('c')).toEqual([{ typeId: ORE, quantity: 60 }]);
+    expect(grown.released).toEqual([{ typeId: ORE, quantity: 70 }]);
     const changes = await db.miningTaxRecordChanges.toArray();
     expect(changes).toHaveLength(1);
     expect(changes[0]).toMatchObject({
@@ -671,7 +675,7 @@ describe('fixClosedDay', () => {
     });
 
     const again = await fixClosedDay(plan, 'autoFix');
-    expect(again).toEqual({ ok: true, value: null });
+    expect(again).toEqual({ ok: true, value: { change: null, stale: true } });
     expect(await db.miningTaxRecordChanges.count()).toBe(1);
   });
 
@@ -686,7 +690,7 @@ describe('fixClosedDay', () => {
 
     const result = await fixClosedDay(planClosedDayFix(dayOf([corp, other], 70)), 'autoFix');
 
-    expect(result.ok && result.value?.reason).toBe('autoFix');
+    expect(result.ok && result.value.change?.reason).toBe('autoFix');
     const byId = new Map((await stored()).map((a) => [a.id, a]));
     expect(byId.get('c')).toMatchObject({
       oreLines: [{ typeId: ORE, quantity: 70 }],
@@ -698,6 +702,21 @@ describe('fixClosedDay', () => {
       taxOwed: 30,
       releasedTypeIds: [ORE],
     });
+  });
+
+  it('keeps a Default-made split a Default one after taking ore from it', async () => {
+    const corp = assignment({ id: 'c', payeeId: 'own', oreLines: [{ typeId: ORE, quantity: 40 }] });
+    const other = assignment({
+      id: 'x',
+      payeeId: 'buddy',
+      override: false,
+      oreLines: [{ typeId: ORE, quantity: 60 }],
+    });
+    await db.miningTaxAssignments.bulkPut([corp, other]);
+
+    await fixClosedDay(planClosedDayFix(dayOf([corp, other], 70)), 'autoFix');
+
+    expect((await db.miningTaxAssignments.get('x'))?.override).toBe(false);
   });
 
   it('creates the corp Assignment when the miner listed none for it', async () => {
@@ -728,7 +747,10 @@ describe('fixClosedDay', () => {
     const plan = planClosedDayFix(dayOf([corp], 60));
     await db.miningTaxAssignments.put({ ...corp, oreLines: [{ typeId: ORE, quantity: 80 }] });
 
-    expect(await fixClosedDay(plan, 'autoFix')).toEqual({ ok: true, value: null });
+    expect(await fixClosedDay(plan, 'autoFix')).toEqual({
+      ok: true,
+      value: { change: null, stale: true },
+    });
     expect((await stored())[0]!.oreLines).toEqual([{ typeId: ORE, quantity: 80 }]);
     expect(await db.miningTaxRecordChanges.count()).toBe(0);
   });

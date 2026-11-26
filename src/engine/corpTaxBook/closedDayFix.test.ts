@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import {
   closedDayRecordChangeId,
-  planClosedDayFix,
+  planClosedDayFix as planWith,
   type ClosedDay,
   type ClosedDayBook,
 } from './closedDayFix';
 import type { PersonalAllocation } from './personal';
+
+const planClosedDayFix = (day: ClosedDay, paidInto: ReadonlySet<string> = new Set()) =>
+  planWith(day, paidInto);
 
 const ME = 90000001;
 const SYSTEM = 30003838;
@@ -21,7 +24,6 @@ const bookOf = (over: Partial<ClosedDayBook> = {}): ClosedDayBook => ({
   share: [{ typeId: ZEO, quantity: 60 }],
   taxPct: 10,
   unitPrices: { [ZEO]: 100, [SYL]: 50 },
-  hubId: 'jita',
   oreForm: 'compressed',
   moneyApplied: false,
   ...over,
@@ -242,6 +244,28 @@ describe('planClosedDayFix', () => {
     expect(plan.state).toBe('conflict');
     expect(plan.blockers).toEqual([{ kind: 'assignmentPaid', assignmentId: 'x' }]);
     expect(plan.fixes).toHaveLength(2);
+  });
+
+  it('takes from an unpaid split before a paid one, so the day can still be fixed', () => {
+    const plan = planClosedDayFix(
+      dayOf({
+        allocations: [
+          alloc({ id: 'c', oreLines: [{ typeId: ZEO, quantity: 40 }] }),
+          alloc({
+            id: 'p',
+            payeeId: 'buddy',
+            status: 'paid',
+            oreLines: [{ typeId: ZEO, quantity: 30 }],
+          }),
+          alloc({ id: 'u', payeeId: 'pal', oreLines: [{ typeId: ZEO, quantity: 30 }] }),
+        ],
+      })
+    );
+    expect(plan.state).toBe('fix');
+    expect(plan.fixes.map((f) => [f.assignmentId, f.after.oreLines])).toEqual([
+      ['c', [{ typeId: ZEO, quantity: 60 }]],
+      ['u', [{ typeId: ZEO, quantity: 10 }]],
+    ]);
   });
 
   it('is a Conflict when money was paid into a changed Assignment', () => {
