@@ -524,10 +524,10 @@ describe('overlayCorpBooks', () => {
         ],
       });
       const out = overlay([two], [book({ ownPayeeIds: ['bmw'] })], SETTLED);
-      // 40,000 + 3,050 fill the book's 43,050; the other 5,950 of 'two' goes back to the member.
+      // 40,000 + 3,050 fill the book's 43,050; the book's rows stand for the other 5,950 of 'two'.
       expect([...(out.absorbed.get(KEY) ?? [])]).toEqual(['one', 'two']);
       expect(out.rows.map((r) => r.state)).toEqual(['billed']);
-      expect(out.released.get(KEY)).toEqual([{ typeId: ZEO, quantity: 5_950 }]);
+      expect(out.takenFromFree.has(KEY)).toBe(false);
     });
 
     it('does not take over an allocation that needs review', () => {
@@ -600,7 +600,7 @@ describe('overlayCorpBooks', () => {
       expect(out.absorbed.size).toBe(0);
     });
 
-    it("gives back what the corporation's own Payee lists beyond the book: no conflict", () => {
+    it("drops what the corporation's own Payee lists beyond the book: no conflict", () => {
       const big = entry({
         freeOreLines: [],
         oreLines: [{ typeId: ZEO, quantity: 50_000 }],
@@ -616,7 +616,7 @@ describe('overlayCorpBooks', () => {
       });
       const out = overlay([big], [book({ ownPayeeIds: ['bmw'] })], SETTLED);
       expect(out.rows.map((r) => r.state)).toEqual(['billed']);
-      expect(out.released.get(KEY)).toEqual([{ typeId: ZEO, quantity: 6_950 }]);
+      expect([...(out.absorbed.get(KEY) ?? [])]).toEqual(['a-big']);
     });
 
     it('is still a conflict when the book does not name it as its own', () => {
@@ -1729,7 +1729,7 @@ describe('overlayCorpBooks: a book takes the miner own Assignments by quantity (
   });
 
   describe("an Assignment to the corporation's own Payee", () => {
-    it("is absorbed up to the share; the excess goes back to the member as the book's records say", () => {
+    it("stands in for the whole Assignment: the book's records stand, the excess is not shown", () => {
       const out = overlay(
         [
           allGiven(50_000, [
@@ -1748,13 +1748,13 @@ describe('overlayCorpBooks: a book takes the miner own Assignments by quantity (
       expect(out.rows[0].taxOwed).toBeCloseTo(43_050 * 148 * 0.15, 4);
       // The member listed more than the book recorded: the book's figure stands, not a dispute.
       expect(out.rows[0].dispute?.quantity).toBe(false);
-      // The book's row stands in for the Assignment; the rest is the member's free ore again.
+      // The book's row stands in for the whole Assignment; nothing is left to sort out.
       expect([...(out.absorbed.get(KEY) ?? [])]).toEqual(['a-bmw']);
-      expect(out.released.get(KEY)).toEqual([{ typeId: ZEO, quantity: 6_950 }]);
-      expect(out.labels.get(KEY)?.state).toBe('unattributed');
+      expect(out.trimmed.size).toBe(0);
+      expect(out.labels.has(KEY)).toBe(false);
     });
 
-    it('gives the excess back right after the day closes, with no waiting state', () => {
+    it('drops the excess right after the day closes, with no waiting state', () => {
       const out = overlay(
         [
           allGiven(50_000, [
@@ -1765,7 +1765,25 @@ describe('overlayCorpBooks: a book takes the miner own Assignments by quantity (
         '2026-10-18T00:40:00Z'
       );
       expect(out.rows.map((r) => r.state)).toEqual(['billed']);
-      expect(out.released.get(KEY)).toEqual([{ typeId: ZEO, quantity: 6_950 }]);
+      expect([...(out.absorbed.get(KEY) ?? [])]).toEqual(['a-bmw']);
+    });
+
+    it('bills the excess once a late refinery log records it, from the same Assignment', () => {
+      const late = book({ ownPayeeIds: ['bmw'] });
+      late.observed = [{ ...late.observed[0], oreLines: [{ typeId: ZEO, quantity: 50_000 }] }];
+      const out = overlay(
+        [
+          allGiven(50_000, [
+            alloc({ id: 'a-bmw', payeeId: 'bmw', oreLines: [{ typeId: ZEO, quantity: 50_000 }] }),
+          ]),
+        ],
+        [late],
+        SETTLED
+      );
+      expect(out.rows.map((r) => [r.state, r.oreLines])).toEqual([
+        ['billed', [{ typeId: ZEO, quantity: 50_000 }]],
+      ]);
+      expect([...(out.absorbed.get(KEY) ?? [])]).toEqual(['a-bmw']);
     });
 
     it("leaves what another book contests on the Assignment, not as this book's excess", () => {

@@ -12,6 +12,9 @@
  *   the book's share comes from ore the member gave no Payee first, and ore
  *   given to another Payee is a visible conflict, not owed, that resolves to
  *   the corp 14 days after the day closed (`resolveBookShare`).
+ * - Once a book closes a day its records stand: what the member listed for
+ *   the corporation's own Payee beyond what it recorded is not billed, shown or
+ *   flagged, never a Conflict (decision 20261125-201722).
  * - The free ore a book left of an entry it observed is Unattributed, owed to
  *   no one; ore no book observed at all stays Unassigned.
  * - What is paid is read off each of the member's Miners' Running account
@@ -475,12 +478,6 @@ export interface PersonalOverlay {
    * resolves it; the Payee bills it as resolved then (`alsoBilled`, or its own again).
    */
   conflicted: Map<string, Map<string, number>>;
-  /**
-   * Per Mining Ledger Entry key, ore the member listed for a corporation's own Payee beyond what
-   * its closed book recorded: the book's records stand, so it is the member's free ore again
-   * (decision 20261125-201722), labelled like any free ore the books left.
-   */
-  released: Map<string, OreLine[]>;
   /** Per Mining Ledger Entry key, how its remaining free ore reads. */
   labels: Map<string, { state: BookLabelState; corporationId: number; corpName: string }>;
   books: BookSummary[];
@@ -905,7 +902,6 @@ export function overlayCorpBooks(input: {
   const trimmed: PersonalOverlay['trimmed'] = new Map();
   const alsoBilled: PersonalOverlay['alsoBilled'] = new Map();
   const conflicted: PersonalOverlay['conflicted'] = new Map();
-  const released: PersonalOverlay['released'] = new Map();
   // The book rows behind each `alsoBilled` share: a day an officer writes off bills nobody.
   const alsoBilledRows = new Map<string, Map<string, BookRowView[]>>();
   // The ore each personal entry still has free after the books, per entry key.
@@ -1068,7 +1064,7 @@ export function overlayCorpBooks(input: {
       const own = ownOf.get(p)!;
       for (const [item, lines] of own.taken)
         takenOf.set(item, sumLines(takenOf.get(item) ?? [], lines));
-      // Ore listed for this corporation beyond what any book took is given back (below).
+      // Ore listed for this corporation beyond what any book took goes with the allocation (below).
       if (here.some((c) => !c.dismissal)) {
         for (const item of pool) {
           const a = item.allocation;
@@ -1157,7 +1153,7 @@ export function overlayCorpBooks(input: {
     }
     // Each allocation the books took part of: the rest stays with its Payee, except what the member
     // listed for a corporation's own Payee beyond any book's share. The closed book's records
-    // stand: its rows stand for the whole allocation, and that excess is free ore again.
+    // stand: its rows stand for the whole allocation, excess included, which nothing bills.
     // Priced at the books' hub prices of the day, for every type the allocation lists.
     const prices = new Map<number, number>();
     for (const p of claiming)
@@ -1169,10 +1165,6 @@ export function overlayCorpBooks(input: {
       const { allocation } = item;
       if (allocation.id === undefined) continue;
       const excess = ownedBy.has(item) ? linesOfLeft(item.left) : [];
-      if (excess.length > 0) {
-        left = sumLines(left, excess);
-        released.set(key, sumLines(released.get(key) ?? [], excess));
-      }
       const gone = sumLines(takenOf.get(item) ?? [], excess);
       const listed = sumLines(allocation.oreLines);
       const kept = minusLines(listed, gone);
@@ -1500,7 +1492,6 @@ export function overlayCorpBooks(input: {
     trimmed,
     alsoBilled,
     conflicted,
-    released,
     labels,
     books: summaries,
   };

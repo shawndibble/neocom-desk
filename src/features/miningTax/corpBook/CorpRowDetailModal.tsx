@@ -212,8 +212,10 @@ export function CorpRowDetailModal({
               return {
                 typeId: line.typeId,
                 name: typeLabel(typeNames, line.typeId),
+                // Only a book that records more than the member mined is a difference to show:
+                // less is just the bill (decision 20261125-201722).
                 quantity:
-                  you !== undefined && you !== line.quantity
+                  you !== undefined && line.quantity > you
                     ? t('miningTax.corpBook.detail.bookAndYou', {
                         book: formatCount(line.quantity),
                         you: formatCount(you),

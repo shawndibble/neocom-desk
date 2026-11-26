@@ -112,7 +112,8 @@ export function CorpBookDiffModal({
           <tbody className="divide-y divide-line">
             {view.oreLines.map((line) => {
               const you = quantityOf(view.personalOreLines, line.typeId);
-              const differsHere = you !== line.quantity;
+              // Only a book that records more than the member mined differs: less is just the bill.
+              const differsHere = line.quantity > (you ?? 0);
               return (
                 <tr key={line.typeId}>
                   <td className="py-1.5">
@@ -172,8 +173,7 @@ export function CorpBookDiffModal({
                   : t('miningTax.corpBook.disputed.both')}
             </p>
             {view.state === 'billed' && (
-              // The one line the member is here for, so it carries the weight — either way round.
-              // When the book bills more, the two ways out sit right under it: take the book's
+              // The one line the member is here for, so it carries the weight. When the book bills more, the two ways out sit right under it: take the book's
               // figure (fix my records) or dispute it (Resolve).
               <p className="font-semibold text-text">
                 {bookAsksMore === undefined
@@ -182,11 +182,7 @@ export function CorpBookDiffModal({
                     ? bookAsksMore
                       ? t('miningTax.corpBook.diff.raiseRate', { corp: view.corpName })
                       : t('miningTax.corpBook.diff.inYourFavourRate', { corp: view.corpName })
-                    : bookAsksMore
-                      ? t('miningTax.corpBook.diff.raiseQuantity', { corp: view.corpName })
-                      : t('miningTax.corpBook.diff.inYourFavourQuantity', {
-                          corp: view.corpName,
-                        })}
+                    : t('miningTax.corpBook.diff.raiseQuantity', { corp: view.corpName })}
               </p>
             )}
             {view.state === 'billed' && bookAsksMore !== false && (onFixRecords || onResolve) && (

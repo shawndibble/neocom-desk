@@ -37,8 +37,7 @@ interface Props {
  * A Conflict day's "Tell {corp}" (#6206): the member sends the book the day, its ore and their
  * Payee, so an officer sees it in Needs you and waives that ore's tax or rejects it with a note.
  * Once sent it says so and can be withdrawn until an officer answers; an answer shows the
- * officer's reason. Ore listed beyond what the
- * book recorded is never billed, so there is nothing to dispute.
+ * officer's reason.
  */
 export function CorpDisputeAction({ view, payeeName, onSent, onResolve, mail }: Props) {
   const { t } = useTranslation();

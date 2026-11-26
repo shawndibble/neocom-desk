@@ -78,7 +78,6 @@ const overlay = (over: Partial<PersonalOverlay> = {}): PersonalOverlay => ({
   absorbed: new Map(),
   trimmed: new Map(),
   alsoBilled: new Map(),
-  released: new Map(),
   conflicted: new Map(),
   labels: new Map(),
   books: [],
@@ -109,30 +108,6 @@ describe('buildDisplayRows', () => {
       nameOf
     );
     expect(wholly).toEqual([]);
-  });
-
-  it('shows ore a closed book gave back as the unassigned row, under its label', () => {
-    const key = `${ME}:2026-10-17:30003838`;
-    const row = {
-      ...mined('2026-10-17'),
-      unassignedOreLines: [],
-      assignments: [{ ...assigned('bmw'), id: 'a1' }],
-    };
-    const out = buildDisplayRows(
-      [row],
-      overlay({
-        absorbed: new Map([[key, new Set(['a1'])]]),
-        released: new Map([[key, [{ typeId: ZEO, quantity: 300 }]]]),
-        labels: new Map([
-          [key, { state: 'unattributed' as const, corporationId: 98000001, corpName: 'Brass' }],
-        ]),
-      }),
-      nameOf
-    );
-    expect(out).toHaveLength(1);
-    expect(out[0].status).toBe('unassigned');
-    expect(out[0].row.unassignedOreLines).toEqual([{ typeId: ZEO, quantity: 300 }]);
-    expect(out[0].corp).toMatchObject({ kind: 'label', state: 'unattributed' });
   });
 
   it('hides the rows of a Payee that is the corporation, the book row stands in for them', () => {

@@ -128,8 +128,9 @@ const keyOf = (row: BookRowView) => notPayingDayKey(row.corporationId, row.chara
 /** Whether the book bills more than the member's record: the case worth disputing. */
 export function bookAsksMore(row: BookRowView): boolean {
   const d = row.dispute;
-  if (!d || (d.quantity && d.rate)) return true;
-  return d.rate ? d.bookPct > (d.personalPct ?? d.bookPct) : d.bookQuantity > d.personalQuantity;
+  // A quantity difference is only ever the book recording more (`disputeOf`).
+  if (!d || d.quantity) return true;
+  return d.bookPct > (d.personalPct ?? d.bookPct);
 }
 
 /** Whether a day still bills the member: a Billed or Conflict day. A day since paid has nothing left to keep. */

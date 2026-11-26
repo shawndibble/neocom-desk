@@ -145,18 +145,16 @@ export function buildDisplayRows(
 ): DisplayRow[] {
   if (!overlay) return flatten(entries);
   const adjusted = entries.map((row) => {
-    const key = entryKey(row.characterId, row.entry.date, row.entry.solarSystemId);
-    const taken = overlay.takenFromFree.get(key);
-    // Ore listed for the corporation beyond its closed book: the book's records stand, so it is
-    // unassigned again, under the same Unattributed label as any ore the books left.
-    const released = overlay.released.get(key);
-    if (!taken && !released) return row;
-    const unassigned = addLines(row.unassignedOreLines, released ?? []);
-    return {
-      ...row,
-      unassignedOreLines: taken ? minusLines(unassigned, taken) : unassigned,
-      ...(taken ? { bookTakenOreLines: taken } : {}),
-    };
+    const taken = overlay.takenFromFree.get(
+      entryKey(row.characterId, row.entry.date, row.entry.solarSystemId)
+    );
+    return taken
+      ? {
+          ...row,
+          unassignedOreLines: minusLines(row.unassignedOreLines, taken),
+          bookTakenOreLines: taken,
+        }
+      : row;
   });
   // A Payee that is the corporation: its rows give way to the book's, which bills the same ore.
   const taken = (dr: DisplayRow) =>

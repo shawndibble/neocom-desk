@@ -8383,7 +8383,6 @@
         "tax": "Tax",
         "explain": "Book rate {{pct}}% is the {{scope}}, effective {{from}}. Once {{date}} is Billable, the book's quantity, price and rate decide what you owe {{corp}}.",
         "raiseQuantity": "The book recorded more ore than you did, so it bills more. If the book is right, fix your records; if yours is, Resolve it and tell {{corp}}.",
-        "inYourFavourQuantity": "The book recorded less ore than you did, so it bills less — you owe the book's figure, and there is nothing to raise.",
         "raiseRate": "The book's rate is higher than the one you recorded, so it bills more. If the book is right, fix your records; if yours is, Resolve it and tell {{corp}}.",
         "inYourFavourRate": "The book's rate is lower than the one you recorded, so it bills less — you owe the book's figure, and there is nothing to raise.",
         "raiseBoth": "The book's quantity and rate both differ from your record. Fix your records if the book is right, or Resolve it if yours is."
