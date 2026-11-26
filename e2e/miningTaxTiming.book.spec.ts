@@ -244,7 +244,7 @@ test("pilot side: an officer's hand record, the wallet entry and the synced dona
   await expect(officerRow(page, /Payment from/)).toHaveCount(1);
 });
 
-test("a day mined today owes nothing yet: the pilot's payment is credit, on both sides", async ({
+test("a day mined today goes to the corp at once: the pilot's payment pays its estimate", async ({
   page,
   book,
   esi,
@@ -256,12 +256,12 @@ test("a day mined today owes nothing yet: the pilot's payment is credit, on both
     mined: [0],
     journal: [sentDonation(sent)],
   });
-  await expect(creditNote(page, ESTIMATE)).toBeVisible();
-  await expect(page.getByRole('main')).not.toContainText(/You owe|Owes/);
   const today = page.getByRole('row').filter({ hasText: day(0) });
-  await expect(today).toContainText(/pending corp record/i);
-  await expect(today).not.toContainText(/billed|outstanding/i);
-  await expect(page.getByText(/is closed \(/)).toBeVisible();
+  await expect(today).toContainText(`${CORP_NAME} · E2E Athanor Alpha`);
+  await expect(today).toContainText(isk(ESTIMATE));
+  await expect(today).toContainText(/paid/i);
+  await expect(page.getByRole('main')).not.toContainText(/You owe|Owes/);
+  await expect(creditNote(page, ESTIMATE)).toHaveCount(0);
 
   await book.seed([credited(sent)]);
   await gotoMiner(page);

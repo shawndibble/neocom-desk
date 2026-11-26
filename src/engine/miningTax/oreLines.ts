@@ -24,3 +24,12 @@ export function addLines(a: readonly OreLine[], b: readonly OreLine[] | undefine
 export function priceMap(unitPrices: Record<number, number>): Map<number, number> {
   return new Map(Object.entries(unitPrices).map(([typeId, price]) => [Number(typeId), price]));
 }
+
+export function sameLines(a: readonly OreLine[], b: readonly OreLine[]): boolean {
+  const x = addLines(a, []);
+  const y = addLines(b, []);
+  return (
+    x.length === y.length &&
+    x.every((l, i) => l.typeId === y[i]!.typeId && l.quantity === y[i]!.quantity)
+  );
+}

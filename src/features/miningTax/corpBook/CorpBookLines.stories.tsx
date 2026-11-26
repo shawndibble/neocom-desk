@@ -73,6 +73,7 @@ const overlay: PersonalOverlay = {
   conflicted: new Map(),
   labels: new Map(),
   books: [],
+  closedDays: [],
 };
 
 function MinerLines() {
