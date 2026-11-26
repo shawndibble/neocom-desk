@@ -48,6 +48,7 @@ export function popLinkCandidates({
         !pop.surveyId &&
         !pop.fullyMined &&
         sharedPopIsShown(pop, now) &&
+        now < Date.parse(pop.expiresAt) &&
         readyAtMs(pop) <= now &&
         atPlace(pop, location)
     )

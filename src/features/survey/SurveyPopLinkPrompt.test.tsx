@@ -118,6 +118,16 @@ describe('SurveyPopLinkPrompt', () => {
     expect(again.container.textContent).toBe('');
   });
 
+  it('asks about a lone pop outright even when its ore only partly matches', async () => {
+    loadSharedPopsRead.mockResolvedValue({
+      entries: [entry('p1', { ore: [{ typeId: 45492, quantity: 1 }] })],
+      corporations: [],
+    });
+    render(<SurveyPopLinkPrompt {...props} />);
+    expect(await screen.findByText(/Is this scan from Alpha Refinery/)).toBeTruthy();
+    expect(screen.queryByRole('combobox')).toBeNull();
+  });
+
   it('offers a pick when several pops match equally, and links the chosen one', async () => {
     loadSharedPopsRead.mockResolvedValue({
       entries: [entry('p1'), entry('p2', {}, 'Beta Refinery')],

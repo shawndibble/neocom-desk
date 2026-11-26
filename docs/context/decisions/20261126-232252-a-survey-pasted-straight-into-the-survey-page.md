@@ -16,6 +16,11 @@ _Recorded 2026-11-26._
   pilot starts a new Survey from the pop). A Survey location that is a solar system or the
   pop's own refinery filters by place; a manual name or an NPC station filters nothing, since
   the system of a station is not known here.
+- **An Expired pop is not offered, though it stays on the Calendar for three more days.** The
+  field is assumed gone at Expired, so no scan can come from it; only the officer's Fully Mined
+  flag and Expired remove a candidate. "Likely mined out" is a guess and still lists it.
+- **A lone candidate is asked about outright**, with no select, whether or not its ores match the
+  scan exactly: the pilot confirms one pop, not a choice of one.
 - **Ranking is the overlap of base ores.** The scan's ores and the pop's ore make-up are
   compared as sets of base ores (a Moon ore variant counts as its base, since a pop names only
   base ores), scored as shared over combined. A pop with no ore in common is dropped; one that

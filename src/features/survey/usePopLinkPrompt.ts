@@ -93,10 +93,12 @@ export function usePopLinkPrompt({
     location,
     now,
   });
+  const options = candidates.map((c) => optionOf(c, entries));
   const strong = strongPopMatch(candidates);
+  const only = options.length === 1 ? options[0] : undefined;
   return {
-    options: candidates.map((c) => optionOf(c, entries)),
-    strong: strong ? optionOf(strong, entries) : null,
+    options,
+    strong: strong ? optionOf(strong, entries) : (only ?? null),
     link,
     linkFailed,
   };

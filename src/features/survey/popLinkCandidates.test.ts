@@ -48,12 +48,13 @@ describe('popLinkCandidates', () => {
     expect(rank([pop({ id: 'a' })]).map((c) => c.pop.id)).toEqual(['a']);
   });
 
-  it('drops a pop still extracting, one already linked, one Fully Mined, and one no longer shown', () => {
+  it('drops a pop still extracting, one already linked, one Fully Mined, one no longer shown, and one Expired but still kept', () => {
     const pops = [
       pop({ id: 'extracting', readyAt: iso(NOW + H), popAt: iso(NOW + H) }),
       pop({ id: 'linked', surveyId: 'abc234' }),
       pop({ id: 'mined', fullyMined: { byName: 'Boss', at: iso(NOW - H) } }),
       pop({ id: 'gone', expiresAt: iso(NOW - H), retainUntil: iso(NOW - H) }),
+      pop({ id: 'expired', expiresAt: iso(NOW - H), retainUntil: iso(NOW + 60 * H) }),
       pop({ id: 'ok' }),
     ];
     expect(rank(pops).map((c) => c.pop.id)).toEqual(['ok']);
