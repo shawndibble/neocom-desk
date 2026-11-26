@@ -7,6 +7,7 @@ import { useHiddenLeftCorps } from '@/features/miningTax/corpBook/leftCorpAck';
 import { useCorpBookView } from '@/features/miningTax/corpBook/useCorpBookView';
 import { useToleranceRecordChanges } from '@/features/miningTax/corpBook/useToleranceRecordChanges';
 import { useClosedDayFixes } from '@/features/miningTax/corpBook/useClosedDayFixes';
+import { useBookAutoAssign } from '@/features/miningTax/corpBook/useBookAutoAssign';
 import { heldPaymentKeys } from '@/engine/miningTax/payeeRunningAccount';
 import { PayeeRunningAccounts, withPaidStatus } from './payeeRunningAccounts';
 import { saveBilledElsewhere, saveBookOwned } from './paymentLinkStore';
@@ -20,7 +21,7 @@ export function useTaxCorpBooks(
   data: TaxSnapshot | null,
   characters: readonly TrackedCharacter[],
   activeCharacterId: number | null,
-  onOwnershipStored?: () => void
+  refreshLedger?: () => void
 ) {
   const { madePayments, paymentSources } = useMadePayments(
     characters.map((c) => c.characterId).join(',')
@@ -122,10 +123,10 @@ export function useTaxCorpBooks(
     storedOwned.current = bookOwned;
     void saveBookOwned(bookOwned)
       .then((changed) => {
-        if (changed && hasDefaultSystems) onOwnershipStored?.();
+        if (changed && hasDefaultSystems) refreshLedger?.();
       })
       .catch(() => undefined);
-  }, [data, booksKnown, bookOwned, hasDefaultSystems, onOwnershipStored]);
+  }, [data, booksKnown, bookOwned, hasDefaultSystems, refreshLedger]);
   const { failed: failedClaims } = useAutoClaimDonations(
     booksRead ? corpView : null,
     reloadCorpBooks
@@ -134,7 +135,13 @@ export function useTaxCorpBooks(
     booksRead ? corpView : null,
     String(data?.fetchedAt?.getTime() ?? 'none')
   );
-  useClosedDayFixes(booksRead ? corpView : null, data ? accounts : null, onOwnershipStored);
+  useClosedDayFixes(booksRead ? corpView : null, data ? accounts : null, refreshLedger);
+  useBookAutoAssign(
+    booksRead && booksKnown ? corpView : null,
+    bookInput?.entries,
+    payees,
+    refreshLedger
+  );
   const bookSystems = useBookSystems(corpView, {
     names: data?.systemNames ?? NO_NAMES,
     security: data?.systemSecurity ?? NO_SECURITY,

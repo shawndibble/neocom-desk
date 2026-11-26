@@ -10,7 +10,7 @@ import { SkillLink } from '@/features/entities';
 import { formatCountdown } from '@/lib/duration';
 import { buildFitCheckRows } from '@/features/skills/ships/fitCheckRows';
 import { WhatToTrainPrerequisites } from './FittingWhatToTrainPrerequisites';
-import { STAT_DETAIL, statRowClassName } from './statKit';
+import { TrainRow } from './FittingTrainRow';
 import type { ScheduleEntries } from './useModuleUpgrades';
 
 interface Props {
@@ -21,7 +21,6 @@ interface Props {
   plan: SkillPlanRecord | null | undefined;
   plannedLevels: ReadonlyMap<number, number>;
   onAdd: (entries: readonly PlanEntry[]) => void;
-  reason?: string;
   together?: boolean;
 }
 
@@ -49,7 +48,6 @@ export function SkillFixList({
   plan,
   plannedLevels,
   onAdd,
-  reason,
   together = false,
 }: Props) {
   const { t } = useTranslation();
@@ -80,59 +78,60 @@ export function SkillFixList({
           (e) => (plannedLevels.get(e.skillTypeID) ?? 0) >= e.targetLevel
         );
         return (
-          <li key={label} className={statRowClassName()}>
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0 flex-1">
-                <p className="font-semibold">
-                  {fix.entries.map((e, i) => (
-                    <span key={e.skillTypeID}>
-                      {i > 0 && ', '}
-                      <SkillLink typeId={e.skillTypeID} planEntries={plan?.entries}>
-                        {skillName(e.skillTypeID)}
-                      </SkillLink>{' '}
-                      {romanLevel(e.targetLevel)}
-                    </span>
-                  ))}
-                </p>
-                <p className={STAT_DETAIL}>{reason ?? t('fittings.skillFixes.makesItFit')}</p>
-              </div>
-              <div className="shrink-0 text-right tabular-nums">
-                {seconds === null ? (
-                  <span className="text-text-dim">{t('common.loading')}</span>
-                ) : (
-                  formatCountdown(seconds)
-                )}
-                {seconds !== null && prerequisiteRows.length > 0 && (
-                  <div>
-                    <WhatToTrainPrerequisites
-                      skill={label}
-                      rows={prerequisiteRows}
-                      plannedLevels={plannedLevels}
-                      planEntries={plan?.entries}
-                      totalSeconds={seconds}
-                    />
-                  </div>
-                )}
-              </div>
-            </div>
-            {plan !== undefined && (
-              <div className="mt-1 flex justify-end">
-                {plan && planned ? (
-                  <span className="text-[0.6875rem] text-text-dim">
-                    {t('fittings.skillFixes.inPlan', { plan: plan.name })}
+          <TrainRow
+            key={label}
+            title={
+              <p className="font-semibold">
+                {fix.entries.map((e) => (
+                  <span key={e.skillTypeID} className="block">
+                    <SkillLink typeId={e.skillTypeID} planEntries={plan?.entries}>
+                      {skillName(e.skillTypeID)}
+                    </SkillLink>{' '}
+                    {romanLevel(e.targetLevel)}
                   </span>
-                ) : (
-                  <Button
-                    size="sm"
-                    aria-label={t('fittings.whatToTrain.addToPlanLabel', { skill: label })}
-                    onClick={() => onAdd(fix.entries)}
-                  >
-                    {t('fittings.whatToTrain.addToPlan')}
-                  </Button>
-                )}
-              </div>
-            )}
-          </li>
+                ))}
+              </p>
+            }
+            time={
+              seconds === null ? (
+                <span className="text-text-dim">{t('common.loading')}</span>
+              ) : (
+                formatCountdown(seconds)
+              )
+            }
+            prerequisites={
+              seconds !== null &&
+              prerequisiteRows.length > 0 && (
+                <WhatToTrainPrerequisites
+                  skill={label}
+                  rows={prerequisiteRows}
+                  plannedLevels={plannedLevels}
+                  planEntries={plan?.entries}
+                  totalSeconds={seconds}
+                />
+              )
+            }
+            action={
+              plan !== undefined &&
+              (plan && planned ? (
+                <span className="max-w-32 truncate text-[0.6875rem] text-text-dim">
+                  {t('fittings.skillFixes.inPlan', { plan: plan.name })}
+                </span>
+              ) : (
+                <Button
+                  size="sm"
+                  aria-label={t('fittings.whatToTrain.addToPlanLabel', { skill: label })}
+                  onClick={() => onAdd(fix.entries)}
+                >
+                  {t(
+                    fix.entries.length > 1
+                      ? 'fittings.whatToTrain.addAll'
+                      : 'fittings.whatToTrain.addToPlan'
+                  )}
+                </Button>
+              ))
+            }
+          />
         );
       })}
     </ul>
