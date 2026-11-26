@@ -54,7 +54,7 @@ import type { PayeeRunningAccounts } from '@/features/miningTax/payeeRunningAcco
 import { buildSettleUpReason } from '@/features/miningTax/groupRows';
 import { systemLabel } from '@/features/miningTax/names';
 import { madePaymentHref } from '@/features/miningTax/madePaymentHref';
-import { minerLedgerSource } from '@/engine/corpTaxBook/minerLedgerSource';
+import { minerLedgerSource, openDayCharges } from '@/engine/corpTaxBook/minerLedgerSource';
 import { minerIdFor } from '@/engine/corpTaxBook/charges';
 import { pricesAtHubOnDate, type DatedUnitPrices } from '@/features/miningTax/pricing';
 import { RowDetailModal } from '@/features/miningTax/RowDetailModal';
@@ -679,11 +679,19 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
     if (!book) return null;
     const miner = book.summary.miners.find((m) => m.minerId === ledgerMinerId);
     if (!miner) return null;
-    return minerLedgerSource(miner, book.loaded, {
+    const source = minerLedgerSource(miner, book.loaded, {
       character: characterNameOf,
       place: (l) =>
         l.structureId === undefined ? undefined : book.loaded.structureNames?.[l.structureId],
     });
+    // A day the book has not billed yet is listed as it stands now, so today's mining shows.
+    const open = openDayCharges(
+      allDisplayRows.flatMap((dr) => (dr.corp?.kind === 'row' ? [dr.corp.view] : [])),
+      book.loaded.corporationId,
+      miner.minerId,
+      (id) => systemLabel(systemNames, id)
+    );
+    return { ...source, charges: [...source.charges, ...open] };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- characterNameOf reads trackedCharacters
   }, [
     ledgerTarget,
@@ -694,6 +702,7 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
     ledgerBook,
     ledgerMinerId,
     trackedCharacters,
+    allDisplayRows,
   ]);
   const ledgerTitle =
     ledgerTarget?.kind === 'personal'
