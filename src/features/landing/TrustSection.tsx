@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useId, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ExternalLink } from '@/components/ui/ExternalLink';
 import { Panel } from '@/components/ui';
@@ -27,6 +27,8 @@ function TrustCard({ id, children }: { id: string; children: ReactNode }) {
 
 export function TrustSection() {
   const { t } = useTranslation();
+  const [listOpen, setListOpen] = useState(false);
+  const listId = useId();
   return (
     <>
       <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -56,13 +58,20 @@ export function TrustSection() {
           </p>
         </TrustCard>
       </div>
-      <div className="mt-8 grid gap-8 lg:grid-cols-2 lg:gap-10">
-        <div>
-          <p className="text-sm text-text-dim">{t('login.permissionsHint')}</p>
-          <div className="mt-3">
-            <ScopesAccordion />
-          </div>
-        </div>
+      <div className="mt-6 flex flex-wrap items-center justify-between gap-x-6 gap-y-2 border border-line bg-panel px-5 py-4 text-sm text-text-dim">
+        <p>{t('login.permissionsBar')}</p>
+        <button
+          type="button"
+          aria-expanded={listOpen}
+          aria-controls={listId}
+          onClick={() => setListOpen(!listOpen)}
+          className={inlineLinkClassName}
+        >
+          {t(listOpen ? 'login.permissionsClose' : 'login.permissionsOpen')}
+        </button>
+      </div>
+      <div id={listId} hidden={!listOpen} className="mt-6 grid gap-8 lg:grid-cols-2 lg:gap-10">
+        <ScopesAccordion />
         <div className="space-y-3 text-sm text-text-dim lg:border-l lg:border-line lg:pl-10">
           <p>{t('login.scopes.planetsNote')}</p>
           <p>{t('login.scopes.oneLoginNote')}</p>

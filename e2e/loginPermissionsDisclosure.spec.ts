@@ -1,6 +1,6 @@
 import { test, expect, PHONE } from './support/testBase';
 
-const PARAGRAPHS = [/^Here is everything logging in grants/];
+const PARAGRAPHS = [/^Every permission, by area/];
 
 for (const size of [
   { width: 1440, height: 900 },
