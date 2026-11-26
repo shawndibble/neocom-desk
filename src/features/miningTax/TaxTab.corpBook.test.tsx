@@ -41,6 +41,7 @@ const snapshot = {
   payeesByCharacter: new Map([[ME, [personalPayee]]]),
   paymentLinks: [],
   billedElsewhere: new Map(),
+  bookOwned: new Set<string>(),
   unclassified: [],
   reauthCharacters: [],
   fetchedAt: new Date(),
