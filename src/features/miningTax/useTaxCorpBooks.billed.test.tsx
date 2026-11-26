@@ -113,6 +113,27 @@ describe('useTaxCorpBooks billed elsewhere', () => {
     expect(result.current.accounts.of('p1')).toBeUndefined();
   });
 
+  it('hands over to the live books once they are known, and never saves the stored set', () => {
+    hoisted.booksKnown = false;
+    hoisted.view = null;
+    saveBookOwned.mockClear();
+    const data = {
+      entries: [{ assignments: [assignment] }],
+      payeesByCharacter: new Map([[1, [payee]]]),
+      paymentLinks: [],
+      billedElsewhere: new Map(),
+      bookOwned: new Set(['p1']),
+      systemNames: new Map(),
+      systemSecurity: new Map(),
+    } as unknown as TaxSnapshot;
+    const { result, rerender } = renderHook(() => useTaxCorpBooks(data, [], null));
+    expect(saveBookOwned).not.toHaveBeenCalled();
+    hoisted.booksKnown = true;
+    rerender();
+    expect(result.current.accounts.of('p1')).toBeDefined();
+    expect(result.current.accounts.isBookOwned('p1')).toBe(false);
+  });
+
   it('stores the Payees a book owns, an unlinked one named as its corporation included', async () => {
     hoisted.view = {
       ...hoisted.view,
