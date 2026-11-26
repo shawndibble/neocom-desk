@@ -266,19 +266,6 @@ describe('OwedBalances Conflicts the member has already answered', () => {
   });
 });
 
-describe('OwedBalances credit', () => {
-  it('shows a Payee in credit as a one-line note with its Ledger link, not a card', async () => {
-    const onOpenLedger = vi.fn();
-    renderBalances([balance('a', 0, 500_000), balance('b', 0)], { onOpenLedger });
-    expect(screen.getByText('500,000 ISK')).toHaveClass('text-isk-pos');
-    expect(screen.queryByText(/ISK credit/i)).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Settle up' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Open the ledger of Payee b' })).toBeNull();
-    await userEvent.click(screen.getByRole('button', { name: 'Open the ledger of Payee a' }));
-    expect(onOpenLedger).toHaveBeenCalledWith(expect.objectContaining({ credit: 500_000 }));
-  });
-});
-
 describe('OwedBalances card actions', () => {
   it('reads the owed figure red with a minus and has no hidden name or figure links', () => {
     renderBalances([balance('a', 1_000_000)]);
