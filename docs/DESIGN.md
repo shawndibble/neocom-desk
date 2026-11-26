@@ -1669,7 +1669,7 @@ is clutter, and clutter hides the actions that matter.
   - a grabber and swipe-down to dismiss
   - tap the scrim, the close button, Back or Escape to close
   - `env(safe-area-inset-bottom)` under the footer
-  - an action bar at the foot is the `Modal` `footer`, never a sticky div. Improve's selection and Apply bar is built from the panel's own tick state, so the panel portals it into the container's foot: this sheet's `footer`, or on desktop the foot of its in-page column (a `Panel` beside the editor, sliding out from behind the nav rail)
+  - an action bar at the foot is the `Modal` `footer`, never a sticky div. The footer may also hold the fields the action itself records, beside its buttons (Settle up's Paid on and method next to Record payment), and the save error or confirm step of those buttons, so it shows where the tap was; everything else stays in the body. Improve's selection and Apply bar is built from the panel's own tick state, so the panel portals it into the container's foot: this sheet's `footer`, or on desktop the foot of its in-page column (a `Panel` beside the editor, sliding out from behind the nav rail)
 
 ### States and motion
 

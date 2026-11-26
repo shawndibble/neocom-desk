@@ -2623,6 +2623,30 @@ describe("overlayCorpBooks: an open day's own-Payee ore is owed as an estimate",
     ]);
   });
 
+  it("gives each miner its open days' estimates, one figure per day across refineries", () => {
+    const second = { ...observedToday(5_000), structureId: 1001 };
+    const out = overlay(
+      [today(30_000)],
+      [withToday(null, { observed: [...book().observed, observedToday(15_000), second] })]
+    );
+    const miner = out.books[0].miners.find((m) => m.minerId === `solo:${ME}`)!;
+    expect(miner.estimateDays).toHaveLength(1);
+    expect(miner.estimateDays?.[0].date).toBe(TODAY);
+    expect(miner.estimateDays?.[0].amount).toBeCloseTo(30_000 * 148 * 0.15, 4);
+    expect(miner.estimate).toBeCloseTo(30_000 * 148 * 0.15, 4);
+  });
+
+  it('leaves out of the open-day estimates what credit already paid', () => {
+    const tax = 30_000 * 148 * 0.15;
+    const out = overlay(
+      [today(30_000)],
+      [withToday(30_000, { payments: [payment(DAY + 400_000)] })]
+    );
+    const miner = out.books[0].miners.find((m) => m.minerId === `solo:${ME}`)!;
+    expect(miner.estimateDays?.map((d) => d.date)).toEqual([TODAY]);
+    expect(miner.estimateDays?.[0].amount).toBeCloseTo(tax - 400_000, 4);
+  });
+
   it('is paid by credit ahead of every billed day; what credit misses stays Outstanding', () => {
     const tax = 30_000 * 148 * 0.15;
     const out = overlay(

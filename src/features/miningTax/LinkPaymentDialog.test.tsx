@@ -164,7 +164,8 @@ describe('LinkPaymentDialog for one Payee', () => {
     await userEvent.click(screen.getByText('350,000 ISK · 2026-09-10'));
     const status = screen.getByRole('status');
     expect(status).toHaveTextContent('2026-09-04');
-    expect(status).toHaveTextContent(/2026-09-0650,000 ISK · 250,000 ISK still owed/);
+    expect(status).toHaveTextContent(/2026-09-0650,000 ISK/);
+    expect(status).toHaveTextContent(/Still owed after it250,000 ISK/);
 
     await userEvent.click(screen.getByRole('button', { name: 'Link to Moon Corp' }));
 
