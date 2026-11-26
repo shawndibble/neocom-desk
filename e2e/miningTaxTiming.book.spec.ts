@@ -325,7 +325,7 @@ for (const { kind, title } of SAME_DAY_CASES) {
       await expect(page.getByRole('main')).not.toContainText(/You owe|Owes/);
       await dayRow().click();
       await page.getByRole('button', { name: `Open the ledger of ${CORP_NAME}` }).click();
-      await expect(pilotLedger(page)).toContainText(/Shortfall forgiven/);
+      await expect(pilotLedger(page)).toContainText(/Closed within tolerance/);
       await expect(pilotLedger(page)).toContainText(isk(gap));
       await page.keyboard.press('Escape');
       await gotoMiner(page);
