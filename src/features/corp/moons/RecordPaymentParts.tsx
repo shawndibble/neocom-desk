@@ -8,6 +8,7 @@ import type { PaymentOutcome } from '@/engine/corpTaxBook/paymentPreview';
 import { netPayment } from '@/engine/corpTaxBook/payments';
 import type { SettlePayment } from '@/engine/corpTaxBook/sync';
 import { cx } from '@/lib/cx';
+import { Well } from '@/components/ui/Well';
 import { atDate, clockAt, isk, shortDate } from './moonsFormat';
 
 const DONATION_SEARCH_FROM = 4;
@@ -22,9 +23,10 @@ export function PaymentOutcomePanel({
   const { t } = useTranslation();
   const k = 'corpTaxBook.moons.dialogs.record';
   return (
-    <section
+    <Well
+      as="section"
       aria-label={t(`${k}.outcomeTitle`)}
-      className="space-y-1.5 rounded-xs border border-line bg-panel-2 p-2 text-xs tabular-nums"
+      className="space-y-1.5 text-xs tabular-nums"
     >
       <h3 className={eyebrowClassName}>{t(`${k}.outcomeTitle`)}</h3>
       {!outcome ? (
@@ -61,7 +63,7 @@ export function PaymentOutcomePanel({
           )}
         </>
       )}
-    </section>
+    </Well>
   );
 }
 

@@ -17,7 +17,7 @@ function Hero({ value, caption }: { value: number; caption: ReactNode }) {
     <div className="flex items-center gap-3">
       <span
         className={cx(
-          'text-4xl leading-none font-semibold tabular-nums',
+          'text-3xl leading-none font-semibold tabular-nums',
           value < 0 ? 'text-isk-neg' : 'text-isk-pos'
         )}
       >
@@ -29,11 +29,26 @@ function Hero({ value, caption }: { value: number; caption: ReactNode }) {
   );
 }
 
-function StatBlock({ label, value }: { label: string; value: ReactNode }) {
+function StatBlock({
+  label,
+  value,
+  unchanged = false,
+}: {
+  label: string;
+  value: ReactNode;
+  unchanged?: boolean;
+}) {
   return (
     <div className="min-w-0 px-3 py-2.5">
       <dt className={eyebrowClassName}>{label}</dt>
-      <dd className="mt-0.5 text-lg font-semibold text-text tabular-nums">{value}</dd>
+      <dd
+        className={cx(
+          'mt-0.5 text-base font-semibold tabular-nums',
+          unchanged ? 'text-text-dim' : 'text-text'
+        )}
+      >
+        {value}
+      </dd>
     </div>
   );
 }
@@ -116,6 +131,7 @@ export function PlanSummaryPanel({
           />
           <StatBlock
             label={t('piPlan.make.statAfterQuick')}
+            unchanged={sameIsk(stats.afterQuickWinsPerDay, stats.todayPerDay)}
             value={
               stats.afterQuickWinsPerDay === null ? (
                 '—'
@@ -126,6 +142,7 @@ export function PlanSummaryPanel({
           />
           <StatBlock
             label={t('piPlan.make.statAfterRebuild')}
+            unchanged={sameIsk(stats.afterRebuildPerDay, stats.afterQuickWinsPerDay)}
             value={
               stats.afterRebuildPerDay === null ? '—' : <PerDay value={stats.afterRebuildPerDay} />
             }
@@ -144,6 +161,10 @@ export function PlanSummaryPanel({
       </div>
     </Panel>
   );
+}
+
+function sameIsk(a: number | null, b: number | null): boolean {
+  return a === null || b === null ? a === b : Math.round(a) === Math.round(b);
 }
 
 function PerDay({ value }: { value: number }) {

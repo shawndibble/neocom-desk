@@ -892,7 +892,7 @@ describe('Contracts row right-click (issue #676)', () => {
 });
 
 describe('Contracts tab strip (issue #908)', () => {
-  const SEARCH_UNAVAILABLE = "Can't reach contract search, and nothing is saved yet";
+  const SEARCH_UNAVAILABLE = 'Contract search is down';
 
   it('lands on My contracts with no tab in the URL', async () => {
     window.history.pushState({}, '', '/contracts');

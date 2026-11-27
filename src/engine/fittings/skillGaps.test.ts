@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { computeSkillGaps, firstResourceOverage, resourceOverage } from './skillGaps';
+import {
+  computeSkillGaps,
+  firstResourceOverage,
+  resourceOverage,
+  resourceTight,
+} from './skillGaps';
 import type { Fitting, FittingStats } from './types';
 
 const fitting: Fitting = {
@@ -30,6 +35,20 @@ describe('resourceOverage', () => {
     expect(resourceOverage(50, 100)).toBe(0);
     expect(resourceOverage(null, 100)).toBe(0);
     expect(resourceOverage(10, null)).toBe(0);
+  });
+});
+
+describe('resourceTight', () => {
+  it('is true from 98% up to the total, before it goes over', () => {
+    expect(resourceTight(98, 100)).toBe(true);
+    expect(resourceTight(100, 100)).toBe(true);
+    expect(resourceTight(97.9, 100)).toBe(false);
+    expect(resourceTight(100.1, 100)).toBe(false);
+  });
+  it('is false when unknown or with no budget', () => {
+    expect(resourceTight(null, 100)).toBe(false);
+    expect(resourceTight(10, null)).toBe(false);
+    expect(resourceTight(0, 0)).toBe(false);
   });
 });
 

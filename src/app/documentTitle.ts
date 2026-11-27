@@ -96,9 +96,11 @@ export function pageTitleFor(path: AppRoutePath, t: Translate): string {
 export function documentTitleFor(
   pathname: string,
   t: Translate,
-  hiddenTabPaths?: ReadonlySet<string>
+  hiddenTabPaths?: ReadonlySet<string>,
+  openName?: string | null
 ): string {
   const names = namesFor(pathname, t, hiddenTabPaths);
   const distinct = names.filter((name, index) => names.indexOf(name) === index);
-  return [...distinct.reverse(), t('app.name')].join(SEPARATOR);
+  const lead = openName ? [openName] : [];
+  return [...lead, ...distinct.reverse(), t('app.name')].join(SEPARATOR);
 }

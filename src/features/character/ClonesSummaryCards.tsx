@@ -65,7 +65,11 @@ export function ClonesSummaryCards({
       t('clones.lastJump', {
         date: formatTimestamp(new Date(lastCloneJumpDate), timeZone),
       }),
-    infomorphLevel > 0 && t('clones.infomorphReduction', { hours: Math.min(infomorphLevel, 24) }),
+    infomorphLevel > 0 &&
+      t('clones.infomorphReduction', {
+        level: infomorphLevel,
+        hours: Math.min(infomorphLevel, 24),
+      }),
   ]
     .filter(Boolean)
     .join(' · ');

@@ -53,6 +53,22 @@ describe('CollapsiblePanel', () => {
     expect(container.querySelector('section')?.children).toHaveLength(1);
   });
 
+  it('fades the body in when opened, but not when it mounts open', () => {
+    const { rerender } = panel(() => {}, true);
+    expect(screen.getByText('detail').parentElement).not.toHaveClass('motion-fade');
+    rerender(
+      <CollapsiblePanel title="Costs" expanded={false} onToggle={() => {}}>
+        <p>detail</p>
+      </CollapsiblePanel>
+    );
+    rerender(
+      <CollapsiblePanel title="Costs" expanded onToggle={() => {}}>
+        <p>detail</p>
+      </CollapsiblePanel>
+    );
+    expect(screen.getByText('detail').parentElement).toHaveClass('motion-fade');
+  });
+
   it('shows the body and the hide label while open', () => {
     panel(() => {}, true);
     expect(screen.getByText('detail')).toBeTruthy();

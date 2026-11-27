@@ -126,10 +126,10 @@ export function SurveyOwnerChange({
               </p>
             )}
             <DialogFooter>
-              <Button variant="ghost" size="sm" onClick={() => setChosen(null)}>
+              <Button variant="ghost" onClick={() => setChosen(null)}>
                 {t('survey.changeOwner.back')}
               </Button>
-              <Button variant="primary" size="sm" loading={busy} onClick={() => void confirm()}>
+              <Button variant="primary" loading={busy} onClick={() => void confirm()}>
                 {t('survey.changeOwner.submit')}
               </Button>
             </DialogFooter>

@@ -76,7 +76,7 @@ describe('SurveyStartScreen', () => {
   it('fills the form from the link, and shows a link that matches it', () => {
     renderScreen('?place=Efa&payee=Bob&rate=10&notes=Bring%20a%20hauler');
     expect(screen.getByTestId('picker')).toHaveTextContent('Efa|no-login');
-    expect(screen.getByLabelText('Moon tax payee')).toHaveValue('Bob');
+    expect(screen.getByLabelText('Moon tax Payee')).toHaveValue('Bob');
     expect(screen.getByLabelText('Moon tax rate (%)')).toHaveValue('10');
     expect(screen.getByLabelText('Start link')).toHaveValue(
       `${window.location.origin}/survey?place=Efa&payee=Bob&rate=10&notes=Bring+a+hauler`
@@ -86,7 +86,7 @@ describe('SurveyStartScreen', () => {
 
   it('puts an edit into the link', () => {
     renderScreen('');
-    fireEvent.change(screen.getByLabelText('Moon tax payee'), { target: { value: 'Bob Corp' } });
+    fireEvent.change(screen.getByLabelText('Moon tax Payee'), { target: { value: 'Bob Corp' } });
     fireEvent.change(screen.getByLabelText('Moon tax rate (%)'), { target: { value: '12.5' } });
     expect(screen.getByLabelText('Start link')).toHaveValue(
       `${window.location.origin}/survey?payee=Bob+Corp&rate=12.5`
@@ -132,7 +132,7 @@ describe('SurveyStartScreen', () => {
       id: 98000001,
     });
     renderScreen('');
-    fireEvent.change(screen.getByLabelText('Moon tax payee'), {
+    fireEvent.change(screen.getByLabelText('Moon tax Payee'), {
       target: { value: 'bob corporation' },
     });
     fireEvent.change(screen.getByLabelText('Moon tax rate (%)'), { target: { value: '10' } });
@@ -160,7 +160,7 @@ describe('SurveyStartScreen', () => {
     });
     fireEvent.change(screen.getByLabelText('Moon tax rate (%)'), { target: { value: '10' } });
     observer.observe(document.body, { childList: true, subtree: true, characterData: true });
-    fireEvent.change(screen.getByLabelText('Moon tax payee'), {
+    fireEvent.change(screen.getByLabelText('Moon tax Payee'), {
       target: { value: 'bob corporation' },
     });
     await waitFor(() => expect(startSurvey).toHaveBeenCalled());
@@ -173,7 +173,7 @@ describe('SurveyStartScreen', () => {
 
   it('says so when no corporation, alliance or pilot has the typed name, and keeps the name', async () => {
     renderScreen('');
-    fireEvent.change(screen.getByLabelText('Moon tax payee'), { target: { value: 'Nobodyatall' } });
+    fireEvent.change(screen.getByLabelText('Moon tax Payee'), { target: { value: 'Nobodyatall' } });
     expect(await screen.findByText(/has exactly that name/)).toBeTruthy();
   });
 
@@ -238,7 +238,7 @@ describe('SurveyStartScreen payee from an ID alone', () => {
     });
     renderScreen('?payeeId=98837836&rate=5');
     await waitFor(() =>
-      expect((screen.getByLabelText('Moon tax payee') as HTMLInputElement).value).toBe(
+      expect((screen.getByLabelText('Moon tax Payee') as HTMLInputElement).value).toBe(
         'Bureau of Unified Harvesting'
       )
     );

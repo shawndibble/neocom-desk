@@ -23,13 +23,13 @@ export function OrphanedMilestoneNotices({
           {t('plans.milestone.orphanedNotice', { name: status.milestone.name })}
           <IconButton
             icon={<Icon.Close size={Icon.ICON_SIZE.sm} />}
+            tone="danger"
             label={t('plans.milestone.removeLabel', { name: status.milestone.name })}
             onClick={() => {
               onRemove(status.milestone.id);
               focusAfterCommit(entriesHeadingRef);
             }}
             size="sm"
-            tone="danger"
           />
         </span>
       ))}

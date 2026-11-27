@@ -3,6 +3,7 @@ import {
   useCallback,
   useLayoutEffect,
   useRef,
+  useState,
   type ReactElement,
   type ReactNode,
 } from 'react';
@@ -112,6 +113,12 @@ function DataTableRowImpl<T>({
     [measureRef]
   );
   const measuredExpanded = useRef(expanded);
+  const [shownExpanded, setShownExpanded] = useState(expanded);
+  const [toggled, setToggled] = useState(false);
+  if (expanded !== shownExpanded) {
+    setShownExpanded(expanded);
+    setToggled(true);
+  }
   useLayoutEffect(() => {
     const node = rowRef.current;
     if (!remeasure || !node) return;
@@ -286,7 +293,7 @@ function DataTableRowImpl<T>({
           <td
             role="cell"
             colSpan={columns.length + trailingColumns}
-            className="bg-panel-2 px-3 py-3"
+            className={cx('bg-panel-2 px-3 py-3', toggled && 'motion-fade')}
           >
             {renderDetail(row)}
           </td>

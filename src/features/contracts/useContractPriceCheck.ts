@@ -16,6 +16,7 @@ import type { TradeHub } from '@/market/hubs';
 import { usePricesUnavailableLabel } from '@/features/market/usePricesUnavailableLabel';
 import { formatSignedPercent, percentDirection, savingTone } from '@/lib/formatSignedPercent';
 import { formatContractIsk } from '@/lib/isk';
+import { formatDateTick } from '@/lib/formatDateTick';
 import { useKeyedLoad } from '@/lib/useAsyncLoad';
 import type { PriceCheckFlip, PriceCheckHubMenu, PriceCheckRowModel } from './ContractPriceCheck';
 import { loadContractPrices, type PriceBasisChoice } from './contractPrices';
@@ -44,14 +45,6 @@ export interface ContractPriceCheckArgs {
   searchedTypeIds?: ReadonlySet<number> | null;
   otherValue?: { value: number; lines: number } | null;
   asBuyer?: boolean;
-}
-
-function utcDayLabel(date: string): string {
-  return new Date(`${date}T00:00:00Z`).toLocaleDateString(undefined, {
-    month: 'short',
-    day: 'numeric',
-    timeZone: 'UTC',
-  });
 }
 
 export function useContractPriceCheck(args: ContractPriceCheckArgs): ContractPriceCheckView | null {
@@ -100,7 +93,7 @@ export function useContractPriceCheck(args: ContractPriceCheckArgs): ContractPri
       day !== null
         ? t('contractDetail.priceCheckHeadingDay', {
             hub: hub.stationLabel,
-            date: utcDayLabel(day),
+            date: formatDateTick(day),
           })
         : t('contractDetail.priceCheckHeadingLive', { hub: hub.stationLabel }),
     flip: {
@@ -137,7 +130,7 @@ export function useContractPriceCheck(args: ContractPriceCheckArgs): ContractPri
     const message = unreachable
       ? unavailableLabel
       : day !== null && prices.size === 0
-        ? t('contractDetail.priceCheckNoDayPrice', { date: utcDayLabel(day) })
+        ? t('contractDetail.priceCheckNoDayPrice', { date: formatDateTick(day) })
         : t('contractDetail.priceCheckNotPriced', { hub: hub.stationLabel });
     return { ...view, rows: [], busy: false, message };
   }

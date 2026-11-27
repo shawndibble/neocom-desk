@@ -93,6 +93,7 @@ import { systemLabel } from './names';
 import type { DailyRatePoint, TypeComparisonPoint } from './MiningYieldCharts';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 import { formatCount } from '@/lib/formatCount';
+import { Well } from '@/components/ui/Well';
 
 const LazyMiningYieldCharts = lazy(() => guarded(() => import('./MiningYieldCharts')));
 
@@ -528,10 +529,7 @@ export function OverviewTab({ tabBar, tabsId }: OverviewTabProps) {
             </LiveStatus>
 
             {data && data.reauthCharacters.length > 0 && (
-              <div
-                role="alert"
-                className="space-y-1 rounded-xs border border-warning/60 bg-warning/10 p-2 text-xs"
-              >
+              <Well tone="warning" role="alert" className="space-y-1 text-xs">
                 <p className="font-semibold text-warning uppercase">{t('miningTax.reauthTitle')}</p>
                 <ul className="space-y-1">
                   {data.reauthCharacters.map((c) => (
@@ -550,7 +548,7 @@ export function OverviewTab({ tabBar, tabsId }: OverviewTabProps) {
                     </li>
                   ))}
                 </ul>
-              </div>
+              </Well>
             )}
 
             <div className="empty:hidden">

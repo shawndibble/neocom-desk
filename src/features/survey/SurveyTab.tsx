@@ -9,6 +9,7 @@ import {
   LoadFailedState,
   PageHeader,
   TabPanel,
+  TextArea,
   textActionClassName,
 } from '@/components/ui';
 import { isShareId } from '@/engine/share/shareId';
@@ -327,6 +328,17 @@ export function SurveyTab({ tabBar, tabsId }: SurveyTabProps) {
               emptyExtra={
                 currentId === null && characterId !== null ? (
                   <>
+                    <TextArea
+                      rows={3}
+                      aria-label={t('survey.start.pasteTitle')}
+                      placeholder={t('survey.start.pastePlaceholder')}
+                      value=""
+                      onChange={() => undefined}
+                      onPaste={(event) => {
+                        event.preventDefault();
+                        void trackedAdd(event.clipboardData.getData('text/plain'));
+                      }}
+                    />
                     <SurveyStartTemplates
                       templates={templates}
                       selectedId={startTemplate?.id ?? null}

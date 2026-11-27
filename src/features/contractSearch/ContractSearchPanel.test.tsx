@@ -642,9 +642,7 @@ describe('ContractSearchPanel', () => {
     loadOfferIndex.mockResolvedValue(null);
     renderWithRouter();
 
-    expect(
-      await screen.findAllByText("Can't reach contract search, and nothing is saved yet")
-    ).not.toHaveLength(0);
+    expect(await screen.findAllByText('Contract search is down')).not.toHaveLength(0);
     expect(screen.queryByText('No public contracts synced yet')).not.toBeInTheDocument();
 
     loadPublicContractOffers.mockResolvedValue(cachedSnapshot([]));
@@ -1896,9 +1894,7 @@ describe('ContractSearchPanel — search first (issue #2921)', () => {
       expect(
         await screen.findByText('Loading public contracts, this may take a moment.')
       ).toBeInTheDocument();
-      expect(
-        await screen.findAllByText("Can't reach contract search, and nothing is saved yet")
-      ).not.toHaveLength(0);
+      expect(await screen.findAllByText('Contract search is down')).not.toHaveLength(0);
       expect(
         screen.queryByText('Loading public contracts, this may take a moment.')
       ).not.toBeInTheDocument();

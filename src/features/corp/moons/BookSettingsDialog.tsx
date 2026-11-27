@@ -51,6 +51,7 @@ import { loadCorporationDivisions } from '../wallet';
 import { divisionNamesFor } from '../taxBook/pushDivisionNames';
 import { primaryDivisionOf } from '@/engine/corpTaxBook/uncounted';
 import { utcDay } from '@/engine/localDay';
+import { formatIsoDay } from '@/lib/formatDateTick';
 import { lockDateFor } from '../../../../functions/src/corpTaxBookCheckpoint';
 import {
   DEFAULT_NOTICE_RULES,
@@ -72,9 +73,6 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
     </section>
   );
 }
-
-const displayDate = (iso: string) =>
-  new Date(`${iso}T00:00:00Z`).toLocaleDateString(undefined, { timeZone: 'UTC' });
 
 const DIVISIONS = [1, 2, 3, 4, 5, 6, 7] as const;
 const RATE_SCOPES = [
@@ -459,7 +457,7 @@ export function BookSettingsDialog({
             </span>
           ) : problem === 'start' ? (
             <span id={rateHintId} className="text-sm text-danger">
-              {t('corpTaxBook.moons.settings.startBeforeLock', { date: displayDate(lockDate) })}
+              {t('corpTaxBook.moons.settings.startBeforeLock', { date: formatIsoDay(lockDate) })}
             </span>
           ) : problem === 'form' || rateIsDuplicate ? (
             <span id={rateHintId} className="text-sm text-text-dim">
@@ -532,7 +530,7 @@ export function BookSettingsDialog({
                       <span className="ml-auto flex items-center gap-3">
                         <span className="text-xs text-text-dim tabular-nums">
                           {t('corpTaxBook.moons.settings.from', {
-                            date: displayDate(r.effectiveFrom),
+                            date: formatIsoDay(r.effectiveFrom),
                           })}
                         </span>
                         {scheduled && (
@@ -712,7 +710,7 @@ export function BookSettingsDialog({
                               )}
                               <span className="text-xs text-text-dim tabular-nums">
                                 {t('corpTaxBook.moons.settings.from', {
-                                  date: displayDate(rate.effectiveFrom),
+                                  date: formatIsoDay(rate.effectiveFrom),
                                 })}
                               </span>
                               <span className="w-14 text-right font-semibold tabular-nums">
@@ -796,7 +794,7 @@ export function BookSettingsDialog({
                       onChange={(e) => e.target.value && setStartDate(e.target.value)}
                     />
                   ) : (
-                    <span className="tabular-nums">{displayDate(settings.startDate)}</span>
+                    <span className="tabular-nums">{formatIsoDay(settings.startDate)}</span>
                   )}
                   <InfoTooltip
                     label={t('common.aboutLabel', {
@@ -809,11 +807,11 @@ export function BookSettingsDialog({
                   <span className="mt-1 block text-xs text-text-dim">
                     {startIsLocked
                       ? t('corpTaxBook.moons.settings.startLocked', {
-                          date: displayDate(settings.startDate),
-                          lock: displayDate(lockDate),
+                          date: formatIsoDay(settings.startDate),
+                          lock: formatIsoDay(lockDate),
                         })
                       : t('corpTaxBook.moons.settings.startBeforeLock', {
-                          date: displayDate(lockDate),
+                          date: formatIsoDay(lockDate),
                         })}
                   </span>
                 )}

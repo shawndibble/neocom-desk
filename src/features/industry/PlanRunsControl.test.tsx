@@ -10,10 +10,10 @@ const base = { runs: 10, onRunsChange: () => {}, seconds: 3_600, profit: -500 };
 describe('PlanRunsControl', () => {
   it('offers Break Even only when the page passes a search', () => {
     const { rerender } = render(<PlanRunsControl {...base} findBreakEven={null} />);
-    expect(screen.queryByRole('button', { name: 'Break Even' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Min. runs' })).toBeNull();
 
     rerender(<PlanRunsControl {...base} findBreakEven={() => 12} />);
-    expect(screen.getByRole('button', { name: 'Break Even' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Min. runs' })).toBeVisible();
   });
 
   it('says so when no run count breaks even, until the profit moves', async () => {
@@ -21,7 +21,7 @@ describe('PlanRunsControl', () => {
     const findBreakEven = vi.fn(() => null);
     const { rerender } = render(<PlanRunsControl {...base} findBreakEven={findBreakEven} />);
 
-    await user.click(screen.getByRole('button', { name: 'Break Even' }));
+    await user.click(screen.getByRole('button', { name: 'Min. runs' }));
     expect(findBreakEven).toHaveBeenCalledTimes(1);
     expect(screen.getByRole('status')).toHaveTextContent(
       /^No break even found up to [\d,]+ runs\.$/

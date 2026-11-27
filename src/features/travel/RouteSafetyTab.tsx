@@ -566,13 +566,18 @@ function RouteBody({
               />
             )}
             {holesState.kind === 'loading' && (
-              <LiveNote className="text-sm text-text-dim">{t('travel.holes.loading')}</LiveNote>
+              <Spinner size="sm" showLabel label={t('travel.holes.loading')} className="text-sm" />
             )}
             {holesState.kind === 'unavailable' && (
               <LiveNote className="text-sm text-text-dim">{t('travel.holes.unavailable')}</LiveNote>
             )}
             {state.activityLoading && (
-              <LiveNote className="text-sm text-text-dim">{t('travel.activityLoading')}</LiveNote>
+              <Spinner
+                size="sm"
+                showLabel
+                label={t('travel.activityLoading')}
+                className="text-sm"
+              />
             )}
             {state.activityUnavailable && (
               <LiveNote className="text-sm text-text-dim">

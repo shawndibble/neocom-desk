@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import {
   Button,
   FilterChip,
+  InfoTooltip,
   Modal,
   Select,
   SelectContent,
@@ -308,11 +309,15 @@ export function SplitDialog({
                     }
                   />
                   {keep > line.quantity && (
-                    <p className="text-[0.6875rem] text-text-dim">
+                    <p className="flex items-center gap-1.5 text-[0.6875rem] text-text-dim">
                       {t('miningTax.splitUnreportedHint', {
                         payee: originalPayeeName,
                         formatted: formatCount(keep - line.quantity),
                       })}
+                      <InfoTooltip
+                        label={t('miningTax.splitUtcDayLabel')}
+                        content={t('miningTax.splitUtcDayTip')}
+                      />
                     </p>
                   )}
                 </li>

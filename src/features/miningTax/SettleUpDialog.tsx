@@ -33,6 +33,7 @@ import { payerOptions } from './settlePayer';
 import type { SettleUpRecheck } from './useSettleUpRecheck';
 import { DividedList } from '@/components/ui/DividedList';
 import { DialogFooter } from '@/components/ui/DialogFooter';
+import { Well } from '@/components/ui/Well';
 import { UnlinkedSentNote, type UnlinkedSent } from './UnlinkedSentNote';
 
 export interface SettleUpRow {
@@ -180,10 +181,10 @@ export function SettleUpDialog({
     <div className="space-y-2">
       <LedgerActionError error={saveError} />
       {confirmingDismiss && onDismissBalance && (
-        <div
+        <Well
           role="group"
           aria-label={t('miningTax.settleUp.dismiss.title')}
-          className="space-y-2 rounded-xs border border-line bg-panel-2 p-2 text-xs"
+          className="space-y-2 text-xs"
         >
           <p>
             {t('miningTax.settleUp.dismiss.intro', {
@@ -209,7 +210,7 @@ export function SettleUpDialog({
               {t('common.cancel')}
             </Button>
           </div>
-        </div>
+        </Well>
       )}
       <div className="flex flex-wrap items-end gap-x-3 gap-y-2">
         {record && (

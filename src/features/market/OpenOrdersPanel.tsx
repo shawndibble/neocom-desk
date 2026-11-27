@@ -591,8 +591,6 @@ export function OpenOrdersPanel({
                 orderSlots={orderSlots}
                 actCount={fixList.act.length}
                 actIskTiedUp={fixList.actIskTiedUp}
-                watchCount={fixList.watch.length}
-                fineCount={fixList.fine.length}
                 {...(activeFilterCount(rowsFilter) > 0
                   ? {
                       matching: {

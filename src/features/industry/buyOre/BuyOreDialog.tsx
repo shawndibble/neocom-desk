@@ -14,6 +14,7 @@ import {
   Modal,
   SegmentedControl,
   type DataTableColumn,
+  Spinner,
 } from '@/components/ui';
 import { DataGate } from '@/components/DataGate';
 import { loadCompressedOreTypeIds, loadReprocessing, loadTypes } from '@/sde/loadSde';
@@ -276,7 +277,7 @@ export function BuyOreDialog({
           onRetry={retry}
         >
           {data === null || route === null ? (
-            <p className="text-text-dim">{t('industry.buyOre.loading')}</p>
+            <Spinner size="sm" showLabel label={t('industry.buyOre.loading')} />
           ) : (
             <>
               <SegmentedControl<OreOrdering>

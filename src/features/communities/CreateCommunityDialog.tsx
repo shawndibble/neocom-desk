@@ -75,13 +75,13 @@ export function CreateCommunityDialog({
           </p>
         )}
         <DialogFooter className="mt-3">
-          <Button size="sm" aria-disabled={working || undefined} onClick={onClose}>
+          <Button aria-disabled={working || undefined} onClick={onClose}>
             {t('communities.cancel')}
           </Button>
           <Tooltip content={!trimmed || !characterName ? t('common.needsInput') : null}>
             <Button
               variant="primary"
-              size="sm"
+
               type="submit"
               loading={working}
               aria-disabled={!trimmed || !characterName || undefined}

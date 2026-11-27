@@ -3,13 +3,14 @@ import { cx } from '@/lib/cx';
 import { eyebrowClassName } from './eyebrowClassName';
 import { FieldNoteContext } from './fieldNote';
 
-export type FieldsVariant = 'compact' | 'form';
+export type FieldsVariant = 'compact' | 'form' | 'stacked';
 
 const VariantContext = createContext<FieldsVariant>('compact');
 
 const GRID: Record<FieldsVariant, string> = {
   compact: 'grid-cols-[max-content_minmax(0,1fr)] gap-x-3 gap-y-2',
-  form: 'grid-cols-1 gap-y-3 lg:grid-cols-[fit-content(16rem)_minmax(0,1fr)] lg:gap-x-6',
+  stacked: 'grid-cols-1 gap-y-3',
+  form: 'grid-cols-1 gap-y-3 lg:grid-cols-[var(--fields-label,fit-content(16rem))_minmax(0,1fr)] lg:gap-x-6',
 };
 
 const FORM_ROW =
@@ -17,16 +18,19 @@ const FORM_ROW =
 
 const ROW: Record<FieldsVariant, string> = {
   compact: 'grid-cols-subgrid items-center gap-x-3 gap-y-2',
+  stacked: 'grid-cols-1 gap-1',
   form: `grid-cols-subgrid lg:items-baseline ${FORM_ROW}`,
 };
 
 const LABEL: Record<FieldsVariant, Record<'normal' | 'warning', string>> = {
   compact: { normal: 'text-text-dim', warning: 'text-warning' },
+  stacked: { normal: 'text-text-dim', warning: 'text-warning' },
   form: { normal: 'font-semibold', warning: 'font-semibold text-warning' },
 };
 
 const NOTE: Record<FieldsVariant, string> = {
   compact: 'col-start-2 -mt-1 text-[0.6875rem] text-text-dim',
+  stacked: 'text-[0.6875rem] text-text-dim',
   form: 'max-w-2xl text-text-dim lg:col-start-2',
 };
 
@@ -77,22 +81,37 @@ export function Field({
   const inlineRow = inline && variant === 'form';
   const noteId = useId();
   const hasNote = note !== undefined && note !== null && note !== false;
+  const rowClassName = cx('col-span-full grid', inlineRow ? INLINE_ROW : ROW[variant]);
+  const labelNode = htmlFor ? (
+    <label htmlFor={htmlFor} className={labelClassName}>
+      {label}
+    </label>
+  ) : (
+    <span className={labelClassName}>{label}</span>
+  );
+  const control = <div className="flex min-w-0 flex-wrap items-center gap-2">{children}</div>;
+  const noteNode = hasNote && (
+    <p id={noteId} className={inlineRow ? INLINE_NOTE : NOTE[variant]}>
+      {note}
+    </p>
+  );
+  if (variant === 'stacked' && !htmlFor) {
+    return (
+      <FieldNoteContext.Provider value={hasNote ? noteId : undefined}>
+        <label className={rowClassName}>
+          {labelNode}
+          {control}
+          {noteNode}
+        </label>
+      </FieldNoteContext.Provider>
+    );
+  }
   return (
     <FieldNoteContext.Provider value={hasNote ? noteId : undefined}>
-      <div className={cx('col-span-full grid', inlineRow ? INLINE_ROW : ROW[variant])}>
-        {htmlFor ? (
-          <label htmlFor={htmlFor} className={labelClassName}>
-            {label}
-          </label>
-        ) : (
-          <span className={labelClassName}>{label}</span>
-        )}
-        <div className="flex min-w-0 flex-wrap items-center gap-2">{children}</div>
-        {hasNote && (
-          <p id={noteId} className={inlineRow ? INLINE_NOTE : NOTE[variant]}>
-            {note}
-          </p>
-        )}
+      <div className={rowClassName}>
+        {labelNode}
+        {control}
+        {noteNode}
       </div>
     </FieldNoteContext.Provider>
   );

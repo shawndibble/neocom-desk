@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   MINING_TAX_WARNING_DAYS,
+  comingUpEventSeverity,
   mailSeverity,
   miningTaxSeverity,
   priceAlertsSeverity,
@@ -74,6 +75,17 @@ describe('spExtractionSeverity', () => {
   });
 });
 
+describe('comingUpEventSeverity', () => {
+  const now = 1_000_000_000;
+  const hour = 3_600_000;
+
+  it('follows the default ladder: red inside 1h, amber inside 24h, else clear', () => {
+    expect(comingUpEventSeverity(now + 30 * 60_000, now)).toBe('critical');
+    expect(comingUpEventSeverity(now + 5 * hour, now)).toBe('warning');
+    expect(comingUpEventSeverity(now + 30 * hour, now)).toBe('clear');
+  });
+});
+
 describe('mailSeverity', () => {
   const data = (unread: number, needsReauth = false): MailBoardData => ({
     unread,
@@ -86,8 +98,8 @@ describe('mailSeverity', () => {
     expect(mailSeverity(null)).toBeNull();
   });
 
-  it('is watch with anything unread, clear with nothing', () => {
-    expect(mailSeverity(data(3))).toBe('watch');
+  it('is clear whether or not anything is unread', () => {
+    expect(mailSeverity(data(3))).toBe('clear');
     expect(mailSeverity(data(0))).toBe('clear');
   });
 

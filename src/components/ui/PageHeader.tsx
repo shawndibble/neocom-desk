@@ -18,6 +18,10 @@ interface PageHeaderProps {
    * @summary Right-aligned control cluster: text actions, icon actions (Export, then Refresh), then ⋮ or gear.
    */
   actions?: ReactNode;
+  /**
+   * @summary Below `lg`, the control cluster takes its own row, starting at the gutter: for a cluster too wide to sit beside the title.
+   */
+  actionsOwnRow?: boolean;
   subNav?: ReactNode;
   className?: string;
 }
@@ -30,6 +34,7 @@ export function PageHeader({
   meta,
   scope,
   actions,
+  actionsOwnRow = false,
   subNav,
   className = '',
 }: PageHeaderProps) {
@@ -86,6 +91,7 @@ export function PageHeader({
           className={cx(
             'ml-auto flex items-center justify-end gap-1.5 md:order-1',
             singleLine ? 'shrink-0 flex-nowrap' : 'max-w-full min-w-0 flex-wrap',
+            actionsOwnRow && 'max-lg:ml-0 max-lg:w-full max-lg:justify-start',
             subNav ? 'md:pb-1' : undefined
           )}
         >

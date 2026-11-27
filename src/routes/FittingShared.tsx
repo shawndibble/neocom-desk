@@ -182,7 +182,7 @@ export function FittingShareView({ code, expiresAt }: { code: string; expiresAt?
           <div className="flex items-center gap-3">
             <TypeIcon typeId={state.fitting.shipTypeId} size={64} className="size-12 shrink-0" />
             <div className="min-w-0">
-              <h2 className="truncate text-lg font-semibold">
+              <h2 className="truncate text-xl font-semibold">
                 {typeName?.(state.fitting.shipTypeId) ?? ''}
               </h2>
               {typeName !== null &&

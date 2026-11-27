@@ -319,7 +319,7 @@ export function MarketWideOpportunitiesPanel({
           <EmptyState
             title={t('industry.marketOpportunitiesEmptyTitle')}
             hint={t('industry.marketOpportunitiesEmptyHint')}
-            className="py-8"
+            className="py-0!"
           />
         ) : rows.length === 0 ? (
           <div className="flex flex-col gap-2">

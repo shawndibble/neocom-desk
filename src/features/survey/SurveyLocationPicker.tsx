@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useGrantedScopes } from '@/app/useGrantedScopes';
 import { SecurityStatus } from '@/components/SecurityStatus';
 import { Button, LiveStatus, Spinner, TextInput } from '@/components/ui';
-import { activeOptionClassName } from '@/components/ui/controlStyles';
+import { activeOptionClassName, rowInteractiveClassName } from '@/components/ui/controlStyles';
 import { useRetryFocus } from '@/lib/useRetryFocus';
 import { ESI_REGISTRY } from '@/esi/registry';
 import { useSolarSystemList } from '@/features/route/useSolarSystems';
@@ -231,7 +231,8 @@ export function SurveyLocationPicker({
                 key={`${place.kind}-${place.id ?? place.name}`}
                 {...combo.optionProps(index)}
                 className={cx(
-                  'flex cursor-pointer items-baseline justify-between gap-3 px-2 py-1 hover:bg-panel-2 touch:min-h-9 touch:items-center',
+                  'flex cursor-pointer items-baseline justify-between gap-3 px-2 py-1 touch:min-h-9 touch:items-center',
+                  rowInteractiveClassName,
                   index === active && `bg-panel-2 ${activeOptionClassName}`
                 )}
                 onMouseDown={(event) => event.preventDefault()}

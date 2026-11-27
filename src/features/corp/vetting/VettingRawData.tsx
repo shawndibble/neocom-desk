@@ -183,7 +183,9 @@ function Browser({
   return (
     <>
       <div className="space-y-1">
-        <h1 className="text-xl font-semibold">{t('vetting.data.title')}</h1>
+        <h1 className="text-xl font-semibold tracking-widest uppercase">
+          {t('vetting.data.title')}
+        </h1>
         <p className="text-sm text-text-dim">
           {reviewKindLabel(review, t)} · {review.pilot.name}
           {characters.length > 1 &&
@@ -208,7 +210,7 @@ function Browser({
           />
           {characters.length > 1 && (
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-xs font-semibold uppercase tracking-wide text-text-dim">
+              <span className="text-xs font-semibold uppercase tracking-widest text-text-dim">
                 {t('vetting.data.character')}
               </span>
               {characters.length <= SEGMENTED_MAX ? (

@@ -262,10 +262,10 @@ afterEach(() => {
 });
 
 describe('access', () => {
-  it('waits rather than deciding while corp access is still resolving', () => {
+  it('waits rather than deciding while corp access is still resolving', async () => {
     mockedAccess.mockReturnValue(accessOf('unknown', {}));
     renderAssets();
-    expect(screen.getByRole('status', { name: 'Loading' })).toBeInTheDocument();
+    expect(await screen.findByRole('status', { name: 'Loading' })).toBeInTheDocument();
     expect(mocked.loadCorporationAssets).not.toHaveBeenCalled();
   });
 

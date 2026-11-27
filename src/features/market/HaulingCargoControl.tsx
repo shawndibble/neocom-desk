@@ -242,7 +242,7 @@ function ShipTab({
         onChange={(event) => setQuery(event.target.value)}
       />
       {catalogue === null ? (
-        <p className="text-xs text-text-dim">{t('common.loading')}</p>
+        <Spinner size="sm" showLabel className="text-xs" />
       ) : (
         <ul className="flex max-h-56 flex-col overflow-y-auto">
           {shown.map((hull) => (
@@ -319,8 +319,10 @@ function CustomTab({ onChoose }: { onChoose: (hold: CargoHold) => void }) {
         if (parsed !== null && parsed > 0) onChoose({ kind, capacityM3: parsed });
       }}
     >
-      <label className="flex flex-1 flex-col gap-1 text-[0.6875rem] uppercase tracking-wider text-text-dim">
-        {t('market.hauling.cargo.customLabel')}
+      <label className="flex flex-1 flex-col gap-1">
+        <span className="text-[0.6875rem] tracking-widest text-text-dim uppercase">
+          {t('market.hauling.cargo.customLabel')}
+        </span>
         <TextInput
           size="sm"
           inputMode="numeric"
@@ -329,8 +331,10 @@ function CustomTab({ onChoose }: { onChoose: (hold: CargoHold) => void }) {
           onChange={(event) => setText(event.target.value)}
         />
       </label>
-      <label className="flex flex-1 flex-col gap-1 text-[0.6875rem] uppercase tracking-wider text-text-dim">
-        {kindLabel}
+      <label className="flex flex-1 flex-col gap-1">
+        <span className="text-[0.6875rem] tracking-widest text-text-dim uppercase">
+          {kindLabel}
+        </span>
         <Select value={kind} onValueChange={(next) => setKind(next as HoldKind)}>
           <SelectTrigger size="sm" aria-label={kindLabel}>
             <SelectValue />

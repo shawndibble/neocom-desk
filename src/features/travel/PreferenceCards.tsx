@@ -1,3 +1,4 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useRef, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SecurityStatus } from '@/components/SecurityStatus';
@@ -35,10 +36,8 @@ function Strip({ securities }: { securities: PreferenceCard['securities'] }) {
 function Fact({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="min-w-0">
-      <dt className="text-[0.6875rem] font-semibold uppercase tracking-wide whitespace-nowrap text-text-dim">
-        {label}
-      </dt>
-      <dd className="text-lg font-semibold leading-tight tabular-nums">{children}</dd>
+      <dt className={`${eyebrowClassName} whitespace-nowrap`}>{label}</dt>
+      <dd className="text-base font-semibold leading-tight tabular-nums">{children}</dd>
     </div>
   );
 }

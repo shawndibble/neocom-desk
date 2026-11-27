@@ -4,6 +4,7 @@ import { Panel } from '@/components/ui';
 import { PASTE_DETECTORS } from '@/engine/import/pasteDestination';
 import { SEQUENCE_PREFIX } from '@/lib/shortcutSequence';
 import { useSingleKeyShortcuts } from '@/lib/singleKeyShortcuts';
+import { COARSE_POINTER_QUERY, useMediaQuery } from '@/lib/useMediaQuery';
 import {
   SHORTCUTS,
   commandPaletteDisplayKey,
@@ -44,9 +45,26 @@ export function ShortcutsPanel() {
   const { t } = useTranslation();
   const apple = isApplePlatform();
   const singleKeys = useSingleKeyShortcuts((s) => s.value);
+  const touch = useMediaQuery(COARSE_POINTER_QUERY);
+  const pastePanel = (
+    <Panel title={t('shortcuts.pasteTitle')}>
+      <p className="mb-2 text-sm text-text-dim">{t('shortcuts.pasteHint')}</p>
+      <dl className={SINGLE_LIST}>
+        <Row label={t('shortcuts.paste')}>
+          <kbd className={KBD}>{pasteDisplayKey(apple)}</kbd>
+        </Row>
+        {PASTE_DETECTORS.map(({ id }) => (
+          <Row key={id} label={t(`shortcuts.pasteDestinations.${id}.label`)}>
+            <span className="text-text">{t(`shortcuts.pasteDestinations.${id}.opens`)}</span>
+          </Row>
+        ))}
+      </dl>
+    </Panel>
+  );
 
   return (
     <div className="space-y-4">
+      {touch && pastePanel}
       <Panel title={t('shortcuts.title')}>
         {!singleKeys && <p className="mb-2 text-sm text-text-dim">{t('shortcuts.offNote')}</p>}
         <dl className={LIST}>
@@ -72,19 +90,7 @@ export function ShortcutsPanel() {
           ))}
         </dl>
       </Panel>
-      <Panel title={t('shortcuts.pasteTitle')}>
-        <p className="mb-2 text-sm text-text-dim">{t('shortcuts.pasteHint')}</p>
-        <dl className={SINGLE_LIST}>
-          <Row label={t('shortcuts.paste')}>
-            <kbd className={KBD}>{pasteDisplayKey(apple)}</kbd>
-          </Row>
-          {PASTE_DETECTORS.map(({ id }) => (
-            <Row key={id} label={t(`shortcuts.pasteDestinations.${id}.label`)}>
-              <span className="text-text">{t(`shortcuts.pasteDestinations.${id}.opens`)}</span>
-            </Row>
-          ))}
-        </dl>
-      </Panel>
+      {!touch && pastePanel}
       <Panel title={t('shortcuts.onPageTitle')}>
         <p className="mb-2 text-sm text-text-dim">{t('shortcuts.onPageHint')}</p>
         <dl className={LIST}>

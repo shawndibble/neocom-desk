@@ -90,4 +90,25 @@ describe('routing guard', () => {
     expect(await screen.findByText('Pilot One')).toBeInTheDocument();
     expect(window.location.pathname).toBe('/characters');
   });
+
+  it('keeps the signed-in shell on an unknown URL', async () => {
+    await db.characters.put({
+      characterId: 91,
+      name: 'Pilot One',
+      ownerHash: 'oh-1',
+      addedAt: Date.now(),
+    });
+    await db.settings.put({ key: ACTIVE_CHARACTER_KEY, value: 91 });
+    window.history.pushState({}, '', '/no-such-page');
+    render(<App />);
+    expect(await screen.findByRole('heading', { name: /page not found/i })).toBeInTheDocument();
+    expect(screen.getAllByText('Go to').length).toBeGreaterThan(0);
+  });
+
+  it('shows the bare not-found page on an unknown URL when signed out', async () => {
+    window.history.pushState({}, '', '/no-such-page');
+    render(<App />);
+    expect(await screen.findByRole('heading', { name: /page not found/i })).toBeInTheDocument();
+    expect(screen.queryByText('Go to')).not.toBeInTheDocument();
+  });
 });

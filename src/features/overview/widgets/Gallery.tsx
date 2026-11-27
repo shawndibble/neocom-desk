@@ -137,9 +137,7 @@ function GalleryItem({
     );
   }
   return (
-    <li
-      className={cx('grid gap-2 rounded-xs border border-line bg-panel-2 p-3', dim && 'opacity-75')}
-    >
+    <Well size="lg" as="li" className={cx('grid gap-2', dim && 'opacity-75')}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-semibold">
@@ -180,7 +178,7 @@ function GalleryItem({
         </span>
       </div>
       {showPreview && !soon && <Preview kind={kind} />}
-    </li>
+    </Well>
   );
 }
 

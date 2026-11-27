@@ -290,7 +290,7 @@ export function LoyaltyStoreLanding({ active = true }: { active?: boolean }) {
 
   return (
     <div className="mx-auto flex max-w-page flex-col gap-3">
-      <PageHeader title={t('loyaltyStore.title')} actions={<LpStoreActions />} />
+      <PageHeader title={t('wallet.title')} actions={<LpStoreActions />} />
       <WalletTabBar tabsId={tabsId} />
       <TabPanel tabsId={tabsId} tabId="lp-store">
         <div className="flex flex-col gap-3">

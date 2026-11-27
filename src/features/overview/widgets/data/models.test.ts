@@ -168,7 +168,7 @@ describe('mail', () => {
   it('counts unread with one row per recent unread mail', () => {
     const view = buildView('mail', { mail: mail(7) }, ctx());
     expect(view.number.value).toBe('7');
-    expect(view.number.tone).toBe('watch');
+    expect(view.number.tone).toBe('clear');
     expect(view.rows).toHaveLength(1);
     expect(view.rows[0].title).toBe('Hello');
     expect(view.rows[0].detail).toBe('Aria');

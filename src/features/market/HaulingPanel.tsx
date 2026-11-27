@@ -1,3 +1,4 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useCopyFeedback } from '@/lib/useCopyFeedback';
 import { formatAge } from '@/lib/age';
 import { HaulingHowItWorks } from './HaulingHowItWorks';
@@ -37,7 +38,6 @@ import { useElementNarrowerThan } from '@/lib/useElementNarrowerThan';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { multibuyText } from '@/engine/market/haulingPlan';
 import { writeToClipboard } from '@/lib/clipboard';
-import { createLocalSetting } from '@/lib/useLocalSetting';
 import { enumParam, intParam, optionalIntParam } from '@/lib/urlState';
 import {
   useRememberedUrlParams,
@@ -218,11 +218,6 @@ function useRememberedHaulingFilter(): RememberedDefaults<ReturnType<typeof haul
   );
 }
 
-const useIntroDismissed = createLocalSetting<boolean>({
-  key: 'haulingIntroDismissed',
-  defaultValue: false,
-});
-
 export interface HaulingRefreshInfo {
   refresh: () => void;
   disabled: boolean;
@@ -274,9 +269,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
 
   const cargo = useHaulingCargo((s) => s.value);
   const setCargo = useHaulingCargo((s) => s.setValue);
-  const introDismissed = useIntroDismissed((s) => s.value);
-  const setIntroDismissed = useIntroDismissed((s) => s.setValue);
-  useHydratedStore(useHaulingCargo, useIntroDismissed);
+  useHydratedStore(useHaulingCargo);
   const cargoSet = cargo !== null && cargo.holds.length > 0;
 
   const bothAny = params.from === ANY_HUB && params.to === ANY_HUB;
@@ -670,9 +663,11 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
                   })
           }
           action={
-            <Button size="sm" onClick={() => setParams(DEFAULT_HAULING_FILTER)}>
-              {t('common.resetFilters')}
-            </Button>
+            hiddenCount > 0 && (
+              <Button size="sm" onClick={() => setParams(DEFAULT_HAULING_FILTER)}>
+                {t('common.resetFilters')}
+              </Button>
+            )
           }
         />
       </Panel>
@@ -711,9 +706,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
             ref={listRef}
             className="flex flex-col gap-1 border-b border-line bg-panel-2 px-3 pt-1 pb-3"
           >
-            <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-              {t('market.hauling.multibuyList')}
-            </span>
+            <span className={eyebrowClassName}>{t('market.hauling.multibuyList')}</span>
             <pre
               aria-label={t('market.hauling.multibuyList')}
               className="max-h-32 overflow-auto border border-line-bright bg-bg px-2 py-1.5 text-xs tabular-nums"
@@ -1059,17 +1052,6 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
           <p className="truncate px-3 pb-2 text-[0.6875rem] text-text-dim">
             {categoryName(categoryId)} · {t(`market.hauling.modes.${mode}`)}
           </p>
-        )}
-
-        {!introDismissed && !instant && (
-          <div className="flex items-start justify-between gap-3 border-t border-accent-dim bg-accent/10 px-3 py-2 text-sm">
-            <p>
-              <b>{t('market.hauling.introLead')}</b> {t('market.hauling.introBody')}
-            </p>
-            <Button variant="ghost" size="sm" onClick={() => void setIntroDismissed(true)}>
-              {t('market.hauling.introDismiss')}
-            </Button>
-          </div>
         )}
       </Panel>
 

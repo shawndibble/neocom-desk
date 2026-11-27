@@ -54,6 +54,7 @@ import { mapWithConcurrencyLimit } from '@/lib/concurrency';
 import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
 import { formatCubicMetres } from '@/lib/volume';
 import { loadGroupCategories, loadShipTree, loadTypes } from '@/sde/loadSde';
+import { Well } from '@/components/ui/Well';
 import { PickerList } from './MovePlanPicker';
 import { usePlaceNicknameMap } from './placeNicknames';
 import { PlanResult, type PlanState } from './MovePlanResult';
@@ -227,7 +228,6 @@ export interface CorpMoveSource {
 }
 
 interface MovePlanTabProps {
-  onClose: () => void;
   characterIds: readonly number[];
   activeCharacterId: number | null;
   onSkippedChange?: (names: readonly string[] | undefined) => void;
@@ -242,7 +242,6 @@ export function MovePlanTab(props: MovePlanTabProps) {
 }
 
 function MovePlanTabBody({
-  onClose,
   characterIds,
   activeCharacterId,
   onSkippedChange,
@@ -803,11 +802,11 @@ function MovePlanTabBody({
               aria-label={t('assets.movePlan.whereTo')}
               className="sticky -top-3 z-20 -mx-3 bg-panel px-3 pt-3 pb-1 sm:static sm:mx-0 sm:p-0"
             >
-              <div className="flex flex-col gap-2 rounded-xs border border-accent-dim bg-accent/10 p-3">
+              <Well tone="accent" size="lg" className="flex flex-col gap-2">
                 <h3
                   ref={deliverHeadingRef}
                   tabIndex={-1}
-                  className="text-xs font-semibold tracking-wide text-text-dim uppercase focus:outline-none"
+                  className="text-xs font-semibold tracking-widest text-text-dim uppercase focus:outline-none"
                 >
                   {t('assets.movePlan.deliverTo')}
                 </h3>
@@ -863,7 +862,7 @@ function MovePlanTabBody({
                     ))}
                   </div>
                 )}
-              </div>
+              </Well>
             </section>
             <section aria-label={t('assets.movePlan.whatToMove')} className="flex flex-col gap-2">
               <div className="flex items-baseline justify-between gap-2">
@@ -929,9 +928,6 @@ function MovePlanTabBody({
                   </span>
                 )}
               </div>
-              <Button variant="ghost" className="max-sm:flex-1" onClick={onClose}>
-                {t('assets.movePlan.cancel')}
-              </Button>
               <Button
                 variant="primary"
                 className="max-sm:flex-1"

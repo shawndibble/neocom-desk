@@ -308,7 +308,6 @@ export function Calendar() {
 
   const periodControls = (
     <div className="flex items-center gap-1.5">
-      <span className="hidden text-xs font-semibold text-text-dim md:inline">{periodLabel}</span>
       <IconButton
         size="md"
         icon={<Icon.Back />}
@@ -410,7 +409,7 @@ export function Calendar() {
               </Panel>
             ) : (
               <div className="w-full min-w-0 space-y-3 lg:flex-1">
-                <Panel padded={false} title={t('calendar.map.title')} actions={periodControls}>
+                <Panel padded={false} title={periodLabel} actions={periodControls}>
                   <CalendarMap
                     days={days}
                     loads={loads}

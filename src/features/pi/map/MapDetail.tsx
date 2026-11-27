@@ -152,7 +152,7 @@ export function ProductDetail(props: ProductDetailProps) {
 
       {figure.kind === 'ranked' ? (
         <div className="mt-3">
-          <div className="text-[1.875rem] leading-[1.1] font-semibold text-isk-pos tabular-nums">
+          <div className="text-3xl leading-[1.1] font-semibold text-isk-pos tabular-nums">
             ≈ <IskAmount value={figure.iskPerDay} decimals={0} />
           </div>
           <div className={eyebrowClassName}>
@@ -190,7 +190,7 @@ export function ProductDetail(props: ProductDetailProps) {
         <div className="mt-3">
           <div
             className={cx(
-              'text-[1.875rem] leading-[1.1] font-semibold tabular-nums',
+              'text-3xl leading-[1.1] font-semibold tabular-nums',
               view.money.estimate.iskPerDay < 0 ? 'text-isk-neg' : 'text-isk-pos'
             )}
           >

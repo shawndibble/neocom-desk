@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { CollapsiblePanel, Panel } from '@/components/ui';
+import { CollapsiblePanel, EmptyState, Panel } from '@/components/ui';
 import { formatTimestamp } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';
 import { useIsPhone } from '@/lib/useIsPhone';
@@ -11,7 +11,7 @@ function ActivityList({ entries }: { entries: readonly SrpAuditEntry[] }) {
   const { t } = useTranslation();
   const zone = useTimeZone();
   if (entries.length === 0) {
-    return <p className="text-sm text-text-dim">{t('srp.officer.activity.empty')}</p>;
+    return <EmptyState variant="inline" title={t('srp.officer.activity.empty')} />;
   }
   return (
     <ol className="space-y-2 text-sm">

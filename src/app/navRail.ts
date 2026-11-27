@@ -9,16 +9,26 @@ import {
 interface OwnedPath {
   readonly path: string;
   readonly pagePath: NavPagePath;
+  readonly viewPath: string;
 }
 
-const OWNED_PATHS: readonly OwnedPath[] = (NAV_PAGES as readonly NavPage[]).flatMap((page) => {
+const NAV_PATHS: readonly OwnedPath[] = (NAV_PAGES as readonly NavPage[]).flatMap((page) => {
   const pagePath = page.path as NavPagePath;
   const tabPaths = navTabs(page).map((tab) => tab.path);
   const viewPaths = (page.subViews ?? []).map((view) => view.path as string);
-  return [page.path, ...tabPaths, ...viewPaths].map((path) => ({ path, pagePath }));
+  return [page.path, ...tabPaths, ...viewPaths].map((path) => ({ path, pagePath, viewPath: path }));
 });
 
-const NAV_ORDER = new Map(OWNED_PATHS.map((owned, index) => [owned.path, index]));
+const VIEW_ALIASES: Readonly<Record<string, string>> = { '/industry/groups': '/industry/plans' };
+
+const OWNED_PATHS: readonly OwnedPath[] = [
+  ...NAV_PATHS,
+  ...Object.entries(VIEW_ALIASES).flatMap(([path, viewPath]) =>
+    NAV_PATHS.filter((owned) => owned.path === viewPath).map((owned) => ({ ...owned, path }))
+  ),
+];
+
+const NAV_ORDER = new Map(NAV_PATHS.map((owned, index) => [owned.path, index]));
 
 function within(pathname: string, path: string): boolean {
   return pathname === path || pathname.startsWith(`${path}/`);
@@ -35,7 +45,7 @@ function deepestOwner(pathname: string): OwnedPath | undefined {
 }
 
 export function viewPathFor(pathname: string): string | null {
-  return deepestOwner(pathname)?.path ?? null;
+  return deepestOwner(pathname)?.viewPath ?? null;
 }
 
 export function navPlaceFor(pathname: string): {
@@ -43,7 +53,7 @@ export function navPlaceFor(pathname: string): {
   viewPath: string | null;
 } {
   const owner = deepestOwner(pathname);
-  return { pagePath: owner?.pagePath ?? null, viewPath: owner?.path ?? null };
+  return { pagePath: owner?.pagePath ?? null, viewPath: owner?.viewPath ?? null };
 }
 
 export const FOOTER_PAGES: readonly NavPage[] = (NAV_PAGES as readonly NavPage[]).filter(

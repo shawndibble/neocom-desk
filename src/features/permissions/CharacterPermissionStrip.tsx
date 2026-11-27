@@ -93,7 +93,7 @@ function PickerGroup({
     <div role="group" aria-labelledby={titleId}>
       <div
         id={titleId}
-        className="px-3 pt-2 pb-1 text-xs font-semibold tracking-wide text-text-dim uppercase"
+        className="px-3 pt-2 pb-1 text-xs font-semibold tracking-widest text-text-dim uppercase"
       >
         {title}
       </div>

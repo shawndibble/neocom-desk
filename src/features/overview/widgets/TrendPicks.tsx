@@ -3,7 +3,6 @@ import { useTranslation } from 'react-i18next';
 import {
   Button,
   IconButton,
-  LiveNote,
   LiveStatus,
   MenuCheckboxItem,
   MenuLabel,
@@ -11,6 +10,7 @@ import {
   NativeSelect,
   SearchInput,
   Tooltip,
+  Spinner,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
@@ -290,7 +290,12 @@ export function TrendItemsDialog({
           <p className="text-xs text-text-dim">{t('overview.menu.trendQuickbarEmpty')}</p>
         )}
         {(searching || source !== 'quickbar') && catalogue.status === 'loading' && (
-          <LiveNote className="text-xs text-text-dim">{t('overview.menu.trendLoading')}</LiveNote>
+          <Spinner
+            size="sm"
+            showLabel
+            label={t('overview.menu.trendLoading')}
+            className="text-xs"
+          />
         )}
         {(searching || source !== 'quickbar') && catalogue.status === 'failed' && (
           <p className="text-xs text-danger">

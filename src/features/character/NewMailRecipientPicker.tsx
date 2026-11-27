@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { GrantNote } from '@/app/GrantNote';
 import { useCharacterLacksEndpoints } from '@/app/useGrantedScopes';
 import { IconButton, LiveStatus, TextInput } from '@/components/ui';
-import { activeOptionClassName } from '@/components/ui/controlStyles';
+import { activeOptionClassName, rowInteractiveClassName } from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
 import { isOfflineFailure } from '@/esi/client';
 import { cx } from '@/lib/cx';
@@ -257,7 +257,7 @@ export function NewMailRecipientPicker({
                     'flex min-h-9 cursor-pointer items-center gap-2 px-3 py-1 text-xs text-text md:min-h-0 touch:min-h-9',
                     i === combo.activeIndex
                       ? `bg-panel-2 ${activeOptionClassName}`
-                      : 'hover:bg-panel-2'
+                      : rowInteractiveClassName
                   )}
                   onMouseEnter={() => combo.setHighlight(i)}
                   onMouseDown={(e) => {

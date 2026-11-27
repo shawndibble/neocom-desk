@@ -419,7 +419,10 @@ export function AssetsList({
                     value={stationSortField}
                     onValueChange={(value) => void setStationSortField(value as StationSortField)}
                   >
-                    <SelectTrigger aria-label={t('assets.stationSort.label')} className="w-36">
+                    <SelectTrigger
+                      aria-label={t('assets.stationSort.label')}
+                      className="w-36 max-sm:w-auto"
+                    >
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>

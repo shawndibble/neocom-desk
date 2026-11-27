@@ -5,6 +5,7 @@ import { Trans, useTranslation } from 'react-i18next';
 import {
   Button,
   Checkbox,
+  EmptyState,
   InfoTooltip,
   IskAmount,
   SegmentedControl,
@@ -250,7 +251,7 @@ export function PopularFitsPanel({
         {t(zkillFailureKey(losses.reason, 'fittings.popular.failed'))}
       </LiveNote>
     ) : losses.fits.length === 0 && (filter === 'loss' || rows.length === 0) ? (
-      <p className="text-xs text-text-dim">{t('fittings.popular.empty')}</p>
+      <EmptyState variant="inline" title={t('fittings.popular.empty')} />
     ) : null;
   const guideStatus: ReactNode =
     guides.status === 'loading' ? (

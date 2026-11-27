@@ -54,7 +54,7 @@ function VettingResultLine({ assessment }: { assessment: VettingAssessment }) {
     <div className="flex items-start gap-3">
       <SeverityIcon severity={line.severity} size={Icon.ICON_SIZE.lg} className="mt-0.5" />
       <div className="min-w-0 space-y-1">
-        <p className="text-lg font-semibold tabular-nums">
+        <p className="text-base font-semibold tabular-nums">
           {line.flags === 0
             ? t('vetting.report.nothingFound', { count: line.checks })
             : t('vetting.report.flagsFound', { count: line.flags, checks: line.checks })}
@@ -377,7 +377,9 @@ export function VettingReport({
   if (load.status === 'ownReview') {
     return frame(
       <>
-        <h1 className="text-xl font-semibold">{t('vetting.report.title')}</h1>
+        <h1 className="text-xl font-semibold tracking-widest uppercase">
+          {t('vetting.report.title')}
+        </h1>
         <Panel>
           <EmptyState
             title={t('vetting.errors.own-review')}
@@ -390,7 +392,9 @@ export function VettingReport({
   if (load.status === 'failed') {
     return frame(
       <>
-        <h1 className="text-xl font-semibold">{t('vetting.report.title')}</h1>
+        <h1 className="text-xl font-semibold tracking-widest uppercase">
+          {t('vetting.report.title')}
+        </h1>
         <Panel>
           <LoadFailedState
             title={t('vetting.report.failedTitle')}
@@ -411,7 +415,9 @@ export function VettingReport({
       <div className="flex items-center gap-3">
         <CharacterAvatar characterId={review.pilot.characterId} size="lg" />
         <div className="min-w-0 space-y-0.5">
-          <h1 className="truncate text-xl font-semibold">{review.pilot.name}</h1>
+          <h1 className="truncate text-xl font-semibold tracking-widest uppercase">
+            {review.pilot.name}
+          </h1>
           <p className="text-sm text-text-dim">
             {reviewKindLabel(review, t)} · {review.pilot.corporationName}
             {review.invite && <> · {t('vetting.report.invite', { label: review.invite })}</>}

@@ -18,10 +18,7 @@ async function seedHauling() {
   clearMarketPriceCache();
   clearOrderBookCache();
   clearHaulingScanCache();
-  await db.settings.bulkPut([
-    { key: 'haulingCargo', value: MASTODON_CARGO },
-    { key: 'haulingIntroDismissed', value: true },
-  ]);
+  await db.settings.bulkPut([{ key: 'haulingCargo', value: MASTODON_CARGO }]);
   useHaulingCargo.setState({ hydrated: false });
   useHaulingBudget.setState({ hydrated: false });
   useHaulingFilterPref.setState({ hydrated: false });

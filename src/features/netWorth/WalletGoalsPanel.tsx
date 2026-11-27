@@ -18,8 +18,10 @@ import {
   SelectTrigger,
   SelectValue,
   TextInput,
+  ToastStack,
+  useDeferredCommits,
 } from '@/components/ui';
-import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { formatDateWithYear } from '@/lib/formatDateTick';
 import type { NetWorthSnapshotRow } from '@/engine/netWorth/snapshot';
 import { GOAL_MAX_TARGET, goalProgress } from '@/engine/netWorth/waiting';
 import type { FittingEditLocation } from '@/features/fittings/fittingRoutes';
@@ -48,7 +50,7 @@ interface Draft {
 const NEW_DRAFT: Draft = { id: null, name: '', mode: 'amount', amount: '', fittingId: '' };
 
 export function WalletGoalsPanel({ rows, today }: WalletGoalsPanelProps) {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const goals = useWalletGoals((s) => s.value);
   const setGoals = useWalletGoals((s) => s.setValue);
   useHydratedStore(useWalletGoals);
@@ -57,15 +59,22 @@ export function WalletGoalsPanel({ rows, today }: WalletGoalsPanelProps) {
   const hub = getTradeHub(useMarketHub((s) => s.value)) ?? DEFAULT_TRADE_HUB;
   const { prices, links } = useGoalPrices(goals, hub, choices.resolve, choices.ready);
   const [draft, setDraft] = useState<Draft | null>(null);
-  const [removing, setRemoving] = useState<WalletGoal | null>(null);
+  const pendingRemovals = useDeferredCommits();
+  const shownGoals = goals.filter((g) => !pendingRemovals.hiddenIds.has(g.id));
 
-  const formatDay = (day: string) =>
-    new Intl.DateTimeFormat(i18n.language, {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-      timeZone: 'UTC',
-    }).format(new Date(`${day}T00:00:00Z`));
+  const remove = () => {
+    const goal = goals.find((g) => g.id === draft?.id);
+    setDraft(null);
+    if (!goal) return;
+    const { id } = goal;
+    pendingRemovals.defer({
+      id,
+      message: t('wallet.goal.removed', {
+        name: goal.name || goal.fittingName || t('wallet.goal.untitled'),
+      }),
+      commit: () => setGoals(useWalletGoals.getState().value.filter((g) => g.id !== id)),
+    });
+  };
 
   const amount = draft ? parseIskAmount(draft.amount) : null;
   const amountOk = amount !== null && amount > 0 && amount <= GOAL_MAX_TARGET;
@@ -113,11 +122,11 @@ export function WalletGoalsPanel({ rows, today }: WalletGoalsPanelProps) {
         </Button>
       }
     >
-      {goals.length === 0 ? (
+      {shownGoals.length === 0 ? (
         <p className="text-sm text-text-dim">{t('wallet.goal.empty')}</p>
       ) : (
         <ul className="space-y-4">
-          {goals.map((goal) => (
+          {shownGoals.map((goal) => (
             <GoalRow
               key={goal.id}
               goal={goal}
@@ -126,7 +135,7 @@ export function WalletGoalsPanel({ rows, today }: WalletGoalsPanelProps) {
               hubName={hub.name}
               price={prices.get(goalPriceKey(goal))}
               fittingLink={links.get(goalPriceKey(goal))}
-              formatDay={formatDay}
+              formatDay={formatDateWithYear}
               onEdit={() => edit(goal)}
             />
           ))}
@@ -139,11 +148,7 @@ export function WalletGoalsPanel({ rows, today }: WalletGoalsPanelProps) {
         footer={
           <>
             {draft?.id != null && (
-              <Button
-                variant="danger"
-                className="mr-auto"
-                onClick={() => setRemoving(goals.find((g) => g.id === draft.id) ?? null)}
-              >
+              <Button variant="danger" className="mr-auto" onClick={remove}>
                 {t('wallet.goal.remove')}
               </Button>
             )}
@@ -228,18 +233,11 @@ export function WalletGoalsPanel({ rows, today }: WalletGoalsPanelProps) {
           </Fields>
         )}
       </Modal>
-      <ConfirmDialog
-        open={removing !== null}
-        title={t('wallet.goal.remove')}
-        body={t('wallet.goal.removeBody', { name: removing?.name || removing?.fittingName || '' })}
-        actionLabel={t('wallet.goal.remove')}
-        cancelLabel={t('common.cancel')}
-        onClose={() => setRemoving(null)}
-        onConfirm={async () => {
-          if (!removing) return;
-          setGoals(goals.filter((g) => g.id !== removing.id));
-          setDraft(null);
-        }}
+      <ToastStack
+        items={pendingRemovals.items}
+        undoLabel={t('wallet.goal.undo')}
+        onUndo={pendingRemovals.undo}
+        onClose={pendingRemovals.commit}
       />
     </Panel>
   );

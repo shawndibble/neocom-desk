@@ -674,7 +674,9 @@ describe('FittingStartScreen Active Fit', () => {
     const section = heading.closest('section') as HTMLElement;
     expect(within(section).getByText('Zipper')).toBeInTheDocument();
     expect(within(section).getByText('Rifter')).toBeInTheDocument();
-    expect(within(section).getByText(/up to an hour behind/)).toBeInTheDocument();
+    expect(
+      within(section).getByRole('button', { name: 'About the active fit' })
+    ).toBeInTheDocument();
     expect(within(list).getAllByRole('heading')[0]).toBe(heading);
     expect(await screen.findByText('preview of Zipper')).toBeInTheDocument();
     expect(shipItemsToFittingMock).toHaveBeenCalledWith({ typeId: 587, name: 'Zipper' }, [

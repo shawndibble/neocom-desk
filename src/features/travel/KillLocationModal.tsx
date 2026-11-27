@@ -253,7 +253,7 @@ function KillRow({
         group.map((kill) => (
           <div key={kill.killmailId}>
             {group.length > 1 && kill.victim?.shipTypeId != null && (
-              <p className="bg-panel-2 px-3 pt-2 pl-14 text-xs font-semibold uppercase tracking-wide text-text-dim">
+              <p className="bg-panel-2 px-3 pt-2 pl-14 text-xs font-semibold uppercase tracking-widest text-text-dim">
                 {typeLabel(kill.victim.shipTypeId)}
               </p>
             )}
@@ -354,7 +354,7 @@ export function KillLocationModal({
         {ordered.map((location) => (
           <section key={location.key}>
             {ordered.length > 1 && (
-              <h3 className="sticky top-0 z-10 flex items-center gap-2 border-y border-line bg-panel px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-text-dim">
+              <h3 className="sticky top-0 z-10 flex items-center gap-2 border-y border-line bg-panel px-3 py-1.5 text-xs font-semibold uppercase tracking-widest text-text-dim">
                 {location.name ?? t('travel.kills.modal.elsewhere')}
                 {location.onPath && <Pill tone="accent">{t('travel.kills.onPath')}</Pill>}
                 <span className="ml-auto shrink-0 whitespace-nowrap font-normal normal-case tracking-normal">

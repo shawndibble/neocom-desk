@@ -1,6 +1,13 @@
 import { Fragment, type ReactNode } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
-import { Button, IskAmount, NeedsConnection, textActionClassName } from '@/components/ui';
+import {
+  Button,
+  IconButton,
+  IskAmount,
+  NeedsConnection,
+  textActionClassName,
+} from '@/components/ui';
+import * as Icon from '@/components/ui/icons';
 import { HintText } from '@/components/ui/HintText';
 import { beginGrant } from '@/app/grantAction';
 import { useCharacterLacksEndpoints } from '@/app/useGrantedScopes';
@@ -52,23 +59,16 @@ function OrderSlotsMeter({ used, breakdown }: OrderSlotsFigure) {
 export function FixListSummary({
   actCount,
   actIskTiedUp,
-  watchCount,
-  fineCount,
   matching,
   orderSlots,
 }: {
   actCount: number;
   actIskTiedUp: number;
-  watchCount: number;
-  fineCount: number;
   matching?: { count: number; iskTiedUp: number };
   orderSlots?: OrderSlotsFigure;
 }) {
   const { t } = useTranslation();
-  const parts: ReactNode[] = [
-    t('market.orders.fixList.toWatch', { count: watchCount }),
-    t('market.orders.fixList.fine', { count: fineCount }),
-  ];
+  const parts: ReactNode[] = [];
   if (actCount > 0) {
     parts.unshift(
       <Trans
@@ -98,7 +98,7 @@ export function FixListSummary({
         <span>
           {parts.map((part, index) => (
             <Fragment key={index}>
-              {index > 0 && ' \u00b7 '}
+              {index > 0 && '\u00a0\u00b7 '}
               {part}
             </Fragment>
           ))}
@@ -125,7 +125,7 @@ export function HealthyFold({
 }) {
   const { t } = useTranslation();
   return (
-    <div className="space-y-2">
+    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
       {folded && fineCount > 0 && (
         <p className="flex flex-wrap items-center gap-x-2 text-sm text-text-dim">
           <span>{t('market.orders.fixList.healthy', { count: fineCount })}</span>
@@ -135,9 +135,12 @@ export function HealthyFold({
           </button>
         </p>
       )}
-      <Button size="sm" onClick={onLegend}>
-        {t('market.orders.legendOpen')}
-      </Button>
+      <IconButton
+        size="sm"
+        icon={<Icon.Info />}
+        label={t('market.orders.legendOpen')}
+        onClick={onLegend}
+      />
     </div>
   );
 }

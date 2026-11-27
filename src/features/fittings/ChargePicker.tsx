@@ -1,6 +1,6 @@
 import { useMemo, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { TypeIcon } from '@/components/ui';
+import { EmptyState, TypeIcon } from '@/components/ui';
 import {
   chargeScore,
   chargeShortName,
@@ -116,7 +116,7 @@ export function ChargePickerGroup({ group, settings, onLoad, wrapRow, pricesLoad
       )}
 
       {visible.length === 0 ? (
-        <p className="px-2 text-[0.6875rem] text-text-dim">{t('fittings.chargePicker.noMatch')}</p>
+        <EmptyState variant="inline" className="px-2" title={t('fittings.chargePicker.noMatch')} />
       ) : settings.view === 'chart' ? (
         <ChargeChart
           choices={visible}

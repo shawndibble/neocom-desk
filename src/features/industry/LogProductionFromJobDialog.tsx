@@ -63,15 +63,10 @@ export function LogProductionFromJobDialog({
             </p>
           )}
           <DialogFooter>
-            <Button size="sm" onClick={onClose} aria-disabled={creating || undefined}>
+            <Button onClick={onClose} aria-disabled={creating || undefined}>
               {t('industry.cancel')}
             </Button>
-            <Button
-              size="sm"
-              variant="primary"
-              onClick={() => void handleCreate()}
-              loading={creating}
-            >
+            <Button variant="primary" onClick={() => void handleCreate()} loading={creating}>
               {t('industry.jobsLogProductionCreatePlan')}
             </Button>
           </DialogFooter>

@@ -9,7 +9,6 @@ import {
   CachedEmptyState,
   ColumnPickerMenu,
   EmptyState,
-  SegmentedControl,
   IconButton,
   Panel,
   Spinner,
@@ -610,16 +609,6 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
               resultCount={filteredTransactions.length}
               actions={
                 <>
-                  <SegmentedControl
-                    label={t('wallet.viewLabel')}
-                    uppercase={false}
-                    options={[
-                      { value: 'flat', label: t('wallet.viewFlat') },
-                      { value: 'station', label: t('wallet.viewByStation') },
-                    ]}
-                    value={filter.view}
-                    onChange={(view) => setFilter({ ...filter, view })}
-                  />
                   {filter.view === 'station' && (
                     <StationSortMenu
                       value={filter.stationsBy}

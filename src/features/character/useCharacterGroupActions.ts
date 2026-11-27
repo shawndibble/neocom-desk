@@ -1,6 +1,12 @@
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { useDeferredCommits } from '@/components/ui/useDeferredCommits';
 import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
-import { updateGroups, type OverviewGroupsValue } from '@/features/character/overviewGroups';
+import {
+  updateGroups,
+  useOverviewGroups,
+  type OverviewGroupsValue,
+} from '@/features/character/overviewGroups';
 import {
   addGroup,
   moveCharacterToGroup,
@@ -18,7 +24,12 @@ export function useCharacterGroupActions(
   const newGroupButton = useRef<HTMLButtonElement>(null);
   const focusAfterCommit = useFocusAfterCommit();
   const [newGroupName, setNewGroupName] = useState('');
-  const [deletingGroupId, setDeletingGroupId] = useState<string | null>(null);
+  const { t } = useTranslation();
+  const pendingGroupDeletes = useDeferredCommits();
+  const shownGroups = useMemo(
+    () => groupsValue.groups.filter((group) => !pendingGroupDeletes.hiddenIds.has(group.id)),
+    [groupsValue.groups, pendingGroupDeletes.hiddenIds]
+  );
 
   async function handleMoveToGroup(characterId: number, groupId: string | null) {
     await setGroupsValue(
@@ -62,13 +73,22 @@ export function useCharacterGroupActions(
     );
   }
 
-  async function handleRemoveGroup(groupId: string) {
-    const at = groupsValue.groups.findIndex((group) => group.id === groupId);
-    const nextId = groupsValue.groups[at + 1]?.id;
-    setDeletingGroupId(null);
-    await setGroupsValue(
-      updateGroups(groupsValue, (groups) => removeGroup(groups, groupId), Date.now())
-    );
+  function handleRemoveGroup(groupId: string) {
+    const at = shownGroups.findIndex((group) => group.id === groupId);
+    if (at < 0) return;
+    const nextId = shownGroups[at + 1]?.id;
+    pendingGroupDeletes.defer({
+      id: groupId,
+      message: t('characters.groupDeleted', { name: shownGroups[at].name }),
+      commit: () =>
+        setGroupsValue(
+          updateGroups(
+            useOverviewGroups.getState().value,
+            (groups) => removeGroup(groups, groupId),
+            Date.now()
+          )
+        ),
+    });
     focusAfterCommit(
       () => document.querySelector<HTMLElement>(`[data-group-heading="${nextId}"]`),
       () => document.querySelector<HTMLElement>('[data-ungrouped-heading]'),
@@ -77,11 +97,14 @@ export function useCharacterGroupActions(
   }
 
   async function handleMoveGroup(index: number, direction: -1 | 1) {
-    const groupId = groupsValue.groups[index]?.id;
+    const groupId = shownGroups[index]?.id;
+    const neighborId = shownGroups[index + direction]?.id;
+    const indexOf = (id: string | undefined) =>
+      groupsValue.groups.findIndex((group) => group.id === id);
     await setGroupsValue(
       updateGroups(
         groupsValue,
-        (groups) => reorderGroups(groups, index, index + direction),
+        (groups) => reorderGroups(groups, indexOf(groupId), indexOf(neighborId)),
         Date.now()
       )
     );
@@ -101,8 +124,8 @@ export function useCharacterGroupActions(
     newGroupButton,
     newGroupName,
     setNewGroupName,
-    deletingGroupId,
-    setDeletingGroupId,
+    shownGroups,
+    pendingGroupDeletes,
     handleMoveToGroup,
     handleCreateGroup,
     cancelCreateGroup,

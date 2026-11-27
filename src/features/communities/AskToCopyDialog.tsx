@@ -43,12 +43,9 @@ export function AskToCopyDialog({
           ))}
         </NativeSelect>
         <DialogFooter className="mt-3">
-          <Button size="sm" onClick={onClose}>
-            {t('communities.cancel')}
-          </Button>
+          <Button onClick={onClose}>{t('communities.cancel')}</Button>
           <Tooltip content={pick === '' ? t('common.nothingSelected') : null}>
             <Button
-              size="sm"
               variant="primary"
               aria-disabled={pick === '' || undefined}
               onClick={() => setChosen(pick)}

@@ -189,9 +189,8 @@ interface MyShipsViewProps {
 
 const ROW_GRID_BASE = 'flex flex-wrap items-center gap-x-3 gap-y-1 sm:grid sm:gap-y-0.5';
 const ROW_GRID_WITH_CHARACTER =
-  'sm:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,1.8fr)_2.5rem_10rem_2rem]';
-const ROW_GRID_SINGLE_CHARACTER =
-  'sm:grid-cols-[minmax(0,1.3fr)_minmax(0,1.8fr)_2.5rem_10rem_2rem]';
+  'sm:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,1.8fr)_2.5rem_6rem_2rem]';
+const ROW_GRID_SINGLE_CHARACTER = 'sm:grid-cols-[minmax(0,1.3fr)_minmax(0,1.8fr)_2.5rem_6rem_2rem]';
 
 type SortColumn = 'ship' | 'character' | 'location' | 'security' | 'jumps';
 
@@ -539,7 +538,7 @@ export function MyShipsView({
             onChange={(e) => setQuery(e.target.value)}
             placeholder={t('assets.myShips.searchPlaceholder')}
             aria-label={t('assets.myShips.searchLabel')}
-            className="min-w-0 flex-1 sm:ml-auto sm:w-64 sm:flex-none"
+            className="min-w-0 flex-1"
             pageSearch
           />
           {state.status === 'ready' && sorted.length > 0 && (

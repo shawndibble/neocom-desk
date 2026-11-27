@@ -10,14 +10,16 @@ interface CollapseProps {
   id?: string;
   children: ReactNode;
   className?: string;
+  /** @summary Slide open only; shutting unmounts the body at once, as a plain expander does. */
+  closeInstantly?: boolean;
 }
 
-export function Collapse({ open, id, children, className }: CollapseProps) {
+export function Collapse({ open, id, children, className, closeInstantly }: CollapseProps) {
   const [phase, setPhase] = useState<Phase>(open ? 'open' : 'closed');
   const [prevOpen, setPrevOpen] = useState(open);
   if (open !== prevOpen) {
     setPrevOpen(open);
-    setPhase(open ? 'opening' : 'closing');
+    setPhase(open ? 'opening' : closeInstantly ? 'closed' : 'closing');
   }
 
   useEffect(() => {
@@ -33,7 +35,7 @@ export function Collapse({ open, id, children, className }: CollapseProps) {
       inert={!open}
       data-state={open ? 'open' : 'closed'}
       className={cx(
-        'grid motion-safe:transition-[grid-template-rows] motion-safe:ease-out',
+        'grid motion-safe:transition-[grid-template-rows] motion-safe:ease-(--motion-ease-out)',
         expanded ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'
       )}
       style={{ transitionDuration: `${COLLAPSE_MS}ms` }}

@@ -131,7 +131,7 @@ export function VettingQueue({
                 needed: row.needed,
               })}
               {needsYours(row) && (
-                <span className={phone ? 'text-warning' : 'block text-xs text-warning'}>
+                <span className={phone ? 'text-text' : 'block text-xs text-text'}>
                   {phone && ' · '}
                   {t('vetting.queue.yoursNeeded')}
                 </span>

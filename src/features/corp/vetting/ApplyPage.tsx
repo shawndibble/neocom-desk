@@ -12,6 +12,8 @@ import {
   Panel,
   Spinner,
   TextArea,
+  Field,
+  Fields,
 } from '@/components/ui';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { InlineError } from '@/components/ui/InlineError';
@@ -209,7 +211,12 @@ export function ApplyPage({ corporationId, invite, login, onSignIn, onOpenApp }:
   const boot: Boot = corporationId === null ? { status: 'missing' } : loadedBoot;
   if (boot.status === 'loading') return <Spinner block="page" label={t('common.loading')} />;
   if (boot.status === 'failed') {
-    return <LoadFailedState onRetry={() => setAttempt((n) => n + 1)} />;
+    return (
+      <LoadFailedState
+        title={t('common.loadFailed.vettingApplication')}
+        onRetry={() => setAttempt((n) => n + 1)}
+      />
+    );
   }
   if (boot.status === 'missing') {
     return (
@@ -440,15 +447,16 @@ export function ApplyPage({ corporationId, invite, login, onSignIn, onOpenApp }:
               </span>
             </span>
           </label>
-          <label className="block space-y-1">
-            <span className="text-xs text-text-dim">{t('vetting.apply.before.note')}</span>
-            <TextArea
-              rows={2}
-              maxLength={VETTING_NOTE_MAX}
-              value={note}
-              onChange={(event) => setNote(event.target.value)}
-            />
-          </label>
+          <Fields variant="stacked">
+            <Field label={t('vetting.apply.before.note')}>
+              <TextArea
+                rows={2}
+                maxLength={VETTING_NOTE_MAX}
+                value={note}
+                onChange={(event) => setNote(event.target.value)}
+              />
+            </Field>
+          </Fields>
         </div>
       </Panel>
       <div className="flex flex-wrap items-center gap-3 max-sm:[&>button]:w-full">

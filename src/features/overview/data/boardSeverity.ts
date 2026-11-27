@@ -1,10 +1,13 @@
-import { worstSeverity, type DeadlineSeverity } from '@/engine/character/severity';
+import {
+  severityForRemaining,
+  worstSeverity,
+  type DeadlineSeverity,
+} from '@/engine/character/severity';
 import { isCompletingSoon, isJobDone } from '@/features/industry/jobs';
 import type { IndustryJob } from '@/esi/endpoints';
 import { openOrderProblemCounts } from '@/features/market/openOrdersModel';
 import type { OpenOrderRow } from '@/features/market/openOrdersModel';
 import { isSpExtractionReady } from '@/engine/skills/spExtraction';
-import { DAY_MS } from '@/lib/age';
 import type {
   ContractsBoardData,
   MailBoardData,
@@ -71,10 +74,8 @@ export function contractsSeverity(data: ContractsBoardData | null): DeadlineSeve
   return data.summary.dueSoon > 0 ? 'warning' : 'clear';
 }
 
-const COMING_UP_WATCH_MS = DAY_MS;
-
 export function comingUpEventSeverity(atMs: number, nowMs: number): DeadlineSeverity {
-  return atMs - nowMs <= COMING_UP_WATCH_MS ? 'watch' : 'clear';
+  return severityForRemaining(atMs - nowMs);
 }
 
 export function spExtractionSeverity(data: SpExtractionBoardData): DeadlineSeverity | null {
@@ -86,7 +87,7 @@ export function spExtractionSeverity(data: SpExtractionBoardData): DeadlineSever
 export function mailSeverity(data: MailBoardData | null): DeadlineSeverity | null {
   if (data === null) return null;
   if (data.needsReauth) return UNREADABLE;
-  return data.unread > 0 ? 'watch' : 'clear';
+  return 'clear';
 }
 
 export function priceAlertsSeverity(data: PriceAlertsBoardData | null): DeadlineSeverity | null {

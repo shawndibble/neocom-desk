@@ -234,13 +234,13 @@ describe('PayeeLedgerPanel', () => {
     expect(screen.getByRole('group', { name: 'Whose account' })).toBeInTheDocument();
   });
 
-  it('says so when nothing is billed yet, and spins while loading', () => {
+  it('says so when nothing is billed yet, and spins while loading', async () => {
     const { unmount } = renderPanel(EMPTY_LEDGER);
     expect(screen.getByText('Nothing on this ledger yet')).toBeInTheDocument();
     expect(screen.queryByRole('table')).not.toBeInTheDocument();
     unmount();
     renderPanel(null);
-    expect(screen.getByRole('status', { name: 'Loading the ledger' })).toBeInTheDocument();
+    expect(await screen.findByRole('status', { name: 'Loading the ledger' })).toBeInTheDocument();
   });
 });
 

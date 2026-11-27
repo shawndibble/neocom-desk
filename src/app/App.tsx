@@ -20,7 +20,7 @@ import { startReconnectRecovery } from './reconnectRecovery';
 import { Login } from '@/routes/Login';
 import { Callback } from '@/routes/Callback';
 import * as routeChunks from './routeChunks';
-import { NotFound } from '@/routes/NotFound';
+import { NotFound, ShellNotFound } from '@/routes/NotFound';
 import { preloadedLazy } from './preloadedLazy';
 import { writeSignedInShellHint } from './signedInShellHint';
 import { AnalyticsPageViewTracker } from './AnalyticsPageViewTracker';
@@ -117,6 +117,12 @@ function SignedInShell() {
       </Suspense>
     </ErrorBoundary>
   );
+}
+
+function NotFoundRoute() {
+  const characterCount = useCharacterCountOrLoading();
+  if (characterCount === undefined) return <BootScreen gate="require-character" />;
+  return characterCount > 0 ? <SignedInShell /> : <NotFound />;
 }
 
 const ROUTE_ELEMENTS = {
@@ -268,7 +274,9 @@ export function App() {
               <Route path="/corp-tax-book/verify/:token" element={<CorpTaxBookVerify />} />
               <Route path="/corp-tax-book/remove-now/:code" element={<CorpTaxBookRemoveNow />} />
               <Route path="/error" element={<ErrorProbe />} />
-              <Route path="*" element={<NotFound />} />
+              <Route element={<NotFoundRoute />}>
+                <Route path="*" element={<ShellNotFound />} />
+              </Route>
             </SentryRoutes>
           </Suspense>
           <ReloadPrompt />

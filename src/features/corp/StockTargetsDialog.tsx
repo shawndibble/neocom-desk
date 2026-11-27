@@ -171,6 +171,7 @@ function TargetRow({
       <IconButton
         label={t('corp.stockTargets.removeLabel', { name })}
         icon={<Icon.Close />}
+        tone="danger"
         disabled={disabled}
         onClick={onRemove}
       />

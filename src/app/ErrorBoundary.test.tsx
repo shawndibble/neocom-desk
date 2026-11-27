@@ -38,6 +38,8 @@ describe('ErrorBoundary', () => {
     );
     expect(screen.getByRole('heading', { name: /something went wrong/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /reload/i })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /go to neocom desk/i })).toHaveAttribute('href', '/');
+    expect(screen.getByRole('link', { name: /discord/i })).toBeInTheDocument();
   });
 
   it('moves focus to the heading, so a failed click does not drop it to the page top', () => {

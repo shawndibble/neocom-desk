@@ -48,7 +48,7 @@ function NoteEditor({ systemId, name }: { systemId: number; name: string }) {
         onBlur={save}
         className="text-sm"
       />
-      <p className="flex justify-between gap-2 text-[0.75rem] text-text-dim tabular-nums">
+      <p className="flex justify-between gap-2 text-xs text-text-dim tabular-nums">
         <span>
           {note
             ? t('travel.note.updated', { date: formatDateOnly(new Date(note.updatedAt), timeZone) })

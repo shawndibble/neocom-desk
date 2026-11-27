@@ -33,6 +33,7 @@ import {
   GROUPED_NUMBER_Y_AXIS_WIDTH,
 } from '@/lib/chartAxis';
 import { formatCompactNumber } from '@/lib/compactNumber';
+import { formatDateTick } from '@/lib/formatDateTick';
 import { formatIsk, formatIskCompact, formatMarketIsk } from '@/lib/isk';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { formatPriceRange, formatVolume } from './format';
@@ -100,14 +101,6 @@ function priceTickDecimals(span: number): number {
   if (span < 10) return 2;
   if (span < 100) return 1;
   return 0;
-}
-
-function formatTick(date: string): string {
-  const [year, month, day] = date.split('-').map(Number);
-  return new Date(year, month - 1, day).toLocaleDateString(undefined, {
-    month: 'short',
-    day: 'numeric',
-  });
 }
 
 interface ChartRow extends Partial<Omit<MarketHistoryPoint, 'date'>> {
@@ -344,7 +337,7 @@ export default function PriceHistoryChart({
     return joined.map(({ date, primary, averages, buy, sell }) => ({
       ...primary,
       date,
-      dateLabel: formatTick(date),
+      dateLabel: formatDateTick(date),
       range: primary ? [primary.lowest, primary.highest] : undefined,
       movingAverage: maByDate.get(date),
       comparison: averages,

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { resourceOverage } from '@/engine/fittings/skillGaps';
+import { resourceOverage, resourceTight } from '@/engine/fittings/skillGaps';
 
 export function useOverBudgetFlash(used: number | null, total: number | null) {
   const known = used !== null && total !== null;
@@ -13,5 +13,5 @@ export function useOverBudgetFlash(used: number | null, total: number | null) {
     if (overBudget) setFlashKey((key) => key + 1);
   }
 
-  return { known, overage, overBudget, flashKey };
+  return { known, overage, overBudget, tight: resourceTight(used, total), flashKey };
 }

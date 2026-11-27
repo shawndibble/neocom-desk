@@ -9,6 +9,7 @@ import {
   Checkbox,
   CollapsiblePanel,
   Disclosure,
+  InfoTooltip,
   Select,
   SelectContent,
   SelectItem,
@@ -58,8 +59,14 @@ import {
 } from '@/features/route/TravelRuleFields';
 import { useIsPhone } from '@/lib/useIsPhone';
 
-function GroupLabel({ children }: { children: string }) {
-  return <h3 className={eyebrowClassName}>{children}</h3>;
+function GroupLabel({ children, hint }: { children: string; hint?: string }) {
+  if (hint === undefined) return <h3 className={eyebrowClassName}>{children}</h3>;
+  return (
+    <div className="flex items-center gap-1.5">
+      <h3 className={eyebrowClassName}>{children}</h3>
+      <InfoTooltip label={children} content={hint} />
+    </div>
+  );
 }
 
 export interface RouteBridgeFieldsProps {
@@ -185,6 +192,8 @@ export function RouteHoleFields({
   const { hulls, ship } = useRouteShipMass();
   const shipTypeId = useRouteShipTypeId((state) => state.value);
   const [sizeHull, setSizeHull] = useState<string | null>(null);
+  const holesOff = !enabled;
+  const holesDim = holesOff ? ' opacity-50' : '';
   return (
     <section
       className={
@@ -199,7 +208,7 @@ export function RouteHoleFields({
       ) : (
         <RouteHoleSwitch enabled={enabled} onChange={onChange} />
       )}
-      <div className="space-y-1.5">
+      <fieldset disabled={holesOff} className={`min-w-0 space-y-1.5${holesDim}`}>
         <p className="font-semibold">
           {t('travel.holes.shipSize')}
           {sizeHull !== null && (
@@ -224,7 +233,7 @@ export function RouteHoleFields({
           className={bare ? bareFillClassName : undefined}
           uppercase={false}
         />
-      </div>
+      </fieldset>
       <div className="space-y-1.5">
         <p className="font-semibold">{t('travel.holes.ship')}</p>
         <Select
@@ -257,7 +266,10 @@ export function RouteHoleFields({
       {jump && ship?.drive && (
         <RouteJumpFields jump={jump} maxLy={hullJumpDrive(ship.groupId, ship.drive).rangeLy} />
       )}
-      <div className="flex flex-wrap items-center gap-2">
+      <fieldset
+        disabled={holesOff}
+        className={`flex min-w-0 flex-wrap items-center gap-2${holesDim}`}
+      >
         <label htmlFor={lifeId}>{t('travel.holes.minLifeBefore')}</label>
         <TextInput
           id={lifeId}
@@ -275,8 +287,8 @@ export function RouteHoleFields({
           }}
         />
         <span>{t('travel.holes.minLifeAfter')}</span>
-      </div>
-      <div className="space-y-1.5">
+      </fieldset>
+      <fieldset disabled={holesOff} className={`min-w-0 space-y-1.5${holesDim}`}>
         <p className="font-semibold">{t('travel.holes.hubs')}</p>
         <SegmentedControl
           label={t('travel.holes.hubs')}
@@ -291,7 +303,7 @@ export function RouteHoleFields({
           className={bare ? bareFillClassName : undefined}
           uppercase={false}
         />
-      </div>
+      </fieldset>
       <RouteBridgeFields {...bridges} />
     </section>
   );
@@ -404,7 +416,9 @@ export function RouteRulesPanel({
       {settingsHydrated && holeQuery.hydrated && bridges.bridgeQuery.hydrated ? (
         <div className="space-y-5 text-xs">
           <section className="space-y-4">
-            <GroupLabel>{t('travel.rules.travelSettings')}</GroupLabel>
+            <GroupLabel hint={t('travel.rules.travelSettingsHint')}>
+              {t('travel.rules.travelSettings')}
+            </GroupLabel>
             <SegmentedControl
               label={t('travel.rules.preferenceLabel')}
               options={ROUTE_PREFERENCES.map((value) => ({

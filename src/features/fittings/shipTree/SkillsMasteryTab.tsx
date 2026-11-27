@@ -2,7 +2,7 @@ import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useMemo, useState } from 'react';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 import { useTranslation } from 'react-i18next';
-import { Button, FilterChip } from '@/components/ui';
+import { Button, FilterChip, Spinner } from '@/components/ui';
 import {
   focusRingClassName,
   interactiveClassName,
@@ -181,7 +181,7 @@ export function SkillsMasteryTab({
             </Button>
           </p>
         ) : !hasTiers && masteriesStatus === 'loading' ? (
-          <p className="text-text-dim">{t('ships.info.skills.masteriesLoading')}</p>
+          <Spinner size="sm" showLabel label={t('ships.info.skills.masteriesLoading')} />
         ) : !hasTiers ? (
           <p className="text-text-dim">{t('ships.info.skills.noMasteries')}</p>
         ) : (

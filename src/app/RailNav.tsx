@@ -1,3 +1,4 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useNavBadges } from './navBadges';
 import { Fragment, memo, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
@@ -93,10 +94,7 @@ function GoToButton() {
 
 function NavGroupLabel({ id, children }: { id: string; children: string }) {
   return (
-    <p
-      id={id}
-      className="mt-3 px-2 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
-    >
+    <p id={id} className={`${eyebrowClassName} mt-3 px-2`}>
       {children}
     </p>
   );

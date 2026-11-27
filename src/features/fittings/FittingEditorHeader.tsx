@@ -15,6 +15,7 @@ import type { EditorShare } from './useEditorShare';
 import type { FittingAlpha } from './useFittingAlpha';
 import type { FittingWorkspace } from './useFittingWorkspace';
 import type { useSavedFittingRecord } from './useSavedFittingRecord';
+import { useDocumentTitleName } from '@/app/documentTitleName';
 
 interface FittingEditorHeaderProps {
   workspace: FittingWorkspace;
@@ -61,6 +62,7 @@ export function FittingEditorHeader({
   const [saveToEveOpen, setSaveToEveOpen] = useState(false);
   const [saveAsNewOpen, setSaveAsNewOpen] = useState(false);
   const [saveAsNewName, setSaveAsNewName] = useState('');
+  useDocumentTitleName(fitting.name);
 
   return (
     <>

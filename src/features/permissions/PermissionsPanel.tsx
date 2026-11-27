@@ -155,7 +155,7 @@ export function PermissionsPanel() {
         </div>
         <div className="flex shrink-0 items-center gap-2">
           {status === 'granted' ? (
-            <span className="text-success">{t('settings.permissions.granted')}</span>
+            <span className="text-text-dim">{t('settings.permissions.granted')}</span>
           ) : status === 'checking' ? (
             <span className="text-text-dim">{t('settings.permissions.checking')}</span>
           ) : (

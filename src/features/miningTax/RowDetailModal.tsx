@@ -37,6 +37,8 @@ import type { PayeeSuggestion } from './suggestPayee';
 import { LedgerActionError } from './LedgerActionError';
 import { labelWithoutSystem } from './assignmentLabel';
 import { formatCount } from '@/lib/formatCount';
+import { Well } from '@/components/ui/Well';
+import { DialogFooter } from '@/components/ui/DialogFooter';
 
 interface RowDetailModalProps {
   open: boolean;
@@ -298,16 +300,13 @@ export function RowDetailModal({
         )}
 
         {assignment && row.duplicateAssignmentIds?.includes(assignment.id) && (
-          <p
-            role="alert"
-            className="rounded-xs border border-warning/60 bg-warning/10 p-2 text-xs text-text-dim"
-          >
+          <Well as="p" tone="warning" role="alert" className="text-xs text-text-dim">
             {t('miningTax.duplicateRowHint')}
-          </p>
+          </Well>
         )}
 
         {status === 'needs-review' && assignment?.reviewDiff && (
-          <div className="space-y-1 rounded-xs border border-warning/60 bg-warning/10 p-2 text-xs">
+          <Well tone="warning" className="space-y-1 text-xs">
             <p className="font-semibold text-warning uppercase">{t('miningTax.resolveTitle')}</p>
             <p className="text-text-dim">{t('miningTax.resolveHint')}</p>
             <ul className="space-y-1">
@@ -324,24 +323,19 @@ export function RowDetailModal({
                 </li>
               ))}
             </ul>
-          </div>
+          </Well>
         )}
 
         {confirmUnassign && (
-          <div
-            role="alert"
-            className="space-y-2 rounded-xs border border-danger/60 bg-danger/10 p-2 text-xs"
-          >
+          <Well tone="danger" role="alert" className="space-y-2 text-xs">
             <p>{t('miningTax.detail.unassignConfirm', { payee: payeeName })}</p>
-            <div className="flex gap-2">
-              <Button size="sm" variant="danger" aria-disabled={busy || undefined} onClick={onUndo}>
+            <DialogFooter>
+              <Button onClick={() => setConfirmUnassign(false)}>{t('filters.cancel')}</Button>
+              <Button variant="danger" aria-disabled={busy || undefined} onClick={onUndo}>
                 {t('miningTax.unassignAction')}
               </Button>
-              <Button size="sm" onClick={() => setConfirmUnassign(false)}>
-                {t('filters.cancel')}
-              </Button>
-            </div>
-          </div>
+            </DialogFooter>
+          </Well>
         )}
 
         <LedgerActionError error={saveError} />

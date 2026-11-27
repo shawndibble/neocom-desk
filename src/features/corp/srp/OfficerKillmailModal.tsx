@@ -1,5 +1,4 @@
-import { useTranslation } from 'react-i18next';
-import { Button, Modal } from '@/components/ui';
+import { Modal } from '@/components/ui';
 import type { DoctrineCheckRecord, SrpClaimValues } from '../srpTypes';
 import {
   AppraisalComparison,
@@ -16,22 +15,9 @@ interface Props {
 }
 
 export function OfficerKillmailModal({ subject, check, values, onClose }: Props) {
-  const { t } = useTranslation();
   const ready = typeof values === 'object' ? values : null;
   return (
-    <Modal
-      open
-      onClose={onClose}
-      placement="medium"
-      title={subject.hullName}
-      footer={
-        <div className="flex justify-end">
-          <Button variant="ghost" className="w-full sm:w-auto" onClick={onClose}>
-            {t('srpKillmail.close')}
-          </Button>
-        </div>
-      }
-    >
+    <Modal open onClose={onClose} placement="medium" title={subject.hullName}>
       <SrpKillmailView
         subject={subject}
         check={check}

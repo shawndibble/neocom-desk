@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation } from 'react-router-dom';
 import { DataTable, Panel, StatChip, StatChips, type DataTableColumn } from '@/components/ui';
+import { HintText } from '@/components/ui/HintText';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
 import type { FlowEnd, GoalPlan } from '@/engine/pi/goalTypes';
@@ -123,7 +124,7 @@ export function Hauling({
           const state = routeState(row.jumps);
           if (state === 'pending') {
             return (
-              <span className="text-text-dim" title={t('piPlan.legJumpsPending')}>
+              <span className="text-text-dim">
                 <span aria-hidden="true">…</span>
                 <span className="sr-only">{t('piPlan.legJumpsPending')}</span>
               </span>
@@ -131,10 +132,9 @@ export function Hauling({
           }
           if (state === 'none') {
             return (
-              <span className="text-text-dim" title={t('jumpRange.distanceUnavailable')}>
-                <span aria-hidden="true">—</span>
-                <span className="sr-only">{t('jumpRange.distanceUnavailable')}</span>
-              </span>
+              <HintText content={t('jumpRange.distanceUnavailable')} className="text-text-dim">
+                —
+              </HintText>
             );
           }
           const to = endSystem(row.to, names);

@@ -4,7 +4,7 @@ import { ExternalLink } from '@/components/ui/ExternalLink';
 import { DividedList } from '@/components/ui/DividedList';
 import { Pill } from '@/components/ui/Pill';
 import { Eyebrow } from '@/components/ui';
-import { focusRingInsetClassName } from '@/components/ui/controlStyles';
+import { focusRingInsetClassName, rowInteractiveClassName } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
 import { formatIskCompactSigned } from '@/lib/isk';
 import { iskTone } from '@/lib/signedIsk';
@@ -12,7 +12,8 @@ import { groupByMonth, type Interaction } from '@/engine/interactions/interactio
 
 const rowClassName = cx(
   'grid grid-cols-[3rem_auto_1fr] items-start gap-x-3 gap-y-0.5 px-3 py-2.5 text-sm',
-  'hover:bg-panel-2 sm:grid-cols-[3rem_7.5rem_1fr_auto]',
+  rowInteractiveClassName,
+  'sm:grid-cols-[3rem_7.5rem_1fr_auto]',
   focusRingInsetClassName
 );
 

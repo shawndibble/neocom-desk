@@ -207,7 +207,7 @@ describe('TrendItemsDialog', () => {
     sde.failNext = true;
     open();
     await user.selectOptions(screen.getByRole('combobox'), 'minerals');
-    await user.click(await screen.findByRole('button', { name: 'Retry' }));
+    await user.click(await screen.findByRole('button', { name: 'Try again' }));
     expect(await screen.findByRole('button', { name: 'Add Mexallon' })).toBeInTheDocument();
   });
 

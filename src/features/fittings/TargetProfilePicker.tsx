@@ -187,10 +187,8 @@ function ProfileForm({
       </fieldset>
       {error && <FieldError id={errorId}>{error}</FieldError>}
       <DialogFooter>
-        <Button size="sm" onClick={onCancel}>
-          {t('fittings.targetProfile.cancel')}
-        </Button>
-        <Button size="sm" variant="primary" type="submit">
+        <Button onClick={onCancel}>{t('fittings.targetProfile.cancel')}</Button>
+        <Button variant="primary" type="submit">
           {t('fittings.targetProfile.save')}
         </Button>
       </DialogFooter>

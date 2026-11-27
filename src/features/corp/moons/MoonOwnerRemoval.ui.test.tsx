@@ -146,12 +146,12 @@ describe('RemoveMoonOwnerDialog', () => {
     expect(dialog).toHaveTextContent('It takes effect 24 hours after the mail below is sent');
     expect(dialog).toHaveTextContent("Brass Meridian Logistics's other officers");
     expect(dialog).toHaveTextContent("Ostrava Salvage's CEO");
-    expect(dialog).toHaveTextContent("Ostrava Salvage's payee");
+    expect(dialog).toHaveTextContent("Ostrava Salvage's Payee");
   });
 
   it('leaves the payee off the list when there is none', () => {
     open(false);
-    expect(screen.getByRole('dialog')).not.toHaveTextContent('payee');
+    expect(screen.getByRole('dialog')).not.toHaveTextContent('Payee');
   });
 
   it('never mentions rates, margins, or developer terms', () => {

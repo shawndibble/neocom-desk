@@ -14,7 +14,7 @@ import { isLibraryStale } from '@/engine/communities/sharedLibrary';
 import { formatAge } from '@/lib/age';
 import { characterIdForUid } from '@/sync/uid';
 import { useOnline } from '@/stores/network';
-import { communityBadgeClassName } from './communityBadge';
+import { Pill } from '@/components/ui/Pill';
 import type { CommunityMember } from './communityStore';
 
 const FILTER_FROM = 8;
@@ -85,12 +85,8 @@ export function CommunityMemberList({
                     </span>
                   )}
                 </span>
-                {stale && (
-                  <span className={communityBadgeClassName}>{t('communities.staleBadge')}</span>
-                )}
-                {isAdminRow && (
-                  <span className={communityBadgeClassName}>{t('communities.adminBadge')}</span>
-                )}
+                {stale && <Pill className="shrink-0">{t('communities.staleBadge')}</Pill>}
+                {isAdminRow && <Pill className="shrink-0">{t('communities.adminBadge')}</Pill>}
                 {isAdmin && !isAdminRow && online && <RowMoreActions />}
               </li>
             );

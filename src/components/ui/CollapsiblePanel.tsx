@@ -1,4 +1,4 @@
-import type { ReactNode, Ref } from 'react';
+import { useState, type ReactNode, type Ref } from 'react';
 import { CaretToggle } from './Disclosure';
 import { Panel } from './Panel';
 
@@ -42,6 +42,13 @@ export function CollapsiblePanel({
   children,
 }: CollapsiblePanelProps) {
   const open = expanded || !collapsible;
+  const [shownOpen, setShownOpen] = useState(open);
+  const [toggled, setToggled] = useState(false);
+  if (open !== shownOpen) {
+    setShownOpen(open);
+    setToggled(true);
+  }
+  const body = toggled ? <div className="motion-fade">{children}</div> : children;
   return (
     <Panel
       title={title}
@@ -63,7 +70,7 @@ export function CollapsiblePanel({
         )
       }
     >
-      {open ? children : collapsedSummary}
+      {open ? body : collapsedSummary}
     </Panel>
   );
 }

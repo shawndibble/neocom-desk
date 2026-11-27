@@ -8,6 +8,7 @@ import {
   FilterChip,
   IskAmount,
   type DataTableColumn,
+  Spinner,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
@@ -261,7 +262,9 @@ export function OfferDetail({
           }}
         />
       </label>
-      {walking && <p className="text-xs text-text-dim">{t('loyaltyStore.walkedLoading')}</p>}
+      {walking && (
+        <Spinner size="sm" showLabel label={t('loyaltyStore.walkedLoading')} className="text-xs" />
+      )}
 
       <div className="flex flex-wrap gap-6">
         <div>

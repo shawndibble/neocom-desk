@@ -76,6 +76,7 @@ import { useUrlParam, useUrlParams } from '@/lib/useUrlState';
 import { isoDateParam, optionalSortParam, type UrlSort } from '@/lib/urlState';
 import { formatCount } from '@/lib/formatCount';
 import { DividedList } from '@/components/ui/DividedList';
+import { Well } from '@/components/ui/Well';
 
 const LazyProductionProfitChart = lazy(() => guarded(() => import('./ProductionProfitChart')));
 
@@ -528,7 +529,7 @@ export function ProductionLogPanel({
     >
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[20rem_minmax(0,1fr)] lg:items-start">
         <div className="space-y-2">
-          <div className="flex flex-col gap-1 rounded-xs border border-line bg-panel-2 px-3 py-2">
+          <Well size="wide" className="flex flex-col gap-1">
             <span className={cx(eyebrowClassName, 'flex items-center gap-1')}>
               {t('industry.totalRealizedProfit')}
               <InfoTooltip
@@ -547,7 +548,7 @@ export function ProductionLogPanel({
                 items: itemRows.length,
               })}
             </span>
-          </div>
+          </Well>
           {summaries.some((s) => s.profit.brokerFee > 0) && (
             <AssumesBaseStandingsNote
               characterId={characterId}

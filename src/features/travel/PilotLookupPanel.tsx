@@ -21,7 +21,7 @@ import {
   TabPanel,
   Tooltip,
 } from '@/components/ui';
-import { activeOptionClassName } from '@/components/ui/controlStyles';
+import { activeOptionClassName, rowInteractiveClassName } from '@/components/ui/controlStyles';
 import { useEndpointsGranted } from '@/app/useGrantedScopes';
 import {
   MIN_RECIPIENT_SEARCH_LENGTH,
@@ -338,7 +338,7 @@ function PilotSearch({
                       {...combo.optionProps(i)}
                       className={cx(
                         'cursor-pointer px-3 py-1.5 text-xs text-text',
-                        'hover:bg-panel-2',
+                        rowInteractiveClassName,
                         i === combo.activeIndex && `bg-panel-2 ${activeOptionClassName}`
                       )}
                       onMouseEnter={() => combo.setHighlight(i)}

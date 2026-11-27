@@ -11,7 +11,6 @@ import {
   DataAgeBadge,
   EmptyState,
   IconButton,
-  Modal,
   Spinner,
   TabPanel,
   Toast,
@@ -88,7 +87,7 @@ import { useUrlParam } from '@/lib/useUrlState';
 import { boolParam } from '@/lib/urlState';
 import { loadMarketWideTrees } from '@/sde/loadSde';
 import type { MarketWideTreeMap } from '@/sde/types';
-import { DialogFooter } from '@/components/ui/DialogFooter';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 
 const BuildPlanList = lazy(() =>
   guarded(() => import('@/features/industry/BuildPlanList')).then((m) => ({
@@ -864,25 +863,22 @@ export function Industry() {
           )}
         </TabPanel>
 
-        <Modal
+        <ConfirmDialog
           open={deletingGroupId !== null}
           onClose={() => setDeletingGroupId(null)}
           title={t('industry.deleteGroup')}
-        >
-          <p className="text-xs text-text-dim">{t('industry.deleteGroupConfirm')}</p>
-          <DialogFooter className="mt-3">
-            <Button size="sm" onClick={() => setDeletingGroupId(null)}>
-              {t('industry.cancel')}
-            </Button>
-            <Button
-              size="sm"
-              variant="danger"
-              onClick={() => deletingGroupId && void handleDeleteGroup(deletingGroupId)}
-            >
-              {t('industry.deleteGroup')}
-            </Button>
-          </DialogFooter>
-        </Modal>
+          body={t('industry.deleteGroupConfirm', {
+            group: groups.find((g) => g.id === deletingGroupId)?.name ?? '',
+            count: deletingGroupId ? membersOfGroup(deletingGroupId).length : 0,
+          })}
+          actionLabel={t('industry.deleteGroupAndPlans', {
+            count: deletingGroupId ? membersOfGroup(deletingGroupId).length : 0,
+          })}
+          cancelLabel={t('industry.cancel')}
+          onConfirm={async () => {
+            if (deletingGroupId) await handleDeleteGroup(deletingGroupId);
+          }}
+        />
 
         {blueprintPasteNote && <Toast message={blueprintPasteNote} />}
 

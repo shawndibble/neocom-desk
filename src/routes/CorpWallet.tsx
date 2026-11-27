@@ -211,7 +211,7 @@ function CorpDivisionsPanel({
                 {divisionLabel(selectedEntry)}
               </span>
               <span
-                className={`shrink-0 text-lg font-medium tabular-nums ${iskToneClass(selectedEntry.balance)}`}
+                className={`shrink-0 text-base font-medium tabular-nums ${iskToneClass(selectedEntry.balance)}`}
               >
                 {formatIsk(selectedEntry.balance, 2)}
               </span>
@@ -236,7 +236,7 @@ function CorpDivisionsPanel({
           <div
             role="group"
             aria-label={t('wallet.corpDivisionLabel')}
-            className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4"
+            className="grid grid-cols-1 gap-2 sm:grid-cols-2 sm:max-lg:[&>*:last-child:nth-child(odd)]:col-span-2 lg:grid-cols-4"
           >
             {shownDivisions.map((entry) => {
               const isSelected = entry.division === selected;
@@ -263,7 +263,7 @@ function CorpDivisionsPanel({
                     </span>
                   </Tooltip>
                   <span
-                    className={`block text-lg font-medium tabular-nums ${iskToneClass(entry.balance)}`}
+                    className={`block text-base font-medium tabular-nums ${iskToneClass(entry.balance)}`}
                   >
                     {formatIsk(entry.balance, 2)}
                   </span>
@@ -344,7 +344,11 @@ function CorpJournalPanel({
   return (
     <Panel
       padded={false}
-      title={t('wallet.journalTab')}
+      title={
+        divisionQualifier
+          ? `${t('wallet.journalTab')} · ${divisionQualifier}`
+          : t('wallet.journalTab')
+      }
       actions={
         journalResult ? (
           <span className="flex items-center gap-2">

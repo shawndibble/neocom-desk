@@ -40,8 +40,10 @@ import { EMPTY_ROSTER, NO_DETAILS, mergeNames, type Snapshot } from './coloniesS
 import {
   colonyCheckRow,
   HOUR_MS,
+  matchesStatusFilter,
   sortRows,
   todayCheck,
+  type CheckStatus,
   type ColonyCheckRow,
 } from './coloniesModel';
 import { ColonyListHeader, ColonyRowView } from './ColonyRowView';
@@ -498,6 +500,27 @@ export function ColoniesTab({
   );
   const check = useMemo(() => todayCheck(todayRows, nowMs), [todayRows, nowMs]);
 
+  const [statusFilter, setStatusFilter] = useState<ReadonlySet<CheckStatus>>(() => new Set());
+  const filtering = statusFilter.size > 0;
+  const toggleStatus = (status: CheckStatus) =>
+    setStatusFilter((current) => {
+      const next = new Set(current);
+      if (next.has(status)) next.delete(status);
+      else next.add(status);
+      return next;
+    });
+  const visibleOwnRows = ownRows.filter((row) => matchesStatusFilter(row.status, statusFilter));
+  const visibleAltGroups = showAltColonies
+    ? altGroups
+        .map((group) => ({
+          ...group,
+          colonies: group.colonies.filter(({ row }) =>
+            matchesStatusFilter(row.status, statusFilter)
+          ),
+        }))
+        .filter((group) => group.colonies.length > 0)
+    : [];
+
   const characterNameOf = (id: number) =>
     id === characterId
       ? activeCharacterName
@@ -571,28 +594,54 @@ export function ColoniesTab({
                 {t('piColonies.attentionFirst')}
               </span>
             }
-            actions={
-              hasOtherCharacters ? (
-                <FilterChip
-                  label={t('pi.altColonies.toggleLabel', { count: otherCharacterCount })}
-                  selected={showAltColonies}
-                  onToggle={() => void setShowAltColonies(!showAltColonies)}
-                />
-              ) : undefined
-            }
             padded={false}
           >
-            {ownRows.length > 0 && <ColonyListHeader haulHours={haulHours} />}
+            {(hasOtherCharacters || todayRows.length > 0) && (
+              <div
+                role="group"
+                aria-label={t('piColonies.statusFilter.label')}
+                className="flex flex-wrap gap-2 border-b border-line px-3 py-2"
+              >
+                {hasOtherCharacters && (
+                  <FilterChip
+                    label={t('pi.altColonies.toggleLabel', { count: otherCharacterCount })}
+                    selected={showAltColonies}
+                    onToggle={() => void setShowAltColonies(!showAltColonies)}
+                  />
+                )}
+                {todayRows.length > 0 &&
+                  (['stopped', 'expiring'] as const).map((status) => {
+                    const count = todayRows.filter((row) => row.status === status).length;
+                    const selected = statusFilter.has(status);
+                    return (
+                      <FilterChip
+                        key={status}
+                        label={t(`piColonies.status.${status}`)}
+                        count={count}
+                        countLabel={t('piColonies.statusFilter.count', { count })}
+                        selected={selected}
+                        disabled={count === 0 && !selected}
+                        onToggle={() => toggleStatus(status)}
+                      />
+                    );
+                  })}
+              </div>
+            )}
+            {visibleOwnRows.length > 0 && <ColonyListHeader haulHours={haulHours} />}
             {ownRows.length === 0 ? (
-              <EmptyState
-                title={t('pi.noOwnColoniesTitle')}
-                hint={showAltColonies ? undefined : t('pi.noOwnColoniesHint')}
-                className="py-6"
-              />
+              !filtering && (
+                <EmptyState
+                  title={t('pi.noOwnColoniesTitle')}
+                  hint={showAltColonies ? undefined : t('pi.noOwnColoniesHint')}
+                  className="py-6"
+                />
+              )
             ) : (
               <div ref={ownListRef}>
-                {showAltColonies && <CharacterGroupHeader name={activeCharacterName} />}
-                {ownRows.map((row, index) => {
+                {showAltColonies && visibleOwnRows.length > 0 && (
+                  <CharacterGroupHeader name={activeCharacterName} />
+                )}
+                {visibleOwnRows.map((row, index) => {
                   const planet = planets.find((p) => p.planet_id === row.planetId)!;
                   return (
                     <ColonyRowView
@@ -619,58 +668,72 @@ export function ColoniesTab({
               </div>
             )}
 
-            {ownRows.length === 0 && includeAlts && <ColonyListHeader haulHours={haulHours} />}
-            {showAltColonies &&
-              altGroups.map((group) => {
-                const summaryParts: string[] = [];
-                if (group.summary.stoppedCount > 0) {
-                  summaryParts.push(
-                    t('pi.altColonies.summaryStopped', { count: group.summary.stoppedCount })
-                  );
-                }
-                if (group.summary.nextExpiryMs !== null) {
-                  summaryParts.push(
-                    t('pi.altColonies.summaryNext', {
-                      duration: formatDuration(
-                        Math.max(0, group.summary.nextExpiryMs - nowMs) / 1000
-                      ),
-                    })
-                  );
-                }
-                return (
-                  <div key={group.characterId}>
-                    <CharacterGroupHeader
-                      name={group.characterName}
-                      summary={summaryParts.length > 0 ? summaryParts.join(' · ') : undefined}
-                      makesPerDay={group.makesPerDay}
-                      fetchedAt={group.fetchedAt}
-                      onSwitch={() => void setActiveCharacter(group.characterId)}
-                    />
-                    {group.colonies.map(({ row, planet, detail }) => (
-                      <ColonyRowView
-                        key={row.key}
-                        row={row}
-                        planet={planet}
-                        detail={detail}
-                        pi={pi}
-                        nowMs={nowMs}
-                        planetName={nameOf(row)}
-                        pinTypeNames={pinTypeNames}
-                        productNames={productNames}
-                        schematicNames={schematicNames}
-                        expanded={isExpanded(row.key)}
-                        onToggle={toggle}
-                        onExpand={expand}
-                        primary={false}
-                        own={false}
-                        switchTo={switchTargets.get(group.characterId)}
-                        onSwitch={switchCharacter}
-                        haulLabel={haulLabel}
-                      />
-                    ))}
-                  </div>
+            {visibleOwnRows.length === 0 && visibleAltGroups.length > 0 && (
+              <ColonyListHeader haulHours={haulHours} />
+            )}
+            {visibleAltGroups.map((group) => {
+              const summaryParts: string[] = [];
+              if (group.summary.stoppedCount > 0) {
+                summaryParts.push(
+                  t('pi.altColonies.summaryStopped', { count: group.summary.stoppedCount })
                 );
-              })}
+              }
+              if (group.summary.nextExpiryMs !== null) {
+                summaryParts.push(
+                  t('pi.altColonies.summaryNext', {
+                    duration: formatDuration(
+                      Math.max(0, group.summary.nextExpiryMs - nowMs) / 1000
+                    ),
+                  })
+                );
+              }
+              return (
+                <div key={group.characterId}>
+                  <CharacterGroupHeader
+                    name={group.characterName}
+                    summary={summaryParts.length > 0 ? summaryParts.join(' · ') : undefined}
+                    makesPerDay={group.makesPerDay}
+                    fetchedAt={group.fetchedAt}
+                    onSwitch={() => void setActiveCharacter(group.characterId)}
+                  />
+                  {group.colonies.map(({ row, planet, detail }) => (
+                    <ColonyRowView
+                      key={row.key}
+                      row={row}
+                      planet={planet}
+                      detail={detail}
+                      pi={pi}
+                      nowMs={nowMs}
+                      planetName={nameOf(row)}
+                      pinTypeNames={pinTypeNames}
+                      productNames={productNames}
+                      schematicNames={schematicNames}
+                      expanded={isExpanded(row.key)}
+                      onToggle={toggle}
+                      onExpand={expand}
+                      primary={false}
+                      own={false}
+                      switchTo={switchTargets.get(group.characterId)}
+                      onSwitch={switchCharacter}
+                      haulLabel={haulLabel}
+                    />
+                  ))}
+                </div>
+              );
+            })}
+
+            {filtering && visibleOwnRows.length === 0 && visibleAltGroups.length === 0 && (
+              <EmptyState
+                title={t('piColonies.statusFilter.noMatchTitle')}
+                hint={t('piColonies.statusFilter.noMatchHint')}
+                action={
+                  <Button size="sm" onClick={() => setStatusFilter(new Set())}>
+                    {t('common.resetFilters')}
+                  </Button>
+                }
+                className="py-6"
+              />
+            )}
 
             {showAltColonies &&
               (roster.notLoaded.length > 0 ||

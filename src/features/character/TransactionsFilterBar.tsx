@@ -6,6 +6,7 @@ import {
   FilterField,
   MultiSelect,
   SearchInput,
+  SegmentedControl,
   Select,
   SelectContent,
   SelectItem,
@@ -13,6 +14,7 @@ import {
   SelectValue,
   type MultiSelectOption,
 } from '@/components/ui';
+import { useIsNarrow } from '@/lib/useIsNarrow';
 import {
   activeWalletTransactionFilters,
   type TransactionSide,
@@ -41,6 +43,22 @@ export function TransactionsFilterBar({
   stationOptions?: readonly MultiSelectOption<number>[];
 }) {
   const { t } = useTranslation();
+  const isNarrow = useIsNarrow();
+  const viewSwitch = (
+    value: WalletTransactionFilter,
+    set: (next: WalletTransactionFilter) => void
+  ) => (
+    <SegmentedControl
+      label={t('wallet.viewLabel')}
+      uppercase={false}
+      options={[
+        { value: 'flat', label: t('wallet.viewFlat') },
+        { value: 'station', label: t('wallet.viewByStation') },
+      ]}
+      value={value.view}
+      onChange={(view) => set({ ...value, view })}
+    />
+  );
   return (
     <FilterBar
       value={filter}
@@ -56,10 +74,18 @@ export function TransactionsFilterBar({
           className="min-w-28 flex-1"
         />
       }
-      actions={actions}
+      actions={
+        <>
+          {!isNarrow && viewSwitch(filter, onChange)}
+          {actions}
+        </>
+      }
     >
       {(draft, setDraft) => (
         <>
+          {isNarrow && (
+            <FilterField label={t('wallet.viewLabel')}>{viewSwitch(draft, setDraft)}</FilterField>
+          )}
           <FilterField label={t('wallet.sideFilterLabel')}>
             <Select
               value={draft.side}

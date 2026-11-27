@@ -89,10 +89,8 @@ export function RunLossModals({ loss }: { loss: RunLoss }) {
             </dl>
 
             <DialogFooter>
-              <Button size="sm" onClick={loss.closeLoss}>
-                {t('industry.cancel')}
-              </Button>
-              <Button size="sm" variant="primary" onClick={() => void loss.saveLoss()}>
+              <Button onClick={loss.closeLoss}>{t('industry.cancel')}</Button>
+              <Button variant="primary" onClick={() => void loss.saveLoss()}>
                 {dialog.lossId ? t('industry.saveLoss') : t('industry.markAsLost')}
               </Button>
             </DialogFooter>
@@ -107,10 +105,8 @@ export function RunLossModals({ loss }: { loss: RunLoss }) {
       >
         <p className="text-xs text-text-dim">{t('industry.removeLossConfirm')}</p>
         <DialogFooter className="mt-3">
-          <Button size="sm" onClick={loss.cancelRemoveLoss}>
-            {t('industry.keepLoss')}
-          </Button>
-          <Button size="sm" variant="danger" onClick={() => void loss.removeLoss()}>
+          <Button onClick={loss.cancelRemoveLoss}>{t('industry.keepLoss')}</Button>
+          <Button variant="danger" onClick={() => void loss.removeLoss()}>
             {t('industry.removeLoss')}
           </Button>
         </DialogFooter>

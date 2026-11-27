@@ -23,7 +23,8 @@ function applyOffset(
   reduced: boolean
 ) {
   if (!el) return;
-  el.style.transition = animate && !reduced ? 'transform 200ms ease-out' : 'none';
+  el.style.transition =
+    animate && !reduced ? 'transform var(--motion-quick) var(--motion-ease-out)' : 'none';
   el.style.transform = transform;
 }
 

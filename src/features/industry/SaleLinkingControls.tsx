@@ -280,10 +280,8 @@ export function SaleLinkingModals({ sale }: { sale: SaleLinking }) {
       >
         <p className="text-xs text-text-dim">{t('industry.deleteProductionRunConfirm')}</p>
         <DialogFooter className="mt-3">
-          <Button size="sm" onClick={sale.cancelDeleteRun}>
-            {t('industry.cancel')}
-          </Button>
-          <Button size="sm" variant="danger" onClick={() => void sale.deleteRun()}>
+          <Button onClick={sale.cancelDeleteRun}>{t('industry.cancel')}</Button>
+          <Button variant="danger" onClick={() => void sale.deleteRun()}>
             {t('industry.deleteProductionRun')}
           </Button>
         </DialogFooter>

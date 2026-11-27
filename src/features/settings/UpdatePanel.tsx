@@ -22,7 +22,7 @@ export function UpdatePanel() {
           loading={updating}
           onClick={update}
         >
-          {t('settings.updateAction')}
+          {t(available ? 'settings.updateAction' : 'settings.updateCheckAction')}
         </Button>
         {notice && <ActionResult kind={notice.kind}>{notice.text}</ActionResult>}
       </div>

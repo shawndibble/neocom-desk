@@ -207,7 +207,7 @@ export function MobileMarketWideList({
                 <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[0.6875rem] text-text-dim">
                   <span
                     className={cx(
-                      'text-[0.6875rem] leading-4 font-semibold tracking-wider uppercase',
+                      'text-[0.6875rem] leading-4 font-semibold tracking-widest uppercase',
                       owned ? 'text-success' : 'text-text-dim'
                     )}
                   >

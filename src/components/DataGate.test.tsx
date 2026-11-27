@@ -11,13 +11,13 @@ function setOnline(value: boolean | null) {
 }
 
 describe('DataGate', () => {
-  it('shows a spinner while busy and the children once ok', () => {
+  it('shows a spinner while busy and the children once ok', async () => {
     const { rerender } = render(
       <DataGate status="busy" title="Nothing">
         <p>Loaded</p>
       </DataGate>
     );
-    expect(screen.getByRole('status', { name: 'Loading' })).toBeInTheDocument();
+    expect(await screen.findByRole('status', { name: 'Loading' })).toBeInTheDocument();
     expect(screen.queryByText('Loaded')).toBeNull();
     rerender(
       <DataGate status="ok" title="Nothing">

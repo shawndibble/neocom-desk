@@ -1,6 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Disclosure, EmptyState, LoadFailedState, Panel, Spinner, Toast } from '@/components/ui';
+import { Link } from 'react-router-dom';
+import {
+  Disclosure,
+  EmptyState,
+  LoadFailedState,
+  Panel,
+  Spinner,
+  Toast,
+  buttonClassName,
+} from '@/components/ui';
+import { useCorpRouteGate } from '../useCorpRouteGate';
 import { GrantBanner } from '@/app/GrantNote';
 import { useIsPhone } from '@/lib/useIsPhone';
 import type { DoctrineCheckRecord, FileSrpClaimInput, HullRule } from '../srpTypes';
@@ -25,6 +35,17 @@ import {
   type MemberSrp as MemberData,
 } from './useMemberSrp';
 
+function ConfigureSrpLink() {
+  const { t } = useTranslation();
+  const gate = useCorpRouteGate((capabilities) => capabilities.canConfigureSrp);
+  if (gate.status !== 'ready') return null;
+  return (
+    <Link to="/corp/srp/settings" className={buttonClassName({ variant: 'primary' })}>
+      {t('srpMember.notSetUp.action')}
+    </Link>
+  );
+}
+
 interface MemberSrpProps {
   characterId: number;
   corporationId: number;
@@ -47,7 +68,11 @@ export function MemberSrp({ characterId, corporationId }: MemberSrpProps) {
   } else if (!status.value.enabled || !status.value.settings) {
     body = (
       <Panel>
-        <EmptyState title={t('srpMember.notSetUp.title')} hint={t('srpMember.notSetUp.hint')} />
+        <EmptyState
+          title={t('srpMember.notSetUp.title')}
+          hint={t('srpMember.notSetUp.hint')}
+          action={<ConfigureSrpLink />}
+        />
       </Panel>
     );
   } else {

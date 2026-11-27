@@ -89,9 +89,11 @@ export function Toast({
   const signal = instance !== undefined ? instance : typeof message === 'string' ? message : null;
   const [seenSignal, setSeenSignal] = useState(signal);
   const [occurrence, setOccurrence] = useState(0);
+  const [leaving, setLeaving] = useState(false);
   if (signal !== null && signal !== seenSignal) {
     setSeenSignal(signal);
     setOccurrence((n) => n + 1);
+    setLeaving(false);
   }
 
   const [held, setHeld] = useState(false);
@@ -105,7 +107,10 @@ export function Toast({
       remainingRef.current = durationMs;
     }
     const startedAt = Date.now();
-    const timer = setTimeout(() => onCloseRef.current?.(), remainingRef.current);
+    const timer = setTimeout(() => {
+      if (typeof rootRef.current?.getAnimations === 'function') setLeaving(true);
+      else onCloseRef.current?.();
+    }, remainingRef.current);
     return () => {
       clearTimeout(timer);
       remainingRef.current = Math.max(0, remainingRef.current - (Date.now() - startedAt));
@@ -133,6 +138,25 @@ export function Toast({
   const rootRef = useRef<HTMLDivElement>(null);
   const cameFrom = useRef<HTMLElement | null>(null);
 
+  useLayoutEffect(() => {
+    if (!leaving) return;
+    const exit = rootRef.current
+      ?.getAnimations()
+      .find((animation) => 'animationName' in animation && animation.animationName === 'toast-out');
+    if (!exit) {
+      onCloseRef.current?.();
+      return;
+    }
+    let live = true;
+    exit.finished.then(
+      () => live && onCloseRef.current?.(),
+      () => {}
+    );
+    return () => {
+      live = false;
+    };
+  }, [leaving]);
+
   const risenFor = useRef(occurrence);
   useLayoutEffect(() => {
     if (occurrence === risenFor.current) return;
@@ -158,7 +182,8 @@ export function Toast({
     <div
       ref={rootRef}
       className={cx(
-        'toast-in bg-panel-2 text-text flex items-center gap-3 rounded-xs border px-4 py-2 text-sm shadow-[0_8px_24px_rgb(0_0_0/0.6)]',
+        leaving ? 'toast-out' : 'toast-in',
+        'bg-panel-2 text-text flex items-center gap-3 rounded-xs border px-4 py-2 text-sm shadow-[0_8px_24px_rgb(0_0_0/0.6)]',
         toned?.border ?? 'border-line-bright',
         stacked
           ? 'pointer-events-auto max-w-full'

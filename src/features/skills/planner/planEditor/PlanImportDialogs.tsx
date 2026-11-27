@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { Button, Modal } from '@/components/ui';
+import { DialogFooter } from '@/components/ui/DialogFooter';
 import type { TrainedSkill } from '@/engine/types';
 import { ImportClipboardDialog } from '../ImportClipboardDialog';
 import type { usePlanImport } from './usePlanImport';
@@ -50,17 +51,17 @@ export function PlanImportDialogs({
         <p className="text-xs text-text-dim">
           {t('plans.importQueueChoiceBody', { count: pendingQueueImport?.length ?? 0 })}
         </p>
-        <div className="mt-2 flex gap-2">
-          <Button variant="primary" size="md" onClick={confirmQueueImportAppend}>
-            {t('plans.importQueueAppend')}
+        <DialogFooter className="mt-3">
+          <Button size="md" onClick={() => setPendingQueueImport(null)}>
+            {t('plans.importCancel')}
           </Button>
           <Button variant="danger" size="md" onClick={confirmQueueImportReplace}>
             {t('plans.importQueueReplace')}
           </Button>
-          <Button size="md" onClick={() => setPendingQueueImport(null)}>
-            {t('plans.importCancel')}
+          <Button variant="primary" size="md" onClick={confirmQueueImportAppend}>
+            {t('plans.importQueueAppend')}
           </Button>
-        </div>
+        </DialogFooter>
       </Modal>
     </>
   );

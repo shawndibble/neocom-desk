@@ -1,12 +1,13 @@
 import { useEffect, useId, useMemo, useState, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, TextInput } from '@/components/ui';
+import { Button, TextInput, Field, Fields } from '@/components/ui';
 import { CharacterAvatar } from '@/components/ui/CharacterAvatar';
 import { rowInteractiveClassName } from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
 import { Pill } from '@/components/ui/Pill';
 import { formatAge } from '@/lib/age';
 import { cx } from '@/lib/cx';
+import { Well } from '@/components/ui/Well';
 import { matchParts, narrowMembers, pickable, type RosterMember } from './reviewRoster';
 
 function useMemberLine() {
@@ -69,43 +70,40 @@ export function MemberCombobox({ members, query, onQuery, onPick, inputRef }: Me
   };
   return (
     <div className="space-y-1.5">
-      <label className="block space-y-1">
-        <span className="text-xs text-text-dim">{t('vetting.member.label')}</span>
-        <span className="relative block">
-          <Icon.Search
-            aria-hidden="true"
-            size={Icon.ICON_SIZE.md}
-            className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-text-dim"
-          />
-          <TextInput
-            ref={inputRef}
-            role="combobox"
-            aria-expanded={!none}
-            aria-controls={none ? undefined : listId}
-            aria-autocomplete="list"
-            aria-activedescendant={none ? undefined : `${listId}-${current}`}
-            className="w-full pl-8"
-            placeholder={t('vetting.member.search', { count: members.length })}
-            value={query}
-            onChange={(event) => {
-              onQuery(event.target.value);
-              setActive(0);
-            }}
-            onKeyDown={keys}
-            autoComplete="off"
-            spellCheck={false}
-          />
-        </span>
-      </label>
+      <Fields variant="stacked">
+        <Field label={t('vetting.member.label')}>
+          <span className="relative block">
+            <Icon.Search
+              aria-hidden="true"
+              size={Icon.ICON_SIZE.md}
+              className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-text-dim"
+            />
+            <TextInput
+              ref={inputRef}
+              role="combobox"
+              aria-expanded={!none}
+              aria-controls={none ? undefined : listId}
+              aria-autocomplete="list"
+              aria-activedescendant={none ? undefined : `${listId}-${current}`}
+              className="w-full pl-8"
+              placeholder={t('vetting.member.search', { count: members.length })}
+              value={query}
+              onChange={(event) => {
+                onQuery(event.target.value);
+                setActive(0);
+              }}
+              onKeyDown={keys}
+              autoComplete="off"
+              spellCheck={false}
+            />
+          </span>
+        </Field>
+      </Fields>
       {none ? (
-        <div
-          id={listId}
-          role="status"
-          className="space-y-1 rounded-xs border border-line bg-panel-2 px-3 py-3 text-sm"
-        >
+        <Well size="lg" id={listId} role="status" className="space-y-1 text-sm">
           <p className="font-semibold">{t('vetting.member.noMatch', { name: query.trim() })}</p>
           <p className="text-xs text-text-dim">{t('vetting.member.noMatchHint')}</p>
-        </div>
+        </Well>
       ) : (
         <>
           <ul
@@ -166,7 +164,7 @@ export function PickedMember({ member, onChange }: { member: RosterMember; onCha
   return (
     <div className="space-y-1">
       <span className="block text-xs text-text-dim">{t('vetting.member.label')}</span>
-      <div className="flex items-center gap-3 rounded-xs border border-line bg-panel-2 px-3 py-2">
+      <Well size="wide" className="flex items-center gap-3">
         <CharacterAvatar characterId={member.characterId} size="md" />
         <span className="min-w-0 flex-1">
           <span className="block truncate text-sm font-semibold">{member.name}</span>
@@ -175,7 +173,7 @@ export function PickedMember({ member, onChange }: { member: RosterMember; onCha
         <Button size="sm" onClick={onChange}>
           {t('vetting.member.change')}
         </Button>
-      </div>
+      </Well>
     </div>
   );
 }

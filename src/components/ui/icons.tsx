@@ -227,6 +227,7 @@ export const ShowLabels = withWeight(TextAa);
 
 export const ScheduledPush = withWeight(Broadcast);
 export const PriceAlert = withWeight(Target);
+export const StockTargets = withWeight(Target);
 export const ExpandAll = withWeight(CaretDoubleDown);
 export const CollapseAll = withWeight(CaretDoubleUp);
 

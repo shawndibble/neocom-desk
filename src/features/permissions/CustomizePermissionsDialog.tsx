@@ -4,6 +4,7 @@ import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Modal, Checkbox, NeedsConnection } from '@/components/ui';
 import { InlineError } from '@/components/ui/InlineError';
+import { DialogFooter } from '@/components/ui/DialogFooter';
 import { beginCustomizedAddCharacterLogin } from '@/app/loginFlow';
 import { PERMISSIONS, SCOPE_GROUPS, WRITE_GROUPS, type ScopeGroup } from '@/esi/registry';
 import { useCustomizePermissionsSelection } from './customizeSelection';
@@ -97,22 +98,26 @@ export function CustomizePermissionsDialog({
       title={title ?? t('permissions.customize.title')}
       placement="wide"
       footer={
-        <div className="flex flex-wrap gap-2">
-          {loginFailed && <InlineError>{t('permissions.customize.loginFailed')}</InlineError>}
-          <NeedsConnection>
-            <Button
-              variant="primary"
-              loading={submitting}
-              aria-disabled={locked || undefined}
-              onClick={() => void submit()}
-            >
-              {t('permissions.customize.submit')}
+        <>
+          {loginFailed && (
+            <InlineError className="mb-2">{t('permissions.customize.loginFailed')}</InlineError>
+          )}
+          <DialogFooter>
+            <Button onClick={handleClose} aria-disabled={submitting || undefined}>
+              {t('common.cancel')}
             </Button>
-          </NeedsConnection>
-          <Button onClick={handleClose} aria-disabled={submitting || undefined}>
-            {t('common.cancel')}
-          </Button>
-        </div>
+            <NeedsConnection>
+              <Button
+                variant="primary"
+                loading={submitting}
+                aria-disabled={locked || undefined}
+                onClick={() => void submit()}
+              >
+                {t('permissions.customize.submit')}
+              </Button>
+            </NeedsConnection>
+          </DialogFooter>
+        </>
       }
     >
       <div className="space-y-4 text-sm">

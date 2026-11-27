@@ -284,7 +284,7 @@ export function StockMarketPage({
           <h2
             data-stock-market-title
             tabIndex={-1}
-            className="text-lg font-semibold [overflow-wrap:anywhere] focus:outline-none"
+            className="text-xl font-semibold [overflow-wrap:anywhere] focus:outline-none"
           >
             {list.name}
           </h2>

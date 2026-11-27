@@ -1,7 +1,7 @@
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, EmptyState, InfoTooltip, IskAmount, LiveNote, TypeIcon } from '@/components/ui';
+import { Button, EmptyState, InfoTooltip, IskAmount, TypeIcon, Spinner } from '@/components/ui';
 import { ItemInfoLink } from '@/features/entities';
 import { loadTypeNames } from '@/features/character/typeNames';
 import { ratioMeterColor } from '@/engine/pilotList/meterColor';
@@ -11,6 +11,7 @@ import { zkillFailureKey } from '@/lib/zkillFailureKey';
 import type { PilotStats, PilotStatsResult, PilotTopShip } from '@/lib/zkillboard';
 import { killerRatio, type StatTileItem } from './zkillFigures';
 import { formatNumber } from '@/lib/numberLocale';
+import { Well } from '@/components/ui/Well';
 
 const NO_HISTORY_HINT = {
   pilot: 'travel.pilot.noHistoryHint',
@@ -27,7 +28,7 @@ export function StatTiles({ items, className }: { items: StatTileItem[]; classNa
   return (
     <dl className={cx('grid grid-cols-2 gap-3 sm:grid-cols-3', className)}>
       {items.map(({ label, value, isk, help, tone }) => (
-        <div key={label} className="min-w-0 rounded-xs border border-line bg-panel-2 px-3 py-2">
+        <Well size="wide" key={label} className="min-w-0">
           <dt className={termClassName}>
             <span className="truncate">{label}</span>
             {help && (
@@ -46,7 +47,7 @@ export function StatTiles({ items, className }: { items: StatTileItem[]; classNa
           >
             {isk === undefined ? value : <IskAmount value={isk} />}
           </dd>
-        </div>
+        </Well>
       ))}
     </dl>
   );
@@ -63,7 +64,7 @@ export function ZkillStatsStatus({
 }): ReactNode {
   const { t } = useTranslation();
   if (stats === null) {
-    return <LiveNote className="text-text-dim">{t('travel.pilot.statsLoading')}</LiveNote>;
+    return <Spinner size="sm" showLabel label={t('travel.pilot.statsLoading')} />;
   }
   if (stats.kind === 'failed') {
     return (

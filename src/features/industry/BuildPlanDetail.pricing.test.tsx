@@ -324,7 +324,7 @@ describe('BuildPlanDetail Break Even button', () => {
       systemCostIndex: 0.05,
     });
   }
-  const breakEvenButton = () => screen.findByRole('button', { name: 'Break Even' });
+  const breakEvenButton = () => screen.findByRole('button', { name: 'Min. runs' });
 
   afterEach(() => {
     breakEvenRuns.mockReset();
@@ -376,7 +376,7 @@ describe('BuildPlanDetail Break Even button', () => {
 
     await screen.findByRole('button', { name: /^Edit price for Tritanium,/ });
     await waitFor(() =>
-      expect(screen.queryByRole('button', { name: 'Break Even' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Min. runs' })).not.toBeInTheDocument()
     );
   });
 

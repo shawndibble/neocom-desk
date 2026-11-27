@@ -131,14 +131,25 @@ export function MapPhone(props: MapPhoneProps) {
             const rank = props.pickRanks.get(product.typeId);
             const traced = props.tracedId === product.typeId;
             const isNew = newIds.has(product.typeId);
+            const versusName =
+              figure.kind === 'ranked' && !figure.isReference && figure.verdict !== null
+                ? figure.versus?.name
+                : undefined;
             const sentence = [
               product.tier === 0
                 ? t('piMap.rawYields', {
                     types: product.hosts.map((type) => planetName(t, type)).join(', '),
                   })
-                : comparisonSentence(t, figure),
+                : versusName !== undefined
+                  ? t('piMap.cmp.vs', { name: versusName })
+                  : comparisonSentence(t, figure),
             ].filter(Boolean);
-            const exact = figureSentence(t, figure);
+            const exact = [
+              versusName !== undefined ? comparisonSentence(t, figure) : null,
+              figureSentence(t, figure),
+            ]
+              .filter(Boolean)
+              .join('. ');
             return (
               <li key={product.typeId}>
                 <Link

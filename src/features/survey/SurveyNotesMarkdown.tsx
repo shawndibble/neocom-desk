@@ -67,7 +67,7 @@ export default function SurveyNotesMarkdown({ notes }: { notes: string }) {
             ) : (
               <>{children}</>
             ),
-          h1: heading('h3', 'text-lg'),
+          h1: heading('h3', 'text-xl'),
           h2: heading('h3', 'text-base'),
           h3: heading('h4', 'text-sm'),
           h4: heading('h4', 'text-sm'),

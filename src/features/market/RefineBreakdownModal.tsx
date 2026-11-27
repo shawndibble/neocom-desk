@@ -1,3 +1,4 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useState, type ReactNode } from 'react';
 import { facilityBaseYieldFor } from '@/engine/industry/refiningSetup';
 import { InlinePercent } from '@/features/refining/InlinePercent';
@@ -658,7 +659,7 @@ export function RefineBreakdownModal({
   );
 }
 
-const SECTION_HEADING = 'text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase';
+const SECTION_HEADING = eyebrowClassName;
 
 function SetupBox({
   label,
@@ -674,7 +675,7 @@ function SetupBox({
   const { t } = useTranslation();
   return (
     <div className="flex min-w-0 flex-col gap-0.5 rounded-xs border border-line bg-panel px-2.5 py-1.5">
-      <span className="flex items-center gap-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+      <span className={`${eyebrowClassName} flex items-center gap-1`}>
         {label}
         <InfoTooltip label={t('common.aboutLabel', { label })} content={tooltip} />
       </span>

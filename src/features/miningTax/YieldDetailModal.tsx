@@ -51,7 +51,7 @@ const CARD = 'min-w-0 rounded-xs border bg-panel-2 p-2 sm:p-2.5';
 const CARD_SUGGESTED = 'border-accent-dim bg-accent/5';
 const CARD_LABEL =
   'min-h-8 text-[0.6875rem] leading-4 font-semibold tracking-wider uppercase sm:min-h-0 sm:tracking-widest';
-const CARD_FIGURE = 'mt-1 text-lg font-semibold tabular-nums sm:text-xl';
+const CARD_FIGURE = 'mt-1 text-base font-semibold tabular-nums sm:text-xl';
 const CARD_HINT = 'mt-0.5 break-words text-[0.6875rem] text-text-dim';
 const TABLE_TITLE =
   'flex items-center justify-between gap-2 border-b border-line bg-panel-2 py-1.5 pr-1 pl-2.5';

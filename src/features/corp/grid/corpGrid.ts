@@ -43,7 +43,7 @@ export const CORP_DEFAULT_SEEDS: readonly WidgetSeed[] = [
   onAll('corpJobs'),
   onAll('corpWallet'),
   presetSeed('corpCashFlow'),
-  'corpMembers',
+  { kind: 'corpMembers', view: 'chart' },
   'corpInactive',
   presetSeed('corpIncome'),
   'corpMining',

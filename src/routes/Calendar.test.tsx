@@ -449,7 +449,7 @@ describe('Calendar', () => {
 
     await user.click(screen.getByRole('button', { name: 'Next month' }));
     await waitFor(() => expect(window.location.search).toMatch(/anchor=\d{4}-\d{2}-\d{2}/));
-    const monthLabel = screen.getByText(/\d{4}/, { selector: 'span.hidden' });
+    const monthLabel = screen.getByText(/^[A-Z][a-z]+ \d{4}$/);
     const shownMonth = monthLabel.textContent;
 
     unmount();

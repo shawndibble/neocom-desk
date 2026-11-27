@@ -945,7 +945,7 @@ describe('LoyaltyStore switching stores through the search', () => {
 
   it('lands on the Stores view with no store chosen, loading no store offers', () => {
     renderAt('/loyalty');
-    expect(screen.getByRole('heading', { level: 1, name: 'LP Store' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: 'Wallet' })).toBeInTheDocument();
     expect(screen.getByRole('searchbox', { name: 'Search LP Stores' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Stores', pressed: true })).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Change store' })).not.toBeInTheDocument();

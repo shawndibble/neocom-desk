@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useEndpointsGranted } from '@/app/useGrantedScopes';
 import { TextInput } from '@/components/ui';
-import { activeOptionClassName } from '@/components/ui/controlStyles';
+import { activeOptionClassName, rowInteractiveClassName } from '@/components/ui/controlStyles';
 import { useCombobox } from '@/lib/useCombobox';
 import { cx } from '@/lib/cx';
 import { LOOKUP_DEBOUNCE_MS } from '@/lib/useDebouncedValue';
@@ -141,7 +141,7 @@ export function PayeeNameField({
               {...combo.optionProps(i)}
               className={cx(
                 'flex cursor-pointer items-baseline justify-between gap-2 px-3 py-1.5 text-xs text-text',
-                'hover:bg-panel-2',
+                rowInteractiveClassName,
                 i === combo.activeIndex && `bg-panel-2 ${activeOptionClassName}`
               )}
               onMouseEnter={() => combo.setHighlight(i)}

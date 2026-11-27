@@ -9,6 +9,8 @@ import {
   SegmentedControl,
   TextArea,
   TextInput,
+  Field,
+  Fields,
 } from '@/components/ui';
 import type { MinerRow } from '@/engine/corpTaxBook/bookView';
 import { previewMinerPayment } from '@/engine/corpTaxBook/paymentPreview';
@@ -36,10 +38,9 @@ import { PAYMENT_NOTE_MAX } from '../../../../functions/src/corpTaxBookKinds';
 
 export function Label({ text, children }: { text: ReactNode; children: ReactNode }) {
   return (
-    <label className="block space-y-1">
-      <span className="block text-xs text-text-dim">{text}</span>
-      {children}
-    </label>
+    <Fields variant="stacked">
+      <Field label={text}>{children}</Field>
+    </Fields>
   );
 }
 

@@ -294,7 +294,7 @@ describe('Widget states', () => {
     );
     expect(within(region).getByText(/Last updated 5m ago/)).toBeInTheDocument();
     expect(within(region).getByText('7').closest('.text-text-dim')).not.toBeNull();
-    await user.click(within(region).getByRole('button', { name: 'Retry' }));
+    await user.click(within(region).getByRole('button', { name: 'Try again' }));
     expect(refresh).toHaveBeenCalledTimes(1);
   });
 
@@ -617,7 +617,7 @@ describe('Kills and losses widget', () => {
       expect(within(region).getByRole('status')).toHaveTextContent('Could not load')
     );
     expect(within(region).getByText('1').closest('.text-text-dim')).not.toBeNull();
-    await user.click(within(region).getByRole('button', { name: 'Retry' }));
+    await user.click(within(region).getByRole('button', { name: 'Try again' }));
     expect(refresh).toHaveBeenCalledTimes(1);
   });
 });

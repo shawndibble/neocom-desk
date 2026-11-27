@@ -1,3 +1,4 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { Fragment, useMemo } from 'react';
 import { MD_UP_QUERY, useMediaQuery } from '@/lib/useMediaQuery';
 import {
@@ -128,7 +129,9 @@ export function EntryList({
       <SortableContext items={sortableIds} strategy={verticalListSortingStrategy}>
         <div className="rounded-xs border border-line">
           {isDesktop && (columns.perLevelTime || columns.cumulativeTime) && (
-            <div className="flex items-center justify-between gap-2 border-b border-line px-2 py-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+            <div
+              className={`${eyebrowClassName} flex items-center justify-between gap-2 border-b border-line px-2 py-1`}
+            >
               <span className="flex-1" />
               {columns.perLevelTime && <span className={TIME_CELL}>{t('plans.columnTakes')}</span>}
               {columns.cumulativeTime && (

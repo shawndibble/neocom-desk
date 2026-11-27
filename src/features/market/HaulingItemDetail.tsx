@@ -179,7 +179,7 @@ function OrderTable({
       <Label>{title}</Label>
       <table className="w-full text-sm tabular-nums">
         <thead>
-          <tr className="text-left text-[0.6875rem] tracking-wider text-text-dim uppercase">
+          <tr className="text-left text-[0.6875rem] tracking-widest text-text-dim uppercase">
             <th className="py-0.5 font-semibold">{t('market.hauling.detail.colPrice')}</th>
             <th className="py-0.5 text-right font-semibold">
               {t('market.hauling.detail.colUnits')}

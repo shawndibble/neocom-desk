@@ -103,7 +103,7 @@ async function open() {
   const user = userEvent.setup();
   render(
     <MemoryRouter>
-      <MovePlanTab onClose={() => {}} characterIds={[1]} activeCharacterId={1} />
+      <MovePlanTab characterIds={[1]} activeCharacterId={1} />
     </MemoryRouter>
   );
   await screen.findByText('Alice');
@@ -143,7 +143,6 @@ function openCorp(entry = '/') {
   render(
     <MemoryRouter initialEntries={[entry]}>
       <MovePlanTab
-        onClose={() => {}}
         characterIds={[]}
         activeCharacterId={1}
         corp={{ pilotId: 1, name: 'Corporation hangars', inputs: corpInputs, version: '1' }}
@@ -165,7 +164,6 @@ describe('MovePlanTab for a corporation', () => {
     render(
       <MemoryRouter>
         <MovePlanTab
-          onClose={() => {}}
           characterIds={[]}
           activeCharacterId={1}
           corp={{ pilotId: 1, name: 'Corporation hangars', inputs: [corpInputs[2]!], version: '1' }}
@@ -216,7 +214,6 @@ describe('MovePlanTab', () => {
     render(
       <MemoryRouter>
         <MovePlanTab
-          onClose={() => {}}
           characterIds={[1, 2]}
           activeCharacterId={1}
           onSkippedChange={onSkippedChange}
@@ -233,7 +230,7 @@ describe('MovePlanTab', () => {
     skippedCharacters.noEntries = true;
     render(
       <MemoryRouter>
-        <MovePlanTab onClose={() => {}} characterIds={[1]} activeCharacterId={1} />
+        <MovePlanTab characterIds={[1]} activeCharacterId={1} />
       </MemoryRouter>
     );
     expect(await screen.findByText(/assets haven't loaded yet/)).toBeInTheDocument();
@@ -261,7 +258,7 @@ describe('MovePlanTab', () => {
   function openAt(entry: string) {
     render(
       <MemoryRouter initialEntries={[entry]}>
-        <MovePlanTab onClose={() => {}} characterIds={[1]} activeCharacterId={1} />
+        <MovePlanTab characterIds={[1]} activeCharacterId={1} />
       </MemoryRouter>
     );
   }
@@ -290,7 +287,7 @@ describe('MovePlanTab', () => {
     const user = userEvent.setup();
     render(
       <MemoryRouter initialEntries={['/']}>
-        <MovePlanTab onClose={() => {}} characterIds={[1]} activeCharacterId={1} />
+        <MovePlanTab characterIds={[1]} activeCharacterId={1} />
       </MemoryRouter>
     );
     await screen.findByText('Alice');

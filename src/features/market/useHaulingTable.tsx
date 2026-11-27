@@ -240,7 +240,7 @@ export function useHaulingTable({
       className: 'tabular-nums whitespace-nowrap',
       cardCorner: true,
       cellClassName: (row) =>
-        iskGains(lineOf.get(row.typeId)?.profit ?? 0, 0) ? 'text-success' : 'text-text-dim',
+        iskGains(lineOf.get(row.typeId)?.profit ?? 0, 0) ? 'text-isk-pos' : 'text-text-dim',
       sortValue: (row) => suggestedProfitOf.get(row.typeId) ?? 0,
       render: (row) => {
         const line = lineOf.get(row.typeId);
@@ -277,7 +277,7 @@ export function useHaulingTable({
       align: 'right',
       className: 'tabular-nums whitespace-nowrap',
       cellClassName: (row) =>
-        row.marginPct >= HAULING_THRESHOLDS.lowMarginPct ? 'text-success' : 'text-text-dim',
+        row.marginPct >= HAULING_THRESHOLDS.lowMarginPct ? 'text-isk-pos' : 'text-text-dim',
       sortValue: (row) => row.marginPct,
       render: (row) => formatSignedPct(row.marginPct, 1),
     },

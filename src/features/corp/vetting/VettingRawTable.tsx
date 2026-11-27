@@ -21,6 +21,7 @@ import {
   textActionClassName,
   type DataTableColumn,
   type DataTableSort,
+  Spinner,
 } from '@/components/ui';
 import type { ActiveFilter } from '@/components/ui/activeFilters';
 import type { VettingFlag, VettingRawSource } from '@/engine/vetting';
@@ -470,7 +471,7 @@ export function VettingRawTable({
   const empty = !data.loading && !data.failed && !short && scope.length === 0;
   let body;
   if (waiting) {
-    body = <p className="p-3 text-sm text-text-dim">{t('common.loading')}</p>;
+    body = <Spinner size="sm" showLabel className="p-3 text-sm" />;
   } else if (empty || scope.length === 0) {
     body = !empty ? null : (
       <EmptyState

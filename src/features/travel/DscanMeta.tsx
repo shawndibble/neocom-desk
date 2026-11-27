@@ -1,7 +1,7 @@
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useEffect, useState } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
-import { IskAmount } from '@/components/ui';
+import { IskAmount, Spinner } from '@/components/ui';
 import type { HoleSizeRead } from '@/engine/pilotList/dscanHoleSize';
 import { buildWorth, diffHulls, type HullCount } from '@/engine/pilotList/dscanWorth';
 import { useMarketHub } from '@/features/market/hub';
@@ -78,7 +78,7 @@ function WorthCard({
     <section aria-label={t('travel.pilot.dscan.worth.title')} className={cardClassName}>
       <h3 className={captionClassName}>{t('travel.pilot.dscan.worth.title')}</h3>
       {worth === null ? (
-        <p className="text-sm text-text-dim">{t('common.loading')}</p>
+        <Spinner size="sm" showLabel className="text-sm" />
       ) : (
         <table className="w-full text-sm">
           <tbody>
@@ -156,7 +156,7 @@ function SinceLastScanCard({
     <section aria-label={t('travel.pilot.dscan.since.title')} className={cardClassName}>
       <h3 className={captionClassName}>{t('travel.pilot.dscan.since.title')}</h3>
       {previous === undefined ? (
-        <p className="text-sm text-text-dim">{t('common.loading')}</p>
+        <Spinner size="sm" showLabel className="text-sm" />
       ) : diff === null ? (
         <p className="text-sm text-text-dim">{t('travel.pilot.dscan.since.none')}</p>
       ) : diff.length === 0 ? (

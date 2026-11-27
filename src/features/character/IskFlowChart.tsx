@@ -45,7 +45,7 @@ export function IskFlowChart({ rows, filter, onFilterChange }: IskFlowChartProps
   return (
     <section aria-label={heading} className="space-y-1">
       <div className="flex items-center justify-between gap-2">
-        <h3 className="min-w-0 text-xs font-semibold uppercase tracking-wide text-text-dim">
+        <h3 className="min-w-0 text-xs font-semibold uppercase tracking-widest text-text-dim">
           {heading}
         </h3>
         <Button

@@ -11,13 +11,30 @@ interface EmptyStateProps {
   action?: ReactNode;
   /** @summary ARIA role for the wrapper; `alert` for a failed read. */
   role?: 'alert';
+  /** @summary `inline`: one dim 12px line for an empty sub-list or dialog list; the title only. */
+  variant?: 'block' | 'inline';
   className?: string;
 }
 
 /**
  * @summary Centred title, hint and optional action for a view with nothing to show.
  */
-export function EmptyState({ title, hint, icon, action, role, className = '' }: EmptyStateProps) {
+export function EmptyState({
+  title,
+  hint,
+  icon,
+  action,
+  role,
+  variant = 'block',
+  className = '',
+}: EmptyStateProps) {
+  if (variant === 'inline') {
+    return (
+      <p role={role} className={`text-xs text-text-dim ${className}`}>
+        {title}
+      </p>
+    );
+  }
   return (
     <div
       role={role}

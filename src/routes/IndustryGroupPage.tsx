@@ -28,6 +28,7 @@ import type { BuildStrategy } from '@/engine/industry/autoMakeOrBuy';
 import type { OwnedStockScope } from '@/engine/industry/types';
 import { ItemActionsProvider } from '@/features/market/ItemActionsProvider';
 import { usePageItemActions } from '@/features/market/usePageItemActions';
+import { useDocumentTitleName } from '@/app/documentTitleName';
 import type { BlueprintPasteNoticeState } from '@/lib/shortcuts';
 
 const NO_PLANS: BuildPlanRecord[] = [];
@@ -75,6 +76,11 @@ export function IndustryGroupPage() {
       .toArray();
   }, [activeCharacterId, groupId]);
   const plans = plansQuery ?? NO_PLANS;
+  useDocumentTitleName(
+    activeCharacterId === null
+      ? null
+      : buildGroupsFor(workspace.buildGroups, activeCharacterId).find((g) => g.id === groupId)?.name
+  );
 
   async function handleRetargetGroup(
     target: Parameters<typeof retargetBuildGroup>[1],

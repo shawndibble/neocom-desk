@@ -33,3 +33,6 @@ export const WithIcon: Story = {
 
 /** @summary Title only: the shortest form, for a small panel. */
 export const TitleOnly: Story = { args: { title: 'No orders' } };
+
+/** @summary Inline: one dim line for an empty sub-list or a list inside a dialog. */
+export const Inline: Story = { args: { title: 'No implants plugged in.', variant: 'inline' } };

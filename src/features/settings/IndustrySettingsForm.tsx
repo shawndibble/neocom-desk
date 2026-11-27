@@ -72,6 +72,7 @@ export function IndustrySettingsForm({ onlyAssumedMe = false }: { onlyAssumedMe?
             <Field label={t('settings.profitBasisLabel')} note={t('settings.profitBasisHint')}>
               <SegmentedControl
                 label={t('settings.profitBasisLabel')}
+                uppercase={false}
                 options={[
                   { value: 'sellValue', label: t('settings.profitBasisSellPrice') },
                   { value: 'free', label: t('settings.profitBasisFree') },

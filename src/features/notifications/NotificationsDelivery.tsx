@@ -13,6 +13,7 @@ import { webPushSupport } from '@/sync/webPushSupport';
 import { androidNotificationSettingsUrl, isPlayStoreApp } from '@/lib/playStoreApp';
 import { assignLocation } from '@/app/navigation';
 import { useHydratedStore } from '@/lib/useHydratedStore';
+import { Well } from '@/components/ui/Well';
 import { AlertsWhenClosedSection } from './AlertsWhenClosedSection';
 import { enableWebPush } from './webPush';
 import { usePushFailure } from './pushFailure';
@@ -77,7 +78,7 @@ export function NotificationsDelivery({
     <>
       {browserBlocked &&
         (inPlayStoreApp ? (
-          <div className="space-y-2 rounded-xs border border-warning/60 bg-warning/10 px-3 py-2">
+          <Well tone="warning" size="wide" className="space-y-2">
             <LiveNote className="text-xs text-warning">
               {t('settings.notifications.blockedNoticePlayApp')}
             </LiveNote>
@@ -88,14 +89,14 @@ export function NotificationsDelivery({
             >
               {t('settings.notifications.openAndroidSettings')}
             </Button>
-          </div>
+          </Well>
         ) : (
           <LiveNote className="rounded-xs border border-warning/60 bg-warning/10 px-3 py-2 text-xs text-warning">
             {t('settings.notifications.blockedNotice')}
           </LiveNote>
         ))}
       {pushFailure && permission === 'granted' && (
-        <div className="flex flex-wrap items-center gap-2 rounded-xs border border-warning/60 bg-warning/10 px-3 py-2">
+        <Well tone="warning" size="wide" className="flex flex-wrap items-center gap-2">
           <LiveNote className="min-w-0 flex-1 text-xs text-warning">
             {t(`settings.notifications.pushFailed.${pushFailure.reason}`)}{' '}
             {t('settings.notifications.pushFailedAt', {
@@ -110,17 +111,17 @@ export function NotificationsDelivery({
           >
             {t('settings.notifications.pushRetryButton')}
           </Button>
-        </div>
+        </Well>
       )}
       {installRequired && (permission === 'default' || permission === 'unsupported') && (
         <>
           <LiveStatus>{t('settings.notifications.installRequiredNotice')}</LiveStatus>
-          <p className="rounded-xs border border-line bg-panel-2 px-3 py-2 text-xs text-text-dim">
+          <Well as="p" size="wide" className="text-xs text-text-dim">
             {t('settings.notifications.installRequiredNotice')}{' '}
             <Link to={tabPath(SETTINGS_TABS, 'app')} className={inlineLinkClassName}>
               {t('settings.notifications.installRequiredLink')}
             </Link>
-          </p>
+          </Well>
         </>
       )}
     </>

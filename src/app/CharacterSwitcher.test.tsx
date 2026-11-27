@@ -9,6 +9,9 @@ import { scopesForGroup } from '@/esi/scopes';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { seedCharacter, seedGrant } from '@/test/seed';
 import { CharacterSwitcher } from './CharacterSwitcher';
+import { beginAddCharacterLogin } from './loginFlow';
+
+vi.mock('./loginFlow', () => ({ beginAddCharacterLogin: vi.fn(async () => undefined) }));
 
 const TOTAL = COUNTED_PERMISSIONS.length;
 
@@ -97,6 +100,13 @@ describe('CharacterSwitcher', () => {
       'href',
       '/characters'
     );
+  });
+
+  it('starts the add-character login from the list', async () => {
+    show();
+    await userEvent.click(await screen.findByRole('button', { name: 'Characters' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Add character' }));
+    expect(beginAddCharacterLogin).toHaveBeenCalledTimes(1);
   });
 
   it('renders nothing for a single Character', async () => {

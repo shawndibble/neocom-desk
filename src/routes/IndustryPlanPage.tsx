@@ -19,6 +19,7 @@ import { applyBuildPlanChange } from '@/features/industry/buildPlanStore';
 import type { JobProductionSeed } from '@/features/industry/logProductionFromJob';
 import { ItemActionsProvider } from '@/features/market/ItemActionsProvider';
 import { usePageItemActions } from '@/features/market/usePageItemActions';
+import { useDocumentTitleName } from '@/app/documentTitleName';
 
 export function IndustryPlanPage() {
   const { t } = useTranslation();
@@ -59,6 +60,7 @@ export function IndustryPlanPage() {
     return { plan: await db.buildPlans.get(planId) };
   }, [planId]);
   const buildGroupId = planQuery?.plan?.buildGroupId;
+  useDocumentTitleName(planQuery?.plan?.name);
   const groupMembers = useLiveQuery(async () => {
     if (activeCharacterId === null || buildGroupId === undefined) return [];
     return db.buildPlans

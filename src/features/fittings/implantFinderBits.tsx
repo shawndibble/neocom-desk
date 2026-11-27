@@ -10,7 +10,7 @@ export function SectionHeading({ children, warning }: { children: ReactNode; war
 
 export function SuccessBadge({ children }: { children: ReactNode }) {
   return (
-    <span className="rounded-xs bg-success px-1.5 text-[0.6875rem] font-bold tracking-wider text-accent-contrast uppercase">
+    <span className="rounded-xs bg-success px-1.5 text-[0.6875rem] font-bold tracking-widest text-accent-contrast uppercase">
       {children}
     </span>
   );

@@ -3,6 +3,7 @@ import { useTimeZone } from '@/lib/timeFormat';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { CheckboxSelect, FilterChip, Panel, RowCaret, Tooltip } from '@/components/ui';
+import { rowInteractiveClassName } from '@/components/ui/controlStyles';
 import { useIsPhone } from '@/lib/useIsPhone';
 import type { ExtractionRow } from '@/engine/corpTaxBook/bookView';
 import type { ExtractionState } from '@/engine/corpTaxBook/extraction';
@@ -177,7 +178,10 @@ function TimelineBody({ shown, now }: { shown: readonly ExtractionRow[]; now: nu
             <Link
               key={e.id}
               to={extractionPath(e.id)}
-              className="group flex flex-col gap-1 rounded-xs py-0.5 hover:bg-panel-2 sm:flex-row sm:items-center sm:gap-0"
+              className={cx(
+                'group flex flex-col gap-1 rounded-xs py-0.5 sm:flex-row sm:items-center sm:gap-0',
+                rowInteractiveClassName
+              )}
             >
               <span
                 className={cx(

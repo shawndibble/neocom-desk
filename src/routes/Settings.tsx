@@ -18,12 +18,7 @@ import { checkForUpdate } from '@/app/updateAvailable';
 import { checkStorageAtRisk } from '@/features/settings/storageAtRisk';
 import { InstallAppPanel } from '@/features/settings/InstallAppPanel';
 import { TravelSettingsPanel } from '@/features/settings/TravelSettingsPanel';
-import {
-  CheckboxField,
-  ChipRow,
-  SegmentedRow,
-  SettingsScopeHint,
-} from '@/features/settings/settingsFields';
+import { CheckboxField, SegmentedRow, SettingsScopeHint } from '@/features/settings/settingsFields';
 import { ActivityLogPanel } from '@/features/settings/ActivityLogPanel';
 import { DataAgePanel } from '@/features/settings/DataAgePanel';
 import { ExportPanel } from '@/features/settings/ExportPanel';
@@ -40,7 +35,7 @@ import { CorpDefaultsPanel } from '@/features/settings/CorpDefaultsPanel';
 import { FONT_SCALE_LABEL_KEYS } from '@/features/settings/fontScaleLabelKeys';
 import { usePhoneSummaries } from '@/features/settings/usePhoneSummaries';
 import { useHydratedStore } from '@/lib/useHydratedStore';
-import { Field, Fields, FilterChip, PageHeader, Panel } from '@/components/ui';
+import { Fields, PageHeader, Panel } from '@/components/ui';
 import { useFontScale, FONT_SCALE_STEPS } from '@/lib/fontScale';
 import { useSingleKeyShortcuts } from '@/lib/singleKeyShortcuts';
 import { NUMBER_FORMATS, useNumberFormat } from '@/lib/numberFormat';
@@ -119,29 +114,24 @@ export function Settings() {
       />
       <div className="space-y-4 lg:grid lg:grid-cols-[11rem_minmax(0,1fr)] lg:gap-6 lg:space-y-0">
         <SettingsNav groups={groups} value={section} />
-        <div className="min-w-0 space-y-4" data-settings-section={section}>
+        <div
+          className="min-w-0 max-w-5xl space-y-4 [--fields-label:14rem]"
+          data-settings-section={section}
+        >
           {section === 'display' && (
             <>
               <Panel>
                 <div className="space-y-4">
                   <SettingsScopeHint scope="device" />
                   <Fields variant="form">
-                    <Field label={t('settings.fontScaleLabel')} note={t('settings.fontScaleHint')}>
-                      <div
-                        role="group"
-                        aria-label={t('settings.fontScaleLabel')}
-                        className="flex flex-wrap gap-2"
-                      >
-                        {FONT_SCALE_STEPS.map((step) => (
-                          <FilterChip
-                            key={step}
-                            label={t(FONT_SCALE_LABEL_KEYS[step])}
-                            selected={scale === step}
-                            onToggle={() => void setScale(step)}
-                          />
-                        ))}
-                      </div>
-                    </Field>
+                    <SegmentedRow
+                      label={t('settings.fontScaleLabel')}
+                      hint={t('settings.fontScaleHint')}
+                      options={FONT_SCALE_STEPS}
+                      selected={scale}
+                      onSelect={(step) => void setScale(step)}
+                      labelFor={(step) => t(FONT_SCALE_LABEL_KEYS[step])}
+                    />
                     <SegmentedRow
                       label={t('settings.timeFormatLabel')}
                       hint={t('settings.timeFormatHint')}
@@ -150,17 +140,13 @@ export function Settings() {
                       onSelect={(format) => void setTimeFormat(format)}
                       labelFor={(format) => t(`settings.timeFormat.${format}`)}
                     />
-                    <ChipRow
+                    <SegmentedRow
                       label={t('settings.numberFormatLabel')}
                       hint={t('settings.numberFormatHint')}
                       options={NUMBER_FORMATS}
                       selected={numberFormat}
                       onSelect={(format) => void setNumberFormat(format)}
-                      labelFor={(format) =>
-                        t(`settings.numberFormat.${format}`, {
-                          example: numberFormatExample(format),
-                        })
-                      }
+                      labelFor={numberFormatExample}
                     />
                     {weekStartHydrated && (
                       <SegmentedRow

@@ -18,6 +18,7 @@ import {
   Tooltip,
   CachedNotice,
 } from '@/components/ui';
+import { rowInteractiveClassName } from '@/components/ui/controlStyles';
 import {
   buildLibraryRows,
   filterLibraryRows,
@@ -93,7 +94,7 @@ function LibraryGroup({
       <button
         type="button"
         aria-expanded={expanded}
-        className="flex min-h-9 w-full items-center gap-1 text-left text-xs font-medium hover:bg-panel-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
+        className={`flex min-h-9 w-full items-center gap-1 text-left text-xs font-medium ${rowInteractiveClassName} focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent`}
         style={{ paddingLeft: depth * 16 }}
         onClick={() => setOpen(!open)}
       >

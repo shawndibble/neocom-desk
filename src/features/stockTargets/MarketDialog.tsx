@@ -3,7 +3,7 @@ import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from 
 import { useTranslation } from 'react-i18next';
 import { useGrantedScopes } from '@/app/useGrantedScopes';
 import { Button, Checkbox, FieldError, Modal, TextInput } from '@/components/ui';
-import { tappableRowClassName } from '@/components/ui/controlStyles';
+import { rowInteractiveClassName, tappableRowClassName } from '@/components/ui/controlStyles';
 import type { StockTarget } from '@/engine/stockTargets/stockLists';
 import { ESI_REGISTRY } from '@/esi/registry';
 import { MIN_STRUCTURE_SEARCH_LENGTH, searchStructures } from '@/features/survey/surveyPlaces';
@@ -178,7 +178,9 @@ function MarketPlacePicker({
       className={cx(
         tappableRowClassName,
         'flex cursor-pointer flex-col justify-center border-l-2 px-3 py-1 text-sm',
-        index === active ? 'border-accent bg-panel-2' : 'border-transparent hover:bg-panel-2'
+        index === active
+          ? 'border-accent bg-panel-2'
+          : `border-transparent ${rowInteractiveClassName}`
       )}
       onMouseDown={(event) => event.preventDefault()}
       onClick={() => choose(place)}

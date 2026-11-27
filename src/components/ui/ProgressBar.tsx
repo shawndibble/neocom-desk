@@ -57,7 +57,9 @@ export function ProgressBar({
         className={cx(
           'block h-full',
           TONE_CLASS[tone],
-          determinate ? 'motion-safe:transition-[width]' : 'motion-safe:animate-pulse'
+          determinate
+            ? 'motion-safe:transition-[width] motion-safe:duration-(--motion-quick) motion-safe:ease-(--motion-ease-out)'
+            : 'motion-safe:animate-pulse'
         )}
         style={{ width: determinate ? `${share * 100}%` : INDETERMINATE_WIDTH }}
       />

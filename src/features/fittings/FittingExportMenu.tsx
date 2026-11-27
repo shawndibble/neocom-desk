@@ -8,6 +8,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
   LiveNote,
+  Spinner,
 } from '@/components/ui';
 import type { Fitting } from '@/engine/fittings/types';
 import type { Appraisal } from '@/engine/market/appraisal';
@@ -86,7 +87,7 @@ export function FittingExportItems({
             })}
           </p>
         ) : (
-          <p>{t('fittings.stats.priceLoading')}</p>
+          <Spinner size="sm" showLabel label={t('fittings.stats.priceLoading')} />
         )}
       </div>
       <DropdownMenuItem onSelect={() => void openInAppraisal()}>

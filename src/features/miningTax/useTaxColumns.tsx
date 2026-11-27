@@ -1,3 +1,4 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useMemo, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -125,7 +126,7 @@ export function useTaxColumns({
         withDayLines(
           dr,
           dr.groupMembers ? (
-            <span className="inline-flex text-[0.6875rem] font-semibold tracking-wider text-text-dim uppercase">
+            <span className={`${eyebrowClassName} inline-flex`}>
               {t('miningTax.combined.days', { count: allMembers(dr).length })}
             </span>
           ) : (
@@ -217,7 +218,7 @@ export function useTaxColumns({
               )}
               {shortDateLabel(dr)}
               {isPhone && dr.groupMembers && (
-                <span className="ml-1.5 text-[0.6875rem] font-semibold tracking-wider text-accent uppercase">
+                <span className="ml-1.5 text-[0.6875rem] font-semibold tracking-widest text-accent uppercase">
                   {t('miningTax.combined.days', { count: allMembers(dr).length })}
                 </span>
               )}

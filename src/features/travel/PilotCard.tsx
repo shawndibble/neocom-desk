@@ -93,9 +93,8 @@ export function PilotCard({
         <div className="shrink-0 text-right">
           <b
             className={cx(
-              'block text-[1.625rem] leading-none font-semibold tabular-nums',
-              tone !== null && THREAT_TEXT_CLASS[tone],
-              threat === 'dangerous' && 'text-[2.125rem]'
+              'block text-xl leading-none font-semibold tabular-nums',
+              tone !== null && THREAT_TEXT_CLASS[tone]
             )}
           >
             <span className="sr-only">{t('travel.pilot.list.killsLabel')}: </span>

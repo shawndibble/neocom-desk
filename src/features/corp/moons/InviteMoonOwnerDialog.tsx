@@ -129,7 +129,7 @@ export function InviteMoonOwnerDialog({
           </div>
         )}
         <div className="space-y-2">
-          <h3 className="text-xs font-semibold tracking-wider text-text-dim uppercase">
+          <h3 className="text-xs font-semibold tracking-widest text-text-dim uppercase">
             {t(k('open'))}
           </h3>
           {invites !== null && invites.length === 0 && (

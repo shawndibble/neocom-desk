@@ -12,11 +12,13 @@ import {
   checkStatus,
   colonyCheckRow,
   faultTagKey,
+  matchesStatusFilter,
   compareRows,
   primaryAction,
   sortRows,
   todayCheck,
   HOUR_MS,
+  type CheckStatus,
   type ColonyCheckRow,
   type StatusFacts,
 } from './coloniesModel';
@@ -264,6 +266,31 @@ describe('attention sort', () => {
     const rows = [row({ planetId: 1 }), row({ planetId: 2, status: 'stopped' })];
     sortRows(rows);
     expect(rows[0].planetId).toBe(1);
+  });
+});
+
+describe('matchesStatusFilter', () => {
+  const rows = [
+    row({ planetId: 1, status: 'stopped' }),
+    row({ planetId: 2, status: 'expiring' }),
+    row({ planetId: 3, status: 'needs-look' }),
+    row({ planetId: 4, status: 'healthy' }),
+    row({ planetId: 5, status: 'unknown' }),
+  ];
+  const ids = (statuses: CheckStatus[]) =>
+    rows.filter((r) => matchesStatusFilter(r.status, new Set(statuses))).map((r) => r.planetId);
+
+  it('keeps every row when no status is picked', () => {
+    expect(ids([])).toEqual([1, 2, 3, 4, 5]);
+  });
+
+  it('keeps only the rows in the one picked status', () => {
+    expect(ids(['stopped'])).toEqual([1]);
+    expect(ids(['expiring'])).toEqual([2]);
+  });
+
+  it('keeps the union of the picked statuses', () => {
+    expect(ids(['expiring', 'stopped'])).toEqual([1, 2]);
   });
 });
 

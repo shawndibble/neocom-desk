@@ -15,6 +15,7 @@ import {
   TypeIcon,
 } from '@/components/ui';
 import { IskAmount } from '@/components/ui';
+import { rowInteractiveClassName } from '@/components/ui/controlStyles';
 import { RowTappableContext } from '@/components/ui/tooltipHold';
 import { useLiftAfterHoldGuard } from '@/components/ui/liftAfterHold';
 import { HintText } from '@/components/ui/HintText';
@@ -455,7 +456,7 @@ export const ColonyRowView = memo(function ColonyRowView(props: ColonyRowViewPro
               return;
             props.onToggle(row.key);
           }}
-          className={`relative grid cursor-pointer gap-x-4 gap-y-2 px-3 py-2 hover:bg-panel-2 lg:py-3 lg:items-start ${ROW_GRID}`}
+          className={`relative grid cursor-pointer gap-x-4 gap-y-2 px-3 py-2 ${rowInteractiveClassName} lg:py-3 lg:items-start ${ROW_GRID}`}
         >
           <RowTappableContext.Provider value>
             <div className="flex min-w-0 items-start gap-2.5 max-lg:pr-11">

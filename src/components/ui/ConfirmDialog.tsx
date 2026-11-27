@@ -67,12 +67,12 @@ export function ConfirmDialog({
         </p>
       )}
       <DialogFooter className="mt-3">
-        <Button size="sm" disabled={working} onClick={onClose}>
+        <Button disabled={working} onClick={onClose}>
           {cancelLabel ?? t('communities.cancel')}
         </Button>
         <Button
           variant={danger ? 'danger' : 'primary'}
-          size="sm"
+
           loading={working}
           onClick={() => void confirm()}
         >

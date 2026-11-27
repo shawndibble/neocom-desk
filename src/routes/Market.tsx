@@ -520,6 +520,7 @@ export function Market() {
             ) : undefined
           }
           scope={tabOwnsHeader ? scopeSlot : undefined}
+          actionsOwnRow={tab === 'browser'}
           actions={
             usesHubPicker(tab) ? (
               <>
@@ -541,7 +542,7 @@ export function Market() {
                     label={t('market.tradeHub')}
                     shownHubId={effectiveHub.id}
                     onPicked={handleHubChange}
-                    className="w-32 sm:w-44"
+                    className={tab === 'browser' ? 'w-32 max-lg:flex-1 sm:w-44' : 'w-32 sm:w-44'}
                   />
                 ) : (
                   <RegionSelect
@@ -552,7 +553,7 @@ export function Market() {
                     searchPlaceholder={t('common.searchRegions')}
                     noResultsLabel={t('common.noRegionMatches')}
                     aria-label={t('market.region')}
-                    className="w-32 sm:w-44"
+                    className={tab === 'browser' ? 'w-32 max-lg:flex-1 sm:w-44' : 'w-32 sm:w-44'}
                   />
                 )}
                 {tab === 'appraisal' && (

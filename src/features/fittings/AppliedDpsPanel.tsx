@@ -10,6 +10,7 @@ import {
   SelectSeparator,
   SelectTrigger,
   SelectValue,
+  Spinner,
 } from '@/components/ui';
 import {
   appliedDps,
@@ -174,7 +175,9 @@ export function AppliedDpsPanel({
               },
             ]}
           />
-          <Suspense fallback={<StatNote>{t('fittings.appliedDps.loading')}</StatNote>}>
+          <Suspense
+            fallback={<Spinner size="sm" showLabel label={t('fittings.appliedDps.loading')} />}
+          >
             <AppliedDpsChart
               range={graphs.range}
               speed={graphs.speed}

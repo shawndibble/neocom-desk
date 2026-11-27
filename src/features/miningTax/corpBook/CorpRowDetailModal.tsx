@@ -42,6 +42,7 @@ import {
 import type { ClosedDayPlan } from '@/engine/corpTaxBook/closedDayFix';
 import type { CorpRowInfo } from './corpRows';
 import { formatCount } from '@/lib/formatCount';
+import { Well } from '@/components/ui/Well';
 
 interface Props {
   open: boolean;
@@ -307,7 +308,7 @@ export function CorpRowDetailModal({
           {!conflict && notice}
 
           {view.dispute && (
-            <div className="space-y-2 rounded-xs border border-warning/60 bg-warning/10 p-2 text-xs">
+            <Well tone="warning" className="space-y-2 text-xs">
               <p className="font-semibold text-warning uppercase">
                 {view.dispute.rate && !view.dispute.quantity
                   ? t('miningTax.corpBook.disputed.rate', {
@@ -325,7 +326,7 @@ export function CorpRowDetailModal({
               <Button size="sm" onClick={() => setComparing(true)}>
                 {t('miningTax.corpBook.diff.open')}
               </Button>
-            </div>
+            </Well>
           )}
 
           <div className="flex flex-wrap gap-2 pt-1">

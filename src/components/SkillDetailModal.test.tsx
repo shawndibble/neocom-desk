@@ -357,7 +357,7 @@ describe('SkillDetailModal', () => {
     const dialog = await screen.findByRole('dialog');
     await user.click(await within(dialog).findByRole('button', { name: 'Try again' }));
 
-    expect(within(dialog).getByRole('status', { name: 'Loading' })).toBeInTheDocument();
+    expect(await within(dialog).findByRole('status', { name: 'Loading' })).toBeInTheDocument();
     expect(within(dialog).queryByText('Could not load')).not.toBeInTheDocument();
 
     await act(async () => resolveRetry(FIXTURE_SKILLS));

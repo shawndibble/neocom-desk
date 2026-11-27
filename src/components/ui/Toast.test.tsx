@@ -156,6 +156,37 @@ describe('Toast', () => {
   describe('persistence and dismissal', () => {
     afterEach(() => vi.useRealTimers());
 
+    it('plays its exit before closing on expiry, while the close button stays instant', async () => {
+      vi.useFakeTimers();
+      let finish = () => {};
+      const exit = {
+        animationName: 'toast-out',
+        finished: new Promise<void>((resolve) => (finish = resolve)),
+      };
+      Object.defineProperty(HTMLElement.prototype, 'getAnimations', {
+        value: function (this: HTMLElement) {
+          return this.classList.contains('toast-out') ? [exit] : [];
+        },
+        configurable: true,
+      });
+      try {
+        const onClose = vi.fn();
+        render(
+          <Toast message="Added" undo={{ label: 'Undo', onUndo: () => {} }} onClose={onClose} />
+        );
+        act(() => {
+          vi.advanceTimersByTime(8_000);
+        });
+        expect(onClose).not.toHaveBeenCalled();
+        await act(async () => finish());
+        expect(onClose).toHaveBeenCalledTimes(1);
+        fireEvent.click(screen.getByRole('button', { name: /close/i }));
+        expect(onClose).toHaveBeenCalledTimes(2);
+      } finally {
+        delete (HTMLElement.prototype as { getAnimations?: unknown }).getAnimations;
+      }
+    });
+
     it('closes an undo toast after 8s, and sooner from the close button', () => {
       vi.useFakeTimers();
       const onClose = vi.fn();

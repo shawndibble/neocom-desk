@@ -241,13 +241,6 @@ export function VettingInvitesDialog({
         placement={mode === 'list' ? (phone ? 'sheet-full' : 'detail') : 'center'}
         dismissOnOutsidePress={false}
         initialFocusRef={mode === 'new' ? labelRef : undefined}
-        footer={
-          <div className="flex justify-end max-sm:[&>button]:w-full">
-            <Button variant="ghost" onClick={onClose}>
-              {t('vetting.invites.close')}
-            </Button>
-          </div>
-        }
       >
         <div className="space-y-4 text-sm">
           {mode === 'list' && (

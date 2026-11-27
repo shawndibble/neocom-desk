@@ -1,7 +1,7 @@
 import { ExternalLink } from '@/components/ui/ExternalLink';
 import { useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Caret, LiveNote, TypeIcon } from '@/components/ui';
+import { Button, Caret, LiveNote, TypeIcon, Spinner } from '@/components/ui';
 import { focusRingInsetClassName, rowInteractiveClassName } from '@/components/ui/controlStyles';
 import { resolveNames } from '@/features/character/names';
 import { cx } from '@/lib/cx';
@@ -106,6 +106,7 @@ export function PilotKillmailsSection({
     characterId
   );
 
+  if (unknown && result !== null && entries.length === 0) return null;
   const title = t('travel.pilot.recent.title');
   return (
     <section
@@ -126,7 +127,7 @@ export function PilotKillmailsSection({
         </ExternalLink>
       </div>
       {result === null ? (
-        <LiveNote className="text-xs text-text-dim">{t('travel.pilot.recent.loading')}</LiveNote>
+        <Spinner size="sm" showLabel label={t('travel.pilot.recent.loading')} className="text-xs" />
       ) : !result.ok ? (
         <div className="flex items-center gap-2 text-xs text-warning">
           <LiveNote as="span">
@@ -144,9 +145,7 @@ export function PilotKillmailsSection({
           </Button>
         </div>
       ) : entries.length === 0 ? (
-        <p className="text-xs text-text-dim">
-          {unknown ? t('travel.pilot.activity.unknown') : t('travel.pilot.recent.empty')}
-        </p>
+        <p className="text-xs text-text-dim">{t('travel.pilot.recent.empty')}</p>
       ) : (
         <ul aria-labelledby={headingId} className="divide-y divide-line border border-line">
           {entries.map((entry) => (

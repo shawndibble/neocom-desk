@@ -1,4 +1,4 @@
-import { NavLink, useLocation, useMatch } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { IconButton, Tooltip } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
@@ -9,7 +9,7 @@ import { useGrantedScopes } from './useGrantedScopes';
 import { warmRoute } from './routeWarm';
 import { preloadRouteChunk } from './routeChunks';
 import { NAV_ICON_BY_PATH } from './navIcons';
-import { PARENT_PAGE_PATHS } from './navDestinations';
+import { navPlaceFor } from './navRail';
 import { toggleHiddenNav } from './navPreferences';
 import type { AppRoutePath } from './routeScopes';
 
@@ -83,13 +83,12 @@ export function NavItem({
   const counted = badge !== undefined && badge > 0;
   const Glyph = NAV_ICON_BY_PATH[to];
   const linkClass = tab ? mobileNavClass : tile ? tileClass : bar ? barClass : navClass;
-  const end = PARENT_PAGE_PATHS.has(to);
-  const isActive = useMatch({ path: to, end }) !== null;
+  const isActive = navPlaceFor(location.pathname).pagePath === to;
   const link = (
-    <NavLink
+    <Link
       to={to}
-      end={end}
       state={originState}
+      aria-current={isActive ? 'page' : undefined}
       onClick={onClick}
       onMouseEnter={warm}
       onFocus={warm}
@@ -144,7 +143,7 @@ export function NavItem({
           )}
         />
       )}
-    </NavLink>
+    </Link>
   );
   return locked ? <Tooltip content={t('reauth.navLocked')}>{link}</Tooltip> : link;
 }

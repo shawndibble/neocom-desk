@@ -12,6 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
   Slider,
+  Spinner,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import {
@@ -66,7 +67,9 @@ export function FittingMutationPanel(props: FittingMutationPanelProps) {
   const { t } = useTranslation();
   const lookup = useMutaplasmidLookup();
   if (lookup === null)
-    return <p className="text-xs text-text-dim">{t('fittings.mutation.loading')}</p>;
+    return (
+      <Spinner size="sm" showLabel label={t('fittings.mutation.loading')} className="text-xs" />
+    );
   return <MutationEditor {...props} lookup={lookup} />;
 }
 
@@ -186,7 +189,7 @@ function MutationEditor({
       {mutation &&
         !baseFailed &&
         (rows === null || dictionary === null ? (
-          <p className="text-text-dim">{t('fittings.mutation.loading')}</p>
+          <Spinner size="sm" showLabel label={t('fittings.mutation.loading')} />
         ) : (
           <ul className="space-y-3" aria-label={t('fittings.mutation.rollsLabel')}>
             {rows.map((row) => (

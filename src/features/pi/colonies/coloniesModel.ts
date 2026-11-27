@@ -391,6 +391,13 @@ export function sortRows(rows: readonly ColonyCheckRow[]): ColonyCheckRow[] {
   return [...rows].sort(compareRows);
 }
 
+export function matchesStatusFilter(
+  status: CheckStatus,
+  statuses: ReadonlySet<CheckStatus>
+): boolean {
+  return statuses.size === 0 || statuses.has(status);
+}
+
 export interface DueItem {
   key: string;
   characterId: number;

@@ -15,9 +15,22 @@ describe('Well', () => {
     ['sm', 'p-2'],
     ['md', 'p-2.5'],
     ['lg', 'p-3'],
+    ['wide', 'px-3'],
   ] as const)('size %s pads %s', (size, cls) => {
     render(<Well size={size}>Note</Well>);
     expect(screen.getByText('Note').className.split(' ')).toContain(cls);
+  });
+
+  it.each([
+    ['accent', 'border-accent-dim', 'bg-accent/10'],
+    ['warning', 'border-warning/60', 'bg-warning/10'],
+    ['danger', 'border-danger/60', 'bg-danger/10'],
+  ] as const)('tone %s swaps the edge and fill', (tone, border, fill) => {
+    render(<Well tone={tone}>Note</Well>);
+    const c = screen.getByText('Note').className.split(' ');
+    expect(c).toEqual(expect.arrayContaining([border, fill]));
+    expect(c).not.toContain('border-line');
+    expect(c).not.toContain('bg-panel-2');
   });
 
   it('renders the requested element and appends layout classes', () => {

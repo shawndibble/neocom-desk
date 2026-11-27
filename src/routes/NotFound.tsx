@@ -5,11 +5,10 @@ import { LogoMark, buttonClassName } from '@/components/ui';
 import { DISCORD_URL } from '@/lib/links';
 import { useMarkPublicRouteRendered } from '@/app/routeFocus';
 
-export function NotFound() {
+function NotFoundBody() {
   const { t } = useTranslation();
-  useMarkPublicRouteRendered();
   return (
-    <main className="safe-inset flex min-h-dvh [--safe-x:1.5rem] [--safe-y:1.5rem] flex-col items-center justify-center gap-3 bg-bg text-center text-text">
+    <>
       <LogoMark className="size-7" />
       <h1 className="text-sm font-semibold tracking-widest uppercase">{t('notFound.title')}</h1>
       <p className="max-w-prose text-xs text-text-dim">{t('notFound.hint')}</p>
@@ -19,6 +18,23 @@ export function NotFound() {
       <ExternalLink href={DISCORD_URL} className="text-xs">
         {t('notFound.discordHint')}
       </ExternalLink>
+    </>
+  );
+}
+
+export function NotFound() {
+  useMarkPublicRouteRendered();
+  return (
+    <main className="safe-inset flex min-h-dvh [--safe-x:1.5rem] [--safe-y:1.5rem] flex-col items-center justify-center gap-3 bg-bg text-center text-text">
+      <NotFoundBody />
     </main>
+  );
+}
+
+export function ShellNotFound() {
+  return (
+    <div className="flex flex-col items-center gap-3 px-6 py-16 text-center text-text">
+      <NotFoundBody />
+    </div>
   );
 }

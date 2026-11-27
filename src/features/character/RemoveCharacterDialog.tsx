@@ -84,10 +84,10 @@ export function RemoveCharacterDialog({
         />
       )}
       <DialogFooter className="mt-3">
-        <Button ref={cancelRef} size="sm" aria-disabled={removing || undefined} onClick={onClose}>
+        <Button ref={cancelRef} aria-disabled={removing || undefined} onClick={onClose}>
           {t('characters.cancel')}
         </Button>
-        <Button variant="danger" size="sm" loading={removing} onClick={() => void confirm()}>
+        <Button variant="danger" loading={removing} onClick={() => void confirm()}>
           {t('characters.remove')}
         </Button>
       </DialogFooter>

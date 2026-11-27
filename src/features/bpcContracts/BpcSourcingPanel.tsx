@@ -37,7 +37,7 @@ import {
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 
-import { activeOptionClassName } from '@/components/ui/controlStyles';
+import { activeOptionClassName, rowInteractiveClassName } from '@/components/ui/controlStyles';
 import { DEFAULT_SOURCE_TOGGLES } from './bpcSourcingUrl';
 import {
   asContract,
@@ -616,7 +616,7 @@ export function BpcSourcingPanel({
                         'flex min-h-9 w-full cursor-pointer items-center gap-3 border-b border-line px-3 py-1.5 text-left text-sm last:border-b-0',
                         suggestion === highlightedSuggestion
                           ? `bg-panel-2 ${activeOptionClassName}`
-                          : 'hover:bg-panel-2'
+                          : rowInteractiveClassName
                       )}
                     >
                       <span className="min-w-0 flex-1 truncate">{suggestion.name}</span>

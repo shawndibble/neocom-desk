@@ -4,6 +4,7 @@ import {
   Button,
   DataTable,
   EmptyState,
+  InfoTooltip,
   Panel,
   StandingIcon,
   Tooltip,
@@ -208,10 +209,13 @@ export function AcrossCharactersPanel({
         >
           {t('contacts.acrossFetchAll')}
         </Button>
+        {fetched === null && (
+          <InfoTooltip
+            label={t('contacts.acrossCachedLabel')}
+            content={t('contacts.acrossCachedHint')}
+          />
+        )}
       </div>
-      {fetched === null && (
-        <p className="px-3 pt-2 text-[0.6875rem] text-text-dim">{t('contacts.acrossCachedHint')}</p>
-      )}
       {visibleRows.length === 0 ? (
         <EmptyState
           title={t('contacts.acrossNoResults')}

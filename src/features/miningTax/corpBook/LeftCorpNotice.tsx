@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { Button, plainTextActionClassName } from '@/components/ui';
 import { formatIsk } from '@/lib/isk';
+import { Well } from '@/components/ui/Well';
 import type { LeftCorpBook } from './leftCorpBooks';
 
 const textAction = plainTextActionClassName('min-h-9 md:min-h-6');
@@ -18,7 +19,7 @@ export function LeftCorpNotice({
   const { corporationId, corpName, owed } = book;
   const amount = formatIsk(owed, 0);
   return (
-    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xs border border-line bg-panel-2 px-3 py-2.5">
+    <Well size="wide" className="flex flex-wrap items-center gap-x-4 gap-y-2">
       <div className="min-w-0 flex-1 basis-72">
         <p className="text-sm font-semibold">
           {t('miningTax.corpBook.leftCorp.title', { corp: corpName })}
@@ -39,7 +40,7 @@ export function LeftCorpNotice({
           {t('miningTax.corpBook.leftCorp.stop', { corp: corpName })}
         </button>
       </div>
-    </div>
+    </Well>
   );
 }
 

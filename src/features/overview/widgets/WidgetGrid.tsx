@@ -102,7 +102,6 @@ function EditControls({
       />
       <IconButton
         size="sm"
-        tone="danger"
         icon={<Icon.RemoveWidget />}
         label={t('overview.customize.remove', { title })}
         onClick={() => edit.remove(widget.id)}

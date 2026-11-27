@@ -184,8 +184,8 @@ export function AlertGroupRow({
       data-group-key={group.key}
       inert={leaving}
       className={cx(
-        'grid motion-safe:transition-[grid-template-rows] motion-safe:duration-200 motion-safe:ease-out',
-        leaving ? 'grid-rows-[0fr] motion-safe:delay-150' : 'grid-rows-[1fr]'
+        'grid motion-safe:transition-[grid-template-rows] motion-safe:duration-(--motion-quick) motion-safe:ease-(--motion-ease-out)',
+        leaving ? 'grid-rows-[0fr] motion-safe:delay-(--motion-quick-exit)' : 'grid-rows-[1fr]'
       )}
     >
       <div className={cx('min-h-0 min-w-0', leaving && 'overflow-hidden')}>
@@ -202,7 +202,7 @@ export function AlertGroupRow({
             ref={slide}
             {...swipe}
             className={cx(
-              'relative border-b border-line motion-safe:transition-[transform,opacity] motion-safe:duration-150 motion-safe:ease-in',
+              'relative border-b border-line motion-safe:transition-[transform,opacity] motion-safe:duration-(--motion-quick-exit) motion-safe:ease-(--motion-ease-in)',
               danger ? 'border-l-2 border-l-danger bg-danger/5' : 'bg-panel',
               leaving && 'opacity-0 ltr:-translate-x-full rtl:translate-x-full'
             )}

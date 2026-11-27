@@ -24,6 +24,7 @@ import { STATUS_TONE } from './statusTone';
 import type { MoonMiningTaxRow } from './snapshot';
 import { LedgerActionError } from './LedgerActionError';
 import { formatCount } from '@/lib/formatCount';
+import { Well } from '@/components/ui/Well';
 
 export interface GroupMember {
   row: MoonMiningTaxRow;
@@ -185,10 +186,7 @@ export function GroupSummaryModal({
         </p>
 
         {confirmUnassign && (
-          <div
-            role="alert"
-            className="space-y-2 rounded-xs border border-danger/60 bg-danger/10 p-2 text-xs"
-          >
+          <Well tone="danger" role="alert" className="space-y-2 text-xs">
             <p>{t('miningTax.combined.unassignConfirm', { count: members.length })}</p>
             <div className="flex gap-2">
               <Button
@@ -203,7 +201,7 @@ export function GroupSummaryModal({
                 {t('filters.cancel')}
               </Button>
             </div>
-          </div>
+          </Well>
         )}
 
         <LedgerActionError error={saveError} />

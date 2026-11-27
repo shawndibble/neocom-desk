@@ -7,6 +7,7 @@ import type { BookRowView } from '@/engine/corpTaxBook/personal';
 import { typeLabel } from './typeLabel';
 import { hubForPayee } from '../pricing';
 import { formatCount } from '@/lib/formatCount';
+import { Well } from '@/components/ui/Well';
 
 interface Props {
   open: boolean;
@@ -62,7 +63,7 @@ export function CorpBookDiffModal({
 
   const cell = (differs: boolean) => cx('text-right tabular-nums', differs && 'font-semibold');
   const differs = (
-    <span className="ml-1.5 text-[0.6875rem] font-semibold tracking-wider text-warning uppercase">
+    <span className="ml-1.5 text-[0.6875rem] font-semibold tracking-widest text-warning uppercase">
       {t('miningTax.corpBook.diff.differs')}
     </span>
   );
@@ -133,7 +134,7 @@ export function CorpBookDiffModal({
           </tbody>
         </table>
         {dispute && (
-          <div className="space-y-1 rounded-xs border border-warning/60 bg-warning/10 p-2">
+          <Well tone="warning" className="space-y-1">
             <p className="font-semibold text-warning">
               {dispute.rate && !dispute.quantity
                 ? t('miningTax.corpBook.disputed.rate', {
@@ -172,7 +173,7 @@ export function CorpBookDiffModal({
                 )}
               </div>
             )}
-          </div>
+          </Well>
         )}
         <p className="text-xs text-text-dim">
           {t('miningTax.corpBook.diff.explain', {

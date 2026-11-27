@@ -343,7 +343,8 @@ describe('ContactsStandings table', () => {
       const user = userEvent.setup();
       renderTab();
       await screen.findByText('Hanna Kurosawa');
-      await user.click(screen.getByRole('button', { name: /^Type: / }));
+      await user.click(screen.getByRole('button', { name: 'Filters' }));
+      await user.click(await screen.findByRole('button', { name: /^Type: / }));
       expect(await screen.findByRole('menuitemcheckbox', { name: 'Agent (1)' })).toBeChecked();
       await user.click(screen.getByRole('menuitemcheckbox', { name: 'Faction (1)' }));
       await user.click(screen.getByRole('menuitemcheckbox', { name: 'Corporation (1)' }));
@@ -364,7 +365,8 @@ describe('ContactsStandings table', () => {
       const user = userEvent.setup();
       renderTab();
       await screen.findByText('Hanna Kurosawa');
-      await user.click(screen.getByRole('button', { name: 'Used for fees' }));
+      await user.click(screen.getByRole('button', { name: 'Filters' }));
+      await user.click(await screen.findByRole('button', { name: 'Used for fees' }));
       await waitFor(() => expect(screen.queryByText('Hanna Kurosawa')).toBeNull());
       expect(screen.getByText('Caldari Navy Corp')).toBeInTheDocument();
       expect(screen.getByTestId('search')).toHaveTextContent('standings.fees=1');

@@ -1,6 +1,6 @@
 import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button } from '@/components/ui';
+import { Button, Spinner } from '@/components/ui';
 import { scheduleTimeFor } from '@/engine/fittings/moduleUpgrades';
 import { scheduledSkillTargets } from '@/engine/fittings/skillGains';
 import { romanLevel } from '@/engine/projection';
@@ -34,7 +34,12 @@ export function ModuleUpgradeList({ rows, ...item }: ModuleUpgradeListProps) {
         {t('fittings.whatToTrain.upgrades.title')}
       </h4>
       {rows === null ? (
-        <p className={STAT_DETAIL}>{t('fittings.whatToTrain.upgrades.loading')}</p>
+        <Spinner
+          size="sm"
+          showLabel
+          label={t('fittings.whatToTrain.upgrades.loading')}
+          className={STAT_DETAIL}
+        />
       ) : (
         <ul className="m-0 list-none p-0 text-xs">
           {rows.map((row) => (

@@ -23,6 +23,7 @@ import { formatPercent } from './format';
 import { isPriceSpike } from '@/engine/market/priceVsMedian';
 import { CalculationBreakdown, type BreakdownContext } from './CalculationBreakdown';
 import type { ItemMenuFor } from '@/features/market/ItemContextMenu';
+import { Well } from '@/components/ui/Well';
 import { SkillGateMarker } from './SkillGateMarker';
 
 type PillTone = 'success' | 'warning' | 'muted';
@@ -189,9 +190,9 @@ export function PlanVerdictHero({
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
             {itemMenuFor && productTypeID != null ? (
-              itemMenuFor(productTypeID, <h2 className="text-lg font-semibold">{productName}</h2>)
+              itemMenuFor(productTypeID, <h2 className="text-base font-semibold">{productName}</h2>)
             ) : (
-              <h2 className="text-lg font-semibold">{productName}</h2>
+              <h2 className="text-base font-semibold">{productName}</h2>
             )}
             {skillGate?.gated && nameForSkill && nameForCharacter && (
               <SkillGateMarker
@@ -231,7 +232,7 @@ export function PlanVerdictHero({
             ) : (
               <p
                 className={cx(
-                  'text-4xl leading-tight font-semibold tabular-nums',
+                  'text-3xl leading-tight font-semibold tabular-nums',
                   profit === null ? 'text-text-dim' : iskToneClass(profit),
                   locationBlock && 'line-through opacity-60'
                 )}
@@ -294,9 +295,11 @@ export function PlanVerdictHero({
               )}
             {!pricesLoading && pricesReady && profit !== null && costMoveNote}
             {locationBlock && (
-              <div
+              <Well
+                tone="warning"
+                size="md"
                 role="status"
-                className="mt-1 flex flex-col items-start gap-2 rounded-xs border border-warning/40 bg-warning/10 p-2.5 text-xs text-warning"
+                className="mt-1 flex flex-col items-start gap-2 text-xs text-warning"
               >
                 <p>
                   {t('industry.reactionBlocked.callout', {
@@ -306,7 +309,7 @@ export function PlanVerdictHero({
                 </p>
                 <div className="flex flex-wrap gap-2">
                   {locationBlock.fix && (
-                    <Button size="sm" variant="primary" onClick={locationBlock.fix.onApply}>
+                    <Button size="sm" variant="accent" onClick={locationBlock.fix.onApply}>
                       {t('industry.reactionBlocked.move', {
                         system: locationBlock.fix.systemName,
                       })}
@@ -316,7 +319,7 @@ export function PlanVerdictHero({
                     {t('industry.reactionBlocked.chooseLocation')}
                   </Button>
                 </div>
-              </div>
+              </Well>
             )}
           </div>
 
@@ -419,7 +422,7 @@ function HeroStat({
         {label}
         {accessory}
       </dt>
-      <dd className="text-lg font-semibold tabular-nums">{children}</dd>
+      <dd className="text-base font-semibold tabular-nums">{children}</dd>
       {note && <dd className="text-xs text-text-dim">{note}</dd>}
     </div>
   );

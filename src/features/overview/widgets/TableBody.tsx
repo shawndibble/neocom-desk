@@ -1,3 +1,4 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -445,7 +446,8 @@ export function TableBody({
                     className={cx(
                       i === 0 && iconSlot ? ICON_SLOT_INDENT : cellPad,
                       column.hideNarrow && HIDE_NARROW,
-                      'py-1 text-[0.6875rem] font-semibold tracking-widest whitespace-nowrap text-text-dim uppercase',
+                      eyebrowClassName,
+                      'py-1 whitespace-nowrap',
                       i === 0 ? 'text-left' : column.align === 'end' ? 'text-right' : 'text-left'
                     )}
                   >

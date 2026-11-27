@@ -32,7 +32,7 @@ export function MailFilterBar({
       <div
         role="group"
         aria-label={t('mail.foldersLabel')}
-        className="flex flex-wrap items-center gap-2"
+        className="flex flex-wrap items-center gap-2 max-sm:grid max-sm:grid-cols-2"
       >
         {MAIL_FOLDERS.map((folder) => {
           const unread = unreadByTab.get(folder) ?? 0;

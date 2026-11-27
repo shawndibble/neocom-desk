@@ -1,5 +1,6 @@
 import { eyebrowClassName } from './eyebrowClassName';
 import { isRowOwnEvent } from './rowEvents';
+import { interactiveClassName } from './controlStyles';
 import { forwardRef, type CSSProperties, type ReactNode, type RefObject } from 'react';
 
 interface PanelProps {
@@ -56,7 +57,7 @@ export const Panel = forwardRef<HTMLElement, PanelProps>(function Panel(
       {(title || actions || leading || meta) && (
         <header
           onClick={onHeaderToggle && ((event) => isRowOwnEvent(event) && onHeaderToggle())}
-          className={`${onHeaderToggle ? 'cursor-pointer hover:bg-panel-2/60 ' : ''}flex min-h-9 items-center justify-between gap-2 border-b border-line bg-panel-2 py-1 pr-3 ${metaOwnRow ? 'max-md:flex-wrap' : ''} ${leading ? 'pl-1' : 'pl-3'}`}
+          className={`${onHeaderToggle ? `cursor-pointer hover:bg-panel-2/60 active:bg-panel ${interactiveClassName} ` : ''}flex min-h-9 items-center justify-between gap-2 border-b border-line bg-panel-2 py-1 pr-3 ${metaOwnRow ? 'max-md:flex-wrap' : ''} ${leading ? 'pl-1' : 'pl-3'}`}
         >
           <div
             className={`flex min-w-0 items-center gap-2 text-[0.6875rem] text-text-dim ${wrapMeta ? 'max-md:flex-wrap' : ''} ${metaOwnRow ? 'max-md:contents' : ''}`}

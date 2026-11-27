@@ -97,3 +97,21 @@ export const WithScopePhone: Story = {
   },
   globals: { viewport: { value: 'phone390', isRotated: false } },
 };
+
+/**
+ * @summary `actionsOwnRow` at 390 wide: a cluster too wide for the title row starts at the gutter on its own row.
+ */
+export const ActionsOwnRowPhone: Story = {
+  args: {
+    title: 'Market',
+    actionsOwnRow: true,
+    actions: (
+      <>
+        <Button variant="ghost">Trade hub</Button>
+        <Button variant="ghost">Region</Button>
+        <IconButton label="Refresh" icon={<Icon.Refresh />} />
+      </>
+    ),
+  },
+  globals: { viewport: { value: 'phone390', isRotated: false } },
+};

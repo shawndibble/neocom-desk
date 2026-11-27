@@ -25,4 +25,18 @@ describe('Collapse', () => {
     act(() => vi.advanceTimersByTime(COLLAPSE_MS));
     expect(screen.queryByText('Body')).toBeNull();
   });
+
+  it('with closeInstantly, unmounts the body the moment it shuts', () => {
+    const { rerender } = render(
+      <Collapse open closeInstantly>
+        Body
+      </Collapse>
+    );
+    rerender(
+      <Collapse open={false} closeInstantly>
+        Body
+      </Collapse>
+    );
+    expect(screen.queryByText('Body')).toBeNull();
+  });
 });

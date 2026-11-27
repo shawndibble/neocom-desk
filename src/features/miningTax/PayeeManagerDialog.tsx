@@ -681,7 +681,7 @@ export function PayeeManagerDialog({
               {draft.id && (
                 <Button
                   variant="danger"
-                  size="sm"
+
                   className="mr-auto"
                   aria-label={t('miningTax.deletePayeeNamed', { name: draft.name || draft.id })}
                   onClick={() => {
@@ -692,12 +692,8 @@ export function PayeeManagerDialog({
                   {t('miningTax.deletePayeeAction')}
                 </Button>
               )}
-              {payees.length > 0 && (
-                <Button size="sm" onClick={closeForm}>
-                  {t('filters.cancel')}
-                </Button>
-              )}
-              <Button variant="primary" size="sm" onClick={() => void handleSave()}>
+              {payees.length > 0 && <Button onClick={closeForm}>{t('filters.cancel')}</Button>}
+              <Button variant="primary" onClick={() => void handleSave()}>
                 {t('common.save')}
               </Button>
             </DialogFooter>
@@ -757,10 +753,8 @@ export function PayeeManagerDialog({
               {t('miningTax.payees.deleteAnywayHint')}
             </p>
             <DialogFooter>
-              <Button size="sm" onClick={() => setDeletingPayee(null)}>
-                {t('filters.cancel')}
-              </Button>
-              <Button size="sm" onClick={() => confirmDelete(false)}>
+              <Button onClick={() => setDeletingPayee(null)}>{t('filters.cancel')}</Button>
+              <Button onClick={() => confirmDelete(false)}>
                 {t('miningTax.payees.deleteAnyway')}
               </Button>
             </DialogFooter>
@@ -771,10 +765,8 @@ export function PayeeManagerDialog({
               {t('miningTax.deletePayeeConfirm', { name: deletingPayee?.name ?? '' })}
             </p>
             <DialogFooter className="mt-3">
-              <Button size="sm" onClick={() => setDeletingPayee(null)}>
-                {t('filters.cancel')}
-              </Button>
-              <Button variant="danger" size="sm" onClick={() => confirmDelete(false)}>
+              <Button onClick={() => setDeletingPayee(null)}>{t('filters.cancel')}</Button>
+              <Button variant="danger" onClick={() => confirmDelete(false)}>
                 {t('miningTax.deletePayeeAction')}
               </Button>
             </DialogFooter>

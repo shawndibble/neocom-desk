@@ -17,6 +17,7 @@ import {
   Button,
   FieldError,
   IconButton,
+  InfoTooltip,
   Modal,
   Select,
   SelectContent,
@@ -514,9 +515,15 @@ export function BlueprintAcquisitionModal({
           )}
           {fact(
             t('industry.bpAcqInventAttempt'),
-            quote.attemptCost === null
-              ? t('industry.bpAcqInventUnpriced')
-              : t('industry.bpAcqInventAttemptValue', { isk: formatIsk(quote.attemptCost) })
+            <span className="inline-flex items-center gap-1.5">
+              {quote.attemptCost === null
+                ? t('industry.bpAcqInventUnpriced')
+                : t('industry.bpAcqInventAttemptValue', { isk: formatIsk(quote.attemptCost) })}
+              <InfoTooltip
+                label={t('industry.bpAcqInventCostLabel')}
+                content={t('industry.bpAcqInventCostTip')}
+              />
+            </span>
           )}
         </dl>
         <ul className="flex flex-col gap-1">

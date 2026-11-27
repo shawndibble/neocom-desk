@@ -29,7 +29,7 @@ interface ResourceBarProps {
 
 export function ResourceBar({ label, used, total, resource }: ResourceBarProps) {
   const { t } = useTranslation();
-  const { overage, overBudget, flashKey } = useOverBudgetFlash(used, total);
+  const { overage, overBudget, tight, flashKey } = useOverBudgetFlash(used, total);
   const known = used !== null && total !== null;
   const pct = known && total > 0 ? Math.min(100, (used / total) * 100) : 0;
 
@@ -46,7 +46,7 @@ export function ResourceBar({ label, used, total, resource }: ResourceBarProps) 
         >
           {known && (
             <div
-              className={`h-full rounded-full ${overBudget ? 'bg-danger' : 'bg-accent'}`}
+              className={`h-full rounded-full ${overBudget ? 'bg-danger' : tight ? 'bg-warning' : 'bg-accent'}`}
               style={{ width: `${pct}%` }}
             />
           )}
@@ -148,13 +148,7 @@ export function SlotCard({
         </div>
         <div className="absolute top-0 right-0 flex @min-[44rem]:static">
           {menu && <RowMoreActions />}
-          <IconButton
-            icon={<Close />}
-            tone="danger"
-            variant="plain"
-            label={removeLabel}
-            onClick={onRemove}
-          />
+          <IconButton icon={<Close />} variant="plain" label={removeLabel} onClick={onRemove} />
         </div>
       </div>
     </div>

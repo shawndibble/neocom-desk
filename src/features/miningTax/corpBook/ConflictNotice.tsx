@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui';
 import type { ConflictCause } from '@/engine/corpTaxBook/personal';
 import { formatIsk } from '@/lib/isk';
+import { Well } from '@/components/ui/Well';
 
 const TITLE_KEY: Record<ConflictCause, string> = {
   otherPayee: 'titleOtherPayee',
@@ -44,11 +45,7 @@ export function ConflictNotice({
   const k = (key: string) => `miningTax.corpBook.conflict.${key}`;
 
   return (
-    <div
-      role="region"
-      aria-label={t(k('region'))}
-      className="space-y-2 rounded-xs border border-warning/60 bg-warning/10 p-2 text-xs"
-    >
+    <Well tone="warning" role="region" aria-label={t(k('region'))} className="space-y-2 text-xs">
       <p className="font-semibold text-warning">
         {t(k(TITLE_KEY[cause ?? 'otherPayee']), { corp: corpName, owner: ownerName })}
       </p>
@@ -101,6 +98,6 @@ export function ConflictNotice({
           {tell}
         </li>
       </ul>
-    </div>
+    </Well>
   );
 }

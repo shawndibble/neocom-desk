@@ -136,7 +136,7 @@ export function BuyerQuotes({
       aria-label={t('communities.board.buyback.quotesTitle')}
       className="space-y-2 rounded-xs border border-line px-3 py-2"
     >
-      <h3 className="text-xs font-medium uppercase tracking-wide text-text-dim">
+      <h3 className="text-xs font-medium uppercase tracking-widest text-text-dim">
         {t('communities.board.buyback.quotesTitle')}
       </h3>
       {quoted.length === 0 && (

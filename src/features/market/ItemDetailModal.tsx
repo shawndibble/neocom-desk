@@ -78,6 +78,9 @@ import { recordAttributes } from '@/features/abyssal/dynamicItems';
 import type { DynamicItemRecord } from '@/db';
 import { formatIsk, formatIskCompact, marketIskDecimals } from '@/lib/isk';
 import { formatCount } from '@/lib/formatCount';
+import { ownedAnywhere } from '@/engine/market/appraisalOwned';
+import { assetHref } from '@/features/assets/assetBrowseModel';
+import { useCachedAssetLists } from '@/features/assets/useCachedAssetLists';
 
 export interface ItemDetailModalProps {
   typeId: number;
@@ -360,6 +363,12 @@ export function ItemDetailModal({
                     </p>
                   )}
                   <VolumeLine type={data.type} />
+                  <FindInAssetsLink
+                    typeId={typeId}
+                    itemName={itemName}
+                    onNavigate={leave}
+                    replace={onLeave !== undefined}
+                  />
                   {abyssal === null
                     ? null
                     : abyssal
@@ -518,6 +527,37 @@ function OpenInMarketLink({
     >
       {t('market.itemDetail.openInMarket')}
     </Link>
+  );
+}
+
+function FindInAssetsLink({
+  typeId,
+  itemName,
+  onNavigate,
+  replace,
+}: {
+  typeId: number;
+  itemName: string;
+  onNavigate: () => void;
+  replace: boolean;
+}) {
+  const { t } = useTranslation();
+  const inRouter = useInRouterContext();
+  const signedIn = useActiveCharacter((state) => state.activeCharacterId !== null);
+  const lists = useCachedAssetLists(inRouter && signedIn);
+  const owned = useMemo(() => lists !== null && ownedAnywhere(lists).has(typeId), [lists, typeId]);
+  if (!owned) return null;
+  return (
+    <p>
+      <Link
+        to={assetHref(null, [], `?chars=all&q=${encodeURIComponent(itemName)}`)}
+        replace={replace}
+        onClick={onNavigate}
+        className={inlineLinkClassName}
+      >
+        {t('market.itemDetail.findInAssets')}
+      </Link>
+    </p>
   );
 }
 

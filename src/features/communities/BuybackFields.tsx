@@ -1,6 +1,14 @@
 import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Checkbox, FieldError, NativeSelect, TextInput, Button } from '@/components/ui';
+import {
+  Checkbox,
+  FieldError,
+  NativeSelect,
+  TextInput,
+  Button,
+  Field,
+  Fields,
+} from '@/components/ui';
 import {
   BUYBACK_GROUP_KEYS,
   parseRate,
@@ -39,71 +47,71 @@ export function BuybackFields({
   return (
     <div className="space-y-4">
       <div className="grid gap-3 sm:grid-cols-3">
-        <label className="block space-y-1">
-          <span className="block text-xs text-text-dim">{t('communities.board.buyback.rate')}</span>
-          <TextInput
-            className="w-full tabular-nums"
-            inputMode="decimal"
-            aria-invalid={!rateValid || undefined}
-            aria-describedby={rateValid ? undefined : rateErrorId}
-            value={draft.rate}
-            onChange={(e) => onChange({ ...draft, rate: e.target.value })}
-          />
-        </label>
-        <label className="block space-y-1">
-          <span className="block text-xs text-text-dim">
-            {t('communities.board.buyback.basis')}
-          </span>
-          <NativeSelect
-            className="w-full"
-            value={draft.rateBasis}
-            onChange={(e) => onChange({ ...draft, rateBasis: e.target.value as RateBasis })}
-          >
-            <option value="buy">{t('communities.board.buyback.basisBuy')}</option>
-            <option value="sell">{t('communities.board.buyback.basisSell')}</option>
-          </NativeSelect>
-        </label>
-        <label className="block space-y-1">
-          <span className="block text-xs text-text-dim">{t('communities.board.buyback.hub')}</span>
-          <NativeSelect
-            className="w-full"
-            value={draft.hubId}
-            onChange={(e) => onChange({ ...draft, hubId: e.target.value as BuybackHubId })}
-          >
-            {COMPARED_HUBS.map((hub) => (
-              <option key={hub.id} value={hub.id}>
-                {hub.systemName}
-              </option>
-            ))}
-          </NativeSelect>
-        </label>
+        <Fields variant="stacked">
+          <Field label={t('communities.board.buyback.rate')}>
+            <TextInput
+              className="w-full tabular-nums"
+              inputMode="decimal"
+              aria-invalid={!rateValid || undefined}
+              aria-describedby={rateValid ? undefined : rateErrorId}
+              value={draft.rate}
+              onChange={(e) => onChange({ ...draft, rate: e.target.value })}
+            />
+          </Field>
+        </Fields>
+        <Fields variant="stacked">
+          <Field label={t('communities.board.buyback.basis')}>
+            <NativeSelect
+              className="w-full"
+              value={draft.rateBasis}
+              onChange={(e) => onChange({ ...draft, rateBasis: e.target.value as RateBasis })}
+            >
+              <option value="buy">{t('communities.board.buyback.basisBuy')}</option>
+              <option value="sell">{t('communities.board.buyback.basisSell')}</option>
+            </NativeSelect>
+          </Field>
+        </Fields>
+        <Fields variant="stacked">
+          <Field label={t('communities.board.buyback.hub')}>
+            <NativeSelect
+              className="w-full"
+              value={draft.hubId}
+              onChange={(e) => onChange({ ...draft, hubId: e.target.value as BuybackHubId })}
+            >
+              {COMPARED_HUBS.map((hub) => (
+                <option key={hub.id} value={hub.id}>
+                  {hub.systemName}
+                </option>
+              ))}
+            </NativeSelect>
+          </Field>
+        </Fields>
       </div>
       {!rateValid && (
         <FieldError id={rateErrorId}>{t('communities.board.buyback.rateInvalid')}</FieldError>
       )}
       {buyers.length > 1 && (
-        <label className="block space-y-1">
-          <span className="block text-xs text-text-dim">
-            {t('communities.board.buyback.buyer')}
-          </span>
-          <NativeSelect
-            className="w-full sm:w-1/2"
-            value={String(draft.buyerCharacterId ?? ownCharacterId)}
-            onChange={(e) => {
-              const id = Number(e.target.value);
-              onChange({ ...draft, buyerCharacterId: id === ownCharacterId ? null : id });
-            }}
-          >
-            {buyers.map((b) => (
-              <option key={b.characterId} value={b.characterId}>
-                {b.name}
-              </option>
-            ))}
-          </NativeSelect>
-          <span className="block text-xs text-text-dim">
-            {t('communities.board.buyback.buyerHint')}
-          </span>
-        </label>
+        <Fields variant="stacked">
+          <Field label={t('communities.board.buyback.buyer')}>
+            <NativeSelect
+              className="w-full sm:w-1/2"
+              value={String(draft.buyerCharacterId ?? ownCharacterId)}
+              onChange={(e) => {
+                const id = Number(e.target.value);
+                onChange({ ...draft, buyerCharacterId: id === ownCharacterId ? null : id });
+              }}
+            >
+              {buyers.map((b) => (
+                <option key={b.characterId} value={b.characterId}>
+                  {b.name}
+                </option>
+              ))}
+            </NativeSelect>
+            <span className="block text-xs text-text-dim">
+              {t('communities.board.buyback.buyerHint')}
+            </span>
+          </Field>
+        </Fields>
       )}
       <fieldset className="space-y-2">
         <legend className="text-xs text-text-dim">{t('communities.board.buyback.buys')}</legend>

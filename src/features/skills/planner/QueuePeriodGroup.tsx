@@ -96,7 +96,7 @@ export function QueuePeriodGroup({ group, catalog, nowMs }: QueuePeriodGroupProp
   return (
     <section>
       <div className="mb-1 flex items-baseline justify-between gap-3 px-1">
-        <h3 className="text-xs font-semibold tracking-wide text-text-dim uppercase">
+        <h3 className="text-xs font-semibold tracking-widest text-text-dim uppercase">
           {periodLabel(t, group, nowMs, timeZone)}
         </h3>
         <span className="text-xs text-text-dim tabular-nums">
@@ -129,7 +129,7 @@ export function QueueLooseRows({
   if (rows.length === 0) return null;
   return (
     <section>
-      <h3 className="mb-1 px-1 text-xs font-semibold tracking-wide text-text-dim uppercase">
+      <h3 className="mb-1 px-1 text-xs font-semibold tracking-widest text-text-dim uppercase">
         {title}
       </h3>
       <ul className="rounded-xs border border-line bg-panel">

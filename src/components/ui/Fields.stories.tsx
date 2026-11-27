@@ -36,6 +36,9 @@ type Story = StoryObj<typeof meta>;
 /** @summary `compact`: two columns, dim labels, for a dense panel or modal. */
 export const Compact: Story = {};
 
+/** @summary `stacked`: one column, dim label above each control; the one way for a caption above a control outside a filter sheet. */
+export const Stacked: Story = { args: { variant: 'stacked' } };
+
 /** @summary `form`: stacked on a phone, label column beside the control at `lg`, hairlines between rows. */
 export const Form: Story = { args: { variant: 'form' } };
 

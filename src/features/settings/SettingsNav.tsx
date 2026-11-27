@@ -32,10 +32,7 @@ export function SettingsNav({ groups, value }: SettingsNavProps) {
     <nav aria-label={t('settings.navLabel')} className={sectionRailClassName}>
       {groups.map((group) => (
         <div key={group.id} className="mb-3">
-          <p
-            id={`settings-nav-${group.id}`}
-            className="px-2 pb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
-          >
+          <p id={`settings-nav-${group.id}`} className={`${eyebrowClassName} px-2 pb-1`}>
             {t(group.labelKey)}
           </p>
           <ul aria-labelledby={`settings-nav-${group.id}`} className="space-y-px">

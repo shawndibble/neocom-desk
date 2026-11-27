@@ -30,7 +30,12 @@ import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
 import { useCompareCodes, MAX_COMPARE_SLOTS } from '@/features/fittings/compareUrl';
 import { FittingComparePicker } from '@/features/fittings/FittingComparePicker';
 import { FITTINGS_PATH, fittingEditLocation } from '@/features/fittings/fittingRoutes';
-import { inlineLinkClassName } from '@/components/ui/controlStyles';
+import {
+  focusRingClassName,
+  inlineLinkClassName,
+  interactiveClassName,
+} from '@/components/ui/controlStyles';
+import { cx } from '@/lib/cx';
 import { FittingCompareModulesSummary } from '@/features/fittings/FittingCompareModulesSummary';
 import {
   FittingCompareTable,
@@ -303,22 +308,35 @@ export function FittingCompare() {
       <PageHeader
         title={t('fittings.compare.title')}
         actions={
-          <Tooltip
-            content={
-              count >= MAX_COMPARE_SLOTS
-                ? t('fittings.compare.slotsFull', { count: MAX_COMPARE_SLOTS })
-                : null
-            }
-          >
-            <Button
-              ref={addFittingRef}
-              variant="primary"
-              aria-disabled={count >= MAX_COMPARE_SLOTS || undefined}
-              onClick={() => setPickerOpen(true)}
+          <>
+            <Link
+              to={FITTINGS_PATH}
+              className={cx(
+                'inline-flex min-h-9 items-center gap-1 rounded-xs px-2 text-sm text-text-dim hover:text-text active:text-text-dim md:hidden',
+                interactiveClassName,
+                focusRingClassName
+              )}
             >
-              {t('fittings.compare.addFitting')}
-            </Button>
-          </Tooltip>
+              <span aria-hidden="true">‹</span>
+              {t('ships.tabs.fittings')}
+            </Link>
+            <Tooltip
+              content={
+                count >= MAX_COMPARE_SLOTS
+                  ? t('fittings.compare.slotsFull', { count: MAX_COMPARE_SLOTS })
+                  : null
+              }
+            >
+              <Button
+                ref={addFittingRef}
+                variant="primary"
+                aria-disabled={count >= MAX_COMPARE_SLOTS || undefined}
+                onClick={() => setPickerOpen(true)}
+              >
+                {t('fittings.compare.addFitting')}
+              </Button>
+            </Tooltip>
+          </>
         }
       />
 

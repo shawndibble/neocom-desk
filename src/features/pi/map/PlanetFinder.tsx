@@ -2,7 +2,7 @@ import { fixed1 } from '@/lib/fixedFormat';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Checkbox } from '@/components/ui';
+import { Checkbox, Spinner } from '@/components/ui';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
 import type { PlanetType } from '@/engine/pi/goalTypes';
 import {
@@ -107,7 +107,12 @@ export function PlanetFinder({
       </div>
       <div aria-live="polite">
         {current === null ? (
-          <p className="py-1.5 text-xs text-text-dim">{t('piMap.finder.loading')}</p>
+          <Spinner
+            size="sm"
+            showLabel
+            label={t('piMap.finder.loading')}
+            className="py-1.5 text-xs"
+          />
         ) : current === 'failed' ? (
           <p className="py-1.5 text-xs text-text-dim">{t('piMap.finder.failed')}</p>
         ) : current.results.length === 0 ? (

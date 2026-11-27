@@ -187,8 +187,29 @@ export function Clones() {
         characterId={activeCharacterId}
         totalSp={sp.totalSp}
         unallocatedSp={sp.unallocatedSp}
+        actions={
+          <IconButton
+            icon={<Icon.Refresh />}
+            label={t('clones.refresh')}
+            onClick={refresh}
+            busy={loading}
+          />
+        }
       />
-      <OverviewSubNav />
+      <OverviewSubNav
+        trailing={
+          clonesResult && (
+            <span className="flex items-center gap-1 text-[0.6875rem] text-text-dim">
+              <span className="max-md:hidden">{t('clones.updated')}</span>
+              <DataAgeBadge
+                date={clonesResult.fetchedAt}
+                expiresAt={clonesResult.expiresAt}
+                alwaysVisible
+              />
+            </span>
+          )
+        }
+      />
 
       {showSummary && (
         <div className="flex flex-col gap-4">
@@ -227,21 +248,7 @@ export function Clones() {
 
       <Panel
         title={t('clones.title')}
-        actions={
-          <span className="flex items-center gap-2">
-            {clonesResult && (
-              <DataAgeBadge date={clonesResult.fetchedAt} expiresAt={clonesResult.expiresAt} />
-            )}
-            <IconButton
-              size="sm"
-              icon={<Icon.Refresh />}
-              label={t('clones.refresh')}
-              onClick={refresh}
-              busy={loading}
-            />
-            <TableActionsMenu name={t('clones.title')} tableExport={clonesExport} />
-          </span>
-        }
+        actions={<TableActionsMenu name={t('clones.title')} tableExport={clonesExport} />}
         padded={false}
       >
         {loading && !data ? (

@@ -759,7 +759,7 @@ describe('A failed board reload', () => {
     const onReload = renderTab([request({ id: 'a' })], vi.fn(), {}, false, false, true);
     expect(screen.getByRole('alert')).toHaveTextContent(/Couldn't load this Community's Requests/);
     expect(screen.getByText('Tritanium')).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Retry' }));
+    await user.click(screen.getByRole('button', { name: 'Try again' }));
     expect(onReload).toHaveBeenCalledTimes(1);
   });
 });
@@ -769,7 +769,7 @@ describe('A failed Pledge read', () => {
     const user = userEvent.setup();
     const reload = renderTab([request({})], vi.fn(), {}, true);
     expect(screen.getByRole('alert')).toHaveTextContent(/Couldn't load some Pledges/);
-    await user.click(screen.getByRole('button', { name: 'Retry' }));
+    await user.click(screen.getByRole('button', { name: 'Try again' }));
     expect(reload).toHaveBeenCalled();
   });
 });

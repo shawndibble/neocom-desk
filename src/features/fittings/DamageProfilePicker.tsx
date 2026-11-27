@@ -122,10 +122,8 @@ function ProfileForm({
       <p className="text-xs text-text-dim">{t('fittings.damageProfile.ratioHint')}</p>
       {error && <FieldError id={errorId}>{error}</FieldError>}
       <DialogFooter>
-        <Button size="sm" onClick={onCancel}>
-          {t('fittings.damageProfile.cancel')}
-        </Button>
-        <Button size="sm" variant="primary" type="submit">
+        <Button onClick={onCancel}>{t('fittings.damageProfile.cancel')}</Button>
+        <Button variant="primary" type="submit">
           {t('fittings.damageProfile.save')}
         </Button>
       </DialogFooter>

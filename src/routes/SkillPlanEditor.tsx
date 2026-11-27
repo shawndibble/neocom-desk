@@ -16,6 +16,7 @@ import { PlanEditorLayout } from '@/features/skills/planner/PlanEditorLayout';
 import { useIsPlanEditorWide } from '@/features/skills/planner/useIsPlanEditorWide';
 import { PlanListPane } from '@/features/skills/planner/PlanListPane';
 import { usePlanEditorData } from '@/features/skills/planner/usePlanEditorData';
+import { useDocumentTitleName } from '@/app/documentTitleName';
 
 export function SkillPlanEditor() {
   const { t } = useTranslation();
@@ -83,6 +84,7 @@ export function SkillPlanEditor() {
   }, [planId]);
 
   const loadedPlan = planQuery?.plan ?? null;
+  useDocumentTitleName(loadedPlan?.name);
   const handleUpdate = useCallback(
     async (patch: PlanPatch) => {
       if (!loadedPlan) return;

@@ -31,6 +31,9 @@ vi.mock('@/features/places/regions', () => ({
 }));
 
 import { useActiveCharacter } from '@/stores/activeCharacter';
+import { db } from '@/db';
+import { writeCached } from '@/esi/cache';
+import { seedCharacter } from '@/test/seed';
 import { PlaceInfoDialog } from './PlaceInfoDialog';
 
 function renderPlace(id: number) {
@@ -61,6 +64,36 @@ describe('PlaceInfoDialog', () => {
       '/?info=place-10000002'
     );
     expect(screen.getByRole('button', { name: /Set destination/ })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Your assets here' })).toBeNull();
+  });
+
+  it('links to the assets a Character holds at the station', async () => {
+    await seedCharacter(7, 'Hauler');
+    await writeCached(
+      7,
+      'assets',
+      [
+        {
+          item_id: 1,
+          type_id: 34,
+          quantity: 5,
+          location_id: 60003760,
+          location_type: 'station',
+          location_flag: 'Hangar',
+        },
+      ],
+      Date.now()
+    );
+    try {
+      renderPlace(60003760);
+      expect(await screen.findByRole('link', { name: 'Your assets here' })).toHaveAttribute(
+        'href',
+        expect.stringContaining('60003760')
+      );
+    } finally {
+      await db.esiCache.clear();
+      await db.characters.clear();
+    }
   });
 
   it('shows a structure the active Character can dock at', async () => {

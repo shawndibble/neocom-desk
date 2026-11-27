@@ -32,7 +32,7 @@ function Status({ status }: { status: NonNullable<RowDetailModel['status']> }) {
   return (
     <Well size="lg" className="space-y-1.5">
       {status.badge && <Pill tone={status.tone}>{status.badge}</Pill>}
-      {status.text && <p className="text-2xl font-semibold tabular-nums">{status.text}</p>}
+      {status.text && <p className="text-xl font-semibold tabular-nums">{status.text}</p>}
       {status.note && <p className="text-xs text-text-dim">{status.note}</p>}
     </Well>
   );

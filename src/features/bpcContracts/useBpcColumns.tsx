@@ -132,9 +132,7 @@ export function useBpcColumns({
           return (
             <span className="inline-flex flex-wrap items-center gap-x-1.5">
               {place}
-              <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                {t('bpcContracts.atTradeHub')}
-              </span>
+              <span className={eyebrowClassName}>{t('bpcContracts.atTradeHub')}</span>
             </span>
           );
         },

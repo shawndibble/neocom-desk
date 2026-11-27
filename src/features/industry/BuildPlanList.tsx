@@ -1,3 +1,4 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { Fragment, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -352,8 +353,10 @@ export function BuildPlanList({
             measuring={{ droppable: { strategy: MeasuringStrategy.Always } }}
             autoScroll={{ threshold: { x: 0.2, y: 0.25 }, acceleration: 20 }}
           >
-            <div className="flex items-center gap-2 border-b border-line bg-panel-2 px-2 py-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-              <span className="flex-1">{t('industry.title')}</span>
+            <div
+              className={`${eyebrowClassName} flex items-center gap-2 border-b border-line bg-panel-2 px-2 py-1.5`}
+            >
+              <span className="flex-1">{t('industry.comparePlanColumn')}</span>
               <BuildPlanSortHeader
                 sortKey="profit"
                 label={t('industry.profitColumn')}

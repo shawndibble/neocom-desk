@@ -53,7 +53,7 @@ const PLACEMENT_CLASSES: Record<ModalPlacement, { dialogClass: string; heightCla
   },
   top: {
     dialogClass:
-      'motion-dialog mx-auto mt-[max(1rem,env(safe-area-inset-top))] mb-auto w-full max-w-lg md:mt-[12vh]',
+      'motion-fade mx-auto mt-[max(1rem,env(safe-area-inset-top))] mb-auto w-full max-w-lg md:mt-[12vh]',
     heightClass: 'h-fit max-h-[85dvh]',
   },
   sheet: {

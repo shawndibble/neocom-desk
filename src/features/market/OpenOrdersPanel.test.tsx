@@ -314,7 +314,7 @@ describe('OpenOrdersPanel', () => {
     expect(await screen.findByRole('heading', { name: '2 orders need you' })).toBeInTheDocument();
     const line = screen.getByText(/ISK tied up in them/).closest('p');
     expect(line).toHaveTextContent('6.5K');
-    expect(line).toHaveTextContent(/ISK tied up in them · 0 to watch · 1 fine/);
+    expect(line).not.toHaveTextContent(/to watch|fine/);
     expect(screen.getByRole('button', { name: 'Needs you (2)' })).toHaveAttribute(
       'aria-pressed',
       'true'
@@ -505,8 +505,7 @@ describe('OpenOrdersPanel', () => {
 
     renderPanel();
 
-    expect(await screen.findByText(/1 to watch · 0 fine/)).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Watch (1)' }));
+    await user.click(await screen.findByRole('button', { name: 'Watch (1)' }));
     const row = within(await screen.findByRole('table', { name: 'Orders to watch' })).getByRole(
       'row',
       { name: /Pyerite/ }

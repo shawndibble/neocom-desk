@@ -101,7 +101,7 @@ function Card({
         {suggested && (
           <span
             aria-hidden="true"
-            className="inline-flex items-center gap-1 text-[0.6875rem] font-semibold tracking-wide text-accent uppercase"
+            className="inline-flex items-center gap-1 text-[0.6875rem] font-semibold tracking-widest text-accent uppercase"
           >
             <Icon.Done className="size-3 shrink-0" />
             {t('assets.oreDecision.suggested')}

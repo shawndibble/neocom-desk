@@ -200,6 +200,23 @@ describe('the rail', () => {
     expect(within(views).queryByRole('link', { name: 'SRP' })).not.toBeInTheDocument();
   });
 
+  it('keeps Overview current on one of its own views', () => {
+    renderAt('/clones');
+    expect(within(rail()).getByRole('link', { name: 'Overview' })).toHaveAttribute(
+      'aria-current',
+      'page'
+    );
+  });
+
+  it('lights Build Plans on a Build Group', () => {
+    renderAt('/industry/groups/g1');
+    const views = within(rail()).getByRole('list', { name: 'Industry' });
+    expect(within(views).getByRole('link', { name: 'Build Plans' })).toHaveAttribute(
+      'aria-current',
+      'page'
+    );
+  });
+
   it('lists only the SRP tabs an officer can see under Corp SRP', async () => {
     vi.mocked(useCorpAccess).mockReturnValue({
       state: 'ready',

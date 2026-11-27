@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Button, Eyebrow, StandingIcon } from '@/components/ui';
 import { SecurityStatus } from '@/components/SecurityStatus';
 import { HintText } from '@/components/ui/HintText';
+import { Well } from '@/components/ui/Well';
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { CharacterLink, CorporationLink, PlaceLink } from '@/features/entities';
 import { JumpsLink } from '@/features/route/JumpsLink';
@@ -31,15 +32,14 @@ function Card({
   fill?: boolean;
 }) {
   return (
-    <section
-      className={cx(
-        'flex flex-col gap-2 rounded-xs border border-line bg-panel-2 p-3',
-        fill ? 'w-full' : 'w-fit max-w-full'
-      )}
+    <Well
+      as="section"
+      size="lg"
+      className={cx('flex flex-col gap-2', fill ? 'w-full' : 'w-fit max-w-full')}
     >
       <Eyebrow as="h3">{title}</Eyebrow>
       {children}
-    </section>
+    </Well>
   );
 }
 

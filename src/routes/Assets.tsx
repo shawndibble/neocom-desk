@@ -81,7 +81,6 @@ export function Assets() {
 
           {tab === 'move' && (
             <MovePlanTab
-              onClose={() => setTab('items')}
               characterIds={shipCharacterIds}
               activeCharacterId={activeCharacterId}
               onSkippedChange={setTabMissingNames}

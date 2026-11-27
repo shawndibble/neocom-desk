@@ -103,7 +103,7 @@ export function pendingColumns(ctx: ClaimColumnsContext): DataTableColumn<SrpCla
       id: 'actions',
       header: '',
       align: 'right',
-      className: 'whitespace-nowrap',
+      className: 'w-0 whitespace-nowrap',
       render: (row) => (
         <span className="flex flex-nowrap justify-end gap-2">
           <ApproveReject claim={row} ctx={ctx} className="whitespace-nowrap" />

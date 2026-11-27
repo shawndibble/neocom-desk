@@ -1,3 +1,4 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useTranslation } from 'react-i18next';
 import type { PlanPriority } from '@/engine/types';
 import type { AttributePair } from '../attributePairBands';
@@ -19,8 +20,6 @@ export function BandHeader({ band }: BandHeaderProps) {
           pair: attributePairLabel(band.primary, band.secondary),
         });
   return (
-    <li className="border-b border-line bg-panel-2 px-2 py-1 text-[0.6875rem] font-semibold uppercase tracking-widest text-text-dim">
-      {text}
-    </li>
+    <li className={`${eyebrowClassName} border-b border-line bg-panel-2 px-2 py-1`}>{text}</li>
   );
 }

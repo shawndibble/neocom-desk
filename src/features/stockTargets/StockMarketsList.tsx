@@ -225,7 +225,7 @@ export function StockMarketsList({
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
       <div className="flex flex-wrap items-center gap-2">
-        <h2 data-stock-markets tabIndex={-1} className="text-lg font-semibold focus:outline-none">
+        <h2 data-stock-markets tabIndex={-1} className="text-xl font-semibold focus:outline-none">
           {t('stockTargets.markets.count', { count: lists.length })}
         </h2>
         {data?.oldestFetchedAt && <DataAgeBadge date={data.oldestFetchedAt} alwaysVisible />}

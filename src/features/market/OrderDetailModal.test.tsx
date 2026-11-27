@@ -461,7 +461,7 @@ describe('OrderDetailModal', () => {
     );
     expect(screen.queryByText(/type in what it cost/i)).not.toBeInTheDocument();
     const costSection = screen.getByText('What it cost you').closest('section')!;
-    expect(within(costSection).getByText(/build plan on the Industry page/i)).toBeInTheDocument();
+    expect(within(costSection).getByText(/Link a logged Build Plan run/)).toBeInTheDocument();
     expect(screen.queryByText(/^0(\.00)? ISK$/)).not.toBeInTheDocument();
     expect(screen.queryByText('You keep a unit')).not.toBeInTheDocument();
   });

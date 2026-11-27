@@ -37,13 +37,13 @@ export function NowTrainingCard({ row, next, catalog, nowMs }: NowTrainingCardPr
       aria-label={t('plans.trainingNow')}
       className="rounded-xs border border-accent-dim bg-panel p-4"
     >
-      <div className="flex items-center gap-2 text-xs font-semibold tracking-wide text-success uppercase">
+      <div className="flex items-center gap-2 text-xs font-semibold tracking-widest text-success uppercase">
         <span aria-hidden className="size-2 rounded-full bg-success motion-safe:animate-pulse" />
         {t('plans.trainingNow')}
       </div>
       <div className="mt-2 flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
         <div className="min-w-0">
-          <div className="text-xl font-semibold text-text sm:text-2xl">
+          <div className="text-xl font-semibold text-text">
             <SkillLink typeId={entry.skill_id}>{name}</SkillLink> {level}
           </div>
           {spPerHour !== null && (
@@ -55,8 +55,8 @@ export function NowTrainingCard({ row, next, catalog, nowMs }: NowTrainingCardPr
           )}
         </div>
         {secondsRemaining !== null && (
-          <div className="sm:text-right">
-            <div className="text-xl font-semibold text-text tabular-nums sm:text-2xl">
+          <div className="sm:ml-auto sm:text-right">
+            <div className="text-xl font-semibold text-text tabular-nums">
               {formatCountdown(secondsRemaining)}
             </div>
             <div className="text-sm text-text-dim">{t('plans.heroDone', { date: finish })}</div>

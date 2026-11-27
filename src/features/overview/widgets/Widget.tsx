@@ -19,6 +19,7 @@ import { GrantBanner } from '@/app/GrantNote';
 import { GrantCellMark } from '@/app/GrantCellMark';
 import { ReauthCachedNote } from '@/app/ReauthCachedNote';
 import { cx } from '@/lib/cx';
+import { skeletonBarClassName } from '@/components/ui/skeletonBarClassName';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { formatAge } from '@/lib/age';
 import { useTicker } from '@/lib/ticker';
@@ -125,7 +126,7 @@ function NumberBody({ model, dimmed = false }: { model: NumberModel; dimmed?: bo
     <div className={only ? 'grid min-w-0 flex-1 gap-1' : 'grid gap-1 px-3 py-2.5'}>
       <div
         className={cx(
-          'flex flex-wrap items-baseline gap-x-1.5 text-2xl leading-tight font-semibold tabular-nums',
+          'flex flex-wrap items-baseline gap-x-1.5 text-xl leading-tight font-semibold tabular-nums',
           dimmed ? 'text-text-dim' : toned ? SEVERITY_TEXT[model.tone] : 'text-text'
         )}
       >
@@ -310,11 +311,10 @@ function HeaderCharacterReadout({ characterId }: { characterId: number }) {
 
 function Skeleton({ minHeight }: { minHeight: number }) {
   const { t } = useTranslation();
-  const bar = 'block animate-pulse rounded-xs bg-line motion-reduce:animate-none';
   return (
     <div className="grid content-start gap-2 px-3 py-3" style={{ minHeight }}>
-      <span aria-hidden="true" className={cx(bar, 'h-6 w-[45%]')} />
-      <span aria-hidden="true" className={cx(bar, 'h-3 w-[70%]')} />
+      <span aria-hidden="true" className={cx(skeletonBarClassName, 'h-6 w-[45%]')} />
+      <span aria-hidden="true" className={cx(skeletonBarClassName, 'h-3 w-[70%]')} />
       <span className="sr-only">{t('overview.widgets.loading')}</span>
     </div>
   );

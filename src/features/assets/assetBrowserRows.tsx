@@ -17,7 +17,11 @@ import type { AskEstimateFigure } from '@/features/assets/assetAskFigure';
 import { HintText } from '@/components/ui/HintText';
 import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
-import { focusRingInsetClassName, tappableRowClassName } from '@/components/ui/controlStyles';
+import {
+  focusRingInsetClassName,
+  rowInteractiveClassName,
+  tappableRowClassName,
+} from '@/components/ui/controlStyles';
 import { useLiftAfterHoldGuard } from '@/components/ui/liftAfterHold';
 import { ItemInfoLink } from '@/features/entities';
 import { formatUnitVolume } from '@/lib/volume';
@@ -187,7 +191,12 @@ export function LocationRow({
   const navigate = useNavigate();
   const pinned = pinState !== 'unpinned';
   const row = (
-    <div className="relative flex items-center gap-2 border-b border-line pr-2 pl-3 hover:bg-panel-2">
+    <div
+      className={cx(
+        'relative flex items-center gap-2 border-b border-line pr-2 pl-3',
+        rowInteractiveClassName
+      )}
+    >
       {selectMode && (
         <span className="relative z-10 flex">
           <SelectionCheckbox
@@ -320,7 +329,9 @@ export function ContainerRow({
   const name = gameName ?? label;
   const hasMenu = actions.length >= 2 || extraItems !== undefined;
   const row = (
-    <div className="flex items-center gap-2 border-b border-line pl-3 hover:bg-panel-2">
+    <div
+      className={cx('flex items-center gap-2 border-b border-line pl-3', rowInteractiveClassName)}
+    >
       {selectMode && (
         <SelectionCheckbox
           state={selectionState}
@@ -563,7 +574,9 @@ export function ItemRow({
   const volumeText =
     unitVolume === undefined ? t('assets.unknownValue') : formatUnitVolume(unitVolume);
   return (
-    <div className="flex items-center gap-2 border-b border-line pl-3 hover:bg-panel-2">
+    <div
+      className={cx('flex items-center gap-2 border-b border-line pl-3', rowInteractiveClassName)}
+    >
       {selectMode && (
         <SelectionCheckbox
           state={selectionState}
@@ -689,7 +702,7 @@ export function SearchResultRow({
   t,
 }: SearchResultRowProps) {
   return (
-    <div className="border-b border-line hover:bg-panel-2">
+    <div className={cx('border-b border-line', rowInteractiveClassName)}>
       {wrap(
         <div className="flex items-center">
           <Link

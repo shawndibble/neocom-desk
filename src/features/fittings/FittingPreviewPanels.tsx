@@ -6,6 +6,7 @@ import { formatCompactNumber } from '@/lib/compactNumber';
 import { formatSeconds } from '@/lib/duration';
 import type { Fitting, FittingStats } from '@/engine/fittings/types';
 import { ResistTable, type ResistRow } from './stats/ResistTable';
+import { formatEhp } from './stats/resistFormat';
 import { MissingSkillsChip } from './MissingSkillsChip';
 import { IN_GAME_FITTING_DESCRIPTION_MAX } from './saveToEve';
 import { useFittingSkillGaps } from './useFittingSkillGaps';
@@ -185,7 +186,7 @@ export function DefensePanel({ stats }: { stats: FittingStats }) {
   ].map(({ key, label, layer }) => ({
     key,
     label,
-    sub: formatCompactNumber(layer.hp),
+    sub: formatEhp(layer.hp),
     resonances: layer,
     ehp: layer.ehp,
   }));
@@ -199,7 +200,7 @@ export function DefensePanel({ stats }: { stats: FittingStats }) {
       <ResistTable rows={rows} />
       <PreviewFacts
         items={[
-          { label: t('fittings.start.preview.ehp'), value: formatCompactNumber(stats.ehp) },
+          { label: t('fittings.start.preview.ehp'), value: formatEhp(stats.ehp) },
           {
             label: t('fittings.start.preview.speed'),
             value: t('fittings.start.preview.unit.speed', {
