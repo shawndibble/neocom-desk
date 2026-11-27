@@ -866,6 +866,21 @@ export function parseLinkSharedPopSurveyInput(data: unknown): LinkSharedPopSurve
   return { popId: d.popId, surveyId: d.surveyId, onlyIfUnlinked: d.onlyIfUnlinked === true };
 }
 
+async function linkIfUnlinked(
+  db: SharedPopsReadDeps['db'],
+  extraction: DocumentReference,
+  surveyId: string
+): Promise<void> {
+  await db.runTransaction(async (tx) => {
+    const snap = await tx.get(extraction);
+    if (!snap.exists) throw new HttpsError('not-found', 'That pop is gone');
+    const current = str(snap.get('popSurveyId')) ?? str(snap.get('surveyId'));
+    if (current !== undefined && current !== surveyId)
+      throw new HttpsError('failed-precondition', 'already linked');
+    if (current === undefined) tx.update(extraction, { popSurveyId: surveyId });
+  });
+}
+
 export async function linkSharedPopSurvey(
   deps: SharedPopsReadDeps,
   caller: Caller,
@@ -885,12 +900,14 @@ export async function linkSharedPopSurvey(
     .collection(EXTRACTIONS)
     .doc(pop.extractionId);
   if (pop.surveyId === input.surveyId) return { linked: true };
-  if (input.onlyIfUnlinked && pop.surveyId)
-    throw new HttpsError('failed-precondition', 'already linked');
-  try {
-    await extraction.update({ popSurveyId: input.surveyId });
-  } catch {
-    throw new HttpsError('not-found', 'That pop is gone');
+  if (input.onlyIfUnlinked) {
+    await linkIfUnlinked(deps.db, extraction, input.surveyId);
+  } else {
+    try {
+      await extraction.update({ popSurveyId: input.surveyId });
+    } catch {
+      throw new HttpsError('not-found', 'That pop is gone');
+    }
   }
   await refreshSharedPops(deps, pop.corporationId);
   return { linked: true };

@@ -70,6 +70,13 @@ describe('linkSharedPopSurvey', () => {
     );
   });
 
+  it('links as the Character that can see the pop when one is named', async () => {
+    characters(1, 2);
+    await linkSharedPopSurvey('98000001_1000_1', 'abc234', { characterId: 2 });
+    expect(ensureSignedIn).toHaveBeenCalledWith(2);
+    expect(callRouted).toHaveBeenCalledWith('linkSharedPopSurveyCallable', expect.anything(), 2);
+  });
+
   it('asks the server not to overwrite a live link when told to', async () => {
     characters(1);
     await linkSharedPopSurvey('98000001_1000_1', 'abc234', { onlyIfUnlinked: true });
