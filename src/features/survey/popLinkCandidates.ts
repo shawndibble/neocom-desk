@@ -78,10 +78,10 @@ export interface PopSurveyDetails {
 export function popSurveyDetails(
   pop: SharedPopView,
   refineryOrMoonName: string | null,
-  corporationName: string
+  corporationName: string | null
 ): PopSurveyDetails {
   const name = refineryOrMoonName?.trim() ?? '';
-  const corporation = corporationName.trim();
+  const corporation = corporationName?.trim() ?? '';
   return {
     place: name === '' ? null : { id: pop.structureId, name },
     payee:
@@ -91,10 +91,15 @@ export function popSurveyDetails(
   };
 }
 
+export interface PopFill {
+  location?: InfoLocation;
+  tax?: SurveyTaxShare;
+}
+
 export function popSurveyFill(
   details: PopSurveyDetails,
   current: { location: InfoLocation | null; tax: SurveyTaxShare | null }
-): { location?: InfoLocation; tax?: SurveyTaxShare } {
+): PopFill {
   return {
     ...(current.location === null && details.place ? { location: details.place } : {}),
     ...(current.tax === null && details.payee ? { tax: details.payee } : {}),

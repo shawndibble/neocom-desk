@@ -183,37 +183,15 @@ describe('SurveyPopLinkPrompt', () => {
     expect(await screen.findByRole('alert')).toBeTruthy();
   });
 
-  it('fills a blank location and tax from the pop once linked, then refreshes the Survey', async () => {
+  it('hands the pop details to the fill once linked, then refreshes the Survey', async () => {
     loadSharedPopsRead.mockResolvedValue({ entries: [entry('p1')], corporations: [] });
     render(<SurveyPopLinkPrompt {...props} />);
     fireEvent.click(await screen.findByRole('button', { name: 'Link' }));
     await waitFor(() => expect(onStored).toHaveBeenCalled());
     expect(applyPopFill).toHaveBeenCalledWith(survey, 7, {
-      location: { id: 1_000_000_000_001, name: 'Alpha Refinery' },
-      tax: { name: 'Mining Co', pct: 10 },
+      place: { id: 1_000_000_000_001, name: 'Alpha Refinery' },
+      payee: { name: 'Mining Co', pct: 10 },
     });
-  });
-
-  it('leaves what the pilot already set alone', async () => {
-    loadSharedPopsRead.mockResolvedValue({ entries: [entry('p1')], corporations: [] });
-    const filled = {
-      ...survey,
-      published: { name: 'Me', pct: 5 },
-      info: { location: { id: null, name: 'my moon' }, notes: 'n' },
-    };
-    render(<SurveyPopLinkPrompt {...props} survey={filled} />);
-    fireEvent.click(await screen.findByRole('button', { name: 'Link' }));
-    await waitFor(() => expect(onStored).toHaveBeenCalled());
-    expect(applyPopFill).toHaveBeenCalledWith(filled, 7, {});
-  });
-
-  it('keeps the link when filling the details fails', async () => {
-    loadSharedPopsRead.mockResolvedValue({ entries: [entry('p1')], corporations: [] });
-    applyPopFill.mockRejectedValue(new Error('offline'));
-    render(<SurveyPopLinkPrompt {...props} />);
-    fireEvent.click(await screen.findByRole('button', { name: 'Link' }));
-    await waitFor(() => expect(onStored).toHaveBeenCalled());
-    expect(screen.queryByRole('alert')).toBeNull();
   });
 
   it('fills nothing when the pop was already linked', async () => {

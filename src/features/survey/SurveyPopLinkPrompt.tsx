@@ -10,9 +10,7 @@ import {
 } from '@/components/ui';
 import { InlineError } from '@/components/ui/InlineError';
 import { useHydratedStore } from '@/lib/useHydratedStore';
-import { applyPopFill } from './applyPopFill';
 import type { InfoSurvey } from './SurveyInfoPanel';
-import { popSurveyFill } from './popLinkCandidates';
 import { dismissPopLink, useDismissedPopLinks } from './surveyPref';
 import { usePopLinkPrompt, type PopLinkOption } from './usePopLinkPrompt';
 
@@ -35,10 +33,11 @@ export function SurveyPopLinkPrompt({
   const [picked, setPicked] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const prompt = usePopLinkPrompt({
-    surveyId,
+    survey,
+    characterId,
     oreNames,
-    location: survey.info?.location ?? null,
     enabled: hydrated && !dismissed.includes(surveyId),
+    onStored,
   });
   if (!prompt || prompt.options.length === 0) return null;
 
@@ -48,16 +47,7 @@ export function SurveyPopLinkPrompt({
     if (!target) return;
     setBusy(true);
     try {
-      await prompt.link(target, async () => {
-        const fill = popSurveyFill(target.details, {
-          location: survey.info?.location ?? null,
-          tax: survey.published,
-        });
-        try {
-          await applyPopFill(survey, characterId, fill);
-        } catch {}
-        onStored();
-      });
+      await prompt.link(target);
     } finally {
       setBusy(false);
     }

@@ -1,28 +1,20 @@
-import type { InfoLocation } from '@/engine/survey/infoTemplate';
 import type { InfoSurvey } from './SurveyInfoPanel';
-import { setSurveyInfo, setSurveyTax, type SurveyTaxShare } from './surveyStore';
+import { popSurveyFill, type PopSurveyDetails } from './popLinkCandidates';
+import { setSurveyInfo, setSurveyTax } from './surveyStore';
 
 export async function applyPopFill(
   survey: InfoSurvey,
   characterId: number,
-  fill: { location?: InfoLocation; tax?: SurveyTaxShare }
+  details: PopSurveyDetails
 ): Promise<void> {
-  if (fill.location) {
-    await setSurveyInfo({
-      id: survey.id,
-      expiresAt: survey.expiresAt,
-      location: fill.location,
-      notes: survey.info?.notes ?? '',
-      characterId,
-    });
-  }
-  if (fill.tax) {
-    await setSurveyTax({
-      id: survey.id,
-      expiresAt: survey.expiresAt,
-      name: fill.tax.name,
-      pct: fill.tax.pct,
-      characterId,
-    });
-  }
+  const fill = popSurveyFill(details, {
+    location: survey.info?.location ?? null,
+    tax: survey.published,
+  });
+  const base = { id: survey.id, expiresAt: survey.expiresAt, characterId };
+  await Promise.allSettled([
+    fill.location &&
+      setSurveyInfo({ ...base, location: fill.location, notes: survey.info?.notes ?? '' }),
+    fill.tax && setSurveyTax({ ...base, name: fill.tax.name, pct: fill.tax.pct }),
+  ]);
 }

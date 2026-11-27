@@ -2,9 +2,10 @@ import { useCallback, useState } from 'react';
 import { sharedPopTitle, type SharedPopEntry } from '@/features/character/calendarSharedPops';
 import { loadSharedPopsRead } from '@/features/character/calendarSharedPopsRead';
 import { loadMoonOreTypeIdByName } from '@/features/corp/moons/keptSurveyScan';
-import type { InfoLocation } from '@/engine/survey/infoTemplate';
 import { useKeyedLoad } from '@/lib/useAsyncLoad';
 import { linkSharedPopSurvey } from '@/sync/sharedPops';
+import { applyPopFill } from './applyPopFill';
+import type { InfoSurvey } from './SurveyInfoPanel';
 import {
   popLinkCandidates,
   popSurveyDetails,
@@ -27,7 +28,7 @@ export interface PopLinkOption {
 export interface PopLinkState {
   options: PopLinkOption[];
   strong: PopLinkOption | null;
-  link: (option: PopLinkOption, afterLinked?: () => Promise<void>) => Promise<void>;
+  link: (option: PopLinkOption) => Promise<void>;
   linkFailed: boolean;
 }
 
@@ -45,7 +46,7 @@ const optionOf = (
     details: popSurveyDetails(
       candidate.pop,
       candidate.pop.refineryName ?? entry?.moonName ?? null,
-      entry?.corporation.name ?? ''
+      entry?.corporation.name ?? null
     ),
   };
 };
@@ -59,16 +60,20 @@ const isAlreadyLinked = (error: unknown): boolean => {
 };
 
 export function usePopLinkPrompt({
-  surveyId,
+  survey,
+  characterId,
   oreNames,
-  location,
   enabled,
+  onStored,
 }: {
-  surveyId: string;
+  survey: InfoSurvey;
+  characterId: number;
   oreNames: readonly string[];
-  location: InfoLocation | null;
   enabled: boolean;
+  onStored: () => void;
 }): PopLinkState | null {
+  const surveyId = survey.id;
+  const location = survey.info?.location ?? null;
   const [attempt, setAttempt] = useState(0);
   const [linkFailed, setLinkFailed] = useState(false);
   const [takenElsewhere, setTakenElsewhere] = useState(false);
@@ -84,7 +89,7 @@ export function usePopLinkPrompt({
   const load = useKeyedLoad(enabled ? `${surveyId}:${oreKey}:${attempt}` : null, loader);
   const refresh = useCallback(() => setAttempt((n) => n + 1), []);
   const link = useCallback(
-    async (option: PopLinkOption, afterLinked?: () => Promise<void>) => {
+    async (option: PopLinkOption) => {
       setLinkFailed(false);
       try {
         await linkSharedPopSurvey(option.id, surveyId, {
@@ -100,10 +105,11 @@ export function usePopLinkPrompt({
         refresh();
         return;
       }
-      await afterLinked?.();
+      await applyPopFill(survey, characterId, option.details);
+      onStored();
       refresh();
     },
-    [surveyId, refresh]
+    [survey, surveyId, characterId, onStored, refresh]
   );
   if (load.status !== 'ready' || takenElsewhere) return null;
   const { now, entries, idByName } = load.data;
