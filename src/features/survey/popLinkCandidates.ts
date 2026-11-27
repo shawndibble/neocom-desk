@@ -3,6 +3,7 @@ import { classifyPlaceId } from '@/features/places/classify';
 import { sharedPopIsShown, sharedPopShownAtMs } from '@/features/character/calendarSharedPops';
 import type { InfoLocation } from '@/engine/survey/infoTemplate';
 import type { SharedPopView } from '@/sync/sharedPops';
+import type { SurveyTaxShare } from './surveyStore';
 
 export interface PopLinkCandidate {
   pop: SharedPopView;
@@ -67,4 +68,40 @@ export function strongPopMatch(candidates: readonly PopLinkCandidate[]): PopLink
   const [best, next] = candidates;
   if (!best || best.score !== 1) return null;
   return next?.score === 1 ? null : best;
+}
+
+export interface PopSurveyDetails {
+  place: InfoLocation | null;
+  payee: SurveyTaxShare | null;
+}
+
+export function popSurveyDetails(
+  pop: SharedPopView,
+  refineryOrMoonName: string | null,
+  corporationName: string | null
+): PopSurveyDetails {
+  const name = refineryOrMoonName?.trim() ?? '';
+  const corporation = corporationName?.trim() ?? '';
+  return {
+    place: name === '' ? null : { id: pop.structureId, name },
+    payee:
+      corporation === '' || corporation === String(pop.corporationId)
+        ? null
+        : { name: corporation, pct: pop.ratePct },
+  };
+}
+
+export interface PopFill {
+  location?: InfoLocation;
+  tax?: SurveyTaxShare;
+}
+
+export function popSurveyFill(
+  details: PopSurveyDetails,
+  current: { location: InfoLocation | null; tax: SurveyTaxShare | null }
+): PopFill {
+  return {
+    ...(current.location === null && details.place ? { location: details.place } : {}),
+    ...(current.tax === null && details.payee ? { tax: details.payee } : {}),
+  };
 }

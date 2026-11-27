@@ -2,10 +2,17 @@ import { useCallback, useState } from 'react';
 import { sharedPopTitle, type SharedPopEntry } from '@/features/character/calendarSharedPops';
 import { loadSharedPopsRead } from '@/features/character/calendarSharedPopsRead';
 import { loadMoonOreTypeIdByName } from '@/features/corp/moons/keptSurveyScan';
-import type { InfoLocation } from '@/engine/survey/infoTemplate';
 import { useKeyedLoad } from '@/lib/useAsyncLoad';
 import { linkSharedPopSurvey } from '@/sync/sharedPops';
-import { popLinkCandidates, strongPopMatch, type PopLinkCandidate } from './popLinkCandidates';
+import { applyPopFill } from './applyPopFill';
+import type { InfoSurvey } from './SurveyInfoPanel';
+import {
+  popLinkCandidates,
+  popSurveyDetails,
+  strongPopMatch,
+  type PopLinkCandidate,
+  type PopSurveyDetails,
+} from './popLinkCandidates';
 
 const FORCE_RELOAD_MS = 0;
 
@@ -15,6 +22,7 @@ export interface PopLinkOption {
   corporation: string;
   score: number | null;
   characterId?: number;
+  details: PopSurveyDetails;
 }
 
 export interface PopLinkState {
@@ -35,6 +43,11 @@ const optionOf = (
     corporation: entry?.corporation.name ?? String(candidate.pop.corporationId),
     score: candidate.score,
     characterId: candidate.pop.viewerCharacterIds?.[0],
+    details: popSurveyDetails(
+      candidate.pop,
+      candidate.pop.refineryName ?? entry?.moonName ?? null,
+      entry?.corporation.name ?? null
+    ),
   };
 };
 
@@ -47,16 +60,20 @@ const isAlreadyLinked = (error: unknown): boolean => {
 };
 
 export function usePopLinkPrompt({
-  surveyId,
+  survey,
+  characterId,
   oreNames,
-  location,
   enabled,
+  onStored,
 }: {
-  surveyId: string;
+  survey: InfoSurvey;
+  characterId: number;
   oreNames: readonly string[];
-  location: InfoLocation | null;
   enabled: boolean;
+  onStored: () => void;
 }): PopLinkState | null {
+  const surveyId = survey.id;
+  const location = survey.info?.location ?? null;
   const [attempt, setAttempt] = useState(0);
   const [linkFailed, setLinkFailed] = useState(false);
   const [takenElsewhere, setTakenElsewhere] = useState(false);
@@ -85,10 +102,14 @@ export function usePopLinkPrompt({
           return;
         }
         setTakenElsewhere(true);
+        refresh();
+        return;
       }
+      await applyPopFill(survey, characterId, option.details);
+      onStored();
       refresh();
     },
-    [surveyId, refresh]
+    [survey, surveyId, characterId, onStored, refresh]
   );
   if (load.status !== 'ready' || takenElsewhere) return null;
   const { now, entries, idByName } = load.data;
