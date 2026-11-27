@@ -62,8 +62,10 @@ export function AcceleratorRow({
         )}
       >
         <span className="min-w-0">
-          <span className="block text-sm">{t('plans.accelerator')}</span>
-          <span className="block truncate text-xs">{status}</span>
+          <span className="block text-sm">{t('skills.attributes')}</span>
+          <span className="block truncate text-xs">
+            <span className="text-text-dim">{t('plans.accelerator')} ·</span> {status}
+          </span>
         </span>
         <Icon.GoTo size={Icon.ICON_SIZE.sm} aria-hidden className="shrink-0 text-text-dim" />
       </button>

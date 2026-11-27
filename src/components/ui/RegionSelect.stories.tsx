@@ -32,12 +32,15 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
+/** @summary A type-to-filter region picker with an "All regions" row on top. */
 export const Default: Story = {};
 
+/** @summary A pinned shortcut row above the list that resolves to one region (open the picker to see it). */
 export const WithShortcut: Story = {
   args: { shortcut: { label: 'From my region', onSelect: () => 10000002 } },
 };
 
+/** @summary The shortcut disabled, with the reason drawn under it. */
 export const ShortcutDisabledWithNote: Story = {
   args: {
     shortcut: {

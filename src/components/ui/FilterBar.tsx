@@ -34,6 +34,9 @@ interface FilterFieldProps {
   className?: string;
 }
 
+/**
+ * @summary One labelled control inside a `FilterBar`; the caption shows in the phone sheet only.
+ */
 export function FilterField({
   label,
   children,
@@ -95,13 +98,41 @@ function focusField(container: HTMLElement | null, label: string | null): void {
 export type FilterControlsSurface = 'box' | 'sheet';
 
 interface FilterBarProps<T> {
+  /** @summary The committed filter state. On desktop edits land here at once. */
   value: T;
+  /** @summary Commit: called on every edit, on every surface. */
   onChange: (next: T) => void;
   search?: ReactNode;
+  /**
+   * @summary The filters set away from their default, in priority order.
+   *
+   * Badges the trigger with their count (in its accessible name too, so "this
+   * list is filtered" is not an accent colour alone, DESIGN.md §7). While the
+   * controls are closed they show as a line of pills — "label: value" with a
+   * remove each, then "Clear all" — in the slot the controls open into, so a
+   * setting is never shown twice. A pill that does not fit folds into "+N"
+   * from the end, so put the filters a reader most needs to see first.
+   *
+   * Supplied by the route rather than derived: which values count as
+   * "default", and how to say one in a few words, are the route's to know.
+   */
   active?: readonly ActiveFilter<T>[];
   resultCount?: number;
   title?: string;
   children: (value: T, onChange: (next: T) => void, surface: FilterControlsSurface) => ReactNode;
+  /**
+   * @summary One or two key filters shown in the row itself on a pointer-width screen.
+   *
+   * For the filter a pilot changes on nearly every visit. Fixed per page, at
+   * most two, and always the same width whatever is picked, so the row stays
+   * one line (DESIGN.md §4b). When they are not in the row — below `md`, and
+   * below `lg` for a `row` placement — `children` is told `surface ===
+   * 'sheet'` and renders them with the rest, and leaves them out otherwise,
+   * where they would show twice.
+   * Mark their `active` entries `inline` so they get no pill and no funnel
+   * count on a pointer-width screen. Not supported with `pointerSurface="popover"`.
+   * The cap of two is a convention, not enforced: the slot is a node.
+   */
   inline?: (value: T, onChange: (next: T) => void) => ReactNode;
   inlinePlacement?: 'row' | 'below';
   actions?: ReactNode;
@@ -112,6 +143,9 @@ interface FilterBarProps<T> {
   pointerSurface?: 'row' | 'popover';
 }
 
+/**
+ * @summary A page's one filter row: search, view actions and a funnel that opens the filters (a box on desktop, a bottom sheet on a phone); active filters show as pills while it is closed.
+ */
 export function FilterBar<T>(props: FilterBarProps<T>) {
   const isNarrow = useIsNarrow();
   if (!isNarrow && props.pointerSurface === 'popover') return <FilterPopover {...props} />;

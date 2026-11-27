@@ -5,7 +5,6 @@ import {
   ColumnPickerMenu,
   DataTable,
   EmptyState,
-  RowActionsMenu,
   type DataTableColumn,
 } from '@/components/ui';
 import { useTableExport } from '@/components/ui/useTableExport';
@@ -14,7 +13,6 @@ import type { useUrlSort } from '@/lib/useUrlState';
 import { formatDateOnly } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';
 import type { Contract } from '@/esi/endpoints';
-import { OpenInEveMenuItem } from '@/features/openInEve/OpenInEveMenuItem';
 import {
   EMPTY_CONTRACTS_FILTER,
   isContractsFilterActive,
@@ -98,7 +96,7 @@ export function ContractsHistoryTable({
           />
         )
       ) : (
-        <div className="relative overflow-x-auto">
+        <div className="relative overflow-x-auto edge-fade-end">
           <DataTable
             {...tableExport.tableProps}
             label={t('contracts.title')}
@@ -106,15 +104,6 @@ export function ContractsHistoryTable({
             rows={rows}
             rowKey={contractRowKey}
             virtualize="auto"
-            rowMoreActions
-            rowContextMenu={(contract, tr) => (
-              <RowActionsMenu
-                name={`${t('contractDetail.contractIdLabel')} ${contract.contract_id}`}
-                items={<OpenInEveMenuItem kind="contract" id={contract.contract_id} />}
-              >
-                {tr}
-              </RowActionsMenu>
-            )}
             highlightRowKey={highlightedContractId}
             {...sortProps}
             stackLayout="dense"

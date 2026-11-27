@@ -47,7 +47,7 @@ export const SETTINGS_TABS = definePageTabs(
     { id: 'activity', labelKey: 'settings.tabs.activity' },
   ],
   undefined,
-  { hiddenFrom: '(min-width: 48rem)' }
+  { hiddenFrom: '(min-width: 64rem)' }
 );
 
 export const HELP_TABS = definePageTabs('/help', [

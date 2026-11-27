@@ -2813,7 +2813,8 @@
       "priceUnavailable": "Couldn't load",
       "openInMarket": "View in Market",
       "findNearby": "Find nearby (≤{{jumps}} jumps)",
-      "facts": "{{group}} · Rank {{rank}} · {{primary}} / {{secondary}}"
+      "facts": "{{group}} · Rank {{rank}} · {{primary}} / {{secondary}}",
+      "factsTrained": "{{group}} · Rank {{rank}} · {{primary}} / {{secondary}} · Trained {{level}}"
     },
     "detail": {
       "title": "Skill Detail",
@@ -3522,7 +3523,7 @@
     "materialPriceBasisSell": "Buy now",
     "materialPriceBasisBuy": "Buy order",
     "materialPriceBasisTooltipLabel": "About material prices",
-    "materialPriceBasisTooltip": "Which prices the plan uses for materials. Buy now: the lowest sell order at the hub. You pay it and get the materials at once. Buy order: what materials cost if you post buy orders and wait. This adds the broker fee (and any Safety Tax) once for posting, so your real cost can be higher. The product is valued at the hub's lowest sell order unless you set a sale price. On Buy now, if the plan needs at least 1% of the units listed at the hub, the price is worked out by buying through the sell orders, cheapest first.",
+    "materialPriceBasisTooltip": "Which prices the plan uses for materials. Buy now: the hub's lowest sell order, paid at once. Buy order: post buy orders and wait; adds the broker fee (and any Safety Tax), so real cost can be higher.",
     "salePrice": "Sale price",
     "salePriceTooltipLabel": "About the sale price",
     "salePriceTooltip": "What you expect to sell one unit for, such as a nullsec market or a contract. It replaces the hub's lowest sell order in revenue, margin, break-even and the Acquisition Verdict. Leave it blank to use the hub price.",
@@ -3530,7 +3531,7 @@
     "resetSalePrice": "Reset the sale price ({{price}} ISK) to the hub price",
     "buildSystem": "Build system",
     "buildSystemTooltipLabel": "About build system",
-    "buildSystemTooltip": "The solar system where your job runs. Its cost index sets the job cost. Its security band scales any fitted rig (1x highsec, 1.9x lowsec, 2.1x nullsec). The game doesn't share structure fittings, so the app can't tell which rig is fitted. Leave it empty to build at the hub. Type the exact system name, then press Enter or click away.",
+    "buildSystemTooltip": "The solar system where your job runs. Its cost index sets the job cost and its security band scales fitted rigs. Leave empty to build at the hub. Type the exact name, then press Enter.",
     "buildSystemNotFound": "No solar system by that name.",
     "buildSystemUnavailable": "Couldn't check that name right now. Try again when you're online.",
     "buildLocation": "Build location",
@@ -3541,7 +3542,7 @@
     "facilityTaxTooltip": "The tax the structure's owner charges. It is part of the job cost, and each owner sets their own.",
     "costIndexOverride": "Job cost index %",
     "costIndexOverrideTooltipLabel": "Where to find the job cost index",
-    "costIndexOverrideTooltip": "In EVE, open the Industry window, go to the Facilities tab and hover the activity icons beside this facility. The tooltip shows the system cost index for each activity. Enter the Manufacturing (or Reaction) figure here. EVE doesn't share it for wormhole systems. It is remembered for this facility, so other plans built here start with it.",
+    "costIndexOverrideTooltip": "Find it in EVE: Industry window, Facilities tab, hover the activity icons. Enter the Manufacturing (or Reaction) figure. Remembered for this facility.",
     "costIndexMissingNote": "No cost index is available for this system (wormhole space), so the job fee is counted as 0. Enter the index from the in-game Industry window to get an accurate profit.",
     "includeReactions": "Include Reactions",
     "includeReactionsTooltipLabel": "About Include Reactions",
@@ -3899,7 +3900,7 @@
     "totalRealizedProfitTooltipLabel": "About total realized profit",
     "totalRealizedProfitTooltip": "Realized profit from logged production runs, across every Build Plan. Completed industry jobs you haven't logged yet are not counted here. This is not your full production history.",
     "productionLogEmptyTitle": "No production runs logged anywhere yet",
-    "productionLogEmptyHint": "Log a production run from any Build Plan's Results panel to start tracking realized profit here.",
+    "productionLogEmptyHint": "Log a run from a Build Plan's Production Runs panel to track realized profit here.",
     "totalRealizedProfit": "Total realized profit",
     "totalCostLogged": "Total cost logged",
     "totalRevenueLinked": "Total revenue linked",
@@ -3924,7 +3925,6 @@
     "jobsTitle": "Jobs",
     "jobsRefresh": "Refresh",
     "jobsEmptyTitle": "Job data not loaded yet",
-    "jobsEmptyHint": "EVE's servers didn't send this character's running industry jobs. Try Refresh in a moment.",
     "jobsNoneMeta": "None",
     "jobsCorpBadge": "Corp",
     "jobsDone": "Done",
@@ -4392,7 +4392,7 @@
     "opportunitiesViewHistory": "View {{name}} price history",
     "opportunitiesPriceHistoryTitle": "{{name}} — Price History",
     "marketOpportunitiesTitle": "What's profitable",
-    "marketOpportunitiesLiquidityTooltip": "Ranks items you could build for profit, including blueprints you can buy. Only products you can get a blueprint for are scanned: you own it, or it is on the NPC market, in a public contract, or in an LP store where you have points. Only products with enough sell orders at the hub count, and only the top few per Market Group. A sell price far above what the item really trades for is replaced by the average. Each row uses the ME/TE a plan opened from it starts with: your owned copy's, else your assumed ME/TE. Sub-builds are folded into the product, so a plan can differ slightly.",
+    "marketOpportunitiesLiquidityTooltip": "Items you could build for profit, including blueprints you can buy. Only products with a blueprint you can get and enough hub sell orders are ranked. Each row uses your owned copy's ME/TE, else your assumed ME/TE.",
     "marketOpportunitiesRunScan": "Scan",
     "marketOpportunitiesScanning": "Scanning…",
     "marketOpportunitiesEmptyTitle": "Nothing scanned yet",
@@ -5177,11 +5177,6 @@
     "ungrouped": "Ungrouped",
     "emptyGroup": "No characters in this group yet. Assign one from its card.",
     "groupFor": "Group for {{name}}",
-    "densityLabel": "Density",
-    "densityCompact": "Compact",
-    "densityCozy": "Cozy",
-    "densityComfortable": "Comfortable",
-    "densitySpacious": "Spacious",
     "remove": "Remove",
     "removeMenuLabel": "Remove {{name}}",
     "removeTitle": "Remove {{name}}?",
@@ -11317,7 +11312,8 @@
       "bringsBackLead": "restarting brings back",
       "savesLead": "hauling now saves",
       "noFigures": "No ISK figures yet. Prices or skills are still loading, or there is nothing to measure.",
-      "summary": "Your {{count}} colonies make about <today/> ISK/day. The small fixes add +<fixes/>/day: the same list as <plan>Plan's Quick wins</plan>."
+      "summary": "Your {{count}} colonies make about <today/> ISK/day. The small fixes add +<fixes/>/day: the same list as <plan>Plan's Quick wins</plan>.",
+      "summaryTuned": "Your {{count}} colonies make about <today/> ISK/day. No small fixes left: <plan>Plan's Quick wins</plan> is clear."
     },
     "chip": {
       "stopped": "Stopped",
@@ -12049,7 +12045,9 @@
       "holdsCopies": "{{name}} shares copies",
       "bpo": "BPO",
       "bpc": "BPC",
-      "sharesNothing": "shares nothing",
+      "sharingCount": "{{n}} sharing",
+      "staleCount": "{{n}} stale",
+      "staleAbout": "Members with an out-of-date list",
       "stale": "{{name}} (stale, as of {{age}})",
       "count_one": "{{count}} blueprint",
       "count_other": "{{count}} blueprints"
@@ -12946,7 +12944,6 @@
       "noResultsTitle": "Nothing matches",
       "noResultsHint": "No store or offer matches the search and filters. Clear a filter or the search.",
       "unavailableTitle": "LP Stores aren't available",
-      "unavailableHint": "The daily LP Store data couldn't be read. Try again later.",
       "resultsStatusStores_one": "{{count}} store",
       "resultsStatusStores_other": "{{count}} stores",
       "resultsStatusOffers_one": "{{count}} offer",
@@ -14803,7 +14800,9 @@
       "jumpsAway_other": "{{count}} jumps from {{system}}",
       "sheetTitle": "Where to look",
       "clearRange": "Clear range",
-      "noteLabel": "What else this covers"
+      "noteLabel": "What else this covers",
+      "hubStationOnly": "{{hub}} station only",
+      "anywhereIn": "Anywhere in {{region}}"
     },
     "summary": {
       "bestSell": "Best sell",
@@ -15988,7 +15987,7 @@
     "emptyTitle": "Search a page, item, asset, pilot or command",
     "emptyHint": "Or paste a fit, item list, Local list or D-Scan",
     "title": "Command palette",
-    "placeholder": "Go to a page, run a command, switch character, find an asset or item…",
+    "placeholder": "Search pages, items, pilots…",
     "inputLabel": "Search pages, commands, characters, assets and items",
     "resultsLabel": "Results",
     "noResults": "Nothing matches.",
@@ -16358,6 +16357,7 @@
     "wallet": {
       "title": "Corp Wallet",
       "divisionsTitle": "Divisions",
+      "divisionsTotal": "Corp total",
       "unusedDivisions_one": "{{count}} unused division",
       "unusedDivisions_other": "{{count}} unused divisions",
       "divisionsShow": "Show all divisions",
@@ -17255,7 +17255,7 @@
           "low": "Low threat",
           "inactive": "No recent kills"
         },
-        "help": "Based on their kills in the last {{days}} days and zKillboard's all-time ratios. Dangerous: {{dangerousKills}} or more recent kills, and either a danger ratio of {{dangerRatio}} or more, or {{killerRatio}}% or more of their kills and losses being kills. Active: {{activeKills}} or more recent kills. Low: fewer kills, or none but a ship lost in that time. Quiet: neither. Low never means safe.",
+        "help": "From kills in the last {{days}} days and zKillboard ratios. Dangerous: {{dangerousKills}}+ recent kills and a danger ratio of {{dangerRatio}}+. Active: {{activeKills}}+ recent kills. Low never means safe.",
         "inactive": "No kills in the last {{days}} days.",
         "inactiveLast": "No kills in the last {{days}} days. Last kill {{age}}.",
         "adjusted": {
@@ -18449,10 +18449,10 @@
   },
   "corpTaxBook": {
     "removeNow": {
-      "title": "End a removal now",
+      "title": "Remove the moon owner now",
       "checking": "Checking this link…",
-      "intro": "{{accounting}} started removing {{owner}} as a moon owner. It takes effect {{time}}. You can end it now instead.",
-      "introNoTime": "{{accounting}} started removing {{owner}} as a moon owner. You can end it now instead.",
+      "intro": "{{accounting}} started removing {{owner}} as a moon owner. It takes effect {{time}}. You can make it take effect now.",
+      "introNoTime": "{{accounting}} started removing {{owner}} as a moon owner. You can make it take effect now.",
       "hint": "Mining at {{owner}}'s refineries stops being counted from today. What {{accounting}} owes {{owner}} stays owed.",
       "confirm": "Remove now",
       "unavailable": "This can't be done right now.",

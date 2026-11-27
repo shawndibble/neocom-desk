@@ -19,6 +19,7 @@ import { SkillRequirementsList } from '../SkillRequirementsList';
 import { buildSkillRequirements } from '../skillRequirements';
 import type { SkillCatalog } from '../skillMap';
 import { entryId } from './reorder';
+import { usePrefersReducedMotion } from '@/lib/useMediaQuery';
 
 function planEntryElementId(skillTypeID: number, targetLevel: number): string {
   return `plan-entry-${entryId({ skillTypeID, targetLevel })}`;
@@ -52,6 +53,7 @@ export function SkillPicker({
   planEntries = [],
 }: SkillPickerProps) {
   const { t } = useTranslation();
+  const reduced = usePrefersReducedMotion();
   const [query, setQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useDebouncedValue(query);
   const [selected, setSelected] = useState<number | null>(null);
@@ -171,7 +173,7 @@ export function SkillPicker({
               className={inlineLinkClassName}
               onClick={() => {
                 const row = document.getElementById(jumpTargetId);
-                row?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                row?.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'center' });
                 row
                   ?.querySelector<HTMLElement>(`[${PLAN_HANDLE_ATTR}]`)
                   ?.focus({ preventScroll: true });

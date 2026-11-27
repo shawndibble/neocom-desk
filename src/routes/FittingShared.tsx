@@ -176,7 +176,7 @@ export function FittingShareView({ code, expiresAt }: { code: string; expiresAt?
       title={t('fittingShare.title')}
       openInApp={openInApp}
       wide
-      notice={t('fittingShare.banner')}
+      notice={state.status === 'ready' ? t('fittingShare.banner') : undefined}
       lead={
         state.status === 'ready' ? (
           <div className="flex items-center gap-3">

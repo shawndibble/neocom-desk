@@ -1,4 +1,4 @@
-import { useEffect, useId, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useId, useRef, useSyncExternalStore } from 'react';
 import { createLocalSetting } from './useLocalSetting';
 
 export type HintCounts = Readonly<Record<string, number>>;
@@ -27,16 +27,23 @@ export function recordHintSeen(id: string): void {
   void setValue({ ...value, [id]: hintSeenCount(value, id) + 1 });
 }
 
-const slots = new Map<string, { owner: string; dismissed: boolean }>();
+const slots = new Map<string, { owner: string; dismissed: boolean; exclusive: boolean }>();
 const listeners = new Set<() => void>();
 const notify = () => listeners.forEach((listener) => listener());
+const subscribe = (listener: () => void) => {
+  listeners.add(listener);
+  return () => void listeners.delete(listener);
+};
 const slotOf = (owner: string) => owner.split(':')[0];
+const otherExclusiveShown = (owner: string) =>
+  [...slots.values()].some((slot) => slot.exclusive && !slot.dismissed && slot.owner !== owner);
 
-export function claimSessionHint(owner: string): boolean {
+export function claimSessionHint(owner: string, exclusive = false): boolean {
   const slot = slots.get(slotOf(owner));
   if (slot !== undefined && slot.owner !== owner) return false;
   if (slot === undefined) {
-    slots.set(slotOf(owner), { owner, dismissed: false });
+    if (exclusive && otherExclusiveShown(owner)) return false;
+    slots.set(slotOf(owner), { owner, dismissed: false, exclusive });
     notify();
   }
   return true;
@@ -57,32 +64,35 @@ export function releaseSessionHint(owner: string): void {
 }
 
 export function useSessionHintShown(owner: string): boolean {
-  return useSyncExternalStore(
-    (listener) => {
-      listeners.add(listener);
-      return () => void listeners.delete(listener);
-    },
-    () => {
-      const slot = slots.get(slotOf(owner));
-      return slot?.owner === owner && !slot.dismissed;
-    }
-  );
+  return useSyncExternalStore(subscribe, () => {
+    const slot = slots.get(slotOf(owner));
+    return slot?.owner === owner && !slot.dismissed;
+  });
 }
 
-export function useOneTimeHint(id: string, active = true): [shown: boolean, dismiss: () => void] {
+export function useOneTimeHint(
+  id: string,
+  active = true
+): [shown: boolean, dismiss: () => void, anchor: (element: HTMLElement | null) => void] {
   const owner = `${id}:${useId()}`;
+  const anchorRef = useRef<HTMLElement | null>(null);
+  const anchor = useCallback((element: HTMLElement | null) => {
+    anchorRef.current = element;
+  }, []);
   const hydrated = useHintCounts((state) => state.hydrated);
   const shown = useSessionHintShown(owner);
+  const waiting = useSyncExternalStore(subscribe, () => otherExclusiveShown(owner));
   useEffect(() => {
-    if (!active || !hydrated) return;
+    if (!active || !hydrated || waiting) return;
+    if (anchorRef.current?.checkVisibility?.() === false) return;
     if (hintSeenCount(useHintCounts.getState().value, id) > 0) return;
-    if (claimSessionHint(owner)) return () => releaseSessionHint(owner);
-  }, [active, hydrated, id, owner]);
+    if (claimSessionHint(owner, true)) return () => releaseSessionHint(owner);
+  }, [active, hydrated, id, owner, waiting]);
   const dismiss = () => {
     recordHintSeen(id);
     dismissSessionHint(owner);
   };
-  return [shown, dismiss];
+  return [shown, dismiss, anchor];
 }
 
 export function resetSessionHints(): void {

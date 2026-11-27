@@ -349,6 +349,18 @@ describe('Wallet', () => {
     expect(screen.queryByText(/: (log in again|grant Wallet)$/)).not.toBeInTheDocument();
   });
 
+  it('offers Retry when the journal fails with nothing cached', async () => {
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/wallet/journal`, () =>
+        HttpResponse.json({ error: 'boom' }, { status: 503 })
+      )
+    );
+    const user = userEvent.setup();
+    renderWalletRoute();
+    await user.click(await screen.findByRole('tab', { name: 'Journal' }));
+    expect(await screen.findByRole('button', { name: 'Try again' })).toBeInTheDocument();
+  });
+
   function useNarrowViewport(): () => void {
     return stubViewport(NARROW_QUERY);
   }

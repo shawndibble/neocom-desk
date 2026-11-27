@@ -243,10 +243,10 @@ describe('Contracts', () => {
     expect(lapsed.parentElement).toHaveAttribute('tabindex', '0');
   });
 
-  it('gives each row a More-actions button whose only row action is Open in EVE', async () => {
+  it('gives rows no More-actions button: Open in EVE lives in the contract detail', async () => {
     renderContracts();
     await screen.findByText('Rifter fit');
-    expect(screen.getAllByRole('button', { name: /^More actions/ }).length).toBeGreaterThan(0);
+    expect(screen.queryAllByRole('button', { name: /^More actions/ })).toHaveLength(0);
   });
 
   it('opens the contract detail modal from ?open=<contractId>', async () => {
@@ -866,26 +866,15 @@ describe('Contracts row right-click (issue #676)', () => {
     return row;
   }
 
-  it('opens the contract in the EVE client from the row menu', async () => {
-    openContractMock.mockResolvedValue({ data: null });
-    await db.tokens.update(CHAR_ID, {
-      scopes: ['esi-contracts.read_character_contracts.v1', 'esi-ui.open_window.v1'],
-    });
-    const user = userEvent.setup();
-    renderContracts();
-    await openContractMenu('Rifter fit');
-    await user.click(await screen.findByRole('menuitem', { name: 'Open in EVE' }));
-    await waitFor(() => expect(openContractMock).toHaveBeenCalledWith(CHAR_ID, 1));
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-  });
-
-  it('has no row copies: no Copy title or Copy Contract ID, and no modal on right-click', async () => {
+  it('has no row menu: no Open in EVE, no row copies and no modal on right-click', async () => {
     renderContracts();
     await openContractMenu('Rifter fit');
 
+    expect(screen.queryByRole('menuitem', { name: 'Open in EVE' })).not.toBeInTheDocument();
     expect(screen.queryByRole('menuitem', { name: 'Copy title' })).not.toBeInTheDocument();
     expect(screen.queryByRole('menuitem', { name: 'Copy contract ID' })).not.toBeInTheDocument();
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(openContractMock).not.toHaveBeenCalled();
   });
 
   it('left-click on the title cell still opens the detail modal, unaffected by the context menu', async () => {

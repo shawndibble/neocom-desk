@@ -184,9 +184,20 @@ function CorpDivisionsPanel({
       refreshFailed={refreshFailed}
     />
   ) : null;
+  const total = divisions.reduce((sum, entry) => sum + entry.balance, 0);
   return (
     <CollapsiblePanel
       title={t('corp.wallet.divisionsTitle')}
+      meta={
+        !loading && walletsResult && divisions.length > 1 ? (
+          <span>
+            {t('corp.wallet.divisionsTotal')}{' '}
+            <span className={cx('font-medium tabular-nums', iskToneClass(total))}>
+              {formatIsk(total, 2)}
+            </span>
+          </span>
+        ) : undefined
+      }
       expanded={expanded}
       onToggle={() => setExpanded((open) => !open)}
       toggleRef={toggleRef}

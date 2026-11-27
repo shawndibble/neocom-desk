@@ -393,7 +393,7 @@ export function Calendar() {
           {(data?.reauthKinds.length ?? 0) > 0 && (
             <CalendarReauthNotice characterId={activeCharacterId} kinds={data?.reauthKinds ?? []} />
           )}
-          <div className="flex flex-col gap-3 md:flex-row md:items-start">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start">
             {isNarrow ? (
               <Panel padded className="w-full">
                 <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
@@ -409,7 +409,7 @@ export function Calendar() {
                 />
               </Panel>
             ) : (
-              <div className="w-full min-w-0 space-y-3 md:flex-1">
+              <div className="w-full min-w-0 space-y-3 lg:flex-1">
                 <Panel padded={false} title={t('calendar.map.title')} actions={periodControls}>
                   <CalendarMap
                     days={days}

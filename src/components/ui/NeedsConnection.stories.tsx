@@ -21,6 +21,9 @@ const offline: Decorator = (Story) => (
   </PretendOffline>
 );
 
+/**
+ * @summary Disables a sign-in control while the browser is offline, with a "Needs a connection" tooltip.
+ */
 const meta = {
   title: 'ui/NeedsConnection',
   component: NeedsConnection,
@@ -31,10 +34,13 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
+/** @summary Online the child is untouched. */
 export const Online: Story = {};
 
+/** @summary Offline the child is `aria-disabled`; hover or focus it for the reason. */
 export const Offline: Story = { decorators: [offline] };
 
+/** @summary Pass the control's own tooltip: online it is shown as is, offline the reason is added beneath it. */
 export const WithOwnTooltip: Story = {
   args: {
     tooltip: 'Add character',

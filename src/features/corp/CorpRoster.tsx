@@ -185,7 +185,7 @@ export function CorpRosterTable({
   }
 
   return (
-    <div className="overflow-x-auto">
+    <div className="overflow-x-auto edge-fade-end">
       <DataTable
         {...tableProps}
         columns={shownColumns}

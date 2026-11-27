@@ -88,6 +88,7 @@ export function ComposeFleetPayoutDialog({
   const [percentPick, setPercentPick] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [touched, setTouched] = useState(false);
 
   const savedHub = useMarketHub((state) => state.value);
   const savedPercent = useMarketPricePercent((state) => state.value);
@@ -242,9 +243,11 @@ export function ComposeFleetPayoutDialog({
       onClose={busy ? () => undefined : onClose}
       title={t('communities.payouts.compose.title')}
       placement="wide"
+      dirty={touched && !busy}
     >
       <form
         className="space-y-4 text-sm"
+        onInput={() => setTouched(true)}
         onSubmit={(e) => {
           e.preventDefault();
           if (canSubmit && !busy) void create();

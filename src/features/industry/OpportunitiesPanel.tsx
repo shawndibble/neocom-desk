@@ -71,6 +71,7 @@ import { priceVsMedianFor, usePriceVsMedian } from './usePriceVsMedian';
 import { Vs90dFigure } from './Vs90dFigure';
 import { vs90dTooltip } from './vs90d';
 import { StartPlanButton } from './StartPlanButton';
+import { useMediaQuery } from '@/lib/useMediaQuery';
 import { COL_ICON, COL_SMALL_NUMBER } from '@/components/ui/dataTableWidths';
 import { opportunitiesCsvColumns, skillGateExport } from './opportunitiesCsv';
 import { TableActionsMenu } from '@/components/ui/TableExport';
@@ -147,6 +148,7 @@ export function OpportunitiesPanel({
   const { t } = useTranslation();
   const unknown = t('common.unknown');
   const isDesktop = useIsDesktop();
+  const xlUp = useMediaQuery('(min-width: 80rem)');
 
   const { candidates: characterCandidates, namesById: characterNames } = useAccountCharacters();
 
@@ -333,6 +335,11 @@ export function OpportunitiesPanel({
     );
   }
 
+  const productCounts = new Map<number | null, number>();
+  for (const row of rows) {
+    const id = row.candidate.catalogEntry.productTypeID;
+    productCounts.set(id, (productCounts.get(id) ?? 0) + 1);
+  }
   const showCharacterColumn = new Set(rows.map((r) => r.candidate.characterId)).size > 1;
 
   const csvColumns = useMemo(
@@ -394,6 +401,9 @@ export function OpportunitiesPanel({
                 nameForCharacter={(id) => characterNames.get(id) ?? unknown}
               />
             )}
+            {productTypeID !== null &&
+              (productCounts.get(productTypeID) ?? 0) > 1 &&
+              !isVisible('blueprint') && <OpportunityBlueprintChip candidate={row.candidate} />}
             {showCharacterColumn && (
               <span className="text-[0.6875rem]">{row.candidate.characterName}</span>
             )}
@@ -537,11 +547,12 @@ export function OpportunitiesPanel({
     {
       id: 'action',
       header: '',
-      width: '16ch',
+      width: xlUp ? '16ch' : COL_ICON,
       render: (row) => (
         <StartPlanButton
           onStart={() => onStartPlan(row.candidate.catalogEntry, row)}
           planKey={row.candidate.catalogEntry}
+          compact={xlUp ? undefined : { name: row.candidate.catalogEntry.productName }}
         />
       ),
     },

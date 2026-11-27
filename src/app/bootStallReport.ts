@@ -1,6 +1,6 @@
 import { captureMessage } from '@sentry/react';
 
-export type BootGate = 'root' | 'require-character' | 'login' | 'fitting-shared';
+export type BootGate = 'root' | 'require-character' | 'login' | 'fitting-shared' | 'shell';
 
 let reported = false;
 let reportedAt: number | undefined;

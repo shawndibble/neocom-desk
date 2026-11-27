@@ -56,6 +56,7 @@ export interface LpStoreLandingState {
   jumpsStatus: 'no-origin' | 'loading' | 'unknown' | 'ready';
   factions: LpLandingOption[];
   categories: LpLandingOption[];
+  retry: () => void;
 }
 
 interface Categories {
@@ -76,7 +77,13 @@ export function useLpStoreLanding(active = true): LpStoreLandingState {
 
   const [snapshotRows, setSnapshotRows] = useState<LpSnapshotStore[] | null>(null);
   const [syncedAt, setSyncedAt] = useState<number | null>(null);
-  const [failed, setFailed] = useState(false);
+  const {
+    failed,
+    attempt: snapshotAttempt,
+    fail: failSnapshot,
+    clear: clearSnapshotFailure,
+    retry,
+  } = useRetryableLoad();
   const [corporations, setCorporations] = useState<LpCorporationEntry[]>([]);
   const [factionList, setFactionList] = useState<UniverseFaction[] | null>(null);
   const [categories, setCategories] = useState<Categories | null>(null);
@@ -105,15 +112,16 @@ export function useLpStoreLanding(active = true): LpStoreLandingState {
         const data = read.cached?.data ?? null;
         setSnapshotRows(data?.rows ?? null);
         setSyncedAt(data?.lastSyncedAt ?? null);
-        setFailed(data === null);
+        if (data === null) failSnapshot();
+        else clearSnapshotFailure();
       })
       .catch(() => {
-        if (!cancelled) setFailed(true);
+        if (!cancelled) failSnapshot();
       });
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [snapshotAttempt, failSnapshot, clearSnapshotFailure]);
 
   useEffect(() => {
     let cancelled = false;
@@ -397,5 +405,6 @@ export function useLpStoreLanding(active = true): LpStoreLandingState {
     jumpsStatus,
     factions,
     categories: categoryOptions,
+    retry,
   };
 }

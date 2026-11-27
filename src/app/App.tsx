@@ -112,7 +112,7 @@ function SignedInShell() {
   const location = useLocation();
   return (
     <ErrorBoundary resetKey={location.pathname}>
-      <Suspense fallback={<BootScreen />}>
+      <Suspense fallback={<BootScreen gate="shell" />}>
         <Layout />
       </Suspense>
     </ErrorBoundary>

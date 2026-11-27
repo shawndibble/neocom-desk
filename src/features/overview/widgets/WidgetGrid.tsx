@@ -35,6 +35,7 @@ import { SIZES } from './sizes';
 import { visibleWidgets } from './visibility';
 import { Widget } from './Widget';
 import { WidgetMenu } from './WidgetMenu';
+import { usePrefersReducedMotion } from '@/lib/useMediaQuery';
 
 interface WidgetGridProps {
   widgets: readonly WidgetModel[];
@@ -125,7 +126,12 @@ function Cell({ widget, title, editing, first, last, isPhone, sortable = false }
   const edit = useOverviewEdit();
   const flashing = edit.flashId === widget.id;
   const plainRef = useRef<HTMLDivElement>(null);
-  const sort = useSortable({ id: widget.id, disabled: !sortable });
+  const reduced = usePrefersReducedMotion();
+  const sort = useSortable({
+    id: widget.id,
+    disabled: !sortable,
+    transition: reduced ? null : undefined,
+  });
   const sortNode = sort.node;
 
   useEffect(() => {

@@ -1,6 +1,9 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { ProgressBar } from './ProgressBar';
 
+/**
+ * @summary A thin filled track for how far along something is.
+ */
 const meta = {
   title: 'ui/ProgressBar',
   component: ProgressBar,
@@ -18,10 +21,13 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
+/** @summary Basic: a value out of 100 in the accent tone. */
 export const Basic: Story = {};
 
+/** @summary Custom range: `max` sets what full means, e.g. units left of units issued. */
 export const CustomRange: Story = { args: { label: 'Units remaining', value: 25, max: 200 } };
 
+/** @summary Tones: accent is progress; success, warning and danger carry a status. */
 export const Tones: Story = {
   render: () => (
     <div className="space-y-2">
@@ -33,6 +39,7 @@ export const Tones: Story = {
   ),
 };
 
+/** @summary Sizes: `xs` 4px, `sm` 6px (default), `md` 8px. */
 export const Sizes: Story = {
   render: () => (
     <div className="space-y-2">
@@ -43,6 +50,7 @@ export const Sizes: Story = {
   ),
 };
 
+/** @summary Surface: on a raised `panel-2` row (an expanded table detail) the track steps up to `line` so it stays visible. */
 export const OnRaisedSurface: Story = {
   args: { surface: 'panel-2' },
   decorators: [
@@ -54,8 +62,10 @@ export const OnRaisedSurface: Story = {
   ],
 };
 
+/** @summary Indeterminate: `value={null}` while work runs and the total is unknown; it pulses unless motion is reduced. */
 export const Indeterminate: Story = { args: { label: 'Searching', value: null } };
 
+/** @summary Full and empty: both ends render cleanly, and an overshoot is clamped. */
 export const Bounds: Story = {
   render: () => (
     <div className="space-y-2">

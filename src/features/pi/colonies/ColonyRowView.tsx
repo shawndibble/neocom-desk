@@ -561,7 +561,7 @@ export const ColonyRowView = memo(function ColonyRowView(props: ColonyRowViewPro
             </div>
 
             <div className="flex min-w-0 flex-col gap-1 lg:items-stretch">
-              {actionWithExact}
+              {action.kind !== 'details' && actionWithExact}
               <p className="text-[0.6875rem] text-text-dim max-lg:text-left lg:text-center">
                 {note}
               </p>

@@ -15,7 +15,6 @@ import { previewMinerPayment } from '@/engine/corpTaxBook/paymentPreview';
 import { netPayment } from '@/engine/corpTaxBook/payments';
 import { utcDay } from '@/engine/localDay';
 import { lockDateFor } from '../../../../functions/src/corpTaxBookCheckpoint';
-import { useIsPhone } from '@/lib/useIsPhone';
 import { callableErrorReason } from '@/lib/callableError';
 import { callableErrorText } from './feederErrorText';
 import { useBook } from './useBook';
@@ -81,7 +80,6 @@ export function DialogShell({
   children,
 }: ShellProps) {
   const { t } = useTranslation();
-  const phone = useIsPhone();
   const formId = useId();
   const reasonId = useId();
   const [busy, setBusy] = useState(false);
@@ -108,7 +106,6 @@ export function DialogShell({
       title={title}
       dirty={touched && !busy}
       initialFocusRef={initialFocusRef}
-      placement={phone ? 'sheet' : 'center'}
       footer={
         <DialogFooter>
           <Button variant="ghost" onClick={onClose}>

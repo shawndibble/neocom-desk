@@ -9,6 +9,7 @@ import {
 } from '@/components/ui/controlStyles';
 import type { AttributeName, PlanPriority } from '@/engine/types';
 import { PLAN_HANDLE_ATTR } from '../focusNeighbour';
+import { usePrefersReducedMotion } from '@/lib/useMediaQuery';
 
 export const ICON_BUTTON = cx(iconButtonClassName({ size: 'sm' }), 'lg:scroll-mt-40');
 export const GRIP_BUTTON = cx(
@@ -42,8 +43,10 @@ interface SortableRowChrome {
 }
 
 export function useRowSortable(id: string): SortableRowChrome {
+  const reduced = usePrefersReducedMotion();
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id,
+    transition: reduced ? null : undefined,
   });
   return {
     setNodeRef,

@@ -281,7 +281,8 @@ describe('CommunityLibrary', () => {
     expect(screen.getAllByRole('img', { name: 'Ann shares the original' }).length).toBeGreaterThan(
       0
     );
-    expect(screen.getByText(en.communities.staleBadge)).toBeInTheDocument();
+    expect(screen.getByText('1 sharing · 1 stale')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: l.staleAbout })).toBeInTheDocument();
   });
 
   it('links to BPC Sourcing narrowed to the Community and owned sources', async () => {

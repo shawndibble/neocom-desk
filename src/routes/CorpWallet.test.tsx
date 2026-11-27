@@ -261,6 +261,7 @@ describe('Corp Wallet: divisions and the journal (AC 2, AC 3)', () => {
     expect(divisionButton('SRP')).toHaveAttribute('aria-pressed', 'false');
     expect(screen.queryByText(/4,500\.00/)).toBeNull();
     expect(screen.queryByText('EverMarks')).toBeNull();
+    expect(screen.getByText('Corp total')).toHaveTextContent('Corp total 1,000,250.00');
   });
 
   it('keeps focus on the caret after a phone folds the panel on a division pick (WCAG 2.4.3)', async () => {

@@ -28,6 +28,9 @@ interface TabPanelProps {
   children: ReactNode;
 }
 
+/**
+ * @summary The panel that holds the selected tab's content; pair it with `Tabs`.
+ */
 export function TabPanel({ tabsId, tabId, className, children }: TabPanelProps) {
   const { className: ring, ...rest } = useTabPanelProps(tabsId, tabId);
   return (
@@ -39,15 +42,22 @@ export function TabPanel({ tabsId, tabId, className, children }: TabPanelProps) 
 
 interface TabsProps {
   tabsId: string;
+  /** @summary The tabs, each with an id and an already-translated label. */
   tabs: TabItem[];
+  /** @summary Id of the selected tab. */
   value: string;
+  /** @summary Called with the id of the tab the user picked. */
   onChange: (id: string) => void;
+  /** @summary Accessible name for the tablist. */
   label: string;
   className?: string;
   activation?: 'automatic' | 'manual';
   onPreload?: (id: string) => void;
 }
 
+/**
+ * @summary Horizontal tab bar for peer views inside one page (Open / History); not for navigation.
+ */
 export function Tabs({
   tabsId,
   tabs,

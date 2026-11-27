@@ -20,7 +20,7 @@ import {
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { useColumnVisibility } from '@/lib/columnVisibility';
 import { cx } from '@/lib/cx';
-import { formatIsk, formatIskCompact } from '@/lib/isk';
+import { formatIsk } from '@/lib/isk';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { writeToClipboard } from '@/lib/clipboard';
 import { useCopyFeedback } from '@/lib/useCopyFeedback';
@@ -307,7 +307,7 @@ export function OfficerQueue({ data, ready }: { data: SrpQueueData; ready: Ready
           <span className="text-text-dim"> · </span>
           <span className="font-semibold">
             {t('srp.officer.summary.owed', {
-              isk: phone ? formatIskCompact(owed) : formatIsk(owed),
+              isk: formatIsk(owed),
             })}
           </span>
         </p>
@@ -394,7 +394,7 @@ export function OfficerQueue({ data, ready }: { data: SrpQueueData; ready: Ready
           ) : rows.length === 0 ? (
             <EmptyState title={empty[0]} hint={empty[1]} />
           ) : (
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto edge-fade-end">
               <DataTable
                 key={tab}
                 label={t(`srp.officer.title.${tab}`)}

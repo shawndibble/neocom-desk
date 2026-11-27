@@ -8,6 +8,9 @@ interface WellProps extends HTMLAttributes<HTMLElement> {
   as?: 'div' | 'p' | 'section' | 'li';
 }
 
+/**
+ * @summary An inset `panel-2` box with a hairline, for a note or readout inside a Panel or dialog.
+ */
 export function Well({ size = 'sm', as = 'div', className, ...rest }: WellProps) {
   return createElement(as, {
     ...rest,

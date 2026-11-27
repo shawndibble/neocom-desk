@@ -3,12 +3,15 @@ import { CaretToggle } from './Disclosure';
 import { Panel } from './Panel';
 
 interface CollapsiblePanelProps {
+  /** @summary Already-translated panel heading. */
   title: string;
   meta?: ReactNode;
   wrapMeta?: boolean;
   metaOwnRow?: boolean;
   actions?: ReactNode;
+  /** @summary Whether the body is open; the caller owns this state. */
   expanded: boolean;
+  /** @summary Called when the caret is pressed. */
   onToggle: () => void;
   labels?: { show: string; hide: string };
   padded?: boolean;
@@ -19,6 +22,9 @@ interface CollapsiblePanelProps {
   children: ReactNode;
 }
 
+/**
+ * @summary A `Panel` whose body folds away behind a caret; the header keeps title, meta and actions.
+ */
 export function CollapsiblePanel({
   title,
   meta,

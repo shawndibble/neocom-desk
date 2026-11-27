@@ -8,6 +8,9 @@ interface IncompleteNoticeProps {
   className?: string;
 }
 
+/**
+ * @summary "Incomplete data — …" amber line above a view whose fetch was truncated, with an optional hint and Retry.
+ */
 export function IncompleteNotice({ hint, action, className }: IncompleteNoticeProps) {
   const { t } = useTranslation();
   const text = (

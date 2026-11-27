@@ -8,8 +8,11 @@ import { STAT_CHIP_TONE_TEXT_CLASS, type StatChipTone } from './statChipTone';
 export type { StatChipTone };
 
 interface StatChipProps {
+  /** @summary Already-translated uppercase micro-heading. */
   label: string;
+  /** @summary The figure or text shown after the label. */
   value: ReactNode;
+  /** @summary Colour of the value: `default`, or a status tone. */
   tone?: StatChipTone;
   className?: string;
   tooltip?: string;
@@ -20,6 +23,9 @@ interface StatChipProps {
   to?: string;
 }
 
+/**
+ * @summary A static label and value readout (ISK balance, SP, a count); no box, because it can't be clicked.
+ */
 export function StatChip({
   label,
   value,
@@ -70,6 +76,9 @@ export function StatChip({
   );
 }
 
+/**
+ * @summary A wrapping strip of `StatChip`s with a hairline between neighbours.
+ */
 export function StatChips({
   dense = false,
   className = '',

@@ -328,7 +328,11 @@ export function TodayPanel(props: TodayPanelProps) {
               )
             ) : (
               <Trans
-                i18nKey="piColonies.today.summary"
+                i18nKey={
+                  props.fixGainPerDay > 0
+                    ? 'piColonies.today.summary'
+                    : 'piColonies.today.summaryTuned'
+                }
                 values={{ count: props.ownCount }}
                 components={{
                   today: (

@@ -117,7 +117,7 @@ export function Settings() {
         meta={<span className="text-sm text-text-dim">{t(settingsSectionLabelKey(section))}</span>}
         actions={<SettingsBackLink />}
       />
-      <div className="space-y-4 md:grid md:grid-cols-[11rem_minmax(0,1fr)] md:gap-6 md:space-y-0">
+      <div className="space-y-4 lg:grid lg:grid-cols-[11rem_minmax(0,1fr)] lg:gap-6 lg:space-y-0">
         <SettingsNav groups={groups} value={section} />
         <div className="min-w-0 space-y-4" data-settings-section={section}>
           {section === 'display' && (

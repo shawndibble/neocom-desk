@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { signedBarGeometry } from './signedBars';
+import { labelClearsBars, signedBarGeometry } from './signedBars';
 
 describe('signedBarGeometry', () => {
   it('sits every bar on the floor when nothing is negative', () => {
@@ -34,5 +34,24 @@ describe('signedBarGeometry', () => {
     expect(g.bars.every((b) => b.size === 0)).toBe(true);
     expect(g.peak).toBeNull();
     expect(g.ref).toBeNull();
+  });
+});
+
+describe('labelClearsBars', () => {
+  const { bars } = signedBarGeometry([4, 3.9, 80, 10]);
+
+  it('drops a label that would print over a taller neighbour', () => {
+    expect(labelClearsBars(bars, 1, 5, 120, 100)).toBe(false);
+  });
+
+  it('keeps a label whose neighbours sit below it', () => {
+    expect(labelClearsBars(bars, 0, 6, 120, 100)).toBe(true);
+    expect(labelClearsBars(bars, 2, 6, 120, 100)).toBe(true);
+  });
+
+  it('checks a label under a negative bar against the deeper neighbour', () => {
+    const signed = signedBarGeometry([10, -2, -40]).bars;
+    expect(labelClearsBars(signed, 1, 5, 60, 100)).toBe(false);
+    expect(labelClearsBars(signed, 2, 5, 60, 100)).toBe(true);
   });
 });

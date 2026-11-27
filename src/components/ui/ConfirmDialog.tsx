@@ -57,6 +57,7 @@ export function ConfirmDialog({
       title={title}
       returnFocusFallback={returnFocusFallback}
       closeOnBack={closeOnBack}
+      phonePlacement="center"
     >
       <p className="text-xs text-text-dim">{body}</p>
       {children}

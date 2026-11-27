@@ -71,7 +71,12 @@ export function RemapMarkerModal({
   }
 
   return (
-    <Modal open={open} onClose={onClose} title={t('plans.markerAttributesModalTitle')}>
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={t('plans.markerAttributesModalTitle')}
+      dirty={ATTRIBUTE_NAMES.some((name) => draft[name] !== initial[name])}
+    >
       <div className="space-y-3 text-xs">
         <p className="text-text-dim">
           {t('plans.markerAttributesModalHint', {

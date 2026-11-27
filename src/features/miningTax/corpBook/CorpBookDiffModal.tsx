@@ -3,7 +3,6 @@ import { useTranslation } from 'react-i18next';
 import { Button, Modal } from '@/components/ui';
 import { cx } from '@/lib/cx';
 import { formatIsk } from '@/lib/isk';
-import { useIsPhone } from '@/lib/useIsPhone';
 import type { BookRowView } from '@/engine/corpTaxBook/personal';
 import { typeLabel } from './typeLabel';
 import { hubForPayee } from '../pricing';
@@ -34,7 +33,6 @@ export function CorpBookDiffModal({
   onFixRecords,
 }: Props) {
   const { t } = useTranslation();
-  const isPhone = useIsPhone();
   const dispute = view.dispute;
   const hub = hubForPayee(view.hubId);
   const form = t(
@@ -73,7 +71,6 @@ export function CorpBookDiffModal({
     <Modal
       open={open}
       onClose={onClose}
-      placement={isPhone ? 'sheet' : 'center'}
       title={t('miningTax.corpBook.diff.title', { date: view.date.slice(5) })}
     >
       <div className="space-y-3 text-sm">

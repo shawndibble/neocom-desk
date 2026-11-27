@@ -155,6 +155,18 @@ describe('the rail', () => {
     expect(within(views).getByRole('link', { name: 'Balance' })).toBeInTheDocument();
   });
 
+  it('scrolls the current view into the rail, without animating', () => {
+    const scrolled = vi.fn();
+    Element.prototype.scrollIntoView = scrolled;
+    try {
+      renderAt('/wallet/lp-store/1000125');
+      expect(scrolled).toHaveBeenCalledWith({ block: 'nearest' });
+      expect(scrolled.mock.contexts.map((el) => (el as Element).textContent)).toContain('LP Store');
+    } finally {
+      delete (Element.prototype as Partial<Element>).scrollIntoView;
+    }
+  });
+
   it("opens the current page's views and leaves the others closed", () => {
     renderAt('/market/appraisal');
 

@@ -211,7 +211,8 @@ export function ArrangedMenuItems({ items }: { items: ReactNode }) {
       {MENU_GROUP_ORDER.map((id) => {
         const bucket = buckets.get(id);
         if (!bucket?.content.length) return null;
-        const { content, size } = bucket;
+        const content = bucket.content.map((node, i) => <Fragment key={i}>{node}</Fragment>);
+        const { size } = bucket;
         const foldKey = FOLDED_GROUPS[id];
         return (
           <div key={id} role="group" className={GROUP_CLASS}>
@@ -341,7 +342,10 @@ export function RowMoreActions({
   const [tip, setTip] = useState(false);
   const loggedIn = useCharacterCount() > 0;
   const showTips = hints && loggedIn;
-  const [hintShown, dismissHint] = useOneTimeHint(ROW_HINT, actions !== null && showTips);
+  const [hintShown, dismissHint, hintAnchor] = useOneTimeHint(
+    ROW_HINT,
+    actions !== null && showTips
+  );
   const context = useTouchContext();
   if (!actions) return null;
   const onOpenChange = (open: boolean) => {
@@ -358,7 +362,7 @@ export function RowMoreActions({
   return (
     <DropdownMenu onOpenChange={onOpenChange} modal={actions.modal}>
       <Popover open={hintShown} onOpenChange={(open) => !open && dismissHint()}>
-        <PopoverAnchor asChild>
+        <PopoverAnchor asChild ref={hintAnchor}>
           <DropdownMenuTrigger asChild>
             <IconButton
               icon={<Icon.More size={Icon.ICON_SIZE.sm} />}

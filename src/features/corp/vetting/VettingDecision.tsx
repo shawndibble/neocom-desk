@@ -217,7 +217,6 @@ export function VettingDecision({
           open
           onClose={() => busy === null && setRefusing(false)}
           title={t(`vetting.decision.refuse.${review.kind}`, { pilot: review.pilot.name })}
-          placement={phone ? 'sheet' : 'center'}
           dismissOnOutsidePress={false}
           footer={<DialogFooter stacked={phone}>{refuseButtons}</DialogFooter>}
         >

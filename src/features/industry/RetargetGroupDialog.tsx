@@ -57,6 +57,7 @@ function initialTarget(group: BuildGroup): RetargetTarget {
 export function RetargetGroupDialog({ group, plans, onApply, onClose }: RetargetGroupDialogProps) {
   const { t } = useTranslation();
   const [step, setStep] = useState<'form' | 'preview'>('form');
+  const [touched, setTouched] = useState(false);
   const [target, setTarget] = useState<RetargetTarget>(() => initialTarget(group));
   const [taxText, setTaxText] = useState(() => String(target.facilityTaxPct ?? 0));
   const [taxEdited, setTaxEdited] = useState(false);
@@ -113,9 +114,14 @@ export function RetargetGroupDialog({ group, plans, onApply, onClose }: Retarget
   }
 
   return (
-    <Modal open onClose={onClose} title={t('industry.retargetGroup', { name: group.name })}>
+    <Modal
+      open
+      onClose={onClose}
+      title={t('industry.retargetGroup', { name: group.name })}
+      dirty={touched}
+    >
       {step === 'form' ? (
-        <div className="flex flex-col gap-3 text-xs">
+        <div className="flex flex-col gap-3 text-xs" onInput={() => setTouched(true)}>
           <p className="text-text-dim">{t('industry.retargetFormHint')}</p>
 
           <BuildLocationPicker

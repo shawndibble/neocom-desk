@@ -72,6 +72,7 @@ vi.mock('@/sync', () => ({ scheduleSync: vi.fn(), markFittingDeleted: vi.fn() })
 
 const isPhoneMock = vi.hoisted(() => vi.fn(() => false));
 vi.mock('@/lib/useIsPhone', () => ({ useIsPhone: isPhoneMock }));
+vi.mock('@/lib/useIsDesktop', () => ({ useIsDesktop: () => true }));
 
 const navigateMock = vi.hoisted(() => vi.fn());
 vi.mock('react-router-dom', async (importOriginal) => ({

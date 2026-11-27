@@ -338,7 +338,7 @@ export function CorpStructures() {
         render: (row) => {
           const system = systemOf(row);
           return (
-            <span className="inline-flex items-center gap-1.5">
+            <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
               {systemName(row)}
               {system && <SecurityStatus security={system.security} />}
             </span>

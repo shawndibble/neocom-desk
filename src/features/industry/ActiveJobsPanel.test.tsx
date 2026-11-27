@@ -263,6 +263,7 @@ describe('ActiveJobsPanel: rendering', () => {
       </MemoryRouter>
     );
     expect(await screen.findByText('Job data not loaded yet')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
   });
 });
 
@@ -1513,6 +1514,15 @@ describe('ActiveJobsPanel: corp jobs by installer (issue #2302)', () => {
 
     expect(await screen.findByText('None')).toBeInTheDocument();
     expect(screen.queryByText(/Factory Manager/)).not.toBeInTheDocument();
+  });
+
+  it('shows no data age when the personal read failed, even with fresh corp jobs', async () => {
+    server.use(http.get(jobsUrl(), () => HttpResponse.error()));
+    mockCorpJobs([]);
+    renderAt('/industry');
+
+    expect(await screen.findByText('Job data not loaded yet')).toBeInTheDocument();
+    expect(screen.queryByText('just now')).not.toBeInTheDocument();
   });
 });
 

@@ -30,8 +30,10 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
+/** @summary Two peer views on one page; the selected tab has an accent underline. */
 export const Basic: Story = {};
 
+/** @summary A tab that holds a countable list shows how many in a round badge after its label. */
 export const WithCount: Story = {
   args: {
     tabs: [
@@ -43,6 +45,7 @@ export const WithCount: Story = {
   },
 };
 
+/** @summary A count can be toned when it is work waiting (`warning`) or something to recover (`danger`); the number always prints. */
 export const WithToneCount: Story = {
   args: {
     tabs: [
@@ -55,6 +58,7 @@ export const WithToneCount: Story = {
   },
 };
 
+/** @summary More tabs than fit: the bar scrolls sideways instead of squeezing. Shown at 390 wide. */
 export const OverflowOnPhone: Story = {
   args: {
     tabs: ['Overview', 'Skills', 'Implants', 'Standings', 'Contracts', 'Wallet', 'Loyalty'].map(
@@ -65,6 +69,7 @@ export const OverflowOnPhone: Story = {
   globals: { viewport: { value: 'phone390', isRotated: false } },
 };
 
+/** @summary The same overflow in a narrow desktop frame: a pointer gets edge chevrons and wheel travel instead of a swipe. */
 export const OverflowWithPointer: Story = {
   args: OverflowOnPhone.args,
   decorators: [
@@ -76,4 +81,5 @@ export const OverflowWithPointer: Story = {
   ],
 };
 
+/** @summary Manual activation: arrows move focus only, Enter or Space selects. Use when `onChange` navigates. */
 export const ManualActivation: Story = { args: { activation: 'manual' } };

@@ -223,18 +223,20 @@ export function useContactsStandings(characterId: number, enabled: boolean) {
               className="py-8"
             />
           ) : (
-            <DataTable
-              label={t('contacts.tabStandings')}
-              columns={columns}
-              rows={rows}
-              rowKey={(row) => row.id}
-              {...standingsExport.tableProps}
-              {...sortProps}
-              mobileSort
-              stackLayout="dense"
-              stackSummary={t('contacts.standings.count', { count: rows.length })}
-              onRowClick={(row) => openNpcInfo(INFO_KIND[row.kind], row.id)}
-            />
+            <div className="overflow-x-auto">
+              <DataTable
+                label={t('contacts.tabStandings')}
+                columns={columns}
+                rows={rows}
+                rowKey={(row) => row.id}
+                {...standingsExport.tableProps}
+                {...sortProps}
+                mobileSort
+                stackLayout="dense"
+                stackSummary={t('contacts.standings.count', { count: rows.length })}
+                onRowClick={(row) => openNpcInfo(INFO_KIND[row.kind], row.id)}
+              />
+            </div>
           )}
         </Panel>
       </div>

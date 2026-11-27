@@ -252,7 +252,7 @@ export function HullRulesEditor({
         )}
       >
         <Caret size={Icon.ICON_SIZE.sm} aria-hidden="true" className="shrink-0" />
-        <span className="min-w-0 break-words">{row.name}</span>
+        <span className={cx('min-w-0', tall && 'break-words')}>{row.name}</span>
         {!tall && (
           <span className="text-xs font-normal text-text-dim">
             {t('srp.settings.hullRules.hullCount', { count: row.count })}
@@ -285,7 +285,7 @@ export function HullRulesEditor({
       header: t('srp.settings.hullRules.amount'),
       render: (row) =>
         ruleOf(form, row.scope, row.id).kind === 'pay-fixed' ? (
-          <div className="w-56">{iskInput(row)}</div>
+          <div className="w-full max-w-56">{iskInput(row)}</div>
         ) : (
           <span className="text-text-dim">{helper(row)}</span>
         ),
@@ -356,14 +356,16 @@ export function HullRulesEditor({
           {rows.map(phoneLine)}
         </ul>
       ) : (
-        <DataTable
-          label={t('srp.settings.hullRules.tableLabel')}
-          columns={columns}
-          rows={rows}
-          rowKey={(r) => ruleKey(r.scope, r.id)}
-          rowClassName={(r) => (isNotCovered(form, r) ? 'bg-panel-2' : undefined)}
-          stackColumns={1}
-        />
+        <div className="overflow-x-auto">
+          <DataTable
+            label={t('srp.settings.hullRules.tableLabel')}
+            columns={columns}
+            rows={rows}
+            rowKey={(r) => ruleKey(r.scope, r.id)}
+            rowClassName={(r) => (isNotCovered(form, r) ? 'bg-panel-2' : undefined)}
+            stackColumns={1}
+          />
+        </div>
       )}
     </div>
   );

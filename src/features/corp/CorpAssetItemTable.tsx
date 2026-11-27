@@ -139,17 +139,20 @@ export function CorpAssetItemTable({
       align: 'right',
       width: '12ch',
       sortValue: (r) => r.ledger.stock?.target,
-      render: (r) =>
-        r.ledger.isBlueprintCopy || !canEditTargets ? (
-          <span className="text-text-dim tabular-nums">{r.ledger.stock?.target ?? '—'}</span>
-        ) : (
-          <StockTargetCell
-            itemName={r.name}
-            target={r.ledger.stock?.target}
-            onChange={(target) => onSetTarget(r.ledger.typeId, target)}
-            onRemove={() => onRemoveTarget(r.ledger.typeId)}
-          />
-        ),
+      render: (r) => {
+        const cell =
+          r.ledger.isBlueprintCopy || !canEditTargets ? (
+            <span className="text-text-dim tabular-nums">{r.ledger.stock?.target ?? '—'}</span>
+          ) : (
+            <StockTargetCell
+              itemName={r.name}
+              target={r.ledger.stock?.target}
+              onChange={(target) => onSetTarget(r.ledger.typeId, target)}
+              onRemove={() => onRemoveTarget(r.ledger.typeId)}
+            />
+          );
+        return r.ledger.stock?.target === undefined ? <span data-dense-omit>{cell}</span> : cell;
+      },
     },
     shortBy: {
       id: 'shortBy',
@@ -160,7 +163,7 @@ export function CorpAssetItemTable({
       sortValue: (r) => r.ledger.stock?.shortBy,
       render: (r) => {
         const stock = r.ledger.stock;
-        if (!stock) return null;
+        if (!stock) return <span data-dense-omit />;
         return (
           <span className={STATUS_TONE[stock.status]}>
             {formatCount(stock.shortBy)}
@@ -271,7 +274,7 @@ export function CorpAssetItemTable({
       {rows.length === 0 ? (
         emptyState
       ) : (
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto edge-fade-end">
           <DataTable
             label={t('corp.assets.itemTableLabel')}
             columns={columns}

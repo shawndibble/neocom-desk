@@ -42,6 +42,7 @@ import {
   type LibrarySourcePick,
 } from '@/engine/fittings/myFittings';
 import { useIsPhone } from '@/lib/useIsPhone';
+import { useIsDesktop } from '@/lib/useIsDesktop';
 import { NO_HOVER_QUERY, useMediaQuery } from '@/lib/useMediaQuery';
 import { formatTimestamp } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';
@@ -136,7 +137,8 @@ export function FittingStartScreen({
   const isPhone = useIsPhone();
   const page = variant === 'page';
   const noHover = useMediaQuery(NO_HOVER_QUERY);
-  const previewing = preview && !isPhone && !noHover;
+  const lgUp = useIsDesktop();
+  const previewing = preview && !isPhone && !noHover && lgUp;
   const [urlQuery, setUrlQuery] = useUrlParam(QUERY_KEY, QUERY_PARAM);
   const [dialogQuery, setDialogQuery] = useState('');
   const query = page ? urlQuery : dialogQuery;

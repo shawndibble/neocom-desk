@@ -70,6 +70,9 @@ function fixedLayoutMinWidth<T>(
   return `calc(${[...sized, ...floors, `${trailingRem}rem`].join(' + ')})`;
 }
 
+/**
+ * @summary The dense, sortable table every list page uses; collapses to labelled cards on a phone.
+ */
 export function DataTable<T>({
   columns,
   rows,
@@ -167,11 +170,11 @@ export function DataTable<T>({
           column.align === 'right' && 'text-right',
           column.align === 'right' && column.sortValue && sortIconGutter,
           column.align === 'center' && 'text-center',
-          column.stickyStart && `${stickyStartClass(column)} ${STICKY_START_CELL}`,
+          column.stickyStart && !isStacked && `${stickyStartClass(column)} ${STICKY_START_CELL}`,
           column.className
         )
       ),
-    [columns, cellPadding, sortIconGutter]
+    [columns, cellPadding, sortIconGutter, isStacked]
   );
 
   const sortColumn = sort ? columns.find((column) => column.id === sort.columnId) : undefined;

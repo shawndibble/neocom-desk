@@ -22,13 +22,16 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
+/** @summary Exactly one of a few views is always on. */
 export const Basic: Story = {};
 
+/** @summary Stretches to the container, segments sharing the width. Useful on a phone. */
 export const Fill: Story = {
   args: { fill: true },
   globals: { viewport: { value: 'phone390', isRotated: false } },
 };
 
+/** @summary One segment disabled, with the reason in a tooltip. */
 export const DisabledSegment: Story = {
   args: {
     options: [

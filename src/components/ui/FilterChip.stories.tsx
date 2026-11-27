@@ -16,12 +16,16 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
+/** @summary Off: hairline border. Click to turn it on. */
 export const Off: Story = {};
 
+/** @summary On: accent tint, `aria-pressed`. */
 export const On: Story = { args: { selected: true } };
 
+/** @summary A match count after the label, with a screen-reader gloss saying what it counts. */
 export const WithCount: Story = { args: { count: 3, countLabel: 'unread' } };
 
+/** @summary Disabled with a tooltip giving the reason; stays hoverable. */
 export const DisabledWithReason: Story = {
   args: { disabled: true, tooltip: 'Needs the Director role.' },
 };

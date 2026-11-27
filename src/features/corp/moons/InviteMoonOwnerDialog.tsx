@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState } from 'react';
 import { useTimeZone } from '@/lib/timeFormat';
 import { useTranslation } from 'react-i18next';
 import { Button, Modal, TextInput, Tooltip } from '@/components/ui';
-import { useIsPhone } from '@/lib/useIsPhone';
 import {
   createFeederInvite,
   inviteLink,
@@ -31,7 +30,6 @@ export function InviteMoonOwnerDialog({
 }) {
   const zone = useTimeZone();
   const { t } = useTranslation();
-  const phone = useIsPhone();
   const [invites, setInvites] = useState<OpenInvite[] | null>(null);
   const [offer, setOffer] = useState('');
   const [link, setLink] = useState<{ url: string; inviteId: string } | null>(null);
@@ -106,7 +104,6 @@ export function InviteMoonOwnerDialog({
       open
       onClose={onClose}
       title={t(k('title'))}
-      placement={phone ? 'sheet' : 'center'}
       footer={
         <div className="flex justify-end">
           <Button variant="primary" onClick={onClose}>

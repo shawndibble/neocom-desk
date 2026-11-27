@@ -72,7 +72,7 @@ export function PlanSummaryPanel({
     <Panel
       title={t('piPlan.make.summaryTitle')}
       meta={
-        <span className="flex items-center gap-1.5">
+        <span className="flex min-w-0 flex-1 basis-0 flex-wrap items-center gap-1.5">
           <EstimateBadge />
           <InfoTooltip
             label={t('piPlan.make.basisLabel')}

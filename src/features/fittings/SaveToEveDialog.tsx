@@ -52,6 +52,7 @@ export function SaveToEveDialog({
   const [target, setTarget] = useState<string>(NEW_TARGET);
   const [alsoSave, setAlsoSave] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [touched, setTouched] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [offlineFailed, setOfflineFailed] = useState(false);
   const [unconfirmed, setUnconfirmed] = useState(false);
@@ -175,9 +176,15 @@ export function SaveToEveDialog({
   }
 
   return (
-    <Modal open={open} onClose={onClose} title={t('fittings.saveToEve.title')}>
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={t('fittings.saveToEve.title')}
+      dirty={touched && !saving}
+    >
       <form
         className="space-y-3"
+        onInput={() => setTouched(true)}
         onSubmit={(e) => {
           e.preventDefault();
           void handleSave();

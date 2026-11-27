@@ -21,10 +21,7 @@ export function SidePanelSubRoot({ children }: { children: ReactNode }) {
 
 export function InlineCaret({ open }: { open: boolean }) {
   return (
-    <span
-      aria-hidden="true"
-      className={cx('text-text-dim transition-transform', open && 'rotate-90')}
-    >
+    <span aria-hidden="true" className={cx('text-text-dim', open && 'rotate-90')}>
       ›
     </span>
   );

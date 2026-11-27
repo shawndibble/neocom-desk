@@ -32,6 +32,7 @@ vi.mock('@/features/loyalty/useLpStoreLanding', () => ({
     jumpsStatus: 'ready',
     factions: [],
     categories: [],
+    retry: () => {},
   }),
 }));
 

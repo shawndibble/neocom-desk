@@ -928,6 +928,18 @@ describe('DataTable', () => {
       expect(screen.getByRole('table')).not.toHaveClass('dt-stacked');
     });
 
+    it('pins its key column in a table, never on a stacked card', () => {
+      const pinned = columns.map((column, i) =>
+        i === 0 ? { ...column, stickyStart: true } : column
+      );
+      const table = renderTable({ columns: pinned, responsive: 'table', stacked: true });
+      expect(screen.getAllByRole('cell')[0]).toHaveClass('sticky', 'max-sm:max-w-30');
+      table.unmount();
+      renderTable({ columns: pinned, stacked: true });
+      expect(screen.getAllByRole('cell')[0]).not.toHaveClass('sticky');
+      expect(screen.getAllByRole('cell')[0]).not.toHaveClass('max-sm:max-w-30');
+    });
+
     it('states its table roles explicitly, since the stacked layout drops the implicit ones', () => {
       renderTable();
       expect(screen.getByRole('table')).toHaveAttribute('role', 'table');

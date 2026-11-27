@@ -359,21 +359,23 @@ export function Contacts() {
                     }
                   />
                 ) : (
-                  <DataTable
-                    {...characterExport.tableProps}
-                    label={t('contacts.title')}
-                    columns={columns}
-                    rows={filteredContacts}
-                    rowKey={(contact) => contact.contact_id}
-                    {...characterSortProps}
-                    mobileSort
-                    stackLayout="dense"
-                    onRowClick={(contact) => {
-                      const kind = contactPublicInfoKind(contact);
-                      if (kind) openPublicInfo(kind, contact.contact_id);
-                    }}
-                    rowClickable={(contact) => contactPublicInfoKind(contact) !== null}
-                  />
+                  <div className="overflow-x-auto">
+                    <DataTable
+                      {...characterExport.tableProps}
+                      label={t('contacts.title')}
+                      columns={columns}
+                      rows={filteredContacts}
+                      rowKey={(contact) => contact.contact_id}
+                      {...characterSortProps}
+                      mobileSort
+                      stackLayout="dense"
+                      onRowClick={(contact) => {
+                        const kind = contactPublicInfoKind(contact);
+                        if (kind) openPublicInfo(kind, contact.contact_id);
+                      }}
+                      rowClickable={(contact) => contactPublicInfoKind(contact) !== null}
+                    />
+                  </div>
                 )}
               </Panel>
             )}

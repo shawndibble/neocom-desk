@@ -28,6 +28,9 @@ function Stateful(args: CheckboxSelectProps<Value>) {
   );
 }
 
+/**
+ * @summary Compact multi-pick filter in a dropdown menu, summarised as "All", a name, or a count. §6c cue: `CaretDown` inside field chrome opens a list to pick from.
+ */
 const meta = {
   title: 'ui/CheckboxSelect',
   component: CheckboxSelect<Value>,
@@ -44,28 +47,37 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
+/** @summary Everything ticked: the summary reads "All". */
 export const All: Story = {};
 
+/** @summary One ticked: the summary names it. */
 export const One: Story = { args: { selected: new Set(['cruiser']) } };
 
+/** @summary Several ticked: the summary is a count. */
 export const Count: Story = { args: { selected: new Set(['frigate', 'cruiser']) } };
 
+/** @summary A narrowed filter: `active` draws the accent border (§6c). */
 export const Active: Story = {
   args: { selected: new Set(['cruiser']), active: true },
 };
 
+/** @summary Nothing ticked: the summary reads "None". */
 export const None: Story = { args: { selected: new Set() } };
 
+/** @summary Open menu: checked items carry a check, options can carry a dim description. */
 export const Open: Story = {
   play: async ({ canvasElement }) => {
     await userEvent.click(within(canvasElement).getByRole('button'));
   },
 };
 
+/** @summary `size="md"`: the 36px height of a `SearchInput` beside it, for a filter row built at the default size. */
 export const Medium: Story = { args: { size: 'md' } };
 
+/** @summary `noneLabel`: for a filter where nothing ticked means no narrowing, the empty summary reads "Any". */
 export const NoneLabel: Story = { args: { selected: new Set(), noneLabel: 'Any' } };
 
+/** @summary A `disabled` option is greyed and unclickable, and keeps its tick when it was already on. */
 export const DisabledOption: Story = {
   args: {
     selected: new Set(['frigate']),

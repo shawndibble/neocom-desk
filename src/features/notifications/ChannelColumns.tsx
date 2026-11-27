@@ -4,7 +4,7 @@ import { NOTIFICATION_CHANNELS } from './eventSelection';
 import { NO_CHANNEL_OFF, type ChannelOffMap } from './channelOff';
 
 export const EVENT_ROW_GRID =
-  'md:grid md:grid-cols-[minmax(0,1fr)_4.25rem_4.25rem_minmax(8rem,12rem)_7rem] md:items-center md:gap-x-3';
+  'md:grid md:grid-cols-[minmax(10rem,1fr)_3.75rem_3.75rem_minmax(6rem,12rem)_7rem] md:items-center md:gap-x-3';
 
 export const DEVICE_CELL = 'md:col-start-2 md:row-start-1 md:justify-self-center';
 export const ALERTS_CELL = 'md:col-start-3 md:row-start-1 md:justify-self-center';

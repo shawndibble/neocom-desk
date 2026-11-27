@@ -11,7 +11,7 @@ import {
 import { MailLabelTags } from '@/features/character/MailLabelTags';
 import { MailRowMenu } from '@/features/character/MailRowMenu';
 import { cx } from '@/lib/cx';
-import { formatDateOnly } from '@/lib/timestamp';
+import { formatDateOnly, formatTimeOfDay } from '@/lib/timestamp';
 import { FOLDER_ICON, TAB_LABEL_KEY, type MailRow } from '@/features/character/mailDisplay';
 
 interface MailListRowProps {
@@ -21,6 +21,7 @@ interface MailListRowProps {
   isSelected: boolean;
   party: string;
   timeZone?: string;
+  timeOnly?: boolean;
   onOpen: (row: MailRow, button: HTMLButtonElement) => void;
   canOrganize?: boolean;
   selecting?: boolean;
@@ -37,6 +38,7 @@ export function MailListRow({
   isSelected,
   party,
   timeZone,
+  timeOnly = false,
   onOpen,
   canOrganize = false,
   selecting = false,
@@ -112,7 +114,10 @@ export function MailListRow({
               )}
               {header.timestamp && (
                 <span className="ml-auto shrink-0 tabular-nums">
-                  {formatDateOnly(new Date(header.timestamp), timeZone)}
+                  {(timeOnly ? formatTimeOfDay : formatDateOnly)(
+                    new Date(header.timestamp),
+                    timeZone
+                  )}
                 </span>
               )}
             </span>

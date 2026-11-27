@@ -1,7 +1,6 @@
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Modal } from '@/components/ui';
-import { useIsPhone } from '@/lib/useIsPhone';
 import { clearNeedsLogin } from '@/stores/authFailure';
 import { isSyncConfigured } from '@/app/syncStatus';
 import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
@@ -25,7 +24,6 @@ export function RemoveCharacterDialog({
   onFailed: (name: string) => void;
 }) {
   const { t } = useTranslation();
-  const phone = useIsPhone();
   const focusAfterCommit = useFocusAfterCommit();
   const cancelRef = useRef<HTMLButtonElement>(null);
   const [removing, setRemoving] = useState(false);
@@ -69,7 +67,6 @@ export function RemoveCharacterDialog({
       onClose={() => {
         if (!removing) onClose();
       }}
-      placement={phone ? 'sheet' : 'center'}
       title={t('characters.removeTitle', { name: target?.name ?? '' })}
       initialFocusRef={cancelRef}
     >

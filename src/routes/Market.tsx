@@ -429,7 +429,7 @@ export function Market() {
     orderRowClassName,
     orderRowContextMenu,
     noOrders,
-    scopeLabel,
+    anyRangeLabel,
     bookScope,
     priceScopeName,
     scopeNote,
@@ -479,7 +479,7 @@ export function Market() {
     onChange: handleBrowserFiltersChange,
     active: activeFilters,
     regionMode,
-    scopeLabel,
+    scopeLabel: anyRangeLabel,
     currentSystem,
   };
 
@@ -831,7 +831,7 @@ export function Market() {
                       onFilterChange={handleBrowserFiltersChange}
                       active={activeFilters}
                       regionMode={regionMode}
-                      scopeLabel={scopeLabel}
+                      scopeLabel={anyRangeLabel}
                       currentSystem={currentSystem}
                       note={scopeNote}
                     />

@@ -1,6 +1,8 @@
 const DIRECTIVE =
   /^\s*(eslint-|@ts-(expect-error|ignore|nocheck|check)\b|@vitest-environment\b|@jsxImportSource\b|prettier-ignore\b|istanbul\b|v8 ignore\b|c8 ignore\b|\/\s*<reference\b)/;
 
+const SUMMARY = /^\*\s*\*?\s*@summary\b/;
+
 export const noComments = {
   meta: {
     type: 'suggestion',
@@ -15,6 +17,7 @@ export const noComments = {
       Program() {
         for (const comment of context.sourceCode.getAllComments()) {
           if (comment.type === 'Shebang' || DIRECTIVE.test(comment.value)) continue;
+          if (comment.type === 'Block' && SUMMARY.test(comment.value)) continue;
           context.report({ loc: comment.loc, messageId: 'comment' });
         }
       },

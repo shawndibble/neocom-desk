@@ -379,7 +379,7 @@ function MailView({ scope, scopeControl, openTarget }: MailViewProps) {
             />
           )}
 
-          <div className="mb-0 grid grid-cols-1 gap-4 lg:grid-cols-[22rem_minmax(0,1fr)] lg:items-start xl:grid-cols-[24rem_minmax(0,1fr)]">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-[22rem_minmax(0,1fr)] lg:items-start xl:grid-cols-[24rem_minmax(0,1fr)] pb-12 lg:pb-0">
             <MailListPane
               visible={isDesktop || selectedKey === null}
               listState={listState}

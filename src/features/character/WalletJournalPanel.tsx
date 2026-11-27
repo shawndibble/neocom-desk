@@ -36,6 +36,7 @@ interface WalletJournalPanelProps {
   allJournalsLoading: boolean;
   hasJournalSelection: boolean;
   onRetryAllJournals: () => void;
+  onRetryJournal: () => void;
   journalFetchedAt: Date | null;
   journalExport: UseTableExport<JournalRow>;
   journalIsTruncated: boolean;
@@ -59,6 +60,7 @@ export function WalletJournalPanel({
   allJournalsLoading,
   hasJournalSelection,
   onRetryAllJournals,
+  onRetryJournal,
   journalFetchedAt,
   journalExport,
   journalIsTruncated,
@@ -103,7 +105,9 @@ export function WalletJournalPanel({
         <div className="p-3">
           <GrantBanner characterId={activeCharacterId} endpoints={['getCharacterWalletJournal']} />
         </div>
-      ) : !showingBeyondActive && (!journalResult || journalLength === 0) ? (
+      ) : !showingBeyondActive && !journalResult ? (
+        <LoadFailedState onRetry={onRetryJournal} className="py-8" />
+      ) : !showingBeyondActive && journalLength === 0 ? (
         <CachedEmptyState
           result={journalResult}
           title={t('wallet.journalEmptyTitle')}

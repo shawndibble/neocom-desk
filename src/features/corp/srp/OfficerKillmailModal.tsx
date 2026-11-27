@@ -1,6 +1,5 @@
 import { useTranslation } from 'react-i18next';
 import { Button, Modal } from '@/components/ui';
-import { useIsPhone } from '@/lib/useIsPhone';
 import type { DoctrineCheckRecord, SrpClaimValues } from '../srpTypes';
 import {
   AppraisalComparison,
@@ -18,13 +17,12 @@ interface Props {
 
 export function OfficerKillmailModal({ subject, check, values, onClose }: Props) {
   const { t } = useTranslation();
-  const phone = useIsPhone();
   const ready = typeof values === 'object' ? values : null;
   return (
     <Modal
       open
       onClose={onClose}
-      placement={phone ? 'sheet' : 'medium'}
+      placement="medium"
       title={subject.hullName}
       footer={
         <div className="flex justify-end">

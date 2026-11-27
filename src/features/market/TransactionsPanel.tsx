@@ -367,6 +367,7 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
       isPhone,
       nameFor,
       widths: numberWidths,
+      stickyStartOnPanel: true,
     });
     return [
       date,
@@ -650,7 +651,7 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
                 }
               />
             ) : (
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto edge-fade-end">
                 <DataTable
                   {...transactionsExport.tableProps}
                   label={t('wallet.transactionsTab')}

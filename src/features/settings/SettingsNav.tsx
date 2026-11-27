@@ -156,7 +156,7 @@ export function SettingsBackLink() {
     <Link
       to={SETTINGS_TABS.base}
       className={cx(
-        'inline-flex min-h-9 items-center gap-1 rounded-xs px-2 text-sm text-text-dim hover:text-text active:text-text-dim md:hidden',
+        'inline-flex min-h-9 items-center gap-1 rounded-xs px-2 text-sm text-text-dim hover:text-text active:text-text-dim lg:hidden',
         interactiveClassName,
         focusRingClassName
       )}

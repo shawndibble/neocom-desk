@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { focusRingInsetClassName, interactiveClassName } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
 
-export const sectionRailClassName = 'hidden md:sticky md:top-4 md:block md:self-start';
+export const sectionRailClassName = 'hidden lg:sticky lg:top-4 lg:block lg:self-start';
 
 export function SectionRailLink({
   to,

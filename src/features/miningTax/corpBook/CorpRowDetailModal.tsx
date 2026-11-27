@@ -22,7 +22,6 @@ import { formatAge, MINUTE_MS } from '@/lib/age';
 import { cx } from '@/lib/cx';
 import { formatIsk } from '@/lib/isk';
 import { useTicker } from '@/lib/ticker';
-import { useIsPhone } from '@/lib/useIsPhone';
 import { OrePricedCard } from '../OrePricedCard';
 import { PayeeLedgerLink } from '../PayeeLedgerLink';
 import { bookRowTax } from './corpRows';
@@ -83,7 +82,6 @@ export function CorpRowDetailModal({
 }: Props) {
   const zone = useTimeZone();
   const { t } = useTranslation();
-  const isPhone = useIsPhone();
   const now = useTicker(MINUTE_MS);
   const [comparing, setComparing] = useState(false);
   const { view } = corp;
@@ -132,7 +130,6 @@ export function CorpRowDetailModal({
       <Modal
         open={open}
         onClose={onClose}
-        placement={isPhone ? 'sheet' : 'center'}
         title={
           <span className="flex items-center gap-1.5">
             {t('miningTax.detailTitle', { date: view.date, system: systemName })}

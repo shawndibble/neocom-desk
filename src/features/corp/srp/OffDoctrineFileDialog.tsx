@@ -1,7 +1,6 @@
 import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Field, FieldError, Modal, TextInput } from '@/components/ui';
-import { useIsPhone } from '@/lib/useIsPhone';
 import type { DoctrineCheckRecord } from '../srpTypes';
 import { DoctrineCheckView } from './DoctrineCheckView';
 
@@ -25,7 +24,6 @@ export function OffDoctrineFileDialog({
   onClose,
 }: Props) {
   const { t } = useTranslation();
-  const phone = useIsPhone();
   const fleetId = useId();
   const fleetErr = `${fleetId}-err`;
   const blocked = fleetRequired && fleet.trim() === '';
@@ -33,7 +31,6 @@ export function OffDoctrineFileDialog({
     <Modal
       open
       onClose={onClose}
-      placement={phone ? 'sheet' : 'center'}
       title={t('srpMember.offDoctrine.title', { hull: hullName })}
       footer={
         <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">

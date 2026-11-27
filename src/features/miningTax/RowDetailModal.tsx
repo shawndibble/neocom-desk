@@ -25,7 +25,6 @@ import { computeAssignmentValue } from '@/engine/miningTax/valuation';
 import { unreportedClaims } from '@/engine/miningTax/ownership';
 import { CharacterLink, SystemLink } from '@/features/entities';
 import { formatIsk } from '@/lib/isk';
-import { useIsPhone } from '@/lib/useIsPhone';
 import { cx } from '@/lib/cx';
 import { AssignDialog } from './AssignDialog';
 import { PriceBreakdownCard } from './PriceBreakdownCard';
@@ -119,7 +118,6 @@ export function RowDetailModal({
   startWithUnassignConfirm = false,
 }: RowDetailModalProps) {
   const { t } = useTranslation();
-  const isPhone = useIsPhone();
   const [confirmUnassign, setConfirmUnassign] = useState(startWithUnassignConfirm);
   const [copied, setCopied] = useState<{ at: number } | null>(null);
   useTimedToast(copied, () => setCopied(null), NOTICE_MS);
@@ -212,7 +210,6 @@ export function RowDetailModal({
       open={open}
       onClose={onClose}
       dismissOnOutsidePress={status !== 'unassigned'}
-      placement={isPhone ? 'sheet' : 'center'}
       title={
         <span className="flex items-center gap-1.5">
           {t('miningTax.detailTitle', { date: row.entry.date, system: systemName })}

@@ -116,7 +116,7 @@ export function CertificateRow({
     <li className="border-t border-line text-xs">
       <div
         onClick={(event) => isRowOwnEvent(event) && onToggle()}
-        className="cursor-pointer grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 px-3 py-2 sm:grid-cols-[minmax(0,1.3fr)_auto_minmax(0,1.4fr)_12rem]"
+        className="cursor-pointer grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 px-3 py-2 lg:grid-cols-[minmax(0,1.3fr)_auto_minmax(0,1.4fr)_12rem]"
       >
         <button
           ref={expanderRef}
@@ -139,7 +139,7 @@ export function CertificateRow({
           <span className="truncate">{certificate.name}</span>
         </button>
         <GradePips grade={grade} alphaReach={alphaReach} />
-        <p className={cx('min-w-0 text-text-dim', capped && 'col-span-2 sm:col-span-1')}>
+        <p className={cx('min-w-0 text-text-dim', capped && 'col-span-2 lg:col-span-1')}>
           {elite ? (
             <span className="text-success">{t('skills.certificates.eliteDone')}</span>
           ) : capped ? (
@@ -162,7 +162,7 @@ export function CertificateRow({
         <div
           className={cx(
             'flex shrink-0 justify-end whitespace-nowrap',
-            capped && 'col-span-2 sm:col-span-1'
+            capped && 'col-span-2 lg:col-span-1'
           )}
         >
           {action}

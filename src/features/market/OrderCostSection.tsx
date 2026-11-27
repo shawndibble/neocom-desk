@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Disclosure } from '@/components/ui';
@@ -9,6 +10,8 @@ import type { OpenOrderRow } from './openOrdersModel';
 import type { OrderDetailView } from './orderDetailView';
 import type { LocationState } from './orderScopeState';
 import { CostLedger } from './OrderCostLedger';
+import { industryTabHref } from '@/features/industry/industryTabs';
+import { useOptionalItemActions } from './itemActions';
 import { formatCount } from '@/lib/formatCount';
 
 export function OrderCostSection({
@@ -27,6 +30,9 @@ export function OrderCostSection({
   onToggle: () => void;
 }) {
   const { t } = useTranslation();
+  const itemActions = useOptionalItemActions();
+  useEffect(() => itemActions?.requestBlueprints(), [itemActions]);
+  const hasBlueprint = Boolean(itemActions?.blueprintFor(row.typeId));
   const floorShown = row.floor ? shownFloorPrice(row.floor) : null;
 
   const costTrailing =
@@ -78,9 +84,14 @@ export function OrderCostSection({
               accountingLevel={accountingLevel}
             />
           )}
-          <Link to="/industry" className={buttonClassName({ variant: 'ghost', size: 'sm' })}>
-            {t('market.orders.linkBuild')}
-          </Link>
+          {hasBlueprint && (
+            <Link
+              to={`${industryTabHref('plans')}?product=${row.typeId}`}
+              className={buttonClassName({ variant: 'ghost', size: 'sm' })}
+            >
+              {t('market.orders.linkBuild')}
+            </Link>
+          )}
         </div>
       </Disclosure>
     </section>

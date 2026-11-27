@@ -38,6 +38,7 @@ export function buildMaterialsColumns({
     {
       id: 'material',
       header: t('industry.material'),
+      headerCellClassName: 'w-40',
       sortValue: (material) => nameFor(material.typeID),
       render: (material) => renderName(material, true),
     },

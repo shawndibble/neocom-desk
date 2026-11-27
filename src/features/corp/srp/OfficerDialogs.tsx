@@ -72,7 +72,6 @@ function Shell({
       open
       onClose={onClose}
       title={title}
-      placement={phone ? 'sheet' : 'center'}
       dismissOnOutsidePress={false}
       footer={<DialogFooter stacked={phone}>{buttons}</DialogFooter>}
     >

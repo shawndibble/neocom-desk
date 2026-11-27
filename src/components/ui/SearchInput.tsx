@@ -12,6 +12,9 @@ interface SearchInputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, '
   pageSearch?: boolean;
 }
 
+/**
+ * @summary The one search box: a magnifier and a fixed `md` height; use it for every filter-as-you-type field.
+ */
 export const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(function SearchInput(
   { className = '', inputClassName, pageSearch = false, ...rest },
   ref

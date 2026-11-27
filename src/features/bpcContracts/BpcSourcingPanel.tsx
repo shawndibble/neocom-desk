@@ -774,7 +774,7 @@ export function BpcSourcingPanel({
                 }
               />
             ) : (
-              <>
+              <div className="overflow-x-auto">
                 <DataTable
                   {...sourcingExport.tableProps}
                   label={t('bpcContracts.title')}
@@ -846,7 +846,7 @@ export function BpcSourcingPanel({
                   )}
                   virtualize
                 />
-              </>
+              </div>
             )}
           </>
         )}

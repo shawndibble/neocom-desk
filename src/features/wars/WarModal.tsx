@@ -7,7 +7,6 @@ import { formatCount } from '@/lib/formatCount';
 import { formatCountdown } from '@/lib/duration';
 import { formatTimestamp } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';
-import { useIsPhone } from '@/lib/useIsPhone';
 import { warZkillUrl } from '@/lib/zkillboard';
 import { usePartyName } from './usePartyName';
 import { WarParty } from './WarParty';
@@ -22,15 +21,9 @@ interface WarModalProps {
 
 export function WarModal({ open, onClose, wars, nameCorporation = false }: WarModalProps) {
   const { t } = useTranslation();
-  const phone = useIsPhone();
   const groups = groupWarsByCorporation(wars);
   return (
-    <Modal
-      open={open}
-      onClose={onClose}
-      placement={phone ? 'sheet' : 'center'}
-      title={t('wars.modal.title', { count: wars.length })}
-    >
+    <Modal open={open} onClose={onClose} title={t('wars.modal.title', { count: wars.length })}>
       {nameCorporation || groups.length > 1 ? (
         <div className="space-y-6">
           {groups.map((group) => (

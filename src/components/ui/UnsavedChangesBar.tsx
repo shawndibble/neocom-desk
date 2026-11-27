@@ -5,17 +5,24 @@ import { Button } from './Button';
 import * as Icon from './icons';
 
 interface UnsavedChangesBarProps {
+  /** @summary Already-translated status line, e.g. "Unsaved changes". Ignored while `problems` is set. */
   message: string;
+  /** @summary Already-translated line naming what blocks Save, e.g. "2 problems to fix before saving". Shown instead of `message` when set. */
   problems?: string | null;
   discardLabel: string;
   saveLabel: string;
   onDiscard: () => void;
   onSave: () => void;
+  /** @summary A save is running: Save shows its spinner and both buttons ignore clicks. */
   saving?: boolean;
+  /** @summary Extra status under the buttons' row, e.g. a failed save's `ActionResult`. */
   children?: ReactNode;
   className?: string;
 }
 
+/**
+ * @summary Pinned bar for a form with edits not yet saved: a status line, Discard and Save. Save stays focusable but inert while a field is invalid.
+ */
 export function UnsavedChangesBar({
   message,
   problems = null,

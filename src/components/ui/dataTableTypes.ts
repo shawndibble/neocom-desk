@@ -50,12 +50,24 @@ export interface DataTableGroupBy<T> {
 }
 
 export interface DataTableProps<T> {
+  /** @summary Column definitions: header text, cell renderer and optional sort value. */
   columns: readonly DataTableColumn<T>[];
+  /** @summary The data to show; one entry per table row. */
   rows: readonly T[];
+  /**
+   * @summary Stable unique key per row.
+   *
+   * Must be unique across `rows` — React reconciles on it, and duplicates
+   * leave rows from a previous render stranded in the table. `index` is
+   * there for rows that carry no identity of their own: a public contract
+   * lists the same blueprint once per copy, so 70% of BPC Search's rows
+   * collided on every field it has.
+   */
   rowKey: (row: T, index: number) => string | number;
   rowClassName?: (row: T) => string | undefined;
   highlightRowKey?: string | number | null;
   selectedRowKey?: string | number | null;
+  /** @summary Accessible name for the table. */
   label: string;
   className?: string;
   defaultSort?: DataTableSort;

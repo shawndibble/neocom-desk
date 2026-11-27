@@ -149,7 +149,6 @@ export function OrderDetailContent({
       open
       onClose={onClose}
       title={row.typeName}
-      placement={isPhone ? 'sheet' : 'center'}
       footer={
         walking ? (
           <div className="flex w-full flex-col gap-2 md:flex-row md:justify-end">

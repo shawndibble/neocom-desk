@@ -11,6 +11,8 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
+/** @summary The one search box, with a leading magnifier. Width comes from `className`. */
 export const Basic: Story = {};
 
+/** @summary With a typed value. */
 export const Filled: Story = { args: { defaultValue: 'tritanium' } };

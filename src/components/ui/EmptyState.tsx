@@ -1,14 +1,22 @@
 import type { ReactNode } from 'react';
 
 interface EmptyStateProps {
+  /** @summary Already-translated headline saying what is missing. */
   title: string;
+  /** @summary One line on why it is empty or what to do next; may hold an inline link. */
   hint?: ReactNode;
+  /** @summary Decorative glyph above the title. */
   icon?: ReactNode;
+  /** @summary The control that resolves the empty state, e.g. a `Button`; two only when they start different things. */
   action?: ReactNode;
+  /** @summary ARIA role for the wrapper; `alert` for a failed read. */
   role?: 'alert';
   className?: string;
 }
 
+/**
+ * @summary Centred title, hint and optional action for a view with nothing to show.
+ */
 export function EmptyState({ title, hint, icon, action, role, className = '' }: EmptyStateProps) {
   return (
     <div

@@ -139,6 +139,7 @@ export function ComposeRequestDialog({
   const catalogue: AppraisalCatalogue | null = catalogueLoad.data ?? null;
   const catalogueFailed = catalogueLoad.status === 'failed';
   const [busy, setBusy] = useState(false);
+  const [touched, setTouched] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notify, setNotify] = useState<RequestNotify>(editing?.request.notify ?? DEFAULT_NOTIFY);
   const searchRef = useRef<HTMLInputElement>(null);
@@ -294,9 +295,11 @@ export function ComposeRequestDialog({
             : 'communities.board.compose.title'
       )}
       placement="wide"
+      dirty={touched && !busy}
     >
       <form
         className="space-y-4 text-sm"
+        onInput={() => setTouched(true)}
         onSubmit={(e) => {
           e.preventDefault();
           if (!canSubmit || busy) return;

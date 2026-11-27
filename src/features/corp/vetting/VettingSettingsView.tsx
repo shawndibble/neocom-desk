@@ -596,7 +596,7 @@ export function VettingSettingsView({
 
   const shown = stacked ? VETTING_SETTINGS_SECTIONS : [section];
   return (
-    <div className="grid gap-4 md:grid-cols-[10rem_minmax(0,1fr)] md:gap-6">
+    <div className="grid gap-4 lg:grid-cols-[10rem_minmax(0,1fr)] lg:gap-6">
       <nav aria-label={t('vetting.settings.sectionsLabel')} className={sectionRailClassName}>
         <ul className="space-y-px">
           {VETTING_SETTINGS_SECTIONS.map((id) => (

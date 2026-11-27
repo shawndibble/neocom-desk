@@ -235,6 +235,11 @@ const RailNavBody = memo(function RailNavBody({
   const focusAfterCommit = useFocusAfterCommit();
   const doneRef = useRef<HTMLButtonElement>(null);
   const editRef = useRef<HTMLButtonElement>(null);
+  const navRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const marked = navRef.current?.querySelectorAll('[aria-current="page"]') ?? [];
+    marked[marked.length - 1]?.scrollIntoView?.({ block: 'nearest' });
+  }, [current, activeViewPath]);
 
   const [open, setOpen] = useState<{ for: NavPagePath | null; path: string | null }>({
     for: current,
@@ -268,6 +273,7 @@ const RailNavBody = memo(function RailNavBody({
     <>
       <GoToButton />
       <nav
+        ref={navRef}
         aria-label={t('nav.railLabel')}
         className="flex flex-1 flex-col gap-0.5 overflow-y-auto p-2"
       >

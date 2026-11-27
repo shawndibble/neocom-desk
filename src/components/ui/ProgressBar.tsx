@@ -25,6 +25,9 @@ const SIZE_CLASS = { xs: 'h-1', sm: 'h-1.5', md: 'h-2' } as const;
 
 const INDETERMINATE_WIDTH = '30%';
 
+/**
+ * @summary A thin filled track for how far along something is.
+ */
 export function ProgressBar({
   label,
   value,

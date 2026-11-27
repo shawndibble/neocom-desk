@@ -33,6 +33,7 @@ import { ShowInfoMenuItem } from './ItemContextMenu';
 import { hasQuickbarTarget } from './quickbar';
 import type { QuickbarItem } from '@/db';
 import type { VsPaid } from './useQuickbarVsPaid';
+import { usePrefersReducedMotion } from '@/lib/useMediaQuery';
 
 function formatPercent(percent: number): string {
   return `${percent > 0 ? '+' : ''}${percent}%`;
@@ -60,8 +61,10 @@ function QuickbarRow({
   onReorder,
 }: QuickbarRowProps) {
   const { t } = useTranslation();
+  const reduced = usePrefersReducedMotion();
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: item.typeId,
+    transition: reduced ? null : undefined,
   });
   const style = { transform: CSS.Transform.toString(transform), transition };
   const hasTarget = hasQuickbarTarget(item);

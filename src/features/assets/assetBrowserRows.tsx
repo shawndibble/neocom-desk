@@ -231,7 +231,12 @@ export function LocationRow({
             <span aria-hidden="true">·</span>
             <span className="tabular-nums">{t('assets.itemCount', { count: itemCount })}</span>
             <span aria-hidden="true">·</span>
-            <span className="tabular-nums text-isk-pos">
+            <span
+              className={cx(
+                'tabular-nums',
+                estimatedValue === 0 ? 'text-text-faint' : 'text-isk-pos'
+              )}
+            >
               <IskAmount value={estimatedValue} decimals={0} />
             </span>
           </span>
@@ -242,7 +247,9 @@ export function LocationRow({
             <span className="sr-only">{t(`assets.pin.${pinState}`)}</span>
           </span>
         )}
-        <Icon.Descend size={Icon.ICON_SIZE.md} className={rowCaretClassName} />
+        {actions.length < 2 && (
+          <Icon.Descend size={Icon.ICON_SIZE.md} className={rowCaretClassName} />
+        )}
       </div>
       {actions.length >= 2 && (
         <span className="relative z-10 flex">
@@ -349,7 +356,7 @@ export function ContainerRow({
         <span className="shrink-0 text-[0.6875rem] text-text-dim tabular-nums">
           {formatBadge({ itemCount, estimatedValue }, t)}
         </span>
-        <Icon.Descend size={Icon.ICON_SIZE.sm} className={rowCaretClassName} />
+        {!hasMenu && <Icon.Descend size={Icon.ICON_SIZE.sm} className={rowCaretClassName} />}
       </Link>
       {hasMenu && (
         <span className="flex pr-2">
@@ -413,6 +420,7 @@ export function ItemColumnLabels({ showCost = false, sort, onSort, t }: ItemColu
         className={cx(
           cellClass,
           'inline-flex items-center gap-1 hover:text-text',
+          id !== 'volume' && 'uppercase',
           id !== 'name' && 'justify-end',
           focusRingInsetClassName
         )}

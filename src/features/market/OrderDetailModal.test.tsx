@@ -8,6 +8,8 @@ import { useActiveCharacter } from '@/stores/activeCharacter';
 import { seedGrant } from '@/test/seed';
 import { OrderDetailContent } from './OrderDetailModal';
 import { FAILOVER } from '@/features/campaigns/turnInStoryData';
+import { FakeItemActions, fakeItemActions } from './__fixtures__/itemActions';
+import { industryTabHref } from '@/features/industry/industryTabs';
 import { relistFees } from './orderDetailView';
 import type { OpenOrderRow, CharacterSkills } from './openOrdersModel';
 import type { RegionCompetition } from './orderCompetition';
@@ -90,26 +92,28 @@ function renderModal({
   const row = overrides.row ?? BASE_ROW;
   render(
     <MemoryRouter>
-      <OrderDetailContent
-        row={row}
-        deep={null}
-        loadingDeep={false}
-        history={null}
-        stationChecked={false}
-        stationsLoaded
-        regionJumps={undefined}
-        stationNameFor={(locationId) =>
-          locationId === 60003760 ? 'Jita IV - Moon 4' : `Station ${locationId}`
-        }
-        structureMarket={null}
-        reprocessing={undefined}
-        hubs={undefined}
-        hubsFailed={false}
-        relistFees={relistFees(row, skills)}
-        onCheckDeeper={onCheckDeeper}
-        onClose={onClose}
-        {...overrides}
-      />
+      <FakeItemActions actions={fakeItemActions({ blueprintFor: () => 999 })}>
+        <OrderDetailContent
+          row={row}
+          deep={null}
+          loadingDeep={false}
+          history={null}
+          stationChecked={false}
+          stationsLoaded
+          regionJumps={undefined}
+          stationNameFor={(locationId) =>
+            locationId === 60003760 ? 'Jita IV - Moon 4' : `Station ${locationId}`
+          }
+          structureMarket={null}
+          reprocessing={undefined}
+          hubs={undefined}
+          hubsFailed={false}
+          relistFees={relistFees(row, skills)}
+          onCheckDeeper={onCheckDeeper}
+          onClose={onClose}
+          {...overrides}
+        />
+      </FakeItemActions>
     </MemoryRouter>
   );
   return { onClose, onCheckDeeper };
@@ -451,7 +455,10 @@ describe('OrderDetailModal', () => {
     );
     expandAll();
     expect(screen.getByText("We don't know what this cost you")).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Link a build' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Link a build' })).toHaveAttribute(
+      'href',
+      `${industryTabHref('plans')}?product=${BASE_ROW.typeId}`
+    );
     expect(screen.queryByText(/type in what it cost/i)).not.toBeInTheDocument();
     const costSection = screen.getByText('What it cost you').closest('section')!;
     expect(within(costSection).getByText(/build plan on the Industry page/i)).toBeInTheDocument();

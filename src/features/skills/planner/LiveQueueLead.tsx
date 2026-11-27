@@ -29,7 +29,7 @@ export function LiveQueueLead({ projection, fetchedAt, nameFor }: LiveQueueLeadP
       onToggle={() => setExpanded((v) => !v)}
       label={t('plans.liveQueueLead', {
         count: queuedLevels.length,
-        date: formatLocalDate(new Date(startMs), timeZone),
+        date: formatLocalDate(new Date(startMs), timeZone).replaceAll('-', '‑'),
       })}
       trailing={fetchedAt ? <DataAgeBadge date={fetchedAt} tooltip={false} /> : undefined}
     >

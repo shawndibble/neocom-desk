@@ -3,8 +3,12 @@ import { isRowOwnEvent } from './rowEvents';
 import { forwardRef, type CSSProperties, type ReactNode, type RefObject } from 'react';
 
 interface PanelProps {
+  /**
+   * @summary The panel heading, rendered as an `<h2>`.
+   */
   title?: ReactNode;
   headingRef?: RefObject<HTMLHeadingElement | null>;
+  /** @summary Right-aligned controls in the header row, usually `IconButton`s. */
   actions?: ReactNode;
   leading?: ReactNode;
   meta?: ReactNode;
@@ -12,12 +16,16 @@ interface PanelProps {
   metaOwnRow?: boolean;
   onHeaderToggle?: () => void;
   children: ReactNode;
+  /** @summary Set false for flush content like tables; the body then has no inner padding. */
   padded?: boolean;
   fill?: boolean;
   className?: string;
   style?: CSSProperties;
 }
 
+/**
+ * @summary The bordered surface every page section sits in: optional title row with meta and actions, then the body.
+ */
 export const Panel = forwardRef<HTMLElement, PanelProps>(function Panel(
   {
     title,

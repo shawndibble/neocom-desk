@@ -741,8 +741,8 @@ describe('Characters', () => {
     renderCharacters();
     await screen.findByText('Pilot One');
 
-    await user.click(screen.getByRole('combobox', { name: 'Density' }));
-    await user.click(await screen.findByRole('option', { name: 'Spacious' }));
+    await user.click(screen.getByRole('combobox', { name: 'Text size' }));
+    await user.click(await screen.findByRole('option', { name: 'Extra large' }));
     await waitForSettingsValue(FONT_SCALE_KEY, (value) => value === 1.25);
     expect(useFontScale.getState().value).toBe(1.25);
   });

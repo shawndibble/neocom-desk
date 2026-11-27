@@ -182,4 +182,16 @@ describe('RemapMarkerModal', () => {
     );
     expect(screen.getByLabelText('Perception')).toHaveValue(27);
   });
+
+  it('asks before Escape throws away an edited spread, and closes straight away when untouched', async () => {
+    const user = userEvent.setup();
+    const { onClose } = renderModal();
+    await user.keyboard('{Escape}');
+    expect(onClose).toHaveBeenCalledTimes(1);
+
+    fireEvent.change(screen.getByLabelText('Intelligence'), { target: { value: '21' } });
+    await user.keyboard('{Escape}');
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(screen.getByText('Discard what you typed?')).toBeInTheDocument();
+  });
 });

@@ -13,6 +13,9 @@ interface QuestionRowProps {
   answerClassName?: string;
 }
 
+/**
+ * @summary A body-size FAQ row (caret and question) that opens its answer below.
+ */
 export function QuestionRow({
   question,
   expanded,

@@ -71,7 +71,6 @@ export function ReviewMemberDialog({
         open
         onClose={onClose}
         title={t('vetting.tell.title')}
-        placement={phone ? 'sheet' : 'center'}
         dismissOnOutsidePress={false}
         footer={
           <div className="flex justify-end gap-2 [&>button]:max-sm:w-full">
@@ -123,7 +122,6 @@ export function ReviewMemberDialog({
       open
       onClose={() => !busy && onClose()}
       title={t('vetting.requestDialog.title')}
-      placement={phone ? 'sheet' : 'center'}
       dismissOnOutsidePress={false}
       initialFocusRef={nameRef}
       footer={<DialogFooter stacked={phone}>{buttons}</DialogFooter>}

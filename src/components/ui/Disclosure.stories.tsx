@@ -16,6 +16,8 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
+/** @summary Folded: the bare caret points right; no box, no hover fill. */
 export const Folded: Story = {};
 
+/** @summary Open: the same caret turned down. */
 export const Open: Story = { args: { expanded: true, label: 'Hide details' } };

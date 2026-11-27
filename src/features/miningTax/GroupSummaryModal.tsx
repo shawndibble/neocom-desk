@@ -18,7 +18,6 @@ import { SecurityValue } from '@/features/assets/assetBrowserRows';
 import type { MiningTaxAssignmentRecord } from '@/db';
 import { STATUS_LABEL_KEY } from '@/engine/miningTax/rowStatus';
 import { formatIsk } from '@/lib/isk';
-import { useIsPhone } from '@/lib/useIsPhone';
 import { formatDateRange } from './groupRows';
 import { PayeeLedgerLink } from './PayeeLedgerLink';
 import { STATUS_TONE } from './statusTone';
@@ -73,7 +72,6 @@ export function GroupSummaryModal({
   startWithUnassignConfirm = false,
 }: GroupSummaryModalProps) {
   const { t } = useTranslation();
-  const isPhone = useIsPhone();
   const [confirmUnassign, setConfirmUnassign] = useState(startWithUnassignConfirm);
   const sorted = [...members].sort((a, b) => a.row.entry.date.localeCompare(b.row.entry.date));
   const dates = sorted.map((m) => m.row.entry.date);
@@ -123,7 +121,6 @@ export function GroupSummaryModal({
     <Modal
       open={open}
       onClose={onClose}
-      placement={isPhone ? 'sheet' : 'center'}
       title={
         <span className="flex items-center gap-1.5">
           {t('miningTax.detailTitle', { date: formatDateRange(dates), system: systemName })}

@@ -49,7 +49,10 @@ export function ColumnPickerMenu<Id extends string, Row>({
   const visibleSet = new Set(visible);
   const loggedIn = useCharacterCount() > 0;
   const hasHiddenColumns = available.some((id) => !visibleSet.has(id));
-  const [hintShown, dismissHint] = useOneTimeHint(COLUMN_PICKER_HINT, loggedIn && hasHiddenColumns);
+  const [hintShown, dismissHint, hintAnchor] = useOneTimeHint(
+    COLUMN_PICKER_HINT,
+    loggedIn && hasHiddenColumns
+  );
 
   return (
     <DropdownMenu
@@ -58,7 +61,7 @@ export function ColumnPickerMenu<Id extends string, Row>({
       }}
     >
       <Popover open={hintShown} onOpenChange={(open) => !open && dismissHint()}>
-        <PopoverAnchor asChild>
+        <PopoverAnchor asChild ref={hintAnchor}>
           <DropdownMenuTrigger asChild>
             <IconButton icon={<Icon.ColumnsPicker />} label={buttonLabel} size={size} />
           </DropdownMenuTrigger>

@@ -12,6 +12,9 @@ interface ValueListProps {
   children: ReactNode;
 }
 
+/**
+ * @summary A short list of label-and-value rows, value at the line's end.
+ */
 export function ValueList({ variant = 'divided', className, children }: ValueListProps) {
   return (
     <VariantContext.Provider value={variant}>
@@ -29,9 +32,13 @@ export function ValueList({ variant = 'divided', className, children }: ValueLis
 }
 
 interface ValueRowProps {
+  /** @summary What the figure is. */
   label: ReactNode;
+  /** @summary The figure, usually an `IskAmount`. Right-aligned, tabular. */
   value: ReactNode;
+  /** @summary A dim aside after the label ("3 orders"). */
   note?: ReactNode;
+  /** @summary Colour of the value: `default`, or a status tone. */
   tone?: StatChipTone;
 }
 

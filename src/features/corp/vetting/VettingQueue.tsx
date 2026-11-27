@@ -98,7 +98,13 @@ export function VettingQueue({
         headerClassName: 'max-xl:md:hidden',
         phoneHidden: true,
         render: (row) =>
-          row.characters > 0 ? row.characters : <span className="text-text-faint">-</span>,
+          phone ? (
+            <span data-dense-omit />
+          ) : row.characters > 0 ? (
+            row.characters
+          ) : (
+            <span className="text-text-faint">-</span>
+          ),
       },
       {
         id: 'result',
@@ -248,16 +254,18 @@ export function VettingQueue({
   }
   return (
     <Panel padded={false} title={t(`vetting.queue.title.${tab}`)}>
-      <DataTable
-        label={t(`vetting.queue.label.${tab}`)}
-        columns={columns}
-        rows={rows}
-        rowKey={(row) => row.id}
-        onRowClick={onOpen}
-        rowContextMenu={onRequestMail ? rowMenu : undefined}
-        rowMoreActions={onRequestMail !== undefined}
-        stackLayout={phone ? 'dense' : 'labelled'}
-      />
+      <div className="overflow-x-auto">
+        <DataTable
+          label={t(`vetting.queue.label.${tab}`)}
+          columns={columns}
+          rows={rows}
+          rowKey={(row) => row.id}
+          onRowClick={onOpen}
+          rowContextMenu={onRequestMail ? rowMenu : undefined}
+          rowMoreActions={onRequestMail !== undefined}
+          stackLayout={phone ? 'dense' : 'labelled'}
+        />
+      </div>
     </Panel>
   );
 }

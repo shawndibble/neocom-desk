@@ -26,7 +26,7 @@ function renderRow(props: Partial<Parameters<typeof AcceleratorRow>[0]> = {}) {
 describe('AcceleratorRow', () => {
   it('says None when nothing is injected, and its sheet opens on the editor', async () => {
     renderRow();
-    await userEvent.click(screen.getByRole('button', { name: /^Accelerator\s*None/ }));
+    await userEvent.click(screen.getByRole('button', { name: /^Attributes\s*Accelerator · None/ }));
     const sheet = screen.getByRole('dialog', { name: 'Accelerator' });
     expect(sheet).toHaveTextContent('Time left');
     expect(sheet).toHaveTextContent('INT 38');

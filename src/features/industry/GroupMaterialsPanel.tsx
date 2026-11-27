@@ -139,6 +139,7 @@ export function GroupMaterialsPanel({
         header: t('industry.material'),
         primary: true,
         stickyStart: true,
+        stickyStartOnPanel: true,
         sortValue: (material) => nameForType(catalog, material.typeID),
         render: (material) => (
           <span className="truncate">{nameForType(catalog, material.typeID)}</span>

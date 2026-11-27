@@ -35,7 +35,7 @@ const SYSTEMS: Record<string, { id: number; security: number }> = {
   'B-2': { id: B, security: -0.3 },
   'C-3': { id: C, security: -0.4 },
   '1DQ1-A': { id: D, security: -0.5 },
-  'E-5': { id: E, security: 0.04 },
+  'E-5': { id: E, security: -0.04 },
   Jita: { id: HI, security: 0.95 },
   J123456: { id: J, security: -0.99 },
 };

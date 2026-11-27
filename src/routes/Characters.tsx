@@ -87,16 +87,10 @@ import { returnPathAfterSwitch } from '@/features/character/characterSwitchRetur
 import { useCharacterCorpStanding } from '@/features/corp/useCharacterCorpStanding';
 import { useAlertsGrants } from '@/features/notifications/alertsGrant';
 import { isSyncConfigured } from '@/app/syncStatus';
+import { FONT_SCALE_LABEL_KEYS } from '@/features/settings/fontScaleLabelKeys';
 import { DialogFooter } from '@/components/ui/DialogFooter';
 
 const NO_CHARACTER_IDS: readonly number[] = [];
-
-const DENSITY_LABEL_KEYS = {
-  0.875: 'characters.densityCompact',
-  1: 'characters.densityCozy',
-  1.125: 'characters.densityComfortable',
-  1.25: 'characters.densitySpacious',
-} as const satisfies Record<FontScale, string>;
 
 export function Characters() {
   const { t } = useTranslation();
@@ -497,13 +491,13 @@ export function Characters() {
                 value={String(density)}
                 onValueChange={(value) => void setDensity(Number(value) as FontScale)}
               >
-                <SelectTrigger size="sm" aria-label={t('characters.densityLabel')} className="w-28">
+                <SelectTrigger size="sm" aria-label={t('settings.fontScaleLabel')} className="w-36">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   {FONT_SCALE_STEPS.map((step) => (
                     <SelectItem key={step} value={String(step)}>
-                      {t(DENSITY_LABEL_KEYS[step])}
+                      {t(FONT_SCALE_LABEL_KEYS[step])}
                     </SelectItem>
                   ))}
                 </SelectContent>

@@ -308,6 +308,13 @@
         transparent
       );
     }
+
+    /* Trailing end only: a leading fade would veil a pinned key column. */
+    .edge-fade-end {
+      animation: tab-fade-right linear both;
+      animation-timeline: scroll(self inline);
+      mask-image: linear-gradient(to right, #000 calc(100% - var(--tab-fade-r)), transparent);
+    }
   }
 
   /*

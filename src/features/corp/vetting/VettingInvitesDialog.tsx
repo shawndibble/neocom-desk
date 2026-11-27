@@ -238,7 +238,7 @@ export function VettingInvitesDialog({
         open
         onClose={() => !busy && onClose()}
         title={t(mode === 'new' ? 'vetting.newInvite' : 'vetting.invites.title')}
-        placement={mode === 'list' ? (phone ? 'sheet-full' : 'detail') : phone ? 'sheet' : 'center'}
+        placement={mode === 'list' ? (phone ? 'sheet-full' : 'detail') : 'center'}
         dismissOnOutsidePress={false}
         initialFocusRef={mode === 'new' ? labelRef : undefined}
         footer={

@@ -16,6 +16,11 @@ import {
   DropdownMenuTrigger,
 } from './DropdownMenu';
 
+/**
+ * @summary Click-triggered command menu on Radix (docs/adr/0004). Cue: the ⋮
+ * `IconButton` opens a row's or table's action menu (DESIGN.md §6c cue
+ * vocabulary).
+ */
 const meta = {
   title: 'ui/DropdownMenu',
   component: DropdownMenu,
@@ -39,6 +44,10 @@ const trigger = (
   </DropdownMenuTrigger>
 );
 
+/**
+ * @summary The row menu (§6c "⋮: only where it holds two or more real actions"): an open menu with
+ * two actions and a separator before the destructive one.
+ */
 export const RowActions: Story = {
   args: {
     defaultOpen: true,
@@ -56,10 +65,12 @@ export const RowActions: Story = {
   },
 };
 
+/** @summary Closed at rest: only the ⋮ trigger shows, as it does on a table row. */
 export const Closed: Story = {
   args: { children: trigger },
 };
 
+/** @summary A table's Columns menu (§6c): ticked items toggle independently and the menu stays open. */
 export const CheckboxItems: Story = {
   args: {
     defaultOpen: true,
@@ -80,6 +91,7 @@ export const CheckboxItems: Story = {
   },
 };
 
+/** @summary A pick-one choice (§6c, a module's state): radio items, the current one ticked. */
 export const RadioChoice: Story = {
   args: {
     defaultOpen: true,
@@ -97,6 +109,7 @@ export const RadioChoice: Story = {
   },
 };
 
+/** @summary A submenu: a side panel beside the menu, items in place on a phone (§6c row actions). */
 export const WithSubmenu: Story = {
   args: {
     defaultOpen: true,
@@ -118,6 +131,10 @@ export const WithSubmenu: Story = {
   },
 };
 
+/**
+ * @summary Anti-pattern (§6c Restraint): a ⋮ menu holding a single action. Put that action on the
+ * row (or let the row click carry it) and add no menu.
+ */
 export const SingleActionMenu: Story = {
   tags: ['!manifest'],
   args: {

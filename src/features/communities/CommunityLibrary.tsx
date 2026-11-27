@@ -18,7 +18,6 @@ import {
   Tooltip,
   CachedNotice,
 } from '@/components/ui';
-import { Pill } from '@/components/ui/Pill';
 import {
   buildLibraryRows,
   filterLibraryRows,
@@ -365,19 +364,24 @@ export function CommunityLibrary({
         </span>
       </div>
 
-      <ul className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-text-dim">
-        {members.map((member) => (
-          <li key={member.uid} className={staleUids.has(member.uid) ? 'opacity-60' : ''}>
-            {member.characterName}
-            {member.libraryAsOf === null
-              ? ` · ${t('communities.library.sharesNothing')}`
-              : ` · ${t('communities.asOf', { age: formatAge(now - member.libraryAsOf, t) })}`}
-            {staleUids.has(member.uid) && (
-              <Pill className="ml-1">{t('communities.staleBadge')}</Pill>
-            )}
-          </li>
-        ))}
-      </ul>
+      <p className="flex items-center gap-1 text-xs text-text-dim">
+        {t('communities.library.sharingCount', {
+          n: members.filter((member) => member.libraryAsOf !== null).length,
+        })}
+        {staleUids.size > 0 && (
+          <>
+            {` · ${t('communities.library.staleCount', { n: staleUids.size })}`}
+            <InfoTooltip
+              label={t('communities.library.staleAbout')}
+              content={members
+                .filter((member) => staleUids.has(member.uid))
+                .map((member) => member.characterName)
+                .join(', ')}
+              glyph="info"
+            />
+          </>
+        )}
+      </p>
       {view === 'shared' ? (
         <SharedBlueprintTable rows={copies} systemIds={systemIds} />
       ) : tree.length === 0 ? (

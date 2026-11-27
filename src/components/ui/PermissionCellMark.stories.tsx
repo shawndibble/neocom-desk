@@ -4,6 +4,9 @@ import { inlineLinkClassName } from './controlStyles';
 import { PermissionCellMark } from './PermissionCellMark';
 import { Tooltip } from './Tooltip';
 
+/**
+ * @summary Amber mark that opens a per-Character grant popover with Don't ask again.
+ */
 const meta = {
   title: 'ui/PermissionCellMark',
   component: PermissionCellMark,
@@ -35,12 +38,18 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
+/** @summary Missing: the mark after the control, nothing else in the layout. */
 export const Missing: Story = {};
 
+/** @summary Open: who and what, one why line, Grant in EVE, Don't ask again and the Settings link. */
 export const Open: Story = { args: { defaultOpen: true } };
 
+/** @summary Granted: no mark at all. */
 export const Granted: Story = { args: { status: 'granted' } };
 
+/**
+ * @summary Dismissed: no mark; the caller's own tooltip carries the fallback words.
+ */
 export const Dismissed: Story = {
   args: { status: 'dismissed' },
   render: (args) => (
@@ -55,10 +64,12 @@ export const Dismissed: Story = {
   ),
 };
 
+/** @summary Several Permissions missing at once: named together, granted in one login. */
 export const SeveralPermissions: Story = {
   args: { permissions: ['Autopilot waypoints', 'Character details'], defaultOpen: true },
 };
 
+/** @summary 390px: still a popover (three lines, anchored to its cell), capped to the screen. */
 export const SeveralCharacters: Story = {
   args: {
     title: '3 Characters: grant Military Campaigns',
