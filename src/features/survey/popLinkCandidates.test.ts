@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import type { SharedPopView } from '@/sync/sharedPops';
-import { popLinkCandidates, strongPopMatch } from './popLinkCandidates';
+import {
+  popLinkCandidates,
+  popSurveyDetails,
+  popSurveyFill,
+  strongPopMatch,
+} from './popLinkCandidates';
 
 const NOW = Date.parse('2026-11-20T12:00:00.000Z');
 const H = 3_600_000;
@@ -149,5 +154,41 @@ describe('strongPopMatch', () => {
     ).toBeNull();
     expect(strongPopMatch(rank([pop({ id: 'a', ore: null })]))).toBeNull();
     expect(strongPopMatch([])).toBeNull();
+  });
+});
+
+describe('popSurveyDetails', () => {
+  it('takes the refinery as the place and the corporation at the pop rate as the payee', () => {
+    const details = popSurveyDetails(pop({ id: 'a' }), 'Alpha Refinery', 'Mining Co');
+    expect(details.place).toEqual({ id: 1_000_000_000_001, name: 'Alpha Refinery' });
+    expect(details.payee).toEqual({ name: 'Mining Co', pct: 10 });
+  });
+
+  it('leaves out a place with no name and a payee known only by id', () => {
+    const details = popSurveyDetails(pop({ id: 'a' }), null, '98000001');
+    expect(details).toEqual({ place: null, payee: null });
+  });
+});
+
+describe('popSurveyFill', () => {
+  const details = popSurveyDetails(pop({ id: 'a' }), 'Alpha Refinery', 'Mining Co');
+
+  it('fills a blank location and a blank tax', () => {
+    expect(popSurveyFill(details, { location: null, tax: null })).toEqual({
+      location: details.place,
+      tax: details.payee,
+    });
+  });
+
+  it('never overwrites what the pilot already set', () => {
+    expect(
+      popSurveyFill(details, {
+        location: { id: null, name: 'my moon' },
+        tax: { name: 'Me', pct: 5 },
+      })
+    ).toEqual({});
+    expect(popSurveyFill(details, { location: { id: null, name: 'my moon' }, tax: null })).toEqual({
+      tax: details.payee,
+    });
   });
 });

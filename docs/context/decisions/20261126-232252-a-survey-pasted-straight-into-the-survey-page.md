@@ -41,6 +41,12 @@ _Recorded 2026-11-26._
 - **The link runs as a Character that can see the pop**: the first of the pop's
   `viewerCharacterIds`, because the server builds the viewer from the calling Character alone.
 - **The select lists every candidate**, in rank order; there is no cap.
+- **Linking also fills the Survey's blanks from the pop, as the pop's start link would**: the
+  refinery (or moon name) as the location, and the collecting corporation at the pop's rate as
+  the moon tax. Only a field the pilot has not set is written, never an existing one, and the
+  Survey's notes are carried over unchanged. A corporation known only by id is not written as a
+  payee. The fill is best effort: the link already stands if a write fails, and the pilot can
+  set the field by hand.
 - **Dismissal is per Survey and device-local.** "Not this one" and "None of these" are remembered
   in a local setting (`miningSurveyPopLinkDismissed`, capped at 50 Surveys), never synced and
   never stored on the Survey.
