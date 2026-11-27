@@ -14,8 +14,6 @@ import { useHydratedStore } from '@/lib/useHydratedStore';
 import { dismissPopLink, useDismissedPopLinks } from './surveyPref';
 import { usePopLinkPrompt, type PopLinkOption } from './usePopLinkPrompt';
 
-const MAX_OPTIONS = 8;
-
 export function SurveyPopLinkPrompt({
   surveyId,
   oreNames,
@@ -39,13 +37,13 @@ export function SurveyPopLinkPrompt({
   });
   if (!prompt || prompt.options.length === 0) return null;
 
-  const options = prompt.options.slice(0, MAX_OPTIONS);
+  const { options } = prompt;
   const target: PopLinkOption | undefined = prompt.strong ?? options.find((o) => o.id === picked);
   const submit = async () => {
     if (!target) return;
     setBusy(true);
     try {
-      await prompt.link(target.id);
+      await prompt.link(target);
     } finally {
       setBusy(false);
     }

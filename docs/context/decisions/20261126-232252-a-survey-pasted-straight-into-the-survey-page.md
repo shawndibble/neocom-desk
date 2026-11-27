@@ -33,6 +33,14 @@ _Recorded 2026-11-26._
   refusal the pops are re-read from the server (past the cache) and the prompt goes away. A
   start link, an officer's `linkSurvey` and the Calendar's "Start a new Survey" are unchanged:
   they still replace, newest wins.
+- **The guard is a transaction on the Extraction.** With `onlyIfUnlinked`, the action reads
+  `popSurveyId` (else the officer's `surveyId`) and writes in one transaction, so two pilots
+  linking at once cannot both pass, and an officer's link that the pop hides (no ore make-up
+  shared) still counts. After "already linked" the prompt stays gone for that Survey, since the
+  re-read cannot show a link the pop hides.
+- **The link runs as a Character that can see the pop**: the first of the pop's
+  `viewerCharacterIds`, because the server builds the viewer from the calling Character alone.
+- **The select lists every candidate**, in rank order; there is no cap.
 - **Dismissal is per Survey and device-local.** "Not this one" and "None of these" are remembered
   in a local setting (`miningSurveyPopLinkDismissed`, capped at 50 Surveys), never synced and
   never stored on the Survey.
