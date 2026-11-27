@@ -52,6 +52,7 @@ const entry = (
     ratePct: 10,
     corporationId: 98000001,
     syncedAt: iso(NOW),
+    viewerCharacterIds: [7],
     ...over,
   } as SharedPopView,
   moonName: null,
@@ -83,7 +84,10 @@ describe('SurveyPopLinkPrompt', () => {
     expect(linkSharedPopSurvey).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: 'Link' }));
     await waitFor(() =>
-      expect(linkSharedPopSurvey).toHaveBeenCalledWith('p1', SURVEY_ID, { onlyIfUnlinked: true })
+      expect(linkSharedPopSurvey).toHaveBeenCalledWith('p1', SURVEY_ID, {
+        onlyIfUnlinked: true,
+        characterId: 7,
+      })
     );
   });
 
@@ -98,8 +102,7 @@ describe('SurveyPopLinkPrompt', () => {
       corporations: [],
     });
     rerender(<SurveyPopLinkPrompt {...props} surveyId="def567" />);
-    await waitFor(() => expect(loadSharedPopsRead).toHaveBeenCalled());
-    expect(container.textContent).toContain('Is this scan from');
+    expect(await screen.findByText(/Is this scan from/)).toBeTruthy();
     rerender(<SurveyPopLinkPrompt {...props} />);
     await waitFor(() => expect(container.textContent).toBe(''));
   });
@@ -139,10 +142,14 @@ describe('SurveyPopLinkPrompt', () => {
     expect(screen.getByRole('button', { name: 'None of these' })).toBeTruthy();
   });
 
-  it('reloads the pops from the server and drops the prompt when the pop was linked meanwhile', async () => {
+  it('reloads the pops from the server and stays hidden when a pop was linked meanwhile', async () => {
+    const partial = entry('p2', { ore: [{ typeId: 45492, quantity: 1 }] }, 'Beta Refinery');
     loadSharedPopsRead
-      .mockResolvedValueOnce({ entries: [entry('p1')], corporations: [] })
-      .mockResolvedValue({ entries: [entry('p1', { surveyId: 'zzz999' })], corporations: [] });
+      .mockResolvedValueOnce({ entries: [entry('p1'), partial], corporations: [] })
+      .mockResolvedValue({
+        entries: [entry('p1', { surveyId: 'zzz999' }), partial],
+        corporations: [],
+      });
     linkSharedPopSurvey.mockRejectedValue({
       code: 'functions/failed-precondition',
       message: 'already linked',
@@ -150,7 +157,8 @@ describe('SurveyPopLinkPrompt', () => {
     const { container } = render(<SurveyPopLinkPrompt {...props} />);
     fireEvent.click(await screen.findByRole('button', { name: 'Link' }));
     await waitFor(() => expect(container.textContent).toBe(''));
-    expect(loadSharedPopsRead).toHaveBeenLastCalledWith(expect.any(Number), 0);
+    await waitFor(() => expect(loadSharedPopsRead).toHaveBeenLastCalledWith(expect.any(Number), 0));
+    expect(container.textContent).toBe('');
   });
 
   it('says so when the Survey itself is gone, which is also a failed precondition', async () => {

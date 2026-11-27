@@ -14,12 +14,13 @@ export interface PopLinkOption {
   title: string;
   corporation: string;
   score: number | null;
+  characterId?: number;
 }
 
 export interface PopLinkState {
   options: PopLinkOption[];
   strong: PopLinkOption | null;
-  link: (popId: string) => Promise<void>;
+  link: (option: PopLinkOption) => Promise<void>;
   linkFailed: boolean;
 }
 
@@ -33,6 +34,7 @@ const optionOf = (
     title: entry ? sharedPopTitle(entry) : `#${candidate.pop.structureId}`,
     corporation: entry?.corporation.name ?? String(candidate.pop.corporationId),
     score: candidate.score,
+    characterId: candidate.pop.viewerCharacterIds?.[0],
   };
 };
 
@@ -57,6 +59,7 @@ export function usePopLinkPrompt({
 }): PopLinkState | null {
   const [attempt, setAttempt] = useState(0);
   const [linkFailed, setLinkFailed] = useState(false);
+  const [takenElsewhere, setTakenElsewhere] = useState(false);
   const oreKey = [...new Set(oreNames)].sort().join('\n');
   const loader = useCallback(async () => {
     const now = Date.now();
@@ -69,21 +72,25 @@ export function usePopLinkPrompt({
   const load = useKeyedLoad(enabled ? `${surveyId}:${oreKey}:${attempt}` : null, loader);
   const refresh = useCallback(() => setAttempt((n) => n + 1), []);
   const link = useCallback(
-    async (popId: string) => {
+    async (option: PopLinkOption) => {
       setLinkFailed(false);
       try {
-        await linkSharedPopSurvey(popId, surveyId, { onlyIfUnlinked: true });
+        await linkSharedPopSurvey(option.id, surveyId, {
+          onlyIfUnlinked: true,
+          characterId: option.characterId,
+        });
       } catch (error) {
         if (!isAlreadyLinked(error)) {
           setLinkFailed(true);
           return;
         }
+        setTakenElsewhere(true);
       }
       refresh();
     },
     [surveyId, refresh]
   );
-  if (load.status !== 'ready') return null;
+  if (load.status !== 'ready' || takenElsewhere) return null;
   const { now, entries, idByName } = load.data;
   if (entries.some((e) => e.pop.surveyId === surveyId)) return null;
   const scanOreIds = new Set(oreNames.flatMap((name) => idByName.get(name) ?? []));

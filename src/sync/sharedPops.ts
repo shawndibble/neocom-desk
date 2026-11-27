@@ -31,15 +31,15 @@ export async function fetchSharedPops(): Promise<SharedPopView[]> {
 export async function linkSharedPopSurvey(
   popId: string,
   surveyId: string,
-  options: { onlyIfUnlinked?: boolean } = {}
+  options: { onlyIfUnlinked?: boolean; characterId?: number } = {}
 ): Promise<void> {
-  const [character] = await db.characters.toArray();
-  if (!character) return;
-  await ensureSignedIn(character.characterId);
+  const characterId = options.characterId ?? (await db.characters.toArray())[0]?.characterId;
+  if (characterId === undefined) return;
+  await ensureSignedIn(characterId);
   await callRouted<{ popId: string; surveyId: string; onlyIfUnlinked: boolean }, { linked: true }>(
     'linkSharedPopSurveyCallable',
     { popId, surveyId, onlyIfUnlinked: options.onlyIfUnlinked === true },
-    character.characterId
+    characterId
   );
 }
 
