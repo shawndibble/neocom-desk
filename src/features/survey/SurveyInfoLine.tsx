@@ -29,9 +29,10 @@ export function SurveyInfoLine({
         {survey && moon && (
           <SurveyPopLinkPrompt
             key={survey.id}
-            surveyId={survey.id}
+            survey={survey}
+            characterId={characterId}
             oreNames={summary.oreNames}
-            location={survey.info?.location ?? null}
+            onStored={onStored}
           />
         )}
         <SurveyInfoEditor

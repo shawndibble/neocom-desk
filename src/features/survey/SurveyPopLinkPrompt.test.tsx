@@ -7,12 +7,14 @@ import type { SharedPopView } from '@/sync/sharedPops';
 import { SurveyPopLinkPrompt } from './SurveyPopLinkPrompt';
 import { useDismissedPopLinks } from './surveyPref';
 
-const { loadSharedPopsRead, linkSharedPopSurvey } = vi.hoisted(() => ({
+const { loadSharedPopsRead, linkSharedPopSurvey, applyPopFill } = vi.hoisted(() => ({
   loadSharedPopsRead: vi.fn(),
   linkSharedPopSurvey: vi.fn(),
+  applyPopFill: vi.fn(),
 }));
 vi.mock('@/features/character/calendarSharedPopsRead', () => ({ loadSharedPopsRead }));
 vi.mock('@/sync/sharedPops', () => ({ linkSharedPopSurvey }));
+vi.mock('./applyPopFill', () => ({ applyPopFill }));
 vi.mock('@/features/corp/moons/keptSurveyScan', () => ({
   loadMoonOreTypeIdByName: async () =>
     new Map([
@@ -60,15 +62,15 @@ const entry = (
   ore: null,
 });
 
-const props = {
-  surveyId: SURVEY_ID,
-  oreNames: ['Bitumens', 'Cobaltite'],
-  location: null,
-};
+const onStored = vi.fn();
+const survey = { id: SURVEY_ID, expiresAt: NOW + 24 * H, published: null, info: null };
+const props = { survey, characterId: 7, oreNames: ['Bitumens', 'Cobaltite'], onStored };
 
 beforeEach(async () => {
   loadSharedPopsRead.mockReset();
   linkSharedPopSurvey.mockReset().mockResolvedValue(undefined);
+  applyPopFill.mockReset().mockResolvedValue(undefined);
+  onStored.mockReset();
   await db.settings.clear();
   useDismissedPopLinks.setState({ value: [], hydrated: false });
 });
@@ -101,7 +103,7 @@ describe('SurveyPopLinkPrompt', () => {
       entries: [entry('p1'), entry('p2', { surveyId: SURVEY_ID })],
       corporations: [],
     });
-    rerender(<SurveyPopLinkPrompt {...props} surveyId="def567" />);
+    rerender(<SurveyPopLinkPrompt {...props} survey={{ ...survey, id: 'def567' }} />);
     expect(await screen.findByText(/Is this scan from/)).toBeTruthy();
     rerender(<SurveyPopLinkPrompt {...props} />);
     await waitFor(() => expect(container.textContent).toBe(''));
@@ -179,5 +181,50 @@ describe('SurveyPopLinkPrompt', () => {
     render(<SurveyPopLinkPrompt {...props} />);
     fireEvent.click(await screen.findByRole('button', { name: 'Link' }));
     expect(await screen.findByRole('alert')).toBeTruthy();
+  });
+
+  it('fills a blank location and tax from the pop once linked, then refreshes the Survey', async () => {
+    loadSharedPopsRead.mockResolvedValue({ entries: [entry('p1')], corporations: [] });
+    render(<SurveyPopLinkPrompt {...props} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Link' }));
+    await waitFor(() => expect(onStored).toHaveBeenCalled());
+    expect(applyPopFill).toHaveBeenCalledWith(survey, 7, {
+      location: { id: 1_000_000_000_001, name: 'Alpha Refinery' },
+      tax: { name: 'Mining Co', pct: 10 },
+    });
+  });
+
+  it('leaves what the pilot already set alone', async () => {
+    loadSharedPopsRead.mockResolvedValue({ entries: [entry('p1')], corporations: [] });
+    const filled = {
+      ...survey,
+      published: { name: 'Me', pct: 5 },
+      info: { location: { id: null, name: 'my moon' }, notes: 'n' },
+    };
+    render(<SurveyPopLinkPrompt {...props} survey={filled} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Link' }));
+    await waitFor(() => expect(onStored).toHaveBeenCalled());
+    expect(applyPopFill).toHaveBeenCalledWith(filled, 7, {});
+  });
+
+  it('keeps the link when filling the details fails', async () => {
+    loadSharedPopsRead.mockResolvedValue({ entries: [entry('p1')], corporations: [] });
+    applyPopFill.mockRejectedValue(new Error('offline'));
+    render(<SurveyPopLinkPrompt {...props} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Link' }));
+    await waitFor(() => expect(onStored).toHaveBeenCalled());
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('fills nothing when the pop was already linked', async () => {
+    loadSharedPopsRead.mockResolvedValue({ entries: [entry('p1')], corporations: [] });
+    linkSharedPopSurvey.mockRejectedValue({
+      code: 'functions/failed-precondition',
+      message: 'already linked',
+    });
+    render(<SurveyPopLinkPrompt {...props} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Link' }));
+    await waitFor(() => expect(linkSharedPopSurvey).toHaveBeenCalled());
+    expect(applyPopFill).not.toHaveBeenCalled();
   });
 });

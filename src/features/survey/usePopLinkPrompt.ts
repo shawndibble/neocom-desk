@@ -5,7 +5,13 @@ import { loadMoonOreTypeIdByName } from '@/features/corp/moons/keptSurveyScan';
 import type { InfoLocation } from '@/engine/survey/infoTemplate';
 import { useKeyedLoad } from '@/lib/useAsyncLoad';
 import { linkSharedPopSurvey } from '@/sync/sharedPops';
-import { popLinkCandidates, strongPopMatch, type PopLinkCandidate } from './popLinkCandidates';
+import {
+  popLinkCandidates,
+  popSurveyDetails,
+  strongPopMatch,
+  type PopLinkCandidate,
+  type PopSurveyDetails,
+} from './popLinkCandidates';
 
 const FORCE_RELOAD_MS = 0;
 
@@ -15,12 +21,13 @@ export interface PopLinkOption {
   corporation: string;
   score: number | null;
   characterId?: number;
+  details: PopSurveyDetails;
 }
 
 export interface PopLinkState {
   options: PopLinkOption[];
   strong: PopLinkOption | null;
-  link: (option: PopLinkOption) => Promise<void>;
+  link: (option: PopLinkOption, afterLinked?: () => Promise<void>) => Promise<void>;
   linkFailed: boolean;
 }
 
@@ -35,6 +42,11 @@ const optionOf = (
     corporation: entry?.corporation.name ?? String(candidate.pop.corporationId),
     score: candidate.score,
     characterId: candidate.pop.viewerCharacterIds?.[0],
+    details: popSurveyDetails(
+      candidate.pop,
+      candidate.pop.refineryName ?? entry?.moonName ?? null,
+      entry?.corporation.name ?? ''
+    ),
   };
 };
 
@@ -72,7 +84,7 @@ export function usePopLinkPrompt({
   const load = useKeyedLoad(enabled ? `${surveyId}:${oreKey}:${attempt}` : null, loader);
   const refresh = useCallback(() => setAttempt((n) => n + 1), []);
   const link = useCallback(
-    async (option: PopLinkOption) => {
+    async (option: PopLinkOption, afterLinked?: () => Promise<void>) => {
       setLinkFailed(false);
       try {
         await linkSharedPopSurvey(option.id, surveyId, {
@@ -85,7 +97,10 @@ export function usePopLinkPrompt({
           return;
         }
         setTakenElsewhere(true);
+        refresh();
+        return;
       }
+      await afterLinked?.();
       refresh();
     },
     [surveyId, refresh]

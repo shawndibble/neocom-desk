@@ -9,20 +9,25 @@ import {
   SelectValue,
 } from '@/components/ui';
 import { InlineError } from '@/components/ui/InlineError';
-import type { InfoLocation } from '@/engine/survey/infoTemplate';
 import { useHydratedStore } from '@/lib/useHydratedStore';
+import { applyPopFill } from './applyPopFill';
+import type { InfoSurvey } from './SurveyInfoPanel';
+import { popSurveyFill } from './popLinkCandidates';
 import { dismissPopLink, useDismissedPopLinks } from './surveyPref';
 import { usePopLinkPrompt, type PopLinkOption } from './usePopLinkPrompt';
 
 export function SurveyPopLinkPrompt({
-  surveyId,
+  survey,
+  characterId,
   oreNames,
-  location,
+  onStored,
 }: {
-  surveyId: string;
+  survey: InfoSurvey;
+  characterId: number;
   oreNames: readonly string[];
-  location: InfoLocation | null;
+  onStored: () => void;
 }) {
+  const surveyId = survey.id;
   const { t } = useTranslation();
   const hydrated = useHydratedStore(useDismissedPopLinks);
   const dismissed = useDismissedPopLinks((s) => s.value);
@@ -32,7 +37,7 @@ export function SurveyPopLinkPrompt({
   const prompt = usePopLinkPrompt({
     surveyId,
     oreNames,
-    location,
+    location: survey.info?.location ?? null,
     enabled: hydrated && !dismissed.includes(surveyId),
   });
   if (!prompt || prompt.options.length === 0) return null;
@@ -43,7 +48,16 @@ export function SurveyPopLinkPrompt({
     if (!target) return;
     setBusy(true);
     try {
-      await prompt.link(target);
+      await prompt.link(target, async () => {
+        const fill = popSurveyFill(target.details, {
+          location: survey.info?.location ?? null,
+          tax: survey.published,
+        });
+        try {
+          await applyPopFill(survey, characterId, fill);
+        } catch {}
+        onStored();
+      });
     } finally {
       setBusy(false);
     }
