@@ -36,7 +36,7 @@ interface ExternalLinkProps extends Omit<
 > {
   href: string;
   variant?: ExternalLinkVariant;
-  mark?: 'glyph' | 'text';
+  mark?: 'glyph' | 'text' | 'none';
   children?: ReactNode;
 }
 
@@ -58,11 +58,8 @@ export function ExternalLink({
       className={cx(VARIANT_CLASS[variant], className)}
     >
       {children}
-      {mark === 'glyph' ? (
-        <ExternalMark />
-      ) : (
-        <span className="sr-only">{t('common.opensInNewTab')}</span>
-      )}
+      {mark === 'glyph' && <ExternalMark />}
+      {mark === 'text' && <span className="sr-only">{t('common.opensInNewTab')}</span>}
     </a>
   );
 }

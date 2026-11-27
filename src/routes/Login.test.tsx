@@ -64,12 +64,12 @@ const READ_ONLY_PHRASES: Record<string, string> = {
 };
 
 const WRITE_SCOPE_PHRASES: Record<string, string> = {
-  'esi-mail.organize_mail.v1': 'flags it as read in EVE',
-  'esi-calendar.respond_calendar_events.v1': 'sends your response',
-  'esi-mail.send_mail.v1': 'goes out through your account',
-  'esi-fittings.write_fittings.v1': 'recreates it on the game',
-  'esi-ui.write_waypoint.v1': 'replaces your autopilot waypoints in the client',
-  'esi-ui.open_window.v1': 'opens a window in the client',
+  'esi-mail.organize_mail.v1': 'Mark a mail read',
+  'esi-calendar.respond_calendar_events.v1': 'Answer a calendar invite',
+  'esi-mail.send_mail.v1': 'Send a mail you wrote',
+  'esi-fittings.write_fittings.v1': 'Save a Fitting',
+  'esi-ui.write_waypoint.v1': 'Set waypoints',
+  'esi-ui.open_window.v1': 'Open a window in the client',
 };
 
 const BASE_GRANT_PHRASES: Record<string, string> = READ_ONLY_PHRASES;
@@ -127,7 +127,7 @@ describe('Login', () => {
       screen.queryByRole('heading', { name: /everything you do outside the client/i })
     ).toBeNull();
     expect(screen.getByRole('heading', { name: 'Neocom Desk' })).toBeInTheDocument();
-    expect(screen.queryByText(/everything logging in grants/i)).toBeNull();
+    expect(screen.queryByText(/every permission, by area/i)).toBeNull();
     expect(
       screen.getByRole('button', { name: /log in with custom permissions/i })
     ).toBeInTheDocument();
@@ -298,19 +298,20 @@ describe('Login', () => {
   });
 
   it('answers the trust objections and enumerates the scopes it asks for', async () => {
+    const user = userEvent.setup();
     renderLogin();
     expect(
       await screen.findByRole('heading', { name: /what it can touch, and what it can't/i })
     ).toBeInTheDocument();
-    expect(
-      screen.getByRole('heading', { name: /it writes only when you act/i })
-    ).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /only when you act/i })).toBeInTheDocument();
     expect(
       screen.getByRole('heading', { name: /your login stays on this device/i })
     ).toBeInTheDocument();
 
     const trust = within(screen.getByRole('region', { name: /what it can touch/i }));
-    expect(trust.getByText(/everything logging in grants/i)).toBeInTheDocument();
+    expect(trust.getByText(/every permission, by area/i)).toBeInTheDocument();
+    expect(trust.queryByRole('button', { name: /money & market/i })).not.toBeInTheDocument();
+    await user.click(trust.getByRole('button', { name: /open the full list/i }));
     for (const name of [
       /skills & clones/i,
       /money & market/i,
@@ -329,14 +330,17 @@ describe('Login', () => {
   it('opens an area to list its permissions with their captions', async () => {
     const user = userEvent.setup();
     renderLogin();
-    await user.click(await screen.findByRole('button', { name: /industry & planets/i }));
+    await user.click(await screen.findByRole('button', { name: /open the full list/i }));
+    await user.click(screen.getByRole('button', { name: /industry & planets/i }));
     expect(screen.getByText('Your mining ledger.')).toBeInTheDocument();
     expect(screen.getByText('Your planetary colonies.')).toBeInTheDocument();
   });
 
   it('keeps the planetary-scope note, the one-login note and the revoke link', async () => {
+    const user = userEvent.setup();
     renderLogin();
     const trust = within(await screen.findByRole('region', { name: /what it can touch/i }));
+    await user.click(trust.getByRole('button', { name: /open the full list/i }));
     expect(trust.getByText(/manage your planetary installations/i)).toHaveTextContent(
       /only reads that data and never writes/i
     );
@@ -357,9 +361,13 @@ describe('Login', () => {
     const user = userEvent.setup();
     renderLogin();
     const community = within(await screen.findByRole('region', { name: /bugs, ideas and chat/i }));
-    expect(community.getByRole('link', { name: /join discord/i })).toHaveAttribute(
+    expect(community.getByRole('link', { name: /join the discord/i })).toHaveAttribute(
       'href',
       DISCORD_URL
+    );
+    expect(community.getByRole('link', { name: /view the source on github/i })).toHaveAttribute(
+      'href',
+      REPO_URL
     );
     expect(community.queryByRole('figure')).not.toBeInTheDocument();
 
@@ -388,8 +396,10 @@ describe('Login', () => {
   });
 
   it('links the permissions note to the privacy policy', async () => {
+    const user = userEvent.setup();
     renderLogin();
     const trust = within(await screen.findByRole('region', { name: /what it can touch/i }));
+    await user.click(trust.getByRole('button', { name: /open the full list/i }));
     expect(trust.getByRole('link', { name: /privacy policy/i })).toHaveAttribute(
       'href',
       '/privacy.html'
@@ -406,9 +416,9 @@ describe('Login', () => {
 
   it('discloses each write scope in the trust card, not the read sentence', async () => {
     renderLogin();
-    await screen.findByRole('heading', { name: /it writes only when you act/i });
+    await screen.findByRole('heading', { name: /only when you act/i });
 
-    const permissions = screen.getByText(/everything logging in grants/i);
+    const permissions = screen.getByText(/skills, wallet, assets, orders/i);
     for (const phrase of Object.values(WRITE_SCOPE_PHRASES)) {
       expect(permissions).not.toHaveTextContent(phrase);
       expect(screen.getByText(new RegExp(phrase, 'i'))).toBeInTheDocument();

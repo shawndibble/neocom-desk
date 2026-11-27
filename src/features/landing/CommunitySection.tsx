@@ -1,9 +1,10 @@
+import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ExternalLink } from '@/components/ui/ExternalLink';
-import { buttonClassName } from '@/components/ui/buttonClassName';
-import { Discord, ICON_SIZE } from '@/components/ui/icons';
+import { Discord, Github, ICON_SIZE } from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
-import { DISCORD_URL } from '@/lib/links';
+import { focusRingClassName, interactiveClassName } from '@/components/ui/controlStyles';
+import { DISCORD_URL, REPO_URL } from '@/lib/links';
 import { LANDING_QUOTES, type Quote } from './landingQuotes';
 
 export function QuotesRow({ quotes }: { quotes: readonly Quote[] }) {
@@ -22,20 +23,54 @@ export function QuotesRow({ quotes }: { quotes: readonly Quote[] }) {
   );
 }
 
+function CommunityLink({
+  href,
+  icon,
+  name,
+  hint,
+}: {
+  href: string;
+  icon: ReactNode;
+  name: string;
+  hint: string;
+}) {
+  return (
+    <ExternalLink
+      href={href}
+      variant="bare"
+      mark="none"
+      className={cx(
+        'flex items-center gap-3.5 border border-line bg-bg/90 px-4 py-3.5 hover:border-accent/60',
+        interactiveClassName,
+        focusRingClassName
+      )}
+    >
+      <span className="shrink-0 text-accent">{icon}</span>
+      <span className="min-w-0">
+        <span className="block text-sm font-semibold">{name}</span>
+        <span className="block text-xs text-text-dim">{hint}</span>
+      </span>
+    </ExternalLink>
+  );
+}
+
 export function CommunitySection({ quotes = LANDING_QUOTES }: { quotes?: readonly Quote[] }) {
   const { t } = useTranslation();
   return (
     <>
-      <div className="mt-6 flex flex-col items-start gap-4 border border-line bg-bg/90 px-5 py-6 sm:flex-row sm:items-center sm:gap-5">
-        <Discord size={ICON_SIZE.lg} aria-hidden="true" className="shrink-0 text-accent" />
-        <p className="min-w-0 flex-1 text-sm text-text-dim">{t('login.community.body')}</p>
-        <ExternalLink
+      <div className="mt-6 grid gap-3">
+        <CommunityLink
           href={DISCORD_URL}
-          variant="bare"
-          className={cx('shrink-0 sm:ml-auto', buttonClassName({ variant: 'ghost' }))}
-        >
-          {t('login.community.join')}
-        </ExternalLink>
+          icon={<Discord size={ICON_SIZE.lg} aria-hidden="true" />}
+          name={t('login.community.discord')}
+          hint={t('login.community.discordHint')}
+        />
+        <CommunityLink
+          href={REPO_URL}
+          icon={<Github size={ICON_SIZE.lg} aria-hidden="true" />}
+          name={t('login.community.github')}
+          hint={t('login.community.githubHint')}
+        />
       </div>
       <QuotesRow quotes={quotes} />
     </>
