@@ -28,14 +28,18 @@ export async function fetchSharedPops(): Promise<SharedPopView[]> {
   return result.pops ?? [];
 }
 
-export async function linkSharedPopSurvey(popId: string, surveyId: string): Promise<void> {
-  const [character] = await db.characters.toArray();
-  if (!character) return;
-  await ensureSignedIn(character.characterId);
-  await callRouted<{ popId: string; surveyId: string }, { linked: true }>(
+export async function linkSharedPopSurvey(
+  popId: string,
+  surveyId: string,
+  options: { onlyIfUnlinked?: boolean; characterId?: number } = {}
+): Promise<void> {
+  const characterId = options.characterId ?? (await db.characters.toArray())[0]?.characterId;
+  if (characterId === undefined) return;
+  await ensureSignedIn(characterId);
+  await callRouted<{ popId: string; surveyId: string; onlyIfUnlinked: boolean }, { linked: true }>(
     'linkSharedPopSurveyCallable',
-    { popId, surveyId },
-    character.characterId
+    { popId, surveyId, onlyIfUnlinked: options.onlyIfUnlinked === true },
+    characterId
   );
 }
 

@@ -849,19 +849,42 @@ export async function setCommunityPopBlock(
 const POP_ID = /^([1-9][0-9]{0,15})_.{1,100}$/;
 const SHARE_ID = /^[2-9a-hj-kmnp-z]{6}$/;
 
-export function parseLinkSharedPopSurveyInput(data: unknown): { popId: string; surveyId: string } {
+export interface LinkSharedPopSurveyInput {
+  popId: string;
+  surveyId: string;
+  onlyIfUnlinked?: boolean;
+}
+
+export function parseLinkSharedPopSurveyInput(data: unknown): LinkSharedPopSurveyInput {
   const d = record(data);
   if (typeof d.popId !== 'string' || !POP_ID.test(d.popId))
     throw new HttpsError('invalid-argument', 'popId must be a Shared Pop id');
   if (typeof d.surveyId !== 'string' || !SHARE_ID.test(d.surveyId))
     throw new HttpsError('invalid-argument', 'surveyId must be a Share Link id');
-  return { popId: d.popId, surveyId: d.surveyId };
+  if (d.onlyIfUnlinked !== undefined && typeof d.onlyIfUnlinked !== 'boolean')
+    throw new HttpsError('invalid-argument', 'onlyIfUnlinked must be a boolean');
+  return { popId: d.popId, surveyId: d.surveyId, onlyIfUnlinked: d.onlyIfUnlinked === true };
+}
+
+async function linkIfUnlinked(
+  db: SharedPopsReadDeps['db'],
+  extraction: DocumentReference,
+  surveyId: string
+): Promise<void> {
+  await db.runTransaction(async (tx) => {
+    const snap = await tx.get(extraction);
+    if (!snap.exists) throw new HttpsError('not-found', 'That pop is gone');
+    const current = str(snap.get('popSurveyId')) ?? str(snap.get('surveyId'));
+    if (current !== undefined && current !== surveyId)
+      throw new HttpsError('failed-precondition', 'already linked');
+    if (current === undefined) tx.update(extraction, { popSurveyId: surveyId });
+  });
 }
 
 export async function linkSharedPopSurvey(
   deps: SharedPopsReadDeps,
   caller: Caller,
-  input: { popId: string; surveyId: string }
+  input: LinkSharedPopSurveyInput
 ): Promise<{ linked: true }> {
   const viewer: PopViewer = {
     characterId: signedInCharacter(caller),
@@ -877,10 +900,14 @@ export async function linkSharedPopSurvey(
     .collection(EXTRACTIONS)
     .doc(pop.extractionId);
   if (pop.surveyId === input.surveyId) return { linked: true };
-  try {
-    await extraction.update({ popSurveyId: input.surveyId });
-  } catch {
-    throw new HttpsError('not-found', 'That pop is gone');
+  if (input.onlyIfUnlinked) {
+    await linkIfUnlinked(deps.db, extraction, input.surveyId);
+  } else {
+    try {
+      await extraction.update({ popSurveyId: input.surveyId });
+    } catch {
+      throw new HttpsError('not-found', 'That pop is gone');
+    }
   }
   await refreshSharedPops(deps, pop.corporationId);
   return { linked: true };
