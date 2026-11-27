@@ -3,7 +3,12 @@ import { getValidAccessToken } from '@/auth/session';
 import { db } from '@/db';
 import { callRouted } from './routedCallable';
 import { ensureSignedIn } from './syncAuth';
-import { fetchSharedPops, findSharedPop, type SharedPopView } from './sharedPops';
+import {
+  fetchSharedPops,
+  findSharedPop,
+  linkSharedPopSurvey,
+  type SharedPopView,
+} from './sharedPops';
 
 vi.mock('@/auth/session', () => ({ getValidAccessToken: vi.fn() }));
 vi.mock('./routedCallable', () => ({ callRouted: vi.fn() }));
@@ -51,5 +56,27 @@ describe('fetchSharedPops', () => {
   it('finds the pop a deep link names', () => {
     expect(findSharedPop([pop], '98000001_1000_1')).toBe(pop);
     expect(findSharedPop([pop], 'nope')).toBeUndefined();
+  });
+});
+
+describe('linkSharedPopSurvey', () => {
+  it('leaves the overwrite guard off by default', async () => {
+    characters(1);
+    await linkSharedPopSurvey('98000001_1000_1', 'abc234');
+    expect(callRouted).toHaveBeenCalledWith(
+      'linkSharedPopSurveyCallable',
+      { popId: '98000001_1000_1', surveyId: 'abc234', onlyIfUnlinked: false },
+      1
+    );
+  });
+
+  it('asks the server not to overwrite a live link when told to', async () => {
+    characters(1);
+    await linkSharedPopSurvey('98000001_1000_1', 'abc234', { onlyIfUnlinked: true });
+    expect(callRouted).toHaveBeenCalledWith(
+      'linkSharedPopSurveyCallable',
+      { popId: '98000001_1000_1', surveyId: 'abc234', onlyIfUnlinked: true },
+      1
+    );
   });
 });
