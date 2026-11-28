@@ -119,6 +119,11 @@ export function MinerCharacters({ miner }: { miner: MinerRow }) {
                         {t('corpTaxBook.moons.grouping.makeMain')}
                       </button>
                     )}
+                    {characterId !== miner.mainCharacterId && isStored && (
+                      <span aria-hidden="true" className="self-center text-text-dim">
+                        ·
+                      </span>
+                    )}
                     {isStored && (
                       <button
                         type="button"

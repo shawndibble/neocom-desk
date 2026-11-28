@@ -23,7 +23,6 @@ import {
 } from '@/components/ui';
 import { InlineError } from '@/components/ui/InlineError';
 import { plainTextActionClassName } from '@/components/ui/plainTextActionClassName';
-import { textActionClassName } from '@/components/ui/textActionClassName';
 import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
 import {
   activityFeed,
@@ -733,13 +732,13 @@ export function MinerDetail({ id }: { id: string }) {
                       d.scope === 'record' &&
                       locked(detail.days.find((x) => x.key === d.targetId)?.date ?? d.at)
                     ) ? (
-                      <button
-                        type="button"
-                        className={textActionClassName('shrink-0 whitespace-nowrap')}
+                      <Button
+                        size="sm"
+                        className="shrink-0"
                         onClick={() => setDialog({ kind: 'reverse', dismissalId: d.id })}
                       >
                         {t('corpTaxBook.moons.miner.reverse')}
-                      </button>
+                      </Button>
                     ) : undefined
                   }
                 >
