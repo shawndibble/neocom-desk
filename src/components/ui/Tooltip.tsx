@@ -12,6 +12,7 @@ import {
   type ReactNode,
   type TouchEvent,
 } from 'react';
+import { createPortal } from 'react-dom';
 import { Tooltip as TooltipPrimitive } from 'radix-ui';
 import { cx } from '@/lib/cx';
 import { usePortalContainer } from './portalContainer';
@@ -21,6 +22,12 @@ const TOUCH_CLICK_ECHO_MS = 700;
 
 export const TOOLTIP_HOVER_DELAY_MS = 400;
 const TOOLTIP_SKIP_DELAY_MS = 300;
+
+const CURSOR_GAP_PX = 14;
+const CURSOR_EDGE_PX = 8;
+const CURSOR_TIP_WIDTH_PX = 224;
+const TIP_CLASS =
+  'z-50 max-w-56 rounded-xs border border-line bg-panel p-2 text-[0.6875rem] font-normal whitespace-pre-line text-text-dim normal-case shadow-lg shadow-black/50';
 
 const InsideTooltipProvider = createContext(false);
 
@@ -69,6 +76,7 @@ interface TooltipProps {
   openOnTap?: boolean;
   className?: string;
   side?: 'top' | 'bottom';
+  followCursor?: boolean;
 }
 
 export function Tooltip({
@@ -77,7 +85,9 @@ export function Tooltip({
   openOnTap = false,
   className = '',
   side = 'top',
+  followCursor = false,
 }: TooltipProps) {
+  const [cursor, setCursor] = useState<{ x: number; y: number } | null>(null);
   const holdOpens = useContext(TooltipHoldContext);
   const container = usePortalContainer();
   const [hoverOpen, setHoverOpen] = useState(false);
@@ -221,6 +231,11 @@ export function Tooltip({
           ref={triggerRef}
           onPointerEnter={handlePointerEnter}
           onPointerLeave={handlePointerLeave}
+          onPointerMove={
+            followCursor
+              ? (e: PointerEvent) => setCursor({ x: e.clientX, y: e.clientY })
+              : undefined
+          }
           onPointerDown={handlePointerDown}
           onTouchStart={handleTouchStart}
           onTouchMove={handleTouchMove}
@@ -232,14 +247,37 @@ export function Tooltip({
         >
           {trigger}
         </TooltipPrimitive.Trigger>
-        {hasContent && (
+        {hasContent &&
+          followCursor &&
+          cursor &&
+          (hoverOpen || touchOpen) &&
+          createPortal(
+            <div
+              role="tooltip"
+              className={`pointer-events-none fixed ${TIP_CLASS}`}
+              style={{
+                left: Math.max(
+                  CURSOR_EDGE_PX,
+                  Math.min(
+                    cursor.x + CURSOR_GAP_PX,
+                    window.innerWidth - CURSOR_TIP_WIDTH_PX - CURSOR_EDGE_PX
+                  )
+                ),
+                top: cursor.y + CURSOR_GAP_PX,
+              }}
+            >
+              {content}
+            </div>,
+            container ?? document.body
+          )}
+        {hasContent && !followCursor && (
           <TooltipPrimitive.Portal container={container}>
             <TooltipPrimitive.Content
               side={side}
               sideOffset={4}
               collisionPadding={8}
               onEscapeKeyDown={handleEscape}
-              className="motion-fade z-50 max-w-56 rounded-xs border border-line bg-panel p-2 text-[0.6875rem] font-normal whitespace-pre-line text-text-dim normal-case shadow-lg shadow-black/50"
+              className={`motion-fade ${TIP_CLASS}`}
             >
               {content}
             </TooltipPrimitive.Content>

@@ -26,6 +26,21 @@ describe('Tooltip', () => {
     expect(dialog).toContainElement(await screen.findByRole('tooltip'));
   });
 
+  it('places a followCursor bubble beside the pointer', async () => {
+    render(
+      <Tooltip content="Follows me." followCursor>
+        <button type="button">Trigger</button>
+      </Tooltip>
+    );
+    fireEvent.pointerMove(screen.getByRole('button', { name: 'Trigger' }), {
+      clientX: 120,
+      clientY: 80,
+    });
+    const bubble = await screen.findByRole('tooltip');
+    expect(bubble).toHaveTextContent('Follows me.');
+    expect(bubble).toHaveStyle({ left: '134px', top: '94px' });
+  });
+
   it('shows no bubble when it has no content', () => {
     vi.useFakeTimers();
     render(
