@@ -12736,6 +12736,7 @@
     "emptyFetchedTitle": "No contacts",
     "emptyFetchedHint": "Pilots, corporations and alliances you add as contacts in EVE show here, with the standing you set.",
     "noResults": "No contacts match the selected filters",
+    "showNpcs": "Show NPCs",
     "name": "Name",
     "type": "Type",
     "typeCharacter": "Player",
@@ -12779,7 +12780,7 @@
     "standingSummaryInherited": "{{tier}} standing ({{value}}) — your entry on their {{source}}, not on them",
     "tabContacts": "Contacts",
     "tabAcrossCharacters": "Across characters",
-    "tabStandings": "Standings",
+    "tabStandings": "NPC Standings",
     "standingsKind": {
       "faction": "Faction",
       "corp": "Corporation",

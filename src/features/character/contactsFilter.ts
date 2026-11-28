@@ -26,6 +26,17 @@ export const ALL_CONTACT_KINDS: readonly ContactKind[] = [
   'faction',
 ];
 
+export const DEFAULT_CONTACT_KINDS: readonly ContactKind[] = ALL_CONTACT_KINDS.filter(
+  (kind) => kind !== 'npc'
+);
+
+function typesNotDefault(types: ReadonlySet<ContactKind>): boolean {
+  return (
+    types.size !== DEFAULT_CONTACT_KINDS.length ||
+    DEFAULT_CONTACT_KINDS.some((kind) => !types.has(kind))
+  );
+}
+
 export const CONTACT_KIND_KEY: Record<ContactKind, string> = {
   ...CONTACT_TYPE_KEY,
   npc: 'contacts.typeNpc',
@@ -66,7 +77,7 @@ export interface ContactsFilter {
 
 export const EMPTY_CONTACTS_FILTER: ContactsFilter = {
   text: '',
-  types: new Set(ALL_CONTACT_KINDS),
+  types: new Set(DEFAULT_CONTACT_KINDS),
   standings: new Set(STANDING_CATEGORIES),
 };
 
@@ -92,7 +103,7 @@ export function filterContacts(
 export function activeContactsFilterCount(filter: ContactsFilter): number {
   let count = 0;
   if (filter.text.trim() !== '') count += 1;
-  if (filter.types.size !== ALL_CONTACT_KINDS.length) count += 1;
+  if (typesNotDefault(filter.types)) count += 1;
   if (filter.standings.size !== STANDING_CATEGORIES.length) count += 1;
   return count;
 }
@@ -108,7 +119,7 @@ export function activeContactsFilters<F extends ContactsFilter>(
   t: Translate
 ): ActiveFilter<F>[] {
   const active: ActiveFilter<F>[] = [];
-  if (filter.types.size !== ALL_CONTACT_KINDS.length)
+  if (typesNotDefault(filter.types))
     active.push({
       label: t('contacts.typeFilterLabel'),
       value: summarizeFilterValues(

@@ -35,6 +35,7 @@ import { useTableExport } from '@/components/ui/useTableExport';
 import { contactsAcrossCsvColumns, contactsCsvColumns } from '@/features/character/contactsCsv';
 import {
   ALL_CONTACT_KINDS,
+  DEFAULT_CONTACT_KINDS,
   STANDING_CATEGORIES,
   EMPTY_CONTACTS_FILTER,
   activeContactsFilterCount,
@@ -68,7 +69,7 @@ import { TableScroll } from '@/components/ui/TableScroll';
 
 const FILTER_PARAMS = {
   q: textParam(),
-  types: enumSetParam(ALL_CONTACT_KINDS),
+  types: enumSetParam(ALL_CONTACT_KINDS, DEFAULT_CONTACT_KINDS),
   standing: enumSetParam(STANDING_CATEGORIES),
   'across.disagree': boolParam(),
 };
@@ -352,7 +353,16 @@ export function Contacts() {
                     title={t('contacts.noResults')}
                     className="py-8"
                     action={
-                      activeContactsFilterCount(filter) > 0 ? (
+                      !filter.types.has('npc') && counts.type.npc > 0 ? (
+                        <Button
+                          size="sm"
+                          onClick={() =>
+                            setFilter({ ...filter, types: new Set([...filter.types, 'npc']) })
+                          }
+                        >
+                          {t('contacts.showNpcs')}
+                        </Button>
+                      ) : activeContactsFilterCount(filter) > 0 ? (
                         <Button size="sm" onClick={() => setFilter(EMPTY_CONTACTS_FILTER)}>
                           {t('common.resetFilters')}
                         </Button>

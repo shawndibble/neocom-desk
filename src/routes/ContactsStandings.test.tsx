@@ -232,7 +232,7 @@ describe('ContactsStandings table', () => {
     renderTab();
     await screen.findByText('Hanna Kurosawa');
 
-    const table = screen.getByRole('table', { name: 'Standings' });
+    const table = screen.getByRole('table', { name: 'NPC Standings' });
     for (const header of ['Name', 'Type', 'Belongs to', 'Standing', 'Access', 'Jumps', 'Fees']) {
       expect(
         within(table).getByRole('columnheader', { name: new RegExp(`^${header}`) })
@@ -263,7 +263,7 @@ describe('ContactsStandings table', () => {
     referenceMock.mockResolvedValue({ ...REFERENCE, skills: null });
     renderTab();
     const corp = (await screen.findByText('Caldari Navy Corp')).closest('tr') as HTMLElement;
-    const table = screen.getByRole('table', { name: 'Standings' });
+    const table = screen.getByRole('table', { name: 'NPC Standings' });
     expect(within(table).queryByRole('columnheader', { name: /^Standing/ })).toBeNull();
     expect(within(table).getByRole('columnheader', { name: /^Base/ })).toBeVisible();
     expect(within(corp).getByText('5.00')).toBeInTheDocument();
@@ -272,7 +272,7 @@ describe('ContactsStandings table', () => {
 
   it('links the jumps to the nearest station, an agent to its own, and plainly says 0 jumps when already there', async () => {
     renderTab();
-    const table = await screen.findByRole('table', { name: 'Standings' });
+    const table = await screen.findByRole('table', { name: 'NPC Standings' });
     const corp = within(table).getByText('Caldari Navy Corp').closest('tr') as HTMLElement;
     const link = within(corp).getByRole('link', { name: '3 jumps' });
     expect(link.getAttribute('href')).toContain('/travel/route');
@@ -285,7 +285,7 @@ describe('ContactsStandings table', () => {
   it('leaves the jumps empty when the distances are unknown', async () => {
     referenceMock.mockResolvedValue({ ...REFERENCE, jumps: null });
     renderTab();
-    const table = await screen.findByRole('table', { name: 'Standings' });
+    const table = await screen.findByRole('table', { name: 'NPC Standings' });
     expect(within(table).queryByRole('link', { name: /jump/ })).toBeNull();
     expect(within(table).queryByText(/jumps?$/)).toBeNull();
   });
