@@ -323,6 +323,11 @@
       background-position: right;
       background-size: var(--tab-fade-r) 100%;
     }
+
+    .edge-fade-end:has(.dt-stacked) {
+      overflow-x: clip;
+      background-image: none;
+    }
   }
 
   /*

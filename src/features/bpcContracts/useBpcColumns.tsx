@@ -119,8 +119,9 @@ export function useBpcColumns({
               </span>
               {row.source === 'lp'
                 ? row.stationName && (
-                    <span className="block truncate text-xs text-text-dim">
+                    <span className="block truncate text-xs text-text-dim max-sm:whitespace-normal">
                       {row.stationName}
+                      {security && ' '}
                       {security}
                     </span>
                   )
