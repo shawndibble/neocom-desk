@@ -1,3 +1,4 @@
+import { TableScroll } from '@/components/ui/TableScroll';
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { HintText } from '@/components/ui/HintText';
 import * as Icon from '@/components/ui/icons';
@@ -798,20 +799,22 @@ export function CourierResults({
                 {t('contractSearch.jumpsSnapshotUnavailable')}
               </p>
             )}
-            <DataTable
-              {...courierExport.tableProps}
-              label={t('contractSearch.courierTitle')}
-              columns={columns}
-              rows={displayRows}
-              rowKey={(row) => String(row.contractId)}
-              {...courierSortProps}
-              onRowClick={setClickedRow}
-              stackLayout="dense"
-              mobileSort
-              stackSummary={stackSummary}
-              groupBy={groupBy}
-              virtualize
-            />
+            <TableScroll>
+              <DataTable
+                {...courierExport.tableProps}
+                label={t('contractSearch.courierTitle')}
+                columns={columns}
+                rows={displayRows}
+                rowKey={(row) => String(row.contractId)}
+                {...courierSortProps}
+                onRowClick={setClickedRow}
+                stackLayout="dense"
+                mobileSort
+                stackSummary={stackSummary}
+                groupBy={groupBy}
+                virtualize
+              />
+            </TableScroll>
           </>
         )}
       </div>
