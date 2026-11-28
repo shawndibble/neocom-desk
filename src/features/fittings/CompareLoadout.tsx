@@ -3,18 +3,28 @@ import { useTranslation } from 'react-i18next';
 import { Panel, eyebrowClassName } from '@/components/ui';
 import { loadoutDiff, type LoadoutEntry } from '@/engine/fittings/fittingCompare';
 import type { Fitting } from '@/engine/fittings/types';
+import { useTypeNames } from '@/features/character/useTypeNames';
 import { cx } from '@/lib/cx';
-import { CompareLetterTag } from './CompareFitCard';
-import { COMPARE_GRID_CLASS, compareGridStyle } from './compareFormat';
-import { useCompareTypeNames } from './useCompareTypeNames';
+import type { Translate } from '@/lib/translate';
+import { typeNameOr } from '@/lib/typeNameOr';
+import { CompareLetterTag } from './CompareCell';
+import { COMPARE_GRID_CLASS, compareGridStyle, type CompareColumn } from './compareFormat';
 
-function entryText(entry: LoadoutEntry, count: number, names: ReadonlyMap<number, string>) {
-  const name = names.get(entry.typeId) ?? `#${entry.typeId}`;
-  const charge =
+function entryText(
+  t: Translate,
+  entry: LoadoutEntry,
+  count: number,
+  names: ReadonlyMap<number, string>
+): string {
+  const module = typeNameOr(t, names.get(entry.typeId), entry.typeId);
+  const name =
     entry.chargeTypeId === undefined
-      ? ''
-      : ` · ${names.get(entry.chargeTypeId) ?? `#${entry.chargeTypeId}`}`;
-  return `${count > 1 ? `${count}× ` : ''}${name}${charge}`;
+      ? module
+      : t('fittings.compare.loadoutWithCharge', {
+          name: module,
+          charge: typeNameOr(t, names.get(entry.chargeTypeId), entry.chargeTypeId),
+        });
+  return count > 1 ? t('fittings.compare.loadoutCount', { count, name }) : name;
 }
 
 function EntryLine({ text, changed }: { text: string; changed: boolean }) {
@@ -34,10 +44,10 @@ function EntryLine({ text, changed }: { text: string; changed: boolean }) {
 
 export function CompareLoadout({
   fittings,
-  letters,
+  columns,
 }: {
   fittings: readonly Fitting[];
-  letters: readonly string[];
+  columns: readonly CompareColumn[];
 }) {
   const { t } = useTranslation();
   const racks = useMemo(() => loadoutDiff(fittings), [fittings]);
@@ -52,52 +62,47 @@ export function CompareLoadout({
       ),
     [racks]
   );
-  const names = useCompareTypeNames(typeIds);
+  const names = useTypeNames(typeIds);
   return (
-    <Panel
-      title={t('fittings.compare.loadoutTitle')}
-      meta={
-        <span className="flex items-center gap-1 text-xs text-text-dim">
-          <span aria-hidden="true" className="inline-block h-3 w-0.5 bg-accent" />
-          {t('fittings.compare.loadoutLegend')}
-        </span>
-      }
-    >
+    <Panel title={t('fittings.compare.loadoutTitle')} meta={t('fittings.compare.loadoutLegend')}>
       {racks.map(({ rack, fits }) => (
         <div
           key={rack}
           className={cx(COMPARE_GRID_CLASS, 'border-t border-line py-2 first:border-t-0')}
-          style={compareGridStyle(letters.length)}
+          style={compareGridStyle(columns.length)}
         >
           <h3 className={cx(eyebrowClassName, 'py-1')}>{t(`fittings.compare.rack.${rack}`)}</h3>
-          {fits.map((entries, index) => (
-            <div key={letters[index]} className="flex gap-2 py-1 md:block">
-              <CompareLetterTag letter={letters[index]!} />
-              <ul className="flex min-w-0 flex-1 flex-col gap-0.5 text-sm">
-                {entries.length === 0 && <li className="pl-2.5 text-text-dim">—</li>}
-                {entries.flatMap((entry) => {
-                  const key = `${entry.typeId}:${entry.chargeTypeId ?? ''}`;
-                  const extra = entry.count - entry.shared;
-                  return [
-                    entry.shared > 0 && (
-                      <EntryLine
-                        key={`${key}:shared`}
-                        text={entryText(entry, entry.shared, names)}
-                        changed={false}
-                      />
-                    ),
-                    extra > 0 && (
-                      <EntryLine
-                        key={`${key}:extra`}
-                        text={entryText(entry, extra, names)}
-                        changed
-                      />
-                    ),
-                  ];
-                })}
-              </ul>
-            </div>
-          ))}
+          {columns.map(({ letter, position }) => {
+            const entries = position === null ? [] : (fits[position] ?? []);
+            return (
+              <div key={letter} className="flex gap-2 py-1 md:block">
+                <CompareLetterTag letter={letter} />
+                <ul className="flex min-w-0 flex-1 flex-col gap-0.5 text-sm">
+                  {entries.length === 0 && <li className="pl-2.5 text-text-dim">—</li>}
+                  {entries.flatMap((entry) => {
+                    const key = `${entry.typeId}:${entry.chargeTypeId ?? ''}`;
+                    const extra = entry.count - entry.shared;
+                    return [
+                      entry.shared > 0 && (
+                        <EntryLine
+                          key={`${key}:shared`}
+                          text={entryText(t, entry, entry.shared, names)}
+                          changed={false}
+                        />
+                      ),
+                      extra > 0 && (
+                        <EntryLine
+                          key={`${key}:extra`}
+                          text={entryText(t, entry, extra, names)}
+                          changed
+                        />
+                      ),
+                    ];
+                  })}
+                </ul>
+              </div>
+            );
+          })}
         </div>
       ))}
     </Panel>

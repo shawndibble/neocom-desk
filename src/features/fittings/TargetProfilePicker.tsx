@@ -325,11 +325,7 @@ export function TargetProfilePicker({
       >
         {t('fittings.stats.manage')}
       </Button>
-      <ManageProfilesModal
-        open={managing}
-        onClose={() => setManaging(false)}
-        targetProfiles={targetProfiles}
-      />
+      {modal}
     </>
   );
   if (field)

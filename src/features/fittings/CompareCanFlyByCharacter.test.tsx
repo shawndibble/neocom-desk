@@ -36,7 +36,7 @@ describe('CompareCanFlyByCharacter', () => {
   it('computes nothing until opened, then answers for every Character', async () => {
     const fitting = { name: 'Doctrine Raven' } as Fitting;
     const user = userEvent.setup();
-    render(<CompareCanFlyByCharacter fitting={fitting} characters={characters} />);
+    render(<CompareCanFlyByCharacter fitting={fitting} cacheKey="fit" characters={characters} />);
     expect(loadActivePilotProfile).not.toHaveBeenCalled();
 
     await user.click(screen.getByRole('button', { name: 'All Characters' }));

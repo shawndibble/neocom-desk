@@ -1,6 +1,6 @@
 import type { CSSProperties } from 'react';
 import {
-  headToHeadRows,
+  baselineDelta,
   type BaselineDelta,
   type CompareRow,
 } from '@/engine/fittings/fittingCompare';
@@ -11,19 +11,31 @@ import { fixed0, fixed1, fixedFormat } from '@/lib/fixedFormat';
 import type { Translate } from '@/lib/translate';
 import { flagWord } from './flagWord';
 
+export interface CompareColumn {
+  letter: string;
+  position: number | null;
+}
+
 const NONE_WHEN_ZERO = new Set<CompareRow['key']>(
   NUMERIC_FIELDS.filter((field) => field.hideWhenNone).map((field) => field.key)
 );
 
-export function isAbsentValue(row: CompareRow, index: number): boolean {
-  const value = row.values[index];
+export const UNIT_KEYS: ReadonlySet<CompareRow['key']> = new Set([
+  'sustainedTank',
+  'maxVelocity',
+  'maxTargetRange',
+]);
+
+export function isAbsentValue(row: CompareRow, position: number | null): boolean {
+  if (position === null) return true;
+  const value = row.values[position];
   if (value === undefined || Number.isNaN(value)) return true;
   return value === 0 && NONE_WHEN_ZERO.has(row.key);
 }
 
-export function formatCompareValue(row: CompareRow, index: number, t: Translate): string {
-  if (isAbsentValue(row, index)) return '—';
-  const value = row.values[index]!;
+export function formatCompareValue(row: CompareRow, position: number, t: Translate): string {
+  if (isAbsentValue(row, position)) return '—';
+  const value = row.values[position]!;
   if (row.key === 'capacitor') {
     return value >= 0
       ? t('fittings.compare.stat.capacitorStable', { pct: fixed0(value) })
@@ -35,10 +47,10 @@ export function formatCompareValue(row: CompareRow, index: number, t: Translate)
   return fixedFormat(STAT_DIGITS[row.key])(value);
 }
 
-export function formatDelta(delta: BaselineDelta): string {
-  const size = Math.abs(delta.percent);
-  const text = size >= 10 ? fixed0(size) : fixed1(size);
-  return `${delta.percent > 0 ? '+' : '−'}${text}%`;
+export function compareDelta(row: CompareRow, position: number | null): BaselineDelta | null {
+  if (position === null || position === 0 || row.key === 'capacitor') return null;
+  if (isAbsentValue(row, position) || isAbsentValue(row, 0)) return null;
+  return baselineDelta(row.values[position]!, row.values[0]!, row.direction);
 }
 
 export const DELTA_TONE_CLASS = {
@@ -56,23 +68,4 @@ export function compareGridStyle(fits: number): CSSProperties {
 
 export function compareLetter(slotIndex: number): string {
   return String.fromCharCode(65 + slotIndex);
-}
-
-export const HEAD_TO_HEAD_UNIT: Partial<Record<CompareRow['key'], string>> = {
-  sustainedTank: 'EHP/s',
-  maxVelocity: 'm/s',
-  maxTargetRange: 'km',
-};
-
-export function headToHeadWins(
-  rows: readonly CompareRow[],
-  label: (key: CompareRow['key']) => string
-): string[][] {
-  const wins: string[][] = [];
-  for (const row of headToHeadRows(rows)) {
-    if (row.bestIndices.length !== 1) continue;
-    const winner = row.bestIndices[0]!;
-    (wins[winner] ??= []).push(label(row.key));
-  }
-  return wins;
 }

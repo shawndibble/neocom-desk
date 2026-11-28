@@ -14,23 +14,13 @@ export interface CompareCharacter {
 
 type RowState = boolean | 'failed';
 
-const fittingKeys = new WeakMap<Fitting, number>();
-let nextFittingKey = 0;
-
-function fittingKey(fitting: Fitting): number {
-  let key = fittingKeys.get(fitting);
-  if (key === undefined) {
-    key = nextFittingKey++;
-    fittingKeys.set(fitting, key);
-  }
-  return key;
-}
-
 function CharacterRows({
   fitting,
+  cacheKey,
   characters,
 }: {
   fitting: Fitting;
+  cacheKey: string;
   characters: readonly CompareCharacter[];
 }) {
   const { t } = useTranslation();
@@ -47,7 +37,7 @@ function CharacterRows({
     [fitting, characters]
   );
   const { data: rows } = useKeyedLoad(
-    `${fittingKey(fitting)}:${characters.map(({ characterId }) => characterId).join(',')}`,
+    `${cacheKey}:${characters.map(({ characterId }) => characterId).join(',')}`,
     loader
   );
   return (
@@ -75,11 +65,13 @@ function CharacterRows({
 
 export function CompareCanFlyByCharacter({
   fitting,
+  cacheKey,
   characters,
   children,
   className,
 }: {
   fitting: Fitting;
+  cacheKey: string;
   characters: readonly CompareCharacter[];
   children?: ReactNode;
   className?: string;
@@ -96,7 +88,7 @@ export function CompareCanFlyByCharacter({
         aria-label={t('fittings.compare.canFlyAllCharactersTitle', { fitting: fitting.name })}
         className="p-3"
       >
-        <CharacterRows fitting={fitting} characters={characters} />
+        <CharacterRows fitting={fitting} cacheKey={cacheKey} characters={characters} />
       </PopoverContent>
     </Popover>
   );

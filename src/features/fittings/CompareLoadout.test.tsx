@@ -4,8 +4,8 @@ import { render, screen } from '@testing-library/react';
 import type { Fitting } from '@/engine/fittings/types';
 import { CompareLoadout } from './CompareLoadout';
 
-vi.mock('./useCompareTypeNames', () => ({
-  useCompareTypeNames: () =>
+vi.mock('@/features/character/useTypeNames', () => ({
+  useTypeNames: () =>
     new Map([
       [1, 'Ballistic Control System II'],
       [2, 'Damage Control II'],
@@ -27,7 +27,15 @@ const low = (typeIds: number[]): Fitting => ({
 
 describe('CompareLoadout', () => {
   it('dims what every Fitting carries and marks the rest, counting copies', () => {
-    render(<CompareLoadout fittings={[low([1, 1, 2]), low([1, 1, 1])]} letters={['A', 'B']} />);
+    render(
+      <CompareLoadout
+        fittings={[low([1, 1, 2]), low([1, 1, 1])]}
+        columns={[
+          { letter: 'A', position: 0 },
+          { letter: 'B', position: 1 },
+        ]}
+      />
+    );
     const items = screen.getAllByRole('listitem').map((li) => li.textContent);
     expect(items).toEqual([
       '2× Ballistic Control System II',

@@ -49,7 +49,6 @@ describe('FittingCompare column header', () => {
     );
     const link = await screen.findByRole('link', { name: 'Brawler' });
     expect(link.getAttribute('href')).toContain('f=abc');
-    expect(screen.queryByRole('button', { name: /More actions for/ })).toBeNull();
   });
 });
 
@@ -97,10 +96,23 @@ describe('FittingCompare cards', () => {
     expect(screen.queryByRole('link', { name: /L3 Kiter/ })).toBeNull();
   });
 
+  it('keeps the back link after the comparison changes', async () => {
+    const user = userEvent.setup();
+    renderWith('?f=one&f=two', {
+      from: 'fitting-editor',
+      name: 'L3 Kiter',
+      back: '/ships/fittings/edit?f=two',
+    });
+    await user.click(await screen.findByRole('button', { name: 'More actions for Fit two' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Compare others to this' }));
+    expect(screen.getByTestId('search')).toHaveTextContent('?f=two&f=one');
+    expect(screen.getByRole('link', { name: /L3 Kiter/ })).toBeInTheDocument();
+  });
+
   it('moves a Fitting to the front with Compare others to this', async () => {
     const user = userEvent.setup();
     renderWith('?f=one&f=two');
-    await user.click(await screen.findByRole('button', { name: 'Actions for Fit two' }));
+    await user.click(await screen.findByRole('button', { name: 'More actions for Fit two' }));
     await user.click(await screen.findByRole('menuitem', { name: 'Compare others to this' }));
     expect(screen.getByTestId('search')).toHaveTextContent('?f=two&f=one');
   });
@@ -108,7 +120,7 @@ describe('FittingCompare cards', () => {
   it('offers no Compare others to this on the first Fitting', async () => {
     const user = userEvent.setup();
     renderWith('?f=one&f=two');
-    await user.click(await screen.findByRole('button', { name: 'Actions for Fit one' }));
+    await user.click(await screen.findByRole('button', { name: 'More actions for Fit one' }));
     expect(await screen.findByRole('menuitem', { name: 'Replace with' })).toBeInTheDocument();
     expect(screen.queryByRole('menuitem', { name: 'Compare others to this' })).toBeNull();
   });
@@ -116,7 +128,7 @@ describe('FittingCompare cards', () => {
   it('opens the picker titled for the Fitting it replaces', async () => {
     const user = userEvent.setup();
     renderWith('?f=one&f=two');
-    await user.click(await screen.findByRole('button', { name: 'Actions for Fit two' }));
+    await user.click(await screen.findByRole('button', { name: 'More actions for Fit two' }));
     await user.click(await screen.findByRole('menuitem', { name: 'Replace with' }));
     expect(await screen.findByRole('dialog', { name: 'Replace Fit two' })).toBeInTheDocument();
   });

@@ -13,7 +13,7 @@ const fittings: FittingCompareCsvFitting[] = [
 ];
 
 function compareRow(key: CompareRow['key'], values: number[]): CompareRow {
-  return { key, values, differs: true, bestIndices: [0] };
+  return { key, values, differs: true, bestIndices: [0], direction: 'higher' };
 }
 
 describe('fittingCompareCsvColumns', () => {

@@ -23,3 +23,16 @@ _Recorded 2026-11-28._
   as Saved and Your edits. Compare from the library row menu carries no origin.
 - **A Fittings library bulk "Compare" is not built.** The library has no multi-select; its row
   menu's Compare stays the way in.
+- **No "Add a fitting" card in an empty slot.** The header's "Compare with" already adds one
+  (§6c restraint: a second control for the same action is clutter); it states the three-Fitting
+  limit when full.
+- **A card's ⋮ has no "Open in the editor".** The Fitting's name is that link; the menu holds
+  only what the card can't do in one tap (Compare others to this, Replace with, Remove).
+- **A card names the hull, not its class.** There is no shared hull-class lookup, and the hull
+  name already tells a pilot the class.
+- **CPU, powergrid and calibration stay separate used and total rows.** The export keeps one
+  number per cell, and over-budget already reads on the card ("Over CPU by 34").
+- **A Fitting whose stats fail keeps its column.** Its cells read "—" so every other Fitting's
+  numbers stay under its own card.
+- **The per-Character "Can fly" list fills in once every Character is checked**, not row by
+  row, now that it loads through `useKeyedLoad`.

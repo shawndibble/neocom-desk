@@ -13,7 +13,7 @@ import {
 } from '@/components/ui';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
-import { compareFittingStats } from '@/engine/fittings/fittingCompare';
+import { compareFittingStats, headToHeadWins } from '@/engine/fittings/fittingCompare';
 import { canFlyVerdict, fitVerdict } from '@/features/fittings/compareVerdicts';
 import type { Fitting, FittingStats } from '@/engine/fittings/types';
 import { useActiveCharacter } from '@/stores/activeCharacter';
@@ -21,11 +21,8 @@ import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
 import { useCompareCodes, MAX_COMPARE_SLOTS } from '@/features/fittings/compareUrl';
 import { FittingComparePicker } from '@/features/fittings/FittingComparePicker';
 import { FITTINGS_PATH, readCompareOrigin } from '@/features/fittings/fittingRoutes';
-import {
-  focusRingClassName,
-  inlineLinkClassName,
-  interactiveClassName,
-} from '@/components/ui/controlStyles';
+import { inlineLinkClassName } from '@/components/ui/controlStyles';
+import { OriginCrumb } from '@/components/OriginCrumb';
 import { cx } from '@/lib/cx';
 import { useCompareCanFly } from '@/features/fittings/useCompareCanFly';
 import { useCompareFittings } from '@/features/fittings/useCompareFittings';
@@ -40,6 +37,7 @@ import {
   type FittingCompareCsvRow,
 } from '@/features/fittings/fittingCompareCsv';
 import {
+  COMPARE_FOCUS_TARGET,
   CompareErrorCard,
   CompareFitCard,
   CompareLoadingCard,
@@ -53,9 +51,9 @@ import {
   COMPARE_GRID_CLASS,
   compareGridStyle,
   compareLetter,
-  headToHeadWins,
+  type CompareColumn,
 } from '@/features/fittings/compareFormat';
-import { useCompareTypeNames } from '@/features/fittings/useCompareTypeNames';
+import { useTypeNames } from '@/features/character/useTypeNames';
 
 type PickerMode = { kind: 'add' } | { kind: 'replace'; index: number };
 
@@ -98,7 +96,7 @@ export function FittingCompare() {
     () => fittings.flatMap((fitting) => (fitting ? [fitting.shipTypeId] : [])),
     [fittings]
   );
-  const hullNames = useCompareTypeNames(hullIds);
+  const hullNames = useTypeNames(hullIds);
 
   function pick(code: string) {
     if (picker?.kind === 'replace') {
@@ -117,7 +115,11 @@ export function FittingCompare() {
     const afterRemoval = (find: () => HTMLElement | null | undefined) => () =>
       countRef.current === expected ? find() : null;
     const removeAt = (i: number) =>
-      afterRemoval(() => document.querySelector<HTMLElement>(`[data-compare-remove="${i}"]`));
+      afterRemoval(() =>
+        document
+          .querySelector(`[data-compare-focus="${i}"]`)
+          ?.querySelector<HTMLElement>(COMPARE_FOCUS_TARGET)
+      );
     focusAfterCommit(
       removeAt(index),
       removeAt(index - 1),
@@ -155,7 +157,14 @@ export function FittingCompare() {
     () => okSlots.map((index) => fittings[index] as Fitting),
     [okSlots, fittings]
   );
-  const okLetters = useMemo(() => okSlots.map(compareLetter), [okSlots]);
+  const columns = useMemo<CompareColumn[]>(
+    () =>
+      codes.map((_, index) => {
+        const position = okSlots.indexOf(index);
+        return { letter: compareLetter(index), position: position === -1 ? null : position };
+      }),
+    [codes, okSlots]
+  );
   const table = useMemo(
     () =>
       statsReady
@@ -170,7 +179,9 @@ export function FittingCompare() {
   const wins = useMemo(
     () =>
       table && comparing
-        ? headToHeadWins(table.rows, (key) => t(`fittings.compare.headToHead.${key}`))
+        ? headToHeadWins(table.rows).map((keys) =>
+            keys.map((key) => t(`fittings.compare.headToHead.${key}`))
+          )
         : [],
     [table, comparing, t]
   );
@@ -220,7 +231,7 @@ export function FittingCompare() {
   function cardFor(index: number) {
     const slot = slots[index];
     const letter = compareLetter(index);
-    if (slot === null || slot === undefined) return <CompareLoadingCard />;
+    if (slot === null || slot === undefined) return <CompareLoadingCard focusIndex={index} />;
     if (slot.shareError || !slot.fitting) {
       return (
         <CompareErrorCard
@@ -246,7 +257,7 @@ export function FittingCompare() {
         wins={position === -1 ? [] : (wins[position] ?? [])}
         statsFailed={Boolean(stats.failed[index])}
         focusIndex={index}
-        onMakeBaseline={index === 0 ? undefined : () => makeBaseline(index)}
+        onMakeBaseline={index === (okSlots[0] ?? 0) ? undefined : () => makeBaseline(index)}
         onReplace={() => setPicker({ kind: 'replace', index })}
         onRemove={() => removeSlot(index)}
       />
@@ -257,31 +268,16 @@ export function FittingCompare() {
 
   return (
     <div className="mx-auto max-w-page space-y-3">
-      {origin && (
-        <Link
-          to={origin.back}
-          className={cx(inlineLinkClassName, 'inline-flex items-center gap-1 text-xs')}
-        >
-          <span aria-hidden="true">‹</span>
-          {origin.name}
-        </Link>
-      )}
       <PageHeader
         title={t('fittings.compare.title')}
         actions={
           <>
-            {!origin && (
-              <Link
-                to={FITTINGS_PATH}
-                className={cx(
-                  'inline-flex min-h-9 items-center gap-1 rounded-xs px-2 text-sm text-text-dim hover:text-text active:text-text-dim md:hidden',
-                  interactiveClassName,
-                  focusRingClassName
-                )}
-              >
-                <span aria-hidden="true">‹</span>
+            {origin ? (
+              <OriginCrumb to={origin.back}>{origin.name}</OriginCrumb>
+            ) : (
+              <OriginCrumb to={FITTINGS_PATH} className="md:hidden">
                 {t('ships.tabs.fittings')}
-              </Link>
+              </OriginCrumb>
             )}
             <Tooltip
               content={
@@ -375,7 +371,7 @@ export function FittingCompare() {
             </Panel>
           ) : (
             <>
-              <CompareHeadToHead rows={table!.rows} letters={okLetters} />
+              <CompareHeadToHead rows={table!.rows} columns={columns} />
               {!pricesReady && (
                 <p className="text-xs text-text-dim">
                   {anyPriceFailed
@@ -383,7 +379,7 @@ export function FittingCompare() {
                     : t('fittings.compare.priceLoading')}
                 </p>
               )}
-              {comparing && <CompareLoadout fittings={okFittings} letters={okLetters} />}
+              {comparing && <CompareLoadout fittings={okFittings} columns={columns} />}
               <section className="space-y-2" aria-labelledby="compare-all-stats">
                 <div className="flex items-center justify-between gap-2">
                   <h2 id="compare-all-stats" className={eyebrowClassName}>
@@ -415,7 +411,7 @@ export function FittingCompare() {
                 <CompareAllStats
                   rows={table!.rows}
                   statsList={okStats}
-                  letters={okLetters}
+                  columns={columns}
                   differencesOnly={showDifferencesOnly}
                   onShowMatching={() => setDifferencesOnly(false)}
                 />

@@ -30,6 +30,7 @@ export const Tones: Story = {
   render: () => (
     <div className="space-y-2">
       <ProgressBar label="Accent" value={60} />
+      <ProgressBar label="Neutral" value={45} tone="neutral" />
       <ProgressBar label="Success" value={100} tone="success" />
       <ProgressBar label="Warning" value={92} tone="warning" />
       <ProgressBar label="Danger" value={100} tone="danger" />
@@ -70,6 +71,16 @@ export const Bounds: Story = {
       <ProgressBar label="Empty" value={0} />
       <ProgressBar label="Full" value={100} />
       <ProgressBar label="Overshoot" value={140} />
+    </div>
+  ),
+};
+
+/** @summary Decorative: a comparison bar beside its own printed figure, hidden from assistive tech. */
+export const Decorative: Story = {
+  render: () => (
+    <div className="flex items-center gap-2">
+      <span className="tabular-nums">1,640 m/s</span>
+      <ProgressBar label="Speed" value={1640} max={1640} decorative className="flex-1" />
     </div>
   ),
 };

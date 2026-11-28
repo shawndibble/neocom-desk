@@ -5,7 +5,7 @@ import {
   compareFittingStats,
   compareSection,
   baselineDelta,
-  compareDirection,
+  headToHeadWins,
   headToHeadRows,
   loadoutDiff,
   sectionCompareRows,
@@ -495,13 +495,42 @@ describe('baselineDelta', () => {
   });
 });
 
-describe('compareDirection', () => {
-  it('reads the stat field direction, applied DPS higher and price neutral', () => {
-    expect(compareDirection('signatureRadius')).toBe('lower');
-    expect(compareDirection('ehp')).toBe('higher');
-    expect(compareDirection('appliedDps')).toBe('higher');
-    expect(compareDirection('priceSell')).toBe('neutral');
-    expect(compareDirection('bestRange')).toBe('neutral');
+describe('compare row direction', () => {
+  it('carries which way is better: the stat field, applied DPS higher, price and range neutral', () => {
+    const table = compareFittingStats([stats(), stats()], { signatureRadius: 125, velocity: 350 }, [
+      { sell: 1, buy: 1 },
+      { sell: 2, buy: 2 },
+    ]);
+    const direction = (key: CompareRow['key']) => table.rows.find((r) => r.key === key)?.direction;
+    expect(direction('signatureRadius')).toBe('lower');
+    expect(direction('ehp')).toBe('higher');
+    expect(direction('appliedDps')).toBe('higher');
+    expect(direction('capacitor')).toBe('higher');
+    expect(direction('priceSell')).toBe('neutral');
+    expect(direction('bestRange')).toBe('neutral');
+    expect(direction('cpuUsed')).toBe('neutral');
+  });
+});
+
+describe('headToHeadWins', () => {
+  const row = (key: CompareRow['key'], bestIndices: number[]): CompareRow => ({
+    key,
+    values: [1, 2, 3],
+    differs: true,
+    bestIndices,
+    direction: 'higher',
+  });
+
+  it('credits each sole winner of a deciding row, skipping ties and other rows', () => {
+    const wins = headToHeadWins([
+      row('ehp', [2]),
+      row('maxVelocity', [0]),
+      row('appliedDps', [0, 1]),
+      row('totalDps', [1]),
+    ]);
+    expect(wins[0]).toEqual(['maxVelocity']);
+    expect(wins[1]).toBeUndefined();
+    expect(wins[2]).toEqual(['ehp']);
   });
 });
 
@@ -530,6 +559,7 @@ describe('sectionCompareRows', () => {
     values: [1, 2],
     differs: true,
     bestIndices: [],
+    direction: 'neutral',
   });
 
   it('keeps the fixed section order whatever order the rows arrive in', () => {

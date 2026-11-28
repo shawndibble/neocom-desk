@@ -2247,7 +2247,6 @@
         "cargoCapacity": "Cargo hold (m³)"
       },
       "openInEditor": "Open in the editor",
-      "actionsFor": "Actions for {{name}}",
       "makeBaseline": "Compare others to this",
       "replace": "Replace with",
       "replaceTitle": "Replace {{name}}",
@@ -2276,7 +2275,7 @@
         "priceSell": "Price"
       },
       "loadoutTitle": "Loadout",
-      "loadoutLegend": "Not in every Fitting",
+      "loadoutLegend": "Marked lines are not in every Fitting",
       "loadoutChanged": "not in every Fitting",
       "rack": {
         "high": "High",
@@ -2286,13 +2285,20 @@
         "subsystem": "Subsystems",
         "drones": "Drones"
       },
-      "sectionSummary_one": "{{count}} stat differs",
-      "sectionSummary_other": "{{count}} stats differ",
-      "sectionSummaryHidden_one": "{{count}} differs · {{hidden}} match",
-      "sectionSummaryHidden_other": "{{count}} differ · {{hidden}} match",
       "matchingHidden_one": "{{count}} matching stat hidden.",
       "matchingHidden_other": "{{count}} matching stats hidden.",
-      "showMatching": "Show"
+      "showMatching": "Show",
+      "sectionSummary_one": "{{count}} stat differs",
+      "sectionSummary_other": "{{count}} stats differ",
+      "sectionSummaryMatching_one": "{{count}} differs · {{matching}} match",
+      "sectionSummaryMatching_other": "{{count}} differ · {{matching}} match",
+      "unit": {
+        "sustainedTank": "{{value}} EHP/s",
+        "maxVelocity": "{{value}} m/s",
+        "maxTargetRange": "{{value}} km"
+      },
+      "loadoutCount": "{{count}}× {{name}}",
+      "loadoutWithCharge": "{{name}} · {{charge}}"
     },
     "item": {
       "slot": "{{rack}} {{index}}",

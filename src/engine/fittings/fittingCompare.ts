@@ -60,11 +60,14 @@ export interface FittingPriceTotals {
 
 export type PriceCompareKey = 'priceSell' | 'priceBuy';
 
+export type CompareDirection = 'higher' | 'lower' | 'neutral';
+
 export interface CompareRow {
   key: StatChangeKey | AppliedCompareKey | PriceCompareKey;
   values: readonly number[];
   differs: boolean;
   bestIndices: readonly number[];
+  direction: CompareDirection;
 }
 
 export type CompareSectionId =
@@ -265,6 +268,7 @@ function capacitorRow(statsList: readonly FittingStats[]): CompareRow {
     ),
     differs,
     bestIndices,
+    direction: 'higher',
   };
 }
 
@@ -281,8 +285,15 @@ function appliedRows(statsList: readonly FittingStats[], target: TargetProfile):
       values: dps,
       differs: new Set(dps).size > 1,
       bestIndices: bestIndicesFor(dps, 'higher'),
+      direction: 'higher',
     },
-    { key: 'bestRange', values: km, differs: new Set(km).size > 1, bestIndices: [] },
+    {
+      key: 'bestRange',
+      values: km,
+      differs: new Set(km).size > 1,
+      bestIndices: [],
+      direction: 'neutral',
+    },
   ];
 }
 
@@ -290,8 +301,20 @@ function priceRows(prices: readonly (FittingPriceTotals | null)[]): CompareRow[]
   const sell = prices.map((p) => (p ? round(p.sell, 0) : NaN));
   const buy = prices.map((p) => (p ? round(p.buy, 0) : NaN));
   return [
-    { key: 'priceSell', values: sell, differs: new Set(sell).size > 1, bestIndices: [] },
-    { key: 'priceBuy', values: buy, differs: new Set(buy).size > 1, bestIndices: [] },
+    {
+      key: 'priceSell',
+      values: sell,
+      differs: new Set(sell).size > 1,
+      bestIndices: [],
+      direction: 'neutral',
+    },
+    {
+      key: 'priceBuy',
+      values: buy,
+      differs: new Set(buy).size > 1,
+      bestIndices: [],
+      direction: 'neutral',
+    },
   ];
 }
 
@@ -309,6 +332,7 @@ export function compareFittingStats(
           values,
           differs: new Set(values).size > 1,
           bestIndices: bestIndicesFor(values, STAT_DIRECTION[field.key]),
+          direction: STAT_DIRECTION[field.key] ?? 'neutral',
         },
       ];
     if (values.every((value) => value === 0)) return [];
@@ -322,6 +346,7 @@ export function compareFittingStats(
           ranked,
           field.direction === 'neutral' ? undefined : field.direction
         ).filter((index) => values[index] !== 0),
+        direction: field.direction,
       },
     ];
   });
@@ -329,17 +354,6 @@ export function compareFittingStats(
   if (target) rows.push(...appliedRows(statsList, target));
   if (prices) rows.push(...priceRows(prices));
   return { rows };
-}
-
-export type CompareDirection = 'higher' | 'lower' | 'neutral';
-
-const FIELD_BY_KEY = new Map(NUMERIC_FIELDS.map((field) => [field.key, field] as const));
-
-export function compareDirection(key: CompareRow['key']): CompareDirection {
-  if (key === 'appliedDps' || key === 'capacitor') return 'higher';
-  const field = FIELD_BY_KEY.get(key as FittingStatKey);
-  if (field?.hideWhenNone) return field.direction;
-  return STAT_DIRECTION[key as FittingStatKey] ?? 'neutral';
 }
 
 export interface BaselineDelta {
@@ -372,6 +386,15 @@ export const HEAD_TO_HEAD_KEYS: readonly CompareRow['key'][] = [
 
 export function headToHeadRows(rows: readonly CompareRow[]): CompareRow[] {
   return HEAD_TO_HEAD_KEYS.flatMap((key) => rows.filter((row) => row.key === key));
+}
+
+export function headToHeadWins(rows: readonly CompareRow[]): CompareRow['key'][][] {
+  const wins: CompareRow['key'][][] = [];
+  for (const row of headToHeadRows(rows)) {
+    if (row.bestIndices.length !== 1) continue;
+    (wins[row.bestIndices[0]!] ??= []).push(row.key);
+  }
+  return wins;
 }
 
 export type LoadoutRack = FittingSlotKind | 'drones';
