@@ -1,24 +1,10 @@
-import { useEffect, type ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '@/db';
 import { cx } from '@/lib/cx';
 import { CharacterAvatar } from '@/components/ui';
 import { AllianceLink, CorporationLink } from '@/features/entities';
-import { usePublicInfo } from '@/stores/publicInfo';
 import { CharacterAchievementLine } from './AchievementLine';
-
-export function useCharacterIdentity(characterId: number) {
-  const character = useLiveQuery(() => db.characters.get(characterId), [characterId]);
-  const publicInfo = usePublicInfo((state) => state.byCharacterId[characterId]);
-  const loadPublicInfo = usePublicInfo((state) => state.load);
-
-  useEffect(() => {
-    void loadPublicInfo(characterId);
-  }, [characterId, loadPublicInfo]);
-
-  return { name: character?.name, publicInfo };
-}
+import type { useCharacterIdentity } from './useCharacterIdentity';
 
 export function CharacterPortrait({ characterId, name }: { characterId: number; name?: string }) {
   const { t } = useTranslation();

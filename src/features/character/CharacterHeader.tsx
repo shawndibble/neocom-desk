@@ -4,7 +4,8 @@ import { PageHeaderClusterContext } from '@/components/ui/pageHeaderCluster';
 import { useTranslation } from 'react-i18next';
 import { cx } from '@/lib/cx';
 import { AlertsBell, StatChip, StatChips } from '@/components/ui';
-import { CharacterIdentity, CharacterPortrait, useCharacterIdentity } from './CharacterIdentity';
+import { CharacterIdentity, CharacterPortrait } from './CharacterIdentity';
+import { useCharacterIdentity } from './useCharacterIdentity';
 
 interface CharacterHeaderProps {
   characterId: number;

@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { AlertsBell } from '@/components/ui';
-import { CharacterIdentity, CharacterPortrait, useCharacterIdentity } from './CharacterIdentity';
+import { CharacterIdentity, CharacterPortrait } from './CharacterIdentity';
+import { useCharacterIdentity } from './useCharacterIdentity';
 
 interface CompactCharacterHeaderProps {
   characterId: number;
