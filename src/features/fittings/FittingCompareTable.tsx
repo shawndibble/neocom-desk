@@ -1,8 +1,9 @@
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import * as Icon from '@/components/ui/icons';
-import { Tooltip } from '@/components/ui';
-import type { CompareRow } from '@/engine/fittings/fittingCompare';
+import { eyebrowClassName, Tooltip } from '@/components/ui';
+import { cx } from '@/lib/cx';
+import { sectionCompareRows, type CompareRow } from '@/engine/fittings/fittingCompare';
 import { FLAG_STATS, STAT_DIGITS } from '@/engine/fittings/fittingStatFields';
 import { formatSeconds } from '@/lib/duration';
 import { formatIsk } from '@/lib/isk';
@@ -103,34 +104,45 @@ export function FittingCompareTable({
           </tr>
         )}
       </thead>
-      <tbody>
-        {shown.map((row) => (
-          <tr key={row.key} className="border-t border-line">
-            <th scope="row" className="p-2 text-left font-normal text-text-dim">
-              {t(`fittings.compare.stat.${row.key}`)}
+      {sectionCompareRows(shown).map(({ section, rows: sectionRows }) => (
+        <tbody key={section}>
+          <tr className="border-t border-line">
+            <th
+              scope="rowgroup"
+              colSpan={columns.length + 1}
+              className={cx(eyebrowClassName, 'px-2 pt-4 pb-1 text-left')}
+            >
+              {t(`fittings.compare.section.${section}`)}
             </th>
-            {columns.map((column) => {
-              const statsIndex = column.statsIndex;
-              const best = statsIndex !== null && row.bestIndices.includes(statsIndex);
-              return (
-                <td
-                  key={column.index}
-                  className={`p-2 text-right tabular-nums ${best ? 'font-semibold text-text' : 'text-text-dim'}`}
-                >
-                  {best && (
-                    <Icon.Done
-                      aria-hidden="true"
-                      className="mr-1 inline-block h-3 w-3 align-middle text-success"
-                    />
-                  )}
-                  {statsIndex === null ? '—' : formatValue(row, statsIndex, t)}
-                  {best && <span className="sr-only"> {t('fittings.compare.best')}</span>}
-                </td>
-              );
-            })}
           </tr>
-        ))}
-      </tbody>
+          {sectionRows.map((row) => (
+            <tr key={row.key} className="border-t border-line">
+              <th scope="row" className="p-2 text-left font-normal text-text-dim">
+                {t(`fittings.compare.stat.${row.key}`)}
+              </th>
+              {columns.map((column) => {
+                const statsIndex = column.statsIndex;
+                const best = statsIndex !== null && row.bestIndices.includes(statsIndex);
+                return (
+                  <td
+                    key={column.index}
+                    className={`p-2 text-right tabular-nums ${best ? 'font-semibold text-text' : 'text-text-dim'}`}
+                  >
+                    {best && (
+                      <Icon.Done
+                        aria-hidden="true"
+                        className="mr-1 inline-block h-3 w-3 align-middle text-success"
+                      />
+                    )}
+                    {statsIndex === null ? '—' : formatValue(row, statsIndex, t)}
+                    {best && <span className="sr-only"> {t('fittings.compare.best')}</span>}
+                  </td>
+                );
+              })}
+            </tr>
+          ))}
+        </tbody>
+      ))}
     </table>
   );
 }

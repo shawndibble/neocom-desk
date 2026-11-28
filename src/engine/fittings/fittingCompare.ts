@@ -67,6 +67,167 @@ export interface CompareRow {
   bestIndices: readonly number[];
 }
 
+export type CompareSectionId =
+  | 'fitting'
+  | 'offence'
+  | 'tank'
+  | 'resists'
+  | 'capacitor'
+  | 'targeting'
+  | 'navigation'
+  | 'drones'
+  | 'ewar'
+  | 'cost'
+  | 'utility';
+
+const SECTION_KEYS: readonly (readonly [CompareSectionId, readonly CompareRow['key'][]])[] = [
+  [
+    'fitting',
+    [
+      'cpuUsed',
+      'cpuTotal',
+      'powergridUsed',
+      'powergridTotal',
+      'calibrationUsed',
+      'calibrationTotal',
+    ],
+  ],
+  [
+    'offence',
+    [
+      'totalDps',
+      'totalVolley',
+      'sustainedDps',
+      'overheatedDps',
+      'appliedDps',
+      'bestRange',
+      'reloadTime',
+      'missileExplosionVelocity',
+      'missileExplosionRadius',
+    ],
+  ],
+  [
+    'tank',
+    [
+      'ehp',
+      'shieldRepair',
+      'armorRepair',
+      'hullRepair',
+      'burstTank',
+      'sustainedTank',
+      'shieldHp',
+      'armorHp',
+      'hullHp',
+    ],
+  ],
+  [
+    'resists',
+    [
+      'shieldEmResonance',
+      'shieldThermalResonance',
+      'shieldKineticResonance',
+      'shieldExplosiveResonance',
+      'armorEmResonance',
+      'armorThermalResonance',
+      'armorKineticResonance',
+      'armorExplosiveResonance',
+      'hullEmResonance',
+      'hullThermalResonance',
+      'hullKineticResonance',
+      'hullExplosiveResonance',
+    ],
+  ],
+  [
+    'capacitor',
+    ['capacitorCapacity', 'capacitorRechargeTime', 'capacitorDelta', 'capacitor', 'capTransfer'],
+  ],
+  ['targeting', ['maxTargetRange', 'maxLockedTargets', 'scanResolution', 'sensorStrength']],
+  [
+    'navigation',
+    ['signatureRadius', 'maxVelocity', 'agility', 'mass', 'warpSpeed', 'cargoCapacity'],
+  ],
+  [
+    'drones',
+    [
+      'droneDps',
+      'droneBandwidthUsed',
+      'droneBandwidthTotal',
+      'droneCapacity',
+      'droneControlRange',
+      'droneSpeed',
+      'droneTracking',
+    ],
+  ],
+  [
+    'ewar',
+    [
+      'tacklePoints',
+      'pointRange',
+      'webStrength',
+      'webRange',
+      'ecmStrength',
+      'ecmRange',
+      'dampStrength',
+      'dampRange',
+      'disruptorStrength',
+      'disruptorRange',
+      'painterStrength',
+      'painterRange',
+      'neutralizer',
+      'nosferatu',
+    ],
+  ],
+  ['cost', ['priceSell', 'priceBuy']],
+  [
+    'utility',
+    [
+      'miningWaste',
+      'dataStrength',
+      'relicStrength',
+      'utilitySlots',
+      'virusCoherence',
+      'hackingCycle',
+      'scanStrength',
+      'scanTimeCut',
+      'deviationCut',
+      'probeStrength',
+      'probeLauncherBonus',
+      'probeLauncherCycle',
+      'cloakRecalibration',
+      'warpsCloaked',
+      'reactivationDelay',
+      'salvageChance',
+      'salvagerRange',
+      'tractorSpeed',
+      'tractorRange',
+      'cargoScanRange',
+      'shipScanRange',
+    ],
+  ],
+];
+
+export const COMPARE_SECTIONS: readonly CompareSectionId[] = SECTION_KEYS.map(([id]) => id);
+
+export const COMPARE_SECTION_OF: ReadonlyMap<CompareRow['key'], CompareSectionId> = new Map(
+  SECTION_KEYS.flatMap(([id, keys]) => keys.map((key) => [key, id] as const))
+);
+
+export function compareSection(key: CompareRow['key']): CompareSectionId {
+  return COMPARE_SECTION_OF.get(key) ?? 'utility';
+}
+
+export interface CompareSection {
+  section: CompareSectionId;
+  rows: readonly CompareRow[];
+}
+
+export function sectionCompareRows(rows: readonly CompareRow[]): CompareSection[] {
+  return COMPARE_SECTIONS.flatMap((section) => {
+    const own = rows.filter((row) => compareSection(row.key) === section);
+    return own.length > 0 ? [{ section, rows: own }] : [];
+  });
+}
+
 export interface CompareTable {
   rows: readonly CompareRow[];
 }

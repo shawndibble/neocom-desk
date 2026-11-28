@@ -213,7 +213,7 @@ test.describe('Fitting Compare pinned names row', () => {
     const pinned = table.getByTestId('compare-pinned-names');
     await expect(pinned).toBeVisible({ timeout: 20_000 });
 
-    const firstRow = table.locator('tbody tr').first();
+    const firstRow = table.locator('tbody tr:has(td)').first();
     await firstRow.evaluate((el) => {
       const bottom = el.getBoundingClientRect().bottom + window.scrollY;
       window.scrollTo(0, bottom + 1);
@@ -228,7 +228,7 @@ test.describe('Fitting Compare pinned names row', () => {
     expect(box.height).toBeLessThan(40);
 
     const names = pinned.locator('th');
-    const cells = table.locator('tbody tr').first().locator('td');
+    const cells = table.locator('tbody tr:has(td)').first().locator('td');
     for (const i of [1, 2]) {
       const nameBox = (await names.nth(i).boundingBox())!;
       const cellBox = (await cells.nth(i - 1).boundingBox())!;

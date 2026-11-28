@@ -1,5 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { compareFittingStats, modulesThatDiffer, compareWindow } from './fittingCompare';
+import {
+  COMPARE_SECTION_OF,
+  COMPARE_SECTIONS,
+  compareFittingStats,
+  compareSection,
+  compareWindow,
+  modulesThatDiffer,
+  sectionCompareRows,
+  type CompareRow,
+} from './fittingCompare';
+import { NUMERIC_FIELDS } from './fittingStatFields';
 import { appliedDps, appliedDpsVsRange, bestRange, graphMaxRange } from './appliedDps';
 import type { AppliedDpsInputs } from './appliedDps';
 import type { Fitting, FittingStats } from './types';
@@ -454,5 +464,59 @@ describe('compareWindow', () => {
 
   it('clamps a page beyond the last window', () => {
     expect(compareWindow(3, 5)).toEqual({ start: 1, end: 3 });
+  });
+});
+
+describe('sectionCompareRows', () => {
+  const row = (key: CompareRow['key']): CompareRow => ({
+    key,
+    values: [1, 2],
+    differs: true,
+    bestIndices: [],
+  });
+
+  it('keeps the fixed section order whatever order the rows arrive in', () => {
+    const sections = sectionCompareRows(
+      (['priceSell', 'warpsCloaked', 'ehp', 'cpuUsed', 'capacitor'] as const).map(row)
+    );
+    expect(sections.map((s) => s.section)).toEqual([
+      'fitting',
+      'tank',
+      'capacitor',
+      'cost',
+      'utility',
+    ]);
+  });
+
+  it('keeps the row order inside a section and drops no row', () => {
+    const rows = (['hullHp', 'cpuUsed', 'ehp', 'shieldHp'] as const).map(row);
+    const sections = sectionCompareRows(rows);
+    expect(sections.find((s) => s.section === 'tank')!.rows.map((r) => r.key)).toEqual([
+      'hullHp',
+      'ehp',
+      'shieldHp',
+    ]);
+    expect(sections.flatMap((s) => s.rows)).toHaveLength(rows.length);
+  });
+
+  it('gives no section to an empty list', () => {
+    expect(sectionCompareRows([])).toEqual([]);
+  });
+
+  it('lists every stat under a section by name, so a new stat cannot fall into Utility unseen', () => {
+    expect(COMPARE_SECTIONS.at(-1)).toBe('utility');
+    const keys: CompareRow['key'][] = [
+      ...NUMERIC_FIELDS.map((field) => field.key),
+      'capacitor',
+      'appliedDps',
+      'bestRange',
+      'priceSell',
+      'priceBuy',
+    ];
+    expect(keys.filter((key) => !COMPARE_SECTION_OF.has(key))).toEqual([]);
+    expect(COMPARE_SECTION_OF.size).toBe(keys.length);
+    expect(compareSection('totalDps')).toBe('offence');
+    expect(compareSection('shieldEmResonance')).toBe('resists');
+    expect(compareSection('salvageChance')).toBe('utility');
   });
 });
