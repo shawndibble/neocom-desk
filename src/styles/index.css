@@ -291,6 +291,15 @@
     }
   }
 
+  @keyframes edge-band {
+    from {
+      --tab-fade-r: 1.5rem;
+    }
+    to {
+      --tab-fade-r: 0px;
+    }
+  }
+
   @supports (animation-timeline: scroll()) {
     .tab-scroller,
     .edge-fade-x {
@@ -312,8 +321,9 @@
     /* `TableScroll`: a painted band, not a mask, so it shows over a column gap
        too. Trailing end only: a leading one would veil a pinned key column. */
     .edge-fade-end {
-      animation: tab-fade-right linear both;
+      animation: edge-band linear both;
       animation-timeline: scroll(self inline);
+      animation-range: calc(100% - 1.5rem) 100%;
       background-image: linear-gradient(
         to left,
         color-mix(in srgb, var(--color-line-bright) 40%, transparent),

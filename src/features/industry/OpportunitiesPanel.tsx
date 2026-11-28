@@ -689,6 +689,7 @@ export function OpportunitiesPanel({
           )}
           {isDesktop && rows.length > 0 && (
             <ColumnPickerMenu
+              size="sm"
               available={OPPORTUNITIES_COLUMN_IDS}
               visible={visible}
               columnsById={columnsById}
