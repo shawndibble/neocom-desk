@@ -1,9 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { Well } from './Well';
 
-/**
- * @summary An inset box with a hairline, for a note, callout or readout inside a Panel or dialog.
- */
+/** @summary An inset box with a hairline, for a note, callout or readout inside a Panel or dialog. */
 const meta = {
   title: 'ui/Well',
   component: Well,
@@ -38,10 +36,10 @@ export const Large: Story = {
   args: { size: 'lg', className: 'text-sm', children: 'Mail limit reached for today.' },
 };
 
-/** @summary `wide`: 12px sides, 8px top and bottom, for a one-line note across a panel. */
-export const Wide: Story = {
+/** @summary `flat`: 12px sides, 8px top and bottom, for a one-line note across a panel. */
+export const Flat: Story = {
   args: {
-    size: 'wide',
+    size: 'flat',
     as: 'p',
     className: 'text-xs text-text-dim',
     children: 'Saved on this device only.',

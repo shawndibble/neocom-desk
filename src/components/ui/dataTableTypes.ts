@@ -54,9 +54,7 @@ export interface DataTableProps<T> {
   columns: readonly DataTableColumn<T>[];
   /** @summary The data to show; one entry per table row. */
   rows: readonly T[];
-  /**
-   * @summary Stable unique key per row.
-   */
+  /** @summary Stable unique key per row. */
   rowKey: (row: T, index: number) => string | number;
   rowClassName?: (row: T) => string | undefined;
   highlightRowKey?: string | number | null;

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { ratchet } from '@/test/sourceRatchet';
 import en from './locales/en.json';
 
 const MAX_WORDS = 30;
@@ -15,7 +15,7 @@ function longTooltips(node: unknown, path: string[] = []): string[] {
   return [];
 }
 
-const ALLOWED_LONG = new Set<string>([
+const ALLOWED_LONG = [
   'industry.materialPriceBasisTooltip',
   'industry.salePriceTooltip',
   'industry.buildSystemTooltip',
@@ -49,16 +49,6 @@ const ALLOWED_LONG = new Set<string>([
   'contractSearch.belowMarket.otherTooltip',
   'travel.pilot.killerMeterHelp',
   'travel.pilot.threat.help',
-]);
+];
 
-describe('tooltip length', () => {
-  const offenders = longTooltips(en);
-
-  it(`new tooltips stay within ${MAX_WORDS} words`, () => {
-    expect(offenders.filter((k) => !ALLOWED_LONG.has(k))).toEqual([]);
-  });
-
-  it('allowlist lists only tooltips still over the limit', () => {
-    expect([...ALLOWED_LONG].filter((k) => !offenders.includes(k))).toEqual([]);
-  });
-});
+ratchet(`tooltips over ${MAX_WORDS} words`, longTooltips(en), ALLOWED_LONG);

@@ -3,9 +3,7 @@ import { ToastStack } from './ToastStack';
 
 const noop = () => {};
 
-/**
- * @summary Stack of Undo toasts, each with its own Undo and clock.
- */
+/** @summary Stack of Undo toasts, each with its own Undo and clock. */
 const meta = {
   title: 'ui/ToastStack',
   component: ToastStack,

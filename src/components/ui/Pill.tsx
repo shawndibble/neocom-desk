@@ -26,9 +26,7 @@ interface PillProps {
   className?: string;
 }
 
-/**
- * @summary A static tinted badge beside a name or status ("Done", "Closed", "Corp").
- */
+/** @summary A static tinted badge beside a name or status ("Done", "Closed", "Corp"). */
 export function Pill({ children, tone = 'neutral', outlined = false, className }: PillProps) {
   return (
     <span

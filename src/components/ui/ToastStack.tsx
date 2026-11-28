@@ -1,4 +1,5 @@
 import { createPortal } from 'react-dom';
+import { useTranslation } from 'react-i18next';
 import { Toast } from './Toast';
 import { usePortalContainer } from './portalContainer';
 
@@ -9,12 +10,13 @@ export interface ToastStackItem {
 
 interface ToastStackProps {
   items: readonly ToastStackItem[];
-  undoLabel: string;
+  undoLabel?: string;
   onUndo: (id: string) => void;
   onClose: (id: string) => void;
 }
 
 export function ToastStack({ items, undoLabel, onUndo, onClose }: ToastStackProps) {
+  const { t } = useTranslation();
   const portalContainer = usePortalContainer();
   if (items.length === 0) return null;
   return createPortal(
@@ -24,7 +26,7 @@ export function ToastStack({ items, undoLabel, onUndo, onClose }: ToastStackProp
           key={item.id}
           stacked
           message={item.message}
-          undo={{ label: undoLabel, onUndo: () => onUndo(item.id) }}
+          undo={{ label: undoLabel ?? t('common.undo'), onUndo: () => onUndo(item.id) }}
           onClose={() => onClose(item.id)}
         />
       ))}

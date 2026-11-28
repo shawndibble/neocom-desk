@@ -36,6 +36,7 @@ import { useMyRefine } from './useMyRefine';
 import { useRefineBasis } from './refineBasis';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 import { useRefineMineralNames } from './useRefineMineralNames';
+import { TableScroll } from '@/components/ui/TableScroll';
 
 const NO_ROWS: readonly AppraisalRow[] = [];
 const NO_ITEMS: readonly AppraisalItem[] = [];
@@ -257,7 +258,7 @@ export function AppraisalShareScreen({ state, expiresAt, openInApp }: AppraisalS
               className="py-10"
             />
           ) : (
-            <div className="overflow-x-auto">
+            <TableScroll>
               <DataTable
                 {...tableExport.tableProps}
                 columns={columns}
@@ -266,7 +267,7 @@ export function AppraisalShareScreen({ state, expiresAt, openInApp }: AppraisalS
                 label={t('appraisalShare.title')}
                 responsive="table"
               />
-            </div>
+            </TableScroll>
           )}
 
           <StatChips className="border-t border-line px-1 py-2">

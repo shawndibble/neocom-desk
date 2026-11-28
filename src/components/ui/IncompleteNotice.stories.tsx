@@ -2,9 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { Button } from './Button';
 import { IncompleteNotice } from './IncompleteNotice';
 
-/**
- * @summary "Incomplete data — …" amber line above a view whose fetch was truncated, with an optional hint and Retry.
- */
+/** @summary "Incomplete data — …" amber line above a view whose fetch was truncated, with an optional hint and Retry. */
 const meta = {
   title: 'ui/IncompleteNotice',
   component: IncompleteNotice,

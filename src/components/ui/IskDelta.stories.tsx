@@ -1,9 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { IskDelta } from './IskDelta';
 
-/**
- * @summary A signed ISK change with its "+" and the isk-pos / isk-neg tone.
- */
+/** @summary A signed ISK change with its "+" and the isk-pos / isk-neg tone. */
 const meta = {
   title: 'ui/IskDelta',
   component: IskDelta,

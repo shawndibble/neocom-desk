@@ -31,9 +31,7 @@ interface SegmentedControlProps<T extends string> {
   className?: string;
 }
 
-/**
- * @summary Pick exactly one of 2–4 views in one joined group of buttons; not tabs and not a filter toggle.
- */
+/** @summary Pick exactly one of 2–4 views in one joined group of buttons; not tabs and not a filter toggle. */
 export function SegmentedControl<T extends string>({
   label,
   options,
@@ -53,7 +51,7 @@ export function SegmentedControl<T extends string>({
       className={cx(
         'overflow-hidden rounded-xs border border-line',
         controlHeightClassName[size],
-        fill ? 'flex w-full' : 'inline-flex',
+        fill ? 'flex w-full' : 'inline-flex w-fit',
         className
       )}
     >

@@ -1,9 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { InlineError } from './InlineError';
 
-/**
- * @summary Announced inline failure message.
- */
+/** @summary Announced inline failure message. */
 const meta = {
   title: 'ui/InlineError',
   component: InlineError,

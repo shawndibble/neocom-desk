@@ -8,6 +8,10 @@ export function useDocumentTitleName(name: string | null | undefined): void {
     const trimmed = name?.trim();
     if (!trimmed) return;
     useDocumentTitleNameStore.setState({ name: trimmed });
-    return () => useDocumentTitleNameStore.setState({ name: null });
+    return () => {
+      if (useDocumentTitleNameStore.getState().name === trimmed) {
+        useDocumentTitleNameStore.setState({ name: null });
+      }
+    };
   }, [name]);
 }

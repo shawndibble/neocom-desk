@@ -64,6 +64,7 @@ import {
   NO_OWN_AFFILIATION,
   loadContactsSnapshot,
 } from '@/features/character/contactsSnapshot';
+import { TableScroll } from '@/components/ui/TableScroll';
 
 const FILTER_PARAMS = {
   q: textParam(),
@@ -359,7 +360,7 @@ export function Contacts() {
                     }
                   />
                 ) : (
-                  <div className="overflow-x-auto edge-fade-end">
+                  <TableScroll>
                     <DataTable
                       {...characterExport.tableProps}
                       label={t('contacts.title')}
@@ -375,7 +376,7 @@ export function Contacts() {
                       }}
                       rowClickable={(contact) => contactPublicInfoKind(contact) !== null}
                     />
-                  </div>
+                  </TableScroll>
                 )}
               </Panel>
             )}

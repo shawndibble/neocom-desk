@@ -553,10 +553,7 @@ export function BookSettingsDialog({
                         value={rateScope}
                         onValueChange={(v) => setRateScope(v as typeof rateScope)}
                       >
-                        <SelectTrigger
-                          aria-label={t('corpTaxBook.moons.settings.rateFor')}
-                          className="w-full"
-                        >
+                        <SelectTrigger aria-label={t('corpTaxBook.moons.settings.rateFor')}>
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -573,10 +570,7 @@ export function BookSettingsDialog({
                     {rateScope === 'miner' && (
                       <Label text={t('corpTaxBook.moons.cols.miner')}>
                         <Select value={rateMiner} onValueChange={setRateMiner}>
-                          <SelectTrigger
-                            aria-label={t('corpTaxBook.moons.cols.miner')}
-                            className="w-full"
-                          >
+                          <SelectTrigger aria-label={t('corpTaxBook.moons.cols.miner')}>
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -592,10 +586,7 @@ export function BookSettingsDialog({
                     {rateScope === 'moon' && (
                       <Label text={t('corpTaxBook.moons.settings.moon')}>
                         <Select value={rateMoon} onValueChange={setRateMoon}>
-                          <SelectTrigger
-                            aria-label={t('corpTaxBook.moons.settings.moon')}
-                            className="w-full"
-                          >
+                          <SelectTrigger aria-label={t('corpTaxBook.moons.settings.moon')}>
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -613,7 +604,6 @@ export function BookSettingsDialog({
                         <Select value={rateRefinery} onValueChange={setRateRefinery}>
                           <SelectTrigger
                             aria-label={t('corpTaxBook.moons.settings.rateScope.structure')}
-                            className="w-full"
                           >
                             <SelectValue />
                           </SelectTrigger>
@@ -632,7 +622,6 @@ export function BookSettingsDialog({
                         <Select value={rateOwner} onValueChange={setRateOwner}>
                           <SelectTrigger
                             aria-label={t('corpTaxBook.moons.settings.rateScope.feeder')}
-                            className="w-full"
                           >
                             <SelectValue />
                           </SelectTrigger>
@@ -648,7 +637,6 @@ export function BookSettingsDialog({
                     )}
                     <Label text={t('corpTaxBook.moons.settings.pct')}>
                       <TextInput
-                        className="w-full"
                         inputMode="decimal"
                         value={ratePct}
                         onChange={(e) => setRatePct(e.target.value)}
@@ -656,7 +644,6 @@ export function BookSettingsDialog({
                     </Label>
                     <Label text={t('corpTaxBook.moons.settings.effectiveFrom')}>
                       <TextInput
-                        className="w-full"
                         type="date"
                         min={earliestRateStart(today)}
                         value={rateFrom}

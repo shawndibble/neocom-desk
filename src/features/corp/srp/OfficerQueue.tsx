@@ -62,6 +62,7 @@ import {
 import { useSrpClaimNames } from './useSrpClaimNames';
 import { useSrpResultMail, type DecidedClaim } from './useSrpResultMail';
 import type { SrpQueueData, SrpQueueState } from './useSrpQueue';
+import { TableScroll } from '@/components/ui/TableScroll';
 
 type Ready = Extract<SrpQueueState, { status: 'ready' }>;
 
@@ -394,7 +395,7 @@ export function OfficerQueue({ data, ready }: { data: SrpQueueData; ready: Ready
           ) : rows.length === 0 ? (
             <EmptyState title={empty[0]} hint={empty[1]} />
           ) : (
-            <div className="overflow-x-auto edge-fade-end">
+            <TableScroll>
               <DataTable
                 key={tab}
                 label={t(`srp.officer.title.${tab}`)}
@@ -420,7 +421,7 @@ export function OfficerQueue({ data, ready }: { data: SrpQueueData; ready: Ready
                 }
                 rowMoreActions={tab !== 'history'}
               />
-            </div>
+            </TableScroll>
           )}
           {tab === 'history' && history.status === 'ready' && history.more && (
             <div className="px-3 pb-3">

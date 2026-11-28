@@ -1,9 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { SkillBar } from './SkillBar';
 
-/**
- * @summary Skill level out of five.
- */
+/** @summary Skill level out of five. */
 const meta = {
   title: 'ui/SkillBar',
   component: SkillBar,

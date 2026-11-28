@@ -30,7 +30,6 @@ export function RoleField({ value, onChange, corpTitles }: RoleFieldProps) {
       <Fields variant="stacked">
         <Field label={t('vetting.requestDialog.role')}>
           <TextInput
-            className="w-full"
             value={value}
             maxLength={VETTING_ROLE_MAX}
             onChange={(event) => onChange(event.target.value)}

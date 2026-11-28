@@ -1,4 +1,5 @@
-import { useState, type ReactNode, type Ref } from 'react';
+import type { ReactNode, Ref } from 'react';
+import { useChangedSinceMount } from '@/lib/useChangedSinceMount';
 import { CaretToggle } from './Disclosure';
 import { Panel } from './Panel';
 
@@ -22,9 +23,7 @@ interface CollapsiblePanelProps {
   children: ReactNode;
 }
 
-/**
- * @summary A `Panel` whose body folds away behind a caret; the header keeps title, meta and actions.
- */
+/** @summary A `Panel` whose body folds away behind a caret; the header keeps title, meta and actions. */
 export function CollapsiblePanel({
   title,
   meta,
@@ -42,12 +41,7 @@ export function CollapsiblePanel({
   children,
 }: CollapsiblePanelProps) {
   const open = expanded || !collapsible;
-  const [shownOpen, setShownOpen] = useState(open);
-  const [toggled, setToggled] = useState(false);
-  if (open !== shownOpen) {
-    setShownOpen(open);
-    setToggled(true);
-  }
+  const toggled = useChangedSinceMount(open);
   const body = toggled ? <div className="motion-fade">{children}</div> : children;
   return (
     <Panel

@@ -96,7 +96,7 @@ function WarCard({ hit }: { hit: WarAgainstMe }) {
 
   return (
     <section className="space-y-3">
-      <Well tone="danger" size="wide" className="space-y-1.5">
+      <Well tone="danger" size="flat" className="space-y-1.5">
         <div className="flex items-center justify-between gap-3">
           <WarParty party={war.aggressor} />
           <Pill tone="danger" className="shrink-0">

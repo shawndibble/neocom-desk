@@ -37,6 +37,7 @@ import { SourcingInput } from './SourcingInput';
 import type { BuyMaterialRow } from './useGroupBuyRows';
 import { useDetectedOwnedStock } from './useDetectedOwnedStock';
 import { useOwnedStockBulk } from './useOwnedStockBulk';
+import { TableScroll } from '@/components/ui/TableScroll';
 
 interface GroupMaterialsPanelProps {
   group: BuildGroup;
@@ -289,7 +290,7 @@ export function GroupMaterialsPanel({
           {nothingToBuy ? (
             <EmptyState title={t('industry.groupNothingToBuy')} className="py-6" />
           ) : buyRows.length > 0 ? (
-            <div className="overflow-x-auto">
+            <TableScroll>
               <DataTable
                 {...buyMaterialsExport.tableProps}
                 rowContextMenu={rowContextMenu}
@@ -303,7 +304,7 @@ export function GroupMaterialsPanel({
                 stackLayout="dense"
                 mobileSort
               />
-            </div>
+            </TableScroll>
           ) : null}
         </Panel>
         <p className="text-xs text-text-dim">{t('industry.groupEstimateNote')}</p>

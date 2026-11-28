@@ -1,4 +1,3 @@
-import { fixed1 } from '@/lib/fixedFormat';
 import { formatCount } from '@/lib/formatCount';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { type ReactElement, type ReactNode } from 'react';
@@ -25,7 +24,7 @@ import {
 import { useLiftAfterHoldGuard } from '@/components/ui/liftAfterHold';
 import { ItemInfoLink } from '@/features/entities';
 import { formatUnitVolume } from '@/lib/volume';
-import { securityStatusColor } from '@/engine/securityStatus';
+import { SecurityStatus } from '@/components/SecurityStatus';
 import { formatBadge } from './assetBrowserFormat';
 import { PlaceRowMenuItems } from './PlaceRowMenuItems';
 import { placeMenuActions } from './placeRowMenu';
@@ -49,15 +48,7 @@ interface SecurityValueProps {
 
 export function SecurityValue({ security }: SecurityValueProps) {
   if (security === null || security === undefined) return null;
-  const value = fixed1(security);
-  return (
-    <span
-      className="shrink-0 text-[0.6875rem] font-semibold tabular-nums"
-      style={{ color: securityStatusColor(security) }}
-    >
-      {value}
-    </span>
-  );
+  return <SecurityStatus security={security} className="shrink-0 text-[0.6875rem]" />;
 }
 
 interface JumpsAwayTextProps {

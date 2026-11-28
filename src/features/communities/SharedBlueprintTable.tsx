@@ -32,6 +32,7 @@ import {
   useVisibleSharedBlueprintColumns,
   type SharedBlueprintColumnId,
 } from './sharedBlueprintColumns';
+import { TableScroll } from '@/components/ui/TableScroll';
 
 function SharedBlueprintMenu({
   row,
@@ -221,7 +222,7 @@ export function SharedBlueprintTable({
     (column) => column.id === 'name' || isVisible(column.id as SharedBlueprintColumnId)
   );
   return (
-    <div className="overflow-x-auto edge-fade-end">
+    <TableScroll>
       <DataTable
         label={t('communities.library.sharedLabel')}
         columns={shownColumns}
@@ -237,6 +238,6 @@ export function SharedBlueprintTable({
         defaultSort={{ columnId: 'name', direction: 'asc' }}
         virtualize="auto"
       />
-    </div>
+    </TableScroll>
   );
 }

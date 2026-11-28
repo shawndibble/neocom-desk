@@ -46,6 +46,7 @@ import { vettingBackend } from './vettingClient';
 import { rememberVettingReview } from './vettingReviewCache';
 import { VETTING_TABS, dataPath } from './vettingTabs';
 import { missingChecks, resultLine } from './vettingView';
+import { TableScroll } from '@/components/ui/TableScroll';
 
 function VettingResultLine({ assessment }: { assessment: VettingAssessment }) {
   const { t } = useTranslation();
@@ -206,14 +207,14 @@ function CharactersPanel({ characters }: { characters: readonly VettingReportCha
   ];
   return (
     <Panel title={t('vetting.report.characters.title')} padded={false} meta={characters.length}>
-      <div className="overflow-x-auto">
+      <TableScroll>
         <DataTable
           label={t('vetting.report.characters.title')}
           columns={columns}
           rows={characters}
           rowKey={(row) => row.characterId}
         />
-      </div>
+      </TableScroll>
     </Panel>
   );
 }

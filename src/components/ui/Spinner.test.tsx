@@ -67,10 +67,10 @@ describe('Spinner', () => {
     expect(screen.getByRole('status', { name: 'Loading orders' })).toBeInTheDocument();
   });
 
-  it('shows a block spinner at once under reduced motion', () => {
+  it('holds a block spinner back under reduced motion too', () => {
     const restore = stubViewport('(prefers-reduced-motion: reduce)');
     render(<Spinner block="panel" label="Loading orders" />);
-    expect(screen.getByRole('status', { name: 'Loading orders' })).toBeInTheDocument();
+    expect(screen.queryByRole('status')).toBeNull();
     restore();
   });
 

@@ -10,6 +10,7 @@ import { minerPath } from './moonsPaths';
 import { atDate, isk } from './moonsFormat';
 import { LateNoticeRun } from './LateNoticeRun';
 import { useCards } from './sectionHelpers';
+import { TableScroll } from '@/components/ui/TableScroll';
 
 interface NoticeRow {
   minerId: string;
@@ -102,7 +103,7 @@ export function LateNoticesTab() {
             className="border-t border-line py-8"
           />
         ) : (
-          <div ref={tableRef} className="@container overflow-x-auto">
+          <TableScroll ref={tableRef} className="@container">
             <DataTable
               label={t('corpTaxBook.moons.notices.title')}
               columns={columns}
@@ -114,7 +115,7 @@ export function LateNoticesTab() {
               stackColumns={2}
               mobileSort
             />
-          </div>
+          </TableScroll>
         )}
       </Panel>
     </div>

@@ -40,9 +40,7 @@ export const WithActions: Story = {
   },
 };
 
-/**
- * @summary Anti-pattern: a Panel nested in a Panel.
- */
+/** @summary Anti-pattern: a Panel nested in a Panel. */
 export const NestedPanel: Story = {
   tags: ['!manifest'],
   args: {

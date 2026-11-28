@@ -2,9 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { ChartTooltipShell } from './ChartTooltipShell';
 import { PointTooltip } from './PointTooltip';
 
-/**
- * @summary A caller-controlled bubble over a moving point, for chart hover readouts (`Tooltip` is for a focusable trigger).
- */
+/** @summary A caller-controlled bubble over a moving point, for chart hover readouts (`Tooltip` is for a focusable trigger). */
 const meta = {
   title: 'ui/PointTooltip',
   component: PointTooltip,

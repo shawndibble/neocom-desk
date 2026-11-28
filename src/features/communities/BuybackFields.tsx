@@ -50,7 +50,7 @@ export function BuybackFields({
         <Fields variant="stacked">
           <Field label={t('communities.board.buyback.rate')}>
             <TextInput
-              className="w-full tabular-nums"
+              className="tabular-nums"
               inputMode="decimal"
               aria-invalid={!rateValid || undefined}
               aria-describedby={rateValid ? undefined : rateErrorId}
@@ -62,7 +62,6 @@ export function BuybackFields({
         <Fields variant="stacked">
           <Field label={t('communities.board.buyback.basis')}>
             <NativeSelect
-              className="w-full"
               value={draft.rateBasis}
               onChange={(e) => onChange({ ...draft, rateBasis: e.target.value as RateBasis })}
             >
@@ -74,7 +73,6 @@ export function BuybackFields({
         <Fields variant="stacked">
           <Field label={t('communities.board.buyback.hub')}>
             <NativeSelect
-              className="w-full"
               value={draft.hubId}
               onChange={(e) => onChange({ ...draft, hubId: e.target.value as BuybackHubId })}
             >
@@ -94,7 +92,7 @@ export function BuybackFields({
         <Fields variant="stacked">
           <Field label={t('communities.board.buyback.buyer')}>
             <NativeSelect
-              className="w-full sm:w-1/2"
+              className="sm:w-1/2"
               value={String(draft.buyerCharacterId ?? ownCharacterId)}
               onChange={(e) => {
                 const id = Number(e.target.value);

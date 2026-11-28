@@ -2,9 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { Button } from './Button';
 import { Modal } from './Modal';
 
-/**
- * @summary Native-`<dialog>` modal; the parent owns `open`.
- */
+/** @summary Native-`<dialog>` modal; the parent owns `open`. */
 const meta = {
   title: 'ui/Modal',
   component: Modal,
@@ -108,9 +106,7 @@ export const WithTitleActions: Story = {
   args: { titleActions: <Button size="sm">More</Button> },
 };
 
-/**
- * @summary `footer`: an action bar pinned to the dialog's foot, outside the scrolling body, which scrolls above it.
- */
+/** @summary `footer`: an action bar pinned to the dialog's foot, outside the scrolling body, which scrolls above it. */
 export const WithFooter: Story = {
   args: {
     placement: 'sheet',
@@ -140,8 +136,8 @@ const phone = { globals: { viewport: { value: 'phone390', isRotated: false } } }
 /** @summary On a phone, `center`, `medium` and `detail` open as a bottom sheet by default. */
 export const CenterOnPhone: Story = { args: { placement: 'center' }, ...phone };
 
-/** @summary `phonePlacement="center"` keeps a short confirm centred on a phone (`ConfirmDialog`). */
+/** @summary `sheetOnPhone={false}` keeps a short confirm centred on a phone (`ConfirmDialog`). */
 export const ConfirmOnPhone: Story = {
-  args: { placement: 'center', phonePlacement: 'center', title: 'Delete plan?' },
+  args: { placement: 'center', sheetOnPhone: false, title: 'Delete plan?' },
   ...phone,
 };

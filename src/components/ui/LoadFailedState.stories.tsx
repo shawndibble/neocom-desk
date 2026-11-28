@@ -1,9 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { LoadFailedState } from './LoadFailedState';
 
-/**
- * @summary Empty state for a read that failed or could not be reached, with Retry; never worded as "none".
- */
+/** @summary Empty state for a read that failed or could not be reached, with Retry; never worded as "none". */
 const meta = {
   title: 'ui/LoadFailedState',
   component: LoadFailedState,

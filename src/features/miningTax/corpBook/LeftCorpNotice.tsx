@@ -19,7 +19,7 @@ export function LeftCorpNotice({
   const { corporationId, corpName, owed } = book;
   const amount = formatIsk(owed, 0);
   return (
-    <Well size="wide" className="flex flex-wrap items-center gap-x-4 gap-y-2">
+    <Well size="flat" className="flex flex-wrap items-center gap-x-4 gap-y-2">
       <div className="min-w-0 flex-1 basis-72">
         <p className="text-sm font-semibold">
           {t('miningTax.corpBook.leftCorp.title', { corp: corpName })}

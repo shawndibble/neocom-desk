@@ -2,9 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { Button } from './Button';
 import { Popover, PopoverContent, PopoverTrigger } from './Popover';
 
-/**
- * @summary Click-triggered panel with a `dialog` role for prose, figures or a small form (docs/adr/0004).
- */
+/** @summary Click-triggered panel with a `dialog` role for prose, figures or a small form (docs/adr/0004). */
 const meta = {
   title: 'ui/Popover',
   component: Popover,

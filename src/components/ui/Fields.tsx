@@ -34,7 +34,11 @@ const NOTE: Record<FieldsVariant, string> = {
   form: 'max-w-2xl text-text-dim lg:col-start-2',
 };
 
-const CONTROL = 'flex min-w-0 flex-wrap items-center gap-2';
+const CONTROL: Record<FieldsVariant, string> = {
+  compact: 'flex min-w-0 flex-wrap items-center gap-2',
+  form: 'flex min-w-0 flex-wrap items-center gap-2',
+  stacked: 'grid min-w-0 gap-2',
+};
 
 const INLINE_ROW = `grid-cols-[minmax(0,1fr)_auto] lg:grid-cols-subgrid ${FORM_ROW}`;
 const INLINE_NOTE = 'col-span-full max-w-2xl text-text-dim lg:col-span-1 lg:col-start-2';
@@ -91,7 +95,7 @@ export function Field({
   ) : (
     <span className={labelClassName}>{label}</span>
   );
-  const control = <div className={CONTROL}>{children}</div>;
+  const control = <div className={CONTROL[variant]}>{children}</div>;
   const noteNode = hasNote && (
     <p id={noteId} className={inlineRow ? INLINE_NOTE : NOTE[variant]}>
       {note}
@@ -103,7 +107,7 @@ export function Field({
         <div className={rowClassName}>
           <label className="grid gap-1">
             {labelNode}
-            <span className={CONTROL}>{children}</span>
+            <span className={CONTROL[variant]}>{children}</span>
           </label>
           {noteNode}
         </div>

@@ -7,9 +7,7 @@ interface SliderProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'type'
   valueText?: string;
 }
 
-/**
- * @summary A native range input in the house recipe: drag, click or arrow-key a value between `min` and `max`. Name it (`aria-label` or a `<label htmlFor>`), set `step`, and print the value beside it.
- */
+/** @summary A native range input in the house recipe: drag, click or arrow-key a value between `min` and `max`. Name it (`aria-label` or a `<label htmlFor>`), set `step`, and print the value beside it. */
 export const Slider = forwardRef<HTMLInputElement, SliderProps>(function Slider(
   { className, valueText, 'aria-describedby': describedBy, ...rest },
   ref

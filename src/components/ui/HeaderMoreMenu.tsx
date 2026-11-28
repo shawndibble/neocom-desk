@@ -1,6 +1,4 @@
-/**
- * @summary The page header's ⋮ "More actions" menu; renders nothing when it has no items.
- */
+/** @summary The page header's ⋮ "More actions" menu; renders nothing when it has no items. */
 import { Children, Fragment, isValidElement, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from './DropdownMenu';

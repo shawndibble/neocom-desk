@@ -76,6 +76,7 @@ import { enumParam, enumSetParam, idListParam } from '@/lib/urlState';
 import { useIndustryCharacterFilter } from './industryCharacterFilter';
 import { activeJobColumns, historyColumns, toneClass, type JobRow } from './activeJobColumns';
 import { useJobSlotSummary, useJobsFanOut } from './useJobsFanOut';
+import { TableScroll } from '@/components/ui/TableScroll';
 
 type JobStatusFilter = 'completingSoon' | 'done';
 
@@ -676,7 +677,7 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
               className="py-4"
             />
           ) : (
-            <div className="overflow-x-auto">
+            <TableScroll>
               <DataTable
                 columns={historyColumnDefs}
                 {...historyExport.tableProps}
@@ -694,7 +695,7 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
                     : undefined
                 }
               />
-            </div>
+            </TableScroll>
           )}
         </div>
       ) : listLoading ? (
@@ -768,7 +769,7 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
               }
             />
           ) : (
-            <div className="overflow-x-auto">
+            <TableScroll>
               <DataTable
                 {...jobsExport.tableProps}
                 columns={columns}
@@ -784,7 +785,7 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
                   toneClass(jobTone(job), { warning: 'bg-warning/10', success: 'bg-success/10' })
                 }
               />
-            </div>
+            </TableScroll>
           )}
         </div>
       )}

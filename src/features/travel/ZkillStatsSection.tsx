@@ -28,7 +28,7 @@ export function StatTiles({ items, className }: { items: StatTileItem[]; classNa
   return (
     <dl className={cx('grid grid-cols-2 gap-3 sm:grid-cols-3', className)}>
       {items.map(({ label, value, isk, help, tone }) => (
-        <Well size="wide" key={label} className="min-w-0">
+        <Well size="flat" key={label} className="min-w-0">
           <dt className={termClassName}>
             <span className="truncate">{label}</span>
             {help && (

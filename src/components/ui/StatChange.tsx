@@ -65,9 +65,7 @@ function Values({ before, after, verdict }: { before: string; after: string; ver
   );
 }
 
-/**
- * @summary A fit stat's before → after, green when better, red when worse.
- */
+/** @summary A fit stat's before → after, green when better, red when worse. */
 export function StatChange({ change, className, bare = false }: StatChangeProps) {
   const { lead, trail, before, after, verdict, spokenName } = useStatChangeParts(change);
   return (
@@ -98,9 +96,7 @@ function StatChangeRow({ change, last }: { change: StatChangeValue; last: boolea
   );
 }
 
-/**
- * @summary Fit stat changes as a two-column list.
- */
+/** @summary Fit stat changes as a two-column list. */
 export function StatChangeList({
   changes,
   className,

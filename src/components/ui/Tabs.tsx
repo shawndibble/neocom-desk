@@ -28,9 +28,7 @@ interface TabPanelProps {
   children: ReactNode;
 }
 
-/**
- * @summary The panel that holds the selected tab's content; pair it with `Tabs`.
- */
+/** @summary The panel that holds the selected tab's content; pair it with `Tabs`. */
 export function TabPanel({ tabsId, tabId, className, children }: TabPanelProps) {
   const { className: ring, ...rest } = useTabPanelProps(tabsId, tabId);
   return (
@@ -55,9 +53,7 @@ interface TabsProps {
   onPreload?: (id: string) => void;
 }
 
-/**
- * @summary Horizontal tab bar for peer views inside one page (Open / History); not for navigation.
- */
+/** @summary Horizontal tab bar for peer views inside one page (Open / History); not for navigation. */
 export function Tabs({
   tabsId,
   tabs,

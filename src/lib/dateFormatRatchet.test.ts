@@ -3,8 +3,10 @@ import { appSourceFiles, ratchet } from '@/test/sourceRatchet';
 const RAW_DATE_FORMAT =
   /\.toLocaleDateString\(|\.toLocaleTimeString\(|Intl\.DateTimeFormat\((?!\)\.resolvedOptions)|new Date\((?:[^()]|\([^()]*\))*\)\.toLocaleString\(/;
 
+const HELPERS = ['src/lib/timestamp.ts', 'src/lib/formatDateTick.ts'];
+
 const found = appSourceFiles()
-  .filter(({ path, source }) => !path.startsWith('src/lib/') && RAW_DATE_FORMAT.test(source))
+  .filter(({ path, source }) => !HELPERS.includes(path) && RAW_DATE_FORMAT.test(source))
   .map(({ path }) => path);
 
 const ALLOWED = [
@@ -26,6 +28,9 @@ const ALLOWED = [
   'src/features/skills/planner/QueuePeriodGroup.tsx',
   'src/features/survey/localClock.ts',
   'src/features/travel/PilotKillActivity.tsx',
+  'src/lib/calendarGrid.ts',
+  'src/lib/eveTime.ts',
+  'src/lib/localDate.ts',
   'src/mockups/corpTaxBookMember.tsx',
   'src/mockups/extractionAutofractureParts.tsx',
 ];

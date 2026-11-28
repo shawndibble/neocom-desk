@@ -106,6 +106,7 @@ import { useHydratedStore } from '@/lib/useHydratedStore';
 import { TABLE_WIDTHS } from './haulingTableWidths';
 import { VIRTUALIZE_THRESHOLD } from '@/components/ui/DataTable';
 import { useAsyncLoad } from '@/lib/useAsyncLoad';
+import { TableScroll } from '@/components/ui/TableScroll';
 const DAY_CHOICES = [7, 14, 30, 0] as const;
 
 const RAIL_REM = 21;
@@ -716,7 +717,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
           </div>
         )}
 
-        <div ref={tableRef} className="@container overflow-x-auto">
+        <TableScroll ref={tableRef} className="@container">
           <DataTable
             {...tableExport.tableProps}
             label={t('market.hauling.title')}
@@ -732,7 +733,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
             onRowClick={selectRow}
             selectedRowKey={selectedRow ? selectedRow.typeId : null}
           />
-        </div>
+        </TableScroll>
 
         <p className="border-t border-line px-3 py-2 text-[0.6875rem] text-text-dim">
           {hiddenCount === 0

@@ -23,9 +23,7 @@ interface InlineEmptyStateProps extends EmptyStateBase {
   variant: 'inline';
 }
 
-/**
- * @summary Centred title, hint and optional action for a view with nothing to show.
- */
+/** @summary Centred title, hint and optional action for a view with nothing to show. */
 export function EmptyState(props: BlockEmptyStateProps | InlineEmptyStateProps) {
   const { title, role, className = '' } = props;
   if (props.variant === 'inline') {

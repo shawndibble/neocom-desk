@@ -22,6 +22,7 @@ import { UndockableChip } from './sectionParts';
 import { tapTargetClassName } from './sectionHelpers';
 import { useBook } from './useBook';
 import { useRefineryList, type RefineryEntry } from './useRefineryList';
+import { TableScroll } from '@/components/ui/TableScroll';
 
 export function RefineriesTab() {
   const zone = useTimeZone();
@@ -117,7 +118,7 @@ export function RefineriesTab() {
         {list.active.length === 0 ? (
           <EmptyState title={t('corpTaxBook.moons.refineries.none')} />
         ) : (
-          <div className="overflow-x-auto">
+          <TableScroll>
             <DataTable
               label={t('corpTaxBook.moons.tabs.refineries')}
               columns={columns}
@@ -131,7 +132,7 @@ export function RefineriesTab() {
                 count: list.active.length,
               })}
             />
-          </div>
+          </TableScroll>
         )}
       </Panel>
       <ArchivedRefineries

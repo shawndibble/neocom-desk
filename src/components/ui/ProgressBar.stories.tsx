@@ -1,9 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { ProgressBar } from './ProgressBar';
 
-/**
- * @summary A thin filled track for how far along something is.
- */
+/** @summary A thin filled track for how far along something is. */
 const meta = {
   title: 'ui/ProgressBar',
   component: ProgressBar,

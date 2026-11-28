@@ -1,9 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { LiveNote, LiveStatus } from './LiveStatus';
 
-/**
- * @summary Screen-reader status message for results, "Copied" and failed loads.
- */
+/** @summary Screen-reader status message for results, "Copied" and failed loads. */
 const meta = {
   title: 'ui/LiveStatus',
   component: LiveStatus,

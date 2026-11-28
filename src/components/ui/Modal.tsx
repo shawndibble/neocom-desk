@@ -30,13 +30,11 @@ interface ModalProps {
   title: ReactNode;
   titleActions?: ReactNode;
   children: ReactNode;
-  /**
-   * @summary Action bar at the dialog's foot (Apply / Cancel, Copy), pinned below the scrolling body.
-   */
+  /** @summary Action bar at the dialog's foot (Apply / Cancel, Copy), pinned below the scrolling body. */
   footer?: ReactNode;
   initialFocusRef?: RefObject<HTMLElement | null>;
   placement?: ModalPlacement;
-  phonePlacement?: 'sheet' | 'center';
+  sheetOnPhone?: boolean;
   closeOnBack?: boolean;
   dismissOnOutsidePress?: boolean;
   dirty?: boolean;
@@ -95,7 +93,7 @@ export function Modal({
   children,
   footer,
   placement: requestedPlacement = 'center',
-  phonePlacement = 'sheet',
+  sheetOnPhone = true,
   initialFocusRef,
   closeOnBack = true,
   dismissOnOutsidePress = true,
@@ -109,7 +107,7 @@ export function Modal({
   const pressBeganInside = useRef(false);
   const isPhone = useIsPhone();
   const placement =
-    isPhone && phonePlacement === 'sheet' && SHEET_ON_PHONE.has(requestedPlacement)
+    isPhone && sheetOnPhone && SHEET_ON_PHONE.has(requestedPlacement)
       ? 'sheet'
       : requestedPlacement;
   const isSheet = placement.startsWith('sheet');

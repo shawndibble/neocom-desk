@@ -13,11 +13,11 @@ const overlayEntry = () =>
 function SheetHarness({
   placement = 'sheet',
   closeOnBack,
-  phonePlacement,
+  sheetOnPhone,
 }: {
   placement?: ModalPlacement;
   closeOnBack?: boolean;
-  phonePlacement?: 'sheet' | 'center';
+  sheetOnPhone?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   return (
@@ -31,7 +31,7 @@ function SheetHarness({
         title="Filters"
         placement={placement}
         closeOnBack={closeOnBack}
-        phonePlacement={phonePlacement}
+        sheetOnPhone={sheetOnPhone}
       >
         <button type="button">Inside</button>
       </Modal>
@@ -87,7 +87,7 @@ describe('Modal bottom sheet', () => {
   it('keeps a dialog centered on a phone when it opts out', async () => {
     stubViewport(PHONE_QUERY);
     const user = userEvent.setup();
-    const { container } = render(<SheetHarness placement="center" phonePlacement="center" />);
+    const { container } = render(<SheetHarness placement="center" sheetOnPhone={false} />);
     await user.click(screen.getByRole('button', { name: 'Open' }));
     expect(container.querySelector('dialog span.rounded-full')).toBeNull();
   });

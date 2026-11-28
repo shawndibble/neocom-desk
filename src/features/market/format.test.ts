@@ -1,6 +1,6 @@
 import { afterEach, describe, it, expect } from 'vitest';
 import { setDecimalMark } from '@/lib/numberLocale';
-import { formatSignedPct, formatVsMedianPct } from './format';
+import { formatOrderLocationText, formatSignedPct, formatVsMedianPct } from './format';
 
 describe('formatSignedPct', () => {
   afterEach(() => setDecimalMark('.'));
@@ -21,5 +21,12 @@ describe('formatVsMedianPct', () => {
   it('drops the sign when the figure rounds to zero', () => {
     expect(formatVsMedianPct(0.4)).toBe('0%');
     expect(formatVsMedianPct(-0.4)).toBe('0%');
+  });
+});
+
+describe('formatOrderLocationText', () => {
+  it('shows a positive security under 0.05 as 0.1, the way the game does', () => {
+    const location = { stationName: 'Hub', systemName: 'Egbinger', security: 0.0346 };
+    expect(formatOrderLocationText(location, '?')).toBe('Hub · Egbinger (0.1)');
   });
 });

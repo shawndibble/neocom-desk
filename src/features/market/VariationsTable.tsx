@@ -12,6 +12,7 @@ import { MarketItemLink } from './MarketItemLink';
 import { versusSelf, type VariationRow } from './variations';
 import { variationsCsvColumns } from './variationsCsv';
 import type { Translate } from '@/lib/translate';
+import { TableScroll } from '@/components/ui/TableScroll';
 
 const KNOWN_TIER_RANK: Record<string, number> = { T1: 0, T2: 1, T3: 2 };
 
@@ -183,7 +184,7 @@ export function VariationsTable({
           {t('market.variations.buy')} {priceCell(selfSummary, 'buy', t)}
         </span>
       </p>
-      <div className="overflow-x-auto">
+      <TableScroll>
         <DataTable
           {...tableExport.tableProps}
           columns={columns}
@@ -221,7 +222,7 @@ export function VariationsTable({
               : undefined
           }
         />
-      </div>
+      </TableScroll>
     </div>
   );
 }

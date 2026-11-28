@@ -7,6 +7,7 @@ import { SystemLink } from '@/features/entities';
 import { useTimeZone } from '@/lib/timeFormat';
 import { formatDateOnly } from '@/lib/timestamp';
 import type { LostRow } from './useMemberSrp';
+import { TableScroll } from '@/components/ui/TableScroll';
 
 interface LostShipsListProps {
   rows: readonly LostRow[];
@@ -90,7 +91,7 @@ export function LostShipsList({ rows, onFile, onOpen, busyKillmailId = null }: L
     [t, timeZone, onFile, onOpen, busyKillmailId]
   );
   return (
-    <div className="overflow-x-auto">
+    <TableScroll>
       <DataTable
         label={t('srpMember.lost.label')}
         columns={columns}
@@ -100,6 +101,6 @@ export function LostShipsList({ rows, onFile, onOpen, busyKillmailId = null }: L
         mobileSort
         onRowClick={onOpen}
       />
-    </div>
+    </TableScroll>
   );
 }

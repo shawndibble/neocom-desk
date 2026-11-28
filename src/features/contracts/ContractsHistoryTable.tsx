@@ -21,6 +21,7 @@ import {
 import { ContractDayHeader } from './ContractCells';
 import { ContractsFilterBar } from './ContractsFilterBar';
 import { CONTRACTS_HISTORY_COLUMN_IDS, type ContractsHistoryColumnId } from './contractsColumns';
+import { TableScroll } from '@/components/ui/TableScroll';
 
 const contractRowKey = (contract: Contract) => contract.contract_id;
 
@@ -96,7 +97,7 @@ export function ContractsHistoryTable({
           />
         )
       ) : (
-        <div className="relative overflow-x-auto edge-fade-end">
+        <TableScroll className="relative">
           <DataTable
             {...tableExport.tableProps}
             label={t('contracts.title')}
@@ -121,7 +122,7 @@ export function ContractsHistoryTable({
               ),
             }}
           />
-        </div>
+        </TableScroll>
       )}
     </>
   );

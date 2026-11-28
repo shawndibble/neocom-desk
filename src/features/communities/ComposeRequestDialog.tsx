@@ -314,7 +314,6 @@ export function ComposeRequestDialog({
           <Fields variant="stacked">
             <Field label={t('communities.board.compose.terms')}>
               <TextInput
-                className="w-full"
                 value={terms}
                 maxLength={MAX_TERMS_LENGTH}
                 placeholder={t('communities.board.compose.termsPlaceholder')}

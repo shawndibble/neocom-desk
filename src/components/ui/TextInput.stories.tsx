@@ -1,9 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { TextInput } from './TextInput';
 
-/**
- * @summary Single-line text field. Field chrome: a box sized like a field marks a control (§6c cue vocabulary).
- */
+/** @summary Single-line text field. Field chrome: a box sized like a field marks a control (§6c cue vocabulary). */
 const meta = {
   title: 'ui/TextInput',
   component: TextInput,

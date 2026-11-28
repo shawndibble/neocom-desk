@@ -72,7 +72,7 @@ export function MemberCombobox({ members, query, onQuery, onPick, inputRef }: Me
     <div className="space-y-1.5">
       <Fields variant="stacked">
         <Field label={t('vetting.member.label')}>
-          <span className="relative block w-full">
+          <span className="relative block">
             <Icon.Search
               aria-hidden="true"
               size={Icon.ICON_SIZE.md}
@@ -164,7 +164,7 @@ export function PickedMember({ member, onChange }: { member: RosterMember; onCha
   return (
     <div className="space-y-1">
       <span className="block text-xs text-text-dim">{t('vetting.member.label')}</span>
-      <Well size="wide" className="flex items-center gap-3">
+      <Well size="flat" className="flex items-center gap-3">
         <CharacterAvatar characterId={member.characterId} size="md" />
         <span className="min-w-0 flex-1">
           <span className="block truncate text-sm font-semibold">{member.name}</span>

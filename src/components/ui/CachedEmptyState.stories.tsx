@@ -1,9 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { CachedEmptyState } from './CachedEmptyState';
 
-/**
- * @summary Empty state that tells a stale or missing read from a genuinely empty list.
- */
+/** @summary Empty state that tells a stale or missing read from a genuinely empty list. */
 const meta = {
   title: 'ui/CachedEmptyState',
   component: CachedEmptyState,

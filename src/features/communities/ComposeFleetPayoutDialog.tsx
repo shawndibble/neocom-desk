@@ -258,7 +258,6 @@ export function ComposeFleetPayoutDialog({
         <Fields variant="stacked">
           <Field label={t('communities.payouts.compose.name')}>
             <TextInput
-              className="w-full"
               value={name}
               maxLength={MAX_PAYOUT_NAME_LENGTH}
               placeholder={t('communities.payouts.compose.namePlaceholder')}

@@ -70,9 +70,7 @@ function fixedLayoutMinWidth<T>(
   return `calc(${[...sized, ...floors, `${trailingRem}rem`].join(' + ')})`;
 }
 
-/**
- * @summary The dense, sortable table every list page uses; collapses to labelled cards on a phone.
- */
+/** @summary The dense, sortable table every list page uses; collapses to labelled cards on a phone. */
 export function DataTable<T>({
   columns,
   rows,

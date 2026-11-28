@@ -1,9 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { DividedList } from './DividedList';
 
-/**
- * @summary A hairline-bordered box with `divide-y` rows; the rows own their padding.
- */
+/** @summary A hairline-bordered box with `divide-y` rows; the rows own their padding. */
 const meta = {
   title: 'ui/DividedList',
   component: DividedList,

@@ -40,6 +40,7 @@ import { loadDepthPrices } from '../depthPriceLoader';
 import type { DepthPrice } from '@/engine/industry/depthPrice';
 import { formatVolume } from '../format';
 import { Well } from '@/components/ui/Well';
+import { TableScroll } from '@/components/ui/TableScroll';
 
 interface OreCandidate {
   typeId: number;
@@ -301,7 +302,7 @@ export function BuyOreDialog({
               ) : !showRoute ? null : (
                 <div className="overflow-hidden rounded-xs border border-line">
                   <p className={TABLE_TITLE_TEXT}>{t('industry.buyOre.routeTitle')}</p>
-                  <div className="overflow-x-auto">
+                  <TableScroll>
                     <DataTable
                       columns={columns}
                       rows={route.purchases}
@@ -309,7 +310,7 @@ export function BuyOreDialog({
                       label={t('industry.buyOre.routeTitle')}
                       responsive="table"
                     />
-                  </div>
+                  </TableScroll>
                 </div>
               )}
               {comparison && (

@@ -16,9 +16,7 @@ import {
   DropdownMenuTrigger,
 } from './DropdownMenu';
 
-/**
- * @summary Click-triggered command menu on Radix (docs/adr/0004).
- */
+/** @summary Click-triggered command menu on Radix (docs/adr/0004). */
 const meta = {
   title: 'ui/DropdownMenu',
   component: DropdownMenu,
@@ -42,9 +40,7 @@ const trigger = (
   </DropdownMenuTrigger>
 );
 
-/**
- * @summary The row menu (§6c "⋮: only where it holds two or more real actions"): an open menu with two actions and a separator before the destructive one.
- */
+/** @summary The row menu (§6c "⋮: only where it holds two or more real actions"): an open menu with two actions and a separator before the destructive one. */
 export const RowActions: Story = {
   args: {
     defaultOpen: true,
@@ -128,9 +124,7 @@ export const WithSubmenu: Story = {
   },
 };
 
-/**
- * @summary Anti-pattern (§6c Restraint): a ⋮ menu holding a single action.
- */
+/** @summary Anti-pattern (§6c Restraint): a ⋮ menu holding a single action. */
 export const SingleActionMenu: Story = {
   tags: ['!manifest'],
   args: {

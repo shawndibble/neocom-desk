@@ -24,9 +24,7 @@ function toneFor(ms: number): string {
   return 'text-danger';
 }
 
-/**
- * @summary Relative age of ESI-backed data ("12m ago"), toned amber after an hour and red after a day; hidden below `md`.
- */
+/** @summary Relative age of ESI-backed data ("12m ago"), toned amber after an hour and red after a day; hidden below `md`. */
 export function DataAgeBadge({
   date,
   note,

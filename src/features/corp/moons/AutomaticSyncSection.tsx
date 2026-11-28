@@ -105,7 +105,7 @@ export function AutomaticSyncSection() {
         <Well
           as="p"
           role="status"
-          size="wide"
+          size="flat"
           tone={notice.tone === 'warning' ? 'warning' : 'neutral'}
           className={notice.tone === 'warning' ? 'text-xs text-warning' : 'text-xs text-text'}
         >

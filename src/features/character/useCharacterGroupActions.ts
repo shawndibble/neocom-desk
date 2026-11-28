@@ -26,10 +26,8 @@ export function useCharacterGroupActions(
   const [newGroupName, setNewGroupName] = useState('');
   const { t } = useTranslation();
   const pendingGroupDeletes = useDeferredCommits();
-  const shownGroups = useMemo(
-    () => groupsValue.groups.filter((group) => !pendingGroupDeletes.hiddenIds.has(group.id)),
-    [groupsValue.groups, pendingGroupDeletes.hiddenIds]
-  );
+  const { visible } = pendingGroupDeletes;
+  const shownGroups = useMemo(() => visible(groupsValue.groups), [groupsValue.groups, visible]);
 
   async function handleMoveToGroup(characterId: number, groupId: string | null) {
     await setGroupsValue(

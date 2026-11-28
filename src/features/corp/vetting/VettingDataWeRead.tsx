@@ -4,6 +4,7 @@ import { DataTable, Panel, textActionClassName, type DataTableColumn } from '@/c
 import { VETTING_RAW_SOURCES, type VettingRawSource } from '@/engine/vetting';
 import { formatCount } from '@/lib/formatCount';
 import { dataPath } from './vettingTabs';
+import { TableScroll } from '@/components/ui/TableScroll';
 
 interface Line {
   id: VettingRawSource;
@@ -52,7 +53,7 @@ export function VettingDataWeRead({
       })}
       padded={false}
     >
-      <div className="overflow-x-auto">
+      <TableScroll>
         <DataTable
           label={t('vetting.data.title')}
           columns={columns}
@@ -61,7 +62,7 @@ export function VettingDataWeRead({
           onRowClick={(row) => navigate(dataPath(tab, reviewId, row.id))}
           responsive="table"
         />
-      </div>
+      </TableScroll>
       <p className="border-t border-line p-3 text-xs text-text-dim">
         {t('vetting.dataWeRead.note')}
       </p>

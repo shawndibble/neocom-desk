@@ -39,9 +39,7 @@ interface ToastBaseProps {
   message: ReactNode;
   instance?: unknown;
   stacked?: boolean;
-  /**
-   * @summary Tints the border and adds a glyph and a spoken word.
-   */
+  /** @summary Tints the border and adds a glyph and a spoken word. */
   tone?: ToastTone;
 }
 
@@ -104,10 +102,7 @@ export function Toast({
       remainingRef.current = durationMs;
     }
     const startedAt = Date.now();
-    const timer = setTimeout(() => {
-      if (typeof rootRef.current?.getAnimations === 'function') setLeaving(true);
-      else onCloseRef.current?.();
-    }, remainingRef.current);
+    const timer = setTimeout(() => setLeaving(true), remainingRef.current);
     return () => {
       clearTimeout(timer);
       remainingRef.current = Math.max(0, remainingRef.current - (Date.now() - startedAt));
@@ -138,7 +133,7 @@ export function Toast({
   useLayoutEffect(() => {
     if (!leaving) return;
     const exit = rootRef.current
-      ?.getAnimations()
+      ?.getAnimations?.()
       .find((animation) => 'animationName' in animation && animation.animationName === 'toast-out');
     if (!exit) {
       onCloseRef.current?.();

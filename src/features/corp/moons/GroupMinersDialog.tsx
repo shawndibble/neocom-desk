@@ -158,7 +158,6 @@ export function GroupMinersView({
       </ul>
       <Label text={t('corpTaxBook.moons.grouping.findLabel')}>
         <SearchInput
-          className="w-full"
           value={find}
           onChange={(e) => setFind(e.target.value)}
           placeholder={t('corpTaxBook.moons.grouping.findPlaceholder')}

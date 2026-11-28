@@ -19,13 +19,11 @@ import * as Icon from '@/components/ui/icons';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
 import { loadTypeNames } from '@/features/character/typeNames';
-import { altGroupSummary } from '@/engine/pi/colonyStatus';
 import { totalQuickWins } from '@/engine/pi/planAdvice';
 import { formatDuration } from '@/lib/duration';
 import { useExpiringWindowMs } from '../expiringWindow';
 import { cadenceHours, useCadence, type PiCadenceDays } from '../cadencePref';
 import { loadPlanetName } from '../names';
-import { colonyStatusFromPins } from '@/engine/pi/colonyPins';
 import { useShowAltColonies } from '../showAltColoniesPref';
 import type { RosterCharacter } from '../roster';
 import { PricesUnavailable } from '../PricesUnavailable';
@@ -40,8 +38,8 @@ import { EMPTY_ROSTER, NO_DETAILS, mergeNames, type Snapshot } from './coloniesS
 import {
   colonyCheckRow,
   HOUR_MS,
-  matchesStatusFilter,
   sortRows,
+  statusFilterView,
   todayCheck,
   type CheckStatus,
   type ColonyCheckRow,
@@ -506,26 +504,11 @@ export function ColoniesTab({
       else next.add(status);
       return next;
     });
-  const statusChips = (['stopped', 'expiring'] as const)
-    .map((status) => ({ status, count: todayRows.filter((row) => row.status === status).length }))
-    .filter(({ status, count }) => count > 0 || statusFilter.has(status));
-  const visibleOwnRows = ownRows.filter((row) => matchesStatusFilter(row.status, statusFilter));
-  const visibleAltGroups = showAltColonies
-    ? altGroups
-        .map((group) => {
-          const colonies = group.colonies.filter(({ row }) =>
-            matchesStatusFilter(row.status, statusFilter)
-          );
-          const summary = {
-            stoppedCount: colonies.filter(({ row }) => row.status === 'stopped').length,
-            nextExpiryMs: altGroupSummary(
-              colonies.map(({ detail }) => colonyStatusFromPins(detail?.pins ?? [], nowMs))
-            ).nextExpiryMs,
-          };
-          return { ...group, colonies, summary };
-        })
-        .filter((group) => group.colonies.length > 0)
-    : [];
+  const {
+    chips: statusChips,
+    ownRows: visibleOwnRows,
+    altGroups: visibleAltGroups,
+  } = statusFilterView(ownRows, showAltColonies ? altGroups : [], statusFilter);
 
   const characterNameOf = (id: number) =>
     id === characterId

@@ -1,9 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { StatChange, StatChangeList } from './StatChange';
 
-/**
- * @summary A fit stat's before → after, green when better, red when worse.
- */
+/** @summary A fit stat's before → after, green when better, red when worse. */
 const meta = {
   title: 'ui/StatChange',
   component: StatChange,

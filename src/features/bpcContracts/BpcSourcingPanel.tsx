@@ -75,6 +75,7 @@ import { useRetryFocus } from '@/lib/useRetryFocus';
 import { useKeyedLoad } from '@/lib/useAsyncLoad';
 import { cx } from '@/lib/cx';
 import { moveHighlight, type ComboboxNavKey } from '@/lib/comboboxNav';
+import { TableScroll } from '@/components/ui/TableScroll';
 
 const SOURCING_GROUP_HEADER = `pb-2 ${eyebrowClassName}`;
 
@@ -774,7 +775,7 @@ export function BpcSourcingPanel({
                 }
               />
             ) : (
-              <div className="overflow-x-auto">
+              <TableScroll>
                 <DataTable
                   {...sourcingExport.tableProps}
                   label={t('bpcContracts.title')}
@@ -846,7 +847,7 @@ export function BpcSourcingPanel({
                   )}
                   virtualize
                 />
-              </div>
+              </TableScroll>
             )}
           </>
         )}

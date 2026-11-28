@@ -1,9 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { Pill } from './Pill';
 
-/**
- * @summary A static tinted badge beside a name or status.
- */
+/** @summary A static tinted badge beside a name or status. */
 const meta = {
   title: 'ui/Pill',
   component: Pill,

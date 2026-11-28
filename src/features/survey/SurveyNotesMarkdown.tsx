@@ -5,6 +5,7 @@ import remarkGfm from 'remark-gfm';
 import { useTranslation } from 'react-i18next';
 import * as Icon from '@/components/ui/icons';
 import { ExternalLink } from '@/components/ui/ExternalLink';
+import { TableScroll } from '@/components/ui/TableScroll';
 
 const ALLOWED_ELEMENTS = [
   'p',
@@ -88,9 +89,9 @@ export default function SurveyNotesMarkdown({ notes }: { notes: string }) {
             </pre>
           ),
           table: ({ children }) => (
-            <div className="overflow-x-auto">
+            <TableScroll>
               <table className="border-collapse text-left">{children}</table>
-            </div>
+            </TableScroll>
           ),
           th: ({ children, style }) => (
             <th className={`${CELL} font-semibold`} style={style}>

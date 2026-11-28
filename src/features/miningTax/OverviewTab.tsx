@@ -95,6 +95,7 @@ import type { DailyRatePoint, TypeComparisonPoint } from './MiningYieldCharts';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 import { formatCount } from '@/lib/formatCount';
 import { Well } from '@/components/ui/Well';
+import { TableScroll } from '@/components/ui/TableScroll';
 
 const LazyMiningYieldCharts = lazy(() => guarded(() => import('./MiningYieldCharts')));
 
@@ -682,7 +683,7 @@ export function OverviewTab({ tabBar, tabsId }: OverviewTabProps) {
                     </>
                   }
                 >
-                  <div className="overflow-x-auto">
+                  <TableScroll>
                     <DataTable
                       {...overviewExport.tableProps}
                       columns={columns}
@@ -695,7 +696,7 @@ export function OverviewTab({ tabBar, tabsId }: OverviewTabProps) {
                       {...overviewSort}
                       onRowClick={(row) => setDetailRow(row)}
                     />
-                  </div>
+                  </TableScroll>
                 </Panel>
               </>
             )}

@@ -118,9 +118,7 @@ const FILTERED: Filters = {
 /** @summary Search plus a funnel. Desktop: filters open in a box under the row and apply at once. */
 export const Desktop: Story = {};
 
-/**
- * @summary Filters on: one line of pills under the row, then Clear all. The funnel slides the box into the pills' slot, so nothing shows twice.
- */
+/** @summary Filters on: one line of pills under the row, then Clear all. The funnel slides the box into the pills' slot, so nothing shows twice. */
 export const WithActiveFilters: Story = { args: { value: FILTERED } };
 
 /** @summary A narrow panel: the pills that do not fit fold into "+N" rather than wrapping. */
@@ -156,9 +154,7 @@ export const WithTrailing: Story = {
   },
 };
 
-/**
- * @summary One key filter shown in the row on desktop (`inline`): no pill for it, and the box leaves it out. The phone sheet holds it with the rest.
- */
+/** @summary One key filter shown in the row on desktop (`inline`): no pill for it, and the box leaves it out. The phone sheet holds it with the rest. */
 export const InlineKeyFilter: Story = {
   args: { value: FILTERED },
   render: function Render(args) {

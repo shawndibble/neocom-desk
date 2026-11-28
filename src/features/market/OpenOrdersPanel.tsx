@@ -91,6 +91,7 @@ import { FixListSummary, HealthyFold, ListNotes } from './OpenOrdersFixListParts
 import { useTurnInOffers } from '@/features/campaigns/useTurnIns';
 import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
 import { useHubFor } from './hub';
+import { TableScroll } from '@/components/ui/TableScroll';
 
 const TABLE_LABEL_KEY: Record<OpenOrdersView, string> = {
   act: 'market.orders.fixList.tableAct',
@@ -698,7 +699,7 @@ export function OpenOrdersPanel({
                   rowContextMenu={rowContextMenu}
                 />
               ) : (
-                <div className="min-w-0 overflow-x-auto">
+                <TableScroll className="min-w-0">
                   <DataTable
                     {...ordersExport.tableProps}
                     className="dt-actions-pinned-only"
@@ -715,7 +716,7 @@ export function OpenOrdersPanel({
                     sort={activeSort}
                     onSortChange={setTableSort}
                   />
-                </div>
+                </TableScroll>
               )}
 
               <HealthyFold

@@ -1,9 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { SeverityIcon } from './SeverityIcon';
 
-/**
- * @summary Severity glyph for the corp board's deadline ladder.
- */
+/** @summary Severity glyph for the corp board's deadline ladder. */
 const meta = {
   title: 'ui/SeverityIcon',
   component: SeverityIcon,

@@ -21,9 +21,7 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   wrap?: boolean;
 }
 
-/**
- * @summary The text button: one `primary` action per view, `ghost` for the rest, with loading and size tiers.
- */
+/** @summary The text button: one `primary` action per view, `ghost` for the rest, with loading and size tiers. */
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
   {
     variant = 'ghost',

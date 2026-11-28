@@ -1,9 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { ConfirmDialog } from './ConfirmDialog';
 
-/**
- * @summary A confirm for one action: body text, a danger or plain action button, and its own failure line.
- */
+/** @summary A confirm for one action: body text, a danger or plain action button, and its own failure line. */
 const meta = {
   title: 'ui/ConfirmDialog',
   component: ConfirmDialog,

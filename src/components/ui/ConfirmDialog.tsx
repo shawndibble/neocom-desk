@@ -57,7 +57,7 @@ export function ConfirmDialog({
       title={title}
       returnFocusFallback={returnFocusFallback}
       closeOnBack={closeOnBack}
-      phonePlacement="center"
+      sheetOnPhone={false}
     >
       <p className="text-xs text-text-dim">{body}</p>
       {children}
@@ -72,7 +72,6 @@ export function ConfirmDialog({
         </Button>
         <Button
           variant={danger ? 'danger' : 'primary'}
-
           loading={working}
           onClick={() => void confirm()}
         >

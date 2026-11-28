@@ -391,11 +391,38 @@ export function sortRows(rows: readonly ColonyCheckRow[]): ColonyCheckRow[] {
   return [...rows].sort(compareRows);
 }
 
-export function matchesStatusFilter(
-  status: CheckStatus,
+const CHIP_STATUSES = ['stopped', 'expiring'] as const;
+
+function rowsSummary(rows: readonly ColonyCheckRow[]) {
+  const expiries = rows.flatMap((row) =>
+    row.status === 'stopped' || row.extractor.expiryMs === null ? [] : [row.extractor.expiryMs]
+  );
+  return {
+    stoppedCount: rows.filter((row) => row.status === 'stopped').length,
+    nextExpiryMs: expiries.length > 0 ? Math.min(...expiries) : null,
+  };
+}
+
+export function statusFilterView<G extends { colonies: readonly { row: ColonyCheckRow }[] }>(
+  ownRows: readonly ColonyCheckRow[],
+  altGroups: readonly G[],
   statuses: ReadonlySet<CheckStatus>
-): boolean {
-  return statuses.size === 0 || statuses.has(status);
+) {
+  const keep = (row: ColonyCheckRow) => statuses.size === 0 || statuses.has(row.status);
+  const allRows = [...ownRows, ...altGroups.flatMap((group) => group.colonies.map((c) => c.row))];
+  return {
+    chips: CHIP_STATUSES.map((status) => ({
+      status,
+      count: allRows.filter((row) => row.status === status).length,
+    })).filter(({ status, count }) => count > 0 || statuses.has(status)),
+    ownRows: ownRows.filter(keep),
+    altGroups: altGroups
+      .map((group) => {
+        const colonies = group.colonies.filter(({ row }) => keep(row));
+        return { ...group, colonies, summary: rowsSummary(colonies.map(({ row }) => row)) };
+      })
+      .filter((group) => group.colonies.length > 0),
+  };
 }
 
 export interface DueItem {

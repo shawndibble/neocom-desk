@@ -29,7 +29,7 @@ export function resourceOverage(used: number | null, total: number | null): numb
   return used > total ? used - total : 0;
 }
 
-export const TIGHT_RESOURCE_SHARE = 0.98;
+const TIGHT_RESOURCE_SHARE = 0.98;
 
 export function resourceTight(used: number | null, total: number | null): boolean {
   if (used === null || total === null || total <= 0) return false;

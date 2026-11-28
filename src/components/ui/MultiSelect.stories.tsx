@@ -34,9 +34,7 @@ const openPopover: Story['play'] = async ({ canvasElement }) => {
   await expect(within(document.body).getByRole('searchbox')).toBeInTheDocument();
 };
 
-/**
- * @summary Searchable many-of-many picker in a popover, with a type-to-filter box and keyboard highlight. §6c cue: `CaretDown` inside field chrome opens a list to pick from.
- */
+/** @summary Searchable many-of-many picker in a popover, with a type-to-filter box and keyboard highlight. §6c cue: `CaretDown` inside field chrome opens a list to pick from. */
 const meta = {
   title: 'ui/MultiSelect',
   component: MultiSelect<Id>,

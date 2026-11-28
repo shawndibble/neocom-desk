@@ -31,6 +31,7 @@ import {
 } from './assetLedgerView';
 import { corpAssetItemCsvColumns } from './corpAssetsCsv';
 import { StockTargetCell } from './StockTargetCell';
+import { TableScroll } from '@/components/ui/TableScroll';
 
 export interface ItemTableRow {
   key: string;
@@ -138,6 +139,7 @@ export function CorpAssetItemTable({
       header: t('corp.assets.column.target'),
       align: 'right',
       width: '12ch',
+      stackAffix: { before: t('corp.assets.stackAffix.target') },
       sortValue: (r) => r.ledger.stock?.target,
       render: (r) => {
         if (r.ledger.isBlueprintCopy || !canEditTargets) {
@@ -178,6 +180,7 @@ export function CorpAssetItemTable({
     where: {
       id: 'where',
       header: t('corp.assets.column.where'),
+      stackEdge: 'below',
       sortValue: (r) => {
         return placementLabels(r.ledger.placements, labels)[0]?.toLowerCase();
       },
@@ -279,7 +282,7 @@ export function CorpAssetItemTable({
       {rows.length === 0 ? (
         emptyState
       ) : (
-        <div className="overflow-x-auto edge-fade-end">
+        <TableScroll>
           <DataTable
             label={t('corp.assets.itemTableLabel')}
             columns={columns}
@@ -308,7 +311,7 @@ export function CorpAssetItemTable({
             )}
             rowMoreActions
           />
-        </div>
+        </TableScroll>
       )}
     </>
   );

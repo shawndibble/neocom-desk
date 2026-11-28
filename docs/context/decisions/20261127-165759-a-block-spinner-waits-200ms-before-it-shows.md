@@ -11,5 +11,5 @@ _Recorded 2026-11-27._
   field cue) answers a press the pilot just made, so it shows at once.
 - **An explicit `delayMs` still wins, `0` included.** A caller that must show the arc at once
   passes `delayMs={0}`.
-- **Reduced motion keeps the old immediate arc.** Under `prefers-reduced-motion: reduce` a block
-  spinner gets no default delay, as before this change.
+- **Reduced motion keeps the delay.** The delay is about flicker, not motion, so a block spinner
+  waits 200ms under `prefers-reduced-motion: reduce` too.

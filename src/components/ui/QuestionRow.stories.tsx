@@ -2,9 +2,7 @@ import { useState } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { QuestionRow } from './QuestionRow';
 
-/**
- * @summary A body-size FAQ row that opens its answer below.
- */
+/** @summary A body-size FAQ row that opens its answer below. */
 const meta = {
   title: 'ui/QuestionRow',
   component: QuestionRow,

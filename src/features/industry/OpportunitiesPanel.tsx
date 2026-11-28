@@ -94,6 +94,7 @@ import {
   useVisibleOpportunitiesColumns,
   type OpportunitiesColumnId,
 } from './opportunitiesColumns';
+import { TableScroll } from '@/components/ui/TableScroll';
 
 interface OpportunitiesPanelProps {
   catalog: BlueprintCatalog;
@@ -769,7 +770,7 @@ export function OpportunitiesPanel({
             className="py-8"
           />
         ) : isDesktop ? (
-          <div className="overflow-x-auto">
+          <TableScroll>
             <DataTable
               {...opportunitiesExport.tableProps}
               columns={shownColumns}
@@ -777,13 +778,14 @@ export function OpportunitiesPanel({
               rowKey={opportunityRowKey}
               rowClassName={opportunityRowClassName}
               virtualize="auto"
+              density={xlUp ? 'default' : 'compact'}
               label={t('industry.opportunitiesTableLabel')}
               onRowClick={startPlanFromRow}
               rowContextMenu={rowContextMenu}
               rowMoreActions
               {...sortProps}
             />
-          </div>
+          </TableScroll>
         ) : (
           <MobileOpportunityList
             rows={rows}

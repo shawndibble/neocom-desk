@@ -1,9 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { HintText } from './HintText';
 
-/**
- * @summary Text with a tooltip.
- */
+/** @summary Text with a tooltip. */
 const meta = {
   title: 'ui/HintText',
   component: HintText,

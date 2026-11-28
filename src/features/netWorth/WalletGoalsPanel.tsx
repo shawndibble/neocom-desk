@@ -60,7 +60,7 @@ export function WalletGoalsPanel({ rows, today }: WalletGoalsPanelProps) {
   const { prices, links } = useGoalPrices(goals, hub, choices.resolve, choices.ready);
   const [draft, setDraft] = useState<Draft | null>(null);
   const pendingRemovals = useDeferredCommits();
-  const shownGoals = goals.filter((g) => !pendingRemovals.hiddenIds.has(g.id));
+  const shownGoals = pendingRemovals.visible(goals);
 
   const remove = () => {
     const goal = goals.find((g) => g.id === draft?.id);
@@ -233,12 +233,7 @@ export function WalletGoalsPanel({ rows, today }: WalletGoalsPanelProps) {
           </Fields>
         )}
       </Modal>
-      <ToastStack
-        items={pendingRemovals.items}
-        undoLabel={t('wallet.goal.undo')}
-        onUndo={pendingRemovals.undo}
-        onClose={pendingRemovals.commit}
-      />
+      <ToastStack {...pendingRemovals.toast} />
     </Panel>
   );
 }

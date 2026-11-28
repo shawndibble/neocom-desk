@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { DataTable, DataTableSortPicker, type DataTableColumn } from './DataTable';
+import { TableScroll } from './TableScroll';
 
 interface Row {
   name: string;
@@ -50,9 +51,7 @@ const groupedRows: Row[] = [
   { name: 'Mexallon', quantity: 50 },
 ];
 
-/**
- * @summary Groups ranked by `groupCompare` (most rows first) while the rows inside each stay in the column sort.
- */
+/** @summary Groups ranked by `groupCompare` (most rows first) while the rows inside each stay in the column sort. */
 export const GroupsOrderedByCompare: Story = {
   args: {
     rows: groupedRows,
@@ -85,9 +84,7 @@ const phone = { globals: { viewport: { value: 'phone390', isRotated: false } } }
 /** @summary Tighter rows for a long list. */
 export const Compact: Story = { args: { density: 'compact' } };
 
-/**
- * @summary Phone cards: one labelled field per line, with a phone sort picker.
- */
+/** @summary Phone cards: one labelled field per line, with a phone sort picker. */
 export const PhoneCards: Story = {
   args: { stacked: true, mobileSort: true, stackSummary: '3 materials' },
   ...phone,
@@ -113,9 +110,7 @@ export const PhoneCardsTwoColumns: Story = {
   ...phone,
 };
 
-/**
- * @summary Phone dense cards: two-line rows for scanning a long list.
- */
+/** @summary Phone dense cards: two-line rows for scanning a long list. */
 export const PhoneDenseCards: Story = {
   args: {
     stacked: true,
@@ -125,9 +120,7 @@ export const PhoneDenseCards: Story = {
   ...phone,
 };
 
-/**
- * @summary Phone cards that open in place: a trailing chevron says so and turns when open.
- */
+/** @summary Phone cards that open in place: a trailing chevron says so and turns when open. */
 export const PhoneCardsExpandable: Story = {
   args: {
     stacked: true,
@@ -162,14 +155,14 @@ const wideColumns = [
   },
 ] as DataTableColumn<Row>[] as unknown as DataTableColumn<unknown>[];
 
-/** @summary `edge-fade-end` on the table's `overflow-x-auto` wrapper: the right edge fades while columns lie past it (§6c). */
+/** @summary `TableScroll` around the table: a right-edge band shows while columns lie past it (§6c). */
 export const TableOnPhoneEdgeFade: Story = {
   args: { responsive: 'table', columns: wideColumns },
   decorators: [
     (Story) => (
-      <div className="overflow-x-auto edge-fade-end">
+      <TableScroll>
         <Story />
-      </div>
+      </TableScroll>
     ),
   ],
   ...phone,

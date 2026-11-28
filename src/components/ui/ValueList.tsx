@@ -12,9 +12,7 @@ interface ValueListProps {
   children: ReactNode;
 }
 
-/**
- * @summary A short list of label-and-value rows, value at the line's end.
- */
+/** @summary A short list of label-and-value rows, value at the line's end. */
 export function ValueList({ variant = 'divided', className, children }: ValueListProps) {
   return (
     <VariantContext.Provider value={variant}>

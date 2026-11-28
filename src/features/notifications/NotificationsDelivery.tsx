@@ -78,7 +78,7 @@ export function NotificationsDelivery({
     <>
       {browserBlocked &&
         (inPlayStoreApp ? (
-          <Well tone="warning" size="wide" className="space-y-2">
+          <Well tone="warning" size="flat" className="space-y-2">
             <LiveNote className="text-xs text-warning">
               {t('settings.notifications.blockedNoticePlayApp')}
             </LiveNote>
@@ -96,7 +96,7 @@ export function NotificationsDelivery({
           </LiveNote>
         ))}
       {pushFailure && permission === 'granted' && (
-        <Well tone="warning" size="wide" className="flex flex-wrap items-center gap-2">
+        <Well tone="warning" size="flat" className="flex flex-wrap items-center gap-2">
           <LiveNote className="min-w-0 flex-1 text-xs text-warning">
             {t(`settings.notifications.pushFailed.${pushFailure.reason}`)}{' '}
             {t('settings.notifications.pushFailedAt', {
@@ -116,7 +116,7 @@ export function NotificationsDelivery({
       {installRequired && (permission === 'default' || permission === 'unsupported') && (
         <>
           <LiveStatus>{t('settings.notifications.installRequiredNotice')}</LiveStatus>
-          <Well as="p" size="wide" className="text-xs text-text-dim">
+          <Well as="p" size="flat" className="text-xs text-text-dim">
             {t('settings.notifications.installRequiredNotice')}{' '}
             <Link to={tabPath(SETTINGS_TABS, 'app')} className={inlineLinkClassName}>
               {t('settings.notifications.installRequiredLink')}

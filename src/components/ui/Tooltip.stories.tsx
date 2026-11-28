@@ -4,9 +4,7 @@ import { IconButton } from './IconButton';
 import * as Icon from './icons';
 import { InfoTooltip, Tooltip } from './Tooltip';
 
-/**
- * @summary Collision-aware hover/focus bubble on Radix (docs/adr/0008).
- */
+/** @summary Collision-aware hover/focus bubble on Radix (docs/adr/0008). */
 const meta = {
   title: 'ui/Tooltip',
   component: Tooltip,
@@ -40,9 +38,7 @@ export const Resting: Story = {
   args: { content: 'Refresh prices', children: refresh },
 };
 
-/**
- * @summary `openOnTap`: a trigger whose only job is explaining, so a plain tap on a phone reveals the bubble (§6c Touch and hold).
- */
+/** @summary `openOnTap`: a trigger whose only job is explaining, so a plain tap on a phone reveals the bubble (§6c Touch and hold). */
 export const OpenOnTap: Story = {
   args: { content: 'Tap to read, tap again to hide.', openOnTap: true, children: refresh },
 };
@@ -63,9 +59,7 @@ export const InfoNote: Story = {
   ),
 };
 
-/**
- * @summary Anti-pattern (§6c Tooltips): a native `title=` is unreachable on touch, keyboard and screen readers.
- */
+/** @summary Anti-pattern (§6c Tooltips): a native `title=` is unreachable on touch, keyboard and screen readers. */
 export const NativeTitle: Story = {
   tags: ['!manifest'],
   args: { content: 'x', children: <span /> },

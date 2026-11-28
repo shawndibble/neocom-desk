@@ -16,9 +16,7 @@ type Story = StoryObj<typeof meta>;
 /** @summary At rest: the value and a faint pencil; a field box on hover or focus. */
 export const AtRest: Story = {};
 
-/**
- * @summary Click, or type a digit on it, to swap in the caller's field; Enter or blur saves, Escape cancels, and focus comes back to the value.
- */
+/** @summary Click, or type a digit on it, to swap in the caller's field; Enter or blur saves, Escape cancels, and focus comes back to the value. */
 export const SwapsToAField: Story = {
   render: function Render(args) {
     const [value, setValue] = useState(3000);

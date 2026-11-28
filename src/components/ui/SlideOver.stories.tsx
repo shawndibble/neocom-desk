@@ -1,9 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { SlideOver } from './SlideOver';
 
-/**
- * @summary Non-modal panel over one edge (docs/adr/0008).
- */
+/** @summary Non-modal panel over one edge (docs/adr/0008). */
 const meta = {
   title: 'ui/SlideOver',
   component: SlideOver,

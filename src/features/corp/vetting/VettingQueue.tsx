@@ -20,6 +20,7 @@ import { useNow } from '@/lib/useNow';
 import { requestMailCooldown } from './vettingRequestMail';
 import { reviewKindLabel } from './vettingText';
 import { needsYours, reviewResult } from './vettingView';
+import { TableScroll } from '@/components/ui/TableScroll';
 
 export function VettingResultPill({ review }: { review: VettingReviewSummary }) {
   const { t } = useTranslation();
@@ -254,7 +255,7 @@ export function VettingQueue({
   }
   return (
     <Panel padded={false} title={t(`vetting.queue.title.${tab}`)}>
-      <div className="overflow-x-auto edge-fade-end">
+      <TableScroll>
         <DataTable
           label={t(`vetting.queue.label.${tab}`)}
           columns={columns}
@@ -265,7 +266,7 @@ export function VettingQueue({
           rowMoreActions={onRequestMail !== undefined}
           stackLayout={phone ? 'dense' : 'labelled'}
         />
-      </div>
+      </TableScroll>
     </Panel>
   );
 }

@@ -52,6 +52,7 @@ import { ownedBlueprintsCsvColumns } from './ownedBlueprintsCsv';
 import type { OwnedStockSnapshot } from './ownedStockDetection';
 import { StartPlanButton } from './StartPlanButton';
 import { MobileOwnedBlueprintList } from './MobileOwnedBlueprintList';
+import { TableScroll } from '@/components/ui/TableScroll';
 
 const OWNED_BLUEPRINTS_COLUMN_IDS = [
   'kind',
@@ -516,7 +517,7 @@ export function OwnedBlueprintsPanel({
               onStartPlan={startRowPlan}
             />
           ) : (
-            <div className="overflow-x-auto">
+            <TableScroll>
               <DataTable
                 {...tableExport.tableProps}
                 columns={shownColumns}
@@ -530,7 +531,7 @@ export function OwnedBlueprintsPanel({
                 label={t('industry.ownedBlueprintsTitle')}
                 {...sortProps}
               />
-            </div>
+            </TableScroll>
           )}
         </>
       )}

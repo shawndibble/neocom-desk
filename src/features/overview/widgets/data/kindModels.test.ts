@@ -741,6 +741,7 @@ describe('location table', () => {
   it.each([
     [0.9459, 'good'],
     [0.3, 'caution'],
+    [0.0346, 'caution'],
     [-0.2, 'bad'],
   ])('colours security %s by its band', (security, tone) => {
     const view = buildView(
@@ -759,6 +760,24 @@ describe('location table', () => {
     expect(view.table?.rows.map((r) => r.key)).toEqual(['system', 'security', 'ship']);
     expect(view.table?.rows[1]?.cells[1]).toMatchObject({ tone });
     expect(view.table?.rows[0]?.cells).toEqual([expect.any(String), 'Sys']);
+  });
+
+  it('shows a positive security under 0.05 as 0.1, the way the game does', () => {
+    const view = buildView(
+      'location',
+      {
+        location: ok({
+          needsReauth: false,
+          system: { id: 1, name: 'Egbinger', security: 0.0346 },
+          shipTypeId: 1,
+          shipName: 'Muninn',
+          fetchedAt: new Date(1_700_000_000_000),
+        }),
+      },
+      ctx()
+    );
+    expect(view.table?.rows[1]?.cells[1]).toMatchObject({ text: '0.1' });
+    expect(view.number.unit).toContain('"value":"0.1"');
   });
 });
 

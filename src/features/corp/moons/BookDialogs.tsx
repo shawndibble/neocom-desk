@@ -357,12 +357,7 @@ export function RecordPaymentDialog({
         <>
           <div className="grid gap-3 sm:grid-cols-2">
             <Label text={t(`${k}.amount`)}>
-              <IskInput
-                className="w-full"
-                value={amount}
-                onChange={setAmount}
-                aria-label={t(`${k}.amount`)}
-              />
+              <IskInput value={amount} onChange={setAmount} aria-label={t(`${k}.amount`)} />
             </Label>
             <Label text={t(`${k}.datePaid`)}>
               <TextInput
@@ -472,7 +467,6 @@ export function MarkNotTaxDialog({
       {mode === 'part' && (
         <Label text={t('corpTaxBook.moons.dialogs.notTax.amount')}>
           <IskInput
-            className="w-full"
             value={partial}
             onChange={setPartial}
             aria-label={t('corpTaxBook.moons.dialogs.notTax.amount')}

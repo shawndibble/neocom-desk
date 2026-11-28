@@ -1,9 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { UnsavedChangesBar } from './UnsavedChangesBar';
 
-/**
- * @summary A pinned bar for a form with edits not yet saved: status line, Discard and Save; the line turns into the problem count while a field is invalid.
- */
+/** @summary A pinned bar for a form with edits not yet saved: status line, Discard and Save; the line turns into the problem count while a field is invalid. */
 const meta = {
   title: 'ui/UnsavedChangesBar',
   component: UnsavedChangesBar,

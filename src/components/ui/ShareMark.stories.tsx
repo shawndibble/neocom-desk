@@ -1,9 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { ShareMark } from './ShareMark';
 
-/**
- * @summary Share mark on a shared row; slashed when sharing was turned off for it.
- */
+/** @summary Share mark on a shared row; slashed when sharing was turned off for it. */
 const meta = {
   title: 'ui/ShareMark',
   component: ShareMark,

@@ -3,11 +3,11 @@ import {
   useCallback,
   useLayoutEffect,
   useRef,
-  useState,
   type ReactElement,
   type ReactNode,
 } from 'react';
 import { cx } from '@/lib/cx';
+import { useChangedSinceMount } from '@/lib/useChangedSinceMount';
 import { interactiveClassName, selectedRowClassName } from './controlStyles';
 import { useLiftAfterHoldGuard } from './liftAfterHold';
 import { isRowOwnEvent } from './rowEvents';
@@ -113,12 +113,7 @@ function DataTableRowImpl<T>({
     [measureRef]
   );
   const measuredExpanded = useRef(expanded);
-  const [shownExpanded, setShownExpanded] = useState(expanded);
-  const [toggled, setToggled] = useState(false);
-  if (expanded !== shownExpanded) {
-    setShownExpanded(expanded);
-    setToggled(true);
-  }
+  const toggled = useChangedSinceMount(expanded);
   useLayoutEffect(() => {
     const node = rowRef.current;
     if (!remeasure || !node) return;

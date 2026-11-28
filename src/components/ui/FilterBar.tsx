@@ -34,9 +34,7 @@ interface FilterFieldProps {
   className?: string;
 }
 
-/**
- * @summary One labelled control inside a `FilterBar`; the caption shows in the phone sheet only.
- */
+/** @summary One labelled control inside a `FilterBar`; the caption shows in the phone sheet only. */
 export function FilterField({
   label,
   children,
@@ -103,16 +101,12 @@ interface FilterBarProps<T> {
   /** @summary Commit: called on every edit, on every surface. */
   onChange: (next: T) => void;
   search?: ReactNode;
-  /**
-   * @summary The filters set away from their default, in priority order.
-   */
+  /** @summary The filters set away from their default, in priority order. */
   active?: readonly ActiveFilter<T>[];
   resultCount?: number;
   title?: string;
   children: (value: T, onChange: (next: T) => void, surface: FilterControlsSurface) => ReactNode;
-  /**
-   * @summary One or two key filters shown in the row itself on a pointer-width screen.
-   */
+  /** @summary One or two key filters shown in the row itself on a pointer-width screen. */
   inline?: (value: T, onChange: (next: T) => void) => ReactNode;
   inlinePlacement?: 'row' | 'below';
   actions?: ReactNode;
@@ -123,9 +117,7 @@ interface FilterBarProps<T> {
   pointerSurface?: 'row' | 'popover';
 }
 
-/**
- * @summary A page's one filter row: search, view actions and a funnel that opens the filters (a box on desktop, a bottom sheet on a phone); active filters show as pills while it is closed.
- */
+/** @summary A page's one filter row: search, view actions and a funnel that opens the filters (a box on desktop, a bottom sheet on a phone); active filters show as pills while it is closed. */
 export function FilterBar<T>(props: FilterBarProps<T>) {
   const isNarrow = useIsNarrow();
   if (!isNarrow && props.pointerSurface === 'popover') return <FilterPopover {...props} />;

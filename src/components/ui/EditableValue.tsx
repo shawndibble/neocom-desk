@@ -13,7 +13,7 @@ import { cx } from '@/lib/cx';
 const SEED_KEY = /^[0-9.,]$/;
 
 const editableValueClassName = cx(
-  'inline-flex min-h-9 items-center gap-1 rounded-xs border border-transparent px-1 tabular-nums hover:border-line-bright hover:bg-panel-2 md:min-h-0',
+  'relative inline-flex min-h-9 items-center gap-1 rounded-xs border border-transparent px-1 tabular-nums hover:border-line-bright hover:bg-panel-2 md:min-h-0',
   interactiveClassName,
   focusRingClassName
 );
@@ -24,23 +24,17 @@ type EditableValueProps = Omit<
 > & {
   /** @summary The visible value, e.g. "3,000" or "@ 4 ISK". */
   children: ReactNode;
-  /**
-   * @summary The action, for a screen reader: "Edit Have for Tritanium".
-   */
+  /** @summary The action, for a screen reader: "Edit Have for Tritanium". */
   label: string;
   /** @summary Opens the field; `seed` is the digit the pilot started typing on the value. */
   onEdit: (seed?: string) => void;
-  /**
-   * @summary Takes focus as it mounts — set when Enter or Escape has just closed this value's field, so focus comes back to the pencil (§6c) rather than falling to the page.
-   */
+  /** @summary Takes focus as it mounts — set when Enter or Escape has just closed this value's field, so focus comes back to the pencil (§6c) rather than falling to the page. */
   focusOnMount?: boolean;
   /** @summary Called once the value has taken focus for `focusOnMount`, to clear the request. */
   onFocused?: () => void;
 };
 
-/**
- * @summary A number edited in place (DESIGN.md §6c, "Faint pencil after a value"): the value as text with a faint pencil, a field box on hover or focus, and the caller's field once clicked.
- */
+/** @summary A number edited in place (DESIGN.md §6c, "Faint pencil after a value"): the value as text with a faint pencil, a field box on hover or focus, and the caller's field once clicked. */
 export function EditableValue({
   children,
   label,

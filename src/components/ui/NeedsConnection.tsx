@@ -12,9 +12,7 @@ interface NeedsConnectionProps {
   tooltip?: string;
 }
 
-/**
- * @summary Disables a sign-in control while the browser is offline, with a "Needs a connection" tooltip.
- */
+/** @summary Disables a sign-in control while the browser is offline, with a "Needs a connection" tooltip. */
 export function NeedsConnection({ children, tooltip }: NeedsConnectionProps) {
   const { t } = useTranslation();
   const online = useOnline();

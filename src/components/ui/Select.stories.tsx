@@ -9,9 +9,7 @@ import {
   SelectValue,
 } from './Select';
 
-/**
- * @summary Radix Select compound (`Select`, `SelectTrigger`, `SelectContent`, `SelectItem`). §6c cue: `CaretDown` inside field chrome opens a list to pick from.
- */
+/** @summary Radix Select compound (`Select`, `SelectTrigger`, `SelectContent`, `SelectItem`). §6c cue: `CaretDown` inside field chrome opens a list to pick from. */
 const meta = {
   title: 'ui/Select',
   component: Select,

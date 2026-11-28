@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { usePrefersReducedMotion } from '@/lib/useMediaQuery';
 
 export type SpinnerSize = 'sm' | 'md' | 'lg';
 
@@ -22,11 +21,10 @@ const SIZE: Record<SpinnerSize, string> = {
 const BLOCK_DELAY_MS = 200;
 
 export function Spinner({ block, delayMs, ...props }: SpinnerProps) {
-  const reducedMotion = usePrefersReducedMotion();
   if (!block) return <SpinnerArc {...props} delayMs={delayMs} />;
   return (
     <div className={block === 'page' ? 'flex justify-center py-16' : 'flex justify-center py-8'}>
-      <SpinnerArc {...props} delayMs={delayMs ?? (reducedMotion ? undefined : BLOCK_DELAY_MS)} />
+      <SpinnerArc {...props} delayMs={delayMs ?? BLOCK_DELAY_MS} />
     </div>
   );
 }

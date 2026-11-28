@@ -5,30 +5,20 @@ import { PageHeaderClusterContext } from './pageHeaderCluster';
 import { usePageHeaderSlot } from './pageHeaderSlot';
 
 interface PageHeaderProps {
-  /**
-   * @summary Already-translated page title, rendered as the route's one `<h1>`.
-   */
+  /** @summary Already-translated page title, rendered as the route's one `<h1>`. */
   title: string;
   meta?: ReactNode;
-  /**
-   * @summary The page's Character picker, first in the right-hand cluster; locks the header to one line.
-   */
+  /** @summary The page's Character picker, first in the right-hand cluster; locks the header to one line. */
   scope?: ReactNode;
-  /**
-   * @summary Right-aligned control cluster: text actions, icon actions (Export, then Refresh), then ⋮ or gear.
-   */
+  /** @summary Right-aligned control cluster: text actions, icon actions (Export, then Refresh), then ⋮ or gear. */
   actions?: ReactNode;
-  /**
-   * @summary Below `lg`, the control cluster takes its own row, starting at the gutter: for a cluster too wide to sit beside the title.
-   */
+  /** @summary Below `lg`, the control cluster takes its own row, starting at the gutter: for a cluster too wide to sit beside the title. */
   actionsOwnRow?: boolean;
   subNav?: ReactNode;
   className?: string;
 }
 
-/**
- * @summary A route's top line: the one `<h1>`, its data age beside it, and the page controls at the right.
- */
+/** @summary A route's top line: the one `<h1>`, its data age beside it, and the page controls at the right. */
 export function PageHeader({
   title,
   meta,

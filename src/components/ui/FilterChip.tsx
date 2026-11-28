@@ -25,16 +25,12 @@ interface FilterChipProps {
   size?: ControlSize;
   disabled?: boolean;
   tooltip?: string;
-  /**
-   * @summary For a chip that opens a region instead of filtering: whether that region is open.
-   */
+  /** @summary For a chip that opens a region instead of filtering: whether that region is open. */
   expanded?: boolean;
   controls?: string;
 }
 
-/**
- * @summary A toggleable filter pill with an optional match count; accent when on.
- */
+/** @summary A toggleable filter pill with an optional match count; accent when on. */
 export function FilterChip({
   label,
   icon,

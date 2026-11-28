@@ -143,16 +143,10 @@ function ChangeRateDialog({
     >
       <p className="text-text-dim">{t('corpTaxBook.moons.rate.appliesTo', { scope: scopeWord })}</p>
       <Label text={t('corpTaxBook.moons.settings.pct')}>
-        <TextInput
-          className="w-full"
-          inputMode="decimal"
-          value={pct}
-          onChange={(e) => setPct(e.target.value)}
-        />
+        <TextInput inputMode="decimal" value={pct} onChange={(e) => setPct(e.target.value)} />
       </Label>
       <Label text={t('corpTaxBook.moons.settings.effectiveFrom')}>
         <TextInput
-          className="w-full"
           type="date"
           min={earliestRateStart(today)}
           value={from}

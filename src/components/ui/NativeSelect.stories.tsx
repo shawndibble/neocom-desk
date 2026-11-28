@@ -1,9 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { NativeSelect } from './NativeSelect';
 
-/**
- * @summary Browser `<select>` in field chrome, for long or phone-friendly lists. §6c cue: `CaretDown` inside field chrome opens a list to pick from.
- */
+/** @summary Browser `<select>` in field chrome, for long or phone-friendly lists. §6c cue: `CaretDown` inside field chrome opens a list to pick from. */
 const meta = {
   title: 'ui/NativeSelect',
   component: NativeSelect,

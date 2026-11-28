@@ -34,6 +34,7 @@ import { PopShareIcon } from './PopShareIcon';
 import { usePopShareMarks } from './usePopShareMarks';
 import { BookSection, PlaceCell } from './sectionParts';
 import { MinedBar, OreLine, StateWord } from './moonsParts';
+import { TableScroll } from '@/components/ui/TableScroll';
 
 export function ExtractionsTab() {
   const zone = useTimeZone();
@@ -190,7 +191,7 @@ export function ExtractionsTab() {
             )}
           />
         ) : (
-          <div className="overflow-x-auto">
+          <TableScroll>
             <DataTable
               label={t('corpTaxBook.moons.tabs.extractions')}
               columns={columns}
@@ -205,7 +206,7 @@ export function ExtractionsTab() {
               stackColumns={2}
               stackSummary={t('corpTaxBook.moons.extractionsSummary', { count: listed.length })}
             />
-          </div>
+          </TableScroll>
         )}
       </Panel>
       {past.length > 0 && (
@@ -224,7 +225,7 @@ export function ExtractionsTab() {
           summary={t('corpTaxBook.moons.extractionsSummary', { count: past.length })}
         >
           {(shown, table) => (
-            <div className="overflow-x-auto">
+            <TableScroll>
               <DataTable
                 label={t('corpTaxBook.moons.pastExtractions')}
                 columns={columns}
@@ -238,7 +239,7 @@ export function ExtractionsTab() {
                 stackColumns={2}
                 {...table}
               />
-            </div>
+            </TableScroll>
           )}
         </BookSection>
       )}

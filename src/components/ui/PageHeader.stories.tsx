@@ -29,9 +29,7 @@ export const WithMetaAndActions: Story = {
   },
 };
 
-/**
- * @summary Title with a `DataAgeBadge` in `meta`, the shape of every ESI-backed route.
- */
+/** @summary Title with a `DataAgeBadge` in `meta`, the shape of every ESI-backed route. */
 export const WithDataAge: Story = {
   args: {
     title: 'Wallet',
@@ -57,9 +55,7 @@ const scopeStandIn = (
   </button>
 );
 
-/**
- * @summary `scope` slot (stand-in trigger): first in the cluster, level with the icon buttons, one line.
- */
+/** @summary `scope` slot (stand-in trigger): first in the cluster, level with the icon buttons, one line. */
 export const WithScope: Story = {
   args: {
     title: 'Market orders',
@@ -78,9 +74,7 @@ export const WithScope: Story = {
   },
 };
 
-/**
- * @summary `scope` at 390 wide: picker, Refresh, ⋮ and bell on one line; the title truncates.
- */
+/** @summary `scope` at 390 wide: picker, Refresh, ⋮ and bell on one line; the title truncates. */
 export const WithScopePhone: Story = {
   args: {
     title: 'Market orders and history',
@@ -98,9 +92,7 @@ export const WithScopePhone: Story = {
   globals: { viewport: { value: 'phone390', isRotated: false } },
 };
 
-/**
- * @summary `actionsOwnRow` at 390 wide: a cluster too wide for the title row starts at the gutter on its own row.
- */
+/** @summary `actionsOwnRow` at 390 wide: a cluster too wide for the title row starts at the gutter on its own row. */
 export const ActionsOwnRowPhone: Story = {
   args: {
     title: 'Market',

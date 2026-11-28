@@ -20,9 +20,7 @@ interface UnsavedChangesBarProps {
   className?: string;
 }
 
-/**
- * @summary Pinned bar for a form with edits not yet saved: a status line, Discard and Save. Save stays focusable but inert while a field is invalid.
- */
+/** @summary Pinned bar for a form with edits not yet saved: a status line, Discard and Save. Save stays focusable but inert while a field is invalid. */
 export function UnsavedChangesBar({
   message,
   problems = null,

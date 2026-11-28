@@ -4,9 +4,7 @@ import { Toast } from './Toast';
 
 const noop = () => {};
 
-/**
- * @summary Transient confirmation floating above the tab bar.
- */
+/** @summary Transient confirmation floating above the tab bar. */
 const meta = {
   title: 'ui/Toast',
   component: Toast,

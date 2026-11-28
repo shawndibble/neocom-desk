@@ -4,9 +4,7 @@ import { inlineLinkClassName } from './controlStyles';
 import { PermissionCellMark } from './PermissionCellMark';
 import { Tooltip } from './Tooltip';
 
-/**
- * @summary Amber mark that opens a per-Character grant popover with Don't ask again.
- */
+/** @summary Amber mark that opens a per-Character grant popover with Don't ask again. */
 const meta = {
   title: 'ui/PermissionCellMark',
   component: PermissionCellMark,
@@ -47,9 +45,7 @@ export const Open: Story = { args: { defaultOpen: true } };
 /** @summary Granted: no mark at all. */
 export const Granted: Story = { args: { status: 'granted' } };
 
-/**
- * @summary Dismissed: no mark; the caller's own tooltip carries the fallback words.
- */
+/** @summary Dismissed: no mark; the caller's own tooltip carries the fallback words. */
 export const Dismissed: Story = {
   args: { status: 'dismissed' },
   render: (args) => (

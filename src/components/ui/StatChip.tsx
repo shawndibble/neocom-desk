@@ -23,9 +23,7 @@ interface StatChipProps {
   to?: string;
 }
 
-/**
- * @summary A static label and value readout (ISK balance, SP, a count); no box, because it can't be clicked.
- */
+/** @summary A static label and value readout (ISK balance, SP, a count); no box, because it can't be clicked. */
 export function StatChip({
   label,
   value,
@@ -76,9 +74,7 @@ export function StatChip({
   );
 }
 
-/**
- * @summary A wrapping strip of `StatChip`s with a hairline between neighbours.
- */
+/** @summary A wrapping strip of `StatChip`s with a hairline between neighbours. */
 export function StatChips({
   dense = false,
   className = '',

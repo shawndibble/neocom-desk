@@ -87,6 +87,7 @@ import { useNow } from '@/lib/useNow';
 import { useRouteSnapshot } from '@/lib/useRouteSnapshot';
 import { useUrlParam, useUrlParams } from '@/lib/useUrlState';
 import { boolParam, optionalIdParam, optionalSortParam, textParam } from '@/lib/urlState';
+import { TableScroll } from '@/components/ui/TableScroll';
 
 const FILTER_PARAMS = {
   q: textParam(),
@@ -688,7 +689,7 @@ export function CorpStructures() {
                   }
                 />
               ) : (
-                <div className="overflow-x-auto">
+                <TableScroll>
                   <DataTable
                     label={t('corp.structures.title')}
                     columns={columns}
@@ -701,7 +702,7 @@ export function CorpStructures() {
                     stackLayout="dense"
                     mobileSort
                   />
-                </div>
+                </TableScroll>
               )}
               {visible.length > 0 && (
                 <div className="space-y-1 border-t border-line px-3 py-2 text-sm">

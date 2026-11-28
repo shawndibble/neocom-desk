@@ -6,18 +6,14 @@ import { EmptyState } from './EmptyState';
 interface LoadFailedStateProps {
   /** @summary Already-translated headline saying what couldn't load. Defaults to "Couldn't load". */
   title?: string;
-  /**
-   * @summary One line on what is missing and what happens next.
-   */
+  /** @summary One line on what is missing and what happens next. */
   hint?: string;
   /** @summary Runs the read again; shows a Retry button when given. */
   onRetry?: () => void;
   className?: string;
 }
 
-/**
- * @summary Empty state for a read that failed or could not be reached, with Retry; never worded as "none".
- */
+/** @summary Empty state for a read that failed or could not be reached, with Retry; never worded as "none". */
 export function LoadFailedState({ title, hint, onRetry, className }: LoadFailedStateProps) {
   const { t } = useTranslation();
   const online = useOnline();

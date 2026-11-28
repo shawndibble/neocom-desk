@@ -141,7 +141,7 @@ export function DevicePanel() {
         }}
         title={t('settings.deviceLogoutConfirmTitle')}
         initialFocusRef={cancelLogoutRef}
-        phonePlacement="center"
+        sheetOnPhone={false}
       >
         <p className="text-xs text-text-dim">
           {t('settings.deviceLogoutConfirm', { count: loggedIn })}
@@ -180,7 +180,7 @@ export function DevicePanel() {
           if (!working && !unpurged) setDialog(null);
         }}
         title={t('settings.deviceDeleteConfirmTitle')}
-        phonePlacement="center"
+        sheetOnPhone={false}
       >
         <p className="text-xs text-text-dim">
           {unpurged

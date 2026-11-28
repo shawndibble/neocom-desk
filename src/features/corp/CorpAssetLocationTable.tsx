@@ -26,6 +26,7 @@ import {
 import type { LedgerLabels, LocationRow } from './assetLedgerView';
 import { corpAssetLocationCsvColumns } from './corpAssetsCsv';
 import { CorpAssetContents } from './CorpAssetContents';
+import { TableScroll } from '@/components/ui/TableScroll';
 
 function sinkDeliveries<V extends string | number | undefined>(
   value: (row: LocationRow) => V
@@ -171,7 +172,7 @@ export function CorpAssetLocationTable({
       {rows.length === 0 ? (
         emptyState
       ) : (
-        <div className="overflow-x-auto">
+        <TableScroll>
           <DataTable
             label={t('corp.assets.locationTableLabel')}
             columns={columns}
@@ -227,7 +228,7 @@ export function CorpAssetLocationTable({
               },
             }}
           />
-        </div>
+        </TableScroll>
       )}
     </>
   );

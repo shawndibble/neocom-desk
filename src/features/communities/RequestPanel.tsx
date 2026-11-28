@@ -246,7 +246,7 @@ export function RequestPanel({
     >
       <div className="space-y-3 text-sm">
         {request.terms && (
-          <Well as="p" size="wide" className="text-xs">
+          <Well as="p" size="flat" className="text-xs">
             <span className="text-text-dim">{t('communities.board.termsLabel')} </span>
             {request.terms}
           </Well>
@@ -254,7 +254,7 @@ export function RequestPanel({
         {request.standing && (
           <Well
             as="section"
-            size="wide"
+            size="flat"
             aria-label={t('communities.board.buyback.termsLabel')}
             className="space-y-2"
           >

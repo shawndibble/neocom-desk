@@ -309,11 +309,19 @@
       );
     }
 
-    /* Trailing end only: a leading fade would veil a pinned key column. */
+    /* `TableScroll`: a painted band, not a mask, so it shows over a column gap
+       too. Trailing end only: a leading one would veil a pinned key column. */
     .edge-fade-end {
       animation: tab-fade-right linear both;
       animation-timeline: scroll(self inline);
-      mask-image: linear-gradient(to right, #000 calc(100% - var(--tab-fade-r)), transparent);
+      background-image: linear-gradient(
+        to left,
+        color-mix(in srgb, var(--color-line-bright) 40%, transparent),
+        transparent
+      );
+      background-repeat: no-repeat;
+      background-position: right;
+      background-size: var(--tab-fade-r) 100%;
     }
   }
 

@@ -2,9 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { Button } from './Button';
 import { DialogFooter } from './DialogFooter';
 
-/**
- * @summary The action row at a dialog's foot: Cancel then the primary or danger action, right-aligned.
- */
+/** @summary The action row at a dialog's foot: Cancel then the primary or danger action, right-aligned. */
 const meta = {
   title: 'ui/DialogFooter',
   component: DialogFooter,

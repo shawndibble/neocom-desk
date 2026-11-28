@@ -1,9 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { Radio } from './Radio';
 
-/**
- * @summary Native radio with the accent colour: pick exactly one of a few options sharing a `name`.
- */
+/** @summary Native radio with the accent colour: pick exactly one of a few options sharing a `name`. */
 const meta = {
   title: 'ui/Radio',
   component: Radio,

@@ -21,9 +21,7 @@ const offline: Decorator = (Story) => (
   </PretendOffline>
 );
 
-/**
- * @summary Disables a sign-in control while the browser is offline, with a "Needs a connection" tooltip.
- */
+/** @summary Disables a sign-in control while the browser is offline, with a "Needs a connection" tooltip. */
 const meta = {
   title: 'ui/NeedsConnection',
   component: NeedsConnection,

@@ -1,9 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { ReauthBanner } from './ReauthBanner';
 
-/**
- * @summary Prompt to log in again or grant a missing Permission.
- */
+/** @summary Prompt to log in again or grant a missing Permission. */
 const meta = {
   title: 'ui/ReauthBanner',
   component: ReauthBanner,

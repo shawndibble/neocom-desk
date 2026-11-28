@@ -705,7 +705,7 @@ function CorpAssetsView({
               ) : (
                 <>
                   {selectMode && !byLocation && (
-                    <Well size="wide" className="flex flex-wrap items-center gap-2">
+                    <Well size="flat" className="flex flex-wrap items-center gap-2">
                       {selectedKeys.size > 0 && (
                         <span
                           aria-hidden="true"

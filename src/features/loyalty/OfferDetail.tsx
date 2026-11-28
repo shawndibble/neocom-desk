@@ -38,6 +38,7 @@ import type { TradeHub } from '@/market/hubs';
 import { SourcingInput } from '@/features/industry/SourcingInput';
 import { parseOrKeep } from '@/features/industry/planInputParsers';
 import { useRedemptionPricing } from './useRedemptionPricing';
+import { TableScroll } from '@/components/ui/TableScroll';
 
 function LoyaltyItemName({ row }: { row: LoyaltyOfferRow }) {
   const { typeId, itemName } = resolveLoyaltyRowItem(row);
@@ -433,7 +434,7 @@ export function OfferDetail({
             <TableActionsMenu name={t('loyaltyStore.materials')} tableExport={materialsExport} />
           </div>
           <p className="text-[0.6875rem] text-text-dim">{t('loyaltyStore.useOwnMaterialsHint')}</p>
-          <div className="overflow-x-auto">
+          <TableScroll>
             <DataTable
               {...materialsExport.tableProps}
               label={t('loyaltyStore.materials')}
@@ -443,7 +444,7 @@ export function OfferDetail({
               density="compact"
               responsive="table"
             />
-          </div>
+          </TableScroll>
         </div>
       )}
     </div>

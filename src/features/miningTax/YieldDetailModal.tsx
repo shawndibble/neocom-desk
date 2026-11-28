@@ -32,6 +32,7 @@ import {
 import { formatCount } from '@/lib/formatCount';
 import { formatPercent } from '@/features/refining/formatPercent';
 import { useRefiningSetup } from '@/features/refining/useRefiningSetup';
+import { TableScroll } from '@/components/ui/TableScroll';
 
 interface YieldDetailModalProps {
   open: boolean;
@@ -395,7 +396,7 @@ export function YieldDetailModal({
                 />
               </span>
             </div>
-            <div className="overflow-x-auto">
+            <TableScroll>
               <DataTable
                 {...oreExport.tableProps}
                 columns={oreColumns}
@@ -405,7 +406,7 @@ export function YieldDetailModal({
                 defaultSort={{ columnId: 'raw', direction: 'desc' }}
                 responsive="table"
               />
-            </div>
+            </TableScroll>
           </div>
 
           <div className="space-y-3">
@@ -429,7 +430,7 @@ export function YieldDetailModal({
                     {t('miningTax.overview.detail.refinesIntoNone')}
                   </p>
                 ) : (
-                  <div className="overflow-x-auto">
+                  <TableScroll>
                     <DataTable
                       {...refinesExport.tableProps}
                       columns={refinedColumns}
@@ -438,7 +439,7 @@ export function YieldDetailModal({
                       label={t('miningTax.overview.detail.refinesIntoTitle')}
                       responsive="table"
                     />
-                  </div>
+                  </TableScroll>
                 )}
                 {totals.unitsLeftOver > 0 && (
                   <p className="border-t border-line px-2.5 py-1.5 text-[0.6875rem] text-warning">

@@ -47,6 +47,7 @@ import {
   type RawItem,
 } from './rawRowsView';
 import { evidenceWhatKey } from './vettingView';
+import { TableScroll } from '@/components/ui/TableScroll';
 
 const ALL = '__all';
 
@@ -501,7 +502,7 @@ export function VettingRawTable({
     );
   } else {
     body = (
-      <div className="overflow-x-auto">
+      <TableScroll>
         <DataTable
           label={label}
           columns={columns}
@@ -513,7 +514,7 @@ export function VettingRawTable({
           virtualize="auto"
           rowClassName={(item) => (item.flag ? 'bg-warning/10' : undefined)}
         />
-      </div>
+      </TableScroll>
     );
   }
 

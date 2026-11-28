@@ -569,12 +569,7 @@ export function Characters() {
         onFailed={setRemoveFailedName}
       />
 
-      <ToastStack
-        items={pendingGroupDeletes.items}
-        undoLabel={t('characters.undo')}
-        onUndo={pendingGroupDeletes.undo}
-        onClose={pendingGroupDeletes.commit}
-      />
+      <ToastStack {...pendingGroupDeletes.toast} />
 
       <CustomizePermissionsDialog
         open={customizingPermissions}

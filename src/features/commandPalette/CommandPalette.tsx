@@ -69,6 +69,7 @@ import { searchKnownPlaces } from '@/features/places/placeSearch';
 import { resolvePlace } from '@/features/places';
 import { usePlaceNicknames } from '@/features/assets/placeNicknames';
 import { fixed1 } from '@/lib/fixedFormat';
+import { shownSecurity } from '@/engine/securityStatus';
 import { readCachedLoyaltyBalances } from '@/features/character/loyalty';
 import { createCharactersProvider, createCommandsProvider, createPagesProvider } from './providers';
 import { createLpStoresProvider, NO_BALANCES } from './lpStoresProvider';
@@ -180,7 +181,7 @@ function useShippedProviders(): {
         setWaypoint,
         waypointLabel: t('commandPalette.setWaypoint'),
         describeSystem: (system) =>
-          t('commandPalette.systemSublabel', { security: fixed1(system.security) }),
+          t('commandPalette.systemSublabel', { security: fixed1(shownSecurity(system.security)) }),
         describeStation: ({ name, systemName }, nickname) =>
           [nickname === undefined ? null : name, systemName]
             .filter((part): part is string => part !== null)

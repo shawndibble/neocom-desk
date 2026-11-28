@@ -1,9 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { Checkbox } from './Checkbox';
 
-/**
- * @summary Native checkbox with the accent colour: an independent on/off choice. Always pair with a visible `<label>`.
- */
+/** @summary Native checkbox with the accent colour: an independent on/off choice. Always pair with a visible `<label>`. */
 const meta = {
   title: 'ui/Checkbox',
   component: Checkbox,

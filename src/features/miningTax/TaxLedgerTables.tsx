@@ -14,6 +14,7 @@ import { TaxColumnPicker } from './TaxColumnPicker';
 import { PayeeFilterMenu } from './PayeeFilterMenu';
 import type { PayeeFilter } from './payeeFilter';
 import type { TaxRowProps } from './useTaxRowInteractions';
+import { TableScroll } from '@/components/ui/TableScroll';
 
 type UrlSortState = ReturnType<typeof useUrlSort>;
 
@@ -91,7 +92,7 @@ export function TaxOpenLedger({
             </p>
           ) : (
             <Panel padded={false}>
-              <div className="overflow-x-auto">
+              <TableScroll>
                 <DataTable
                   {...taxExport.tableProps}
                   columns={openColumns}
@@ -103,7 +104,7 @@ export function TaxOpenLedger({
                   stackLayout="dense"
                   {...rowProps}
                 />
-              </div>
+              </TableScroll>
             </Panel>
           )}
         </section>
@@ -134,7 +135,7 @@ export function TaxHistoryLedger({
         {t('miningTax.sections.history')}
       </h2>
       <Panel padded={false}>
-        <div className="overflow-x-auto">
+        <TableScroll>
           <DataTable
             columns={historyColumns}
             rows={historyRows}
@@ -159,7 +160,7 @@ export function TaxHistoryLedger({
               ),
             }}
           />
-        </div>
+        </TableScroll>
       </Panel>
     </section>
   );

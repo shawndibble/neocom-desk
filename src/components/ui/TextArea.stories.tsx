@@ -1,9 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { TextArea } from './TextArea';
 
-/**
- * @summary Multi-line text field. Same field chrome as `TextInput` (§6c: a box sized like a field marks a control).
- */
+/** @summary Multi-line text field. Same field chrome as `TextInput` (§6c: a box sized like a field marks a control). */
 const meta = {
   title: 'ui/TextArea',
   component: TextArea,

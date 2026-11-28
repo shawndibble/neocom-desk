@@ -4,9 +4,7 @@ import { Field, Fields, FieldsHeading } from './Fields';
 import { NativeSelect } from './NativeSelect';
 import { TextInput } from './TextInput';
 
-/**
- * @summary Labelled-control grid: `Fields` sets the columns, each `Field` is one subgrid row with a label, control and optional note. A box sized like a field marks a control (§6c).
- */
+/** @summary Labelled-control grid: `Fields` sets the columns, each `Field` is one subgrid row with a label, control and optional note. A box sized like a field marks a control (§6c). */
 const meta = {
   title: 'ui/Fields',
   component: Fields,

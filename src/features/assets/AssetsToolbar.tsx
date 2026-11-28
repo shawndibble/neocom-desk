@@ -78,7 +78,7 @@ export function AssetsToolbar({
       {assetsResult && <AssetsFilterRow assetsData={assetsData} assetsRows={assetsRows} />}
 
       {selectMode && (
-        <Well size="wide" className="flex flex-wrap items-center gap-2">
+        <Well size="flat" className="flex flex-wrap items-center gap-2">
           {selectedIds.size > 0 && (
             <span className="whitespace-nowrap text-[0.6875rem] text-text-dim tabular-nums">
               {selectionParts.map((part, index) => (

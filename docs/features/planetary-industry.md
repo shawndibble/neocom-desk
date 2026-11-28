@@ -46,7 +46,7 @@ Only fields fixed at install are trusted: `expiry_time`, `extractor_details.{cyc
 
 One table, with keys, scope and defaults: section 11 ("Settings and persisted state"). Device-local unless the table says synced.
 
-PI settings form fields (`src/features/settings/PiSettingsForm.tsx`): Sell at (Settings page only; the modal leaves it to the strip, `showSellAt`), "Buy tiers" FilterChips P1/P2/P3, "Restart every" and "Haul every" selects, "I will haul between my planets" checkbox (Bigger chains opt-in), Expiring-soon window ChipRow. Modal wrapper: `PageSettingsModal`.
+PI settings form fields (`src/features/settings/PiSettingsForm.tsx`): Sell at (Settings page only; the modal leaves it to the strip, `showSellAt`), "Buy tiers" FilterChips P1/P2/P3, "Restart every" and "Haul every" selects, "I will haul between my planets" checkbox (Bigger chains opt-in), Expiring-soon window `SegmentedRow`. Modal wrapper: `PageSettingsModal`.
 
 ## 2. Header strip (`src/features/pi/PiHeaderStrip.tsx`)
 

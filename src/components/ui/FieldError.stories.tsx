@@ -2,9 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { FieldError } from './FieldError';
 import { TextInput } from './TextInput';
 
-/**
- * @summary Inline validation message in the danger tone. It is a `role="alert"`, so it is announced when it appears (§6c States, Invalid).
- */
+/** @summary Inline validation message in the danger tone. It is a `role="alert"`, so it is announced when it appears (§6c States, Invalid). */
 const meta = {
   title: 'ui/FieldError',
   component: FieldError,

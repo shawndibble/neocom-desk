@@ -4,9 +4,7 @@ import { MINUTE_MS } from '@/lib/age';
 
 const ago = (minutes: number) => Date.now() - minutes * MINUTE_MS;
 
-/**
- * @summary "Showing cached data · 3h ago" line for a cached read, at every width (the phone answer to the md-hidden DataAgeBadge).
- */
+/** @summary "Showing cached data · 3h ago" line for a cached read, at every width (the phone answer to the md-hidden DataAgeBadge). */
 const meta = {
   title: 'ui/CachedNotice',
   component: CachedNotice,

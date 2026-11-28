@@ -4,9 +4,7 @@ import { interactiveClassName } from './controlStyles';
 import { forwardRef, type CSSProperties, type ReactNode, type RefObject } from 'react';
 
 interface PanelProps {
-  /**
-   * @summary The panel heading, rendered as an `<h2>`.
-   */
+  /** @summary The panel heading, rendered as an `<h2>`. */
   title?: ReactNode;
   headingRef?: RefObject<HTMLHeadingElement | null>;
   /** @summary Right-aligned controls in the header row, usually `IconButton`s. */
@@ -24,9 +22,7 @@ interface PanelProps {
   style?: CSSProperties;
 }
 
-/**
- * @summary The bordered surface every page section sits in: optional title row with meta and actions, then the body.
- */
+/** @summary The bordered surface every page section sits in: optional title row with meta and actions, then the body. */
 export const Panel = forwardRef<HTMLElement, PanelProps>(function Panel(
   {
     title,

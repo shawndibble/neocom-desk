@@ -28,9 +28,7 @@ function Stateful(args: CheckboxSelectProps<Value>) {
   );
 }
 
-/**
- * @summary Compact multi-pick filter in a dropdown menu, summarised as "All", a name, or a count. §6c cue: `CaretDown` inside field chrome opens a list to pick from.
- */
+/** @summary Compact multi-pick filter in a dropdown menu, summarised as "All", a name, or a count. §6c cue: `CaretDown` inside field chrome opens a list to pick from. */
 const meta = {
   title: 'ui/CheckboxSelect',
   component: CheckboxSelect<Value>,

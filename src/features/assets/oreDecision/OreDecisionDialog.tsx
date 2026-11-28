@@ -45,6 +45,7 @@ import type { ReprocessingMaterial } from '@/engine/industry/reprocessing';
 import { formatPercent } from '@/features/refining/formatPercent';
 import { RefiningSetupChips } from '@/features/refining/RefiningSetupChips';
 import { useRefiningSetup } from '@/features/refining/useRefiningSetup';
+import { TableScroll } from '@/components/ui/TableScroll';
 
 const CARD = 'rounded-xs border bg-panel-2 p-2.5';
 const CARD_SUGGESTED = 'border-accent-dim';
@@ -412,7 +413,7 @@ export function OreDecisionDialog({
                       {t('assets.oreDecision.refinesIntoNone')}
                     </p>
                   ) : (
-                    <div className="overflow-x-auto">
+                    <TableScroll>
                       <DataTable
                         columns={refinedColumns}
                         rows={refinedRows}
@@ -420,7 +421,7 @@ export function OreDecisionDialog({
                         label={t('assets.oreDecision.refinesIntoTitle')}
                         responsive="table"
                       />
-                    </div>
+                    </TableScroll>
                   )}
                   {exits.unitsLeftOver > 0 && (
                     <p className="border-t border-line px-2.5 py-1.5 text-[0.6875rem] text-warning">
@@ -455,7 +456,7 @@ export function OreDecisionDialog({
                   </div>
                   {inPlan ? (
                     <>
-                      <div className="overflow-x-auto">
+                      <TableScroll>
                         <DataTable
                           columns={coverColumns}
                           rows={inPlan.coverage}
@@ -463,7 +464,7 @@ export function OreDecisionDialog({
                           label={t('assets.oreDecision.coversTitleNone')}
                           responsive="table"
                         />
-                      </div>
+                      </TableScroll>
                       <p className="border-t border-line px-2.5 py-1.5 text-[0.6875rem] text-text-dim">
                         {t('assets.oreDecision.notUsedHint', {
                           units: formatCount(inPlan.unitsNotUsed),

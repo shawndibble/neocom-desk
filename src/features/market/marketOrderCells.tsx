@@ -8,7 +8,7 @@ import {
   type NpcStationLookup,
   type SolarSystemLookup,
 } from '@/engine/market/orderBook';
-import { securityStatusColor } from '@/engine/securityStatus';
+import { securityStatusColor, shownSecurity } from '@/engine/securityStatus';
 import type { RegionOrder } from '@/esi/endpoints';
 import { formatCount } from '@/lib/formatCount';
 
@@ -41,7 +41,7 @@ export function LocationCell({
 
 export function SecurityCell({ order, npcStations, solarSystems, t }: LocationCellProps) {
   const { security } = resolveOrderLocation(order, npcStations, solarSystems);
-  const value = fixed1(security);
+  const value = fixed1(shownSecurity(security));
   return (
     <HintText
       content={t('market.securityAriaLabel', { value })}

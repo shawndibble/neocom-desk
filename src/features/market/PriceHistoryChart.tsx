@@ -53,6 +53,7 @@ import {
   type PriceSeriesChoice,
   type RegionOpenSeries,
 } from '@/engine/market/priceHistoryOpen';
+import { TableScroll } from '@/components/ui/TableScroll';
 
 export interface ComparedRegionSeries {
   regionId: number;
@@ -797,7 +798,7 @@ export default function PriceHistoryChart({
         </div>
       </div>
 
-      <div className="overflow-x-auto">
+      <TableScroll>
         <DataTable
           {...tableExport.tableProps}
           columns={columns}
@@ -807,7 +808,7 @@ export default function PriceHistoryChart({
           responsive="table"
           defaultSort={{ columnId: 'date', direction: 'asc' }}
         />
-      </div>
+      </TableScroll>
     </div>
   );
 }

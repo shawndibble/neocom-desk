@@ -50,6 +50,7 @@ import {
   textParam,
 } from '@/lib/urlState';
 import { filterFromParamValues, paramsPatchFromFilter, useUrlParams } from '@/lib/useUrlState';
+import { TableScroll } from '@/components/ui/TableScroll';
 
 const FEE_OWNERS = feeOwnerIds();
 const INFO_KIND: Record<NpcStandingKind, NpcInfoKind> = {
@@ -223,7 +224,7 @@ export function useContactsStandings(characterId: number, enabled: boolean) {
               className="py-8"
             />
           ) : (
-            <div className="overflow-x-auto edge-fade-end">
+            <TableScroll>
               <DataTable
                 label={t('contacts.tabStandings')}
                 columns={columns}
@@ -236,7 +237,7 @@ export function useContactsStandings(characterId: number, enabled: boolean) {
                 stackSummary={t('contacts.standings.count', { count: rows.length })}
                 onRowClick={(row) => openNpcInfo(INFO_KIND[row.kind], row.id)}
               />
-            </div>
+            </TableScroll>
           )}
         </Panel>
       </div>

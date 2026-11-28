@@ -9,9 +9,7 @@ import {
   ContextMenuTrigger,
 } from './ContextMenu';
 
-/**
- * @summary Right-click (touch-and-hold) menu on Radix (docs/adr/0004).
- */
+/** @summary Right-click (touch-and-hold) menu on Radix (docs/adr/0004). */
 const meta = {
   title: 'ui/ContextMenu',
   component: ContextMenu,
@@ -40,9 +38,7 @@ const area = (
 /** @summary Closed at rest: the surface gives no cue by itself, which is why a ⋮ button must back it up (§6c). */
 export const Closed: Story = { args: { children: area } };
 
-/**
- * @summary The open menu (§6c row menu: two or more real actions, destructive one set apart by a separator).
- */
+/** @summary The open menu (§6c row menu: two or more real actions, destructive one set apart by a separator). */
 export const Open: Story = {
   args: {
     children: (

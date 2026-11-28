@@ -15,7 +15,7 @@ describe('Well', () => {
     ['sm', 'p-2'],
     ['md', 'p-2.5'],
     ['lg', 'p-3'],
-    ['wide', 'px-3'],
+    ['flat', 'px-3'],
   ] as const)('size %s pads %s', (size, cls) => {
     render(<Well size={size}>Note</Well>);
     expect(screen.getByText('Note').className.split(' ')).toContain(cls);

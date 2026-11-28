@@ -2,9 +2,7 @@ import { useState } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { IskInput } from './IskInput';
 
-/**
- * @summary ISK amount field. Digits group with the display separator as they are typed; shorthand (`1.5b`, `250m`) is accepted and settles to the full figure on blur (§6c "Numbers": the full ISK form is shown, never only the shorthand).
- */
+/** @summary ISK amount field. Digits group with the display separator as they are typed; shorthand (`1.5b`, `250m`) is accepted and settles to the full figure on blur (§6c "Numbers": the full ISK form is shown, never only the shorthand). */
 const meta = {
   title: 'ui/IskInput',
   component: IskInput,

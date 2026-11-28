@@ -22,6 +22,7 @@ import { atDate, isk, shortDateTime } from './moonsFormat';
 import { minerPath } from './moonsPaths';
 import { OreLine, StateWord } from './moonsParts';
 import { useBook } from './useBook';
+import { TableScroll } from '@/components/ui/TableScroll';
 
 const kp = (key: string) => `corpTaxBook.moons.refineryPage.${key}`;
 const NONE = <span className="text-text-dim">—</span>;
@@ -286,7 +287,7 @@ export function ExtractionsPanel({
               })}
             </div>
           )}
-          <div className="overflow-x-auto">
+          <TableScroll>
             <DataTable
               label={t(kp('ext.label'))}
               columns={columns}
@@ -298,7 +299,7 @@ export function ExtractionsPanel({
               mobileSort
               stackColumns={2}
             />
-          </div>
+          </TableScroll>
         </>
       )}
     </Panel>

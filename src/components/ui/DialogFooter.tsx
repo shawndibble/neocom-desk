@@ -7,9 +7,7 @@ interface DialogFooterProps {
   className?: string;
 }
 
-/**
- * @summary Right-aligned Cancel + primary/danger row for a dialog's footer.
- */
+/** @summary Right-aligned Cancel + primary/danger row for a dialog's footer. */
 export function DialogFooter({ children, stacked = false, className }: DialogFooterProps) {
   return (
     <div

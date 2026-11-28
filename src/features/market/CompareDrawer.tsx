@@ -52,6 +52,7 @@ import { loadCharacterModifiers } from '@/features/character/characterModifiers'
 import { AssumesBaseStandingsNote } from '@/features/character/AssumesBaseStandingsNote';
 import { marketIskDecimals } from '@/lib/isk';
 import { useKeyedLoad } from '@/lib/useAsyncLoad';
+import { TableScroll } from '@/components/ui/TableScroll';
 
 const DRAWER_ID = 'compare-drawer';
 const MIN_HEIGHT = 160;
@@ -489,7 +490,7 @@ export function CompareDrawer({
                     {t('market.compare.hubsSubtitle', { hub: ownHubName })}
                   </p>
                 )}
-                <div className="overflow-x-auto">
+                <TableScroll>
                   <TradeHubsTable
                     rows={hubRows}
                     jumps={hubsData.jumps}
@@ -497,7 +498,7 @@ export function CompareDrawer({
                     tableExport={hubsExport}
                     onRemove={removeItem}
                   />
-                </div>
+                </TableScroll>
               </>
             ) : rows.length === 0 ? (
               <Spinner block="panel" label={t('common.loading')} />
@@ -514,7 +515,7 @@ export function CompareDrawer({
                     hint={t('market.compare.assumesBaseStandingsHint')}
                   />
                 )}
-                <div className="overflow-x-auto">
+                <TableScroll>
                   <DataTable
                     {...pricesExport.tableProps}
                     columns={columns}
@@ -523,7 +524,7 @@ export function CompareDrawer({
                     label={t('market.compare.title')}
                     responsive="table"
                   />
-                </div>
+                </TableScroll>
               </>
             )}
           </div>

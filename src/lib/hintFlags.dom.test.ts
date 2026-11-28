@@ -138,4 +138,35 @@ describe('useOneTimeHint on a hidden anchor', () => {
     expect(screen.getByTestId('late')).toHaveAttribute('data-shown', 'true');
     vi.unstubAllGlobals();
   });
+
+  it('watches no anchor that is inactive or waiting behind a shown hint', () => {
+    let watching = 0;
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        observe() {
+          watching += 1;
+        }
+        disconnect() {
+          watching -= 1;
+        }
+      }
+    );
+    function Row({ id, active }: { id: string; active: boolean }) {
+      const [, , anchor] = useOneTimeHint(id, active);
+      return createElement('span', { ref: anchor });
+    }
+    render(
+      createElement(
+        'div',
+        null,
+        createElement(Row, { id: 'columnPickerHint', active: true }),
+        createElement(Row, { id: 'rowHint', active: false }),
+        createElement(Row, { id: 'rowHint', active: true }),
+        createElement(Row, { id: 'rowHint', active: true })
+      )
+    );
+    expect(watching).toBe(1);
+    vi.unstubAllGlobals();
+  });
 });

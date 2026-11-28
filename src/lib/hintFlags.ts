@@ -78,22 +78,23 @@ export function useOneTimeHint(
   const anchorRef = useRef<HTMLElement | null>(null);
   const observerRef = useRef<ResizeObserver | null>(null);
   const [anchorHidden, setAnchorHidden] = useState(false);
+  const hydrated = useHintCounts((state) => state.hydrated);
+  const shown = useSessionHintShown(owner);
+  const waiting = useSyncExternalStore(subscribe, () => otherExclusiveShown(owner));
   const anchor = useCallback(
     (element: HTMLElement | null) => {
       anchorRef.current = element;
       observerRef.current?.disconnect();
       observerRef.current = null;
-      if (element === null || hintSeenCount(useHintCounts.getState().value, id) > 0) return;
+      if (element === null || !active || waiting) return;
+      if (hintSeenCount(useHintCounts.getState().value, id) > 0) return;
       observerRef.current = new ResizeObserver(() =>
         setAnchorHidden(element.checkVisibility?.() === false)
       );
       observerRef.current.observe(element);
     },
-    [id]
+    [id, active, waiting]
   );
-  const hydrated = useHintCounts((state) => state.hydrated);
-  const shown = useSessionHintShown(owner);
-  const waiting = useSyncExternalStore(subscribe, () => otherExclusiveShown(owner));
   useEffect(() => {
     if (!active || !hydrated || waiting || anchorHidden) return;
     if (anchorRef.current?.checkVisibility?.() === false) return;
