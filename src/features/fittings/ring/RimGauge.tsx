@@ -1,5 +1,7 @@
+import { useState, type PointerEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Tooltip } from '@/components/ui';
+import { ChartTooltipShell } from '@/components/ui/ChartTooltipShell';
+import { PointTooltip } from '@/components/ui/PointTooltip';
 import {
   RING_GAUGES,
   RING_GAUGE_RADIUS,
@@ -52,6 +54,15 @@ function gaugeTooltip(t: ReturnType<typeof useTranslation>['t'], budget: Budget)
     : t('fittings.ring.gauge', { label: budget.label, value, percent });
 }
 
+function svgPoint(event: PointerEvent<SVGGElement>): { x: number; y: number } | null {
+  const box = event.currentTarget.ownerSVGElement?.getBoundingClientRect();
+  if (!box || box.width === 0 || box.height === 0) return null;
+  return {
+    x: ((event.clientX - box.left) / box.width) * RING_VIEW,
+    y: ((event.clientY - box.top) / box.height) * RING_VIEW,
+  };
+}
+
 export function RimGauge({
   gauge,
   budget,
@@ -62,6 +73,7 @@ export function RimGauge({
   compact: boolean;
 }) {
   const { t } = useTranslation();
+  const [hover, setHover] = useState<{ x: number; y: number } | null>(null);
   const { from, to } = RING_GAUGES[gauge];
   const style = GAUGE_STYLE[gauge];
   const c = RING_VIEW / 2;
@@ -90,8 +102,13 @@ export function RimGauge({
   );
   if (compact) return <g data-gauge={gauge}>{bands}</g>;
   return (
-    <Tooltip content={gaugeTooltip(t, budget)} followCursor>
-      <g data-gauge={gauge} className="pointer-events-auto">
+    <>
+      <g
+        data-gauge={gauge}
+        className="pointer-events-auto"
+        onPointerMove={(event) => setHover(svgPoint(event))}
+        onPointerLeave={() => setHover(null)}
+      >
         <path
           d={arcPath(from, to, RING_GAUGE_RADIUS, c, c)}
           className="fill-none stroke-transparent"
@@ -99,7 +116,22 @@ export function RimGauge({
         />
         {bands}
       </g>
-    </Tooltip>
+      <PointTooltip
+        open={hover !== null}
+        onClose={() => setHover(null)}
+        anchor={
+          <circle
+            aria-hidden="true"
+            r={0}
+            cx={hover?.x ?? 0}
+            cy={hover?.y ?? 0}
+            className="pointer-events-none"
+          />
+        }
+      >
+        <ChartTooltipShell>{gaugeTooltip(t, budget)}</ChartTooltipShell>
+      </PointTooltip>
+    </>
   );
 }
 
