@@ -122,10 +122,10 @@ export function RimGauge({
         anchor={
           <circle
             aria-hidden="true"
-            r={0}
-            cx={hover?.x ?? 0}
-            cy={hover?.y ?? 0}
-            className="pointer-events-none"
+            r={1}
+            cx={hover?.x ?? c}
+            cy={hover?.y ?? c}
+            className="pointer-events-none fill-transparent"
           />
         }
       >
