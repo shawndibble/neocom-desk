@@ -13,6 +13,7 @@ import { useHydratedStore } from '@/lib/useHydratedStore';
 import { useTranslation } from 'react-i18next';
 import { Spinner } from '@/components/ui';
 import { guarded } from '@/app/routeChunks';
+import { CompactCharacterHeader } from '@/features/character/CompactCharacterHeader';
 import { CharacterHeader } from '@/features/character/CharacterHeader';
 import { OverviewSubNav } from '@/features/character/OverviewSubNav';
 import { DangerBanner } from '@/features/notifications/DangerBanner';
@@ -91,14 +92,13 @@ function Board({ characterId, layout }: BoardProps) {
   const [rolesOpen, setRolesOpen] = useState(false);
   const summary = useOverviewSummary(layout.widgets);
   const pageScope = usePageScopeControl();
+  const scopeControl = pageScope && <CharacterFilterControl {...pageScope} />;
 
   return (
     <div className="mx-auto max-w-page space-y-4">
       {narrow ? (
-        <CharacterHeader
+        <CompactCharacterHeader
           characterId={characterId}
-          overview
-          compact
           corner={<OverviewMoreMenu summary={summary} />}
           below={<OverviewNext summary={summary} />}
         />
@@ -106,7 +106,7 @@ function Board({ characterId, layout }: BoardProps) {
         <CharacterHeader
           characterId={characterId}
           overview
-          scope={pageScope && <CharacterFilterControl {...pageScope} />}
+          scope={scopeControl}
           actions={
             <>
               <OverviewNext summary={summary} />
@@ -124,11 +124,7 @@ function Board({ characterId, layout }: BoardProps) {
           <CustomizeBar onAdd={() => setGalleryOpen(true)} onRoles={() => setRolesOpen(true)} />
         </Suspense>
       )}
-      {narrow && pageScope && (
-        <div>
-          <CharacterFilterControl {...pageScope} />
-        </div>
-      )}
+      {narrow && scopeControl}
       {editing && isPhone && layout.widgets.length > 0 ? (
         <Suspense fallback={<Spinner block="panel" />}>
           <PhoneCustomizeList />

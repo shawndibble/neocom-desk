@@ -4,6 +4,8 @@ _Recorded 2026-10-22. Supersedes the placement half of
 `20260908-192806-the-character-filter-rides-in-the-panel-header.md`; its
 "hidden for a one-character account" rule stands._
 
+> **Superseded in part by `20261128-070711-overview-phone-header-bell-in-the-corner-next.md`:** the scope picker's phone placement on the Overview (it sits above the widgets, not in the header).
+
 - **Every page that offers the This character / All characters / Corporation
   picker renders exactly one, in its `PageHeader`'s `scope` slot: the first
   item of the right-hand control cluster.** Before this the picker sat in six
