@@ -94,17 +94,27 @@ function Board({ characterId, layout }: BoardProps) {
 
   return (
     <div className="mx-auto max-w-page space-y-4">
-      <CharacterHeader
-        characterId={characterId}
-        overview
-        scope={pageScope && <CharacterFilterControl {...pageScope} />}
-        actions={
-          <>
-            <OverviewNext summary={summary} />
-            {narrow ? <OverviewMoreMenu summary={summary} /> : <OverviewCustomize />}
-          </>
-        }
-      />
+      {narrow ? (
+        <CharacterHeader
+          characterId={characterId}
+          overview
+          compact
+          corner={<OverviewMoreMenu summary={summary} />}
+          below={<OverviewNext summary={summary} />}
+        />
+      ) : (
+        <CharacterHeader
+          characterId={characterId}
+          overview
+          scope={pageScope && <CharacterFilterControl {...pageScope} />}
+          actions={
+            <>
+              <OverviewNext summary={summary} />
+              <OverviewCustomize />
+            </>
+          }
+        />
+      )}
       <OverviewSubNav trailing={narrow ? undefined : <OverviewDataAge summary={summary} />} />
       <DangerBanner />
       <WarBanner characterId={characterId} />
@@ -113,6 +123,11 @@ function Board({ characterId, layout }: BoardProps) {
         <Suspense fallback={<Spinner block="panel" />}>
           <CustomizeBar onAdd={() => setGalleryOpen(true)} onRoles={() => setRolesOpen(true)} />
         </Suspense>
+      )}
+      {narrow && pageScope && (
+        <div>
+          <CharacterFilterControl {...pageScope} />
+        </div>
       )}
       {editing && isPhone && layout.widgets.length > 0 ? (
         <Suspense fallback={<Spinner block="panel" />}>

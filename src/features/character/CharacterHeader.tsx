@@ -15,6 +15,9 @@ interface CharacterHeaderProps {
   totalSp?: number | null;
   unallocatedSp?: number | null;
   overview?: boolean;
+  compact?: boolean;
+  corner?: ReactNode;
+  below?: ReactNode;
   aside?: ReactNode;
   scope?: ReactNode;
   actions?: ReactNode;
@@ -25,6 +28,9 @@ export function CharacterHeader({
   totalSp,
   unallocatedSp,
   overview = false,
+  compact = false,
+  corner,
+  below,
   aside,
   scope,
   actions,
@@ -41,71 +47,84 @@ export function CharacterHeader({
   const sp = (value: number | null | undefined): string =>
     value == null ? t('common.unknown') : formatCount(value);
   const showSp = totalSp !== undefined || unallocatedSp !== undefined;
-  const affiliationLinkClassName = cx('min-w-0 truncate py-1', overview ? 'md:-my-1' : '-my-1');
+  const affiliationLinkClassName = cx('min-w-0 truncate py-1', compact ? '-my-0.5' : '-my-1');
 
-  return (
-    <header
-      className={cx(
-        'flex flex-wrap items-center gap-x-3 gap-y-2',
-        overview && 'max-md:justify-end'
-      )}
-    >
-      <CharacterAvatar
-        characterId={characterId}
-        size="lg"
-        priority
-        alt={t('characters.portraitAlt', { name: character?.name ?? '' })}
-      />
-      <div
-        className={cx(
-          'min-w-0 flex-1',
-          overview || actions ? 'basis-36' : 'basis-48',
-          overview && 'max-md:basis-[calc(100%-4.8rem)]'
-        )}
-      >
-        <div className="flex flex-wrap items-center gap-x-3">
-          <h1
-            tabIndex={-1}
-            className={cx(
-              'max-w-full min-w-0 text-xl font-semibold tracking-widest uppercase focus:outline-none',
-              overview ? 'max-md:wrap-break-word md:truncate' : 'truncate'
-            )}
-          >
-            {character?.name ?? t('common.unknown')}
-          </h1>
-          {aside}
-        </div>
-        <p
+  const avatar = (
+    <CharacterAvatar
+      characterId={characterId}
+      size="lg"
+      priority
+      alt={t('characters.portraitAlt', { name: character?.name ?? '' })}
+    />
+  );
+
+  const identity = (
+    <>
+      <div className="flex flex-wrap items-center gap-x-3">
+        <h1
+          tabIndex={-1}
           className={cx(
-            'flex min-w-0 text-xs whitespace-nowrap text-text-dim',
-            overview && 'max-md:flex-col'
+            'max-w-full min-w-0 text-xl font-semibold tracking-widest uppercase focus:outline-none',
+            compact ? 'wrap-break-word' : 'truncate'
           )}
         >
-          {publicInfo?.corporationName && publicInfo.corporationId !== undefined ? (
-            <CorporationLink id={publicInfo.corporationId} className={affiliationLinkClassName}>
-              {publicInfo.corporationName}
-            </CorporationLink>
-          ) : (
-            <span className="min-w-0 truncate">
-              {publicInfo?.corporationName ?? t('common.unknown')}
-            </span>
-          )}
-          {publicInfo?.allianceName && (
-            <>
-              <span className={cx('shrink-0 whitespace-pre', overview && 'max-md:hidden')}>
-                {' / '}
-              </span>
-              {publicInfo.allianceId !== undefined ? (
-                <AllianceLink id={publicInfo.allianceId} className={affiliationLinkClassName}>
-                  {publicInfo.allianceName}
-                </AllianceLink>
-              ) : (
-                <span className="min-w-0 truncate">{publicInfo.allianceName}</span>
-              )}
-            </>
-          )}
-        </p>
-        <CharacterAchievementLine characterId={characterId} />
+          {character?.name ?? t('common.unknown')}
+        </h1>
+        {aside}
+      </div>
+      <p
+        className={cx(
+          'flex min-w-0 text-xs text-text-dim',
+          compact ? 'flex-wrap' : 'whitespace-nowrap'
+        )}
+      >
+        {publicInfo?.corporationName && publicInfo.corporationId !== undefined ? (
+          <CorporationLink id={publicInfo.corporationId} className={affiliationLinkClassName}>
+            {publicInfo.corporationName}
+          </CorporationLink>
+        ) : (
+          <span className="min-w-0 truncate">
+            {publicInfo?.corporationName ?? t('common.unknown')}
+          </span>
+        )}
+        {publicInfo?.allianceName && (
+          <>
+            <span className="shrink-0 whitespace-pre">{compact ? ' · ' : ' / '}</span>
+            {publicInfo.allianceId !== undefined ? (
+              <AllianceLink id={publicInfo.allianceId} className={affiliationLinkClassName}>
+                {publicInfo.allianceName}
+              </AllianceLink>
+            ) : (
+              <span className="min-w-0 truncate">{publicInfo.allianceName}</span>
+            )}
+          </>
+        )}
+      </p>
+      <CharacterAchievementLine characterId={characterId} />
+    </>
+  );
+
+  if (compact) {
+    return (
+      <header className="space-y-2">
+        <div className="flex items-start gap-3">
+          {avatar}
+          <div className="min-w-0 flex-1">{identity}</div>
+          <div className="flex shrink-0 flex-col gap-1">
+            <AlertsBell showWhenEmpty />
+            {corner}
+          </div>
+        </div>
+        {below}
+      </header>
+    );
+  }
+
+  return (
+    <header className="flex flex-wrap items-center gap-x-3 gap-y-2">
+      {avatar}
+      <div className={cx('min-w-0 flex-1', overview || actions ? 'basis-36' : 'basis-48')}>
+        {identity}
       </div>
       {scope && (
         <PageHeaderClusterContext.Provider value={true}>{scope}</PageHeaderClusterContext.Provider>

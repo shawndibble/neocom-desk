@@ -74,14 +74,14 @@ export function OverviewNext({ summary }: { summary: OverviewSummary }) {
       </>
     );
     return next.to === undefined ? (
-      <span className="flex min-w-0 flex-1 items-center gap-2 text-sm whitespace-nowrap">
+      <span className="flex min-w-0 items-center gap-2 border-t border-line pt-1 text-sm whitespace-nowrap">
         {row}
       </span>
     ) : (
       <Link
         to={next.to}
         className={cx(
-          'flex min-w-0 flex-1 items-center gap-2 rounded-xs text-sm whitespace-nowrap',
+          'flex min-w-0 items-center gap-2 border-t border-line pt-1 text-sm whitespace-nowrap',
           tappableRowClassName,
           interactiveClassName,
           focusRingClassName
