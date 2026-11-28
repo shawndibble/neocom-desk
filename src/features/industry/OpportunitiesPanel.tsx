@@ -441,7 +441,7 @@ export function OpportunitiesPanel({
     {
       id: 'margin',
       header: t('industry.margin'),
-      width: COL_SMALL_NUMBER,
+      width: '9.5ch',
       align: 'right',
       className: 'tabular-nums',
       sortValue: SORT_VALUE.margin,

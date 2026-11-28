@@ -159,7 +159,6 @@ export function VettingRawTable({
     const withParty = (header: string): DataTableColumn<RawItem> => ({
       id: 'party',
       header,
-      minWidth: '26ch',
       sortValue: (item) => data.parties.get(item.row.partyId ?? -1)?.name,
       render: (item) => {
         const who = item.row.partyId === undefined ? undefined : data.parties.get(item.row.partyId);
@@ -182,7 +181,7 @@ export function VettingRawTable({
       id: 'amount',
       header,
       align: 'right',
-      width: '22ch',
+      width: '20ch',
       className: 'whitespace-nowrap tabular-nums',
       cellClassName: (item) =>
         item.row.amount !== undefined && item.row.amount < 0 ? 'text-isk-neg' : undefined,
@@ -243,8 +242,8 @@ export function VettingRawTable({
       ],
       mail: [
         when(t('vetting.data.columns.sent')),
-        kind('14ch'),
-        withParty(t('vetting.data.columns.senderOrRecipient')),
+        kind('13ch'),
+        { ...withParty(t('vetting.data.columns.senderOrRecipient')), width: '24ch' },
         {
           id: 'recipients',
           header: t('vetting.data.columns.recipients'),
@@ -260,7 +259,7 @@ export function VettingRawTable({
       ],
       contract: [
         when(t('vetting.data.columns.issued')),
-        kind('16ch'),
+        kind('20ch'),
         withParty(t('vetting.data.columns.with')),
         money(t('vetting.data.columns.price')),
         {
@@ -300,7 +299,7 @@ export function VettingRawTable({
         {
           id: 'level',
           header: t('vetting.data.columns.level'),
-          width: '18ch',
+          width: '9ch',
           sortValue: (item) => item.row.level,
           render: (item) => <SkillBar level={item.row.level ?? 0} />,
         },
@@ -361,7 +360,7 @@ export function VettingRawTable({
       columns.push({
         id: 'character',
         header: t('vetting.data.columns.character'),
-        width: '18ch',
+        width: '16ch',
         sortValue: (item) => names.get(item.row.characterId),
         render: (item) => (
           <span className="flex items-center gap-2 whitespace-nowrap">
@@ -381,10 +380,7 @@ export function VettingRawTable({
           item.flag ? (
             <Link
               to={`${reportPath}#flag-${item.flag.check}`}
-              className={cx(
-                textActionClassName(),
-                'inline-flex items-center gap-1.5 whitespace-nowrap'
-              )}
+              className={cx(textActionClassName(), 'inline-flex items-center gap-1.5')}
             >
               <SeverityIcon severity={item.flag.severity} />
               {t(`vetting.checks.${item.flag.check}.title`)}

@@ -2,7 +2,7 @@ import { formatCount } from '@/lib/formatCount';
 import { useCallback, useMemo, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { IskAmount, type DataTableColumn } from '@/components/ui';
-import { COL_DATETIME, COL_QUANTITY, COL_SMALL_NUMBER } from '@/components/ui/dataTableWidths';
+import { COL_DATETIME, COL_SMALL_NUMBER } from '@/components/ui/dataTableWidths';
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { SecurityStatus } from '@/components/SecurityStatus';
 import type { PublicContractOfferRow } from '@/engine/contracts/contractOffers';
@@ -90,9 +90,9 @@ export function useItemsColumns({
       qty: {
         id: 'qty',
         header: t('contractSearch.qtyColumn'),
-        width: COL_QUANTITY,
+        width: '13.5ch',
         align: 'right',
-        className: 'tabular-nums',
+        className: 'tabular-nums whitespace-nowrap',
         sortValue: (row) => row.quantity,
         render: (row) => formatCount(row.quantity),
         stackAffix: { before: t('contractSearch.mobile.qtyAffix') },
@@ -100,7 +100,7 @@ export function useItemsColumns({
       iskPerUnit: {
         id: 'iskPerUnit',
         header: t('contractSearch.iskPerUnitColumn'),
-        width: '14ch',
+        width: '10.5ch',
         align: 'right',
         className: 'tabular-nums whitespace-nowrap',
         sortFirst: 'asc',
@@ -154,7 +154,7 @@ export function useItemsColumns({
       saving: {
         id: 'saving',
         header: t('contractSearch.savingColumn'),
-        width: COL_SMALL_NUMBER,
+        width: '9.5ch',
         align: 'right',
         className: 'tabular-nums whitespace-nowrap',
         sortFirst: 'desc',
@@ -173,7 +173,7 @@ export function useItemsColumns({
       system: {
         id: 'system',
         header: t('contractSearch.systemColumn'),
-        width: '16ch',
+        width: '14ch',
         className: 'whitespace-nowrap',
         sortValue: (row) => offerLocations.get(row.locationId)?.systemName ?? undefined,
         render: (row) => {

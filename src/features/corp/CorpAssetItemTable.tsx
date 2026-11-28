@@ -1,6 +1,6 @@
 import { useMemo, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { COL_ICON, COL_ISK, COL_QUANTITY } from '@/components/ui/dataTableWidths';
+import { COL_ICON } from '@/components/ui/dataTableWidths';
 import { Checkbox, ColumnPickerMenu, DataTable, type DataTableColumn } from '@/components/ui';
 import { Pill } from '@/components/ui/Pill';
 import { TableActionsMenu } from '@/components/ui/TableExport';
@@ -110,6 +110,7 @@ export function CorpAssetItemTable({
       primary: true,
       stickyStart: true,
       stickyStartOnPanel: true,
+      width: '30ch',
       sortValue: (r) => r.name.toLowerCase(),
       render: (r) => {
         const kind = assetBlueprintKind(
@@ -128,7 +129,7 @@ export function CorpAssetItemTable({
       id: 'quantity',
       header: t('corp.assets.column.quantity'),
       align: 'right',
-      width: COL_QUANTITY,
+      width: '13.5ch',
       className: 'tabular-nums whitespace-nowrap',
       stackAffix: { before: t('corp.assets.stackAffix.quantity') },
       sortValue: (r) => r.ledger.quantity,
@@ -210,7 +211,7 @@ export function CorpAssetItemTable({
       id: 'value',
       header: t('corp.assets.column.value'),
       align: 'right',
-      width: COL_ISK,
+      width: '17ch',
       className: 'tabular-nums whitespace-nowrap',
       cardCorner: true,
       sortValue: (r) => r.ledger.estimatedValue,

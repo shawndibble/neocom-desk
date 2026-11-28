@@ -110,7 +110,7 @@ export function useJournalColumnsBuilder(): (
             {
               id: 'character',
               header: t('wallet.balanceCharacterColumn'),
-              width: '22ch',
+              width: '18ch',
               className: 'max-sm:px-1 sm:truncate',
               headerClassName: 'max-sm:px-1',
               render: nameOf,
@@ -123,7 +123,7 @@ export function useJournalColumnsBuilder(): (
             {
               id: 'player',
               header: t('wallet.playerColumn'),
-              width: '22ch',
+              width: '18ch',
               className: 'max-sm:px-1 sm:truncate',
               headerClassName: 'max-sm:px-1',
               render: (entry: JournalRow) =>
@@ -160,7 +160,7 @@ export function useJournalColumnsBuilder(): (
         {
           id: 'refType',
           header: t('wallet.refType'),
-          width: '24ch',
+          width: '20ch',
           className: 'max-sm:px-1 sm:truncate',
           headerClassName: 'max-sm:px-1',
           render: (entry) => journalRefLabel(journalRefKey(entry), t),
@@ -203,7 +203,7 @@ export function useJournalColumnsBuilder(): (
         {
           id: 'amount',
           header: t('wallet.amount'),
-          width: '15ch',
+          width: '16ch',
           align: 'right',
           className: 'tabular-nums whitespace-nowrap max-sm:px-1',
           headerClassName: 'max-sm:px-1',

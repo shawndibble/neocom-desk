@@ -201,7 +201,7 @@ export function useBpcColumns({
       price: {
         id: 'price',
         header: t('bpcContracts.priceColumn'),
-        width: '20ch',
+        width: '15ch',
         align: 'right',
         cardCorner: true,
         className: 'tabular-nums whitespace-nowrap',
@@ -268,7 +268,7 @@ export function useBpcColumns({
       iskPerRun: {
         id: 'iskPerRun',
         header: t('bpcContracts.iskPerRunColumn'),
-        width: '16ch',
+        width: '15.5ch',
         align: 'right',
         className: 'tabular-nums whitespace-nowrap',
         sortValue: (row) => {
@@ -332,7 +332,7 @@ export function useBpcColumns({
       space: {
         id: 'space',
         header: t('bpcContracts.spaceColumn'),
-        width: '12ch',
+        width: '10ch',
         sortValue: (row) => row.space ?? '',
         render: (row) =>
           row.space ? t(`common.spaceOption.${row.space}`) : t('bpcContracts.notApplicable'),
@@ -387,6 +387,7 @@ export function useBpcColumns({
         id: 'item',
         header: t('bpcContracts.itemColumn'),
         primary: true,
+        width: '28ch',
         className: 'truncate',
         sortValue: itemSortValue,
         render: (row) => {

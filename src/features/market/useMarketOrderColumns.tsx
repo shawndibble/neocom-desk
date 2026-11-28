@@ -145,9 +145,9 @@ export function useMarketOrderColumns({
       quantity: {
         id: 'quantity',
         header: t('market.quantityColumn'),
-        width: COL_QUANTITY,
+        width: '13.5ch',
         align: 'right',
-        className: 'tabular-nums',
+        className: 'tabular-nums whitespace-nowrap',
         stackAffix: { before: t('market.quantityAffix') },
         render: (o) => formatVolume(o.volume_remain),
         sortValue: (o) => o.volume_remain,
@@ -172,7 +172,7 @@ export function useMarketOrderColumns({
       security: {
         id: 'security',
         header: t('market.securityColumn'),
-        width: '10ch',
+        width: '7ch',
         align: 'right',
         className: 'tabular-nums',
         sortValue: (o) => resolveOrderLocation(o, npcStationMap, solarSystemMap).security,
@@ -215,7 +215,7 @@ export function useMarketOrderColumns({
       range: {
         id: 'range',
         header: t('market.range'),
-        width: '14ch',
+        width: '9.5ch',
         className: 'text-text-dim',
         stackAffix: { before: t('market.rangeAffix') },
         sortValue: (o) => rangeRank(o.range),

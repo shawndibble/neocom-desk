@@ -86,7 +86,7 @@ export function useContractsHistoryColumns({
       type: {
         id: 'type',
         header: t('contracts.type'),
-        width: '16ch',
+        width: '13ch',
         className: 'whitespace-nowrap',
         sortValue: (contract) => t(CONTRACT_TYPE_KEY[contract.type]),
         render: (contract) => <span data-dense-omit>{t(CONTRACT_TYPE_KEY[contract.type])}</span>,
@@ -94,7 +94,7 @@ export function useContractsHistoryColumns({
       status: {
         id: 'status',
         header: t('contracts.status'),
-        width: '24ch',
+        width: '18ch',
         className: 'font-semibold whitespace-nowrap',
         cellClassName: (contract) => STATUS_TONE[contract.status],
         sortValue: (contract) => t(CONTRACT_STATUS_KEY[contract.status]),
@@ -103,7 +103,7 @@ export function useContractsHistoryColumns({
       issuer: {
         id: 'issuer',
         header: t('contracts.issuer'),
-        width: '24ch',
+        width: '20ch',
         className: 'truncate',
         sortValue: (contract) => {
           const { id } = contractIssuer(contract);
@@ -133,7 +133,7 @@ export function useContractsHistoryColumns({
       receiver: {
         id: 'receiver',
         header: t('contracts.receiver'),
-        width: '24ch',
+        width: '20ch',
         className: 'truncate',
         sortValue: (contract) => {
           const receiver = receiverFor(contract);
@@ -184,7 +184,7 @@ export function useContractsHistoryColumns({
       expires: {
         id: 'expires',
         header: t('contracts.expires'),
-        width: '30ch',
+        width: '26ch',
         className: 'whitespace-nowrap text-text-dim',
         sortValue: (contract) =>
           courierDeliveryDeadlineMs(contract) ?? new Date(contract.date_expired).getTime(),
