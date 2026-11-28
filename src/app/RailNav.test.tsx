@@ -155,33 +155,50 @@ describe('the rail', () => {
     expect(within(views).getByRole('link', { name: 'Balance' })).toBeInTheDocument();
   });
 
-  it('scrolls the current view into the rail, without animating', () => {
+  function stubRailGeometry(isBelow: (el: Element) => boolean) {
+    const rect = (top: number, bottom: number) => ({ top, bottom }) as DOMRect;
+    const geometry = vi
+      .spyOn(Element.prototype, 'getBoundingClientRect')
+      .mockImplementation(function (this: Element) {
+        if (this.tagName === 'NAV') return rect(0, 100);
+        return isBelow(this) ? rect(300, 320) : rect(10, 20);
+      });
     const scrolled = vi.fn();
-    Element.prototype.scrollIntoView = scrolled;
+    Element.prototype.scrollBy = scrolled;
+    const restore = () => {
+      geometry.mockRestore();
+      delete (Element.prototype as Partial<Element>).scrollBy;
+    };
+    return { scrolled, restore };
+  }
+
+  it('scrolls the rail itself to the current view, so the first Tab still reaches the skip link', () => {
+    const { scrolled, restore } = stubRailGeometry((el) => el.textContent === 'LP Store');
     try {
       renderAt('/wallet/lp-store/1000125');
-      expect(scrolled).toHaveBeenCalledWith({ block: 'nearest' });
-      expect(scrolled.mock.contexts.map((el) => (el as Element).textContent)).toContain('LP Store');
+      expect(scrolled).toHaveBeenCalledWith({ top: 220 });
+      expect(scrolled.mock.contexts).toContain(rail());
     } finally {
-      delete (Element.prototype as Partial<Element>).scrollIntoView;
+      restore();
     }
   });
 
   it('keeps the current view in sight while the rail fills in, until the pilot touches it', async () => {
-    const scrolled = vi.fn();
-    Element.prototype.scrollIntoView = scrolled;
+    const { scrolled, restore } = stubRailGeometry(
+      (el) => el.getAttribute('aria-current') === 'page'
+    );
     try {
       renderAt('/wallet/journal');
       scrolled.mockClear();
       act(() => void rail().append(document.createElement('div')));
-      await waitFor(() => expect(scrolled).toHaveBeenCalledWith({ block: 'nearest' }));
+      await waitFor(() => expect(scrolled).toHaveBeenCalledWith({ top: 220 }));
 
       rail().dispatchEvent(new Event('pointerdown'));
       scrolled.mockClear();
       await act(async () => void rail().append(document.createElement('div')));
       expect(scrolled).not.toHaveBeenCalled();
     } finally {
-      delete (Element.prototype as Partial<Element>).scrollIntoView;
+      restore();
     }
   });
 

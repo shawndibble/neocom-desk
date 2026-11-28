@@ -239,7 +239,12 @@ const RailNavBody = memo(function RailNavBody({
     if (!nav) return;
     const reveal = () => {
       const marked = nav.querySelectorAll('[aria-current="page"]');
-      marked[marked.length - 1]?.scrollIntoView?.({ block: 'nearest' });
+      const item = marked[marked.length - 1];
+      if (!item) return;
+      const box = nav.getBoundingClientRect();
+      const { top, bottom } = item.getBoundingClientRect();
+      const offset = top < box.top ? top - box.top : bottom > box.bottom ? bottom - box.bottom : 0;
+      if (offset !== 0) nav.scrollBy?.({ top: offset });
     };
     reveal();
     const grown = typeof MutationObserver === 'undefined' ? null : new MutationObserver(reveal);

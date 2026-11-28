@@ -39,11 +39,11 @@ describe('OwedBalances summary line', () => {
     expect(screen.queryByText('You owe')).not.toBeInTheDocument();
   });
 
-  it('reads "You owe" in sentence case with the total and payee count for two or more', () => {
+  it('reads "You owe" in sentence case with the total and Payee count for two or more', () => {
     renderBalances([balance('a', 1_000_000), balance('b', 2_000_000)]);
     const label = screen.getByText('You owe');
     expect(label.className).not.toMatch(/uppercase/);
-    expect(screen.getByText('across 2 payees')).toBeInTheDocument();
+    expect(screen.getByText('across 2 Payees')).toBeInTheDocument();
     expect(screen.getByText(/3,000,000 ISK/)).toBeInTheDocument();
   });
 

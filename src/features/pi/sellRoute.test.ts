@@ -21,11 +21,18 @@ describe('routeFigures', () => {
       nullsecJumps: 0,
     });
   });
-  it('splits lowsec from nullsec the way Hauling does (nullsec below 0.1)', () => {
-    expect(routeFigures([-0.3, -0.2, 0.04, 0.1, 0.3, 0.5])).toEqual({
+  it('splits lowsec from nullsec the way Hauling does (nullsec shown as 0.0 or below)', () => {
+    expect(routeFigures([-0.3, -0.2, 0, 0.1, 0.3, 0.5])).toEqual({
       jumps: 5,
       lowsecJumps: 2,
       nullsecJumps: 2,
+    });
+  });
+  it('counts a true security just above 0 as lowsec, since the game shows it as 0.1', () => {
+    expect(routeFigures([0.5, 0.04, -0.1])).toEqual({
+      jumps: 2,
+      lowsecJumps: 1,
+      nullsecJumps: 1,
     });
   });
   it('does not count the origin as a lowsec jump', () => {

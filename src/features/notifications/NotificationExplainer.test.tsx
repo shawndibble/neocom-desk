@@ -161,7 +161,7 @@ describe('NotificationExplainer', () => {
       renderExplainer();
 
       await user.click(await screen.findByRole('button', { name: /^enable$/i }));
-      expect(await screen.findByText(/alerts when neocom is closed/i)).toBeInTheDocument();
+      expect(await screen.findByText(/alerts when the app is closed/i)).toBeInTheDocument();
       expect(screen.getByText(/Pilot One/)).toBeInTheDocument();
       expect(beginAlertsLogin).not.toHaveBeenCalled();
     });
@@ -172,10 +172,10 @@ describe('NotificationExplainer', () => {
       const { unmount } = renderExplainer();
 
       await user.click(await screen.findByRole('button', { name: /^enable$/i }));
-      await screen.findByText(/alerts when neocom is closed/i);
+      await screen.findByText(/alerts when the app is closed/i);
       unmount();
       renderExplainer();
-      expect(await screen.findByText(/alerts when neocom is closed/i)).toBeInTheDocument();
+      expect(await screen.findByText(/alerts when the app is closed/i)).toBeInTheDocument();
     });
 
     it('Turn on starts the Alerts flow for that Character and records the offer as seen', async () => {
@@ -216,7 +216,7 @@ describe('NotificationExplainer', () => {
       await waitFor(async () =>
         expect((await db.settings.get(ALERTS_OFFER_SEEN_KEY))?.value).toBe(false)
       );
-      expect(await screen.findByText(/alerts when neocom is closed/i)).toBeInTheDocument();
+      expect(await screen.findByText(/alerts when the app is closed/i)).toBeInTheDocument();
     });
 
     it('Not now suppresses it for good without starting the flow', async () => {
@@ -225,10 +225,10 @@ describe('NotificationExplainer', () => {
       renderExplainer();
 
       await user.click(await screen.findByRole('button', { name: /^enable$/i }));
-      await screen.findByText(/alerts when neocom is closed/i);
+      await screen.findByText(/alerts when the app is closed/i);
       await user.click(screen.getByRole('button', { name: /not now/i }));
       await waitFor(() =>
-        expect(screen.queryByText(/alerts when neocom is closed/i)).not.toBeInTheDocument()
+        expect(screen.queryByText(/alerts when the app is closed/i)).not.toBeInTheDocument()
       );
       expect(beginAlertsLogin).not.toHaveBeenCalled();
       expect((await db.settings.get(ALERTS_OFFER_SEEN_KEY))?.value).toBe(true);
@@ -243,7 +243,7 @@ describe('NotificationExplainer', () => {
       await waitFor(() =>
         expect(screen.queryByText(/turn on notifications/i)).not.toBeInTheDocument()
       );
-      expect(screen.queryByText(/alerts when neocom is closed/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/alerts when the app is closed/i)).not.toBeInTheDocument();
     });
 
     it('never shows for a player who already saw the explainer', async () => {
@@ -254,7 +254,7 @@ describe('NotificationExplainer', () => {
       });
       renderExplainer();
       await waitFor(() => expect(useNotificationPromptState.getState().hydrated).toBe(true));
-      expect(screen.queryByText(/alerts when neocom is closed/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/alerts when the app is closed/i)).not.toBeInTheDocument();
     });
   });
 });

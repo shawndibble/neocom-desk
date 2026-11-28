@@ -300,7 +300,9 @@ describe('SkillPlans layout: side by side list + editor (#158)', () => {
     renderSkillsRoutes();
 
     expect(await screen.findByRole('button', { name: 'New plan' })).toBeInTheDocument();
-    expect(await screen.findByRole('button', { name: /^Accelerator/ })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('button', { name: /^Attributes\s*Accelerator/ })
+    ).toBeInTheDocument();
     expect(screen.queryByRole('region', { name: 'Attributes' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Back to plans' })).not.toBeInTheDocument();
 
@@ -313,7 +315,9 @@ describe('SkillPlans layout: side by side list + editor (#158)', () => {
 
     await user.click(screen.getByRole('link', { name: 'Back to plans' }));
 
-    expect(await screen.findByRole('button', { name: /^Accelerator/ })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('button', { name: /^Attributes\s*Accelerator/ })
+    ).toBeInTheDocument();
     expect(await screen.findByRole('button', { name: 'New plan' })).toBeInTheDocument();
   });
 
@@ -326,7 +330,9 @@ describe('SkillPlans layout: side by side list + editor (#158)', () => {
 
     expect(await screen.findByRole('heading', { name: 'Attributes' })).toBeInTheDocument();
     expect(await screen.findByRole('button', { name: 'Optimize queue' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /^Accelerator/ })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /^Attributes\s*Accelerator/ })
+    ).not.toBeInTheDocument();
 
     await user.click(await screen.findByRole('link', { name: /^Test plan/ }));
     await screen.findByText('Your entries');
