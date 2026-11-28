@@ -1,4 +1,4 @@
-import { COL_QUANTITY, COL_SMALL_NUMBER } from '@/components/ui/dataTableWidths';
+import { COL_SMALL_NUMBER } from '@/components/ui/dataTableWidths';
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -267,7 +267,7 @@ export function OwnedBlueprintsPanel({
       id: 'me',
       header: t('industry.ownedBlueprintsMe'),
       align: 'right',
-      width: COL_SMALL_NUMBER,
+      width: '6ch',
       className: 'tabular-nums whitespace-nowrap',
       sortValue: OWNED_BLUEPRINT_SORT_VALUE.me,
       render: (row) => row.blueprint.material_efficiency,
@@ -276,7 +276,7 @@ export function OwnedBlueprintsPanel({
       id: 'te',
       header: t('industry.ownedBlueprintsTe'),
       align: 'right',
-      width: COL_SMALL_NUMBER,
+      width: '6ch',
       className: 'tabular-nums whitespace-nowrap',
       sortValue: OWNED_BLUEPRINT_SORT_VALUE.te,
       render: (row) => row.blueprint.time_efficiency,
@@ -285,7 +285,7 @@ export function OwnedBlueprintsPanel({
       id: 'runs',
       header: t('industry.runs'),
       align: 'right',
-      width: COL_QUANTITY,
+      width: COL_SMALL_NUMBER,
       className: 'tabular-nums whitespace-nowrap',
       sortValue: OWNED_BLUEPRINT_SORT_VALUE.runs,
       render: (row) =>
@@ -295,7 +295,7 @@ export function OwnedBlueprintsPanel({
       id: 'quantity',
       header: t('industry.quantity'),
       align: 'right',
-      width: COL_QUANTITY,
+      width: COL_SMALL_NUMBER,
       className: 'tabular-nums whitespace-nowrap',
       sortValue: OWNED_BLUEPRINT_SORT_VALUE.quantity,
       render: (row) => ownedBlueprintQuantity(row.blueprint),
@@ -310,7 +310,7 @@ export function OwnedBlueprintsPanel({
     {
       id: 'owner',
       header: t('industry.ownedBlueprintsOwner'),
-      width: '22ch',
+      width: '18ch',
       className: 'truncate',
       sortValue: OWNED_BLUEPRINT_SORT_VALUE.owner,
       render: (row) => {
