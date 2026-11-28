@@ -254,8 +254,8 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
     RAIL_MIN_COLUMN_REM + RAIL_REM,
   ]);
   const railShown = !isPhone && !layoutNarrow;
-  const [tableRef, [tableNarrow = false, tableCards = false]] =
-    useElementNarrowerThan<HTMLDivElement>([widths.compact, widths.cards]);
+  const [tableRef, [tableNarrow = false, tableCards = false, tableTerse = false]] =
+    useElementNarrowerThan<HTMLDivElement>([widths.compact, widths.cards, widths.demandLabel]);
   const cards = isPhone || tableCards;
   const compact = isPhone || tableNarrow;
 
@@ -487,6 +487,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
       anyEnd,
       cards,
       compact,
+      demandLabel: !tableTerse,
       windowed: tableRows.length > VIRTUALIZE_THRESHOLD,
       lineOf,
       suggestedProfitOf,

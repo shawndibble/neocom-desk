@@ -1,7 +1,7 @@
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { DataTableColumn } from '@/components/ui';
-import { COL_DATETIME, COL_ISK } from '@/components/ui/dataTableWidths';
+import { COL_DATETIME } from '@/components/ui/dataTableWidths';
 import type { WalletTransactionCommon } from '@/esi/endpoints';
 import { iskToneClass } from '@/features/character/format';
 import { journalRefKey, type JournalLine, type JournalRow } from '@/engine/journalNetting';
@@ -203,9 +203,9 @@ export function useJournalColumnsBuilder(): (
         {
           id: 'amount',
           header: t('wallet.amount'),
-          width: COL_ISK,
+          width: '15ch',
           align: 'right',
-          className: 'tabular-nums max-sm:px-1',
+          className: 'tabular-nums whitespace-nowrap max-sm:px-1',
           headerClassName: 'max-sm:px-1',
           cellClassName: (entry) =>
             entry.internal
@@ -220,9 +220,9 @@ export function useJournalColumnsBuilder(): (
         {
           id: 'balance',
           header: t('wallet.balanceCol'),
-          width: COL_ISK,
+          width: '16ch',
           align: 'right',
-          className: 'tabular-nums text-text-dim',
+          className: 'tabular-nums whitespace-nowrap text-text-dim',
           render: (entry) =>
             entry.balance !== undefined ? formatIsk(entry.balance) : t('common.unknown'),
           sortValue: (entry) => entry.balance,

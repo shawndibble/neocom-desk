@@ -38,7 +38,7 @@ export function useLpLandingStoreColumns({
       id: 'store',
       header: t('loyaltyStore.landing.colStore'),
       primary: true,
-      minWidth: '13rem',
+      width: '28ch',
       sortValue: (row) => row.name,
       render: (row) => {
         const faction =
