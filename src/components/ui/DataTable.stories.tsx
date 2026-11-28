@@ -145,3 +145,32 @@ export const PhoneCardsExpandable: Story = {
 
 /** @summary Keeps real columns on a phone and scrolls sideways; right when comparing across columns is the point. */
 export const TableOnPhone: Story = { args: { responsive: 'table' }, ...phone };
+
+const wideColumns = [
+  ...columns,
+  { id: 'unit', header: 'Unit price', align: 'right', render: () => '4.12 ISK' },
+  {
+    id: 'total',
+    header: 'Total value',
+    align: 'right',
+    render: (r) => `${(r.quantity * 4.12).toLocaleString('en')} ISK`,
+  },
+  {
+    id: 'hub',
+    header: 'Trade hub',
+    render: () => 'Jita IV - Moon 4 - Caldari Navy Assembly Plant',
+  },
+] as DataTableColumn<Row>[] as unknown as DataTableColumn<unknown>[];
+
+/** @summary `edge-fade-end` on the table's `overflow-x-auto` wrapper: the right edge fades while columns lie past it (§6c). */
+export const TableOnPhoneEdgeFade: Story = {
+  args: { responsive: 'table', columns: wideColumns },
+  decorators: [
+    (Story) => (
+      <div className="overflow-x-auto edge-fade-end">
+        <Story />
+      </div>
+    ),
+  ],
+  ...phone,
+};

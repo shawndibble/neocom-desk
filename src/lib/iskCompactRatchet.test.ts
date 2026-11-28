@@ -1,23 +1,14 @@
-import { readdirSync, readFileSync, statSync } from 'node:fs';
-import { join } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { appSourceFiles, ratchet } from '@/test/sourceRatchet';
 
-function tsxFiles(dir: string): string[] {
-  return readdirSync(dir).flatMap((name) => {
-    const path = join(dir, name);
-    if (statSync(path).isDirectory()) return tsxFiles(path);
-    return /\.tsx$/.test(name) && !/\.test\.tsx$/.test(name) ? [path] : [];
-  });
-}
-
-const root = join(__dirname, '..');
-const offenders = tsxFiles(root)
-  .filter((path) => {
-    if (path.includes('/charts/')) return false;
-    const source = readFileSync(path, 'utf8');
-    return /formatIskCompact/.test(source) && !/from 'recharts'/.test(source);
-  })
-  .map((path) => 'src/' + path.slice(root.length + 1));
+const offenders = appSourceFiles()
+  .filter(
+    ({ path, source }) =>
+      path.endsWith('.tsx') &&
+      !path.includes('/charts/') &&
+      /formatIskCompact/.test(source) &&
+      !/from 'recharts'/.test(source)
+  )
+  .map(({ path }) => path);
 
 const ALLOWED = new Set<string>([
   'src/components/ui/IskAmount.tsx',
@@ -69,12 +60,4 @@ const ALLOWED = new Set<string>([
   'src/routes/Characters.tsx',
 ]);
 
-describe('compact ISK outside charts', () => {
-  it('no new file uses formatIskCompact', () => {
-    expect(offenders.filter((f) => !ALLOWED.has(f))).toEqual([]);
-  });
-
-  it('allowlist lists only files still using it', () => {
-    expect([...ALLOWED].filter((f) => !offenders.includes(f))).toEqual([]);
-  });
-});
+ratchet('compact ISK outside charts', offenders, ALLOWED);

@@ -63,7 +63,7 @@ export function GroupTile({
         </span>
         <span aria-hidden="true" className="mt-1.5 flex h-1.5 overflow-hidden rounded-full bg-line">
           <span className="bg-accent" style={{ width: `${trainedShare}%` }} />
-          <span className="bg-accent-dim" style={{ width: `${queuedShare}%` }} />
+          <span className="bg-line-bright" style={{ width: `${queuedShare}%` }} />
         </span>
       </span>
     </button>

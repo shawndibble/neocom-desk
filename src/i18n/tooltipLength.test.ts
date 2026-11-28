@@ -26,6 +26,7 @@ const ALLOWED_LONG = new Set<string>([
   'industry.iskPerHourTooltip',
   'industry.breakEvenPriceTooltip',
   'industry.costIndexTooltip',
+  'industry.costIndexOverrideTooltip',
   'wallet.marginTooltip',
   'pi.stalenessTooltip',
   'pi.yield.decayedTooltip',
@@ -47,6 +48,7 @@ const ALLOWED_LONG = new Set<string>([
   'contractSearch.hideUncompletableTooltip',
   'contractSearch.belowMarket.otherTooltip',
   'travel.pilot.killerMeterHelp',
+  'travel.pilot.threat.help',
 ]);
 
 describe('tooltip length', () => {

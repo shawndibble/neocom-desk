@@ -7,10 +7,12 @@ export function SurveyStartDetails({
   characterId,
   draft,
   onChange,
+  hasTemplates,
 }: {
   characterId: number;
   draft: StartDraft;
   onChange: (draft: StartDraft) => void;
+  hasTemplates: boolean;
 }) {
   const { t } = useTranslation();
   return (
@@ -18,10 +20,12 @@ export function SurveyStartDetails({
       title={
         <span className="inline-flex items-center gap-2">
           {t('survey.info.title')}
-          <InfoTooltip
-            label={t('survey.templates.startFromLabel')}
-            content={t('survey.templates.startFrom')}
-          />
+          {hasTemplates && (
+            <InfoTooltip
+              label={t('survey.templates.startFromLabel')}
+              content={t('survey.templates.startFrom')}
+            />
+          )}
         </span>
       }
     >

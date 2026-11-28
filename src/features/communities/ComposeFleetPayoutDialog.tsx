@@ -349,7 +349,10 @@ export function ComposeFleetPayoutDialog({
             size="sm"
             label={t('communities.payouts.compose.basis')}
             value={basis}
-            onChange={setBasis}
+            onChange={(next) => {
+              setBasis(next);
+              setTouched(true);
+            }}
             options={[
               { value: 'buy', label: t('communities.payouts.compose.basisBuy') },
               { value: 'sell', label: t('communities.payouts.compose.basisSell') },
@@ -383,7 +386,10 @@ export function ComposeFleetPayoutDialog({
             size="sm"
             label={t('communities.payouts.compose.rule')}
             value={rule}
-            onChange={setRule}
+            onChange={(next) => {
+              setRule(next);
+              setTouched(true);
+            }}
             options={[
               { value: 'equal', label: t('communities.payouts.compose.ruleEqual') },
               { value: 'weighted', label: t('communities.payouts.compose.ruleWeighted') },

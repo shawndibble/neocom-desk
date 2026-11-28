@@ -115,7 +115,7 @@ export function Settings() {
       <div className="space-y-4 lg:grid lg:grid-cols-[11rem_minmax(0,1fr)] lg:gap-6 lg:space-y-0">
         <SettingsNav groups={groups} value={section} />
         <div
-          className="min-w-0 max-w-5xl space-y-4 [--fields-label:14rem]"
+          className="min-w-0 max-w-5xl space-y-4 xl:[--fields-label:14rem]"
           data-settings-section={section}
         >
           {section === 'display' && (

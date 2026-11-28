@@ -1,43 +1,23 @@
-import { readdirSync, readFileSync, statSync } from 'node:fs';
-import { join } from 'node:path';
-import { describe, expect, it } from 'vitest';
-
-function sourceFiles(dir: string): string[] {
-  return readdirSync(dir).flatMap((name) => {
-    const path = join(dir, name);
-    if (statSync(path).isDirectory()) {
-      return path.endsWith(join('components', 'ui')) || name === 'landing' ? [] : sourceFiles(path);
-    }
-    return /\.tsx?$/.test(name) && !/\.(test|stories)\.tsx?$/.test(name) ? [path] : [];
-  });
-}
+import { appSourceFiles, ratchet } from '@/test/sourceRatchet';
 
 const token = (str: string, pattern: string) =>
   new RegExp(`(^|[\\s'"\`])(${pattern})([\\s'"\`]|$)`).test(str);
 
-const root = join(__dirname, '..', '..', '..');
-const literals = ['src/app', 'src/features', 'src/routes', 'src/components']
-  .flatMap((dir) => sourceFiles(join(root, dir)))
-  .map((file) => ({
-    file: file.slice(root.length + 1),
-    strings: readFileSync(file, 'utf8').match(/(['"`])(?:(?!\1)[^\n])*\1/g) ?? [],
-  }))
-  .filter(({ file }) => file !== 'src/routes/Login.tsx');
+const scanned = appSourceFiles().filter(
+  ({ path }) =>
+    /^src\/(app|features|routes|components)\//.test(path) &&
+    !path.startsWith('src/components/ui/') &&
+    !path.split('/').includes('landing') &&
+    path !== 'src/routes/Login.tsx'
+);
+
+const literals = scanned.map(({ path, source }) => ({
+  file: path,
+  strings: source.match(/(['"`])(?:(?!\1)[^\n])*\1/g) ?? [],
+}));
 
 const offenders = (test: (str: string) => boolean) =>
   literals.filter(({ strings }) => strings.some(test)).map(({ file }) => file);
-
-function ratchet(name: string, found: string[], allowed: string[]) {
-  describe(name, () => {
-    it('no new file', () => {
-      expect(found.filter((f) => !allowed.includes(f))).toEqual([]);
-    });
-
-    it('allowlist lists only current offenders', () => {
-      expect(allowed.filter((f) => !found.includes(f))).toEqual([]);
-    });
-  });
-}
 
 const TONE = '(warning|danger|accent)';
 
@@ -118,16 +98,11 @@ ratchet(
 
 ratchet(
   'a label hand-stacked over its control instead of Fields variant="stacked"',
-  ['src/app', 'src/features', 'src/routes', 'src/components']
-    .flatMap((dir) => sourceFiles(join(root, dir)))
-    .map((file) => file.slice(root.length + 1))
-    .filter(
-      (file) =>
-        file !== 'src/routes/Login.tsx' &&
-        /<label\b[^>]*(block space-y-1|flex flex-col gap-1|grid gap-1)/.test(
-          readFileSync(join(root, file), 'utf8')
-        )
-    ),
+  scanned
+    .filter(({ source }) =>
+      /<label\b[^>]*(block space-y-1|flex flex-col gap-1|grid gap-1)/.test(source)
+    )
+    .map(({ path }) => path),
   [
     'src/features/corp/moons/addCorps/ConfirmBatchDialog.tsx',
     'src/features/corp/srp/MemberClaimDialogs.tsx',

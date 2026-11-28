@@ -11,8 +11,7 @@ import {
 } from './RowActions';
 
 /**
- * @summary One item list drawn two ways (docs/DESIGN.md §6c): right-click or touch-and-hold on the
- * row, and the visible ⋮ button. Write items with the `Menu*` pieces so both menus read one list.
+ * @summary One item list drawn two ways (docs/DESIGN.md §6c): right-click or touch-and-hold on the row, and the visible ⋮ button.
  */
 const meta = {
   title: 'ui/RowActionsMenu',

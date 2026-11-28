@@ -294,6 +294,7 @@ export function EditCorrectionDialog({
       </Label>
       <Label text={t('corpTaxBook.moons.corrections.adjust.amount')}>
         <IskInput
+          className="w-full"
           value={amount}
           onChange={setAmount}
           aria-label={t('corpTaxBook.moons.corrections.adjust.amount')}
@@ -358,6 +359,7 @@ export function MarketAdjustmentDialog({
       </p>
       <Label text={t('corpTaxBook.moons.ledger.dialogs.marketEdit.amount')}>
         <IskInput
+          className="w-full"
           value={amount}
           onChange={setAmount}
           aria-label={t('corpTaxBook.moons.ledger.dialogs.marketEdit.amount')}

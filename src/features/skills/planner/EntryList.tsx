@@ -1,6 +1,6 @@
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { Fragment, useMemo } from 'react';
-import { MD_UP_QUERY, useMediaQuery } from '@/lib/useMediaQuery';
+import { MD_UP_QUERY, useMediaQuery, usePrefersReducedMotion } from '@/lib/useMediaQuery';
 import {
   DndContext,
   KeyboardSensor,
@@ -84,6 +84,7 @@ export function EntryList({
 }: EntryListProps) {
   const { t } = useTranslation();
   const isDesktop = useMediaQuery(MD_UP_QUERY);
+  const reducedMotion = usePrefersReducedMotion();
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
@@ -156,6 +157,7 @@ export function EntryList({
                       startDate={startDate}
                       columns={columns}
                       isDesktop={isDesktop}
+                      reducedMotion={reducedMotion}
                       continuation={continuationIds.has(row.id)}
                       onRemove={onRemove}
                       onStageSkillDetail={onStageSkillDetail}
@@ -181,6 +183,7 @@ export function EntryList({
                       startDate={startDate}
                       columns={columns}
                       isDesktop={isDesktop}
+                      reducedMotion={reducedMotion}
                       onPromote={onPromotePrereq}
                       onStageSkillDetail={onStageSkillDetail}
                     />
@@ -191,6 +194,7 @@ export function EntryList({
                       markerIndex={row.markerIndex}
                       attributes={markerAttributesFor?.(row.markerIndex)}
                       implants={markerImplants}
+                      reducedMotion={reducedMotion}
                       onRemove={onRemoveMarker}
                       onEdit={onEditMarker}
                     />

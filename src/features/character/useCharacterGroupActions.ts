@@ -12,7 +12,7 @@ import {
   moveCharacterToGroup,
   removeGroup,
   renameGroup,
-  reorderGroups,
+  swapGroups,
   type CharacterGroup,
 } from '@/features/character/groups';
 
@@ -99,14 +99,9 @@ export function useCharacterGroupActions(
   async function handleMoveGroup(index: number, direction: -1 | 1) {
     const groupId = shownGroups[index]?.id;
     const neighborId = shownGroups[index + direction]?.id;
-    const indexOf = (id: string | undefined) =>
-      groupsValue.groups.findIndex((group) => group.id === id);
+    if (groupId === undefined || neighborId === undefined) return;
     await setGroupsValue(
-      updateGroups(
-        groupsValue,
-        (groups) => reorderGroups(groups, indexOf(groupId), indexOf(neighborId)),
-        Date.now()
-      )
+      updateGroups(groupsValue, (groups) => swapGroups(groups, groupId, neighborId), Date.now())
     );
     const enabledMove = (side: 'up' | 'down') => () => {
       const el = document.querySelector<HTMLButtonElement>(

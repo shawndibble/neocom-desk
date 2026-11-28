@@ -66,12 +66,15 @@ describe('MemberSrp', () => {
       'href',
       '/corp/srp/settings'
     );
+    expect(screen.getByText('Turn it on and set the rules in SRP settings.')).toBeTruthy();
+    expect(screen.queryByText(/Ask a director/)).toBeNull();
   });
 
   it('shows no set-up link to a member who cannot configure SRP', async () => {
     setup({ enabled: false });
     await screen.findByText('Ship replacement (SRP) is not set up for your corporation');
     expect(screen.queryByRole('link', { name: 'Set up SRP' })).toBeNull();
+    expect(screen.getByText(/Ask a director/)).toBeTruthy();
   });
 
   it('lists lost ships with their outcome and My claims with state, amount and reason', async () => {

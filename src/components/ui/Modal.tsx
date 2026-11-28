@@ -32,7 +32,6 @@ interface ModalProps {
   children: ReactNode;
   /**
    * @summary Action bar at the dialog's foot (Apply / Cancel, Copy), pinned below the scrolling body.
-   * Never a sticky div inside `children`. On a sheet it takes the safe-area inset in place of the body.
    */
   footer?: ReactNode;
   initialFocusRef?: RefObject<HTMLElement | null>;

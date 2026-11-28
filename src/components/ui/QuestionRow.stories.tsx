@@ -3,8 +3,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { QuestionRow } from './QuestionRow';
 
 /**
- * @summary A body-size FAQ row that opens its answer below. The caller owns `expanded` and the
- * row's frame.
+ * @summary A body-size FAQ row that opens its answer below.
  */
 const meta = {
   title: 'ui/QuestionRow',

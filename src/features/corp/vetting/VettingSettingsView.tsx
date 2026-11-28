@@ -45,7 +45,7 @@ import { ActionResult, CheckboxField, SettingsHint } from '@/features/settings/s
 import { callableErrorReason } from '@/lib/callableError';
 import { cx } from '@/lib/cx';
 import { formatCount } from '@/lib/formatCount';
-import { useIsNarrow } from '@/lib/useIsNarrow';
+import { useIsBelowDesktop } from '@/lib/useIsBelowDesktop';
 import { PayeeNameField } from '@/features/miningTax/PayeeNameField';
 import { VettingEntity } from './VettingEntity';
 import type { VettingSettingsPatch } from './vettingBackend';
@@ -99,7 +99,7 @@ export function VettingSettingsView({
 }: VettingSettingsViewProps) {
   const { t } = useTranslation();
   const uid = useId();
-  const stacked = useIsNarrow();
+  const stacked = useIsBelowDesktop();
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [name, setName] = useState('');

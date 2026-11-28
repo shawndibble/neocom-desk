@@ -32,6 +32,12 @@ describe('AcceleratorRow', () => {
     expect(sheet).toHaveTextContent('INT 38');
   });
 
+  it('shows the attribute chips on the row itself', () => {
+    renderRow();
+    expect(screen.getByText('INT 38')).toBeVisible();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
   it('asks for the time left when the bonus was only detected', () => {
     renderRow({ detectedBonus: 13 });
     expect(screen.getByRole('button', { name: /\+13 detected · set time left/ })).toBeVisible();

@@ -3,9 +3,7 @@ import { Button } from './Button';
 import { Modal } from './Modal';
 
 /**
- * @summary Native-`<dialog>` modal; the parent owns `open`. §6c "…" cue: a button whose label ends
- * in "…" opens a dialog that needs more input or a confirmation. Every placement is a story
- * below, open, since a closed Modal renders nothing.
+ * @summary Native-`<dialog>` modal; the parent owns `open`.
  */
 const meta = {
   title: 'ui/Modal',
@@ -111,8 +109,7 @@ export const WithTitleActions: Story = {
 };
 
 /**
- * @summary `footer`: an action bar pinned to the dialog's foot, outside the scrolling body, which
- * scrolls above it.
+ * @summary `footer`: an action bar pinned to the dialog's foot, outside the scrolling body, which scrolls above it.
  */
 export const WithFooter: Story = {
   args: {

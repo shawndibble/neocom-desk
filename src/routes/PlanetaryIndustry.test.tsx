@@ -682,7 +682,7 @@ describe('PlanetaryIndustry', () => {
       );
 
     expect(chip(/^Stopped 1 colony$/)).toBeEnabled();
-    expect(chip(/^Expiring soon 0 colonies$/)).toBeDisabled();
+    expect(within(filters()).queryByRole('button', { name: /^Expiring soon/ })).toBeNull();
 
     await user.click(chip(/show \d+ alt/i));
     expect(statuses()).toEqual(['stopped', 'expiring', 'healthy']);
@@ -1318,6 +1318,9 @@ describe('PlanetaryIndustry', () => {
     await user.click(screen.getByRole('button', { name: /show \d+ alt/i }));
 
     expect(within(coloniesPanel()).getByText(/^1 stopped · next \d+m$/)).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /^Expiring soon/ }));
+    expect(within(coloniesPanel()).getByText(/^next \d+m$/)).toBeInTheDocument();
   });
 
   it("badges an alt colony group's header with that alt's own cache age, not the active Character's", async () => {

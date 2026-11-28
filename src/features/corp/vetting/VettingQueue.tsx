@@ -254,7 +254,7 @@ export function VettingQueue({
   }
   return (
     <Panel padded={false} title={t(`vetting.queue.title.${tab}`)}>
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto edge-fade-end">
         <DataTable
           label={t(`vetting.queue.label.${tab}`)}
           columns={columns}

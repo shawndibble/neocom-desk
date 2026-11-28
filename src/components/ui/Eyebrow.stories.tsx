@@ -2,8 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { Eyebrow } from './Eyebrow';
 
 /**
- * @summary A small uppercase label that names a section, field or table group. Static text:
- * it carries no action, so it has no cue (§6c).
+ * @summary A small uppercase label that names a section, field or table group.
  */
 const meta = {
   title: 'ui/Eyebrow',

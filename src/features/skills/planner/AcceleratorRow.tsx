@@ -51,24 +51,27 @@ export function AcceleratorRow({
 
   return (
     <>
-      <button
-        type="button"
-        aria-haspopup="dialog"
-        onClick={() => setOpen(true)}
-        className={cx(
-          'flex min-h-9 w-full items-center justify-between gap-2 rounded-xs border border-line bg-panel px-3 py-1.5 text-left',
-          rowInteractiveClassName,
-          focusRingClassName
-        )}
-      >
-        <span className="min-w-0">
-          <span className="block text-sm">{t('skills.attributes')}</span>
-          <span className="block truncate text-xs">
-            <span className="text-text-dim">{t('plans.accelerator')} ·</span> {status}
+      <div className="rounded-xs border border-line bg-panel">
+        <button
+          type="button"
+          aria-haspopup="dialog"
+          onClick={() => setOpen(true)}
+          className={cx(
+            'flex min-h-9 w-full items-center justify-between gap-2 rounded-xs px-3 py-1.5 text-left',
+            rowInteractiveClassName,
+            focusRingClassName
+          )}
+        >
+          <span className="min-w-0">
+            <span className="block text-sm">{t('skills.attributes')}</span>
+            <span className="block truncate text-xs">
+              <span className="text-text-dim">{t('plans.accelerator')} ·</span> {status}
+            </span>
           </span>
-        </span>
-        <Icon.GoTo size={Icon.ICON_SIZE.sm} aria-hidden className="shrink-0 text-text-dim" />
-      </button>
+          <Icon.GoTo size={Icon.ICON_SIZE.sm} aria-hidden className="shrink-0 text-text-dim" />
+        </button>
+        <div className="px-3 pb-2">{attributes}</div>
+      </div>
       <Modal
         open={open}
         onClose={() => setOpen(false)}

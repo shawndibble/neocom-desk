@@ -2,8 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { HintText } from './HintText';
 
 /**
- * @summary Text with a tooltip. Cue (§6c cue vocabulary): a dotted underline means "has a tooltip"
- * and nothing else; it shows at rest, is keyboard-focusable and taps open on a phone.
+ * @summary Text with a tooltip.
  */
 const meta = {
   title: 'ui/HintText',

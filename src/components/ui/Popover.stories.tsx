@@ -4,8 +4,6 @@ import { Popover, PopoverContent, PopoverTrigger } from './Popover';
 
 /**
  * @summary Click-triggered panel with a `dialog` role for prose, figures or a small form (docs/adr/0004).
- * §6c: a trigger that opens one is field chrome with a trailing `CaretDown`, never a dotted
- * underline (that means "has a tooltip").
  */
 const meta = {
   title: 'ui/Popover',

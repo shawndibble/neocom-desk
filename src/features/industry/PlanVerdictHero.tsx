@@ -222,8 +222,8 @@ export function PlanVerdictHero({
           </div>
         </div>
 
-        <div className="flex flex-col gap-4 md:flex-row md:items-end md:gap-10">
-          <div className="flex min-w-0 flex-col items-start gap-1.5 md:flex-1">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:gap-10">
+          <div className="flex min-w-0 flex-col items-start gap-1.5 lg:flex-1">
             {!pricesLoading && pricesReady && verdict}
             {pricesLoading ? (
               <div className="py-2">
@@ -324,7 +324,7 @@ export function PlanVerdictHero({
           </div>
 
           {!pricesLoading && pricesReady && profit !== null && (
-            <dl className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:flex-1">
+            <dl className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:flex-1">
               <HeroStat label={t('industry.margin')}>
                 {figures.marginPct === null ? '—' : formatPercent(figures.marginPct)}
               </HeroStat>

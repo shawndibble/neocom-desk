@@ -11,6 +11,7 @@ interface MarkerRowProps {
   markerIndex: number;
   attributes?: Attributes;
   implants: Implants;
+  reducedMotion: boolean;
   onRemove: (markerIndex: number) => void;
   onEdit: (markerIndex: number) => void;
 }
@@ -20,11 +21,12 @@ export const MarkerRow = memo(function MarkerRow({
   markerIndex,
   attributes,
   implants,
+  reducedMotion,
   onRemove,
   onEdit,
 }: MarkerRowProps) {
   const { t } = useTranslation();
-  const { setNodeRef, style, handleProps, isDragging } = useRowSortable(id);
+  const { setNodeRef, style, handleProps, isDragging } = useRowSortable(id, reducedMotion);
 
   return (
     <li

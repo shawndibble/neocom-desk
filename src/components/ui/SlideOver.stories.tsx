@@ -2,9 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { SlideOver } from './SlideOver';
 
 /**
- * @summary Non-modal panel over one edge (docs/adr/0008). Unlike `Modal`, the page behind stays
- * live and a click outside does not close it; Escape, the close button and Back do. Use it where
- * the page keeps steering what the panel shows.
+ * @summary Non-modal panel over one edge (docs/adr/0008).
  */
 const meta = {
   title: 'ui/SlideOver',

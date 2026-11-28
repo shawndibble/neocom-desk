@@ -6,10 +6,10 @@ import { InfoTooltip, IskAmount, Panel, SegmentedControl } from '@/components/ui
 import type { RebuildPreference } from '@/engine/pi/planAdvice';
 import { cx } from '@/lib/cx';
 import { useMediaQuery } from '@/lib/useMediaQuery';
+import { useIsDesktop } from '@/lib/useIsDesktop';
 import { EstimateBadge } from '../DirectiveRow';
 import type { PlanView } from '../planView';
 
-const SM_UP = '(min-width: 40rem)';
 const MD_UP = '(min-width: 48rem)';
 
 function Hero({ value, caption }: { value: number; caption: ReactNode }) {
@@ -66,7 +66,7 @@ export function PlanSummaryPanel({
 }) {
   const { t } = useTranslation();
   const mdUp = useMediaQuery(MD_UP);
-  const smUp = useMediaQuery(SM_UP);
+  const desktop = useIsDesktop();
   const { headline, stats } = view;
   const mattersToggle = (
     <span className="flex flex-wrap items-center justify-end gap-2">
@@ -87,7 +87,7 @@ export function PlanSummaryPanel({
     <Panel
       title={t('piPlan.make.summaryTitle')}
       meta={
-        <span className="flex min-w-0 flex-1 basis-0 flex-wrap items-center gap-1.5">
+        <span className="flex shrink-0 items-center gap-1.5">
           <EstimateBadge />
           <InfoTooltip
             label={t('piPlan.make.basisLabel')}
@@ -96,11 +96,11 @@ export function PlanSummaryPanel({
           />
         </span>
       }
-      actions={smUp ? mattersToggle : undefined}
+      actions={desktop ? mattersToggle : undefined}
       padded={false}
     >
       <div className="space-y-3 pt-3">
-        {!smUp && (
+        {!desktop && (
           <div className="px-3" data-testid="pi-matters-row">
             {mattersToggle}
           </div>

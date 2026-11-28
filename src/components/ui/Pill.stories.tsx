@@ -2,8 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { Pill } from './Pill';
 
 /**
- * @summary A static tinted badge beside a name or status. It carries no action, so it has no cue
- * (§6c) and no border.
+ * @summary A static tinted badge beside a name or status.
  */
 const meta = {
   title: 'ui/Pill',

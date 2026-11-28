@@ -17,8 +17,7 @@ type Story = StoryObj<typeof meta>;
 export const AtRest: Story = {};
 
 /**
- * @summary Click, or type a digit on it, to swap in the caller's field; Enter
- * or blur saves, Escape cancels, and focus comes back to the value.
+ * @summary Click, or type a digit on it, to swap in the caller's field; Enter or blur saves, Escape cancels, and focus comes back to the value.
  */
 export const SwapsToAField: Story = {
   render: function Render(args) {

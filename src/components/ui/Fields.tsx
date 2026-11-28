@@ -34,6 +34,8 @@ const NOTE: Record<FieldsVariant, string> = {
   form: 'max-w-2xl text-text-dim lg:col-start-2',
 };
 
+const CONTROL = 'flex min-w-0 flex-wrap items-center gap-2';
+
 const INLINE_ROW = `grid-cols-[minmax(0,1fr)_auto] lg:grid-cols-subgrid ${FORM_ROW}`;
 const INLINE_NOTE = 'col-span-full max-w-2xl text-text-dim lg:col-span-1 lg:col-start-2';
 
@@ -89,7 +91,7 @@ export function Field({
   ) : (
     <span className={labelClassName}>{label}</span>
   );
-  const control = <div className="flex min-w-0 flex-wrap items-center gap-2">{children}</div>;
+  const control = <div className={CONTROL}>{children}</div>;
   const noteNode = hasNote && (
     <p id={noteId} className={inlineRow ? INLINE_NOTE : NOTE[variant]}>
       {note}
@@ -98,11 +100,13 @@ export function Field({
   if (variant === 'stacked' && !htmlFor) {
     return (
       <FieldNoteContext.Provider value={hasNote ? noteId : undefined}>
-        <label className={rowClassName}>
-          {labelNode}
-          {control}
+        <div className={rowClassName}>
+          <label className="grid gap-1">
+            {labelNode}
+            <span className={CONTROL}>{children}</span>
+          </label>
           {noteNode}
-        </label>
+        </div>
       </FieldNoteContext.Provider>
     );
   }

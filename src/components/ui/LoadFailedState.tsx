@@ -7,8 +7,7 @@ interface LoadFailedStateProps {
   /** @summary Already-translated headline saying what couldn't load. Defaults to "Couldn't load". */
   title?: string;
   /**
-   * @summary One line on what is missing and what happens next. Defaults to "Try again" online and
-   * "You're offline. Connect once…" offline, from the browser's own connection state.
+   * @summary One line on what is missing and what happens next.
    */
   hint?: string;
   /** @summary Runs the read again; shows a Retry button when given. */

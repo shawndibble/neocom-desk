@@ -2815,7 +2815,7 @@
       "openInMarket": "View in Market",
       "findNearby": "Find nearby (≤{{jumps}} jumps)",
       "facts": "{{group}} · Rank {{rank}} · {{primary}} / {{secondary}}",
-      "factsTrained": "{{group}} · Rank {{rank}} · {{primary}} / {{secondary}} · Trained {{level}}"
+      "factsTrained": "{{group}} · Rank {{rank}} · {{primary}} / {{secondary}} · Trained {{level}}"
     },
     "detail": {
       "title": "Skill Detail",
@@ -3525,7 +3525,7 @@
     "materialPriceBasisSell": "Buy now",
     "materialPriceBasisBuy": "Buy order",
     "materialPriceBasisTooltipLabel": "About material prices",
-    "materialPriceBasisTooltip": "Which prices the plan uses for materials. Buy now: the hub's lowest sell order, paid at once. Buy order: post buy orders and wait; adds the broker fee (and any Safety Tax), so real cost can be higher.",
+    "materialPriceBasisTooltip": "Which prices the plan uses for materials. Buy now: the hub's lowest sell order, paid at once. Buy order: post buy orders and wait; adds the broker fee (and any Safety Tax), so real cost can be higher. The product uses the hub's lowest sell order unless you set a sale price. On Buy now, if the plan needs 1% or more of the units listed at the hub, the price walks the sell orders, cheapest first.",
     "salePrice": "Sale price",
     "salePriceTooltipLabel": "About the sale price",
     "salePriceTooltip": "What you expect to sell one unit for, such as a nullsec market or a contract. It replaces the hub's lowest sell order in revenue, margin, break-even and the Acquisition Verdict. Leave it blank to use the hub price.",
@@ -3533,7 +3533,7 @@
     "resetSalePrice": "Reset the sale price ({{price}} ISK) to the hub price",
     "buildSystem": "Build system",
     "buildSystemTooltipLabel": "About build system",
-    "buildSystemTooltip": "The solar system where your job runs. Its cost index sets the job cost and its security band scales fitted rigs. Leave empty to build at the hub. Type the exact name, then press Enter.",
+    "buildSystemTooltip": "The solar system where your job runs. Its cost index sets the job cost and its security band scales fitted rigs (1x highsec, 1.9x lowsec, 2.1x nullsec). EVE doesn't share structure fittings, so the app can't tell which rig is fitted. Leave empty to build at the hub. Type the exact name, then press Enter or click away.",
     "buildSystemNotFound": "No solar system by that name.",
     "buildSystemUnavailable": "Couldn't check that name right now. Try again when you're online.",
     "buildLocation": "Build location",
@@ -3544,7 +3544,7 @@
     "facilityTaxTooltip": "The tax the structure's owner charges. It is part of the job cost, and each owner sets their own.",
     "costIndexOverride": "Job cost index %",
     "costIndexOverrideTooltipLabel": "Where to find the job cost index",
-    "costIndexOverrideTooltip": "Find it in EVE: Industry window, Facilities tab, hover the activity icons. Enter the Manufacturing (or Reaction) figure. Remembered for this facility.",
+    "costIndexOverrideTooltip": "Find it in EVE: Industry window, Facilities tab, hover the activity icons beside this facility. Enter the Manufacturing (or Reaction) figure. EVE doesn't share it for wormhole systems. Remembered for this facility, so other plans built here start with it.",
     "costIndexMissingNote": "No cost index is available for this system (wormhole space), so the job fee is counted as 0. Enter the index from the in-game Industry window to get an accurate profit.",
     "includeReactions": "Include Reactions",
     "includeReactionsTooltipLabel": "About Include Reactions",
@@ -3927,7 +3927,6 @@
     "dateToLabel": "To",
     "jobsTitle": "Jobs",
     "jobsRefresh": "Refresh",
-    "jobsEmptyTitle": "Job data not loaded yet",
     "jobsNoneMeta": "None",
     "jobsCorpBadge": "Corp",
     "jobsDone": "Done",
@@ -4398,7 +4397,7 @@
     "opportunitiesViewHistory": "View {{name}} price history",
     "opportunitiesPriceHistoryTitle": "{{name}} — Price History",
     "marketOpportunitiesTitle": "What's profitable",
-    "marketOpportunitiesLiquidityTooltip": "Items you could build for profit, including blueprints you can buy. Only products with a blueprint you can get and enough hub sell orders are ranked. Each row uses your owned copy's ME/TE, else your assumed ME/TE.",
+    "marketOpportunitiesLiquidityTooltip": "Items you could build for profit, including blueprints you can buy. Only products with a blueprint you can get (owned, NPC market, public contract, or an LP store where you have points) and enough hub sell orders are ranked, the top few per Market Group. A sell price far above what the item really trades for is replaced by the average. Each row uses your owned copy's ME/TE, else your assumed ME/TE. Sub-builds are folded into the product, so a plan can differ slightly.",
     "marketOpportunitiesRunScan": "Scan",
     "marketOpportunitiesScanning": "Scanning…",
     "marketOpportunitiesEmptyTitle": "Nothing scanned yet",
@@ -12964,6 +12963,7 @@
       "noResultsTitle": "Nothing matches",
       "noResultsHint": "No store or offer matches the search and filters. Clear a filter or the search.",
       "unavailableTitle": "LP Stores aren't available",
+      "unavailableHint": "The daily LP Store data couldn't be read.",
       "resultsStatusStores_one": "{{count}} store",
       "resultsStatusStores_other": "{{count}} stores",
       "resultsStatusOffers_one": "{{count}} offer",
@@ -16220,7 +16220,7 @@
         "fuelDry": "No fuel",
         "stateTimer": "Leaves {{state}}",
         "unanchoring": "Unanchors",
-        "moonArrival": "Ready",
+        "moonArrival": "Chunk",
         "moonDecay": "Auto-fracture",
         "jobReady": "Job done",
         "serviceOffline": "{{service}} off",
@@ -17271,7 +17271,7 @@
           "low": "Low threat",
           "inactive": "No recent kills"
         },
-        "help": "From kills in the last {{days}} days and zKillboard ratios. Dangerous: {{dangerousKills}}+ recent kills and a danger ratio of {{dangerRatio}}+. Active: {{activeKills}}+ recent kills. Low never means safe.",
+        "help": "From kills in the last {{days}} days and zKillboard ratios. Dangerous: {{dangerousKills}}+ recent kills, and either a danger ratio of {{dangerRatio}}+ or {{killerRatio}}%+ of their kills and losses being kills. Active: {{activeKills}}+ recent kills. Low: fewer, or none but a ship lost in that time. Quiet: neither. Low never means safe.",
         "inactive": "No kills in the last {{days}} days.",
         "inactiveLast": "No kills in the last {{days}} days. Last kill {{age}}.",
         "adjusted": {
@@ -20917,6 +20917,7 @@
     "notSetUp": {
       "title": "Ship replacement (SRP) is not set up for your corporation",
       "hint": "Your corp hasn't turned SRP on. Ask a director.",
+      "hintDirector": "Turn it on and set the rules in SRP settings.",
       "action": "Set up SRP"
     },
     "npcTitle": "No ship replacement (SRP) in an NPC corporation",

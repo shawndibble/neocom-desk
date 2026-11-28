@@ -617,6 +617,7 @@ function CorpAssetsView({
           icon={<Icon.StockTargets />}
           label={t('corp.assets.stockTargetsButton')}
           visibleLabel={t('corp.assets.stockTargetsButton')}
+          tooltip={targetsPending ? t('common.loading') : undefined}
           aria-disabled={targetsPending || undefined}
           onClick={() => setTargetsOpen(true)}
         />

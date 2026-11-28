@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SecurityStatus } from '@/components/SecurityStatus';
 import { EmptyState, LoadFailedState, Modal, Spinner } from '@/components/ui';
@@ -15,9 +15,8 @@ import { useActiveCharacter } from '@/stores/activeCharacter';
 import { PlaceLink, SystemLink } from './EntityLink';
 import { Link } from 'react-router-dom';
 import { inlineLinkClassName } from '@/components/ui/controlStyles';
-import { ownedPlaces } from '@/engine/market/appraisalOwned';
 import { assetHref } from '@/features/assets/assetBrowseModel';
-import { useCachedAssetLists } from '@/features/assets/useCachedAssetLists';
+import { useOwnedAssetIndex } from '@/features/assets/useOwnedAssetIndex';
 
 function useLookup<T>(
   id: number | null | undefined,
@@ -53,11 +52,7 @@ export function PlaceInfoDialog({ id, onClose }: { id: number; onClose: () => vo
   const name = kind === 'region' ? regionName : detail?.name;
   const readFailed = isLocation ? place.status === 'failed' : regionLookup.failed;
   const retry = isLocation ? place.retry : regionLookup.retry;
-  const assetLists = useCachedAssetLists(isLocation && scopeId !== null);
-  const ownedHere = useMemo(
-    () => assetLists !== null && ownedPlaces(assetLists).some((owned) => owned.id === id),
-    [assetLists, id]
-  );
+  const ownedHere = useOwnedAssetIndex(isLocation && scopeId !== null)?.placeIds.has(id) === true;
 
   let body;
   if (kind !== null && readFailed) {

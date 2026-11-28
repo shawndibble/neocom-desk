@@ -50,8 +50,8 @@ export function TransactionsSummaryStrip({
       )}
       <dl
         className={cx(
-          'grid grid-cols-2 items-start gap-x-4 gap-y-3 tabular-nums lg:grid-cols-5',
-          figureCount === 4 ? 'sm:grid-cols-4' : 'min-[26rem]:grid-cols-3'
+          'grid grid-cols-2 items-start gap-x-4 gap-y-3 tabular-nums',
+          figureCount === 4 ? 'sm:grid-cols-4' : 'min-[26rem]:grid-cols-3 lg:grid-cols-5'
         )}
       >
         <SummaryFigure

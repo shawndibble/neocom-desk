@@ -140,18 +140,19 @@ export function CorpAssetItemTable({
       width: '12ch',
       sortValue: (r) => r.ledger.stock?.target,
       render: (r) => {
-        const cell =
-          r.ledger.isBlueprintCopy || !canEditTargets ? (
-            <span className="text-text-dim tabular-nums">{r.ledger.stock?.target ?? '—'}</span>
-          ) : (
-            <StockTargetCell
-              itemName={r.name}
-              target={r.ledger.stock?.target}
-              onChange={(target) => onSetTarget(r.ledger.typeId, target)}
-              onRemove={() => onRemoveTarget(r.ledger.typeId)}
-            />
-          );
-        return r.ledger.stock?.target === undefined ? <span data-dense-omit>{cell}</span> : cell;
+        if (r.ledger.isBlueprintCopy || !canEditTargets) {
+          const target = r.ledger.stock?.target;
+          const cell = <span className="text-text-dim tabular-nums">{target ?? '—'}</span>;
+          return target === undefined ? <span data-dense-omit>{cell}</span> : cell;
+        }
+        return (
+          <StockTargetCell
+            itemName={r.name}
+            target={r.ledger.stock?.target}
+            onChange={(target) => onSetTarget(r.ledger.typeId, target)}
+            onRemove={() => onRemoveTarget(r.ledger.typeId)}
+          />
+        );
       },
     },
     shortBy: {
@@ -187,9 +188,13 @@ export function CorpAssetItemTable({
         const shown = placements.slice(0, MAX_PLACEMENT_CHIPS);
         const hidden = placements.length - shown.length;
         return (
-          <span className="flex flex-wrap gap-1">
+          <span className="inline-flex flex-wrap gap-1">
             {shown.map((p, i) => (
-              <Pill key={`${p.state}|${p.locationId}|${p.division}`} tone={placementTone(p.state)}>
+              <Pill
+                key={`${p.state}|${p.locationId}|${p.division}`}
+                tone={placementTone(p.state)}
+                className="sm:whitespace-nowrap"
+              >
                 {texts[i]} ×{formatCount(p.quantity)}
               </Pill>
             ))}

@@ -8,7 +8,7 @@ import { useMilestones } from './useMilestones';
 import { SkillPicker } from './SkillPicker';
 import { EntryList } from './EntryList';
 import { PlanEditorLayout } from './PlanEditorLayout';
-import { useIsPlanEditorWide } from './useIsPlanEditorWide';
+import { useIsXlUp } from '@/lib/useIsXlUp';
 import { LiveQueueLead } from './LiveQueueLead';
 import { addEntry } from './skillPlanEdit';
 import { EntryListControls } from './planEditor/EntryListControls';
@@ -62,7 +62,7 @@ export function PlanEditor({
   onUpdate,
 }: PlanEditorProps) {
   const { t } = useTranslation();
-  const isDesktop = useIsPlanEditorWide();
+  const isDesktop = useIsXlUp();
   const { focusName, pastedPlanText } = usePlanLocationFlags(isDesktop);
   const viewPrefs = usePlanViewPrefs();
   const assumptions = usePlanAssumptions({

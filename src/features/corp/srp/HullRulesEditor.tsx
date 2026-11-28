@@ -285,7 +285,7 @@ export function HullRulesEditor({
       header: t('srp.settings.hullRules.amount'),
       render: (row) =>
         ruleOf(form, row.scope, row.id).kind === 'pay-fixed' ? (
-          <div className="w-full max-w-56">{iskInput(row)}</div>
+          <div className="w-full min-w-36 max-w-56">{iskInput(row)}</div>
         ) : (
           <span className="text-text-dim">{helper(row)}</span>
         ),
@@ -356,7 +356,7 @@ export function HullRulesEditor({
           {rows.map(phoneLine)}
         </ul>
       ) : (
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto edge-fade-end">
           <DataTable
             label={t('srp.settings.hullRules.tableLabel')}
             columns={columns}

@@ -68,6 +68,7 @@ function StopRow({
   onRemove,
   onMove,
   count,
+  reducedMotion,
 }: {
   systemId: number;
   index: number;
@@ -77,12 +78,12 @@ function StopRow({
   onRemove: (index: number) => void;
   onMove: (from: number, to: number) => void;
   count: number;
+  reducedMotion: boolean;
 }) {
   const { t } = useTranslation();
-  const reduced = usePrefersReducedMotion();
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: systemId,
-    transition: reduced ? null : undefined,
+    transition: reducedMotion ? null : undefined,
   });
   const hasMenu = count > 1;
   const li = (
@@ -182,6 +183,7 @@ export function StopsPanel({
 }) {
   const { t } = useTranslation();
   const isPhone = useIsPhone();
+  const reducedMotion = usePrefersReducedMotion();
   const [expanded, setExpanded] = useState(false);
   const systems = useSolarSystemIndex();
   const sensors = useSensors(
@@ -307,6 +309,7 @@ export function StopsPanel({
                       onRemove={remove}
                       onMove={move}
                       count={stops.length}
+                      reducedMotion={reducedMotion}
                     />
                   ))}
                 </ol>

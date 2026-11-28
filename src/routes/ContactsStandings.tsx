@@ -223,7 +223,7 @@ export function useContactsStandings(characterId: number, enabled: boolean) {
               className="py-8"
             />
           ) : (
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto edge-fade-end">
               <DataTable
                 label={t('contacts.tabStandings')}
                 columns={columns}

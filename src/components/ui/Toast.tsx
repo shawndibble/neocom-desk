@@ -41,9 +41,6 @@ interface ToastBaseProps {
   stacked?: boolean;
   /**
    * @summary Tints the border and adds a glyph and a spoken word.
-   * `TOAST_TONE` holds the three together. Leave unset for a routine
-   * confirmation; pass `success` where the outcome could have failed and
-   * didn't, `danger` where it failed.
    */
   tone?: ToastTone;
 }

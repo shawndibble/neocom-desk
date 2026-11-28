@@ -100,7 +100,7 @@ export function EveNotificationRow({
                   <div
                     className={`flex items-center justify-between gap-3 border-t border-line/60 px-3 py-1 ${EVENT_ROW_GRID}`}
                   >
-                    <span className={`${eyebrowClassName} md:col-start-1`}>{familyLabel}</span>
+                    <span className={`${eyebrowClassName} lg:col-start-1`}>{familyLabel}</span>
                     {NOTIFICATION_CHANNELS.map((channel, index) => (
                       <div key={channel} className={index === 0 ? DEVICE_CELL : ALERTS_CELL}>
                         <ChannelOffTip reason={context.channelOff[channel]}>

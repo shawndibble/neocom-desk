@@ -16,7 +16,6 @@ import {
   Toast,
   ToastStack,
   useDeferredCommits,
-  useTimedToast,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { guarded, preloadRouteChunk } from '@/app/routeChunks';
@@ -213,7 +212,6 @@ export function Industry() {
     setFitImportOpen(true);
   }, [location.key, location.state]);
   const [blueprintPasteNote, setBlueprintPasteNote] = useState<string | null>(null);
-  useTimedToast(blueprintPasteNote, () => setBlueprintPasteNote(null));
   const handledBlueprintPasteKey = useRef<string | null>(null);
   useEffect(() => {
     const text = (location.state as Partial<IndustryBlueprintListState> | null)?.blueprintListText;
@@ -880,7 +878,9 @@ export function Industry() {
           }}
         />
 
-        {blueprintPasteNote && <Toast message={blueprintPasteNote} />}
+        {blueprintPasteNote && (
+          <Toast message={blueprintPasteNote} onClose={() => setBlueprintPasteNote(null)} />
+        )}
 
         <ToastStack
           items={pendingDeletes.items}

@@ -72,7 +72,7 @@ export function MemberCombobox({ members, query, onQuery, onPick, inputRef }: Me
     <div className="space-y-1.5">
       <Fields variant="stacked">
         <Field label={t('vetting.member.label')}>
-          <span className="relative block">
+          <span className="relative block w-full">
             <Icon.Search
               aria-hidden="true"
               size={Icon.ICON_SIZE.md}

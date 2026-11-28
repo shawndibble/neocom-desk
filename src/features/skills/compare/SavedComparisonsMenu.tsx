@@ -140,6 +140,7 @@ export function SavedComparisonsMenu({
 
   const [open, setOpen] = useState(false);
   const pendingDeletes = useDeferredCommits();
+  const unlinkedByDelete = useRef<string | null>(null);
   const shown = value.items.filter((item) => !pendingDeletes.hiddenIds.has(item.id));
   const focusAfterCommit = useFocusAfterCommit();
   const loadButtons = useRef(new Map<string, HTMLButtonElement>());
@@ -178,7 +179,10 @@ export function SavedComparisonsMenu({
     const near = [shown[index + 1], shown[index - 1]].map(
       (item) => () => (item ? loadButtons.current.get(item.id) : null)
     );
-    if (activeComparisonId === id) onUnlinked();
+    if (activeComparisonId === id) {
+      unlinkedByDelete.current = id;
+      onUnlinked();
+    }
     pendingDeletes.defer({
       id,
       message: t('skillCompare.deleted', { name: shown[index].name }),
@@ -252,7 +256,10 @@ export function SavedComparisonsMenu({
       <ToastStack
         items={pendingDeletes.items}
         undoLabel={t('skillCompare.undo')}
-        onUndo={pendingDeletes.undo}
+        onUndo={(id) => {
+          pendingDeletes.undo(id);
+          if (unlinkedByDelete.current === id && activeComparisonId === null) onSaved(id);
+        }}
         onClose={pendingDeletes.commit}
       />
     </>

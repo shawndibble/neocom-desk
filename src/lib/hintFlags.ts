@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useRef, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useId, useRef, useState, useSyncExternalStore } from 'react';
 import { createLocalSetting } from './useLocalSetting';
 
 export type HintCounts = Readonly<Record<string, number>>;
@@ -76,18 +76,30 @@ export function useOneTimeHint(
 ): [shown: boolean, dismiss: () => void, anchor: (element: HTMLElement | null) => void] {
   const owner = `${id}:${useId()}`;
   const anchorRef = useRef<HTMLElement | null>(null);
-  const anchor = useCallback((element: HTMLElement | null) => {
-    anchorRef.current = element;
-  }, []);
+  const observerRef = useRef<ResizeObserver | null>(null);
+  const [anchorHidden, setAnchorHidden] = useState(false);
+  const anchor = useCallback(
+    (element: HTMLElement | null) => {
+      anchorRef.current = element;
+      observerRef.current?.disconnect();
+      observerRef.current = null;
+      if (element === null || hintSeenCount(useHintCounts.getState().value, id) > 0) return;
+      observerRef.current = new ResizeObserver(() =>
+        setAnchorHidden(element.checkVisibility?.() === false)
+      );
+      observerRef.current.observe(element);
+    },
+    [id]
+  );
   const hydrated = useHintCounts((state) => state.hydrated);
   const shown = useSessionHintShown(owner);
   const waiting = useSyncExternalStore(subscribe, () => otherExclusiveShown(owner));
   useEffect(() => {
-    if (!active || !hydrated || waiting) return;
+    if (!active || !hydrated || waiting || anchorHidden) return;
     if (anchorRef.current?.checkVisibility?.() === false) return;
     if (hintSeenCount(useHintCounts.getState().value, id) > 0) return;
     if (claimSessionHint(owner, true)) return () => releaseSessionHint(owner);
-  }, [active, hydrated, id, owner, waiting]);
+  }, [active, hydrated, id, owner, waiting, anchorHidden]);
   const dismiss = () => {
     recordHintSeen(id);
     dismissSessionHint(owner);

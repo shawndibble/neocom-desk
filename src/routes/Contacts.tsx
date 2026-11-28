@@ -359,7 +359,7 @@ export function Contacts() {
                     }
                   />
                 ) : (
-                  <div className="overflow-x-auto">
+                  <div className="overflow-x-auto edge-fade-end">
                     <DataTable
                       {...characterExport.tableProps}
                       label={t('contacts.title')}

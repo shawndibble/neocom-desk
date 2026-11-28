@@ -78,9 +78,8 @@ import { recordAttributes } from '@/features/abyssal/dynamicItems';
 import type { DynamicItemRecord } from '@/db';
 import { formatIsk, formatIskCompact, marketIskDecimals } from '@/lib/isk';
 import { formatCount } from '@/lib/formatCount';
-import { ownedAnywhere } from '@/engine/market/appraisalOwned';
 import { assetHref } from '@/features/assets/assetBrowseModel';
-import { useCachedAssetLists } from '@/features/assets/useCachedAssetLists';
+import { useOwnedAssetIndex } from '@/features/assets/useOwnedAssetIndex';
 
 export interface ItemDetailModalProps {
   typeId: number;
@@ -544,9 +543,8 @@ function FindInAssetsLink({
   const { t } = useTranslation();
   const inRouter = useInRouterContext();
   const signedIn = useActiveCharacter((state) => state.activeCharacterId !== null);
-  const lists = useCachedAssetLists(inRouter && signedIn);
-  const owned = useMemo(() => lists !== null && ownedAnywhere(lists).has(typeId), [lists, typeId]);
-  if (!owned) return null;
+  const owned = useOwnedAssetIndex(inRouter && signedIn);
+  if (owned?.typeIds.has(typeId) !== true) return null;
   return (
     <p>
       <Link

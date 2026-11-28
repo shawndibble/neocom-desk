@@ -330,6 +330,7 @@ export function SurveyTab({ tabBar, tabsId }: SurveyTabProps) {
                   <>
                     <TextArea
                       rows={3}
+                      className="max-w-3xl"
                       aria-label={t('survey.start.pasteTitle')}
                       placeholder={t('survey.start.pastePlaceholder')}
                       value=""
@@ -352,6 +353,7 @@ export function SurveyTab({ tabBar, tabsId }: SurveyTabProps) {
                       characterId={characterId}
                       draft={startDraft}
                       onChange={setStartDraft}
+                      hasTemplates={templates.length > 0}
                     />
                   </>
                 ) : undefined

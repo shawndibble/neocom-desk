@@ -35,14 +35,24 @@ import {
   type MemberSrp as MemberData,
 } from './useMemberSrp';
 
-function ConfigureSrpLink() {
+function SrpNotSetUp() {
   const { t } = useTranslation();
   const gate = useCorpRouteGate((capabilities) => capabilities.canConfigureSrp);
-  if (gate.status !== 'ready') return null;
+  const canSetUp = gate.status === 'ready';
   return (
-    <Link to="/corp/srp/settings" className={buttonClassName({ variant: 'primary' })}>
-      {t('srpMember.notSetUp.action')}
-    </Link>
+    <Panel>
+      <EmptyState
+        title={t('srpMember.notSetUp.title')}
+        hint={t(canSetUp ? 'srpMember.notSetUp.hintDirector' : 'srpMember.notSetUp.hint')}
+        action={
+          canSetUp && (
+            <Link to="/corp/srp/settings" className={buttonClassName({ variant: 'primary' })}>
+              {t('srpMember.notSetUp.action')}
+            </Link>
+          )
+        }
+      />
+    </Panel>
   );
 }
 
@@ -66,15 +76,7 @@ export function MemberSrp({ characterId, corporationId }: MemberSrpProps) {
   } else if (status.state === 'failed') {
     body = <LoadFailedState title={t('srpMember.loadFailed')} onRetry={data.retry} />;
   } else if (!status.value.enabled || !status.value.settings) {
-    body = (
-      <Panel>
-        <EmptyState
-          title={t('srpMember.notSetUp.title')}
-          hint={t('srpMember.notSetUp.hint')}
-          action={<ConfigureSrpLink />}
-        />
-      </Panel>
-    );
+    body = <SrpNotSetUp />;
   } else {
     const { windowDays, requireFleetOrFc, hullRules } = status.value.settings;
     body = (

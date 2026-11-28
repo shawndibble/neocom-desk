@@ -1,40 +1,41 @@
 import type { ReactNode } from 'react';
 
-interface EmptyStateProps {
+interface EmptyStateBase {
   /** @summary Already-translated headline saying what is missing. */
   title: string;
+  /** @summary ARIA role for the wrapper; `alert` for a failed read. */
+  role?: 'alert';
+  className?: string;
+}
+
+interface BlockEmptyStateProps extends EmptyStateBase {
   /** @summary One line on why it is empty or what to do next; may hold an inline link. */
   hint?: ReactNode;
   /** @summary Decorative glyph above the title. */
   icon?: ReactNode;
   /** @summary The control that resolves the empty state, e.g. a `Button`; two only when they start different things. */
   action?: ReactNode;
-  /** @summary ARIA role for the wrapper; `alert` for a failed read. */
-  role?: 'alert';
-  /** @summary `inline`: one dim 12px line for an empty sub-list or dialog list; the title only. */
-  variant?: 'block' | 'inline';
-  className?: string;
+  variant?: 'block';
+}
+
+interface InlineEmptyStateProps extends EmptyStateBase {
+  /** @summary `inline`: one dim 12px line for an empty sub-list or dialog list; the title only, so no hint, icon or action. */
+  variant: 'inline';
 }
 
 /**
  * @summary Centred title, hint and optional action for a view with nothing to show.
  */
-export function EmptyState({
-  title,
-  hint,
-  icon,
-  action,
-  role,
-  variant = 'block',
-  className = '',
-}: EmptyStateProps) {
-  if (variant === 'inline') {
+export function EmptyState(props: BlockEmptyStateProps | InlineEmptyStateProps) {
+  const { title, role, className = '' } = props;
+  if (props.variant === 'inline') {
     return (
       <p role={role} className={`text-xs text-text-dim ${className}`}>
         {title}
       </p>
     );
   }
+  const { hint, icon, action } = props;
   return (
     <div
       role={role}

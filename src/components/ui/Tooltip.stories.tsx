@@ -5,8 +5,7 @@ import * as Icon from './icons';
 import { InfoTooltip, Tooltip } from './Tooltip';
 
 /**
- * @summary Collision-aware hover/focus bubble on Radix (docs/adr/0008). §6c Tooltips: use
- * `Tooltip`, `InfoTooltip` or `HintText`, never native `title=`; content is never essential.
+ * @summary Collision-aware hover/focus bubble on Radix (docs/adr/0008).
  */
 const meta = {
   title: 'ui/Tooltip',
@@ -42,8 +41,7 @@ export const Resting: Story = {
 };
 
 /**
- * @summary `openOnTap`: a trigger whose only job is explaining, so a plain tap on a phone reveals
- * the bubble (§6c Touch and hold). Leave off when the tap does something.
+ * @summary `openOnTap`: a trigger whose only job is explaining, so a plain tap on a phone reveals the bubble (§6c Touch and hold).
  */
 export const OpenOnTap: Story = {
   args: { content: 'Tap to read, tap again to hide.', openOnTap: true, children: refresh },
@@ -66,8 +64,7 @@ export const InfoNote: Story = {
 };
 
 /**
- * @summary Anti-pattern (§6c Tooltips): a native `title=` is unreachable on touch, keyboard and
- * screen readers. Use `Tooltip` instead.
+ * @summary Anti-pattern (§6c Tooltips): a native `title=` is unreachable on touch, keyboard and screen readers.
  */
 export const NativeTitle: Story = {
   tags: ['!manifest'],

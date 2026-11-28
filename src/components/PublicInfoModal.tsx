@@ -222,7 +222,7 @@ export function PublicInfoModal() {
       open
       onClose={close}
       title={title}
-      placement={npcView ? (isPhone ? 'sheet-full' : 'medium') : 'wide'}
+      placement={isPhone ? 'sheet-full' : npcView ? 'medium' : 'wide'}
       closeOnBack={false}
       titleActions={
         activeEntityId === undefined || activeEntityId === null ? undefined : (

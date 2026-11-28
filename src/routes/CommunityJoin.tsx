@@ -165,7 +165,7 @@ export function CommunityJoin() {
   }
 
   const signedOut = characters !== undefined && characters.length === 0;
-  const anyJoined = Object.values(results).some(isFine);
+  const anyJoined = Object.values(results).some((r) => r === 'joined' || r === 'alreadyMember');
 
   return (
     <div className="safe-inset mx-auto flex min-h-dvh max-w-xl [--safe-x:0.5rem] [--safe-y:0.5rem] flex-col gap-4 bg-bg text-text sm:[--safe-x:1.5rem] sm:[--safe-y:1.5rem]">

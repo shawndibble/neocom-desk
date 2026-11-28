@@ -234,7 +234,11 @@ export function LoyaltyStoreLanding({ active = true }: { active?: boolean }) {
     );
   } else if (data.status === 'unavailable') {
     body = (
-      <LoadFailedState title={t('loyaltyStore.landing.unavailableTitle')} onRetry={data.retry} />
+      <LoadFailedState
+        title={t('loyaltyStore.landing.unavailableTitle')}
+        hint={t('loyaltyStore.landing.unavailableHint')}
+        onRetry={data.retry}
+      />
     );
   } else if (shown === 0) {
     body = (

@@ -7,7 +7,7 @@ import {
   renameGroup,
   removeGroup,
   moveCharacterToGroup,
-  reorderGroups,
+  swapGroups,
   sortCharacterIds,
   rosterSortStats,
   type CharacterGroup,
@@ -91,19 +91,19 @@ describe('moveCharacterToGroup', () => {
   });
 });
 
-describe('reorderGroups', () => {
-  it('moves a group from one index to another', () => {
-    const groups: CharacterGroup[] = [
-      { id: 'g1', name: 'A', characterIds: [] },
-      { id: 'g2', name: 'B', characterIds: [] },
-      { id: 'g3', name: 'C', characterIds: [] },
-    ];
-    expect(reorderGroups(groups, 0, 2).map((g) => g.id)).toEqual(['g2', 'g3', 'g1']);
+describe('swapGroups', () => {
+  const groups: CharacterGroup[] = [
+    { id: 'g1', name: 'A', characterIds: [] },
+    { id: 'g2', name: 'B', characterIds: [] },
+    { id: 'g3', name: 'C', characterIds: [] },
+  ];
+
+  it('swaps two groups and leaves the ones between them in place', () => {
+    expect(swapGroups(groups, 'g3', 'g1').map((g) => g.id)).toEqual(['g3', 'g2', 'g1']);
   });
 
-  it('is a no-op for an out-of-range index', () => {
-    const groups: CharacterGroup[] = [{ id: 'g1', name: 'A', characterIds: [] }];
-    expect(reorderGroups(groups, 0, 5)).toEqual(groups);
+  it('is a no-op for an unknown id', () => {
+    expect(swapGroups(groups, 'g1', 'nope')).toEqual(groups);
   });
 });
 

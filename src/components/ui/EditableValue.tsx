@@ -25,16 +25,13 @@ type EditableValueProps = Omit<
   /** @summary The visible value, e.g. "3,000" or "@ 4 ISK". */
   children: ReactNode;
   /**
-   * @summary The action, for a screen reader: "Edit Have for Tritanium". Read
-   * before the value, so the button says what it does and what it holds.
+   * @summary The action, for a screen reader: "Edit Have for Tritanium".
    */
   label: string;
   /** @summary Opens the field; `seed` is the digit the pilot started typing on the value. */
   onEdit: (seed?: string) => void;
   /**
-   * @summary Takes focus as it mounts — set when Enter or Escape has just
-   * closed this value's field, so focus comes back to the pencil (§6c)
-   * rather than falling to the page. `onFocused` clears the request.
+   * @summary Takes focus as it mounts — set when Enter or Escape has just closed this value's field, so focus comes back to the pencil (§6c) rather than falling to the page.
    */
   focusOnMount?: boolean;
   /** @summary Called once the value has taken focus for `focusOnMount`, to clear the request. */
@@ -42,17 +39,7 @@ type EditableValueProps = Omit<
 };
 
 /**
- * @summary A number edited in place (DESIGN.md §6c, "Faint pencil after a
- * value"): the value as text with a faint pencil, a field box on hover or
- * focus, and the caller's field once clicked.
- *
- * The caller owns the field and swaps it in when `onEdit` fires. Typing a
- * digit while the value has focus opens the field with that digit, so
- * tabbing down a column and typing works the way it does when every cell is
- * a field. The field keeps `useInPlaceEdit`'s contract — Enter or blur saves,
- * Escape cancels, and Enter or Escape hands focus back here (`focusOnMount`,
- * or a `ref` the caller focuses). A click edits the value and never reaches a
- * row behind it.
+ * @summary A number edited in place (DESIGN.md §6c, "Faint pencil after a value"): the value as text with a faint pencil, a field box on hover or focus, and the caller's field once clicked.
  */
 export function EditableValue({
   children,

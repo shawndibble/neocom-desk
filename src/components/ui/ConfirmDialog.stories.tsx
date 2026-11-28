@@ -2,9 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { ConfirmDialog } from './ConfirmDialog';
 
 /**
- * @summary A confirm for one action: body text, a danger or plain action button, and its own
- * failure line. `onConfirm` rejecting keeps the dialog open and shows `failedLabel`. Open here,
- * since a closed dialog renders nothing.
+ * @summary A confirm for one action: body text, a danger or plain action button, and its own failure line.
  */
 const meta = {
   title: 'ui/ConfirmDialog',

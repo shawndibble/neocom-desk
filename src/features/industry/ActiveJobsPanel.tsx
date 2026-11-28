@@ -704,11 +704,7 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
       ) : blockingNeedsReauth ? (
         <GrantBanner characterId={characterId} endpoints={['getCharacterIndustryJobs']} />
       ) : jobs.length === 0 ? (
-        <LoadFailedState
-          title={t('industry.jobsEmptyTitle')}
-          onRetry={listRefresh}
-          className="py-4"
-        />
+        <LoadFailedState onRetry={listRefresh} className="py-4" />
       ) : (
         <div className="space-y-2">
           {fromCacheAny && (

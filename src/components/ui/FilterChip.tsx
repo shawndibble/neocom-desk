@@ -27,7 +27,6 @@ interface FilterChipProps {
   tooltip?: string;
   /**
    * @summary For a chip that opens a region instead of filtering: whether that region is open.
-   * Reported as `aria-expanded` (with `controls`) in place of `aria-pressed`.
    */
   expanded?: boolean;
   controls?: string;

@@ -466,9 +466,6 @@ export function ColoniesTab({
         fetchedAt: group.fetchedAt,
         makesPerDay: altAdvice?.get(altId)?.makesPerDay ?? null,
         colonies: sorted.map((row) => ({ ...byKey.get(row.key)!, row })),
-        summary: altGroupSummary(
-          group.colonies.map((entry) => colonyStatusFromPins(entry.detail?.pins ?? [], nowMs))
-        ),
       };
     });
   }, [roster, pi, planAdvice.snapshot, altAdvice, nowMs, expiringWindowMs, haulHours]);
@@ -509,15 +506,24 @@ export function ColoniesTab({
       else next.add(status);
       return next;
     });
+  const statusChips = (['stopped', 'expiring'] as const)
+    .map((status) => ({ status, count: todayRows.filter((row) => row.status === status).length }))
+    .filter(({ status, count }) => count > 0 || statusFilter.has(status));
   const visibleOwnRows = ownRows.filter((row) => matchesStatusFilter(row.status, statusFilter));
   const visibleAltGroups = showAltColonies
     ? altGroups
-        .map((group) => ({
-          ...group,
-          colonies: group.colonies.filter(({ row }) =>
+        .map((group) => {
+          const colonies = group.colonies.filter(({ row }) =>
             matchesStatusFilter(row.status, statusFilter)
-          ),
-        }))
+          );
+          const summary = {
+            stoppedCount: colonies.filter(({ row }) => row.status === 'stopped').length,
+            nextExpiryMs: altGroupSummary(
+              colonies.map(({ detail }) => colonyStatusFromPins(detail?.pins ?? [], nowMs))
+            ).nextExpiryMs,
+          };
+          return { ...group, colonies, summary };
+        })
         .filter((group) => group.colonies.length > 0)
     : [];
 
@@ -596,7 +602,7 @@ export function ColoniesTab({
             }
             padded={false}
           >
-            {(hasOtherCharacters || todayRows.length > 0) && (
+            {(hasOtherCharacters || statusChips.length > 0) && (
               <div
                 role="group"
                 aria-label={t('piColonies.statusFilter.label')}
@@ -609,22 +615,16 @@ export function ColoniesTab({
                     onToggle={() => void setShowAltColonies(!showAltColonies)}
                   />
                 )}
-                {todayRows.length > 0 &&
-                  (['stopped', 'expiring'] as const).map((status) => {
-                    const count = todayRows.filter((row) => row.status === status).length;
-                    const selected = statusFilter.has(status);
-                    return (
-                      <FilterChip
-                        key={status}
-                        label={t(`piColonies.status.${status}`)}
-                        count={count}
-                        countLabel={t('piColonies.statusFilter.count', { count })}
-                        selected={selected}
-                        disabled={count === 0 && !selected}
-                        onToggle={() => toggleStatus(status)}
-                      />
-                    );
-                  })}
+                {statusChips.map(({ status, count }) => (
+                  <FilterChip
+                    key={status}
+                    label={t(`piColonies.status.${status}`)}
+                    count={count}
+                    countLabel={t('piColonies.statusFilter.count', { count })}
+                    selected={statusFilter.has(status)}
+                    onToggle={() => toggleStatus(status)}
+                  />
+                ))}
               </div>
             )}
             {visibleOwnRows.length > 0 && <ColonyListHeader haulHours={haulHours} />}

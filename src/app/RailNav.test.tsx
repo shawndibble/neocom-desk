@@ -167,6 +167,24 @@ describe('the rail', () => {
     }
   });
 
+  it('keeps the current view in sight while the rail fills in, until the pilot touches it', async () => {
+    const scrolled = vi.fn();
+    Element.prototype.scrollIntoView = scrolled;
+    try {
+      renderAt('/wallet/journal');
+      scrolled.mockClear();
+      act(() => void rail().append(document.createElement('div')));
+      await waitFor(() => expect(scrolled).toHaveBeenCalledWith({ block: 'nearest' }));
+
+      rail().dispatchEvent(new Event('pointerdown'));
+      scrolled.mockClear();
+      await act(async () => void rail().append(document.createElement('div')));
+      expect(scrolled).not.toHaveBeenCalled();
+    } finally {
+      delete (Element.prototype as Partial<Element>).scrollIntoView;
+    }
+  });
+
   it("opens the current page's views and leaves the others closed", () => {
     renderAt('/market/appraisal');
 

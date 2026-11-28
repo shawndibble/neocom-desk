@@ -1,25 +1,11 @@
-import { readdirSync, readFileSync, statSync } from 'node:fs';
-import { join } from 'node:path';
-import { describe, expect, it } from 'vitest';
-
-const root = join(__dirname, '..', '..');
-
-function sourceFiles(dir: string): string[] {
-  return readdirSync(dir).flatMap((name) => {
-    const path = join(dir, name);
-    if (statSync(path).isDirectory()) return sourceFiles(path);
-    return /\.tsx?$/.test(name) && !/\.(test|stories)\.tsx?$/.test(name) ? [path] : [];
-  });
-}
+import { appSourceFiles, ratchet } from '@/test/sourceRatchet';
 
 const RAW_DATE_FORMAT =
   /\.toLocaleDateString\(|\.toLocaleTimeString\(|Intl\.DateTimeFormat\((?!\)\.resolvedOptions)|new Date\((?:[^()]|\([^()]*\))*\)\.toLocaleString\(/;
 
-const found = sourceFiles(join(root, 'src'))
-  .map((file) => file.slice(root.length + 1))
-  .filter((file) => !file.startsWith('src/lib/'))
-  .filter((file) => RAW_DATE_FORMAT.test(readFileSync(join(root, file), 'utf8')))
-  .sort();
+const found = appSourceFiles()
+  .filter(({ path, source }) => !path.startsWith('src/lib/') && RAW_DATE_FORMAT.test(source))
+  .map(({ path }) => path);
 
 const ALLOWED = [
   'src/engine/mail/mailAge.ts',
@@ -44,12 +30,4 @@ const ALLOWED = [
   'src/mockups/extractionAutofractureParts.tsx',
 ];
 
-describe('dates formatted outside src/lib/timestamp and src/lib/formatDateTick', () => {
-  it('no new file', () => {
-    expect(found.filter((f) => !ALLOWED.includes(f))).toEqual([]);
-  });
-
-  it('allowlist lists only current offenders', () => {
-    expect(ALLOWED.filter((f) => !found.includes(f))).toEqual([]);
-  });
-});
+ratchet('dates formatted outside src/lib/timestamp and src/lib/formatDateTick', found, ALLOWED);

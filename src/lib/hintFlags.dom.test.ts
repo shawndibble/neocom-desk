@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { createElement } from 'react';
 import { act, render, renderHook, screen } from '@testing-library/react';
 import {
@@ -103,5 +103,39 @@ describe('useOneTimeHint on a hidden anchor', () => {
     );
     expect(screen.getByTestId('rowHint')).toHaveAttribute('data-shown', 'false');
     expect(screen.getByTestId('columnPickerHint')).toHaveAttribute('data-shown', 'true');
+  });
+
+  it('shows once a hidden anchor becomes visible', () => {
+    const resized: (() => void)[] = [];
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        constructor(callback: () => void) {
+          resized.push(callback);
+        }
+        observe() {}
+        disconnect() {}
+      }
+    );
+    let visible = false;
+    function Late() {
+      const [shown, , anchor] = useOneTimeHint('rowHint');
+      return createElement('span', {
+        'data-testid': 'late',
+        'data-shown': String(shown),
+        ref: (element: HTMLElement | null) => {
+          if (element) element.checkVisibility = () => visible;
+          anchor(element);
+        },
+      });
+    }
+    render(createElement(Late));
+    act(() => resized.forEach((callback) => callback()));
+    expect(screen.getByTestId('late')).toHaveAttribute('data-shown', 'false');
+
+    visible = true;
+    act(() => resized.forEach((callback) => callback()));
+    expect(screen.getByTestId('late')).toHaveAttribute('data-shown', 'true');
+    vi.unstubAllGlobals();
   });
 });

@@ -248,7 +248,7 @@ describe('ActiveJobsPanel: rendering', () => {
       </MemoryRouter>
     );
     expect(await screen.findByText('None')).toBeInTheDocument();
-    expect(screen.queryByText('Job data not loaded yet')).toBeNull();
+    expect(screen.queryByText("Couldn't load")).toBeNull();
     expect(screen.queryByRole('table')).toBeNull();
     expect(screen.getByRole('button', { name: 'Refresh' })).toBeInTheDocument();
   });
@@ -262,7 +262,7 @@ describe('ActiveJobsPanel: rendering', () => {
         </FakeItemActions>
       </MemoryRouter>
     );
-    expect(await screen.findByText('Job data not loaded yet')).toBeInTheDocument();
+    expect(await screen.findByText("Couldn't load")).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
   });
 });
@@ -295,7 +295,7 @@ describe('ActiveJobsPanel: 403 (missing scope) surfaces a distinct re-login stat
 
     expect(await screen.findByText('Pilot One: grant Industry')).toBeInTheDocument();
     expect(screen.queryByText(/showing cached data/i)).toBeNull();
-    expect(screen.queryByText('Job data not loaded yet')).toBeNull();
+    expect(screen.queryByText("Couldn't load")).toBeNull();
   });
 
   it('offers a real login action wired to beginEveLogin (UX-REVIEW #3)', async () => {
@@ -1291,7 +1291,7 @@ describe('ActiveJobsPanel: cross-character view (issue #607)', () => {
     await user.click(await screen.findByRole('button', { name: 'This character' }));
     await user.click(await screen.findByRole('menuitemradio', { name: 'All characters · 2' }));
 
-    expect(await screen.findByText('Job data not loaded yet')).toBeInTheDocument();
+    expect(await screen.findByText("Couldn't load")).toBeInTheDocument();
     expect(screen.queryByRole('status', { name: 'Loading' })).not.toBeInTheDocument();
     expect(screen.queryByText('None')).not.toBeInTheDocument();
   });
@@ -1521,7 +1521,7 @@ describe('ActiveJobsPanel: corp jobs by installer (issue #2302)', () => {
     mockCorpJobs([]);
     renderAt('/industry');
 
-    expect(await screen.findByText('Job data not loaded yet')).toBeInTheDocument();
+    expect(await screen.findByText("Couldn't load")).toBeInTheDocument();
     expect(screen.queryByText('just now')).not.toBeInTheDocument();
   });
 });

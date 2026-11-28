@@ -221,7 +221,7 @@ export function SharedBlueprintTable({
     (column) => column.id === 'name' || isVisible(column.id as SharedBlueprintColumnId)
   );
   return (
-    <div className="overflow-x-auto">
+    <div className="overflow-x-auto edge-fade-end">
       <DataTable
         label={t('communities.library.sharedLabel')}
         columns={shownColumns}

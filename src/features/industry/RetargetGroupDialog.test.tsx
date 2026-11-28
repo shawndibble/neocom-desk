@@ -60,6 +60,18 @@ describe('RetargetGroupDialog', () => {
     expect(new Set(planIds)).toEqual(new Set(['p1', 'p2']));
   });
 
+  it('asks before Escape throws away a changed trade hub', async () => {
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    render(<RetargetGroupDialog group={GROUP} plans={[]} onApply={vi.fn()} onClose={onClose} />);
+
+    await user.click(screen.getByRole('combobox', { name: 'Trade hub' }));
+    await user.click(screen.getByRole('option', { name: /^Amarr/ }));
+    await user.keyboard('{Escape}');
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByText('Discard what you typed?')).toBeInTheDocument();
+  });
+
   it('skips a plan unchecked in the preview', async () => {
     const user = userEvent.setup();
     const onApply = vi.fn();

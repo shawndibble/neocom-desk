@@ -54,6 +54,19 @@ describe('Field note', () => {
     const input = screen.getByLabelText('Price');
     expect(input).toHaveAccessibleDescription('Per unit');
   });
+
+  it('names a stacked field by its label alone and describes it by the note', () => {
+    render(
+      <Fields variant="stacked">
+        <Field label="Name" note="Shown to members">
+          <TextInput />
+        </Field>
+      </Fields>
+    );
+    const input = screen.getByRole('textbox', { name: 'Name' });
+    expect(input).toHaveAccessibleDescription('Shown to members');
+    expect(input.closest('label')?.querySelector('div, p')).toBeNull();
+  });
 });
 
 describe('FieldsHeading', () => {

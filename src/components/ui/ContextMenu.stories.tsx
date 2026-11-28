@@ -10,9 +10,7 @@ import {
 } from './ContextMenu';
 
 /**
- * @summary Right-click (touch-and-hold) menu on Radix (docs/adr/0004). §6c: it is the second way
- * into a row's actions; the visible ⋮ button is the first, so the same items must be reachable
- * there too (WCAG 2.1.1).
+ * @summary Right-click (touch-and-hold) menu on Radix (docs/adr/0004).
  */
 const meta = {
   title: 'ui/ContextMenu',
@@ -43,8 +41,7 @@ const area = (
 export const Closed: Story = { args: { children: area } };
 
 /**
- * @summary The open menu (§6c row menu: two or more real actions, destructive one set apart by a
- * separator).
+ * @summary The open menu (§6c row menu: two or more real actions, destructive one set apart by a separator).
  */
 export const Open: Story = {
   args: {

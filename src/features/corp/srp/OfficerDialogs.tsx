@@ -161,7 +161,12 @@ export function ChangeAmountDialog({
         <dd>{claimBasisLine(t, claim)}</dd>
       </dl>
       <Label text={t('srp.officer.change.newAmount')}>
-        <IskInput value={text} onChange={setText} aria-label={t('srp.officer.change.newAmount')} />
+        <IskInput
+          className="w-full"
+          value={text}
+          onChange={setText}
+          aria-label={t('srp.officer.change.newAmount')}
+        />
       </Label>
       <Label text={t('srp.officer.change.reason')}>
         <TextArea

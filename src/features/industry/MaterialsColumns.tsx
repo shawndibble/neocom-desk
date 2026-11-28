@@ -38,7 +38,7 @@ export function buildMaterialsColumns({
     {
       id: 'material',
       header: t('industry.material'),
-      headerCellClassName: 'w-40',
+      headerCellClassName: 'max-[78.125rem]:w-40',
       sortValue: (material) => nameFor(material.typeID),
       render: (material) => renderName(material, true),
     },

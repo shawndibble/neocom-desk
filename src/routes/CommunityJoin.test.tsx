@@ -151,7 +151,7 @@ describe('Community invite page', () => {
       await user.click(await screen.findByRole('button', { name: /Join and share/ }));
       expect(await screen.findByText(j.pending)).toBeInTheDocument();
       expect(screen.queryByText('communities page')).not.toBeInTheDocument();
-      expect(screen.getByRole('link', { name: j.open })).toHaveAttribute('href', '/communities');
+      expect(screen.queryByRole('link', { name: j.open })).not.toBeInTheDocument();
     });
 
     it('stays on the page and names the cap when a join is refused', async () => {

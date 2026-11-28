@@ -177,6 +177,7 @@ function MoreTab({
   return (
     <button
       type="button"
+      aria-current={offBar ? 'page' : undefined}
       {...props}
       className={`${MOBILE_NAV_ITEM} ${open || offBar ? MOBILE_NAV_ACTIVE : MOBILE_NAV_IDLE}`}
     />

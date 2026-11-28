@@ -235,8 +235,27 @@ const RailNavBody = memo(function RailNavBody({
   const editRef = useRef<HTMLButtonElement>(null);
   const navRef = useRef<HTMLElement>(null);
   useEffect(() => {
-    const marked = navRef.current?.querySelectorAll('[aria-current="page"]') ?? [];
-    marked[marked.length - 1]?.scrollIntoView?.({ block: 'nearest' });
+    const nav = navRef.current;
+    if (!nav) return;
+    const reveal = () => {
+      const marked = nav.querySelectorAll('[aria-current="page"]');
+      marked[marked.length - 1]?.scrollIntoView?.({ block: 'nearest' });
+    };
+    reveal();
+    const grown = typeof MutationObserver === 'undefined' ? null : new MutationObserver(reveal);
+    grown?.observe(nav, { childList: true, subtree: true });
+    const resized = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(reveal);
+    resized?.observe(nav);
+    const settle = () => {
+      grown?.disconnect();
+      resized?.disconnect();
+    };
+    const userEvents = ['pointerdown', 'wheel', 'focusin', 'keydown'] as const;
+    for (const type of userEvents) nav.addEventListener(type, settle, { passive: true });
+    return () => {
+      settle();
+      for (const type of userEvents) nav.removeEventListener(type, settle);
+    };
   }, [current, activeViewPath]);
 
   const [open, setOpen] = useState<{ for: NavPagePath | null; path: string | null }>({

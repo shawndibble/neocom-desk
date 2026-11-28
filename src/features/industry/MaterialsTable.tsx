@@ -857,7 +857,7 @@ export function MaterialsTable({
                   </ul>
                 </>
               ) : (
-                <div className="overflow-x-auto">
+                <div className="overflow-x-auto edge-fade-end">
                   <DataTable
                     {...exportProps}
                     rowContextMenu={rowContextMenu}

@@ -4,7 +4,7 @@ import { Panel, EmptyState, SearchInput } from '@/components/ui';
 import { NotificationsDelivery } from './NotificationsDelivery';
 import { NotificationEventList } from './NotificationEventList';
 import type { EventRowContext } from './eventRowSupport';
-import { MD_UP_QUERY, useMediaQuery } from '@/lib/useMediaQuery';
+import { useIsDesktop } from '@/lib/useIsDesktop';
 import { useCharacters } from '@/features/character/useCharacters';
 import { NOTIFICATION_EVENT_IDS, eventLabelKey, isCorpEventId } from './events';
 import { corpEventsApply } from './eventGroups';
@@ -65,7 +65,7 @@ export function NotificationsPanel() {
   const { permission, refresh: refreshPermission } = useNotificationPermission();
   const [search, setSearch] = useUrlParam('search', SEARCH_PARAM);
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
-  const isDesktop = useMediaQuery(MD_UP_QUERY);
+  const isDesktop = useIsDesktop();
 
   const [capabilitiesByCharacterId, setCapabilitiesByCharacterId] = useState<
     ReadonlyMap<number, CorpCapabilities>

@@ -13,7 +13,7 @@ import { SkillsPageHeader } from '@/features/skills/SkillsPageHeader';
 import { SkillsSubNav } from '@/features/skills/SkillsSubNav';
 import { PlanEditor, type PlanPatch } from '@/features/skills/planner/PlanEditor';
 import { PlanEditorLayout } from '@/features/skills/planner/PlanEditorLayout';
-import { useIsPlanEditorWide } from '@/features/skills/planner/useIsPlanEditorWide';
+import { useIsXlUp } from '@/lib/useIsXlUp';
 import { PlanListPane } from '@/features/skills/planner/PlanListPane';
 import { usePlanEditorData } from '@/features/skills/planner/usePlanEditorData';
 import { useDocumentTitleName } from '@/app/documentTitleName';
@@ -44,7 +44,7 @@ export function SkillPlanEditor() {
     loaded && catalogFailed ? 'failed' : 'busy',
     activeCharacterId
   );
-  const isDesktop = useIsPlanEditorWide();
+  const isDesktop = useIsXlUp();
   const navigate = useNavigate();
   const location = useLocation();
   const stateMessage = (location.state as Partial<OptimizeQueueToastState> | null)

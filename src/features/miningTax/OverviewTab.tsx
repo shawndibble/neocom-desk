@@ -83,7 +83,8 @@ import {
   ValueMenu,
 } from './OverviewSettings';
 import { basisSummary } from './basisLabel';
-import { useMediaQuery } from '@/lib/useMediaQuery';
+import { useIsDesktop } from '@/lib/useIsDesktop';
+import { useIsXlUp } from '@/lib/useIsXlUp';
 import { YieldDetailModal } from './YieldDetailModal';
 import { yieldOverviewCsvColumns } from './yieldCsv';
 import { sumVolume, volumeDisplayMode } from './volume';
@@ -100,8 +101,6 @@ const LazyMiningYieldCharts = lazy(() => guarded(() => import('./MiningYieldChar
 const EMPTY_NAMES: ReadonlyMap<number, string> = new Map();
 
 const OVERVIEW_CHARACTER_FILTER_PARAM = characterFilterParam('all');
-const WIDE_HEADER_QUERY = '(min-width: 80rem)';
-const MID_HEADER_QUERY = '(min-width: 64rem)';
 const OVERVIEW_DEFAULT_SORT = { columnId: 'date', direction: 'desc' as const };
 
 function entryVolume(row: MiningYieldRow, typeVolumes: ReadonlyMap<number, number>) {
@@ -187,8 +186,8 @@ export function OverviewTab({ tabBar, tabsId }: OverviewTabProps) {
 
   const characters = data?.characters ?? [];
   const characterIds = useMemo(() => (data?.characters ?? []).map((c) => c.characterId), [data]);
-  const isWide = useMediaQuery(WIDE_HEADER_QUERY);
-  const isMid = useMediaQuery(MID_HEADER_QUERY);
+  const isWide = useIsXlUp();
+  const isMid = useIsDesktop();
   const headerLayout: 'narrow' | 'mid' | 'wide' = isWide ? 'wide' : isMid ? 'mid' : 'narrow';
   const showCharacterColumn = characters.length > 1;
   const refiningUnavailable = showRefining && (data?.refiningUnavailable ?? false);

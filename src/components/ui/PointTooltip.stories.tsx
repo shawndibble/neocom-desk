@@ -3,9 +3,7 @@ import { ChartTooltipShell } from './ChartTooltipShell';
 import { PointTooltip } from './PointTooltip';
 
 /**
- * @summary A caller-controlled bubble over a moving point, for chart hover readouts (`Tooltip` is
- * for a focusable trigger). Fill it with `ChartTooltipShell`; pointer-only, so the figures must
- * also live in a table or summary.
+ * @summary A caller-controlled bubble over a moving point, for chart hover readouts (`Tooltip` is for a focusable trigger).
  */
 const meta = {
   title: 'ui/PointTooltip',

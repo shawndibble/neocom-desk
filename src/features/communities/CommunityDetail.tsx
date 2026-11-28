@@ -17,7 +17,6 @@ import {
   Toast,
   useOpenAfterMenu,
   useTabsId,
-  useTimedToast,
   CachedNotice,
   NeedsConnection,
 } from '@/components/ui';
@@ -130,7 +129,6 @@ export function CommunityDetail({
     );
   }, [shownRequests, characterId, community.id]);
   const manageMenu = useOpenAfterMenu();
-  useTimedToast(copied, () => setCopied(null), NOTICE_MS);
 
   const [sharingOpen, setSharingOpen] = useState(initialSharing && isContentTab(initialTab));
   const [contentKey, setContentKey] = useState(0);
@@ -413,7 +411,9 @@ export function CommunityDetail({
           />
           <CommunityPopSharers communityId={community.id} characterId={characterId} />
         </div>
-        {copied && <Toast message={copied} onClose={() => setCopied(null)} />}
+        {copied && (
+          <Toast message={copied} durationMs={NOTICE_MS} onClose={() => setCopied(null)} />
+        )}
       </Modal>
       <Modal
         open={shownPanel === 'transfer'}

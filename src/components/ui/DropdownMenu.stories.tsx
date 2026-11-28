@@ -17,9 +17,7 @@ import {
 } from './DropdownMenu';
 
 /**
- * @summary Click-triggered command menu on Radix (docs/adr/0004). Cue: the ⋮
- * `IconButton` opens a row's or table's action menu (DESIGN.md §6c cue
- * vocabulary).
+ * @summary Click-triggered command menu on Radix (docs/adr/0004).
  */
 const meta = {
   title: 'ui/DropdownMenu',
@@ -45,8 +43,7 @@ const trigger = (
 );
 
 /**
- * @summary The row menu (§6c "⋮: only where it holds two or more real actions"): an open menu with
- * two actions and a separator before the destructive one.
+ * @summary The row menu (§6c "⋮: only where it holds two or more real actions"): an open menu with two actions and a separator before the destructive one.
  */
 export const RowActions: Story = {
   args: {
@@ -132,8 +129,7 @@ export const WithSubmenu: Story = {
 };
 
 /**
- * @summary Anti-pattern (§6c Restraint): a ⋮ menu holding a single action. Put that action on the
- * row (or let the row click carry it) and add no menu.
+ * @summary Anti-pattern (§6c Restraint): a ⋮ menu holding a single action.
  */
 export const SingleActionMenu: Story = {
   tags: ['!manifest'],
