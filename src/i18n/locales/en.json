@@ -12733,7 +12733,7 @@
     "standingSummaryInherited": "{{tier}} standing ({{value}}) — your entry on their {{source}}, not on them",
     "tabContacts": "Contacts",
     "tabAcrossCharacters": "Across characters",
-    "tabStandings": "Standings",
+    "tabStandings": "NPC Standings",
     "standingsKind": {
       "faction": "Faction",
       "corp": "Corporation",

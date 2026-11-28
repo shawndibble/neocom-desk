@@ -202,12 +202,16 @@ describe('contactKind', () => {
     expect(contactPublicInfoKind(contact(500001, 'faction', 0))).toBeNull();
   });
 
-  it('lets the NPCs chip hide NPCs without hiding players or player corps', () => {
-    const filter = {
-      ...EMPTY_CONTACTS_FILTER,
-      types: new Set(ALL_CONTACT_KINDS.filter((kind) => kind !== 'npc')),
-    };
-    expect(ids(filterContacts([...CONTACTS, ...NPCS], filter, NAMES))).toEqual([1, 2, 3, 4]);
+  it('hides NPCs by default without hiding players or player corps', () => {
+    expect(ids(filterContacts([...CONTACTS, ...NPCS], EMPTY_CONTACTS_FILTER, NAMES))).toEqual([
+      1, 2, 3, 4,
+    ]);
+  });
+
+  it('counts turning NPCs on as a filter, so the pill can put the default back', () => {
+    const filter = { ...EMPTY_CONTACTS_FILTER, types: new Set(ALL_CONTACT_KINDS) };
+    expect(ids(filterContacts([...CONTACTS, ...NPCS], filter, NAMES))).toHaveLength(6);
+    expect(activeContactsFilterCount(filter)).toBe(1);
   });
 
   it('names an NPC by what it is in the Type column', () => {
