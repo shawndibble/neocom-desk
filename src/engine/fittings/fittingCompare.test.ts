@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  COMPARE_SECTION_OF,
   COMPARE_SECTIONS,
   compareFittingStats,
   compareSection,
@@ -502,11 +503,18 @@ describe('sectionCompareRows', () => {
     expect(sectionCompareRows([])).toEqual([]);
   });
 
-  it('places every stat in a listed section and ends with Utility', () => {
+  it('lists every stat under a section by name, so a new stat cannot fall into Utility unseen', () => {
     expect(COMPARE_SECTIONS.at(-1)).toBe('utility');
-    for (const field of NUMERIC_FIELDS) {
-      expect(COMPARE_SECTIONS).toContain(compareSection(field.key));
-    }
+    const keys: CompareRow['key'][] = [
+      ...NUMERIC_FIELDS.map((field) => field.key),
+      'capacitor',
+      'appliedDps',
+      'bestRange',
+      'priceSell',
+      'priceBuy',
+    ];
+    expect(keys.filter((key) => !COMPARE_SECTION_OF.has(key))).toEqual([]);
+    expect(COMPARE_SECTION_OF.size).toBe(keys.length);
     expect(compareSection('totalDps')).toBe('offence');
     expect(compareSection('shieldEmResonance')).toBe('resists');
     expect(compareSection('salvageChance')).toBe('utility');

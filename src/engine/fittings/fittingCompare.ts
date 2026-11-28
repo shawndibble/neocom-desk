@@ -178,19 +178,42 @@ const SECTION_KEYS: readonly (readonly [CompareSectionId, readonly CompareRow['k
     ],
   ],
   ['cost', ['priceSell', 'priceBuy']],
+  [
+    'utility',
+    [
+      'miningWaste',
+      'dataStrength',
+      'relicStrength',
+      'utilitySlots',
+      'virusCoherence',
+      'hackingCycle',
+      'scanStrength',
+      'scanTimeCut',
+      'deviationCut',
+      'probeStrength',
+      'probeLauncherBonus',
+      'probeLauncherCycle',
+      'cloakRecalibration',
+      'warpsCloaked',
+      'reactivationDelay',
+      'salvageChance',
+      'salvagerRange',
+      'tractorSpeed',
+      'tractorRange',
+      'cargoScanRange',
+      'shipScanRange',
+    ],
+  ],
 ];
 
-export const COMPARE_SECTIONS: readonly CompareSectionId[] = [
-  ...SECTION_KEYS.map(([id]) => id),
-  'utility',
-];
+export const COMPARE_SECTIONS: readonly CompareSectionId[] = SECTION_KEYS.map(([id]) => id);
 
-const SECTION_OF: ReadonlyMap<CompareRow['key'], CompareSectionId> = new Map(
+export const COMPARE_SECTION_OF: ReadonlyMap<CompareRow['key'], CompareSectionId> = new Map(
   SECTION_KEYS.flatMap(([id, keys]) => keys.map((key) => [key, id] as const))
 );
 
 export function compareSection(key: CompareRow['key']): CompareSectionId {
-  return SECTION_OF.get(key) ?? 'utility';
+  return COMPARE_SECTION_OF.get(key) ?? 'utility';
 }
 
 export interface CompareSection {

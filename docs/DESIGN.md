@@ -1000,8 +1000,8 @@ one badges each high-slot tile whose module takes that hardpoint. Scope decision
   page records an override (§6c "Entities").
   `textActionClassName` stays the recipe for uppercase text actions.
 - **A long stat table gets section rows, not separate tables.** One `<tbody>` per
-  section, opened by a `<th scope="rowgroup">` that spans every column and holds an
-  `Eyebrow`. The section row is a label only: it does not collapse, sort or link.
+  section, opened by a `<th scope="rowgroup">` that spans every column and carries
+  `eyebrowClassName`. The section row is a label only: it does not collapse, sort or link.
   Columns stay aligned across sections, and a section with no rows prints no header
   (Fitting compare).
 - **A control that opens a modal or navigates is a `Button`.** A text action

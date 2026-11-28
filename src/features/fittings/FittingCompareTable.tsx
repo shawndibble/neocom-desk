@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import * as Icon from '@/components/ui/icons';
-import { Eyebrow, Tooltip } from '@/components/ui';
+import { eyebrowClassName, Tooltip } from '@/components/ui';
+import { cx } from '@/lib/cx';
 import { sectionCompareRows, type CompareRow } from '@/engine/fittings/fittingCompare';
 import { FLAG_STATS, STAT_DIGITS } from '@/engine/fittings/fittingStatFields';
 import { formatSeconds } from '@/lib/duration';
@@ -106,8 +107,12 @@ export function FittingCompareTable({
       {sectionCompareRows(shown).map(({ section, rows: sectionRows }) => (
         <tbody key={section}>
           <tr className="border-t border-line">
-            <th scope="rowgroup" colSpan={columns.length + 1} className="px-2 pt-4 pb-1 text-left">
-              <Eyebrow as="span">{t(`fittings.compare.section.${section}`)}</Eyebrow>
+            <th
+              scope="rowgroup"
+              colSpan={columns.length + 1}
+              className={cx(eyebrowClassName, 'px-2 pt-4 pb-1 text-left')}
+            >
+              {t(`fittings.compare.section.${section}`)}
             </th>
           </tr>
           {sectionRows.map((row) => (
