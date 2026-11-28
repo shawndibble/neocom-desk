@@ -6,7 +6,7 @@ import {
 } from './fittingStatFields';
 import { appliedDps, appliedDpsVsRange, bestRange, graphMaxRange } from './appliedDps';
 import type { TargetProfile } from './targetProfile';
-import type { CapacitorStatus, Fitting, FittingStats } from './types';
+import type { CapacitorStatus, Fitting, FittingSlotKind, FittingStats } from './types';
 
 const STAT_DIRECTION: Readonly<Partial<Record<FittingStatKey, 'higher' | 'lower'>>> = {
   totalDps: 'higher',
@@ -331,32 +331,109 @@ export function compareFittingStats(
   return { rows };
 }
 
-export interface ModuleDiffEntry {
+export type CompareDirection = 'higher' | 'lower' | 'neutral';
+
+const FIELD_BY_KEY = new Map(NUMERIC_FIELDS.map((field) => [field.key, field] as const));
+
+export function compareDirection(key: CompareRow['key']): CompareDirection {
+  if (key === 'appliedDps' || key === 'capacitor') return 'higher';
+  const field = FIELD_BY_KEY.get(key as FittingStatKey);
+  if (field?.hideWhenNone) return field.direction;
+  return STAT_DIRECTION[key as FittingStatKey] ?? 'neutral';
+}
+
+export interface BaselineDelta {
+  percent: number;
+  tone: 'better' | 'worse' | 'neutral';
+}
+
+export function baselineDelta(
+  value: number,
+  baseline: number,
+  direction: CompareDirection
+): BaselineDelta | null {
+  if (!Number.isFinite(value) || !Number.isFinite(baseline)) return null;
+  if (baseline === 0 || value === baseline) return null;
+  const percent = ((value - baseline) / Math.abs(baseline)) * 100;
+  if (direction === 'neutral') return { percent, tone: 'neutral' };
+  const better = direction === 'higher' ? percent > 0 : percent < 0;
+  return { percent, tone: better ? 'better' : 'worse' };
+}
+
+export const HEAD_TO_HEAD_KEYS: readonly CompareRow['key'][] = [
+  'appliedDps',
+  'ehp',
+  'sustainedTank',
+  'maxVelocity',
+  'maxTargetRange',
+  'capacitor',
+  'priceSell',
+];
+
+export function headToHeadRows(rows: readonly CompareRow[]): CompareRow[] {
+  return HEAD_TO_HEAD_KEYS.flatMap((key) => rows.filter((row) => row.key === key));
+}
+
+export type LoadoutRack = FittingSlotKind | 'drones';
+
+export const LOADOUT_RACKS: readonly LoadoutRack[] = [
+  'high',
+  'medium',
+  'low',
+  'rig',
+  'subsystem',
+  'drones',
+];
+
+export interface LoadoutEntry {
   typeId: number;
-  counts: readonly number[];
+  chargeTypeId?: number;
+  count: number;
+  shared: number;
 }
 
-export function modulesThatDiffer(fittings: readonly Fitting[]): ModuleDiffEntry[] {
-  const typeIds = new Set<number>();
-  const countsByFitting = fittings.map((fitting) => {
-    const counts = new Map<number, number>();
-    for (const module of fitting.modules) {
-      counts.set(module.typeId, (counts.get(module.typeId) ?? 0) + 1);
-      typeIds.add(module.typeId);
-    }
-    return counts;
-  });
-  const result: ModuleDiffEntry[] = [];
-  for (const typeId of [...typeIds].sort((a, b) => a - b)) {
-    const counts = countsByFitting.map((byType) => byType.get(typeId) ?? 0);
-    if (new Set(counts).size > 1) result.push({ typeId, counts });
+export interface LoadoutRackDiff {
+  rack: LoadoutRack;
+  fits: LoadoutEntry[][];
+}
+
+type RackItem = { typeId: number; chargeTypeId?: number; count: number };
+
+function rackItems(fitting: Fitting, rack: LoadoutRack): RackItem[] {
+  if (rack === 'drones')
+    return fitting.drones.map(({ typeId, quantity }) => ({ typeId, count: quantity }));
+  return [...fitting.modules]
+    .filter((module) => module.slot === rack)
+    .sort((a, b) => a.slotIndex - b.slotIndex)
+    .map(({ typeId, chargeTypeId }) => ({ typeId, chargeTypeId, count: 1 }));
+}
+
+const itemKey = ({ typeId, chargeTypeId }: { typeId: number; chargeTypeId?: number }) =>
+  `${typeId}:${chargeTypeId ?? ''}`;
+
+function grouped(items: readonly RackItem[]): Map<string, RackItem> {
+  const groups = new Map<string, RackItem>();
+  for (const item of items) {
+    const key = itemKey(item);
+    const group = groups.get(key);
+    if (group) group.count += item.count;
+    else groups.set(key, { ...item });
   }
-  return result;
+  return groups;
 }
 
-export function compareWindow(count: number, page: number): { start: number; end: number } {
-  if (count <= 2) return { start: 0, end: count };
-  const lastPage = count - 2;
-  const clamped = Math.max(0, Math.min(page, lastPage));
-  return { start: clamped, end: clamped + 2 };
+export function loadoutDiff(fittings: readonly Fitting[]): LoadoutRackDiff[] {
+  return LOADOUT_RACKS.flatMap((rack) => {
+    const groupsByFit = fittings.map((fitting) => grouped(rackItems(fitting, rack)));
+    if (groupsByFit.every((groups) => groups.size === 0)) return [];
+    const fits = groupsByFit.map((groups) =>
+      [...groups.entries()].map(([key, { typeId, chargeTypeId, count }]) => ({
+        typeId,
+        ...(chargeTypeId === undefined ? {} : { chargeTypeId }),
+        count,
+        shared: Math.min(...groupsByFit.map((other) => other.get(key)?.count ?? 0)),
+      }))
+    );
+    return [{ rack, fits }];
+  });
 }

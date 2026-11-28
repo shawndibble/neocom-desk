@@ -8,6 +8,7 @@ interface FittingComparePickerProps {
   onClose: () => void;
   characterId: number | null;
   onAdd: (code: string) => void;
+  title?: string;
 }
 
 export function FittingComparePicker({
@@ -15,6 +16,7 @@ export function FittingComparePicker({
   onClose,
   characterId,
   onAdd,
+  title,
 }: FittingComparePickerProps) {
   const { t } = useTranslation();
   const source = useFittingPicker((code) => {
@@ -23,7 +25,7 @@ export function FittingComparePicker({
   });
 
   return (
-    <Modal open={open} onClose={onClose} title={t('fittings.compare.picker.title')}>
+    <Modal open={open} onClose={onClose} title={title ?? t('fittings.compare.picker.title')}>
       <FittingStartScreen
         variant="dialog"
         importInline

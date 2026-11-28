@@ -9,6 +9,7 @@ import {
   fittingCompareHref,
   fittingEditLocation,
   fittingsRedirect,
+  readCompareOrigin,
 } from './fittingRoutes';
 import { SHIPS_TABS } from './shipsTabs';
 
@@ -61,5 +62,43 @@ describe('fittingCompareHref', () => {
     expect(fittingCompareHref('?f=1.a&f=1.b')).toBe('/ships/fittings/compare?f=1.a&f=1.b');
     expect(fittingCompareHref('f=1.a')).toBe('/ships/fittings/compare?f=1.a');
     expect(fittingCompareHref('')).toBe('/ships/fittings/compare');
+  });
+});
+
+describe('readCompareOrigin', () => {
+  it('reads an editor origin with its saved and edited codes', () => {
+    expect(
+      readCompareOrigin({
+        from: 'fitting-editor',
+        name: 'Kiter',
+        back: '/ships/fittings/edit?f=a',
+        savedCode: 'a',
+        editedCode: 'b',
+      })
+    ).toEqual({
+      from: 'fitting-editor',
+      name: 'Kiter',
+      back: '/ships/fittings/edit?f=a',
+      savedCode: 'a',
+      editedCode: 'b',
+    });
+  });
+
+  it('ignores missing, foreign or malformed state', () => {
+    expect(readCompareOrigin(null)).toBeNull();
+    expect(readCompareOrigin({ from: 'wallet' })).toBeNull();
+    expect(readCompareOrigin({ from: 'fitting-editor', name: 3, back: '/x' })).toBeNull();
+  });
+
+  it('drops empty codes', () => {
+    expect(
+      readCompareOrigin({ from: 'fitting-editor', name: 'K', back: '/x', savedCode: '' })
+    ).toEqual({
+      from: 'fitting-editor',
+      name: 'K',
+      back: '/x',
+      savedCode: undefined,
+      editedCode: undefined,
+    });
   });
 });

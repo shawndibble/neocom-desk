@@ -4,8 +4,10 @@ import {
   COMPARE_SECTIONS,
   compareFittingStats,
   compareSection,
-  compareWindow,
-  modulesThatDiffer,
+  baselineDelta,
+  compareDirection,
+  headToHeadRows,
+  loadoutDiff,
   sectionCompareRows,
   type CompareRow,
 } from './fittingCompare';
@@ -415,55 +417,110 @@ describe('compareFittingStats applied DPS rows', () => {
   });
 });
 
-describe('modulesThatDiffer', () => {
-  it('excludes a module every fitting shares in the same quantity', () => {
-    const a = fitting([{ slot: 'high', slotIndex: 0, typeId: 100, state: 'active' }]);
-    const b = fitting([{ slot: 'high', slotIndex: 0, typeId: 100, state: 'active' }]);
-    expect(modulesThatDiffer([a, b])).toEqual([]);
+describe('loadoutDiff', () => {
+  const high = (slotIndex: number, typeId: number, chargeTypeId?: number) => ({
+    slot: 'high' as const,
+    slotIndex,
+    typeId,
+    state: 'active' as const,
+    ...(chargeTypeId ? { chargeTypeId } : {}),
   });
 
-  it('reports a module only some fittings carry, with a per-fitting count', () => {
-    const a = fitting([{ slot: 'high', slotIndex: 0, typeId: 100, state: 'active' }]);
-    const b = fitting([]);
-    const result = modulesThatDiffer([a, b]);
-    expect(result).toEqual([{ typeId: 100, counts: [1, 0] }]);
-  });
-
-  it('reports a differing stack count for a module both fittings carry', () => {
-    const a = fitting([
-      { slot: 'high', slotIndex: 0, typeId: 200, state: 'active' },
-      { slot: 'high', slotIndex: 1, typeId: 200, state: 'active' },
+  it('groups a rack by module and charge, marking what every fitting shares', () => {
+    const a = fitting([high(0, 100, 7), high(1, 100, 7), high(2, 300)]);
+    const b = fitting([high(0, 100, 7), high(1, 100, 7)]);
+    expect(loadoutDiff([a, b])).toEqual([
+      {
+        rack: 'high',
+        fits: [
+          [
+            { typeId: 100, chargeTypeId: 7, count: 2, shared: 2 },
+            { typeId: 300, count: 1, shared: 0 },
+          ],
+          [{ typeId: 100, chargeTypeId: 7, count: 2, shared: 2 }],
+        ],
+      },
     ]);
-    const b = fitting([{ slot: 'high', slotIndex: 0, typeId: 200, state: 'active' }]);
-    expect(modulesThatDiffer([a, b])).toEqual([{ typeId: 200, counts: [2, 1] }]);
   });
 
-  it('handles entirely different hulls with no shared modules', () => {
-    const a = fitting([{ slot: 'high', slotIndex: 0, typeId: 100, state: 'active' }]);
-    const b = fitting([{ slot: 'high', slotIndex: 0, typeId: 200, state: 'active' }]);
-    expect(modulesThatDiffer([a, b])).toEqual([
-      { typeId: 100, counts: [1, 0] },
-      { typeId: 200, counts: [0, 1] },
+  it('counts copies, so a third launcher is a change even though both carry the module', () => {
+    const a = fitting([high(0, 200), high(1, 200)]);
+    const b = fitting([high(0, 200), high(1, 200), high(2, 200)]);
+    const [rack] = loadoutDiff([a, b]);
+    expect(rack!.fits[1]).toEqual([{ typeId: 200, count: 3, shared: 2 }]);
+  });
+
+  it('treats the same launcher with another charge as a change', () => {
+    const [rack] = loadoutDiff([fitting([high(0, 100, 7)]), fitting([high(0, 100, 8)])]);
+    expect(rack!.fits.map((entries) => entries[0]!.shared)).toEqual([0, 0]);
+  });
+
+  it('orders racks high to rigs then drones, skipping racks no fitting uses', () => {
+    const a: Fitting = {
+      ...fitting([
+        { slot: 'rig', slotIndex: 0, typeId: 31, state: 'online' },
+        { slot: 'low', slotIndex: 0, typeId: 21, state: 'online' },
+      ]),
+      drones: [{ typeId: 2456, quantity: 5, state: 'online' }],
+    };
+    const b: Fitting = {
+      ...fitting([]),
+      drones: [{ typeId: 2456, quantity: 3, state: 'online' }],
+    };
+    const diff = loadoutDiff([a, b]);
+    expect(diff.map((r) => r.rack)).toEqual(['low', 'rig', 'drones']);
+    expect(diff[2]!.fits).toEqual([
+      [{ typeId: 2456, count: 5, shared: 3 }],
+      [{ typeId: 2456, count: 3, shared: 3 }],
     ]);
   });
 });
 
-describe('compareWindow', () => {
-  it('shows every column at once when there are 2 or fewer', () => {
-    expect(compareWindow(1, 0)).toEqual({ start: 0, end: 1 });
-    expect(compareWindow(2, 0)).toEqual({ start: 0, end: 2 });
+describe('baselineDelta', () => {
+  it('is the percent change from the baseline, better when it moves the good way', () => {
+    expect(baselineDelta(150, 100, 'higher')).toEqual({ percent: 50, tone: 'better' });
+    expect(baselineDelta(150, 100, 'lower')).toEqual({ percent: 50, tone: 'worse' });
+    expect(baselineDelta(80, 100, 'lower')).toEqual({ percent: -20, tone: 'better' });
   });
 
-  it('windows to 2 of 3, starting at page 0', () => {
-    expect(compareWindow(3, 0)).toEqual({ start: 0, end: 2 });
+  it('has a neutral tone for a stat with no better direction', () => {
+    expect(baselineDelta(150, 100, 'neutral')).toEqual({ percent: 50, tone: 'neutral' });
   });
 
-  it('windows to the last 2 of 3 at page 1', () => {
-    expect(compareWindow(3, 1)).toEqual({ start: 1, end: 3 });
+  it('is absent when equal, against a zero baseline, or for a missing value', () => {
+    expect(baselineDelta(100, 100, 'higher')).toBeNull();
+    expect(baselineDelta(5, 0, 'higher')).toBeNull();
+    expect(baselineDelta(NaN, 100, 'higher')).toBeNull();
+    expect(baselineDelta(100, NaN, 'higher')).toBeNull();
   });
+});
 
-  it('clamps a page beyond the last window', () => {
-    expect(compareWindow(3, 5)).toEqual({ start: 1, end: 3 });
+describe('compareDirection', () => {
+  it('reads the stat field direction, applied DPS higher and price neutral', () => {
+    expect(compareDirection('signatureRadius')).toBe('lower');
+    expect(compareDirection('ehp')).toBe('higher');
+    expect(compareDirection('appliedDps')).toBe('higher');
+    expect(compareDirection('priceSell')).toBe('neutral');
+    expect(compareDirection('bestRange')).toBe('neutral');
+  });
+});
+
+describe('headToHeadRows', () => {
+  it('picks the deciding rows in a fixed order from the full table', () => {
+    const target = { signatureRadius: 125, velocity: 350 };
+    const table = compareFittingStats([stats(), stats()], target, [
+      { sell: 1, buy: 1 },
+      { sell: 2, buy: 2 },
+    ]);
+    expect(headToHeadRows(table.rows).map((row) => row.key)).toEqual([
+      'appliedDps',
+      'ehp',
+      'sustainedTank',
+      'maxVelocity',
+      'maxTargetRange',
+      'capacitor',
+      'priceSell',
+    ]);
   });
 });
 

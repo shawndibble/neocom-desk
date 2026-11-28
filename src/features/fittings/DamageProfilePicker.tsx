@@ -29,6 +29,7 @@ import { STAT_FIELD_WIDTH } from './statKit';
 import { DialogFooter } from '@/components/ui/DialogFooter';
 
 const DAMAGE_TYPES = ['em', 'thermal', 'kinetic', 'explosive'] as const;
+const MANAGE_OPTION = 'manage-profiles';
 
 interface Draft {
   id: string | null;
@@ -176,7 +177,13 @@ export function DamageProfilePicker({
 
   const controls = (
     <>
-      <Select value={damageProfiles.selected.id} onValueChange={damageProfiles.select}>
+      <Select
+        value={damageProfiles.selected.id}
+        onValueChange={(value) => {
+          if (value === MANAGE_OPTION) setManaging(true);
+          else damageProfiles.select(value);
+        }}
+      >
         <SelectTrigger aria-label={label} size="sm" className={STAT_FIELD_WIDTH}>
           <SelectValue />
         </SelectTrigger>
@@ -202,15 +209,25 @@ export function DamageProfilePicker({
               </SelectGroup>
             </>
           )}
+          {!field && (
+            <>
+              <SelectSeparator />
+              <SelectItem value={MANAGE_OPTION}>
+                {t('fittings.damageProfile.manageOption')}
+              </SelectItem>
+            </>
+          )}
         </SelectContent>
       </Select>
-      <Button
-        size="sm"
-        aria-label={field ? t('fittings.damageProfile.manage') : undefined}
-        onClick={() => setManaging(true)}
-      >
-        {field ? t('fittings.stats.manage') : t('fittings.damageProfile.manage')}
-      </Button>
+      {field && (
+        <Button
+          size="sm"
+          aria-label={t('fittings.damageProfile.manage')}
+          onClick={() => setManaging(true)}
+        >
+          {t('fittings.stats.manage')}
+        </Button>
+      )}
       <ManageProfilesModal
         open={managing}
         onClose={() => setManaging(false)}
@@ -219,10 +236,5 @@ export function DamageProfilePicker({
     </>
   );
   if (field) return <StatField label={label}>{controls}</StatField>;
-  return (
-    <div className="flex flex-wrap items-center gap-2 text-xs">
-      <span className="text-text-dim">{label}</span>
-      {controls}
-    </div>
-  );
+  return controls;
 }

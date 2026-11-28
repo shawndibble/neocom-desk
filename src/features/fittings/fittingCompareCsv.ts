@@ -1,8 +1,7 @@
 import type { CsvColumn } from '@/lib/csv';
 import { formatSeconds } from '@/lib/duration';
 import { joined } from '@/lib/exportSheets';
-import { typeNameOr } from '@/lib/typeNameOr';
-import type { CompareRow, ModuleDiffEntry } from '@/engine/fittings/fittingCompare';
+import type { CompareRow } from '@/engine/fittings/fittingCompare';
 import type { Translate } from '@/lib/translate';
 
 export interface FittingCompareCsvFitting {
@@ -58,22 +57,5 @@ export function fittingCompareCsvColumns(
         );
       },
     },
-  ];
-}
-
-export function fittingCompareModulesCsvColumns(
-  t: Translate,
-  names: ReadonlyMap<number, string>,
-  fittings: readonly FittingCompareCsvFitting[]
-): CsvColumn<ModuleDiffEntry>[] {
-  return [
-    {
-      header: t('fittings.compare.moduleColumn'),
-      value: (entry) => typeNameOr(t, names.get(entry.typeId), entry.typeId),
-    },
-    ...fittings.map(({ name, statsIndex }): CsvColumn<ModuleDiffEntry> => ({
-      header: name,
-      value: (entry) => (statsIndex === null ? null : (entry.counts[statsIndex] ?? 0)),
-    })),
   ];
 }

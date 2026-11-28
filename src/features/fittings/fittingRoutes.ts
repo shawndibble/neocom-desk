@@ -29,3 +29,28 @@ export function fittingsRedirect(pathname: string, search: string): string | nul
   if (path === FITTING_EDIT_PATH && !hasCode) return FITTINGS_PATH;
   return null;
 }
+
+export interface FittingCompareOrigin {
+  from: 'fitting-editor';
+  name: string;
+  back: string;
+  savedCode?: string;
+  editedCode?: string;
+}
+
+const optionalString = (value: unknown): string | undefined =>
+  typeof value === 'string' && value !== '' ? value : undefined;
+
+export function readCompareOrigin(state: unknown): FittingCompareOrigin | null {
+  if (typeof state !== 'object' || state === null) return null;
+  const { from, name, back, savedCode, editedCode } = state as Record<string, unknown>;
+  if (from !== 'fitting-editor' || typeof name !== 'string' || typeof back !== 'string')
+    return null;
+  return {
+    from,
+    name,
+    back,
+    savedCode: optionalString(savedCode),
+    editedCode: optionalString(editedCode),
+  };
+}
