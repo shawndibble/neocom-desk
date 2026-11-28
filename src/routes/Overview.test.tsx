@@ -498,12 +498,13 @@ describe('Overview widget grid on a phone', () => {
     ).toBeInTheDocument();
   });
 
-  it('draws the Next deadline as one borderless row that goes where the clock lives', async () => {
+  it('draws the Next deadline as one full-width row under the identity block', async () => {
     await seedLayout(widget('b', 'training', { size: 'S' }));
     renderOverviewRoute();
     const next = await screen.findByRole('link', { name: /next skill finishes/i });
     expect(next).toHaveAttribute('href', '/skills/plans');
-    expect(next).not.toHaveClass('border');
+    expect(next).toHaveClass('border-t');
+    expect(next.closest('header')).toContainElement(next);
   });
 
   it('leaves out a widget set to Hide on phone, and keeps the rest', async () => {
