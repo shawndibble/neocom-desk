@@ -1,11 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { toCsv } from '@/lib/csv';
 import type { CompareRow } from '@/engine/fittings/fittingCompare';
-import {
-  fittingCompareCsvColumns,
-  fittingCompareModulesCsvColumns,
-  type FittingCompareCsvFitting,
-} from './fittingCompareCsv';
+import { fittingCompareCsvColumns, type FittingCompareCsvFitting } from './fittingCompareCsv';
 
 const t = (k: string, opts?: Record<string, unknown>) =>
   opts ? `${k}(${Object.values(opts).join(',')})` : k;
@@ -17,7 +13,7 @@ const fittings: FittingCompareCsvFitting[] = [
 ];
 
 function compareRow(key: CompareRow['key'], values: number[]): CompareRow {
-  return { key, values, differs: true, bestIndices: [0] };
+  return { key, values, differs: true, bestIndices: [0], direction: 'higher' };
 }
 
 describe('fittingCompareCsvColumns', () => {
@@ -93,28 +89,5 @@ describe('fittingCompareCsvColumns header facts and best', () => {
       'Fit A; Fit B'
     );
     expect(best.value({ ...compareRow('totalDps', [1, 1]), bestIndices: [] })).toBeNull();
-  });
-});
-
-describe('fittingCompareModulesCsvColumns', () => {
-  it('exports the module name and each Fitting count, blank where stats failed', () => {
-    const columns = fittingCompareModulesCsvColumns(
-      t,
-      new Map([[1, 'Warp Disruptor II']]),
-      fittings
-    );
-    expect(columns.map((c) => c.header)).toEqual([
-      'fittings.compare.moduleColumn',
-      'Fit A',
-      'Fit B',
-      'Fit C',
-    ]);
-    expect(columns.map((c) => c.value({ typeId: 1, counts: [2, 0] }))).toEqual([
-      'Warp Disruptor II',
-      2,
-      0,
-      null,
-    ]);
-    expect(columns[0].value({ typeId: 9, counts: [1, 1] })).toBe('common.unknownType(9)');
   });
 });

@@ -5,7 +5,7 @@ import { useEndpointsGranted } from '@/app/useGrantedScopes';
 import { permissionsForEndpoints } from '@/esi/registry';
 import { useOnline } from '@/stores/network';
 import type { Fitting, FittingStats } from '@/engine/fittings/types';
-import { fittingCompareHref } from './fittingRoutes';
+import { fittingCompareHref, type FittingCompareOrigin } from './fittingRoutes';
 import { writeCompareCodes } from './compareUrl';
 import { FittingHeader, type LibraryAction } from './FittingHeader';
 import { FittingSaveButton } from './FittingSaveButton';
@@ -74,15 +74,22 @@ export function FittingEditorHeader({
         onImprove={onImprove}
         unflyable={unflyable}
         onCompare={() => {
+          const origin: FittingCompareOrigin = {
+            from: 'fitting-editor',
+            name: fitting.name,
+            back: `${location.pathname}${location.search}`,
+          };
           if (hasUnsavedEdits && savedRecord && currentShareCode) {
             const params = writeCompareCodes(new URLSearchParams(), [
               savedRecord.code,
               currentShareCode,
             ]);
-            navigate(fittingCompareHref(params.toString()));
+            navigate(fittingCompareHref(params.toString()), {
+              state: { ...origin, savedCode: savedRecord.code, editedCode: currentShareCode },
+            });
             return;
           }
-          navigate(fittingCompareHref(location.search));
+          navigate(fittingCompareHref(location.search), { state: origin });
         }}
         price={workspace.price}
         cloneImplants={workspace.profile?.implantTypeIds}

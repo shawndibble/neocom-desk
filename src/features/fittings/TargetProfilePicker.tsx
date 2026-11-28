@@ -238,6 +238,8 @@ function ManageProfilesModal({
   );
 }
 
+const MANAGE_OPTION = 'manage-targets';
+
 export function TargetProfilePicker({
   targetProfiles,
   field = false,
@@ -264,7 +266,13 @@ export function TargetProfilePicker({
     </>
   );
   const select = (
-    <Select value={selected.id} onValueChange={targetProfiles.select}>
+    <Select
+      value={selected.id}
+      onValueChange={(value) => {
+        if (value === MANAGE_OPTION) setManaging(true);
+        else targetProfiles.select(value);
+      }}
+    >
       <SelectTrigger aria-label={label} size="sm" className={STAT_FIELD_WIDTH}>
         <SelectValue />
       </SelectTrigger>
@@ -290,23 +298,34 @@ export function TargetProfilePicker({
             </SelectGroup>
           </>
         )}
+        {!field && (
+          <>
+            <SelectSeparator />
+            <SelectItem value={MANAGE_OPTION}>
+              {t('fittings.targetProfile.manageOption')}
+            </SelectItem>
+          </>
+        )}
       </SelectContent>
     </Select>
+  );
+  const modal = (
+    <ManageProfilesModal
+      open={managing}
+      onClose={() => setManaging(false)}
+      targetProfiles={targetProfiles}
+    />
   );
   const manage = (
     <>
       <Button
         size="sm"
-        aria-label={field ? t('fittings.targetProfile.manage') : undefined}
+        aria-label={t('fittings.targetProfile.manage')}
         onClick={() => setManaging(true)}
       >
-        {field ? t('fittings.stats.manage') : t('fittings.targetProfile.manage')}
+        {t('fittings.stats.manage')}
       </Button>
-      <ManageProfilesModal
-        open={managing}
-        onClose={() => setManaging(false)}
-        targetProfiles={targetProfiles}
-      />
+      {modal}
     </>
   );
   if (field)
@@ -317,13 +336,10 @@ export function TargetProfilePicker({
       </StatField>
     );
   return (
-    <div className="flex flex-wrap items-center gap-x-1.5 gap-y-2 text-xs md:min-w-[22rem] md:flex-[1_1_0]">
-      <div className="flex items-center gap-x-1.5">
-        <span className="text-text-dim">{label}</span>
-        {select}
-      </div>
-      <span className="text-text-dim">{summary}</span>
-      {manage}
-    </div>
+    <>
+      {select}
+      <span className="text-xs text-text-dim">{summary}</span>
+      {modal}
+    </>
   );
 }

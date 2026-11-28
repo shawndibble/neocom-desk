@@ -1,73 +1,66 @@
 import { useCharacters } from '@/features/character/useCharacters';
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import {
   Button,
+  Checkbox,
   EmptyState,
-  IconButton,
-  LiveStatus,
-  entityLinkClassName,
   PageHeader,
   Panel,
   Tooltip,
-  Spinner,
-  Checkbox,
+  eyebrowClassName,
 } from '@/components/ui';
-import * as Icon from '@/components/ui/icons';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
-import {
-  compareFittingStats,
-  compareWindow,
-  modulesThatDiffer,
-} from '@/engine/fittings/fittingCompare';
+import { compareFittingStats, headToHeadWins } from '@/engine/fittings/fittingCompare';
 import { canFlyVerdict, fitVerdict } from '@/features/fittings/compareVerdicts';
 import type { Fitting, FittingStats } from '@/engine/fittings/types';
 import { useActiveCharacter } from '@/stores/activeCharacter';
-import { useIsPhone } from '@/lib/useIsPhone';
 import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
 import { useCompareCodes, MAX_COMPARE_SLOTS } from '@/features/fittings/compareUrl';
 import { FittingComparePicker } from '@/features/fittings/FittingComparePicker';
-import { FITTINGS_PATH, fittingEditLocation } from '@/features/fittings/fittingRoutes';
-import {
-  focusRingClassName,
-  inlineLinkClassName,
-  interactiveClassName,
-} from '@/components/ui/controlStyles';
+import { FITTINGS_PATH, readCompareOrigin } from '@/features/fittings/fittingRoutes';
+import { inlineLinkClassName } from '@/components/ui/controlStyles';
+import { OriginCrumb } from '@/components/OriginCrumb';
 import { cx } from '@/lib/cx';
-import { FittingCompareModulesSummary } from '@/features/fittings/FittingCompareModulesSummary';
-import {
-  FittingCompareTable,
-  type FittingCompareColumn,
-} from '@/features/fittings/FittingCompareTable';
-import { CompareCanFlyByCharacter } from '@/features/fittings/CompareCanFlyByCharacter';
 import { useCompareCanFly } from '@/features/fittings/useCompareCanFly';
 import { useCompareFittings } from '@/features/fittings/useCompareFittings';
 import { useComparePrice } from '@/features/fittings/useComparePrice';
 import { useCompareStats } from '@/features/fittings/useCompareStats';
-import { AbyssalWeatherPicker } from '@/features/fittings/AbyssalWeatherPicker';
-import { DamageProfilePicker } from '@/features/fittings/DamageProfilePicker';
 import { useDamageProfiles } from '@/features/fittings/damageProfiles';
-import { TargetProfilePicker } from '@/features/fittings/TargetProfilePicker';
 import { useTargetProfiles } from '@/features/fittings/targetProfiles';
 import { usePilotProfile } from '@/features/fittings/fittingPilotProfile';
 import { useShipDataNeedsConnection } from '@/features/fittings/useDogmaEngineStatus';
 import {
   fittingCompareCsvColumns,
   type FittingCompareCsvRow,
-  fittingCompareModulesCsvColumns,
 } from '@/features/fittings/fittingCompareCsv';
-import { useModuleDiffNames } from '@/features/fittings/useModuleDiffNames';
+import {
+  COMPARE_FOCUS_TARGET,
+  CompareErrorCard,
+  CompareFitCard,
+  CompareLoadingCard,
+  type CompareCardBadge,
+} from '@/features/fittings/CompareFitCard';
+import { CompareHeadToHead } from '@/features/fittings/CompareHeadToHead';
+import { CompareLoadout } from '@/features/fittings/CompareLoadout';
+import { CompareAllStats } from '@/features/fittings/CompareAllStats';
+import { CompareScenarioLine } from '@/features/fittings/CompareScenarioLine';
+import {
+  COMPARE_GRID_CLASS,
+  compareGridStyle,
+  compareLetter,
+  type CompareColumn,
+} from '@/features/fittings/compareFormat';
+import { useTypeNames } from '@/features/character/useTypeNames';
 
-const VERDICT_TONE_CLASS = {
-  good: 'text-success',
-  bad: 'text-danger',
-  unknown: 'text-text-dim',
-} as const;
+type PickerMode = { kind: 'add' } | { kind: 'replace'; index: number };
 
 export function FittingCompare() {
   const { t } = useTranslation();
+  const location = useLocation();
+  const origin = readCompareOrigin(location.state);
   const [codes, setCodes] = useCompareCodes();
   const slots = useCompareFittings(codes);
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
@@ -89,10 +82,8 @@ export function FittingCompare() {
   const stats = useCompareStats(fittings, profile);
   const canFly = useCompareCanFly(fittings, profile);
   const price = useComparePrice(fittings, profile);
-  const isPhone = useIsPhone();
-  const [page, setPage] = useState(0);
   const [differencesOnly, setDifferencesOnly] = useState(true);
-  const [pickerOpen, setPickerOpen] = useState(false);
+  const [picker, setPicker] = useState<PickerMode | null>(null);
   const focusAfterCommit = useFocusAfterCommit();
   const addFittingRef = useRef<HTMLButtonElement>(null);
   const countRef = useRef(codes.length);
@@ -101,14 +92,22 @@ export function FittingCompare() {
   });
 
   const count = codes.length;
-  const pageWindow = isPhone ? compareWindow(count, page) : { start: 0, end: count };
-  const visible = Array.from(
-    { length: pageWindow.end - pageWindow.start },
-    (_, i) => pageWindow.start + i
+  const hullIds = useMemo(
+    () => fittings.flatMap((fitting) => (fitting ? [fitting.shipTypeId] : [])),
+    [fittings]
   );
+  const hullNames = useTypeNames(hullIds);
 
-  function addCode(code: string) {
+  function pick(code: string) {
+    if (picker?.kind === 'replace') {
+      const at = picker.index;
+      setCodes((prev) => prev.map((existing, i) => (i === at ? code : existing)));
+      return;
+    }
     setCodes((prev) => [...prev, code].slice(0, MAX_COMPARE_SLOTS));
+  }
+  function makeBaseline(index: number) {
+    setCodes((prev) => [prev[index]!, ...prev.filter((_, i) => i !== index)]);
   }
   function removeSlot(index: number) {
     setCodes((prev) => prev.filter((_, i) => i !== index));
@@ -116,7 +115,11 @@ export function FittingCompare() {
     const afterRemoval = (find: () => HTMLElement | null | undefined) => () =>
       countRef.current === expected ? find() : null;
     const removeAt = (i: number) =>
-      afterRemoval(() => document.querySelector<HTMLElement>(`[data-compare-remove="${i}"]`));
+      afterRemoval(() =>
+        document
+          .querySelector(`[data-compare-focus="${i}"]`)
+          ?.querySelector<HTMLElement>(COMPARE_FOCUS_TARGET)
+      );
     focusAfterCommit(
       removeAt(index),
       removeAt(index - 1),
@@ -137,7 +140,8 @@ export function FittingCompare() {
     slots.every((slot) => slot !== null) &&
     stats.values.every((s, index) => s !== null || stats.failed[index]);
   const statsReady = settled && okSlots.length > 0;
-  const showDifferencesOnly = differencesOnly && okSlots.length >= 2;
+  const comparing = okSlots.length >= 2;
+  const showDifferencesOnly = differencesOnly && comparing;
 
   const priceSettled = okSlots.every(
     (index) => price.values[index] !== null || price.failed[index]
@@ -145,25 +149,42 @@ export function FittingCompare() {
   const pricesReady = priceSettled && okSlots.some((index) => price.values[index] !== null);
   const anyPriceFailed = okSlots.some((index) => price.failed[index]);
 
+  const okStats = useMemo(
+    () => okSlots.map((index) => stats.values[index] as FittingStats),
+    [okSlots, stats.values]
+  );
+  const okFittings = useMemo(
+    () => okSlots.map((index) => fittings[index] as Fitting),
+    [okSlots, fittings]
+  );
+  const columns = useMemo<CompareColumn[]>(
+    () =>
+      codes.map((_, index) => {
+        const position = okSlots.indexOf(index);
+        return { letter: compareLetter(index), position: position === -1 ? null : position };
+      }),
+    [codes, okSlots]
+  );
   const table = useMemo(
     () =>
       statsReady
         ? compareFittingStats(
-            okSlots.map((index) => stats.values[index] as FittingStats),
+            okStats,
             target,
             pricesReady ? okSlots.map((index) => price.values[index]) : undefined
           )
         : null,
-    [statsReady, okSlots, stats.values, target, pricesReady, price.values]
+    [statsReady, okStats, okSlots, target, pricesReady, price.values]
   );
-  const moduleDiffs = useMemo(
-    () => (statsReady ? modulesThatDiffer(okSlots.map((index) => fittings[index] as Fitting)) : []),
-    [statsReady, okSlots, fittings]
+  const wins = useMemo(
+    () =>
+      table && comparing
+        ? headToHeadWins(table.rows).map((keys) =>
+            keys.map((key) => t(`fittings.compare.headToHead.${key}`))
+          )
+        : [],
+    [table, comparing, t]
   );
-  const statsPosition = (index: number) => {
-    const position = okSlots.indexOf(index);
-    return position === -1 ? null : position;
-  };
 
   const csvFittings = useMemo(
     () =>
@@ -197,111 +218,53 @@ export function FittingCompare() {
     columns: statsCsvColumns,
     source: 'rows',
   });
-  const moduleNames = useModuleDiffNames(moduleDiffs);
-  const modulesCsvColumns = useMemo(
-    () => fittingCompareModulesCsvColumns(t, moduleNames, csvFittings),
-    [t, moduleNames, csvFittings]
-  );
-  const modulesExport = useTableExport({
-    surface: 'fitting-compare-modules',
-    rows: moduleDiffs,
-    columns: modulesCsvColumns,
-    source: 'rows',
-  });
 
-  function headerFor(index: number) {
-    const slot = slots[index];
-    if (slot === null || slot === undefined) {
-      return (
-        <div className="flex justify-end">
-          <Spinner size="sm" label={t('common.loading')} />
-        </div>
-      );
-    }
-    if (slot.shareError) {
-      return (
-        <div className="flex flex-col items-end gap-1">
-          <span className="text-danger">{t(`fittings.load.shareError.${slot.shareError}`)}</span>
-          <IconButton
-            icon={<Icon.Close />}
-            label={t('fittings.compare.removeNamed', {
-              name: t(`fittings.load.shareError.${slot.shareError}`),
-            })}
-            tooltip={t('fittings.compare.remove')}
-            onClick={() => removeSlot(index)}
-            data-compare-remove={index}
-            tone="danger"
-          />
-        </div>
-      );
-    }
-    const fits = fitVerdict(t, stats.values[index]);
-    const flyVerdict = canFlyVerdict(t, canFly.values[index], Boolean(canFly.failed[index]));
-    const name = slot.fitting?.name ?? '';
+  function badgesFor(index: number): CompareCardBadge[] {
     const code = codes[index];
+    const badges: CompareCardBadge[] = [];
+    if (comparing && okSlots[0] === index) badges.push('baseline');
+    if (origin?.savedCode !== undefined && code === origin.savedCode) badges.push('saved');
+    if (origin?.editedCode !== undefined && code === origin.editedCode) badges.push('edits');
+    return badges;
+  }
+
+  function cardFor(index: number) {
+    const slot = slots[index];
+    const letter = compareLetter(index);
+    if (slot === null || slot === undefined) return <CompareLoadingCard focusIndex={index} />;
+    if (slot.shareError || !slot.fitting) {
+      return (
+        <CompareErrorCard
+          letter={letter}
+          message={t(`fittings.load.shareError.${slot.shareError ?? 'invalid'}`)}
+          focusIndex={index}
+          onRemove={() => removeSlot(index)}
+        />
+      );
+    }
+    const position = okSlots.indexOf(index);
     return (
-      <div className="flex flex-col items-end gap-1">
-        {code === undefined ? (
-          <span className="max-w-40 truncate font-medium sm:max-w-full text-text">{name}</span>
-        ) : (
-          <Tooltip content={t('fittings.compare.openInEditor')}>
-            <Link
-              to={fittingEditLocation(code)}
-              className={entityLinkClassName('max-w-40 truncate font-medium sm:max-w-full')}
-            >
-              {name}
-            </Link>
-          </Tooltip>
-        )}
-        {stats.failed[index] && (
-          <span className="text-danger">{t('fittings.compare.statsFailed')}</span>
-        )}
-        {fits && (
-          <span className={fits.overBudget ? 'text-danger' : 'text-success'}>{fits.text}</span>
-        )}
-        {flyVerdict && (
-          <span className={VERDICT_TONE_CLASS[flyVerdict.tone]}>{flyVerdict.text}</span>
-        )}
-        {slot.fitting && characterOptions.length > 1 && (
-          <CompareCanFlyByCharacter fitting={slot.fitting} characters={characterOptions} />
-        )}
-        <div className="flex items-center gap-1">
-          <IconButton
-            icon={<Icon.Close />}
-            label={t('fittings.compare.removeNamed', {
-              name: name || t('fittings.compare.slotFallback', { n: index + 1 }),
-            })}
-            tooltip={t('fittings.compare.remove')}
-            onClick={() => removeSlot(index)}
-            data-compare-remove={index}
-            tone="danger"
-          />
-        </div>
-      </div>
+      <CompareFitCard
+        letter={letter}
+        fitting={slot.fitting}
+        code={codes[index]}
+        hullName={hullNames.get(slot.fitting.shipTypeId)}
+        badges={badgesFor(index)}
+        fits={fitVerdict(t, stats.values[index])}
+        fly={canFlyVerdict(t, canFly.values[index], Boolean(canFly.failed[index]))}
+        characters={characterOptions}
+        price={price.values[index]?.sell ?? null}
+        wins={position === -1 ? [] : (wins[position] ?? [])}
+        statsFailed={Boolean(stats.failed[index])}
+        focusIndex={index}
+        onMakeBaseline={index === (okSlots[0] ?? 0) ? undefined : () => makeBaseline(index)}
+        onReplace={() => setPicker({ kind: 'replace', index })}
+        onRemove={() => removeSlot(index)}
+      />
     );
   }
 
-  const columns: FittingCompareColumn[] = visible.map((index) => ({
-    index,
-    statsIndex: statsPosition(index),
-    header: headerFor(index),
-    name: slots[index]?.fitting?.name,
-  }));
-
-  const differencesToggle = (
-    <label className="flex min-h-9 cursor-pointer items-center gap-2 text-xs font-semibold md:min-h-0">
-      <Tooltip content={count < 2 ? t('fittings.compare.differencesNeedsTwo') : null}>
-        <Checkbox
-          checked={showDifferencesOnly}
-          aria-disabled={count < 2 || undefined}
-          onChange={() => {
-            if (count >= 2) setDifferencesOnly((v) => !v);
-          }}
-        />
-      </Tooltip>
-      {t('fittings.compare.differencesOnly')}
-    </label>
-  );
+  const slotsFull = count >= MAX_COMPARE_SLOTS;
 
   return (
     <div className="mx-auto max-w-page space-y-3">
@@ -309,29 +272,25 @@ export function FittingCompare() {
         title={t('fittings.compare.title')}
         actions={
           <>
-            <Link
-              to={FITTINGS_PATH}
-              className={cx(
-                'inline-flex min-h-9 items-center gap-1 rounded-xs px-2 text-sm text-text-dim hover:text-text active:text-text-dim md:hidden',
-                interactiveClassName,
-                focusRingClassName
-              )}
-            >
-              <span aria-hidden="true">‹</span>
-              {t('ships.tabs.fittings')}
-            </Link>
+            {origin ? (
+              <OriginCrumb to={origin.back}>{origin.name}</OriginCrumb>
+            ) : (
+              <OriginCrumb to={FITTINGS_PATH} className="md:hidden">
+                {t('ships.tabs.fittings')}
+              </OriginCrumb>
+            )}
             <Tooltip
               content={
-                count >= MAX_COMPARE_SLOTS
-                  ? t('fittings.compare.slotsFull', { count: MAX_COMPARE_SLOTS })
-                  : null
+                slotsFull ? t('fittings.compare.slotsFull', { count: MAX_COMPARE_SLOTS }) : null
               }
             >
               <Button
                 ref={addFittingRef}
                 variant="primary"
-                aria-disabled={count >= MAX_COMPARE_SLOTS || undefined}
-                onClick={() => setPickerOpen(true)}
+                aria-disabled={slotsFull || undefined}
+                onClick={() => {
+                  if (!slotsFull) setPicker({ kind: 'add' });
+                }}
               >
                 {t('fittings.compare.addFitting')}
               </Button>
@@ -339,17 +298,6 @@ export function FittingCompare() {
           </>
         }
       />
-
-      {count > 0 && (
-        <div
-          data-testid="compare-controls"
-          className="flex flex-col gap-3 md:flex-row md:flex-wrap md:items-start md:gap-x-2 md:gap-y-2"
-        >
-          <DamageProfilePicker damageProfiles={damageProfiles} />
-          <AbyssalWeatherPicker />
-          <TargetProfilePicker targetProfiles={targetProfiles} />
-        </div>
-      )}
 
       {count === 0 ? (
         <EmptyState
@@ -363,57 +311,41 @@ export function FittingCompare() {
             />
           }
           action={
-            <Button onClick={() => setPickerOpen(true)}>{t('fittings.compare.addFitting')}</Button>
+            <Button onClick={() => setPicker({ kind: 'add' })}>
+              {t('fittings.compare.addFitting')}
+            </Button>
           }
         />
       ) : (
         <>
-          {isPhone && count > 2 && (
-            <div className="flex items-center justify-between">
-              <Button
-                className="min-h-9 min-w-9"
-                aria-disabled={pageWindow.start === 0 || undefined}
-                onClick={() => {
-                  if (pageWindow.start > 0) setPage((p) => p - 1);
-                }}
-              >
-                {t('fittings.compare.pagePrev')}
-              </Button>
-              <Button
-                className="min-h-9 min-w-9"
-                aria-disabled={pageWindow.end >= count || undefined}
-                onClick={() => {
-                  if (pageWindow.end < count) setPage((p) => p + 1);
-                }}
-              >
-                {t('fittings.compare.pageNext')}
-              </Button>
-              <LiveStatus>
-                {t('fittings.compare.pageStatus', {
-                  from: pageWindow.start + 1,
-                  to: pageWindow.end,
-                  count,
-                })}
-              </LiveStatus>
-            </div>
-          )}
+          <CompareScenarioLine damageProfiles={damageProfiles} targetProfiles={targetProfiles} />
 
-          {isPhone && differencesToggle}
+          <div
+            data-testid="compare-cards"
+            className={cx(
+              COMPARE_GRID_CLASS,
+              'edge-fade-x gap-y-3 md:border md:border-transparent md:px-3 max-md:flex max-md:snap-x max-md:overflow-x-auto max-md:pb-1'
+            )}
+            style={compareGridStyle(count)}
+          >
+            <div className="hidden md:block" />
+            {codes.map((code, index) => (
+              <div
+                key={`${index}:${code}`}
+                className="max-md:w-[72vw] max-md:max-w-80 max-md:shrink-0 max-md:snap-start"
+              >
+                {cardFor(index)}
+              </div>
+            ))}
+          </div>
+
           {!skillsKnown && (
             <p className="text-xs text-warning">{t('fittings.stats.skillsUnknown')}</p>
           )}
+
           {!statsReady ? (
-            <Panel title={t('fittings.compare.statsTitle')}>
-              <div className="flex flex-wrap justify-end gap-3">
-                {columns.map((column) => (
-                  <div key={column.index}>{column.header}</div>
-                ))}
-              </div>
-              <p
-                className={
-                  profileFailed ? 'mt-2 text-xs text-danger' : 'mt-2 text-xs text-text-dim'
-                }
-              >
+            <Panel>
+              <p className={profileFailed ? 'text-xs text-danger' : 'text-xs text-text-dim'}>
                 {profileFailed
                   ? t('fittings.compare.profileFailed')
                   : anyError
@@ -439,60 +371,71 @@ export function FittingCompare() {
             </Panel>
           ) : (
             <>
-              <Panel
-                title={t('fittings.compare.statsTitle')}
-                actions={
-                  <>
-                    {!isPhone && differencesToggle}
+              <CompareHeadToHead rows={table!.rows} columns={columns} />
+              {!pricesReady && (
+                <p className="text-xs text-text-dim">
+                  {anyPriceFailed
+                    ? t('fittings.compare.priceFailed')
+                    : t('fittings.compare.priceLoading')}
+                </p>
+              )}
+              {comparing && <CompareLoadout fittings={okFittings} columns={columns} />}
+              <section className="space-y-2" aria-labelledby="compare-all-stats">
+                <div className="flex items-center justify-between gap-2">
+                  <h2 id="compare-all-stats" className={eyebrowClassName}>
+                    {t('fittings.compare.statsTitle')}
+                  </h2>
+                  <div className="flex items-center gap-2">
+                    <label className="flex min-h-9 cursor-pointer items-center gap-2 text-xs font-semibold md:min-h-0">
+                      <Tooltip
+                        content={comparing ? null : t('fittings.compare.differencesNeedsTwo')}
+                      >
+                        <Checkbox
+                          checked={showDifferencesOnly}
+                          aria-disabled={!comparing || undefined}
+                          onChange={() => {
+                            if (comparing) setDifferencesOnly((v) => !v);
+                          }}
+                        />
+                      </Tooltip>
+                      {t('fittings.compare.differencesOnly')}
+                    </label>
                     {statsCsvRows.length > 0 && (
                       <TableActionsMenu
                         name={t('fittings.compare.statsTitle')}
                         tableExport={statsExport}
                       />
                     )}
-                  </>
-                }
-              >
-                <FittingCompareTable
+                  </div>
+                </div>
+                <CompareAllStats
                   rows={table!.rows}
+                  statsList={okStats}
                   columns={columns}
                   differencesOnly={showDifferencesOnly}
-                  pinNames={!isPhone}
+                  onShowMatching={() => setDifferencesOnly(false)}
                 />
-                {!pricesReady && (
-                  <p className="mt-2 text-xs text-text-dim">
-                    {anyPriceFailed
-                      ? t('fittings.compare.priceFailed')
-                      : t('fittings.compare.priceLoading')}
-                  </p>
-                )}
-                <p className="mt-2 text-xs text-text-dim">{t('fittings.appliedDps.assumptions')}</p>
-              </Panel>
-              {okSlots.length >= 2 && (
-                <Panel
-                  title={t('fittings.compare.modulesTitle')}
-                  actions={
-                    moduleDiffs.length > 0 && (
-                      <TableActionsMenu
-                        name={t('fittings.compare.modulesTitle')}
-                        tableExport={modulesExport}
-                      />
-                    )
-                  }
-                >
-                  <FittingCompareModulesSummary entries={moduleDiffs} columns={columns} />
-                </Panel>
-              )}
+              </section>
+              <p className="text-xs text-text-dim">{t('fittings.appliedDps.assumptions')}</p>
             </>
           )}
         </>
       )}
 
       <FittingComparePicker
-        open={pickerOpen}
-        onClose={() => setPickerOpen(false)}
+        open={picker !== null}
+        title={
+          picker?.kind === 'replace'
+            ? t('fittings.compare.replaceTitle', {
+                name:
+                  fittings[picker.index]?.name ??
+                  t('fittings.compare.slotFallback', { n: compareLetter(picker.index) }),
+              })
+            : undefined
+        }
+        onClose={() => setPicker(null)}
         characterId={activeCharacterId}
-        onAdd={addCode}
+        onAdd={pick}
       />
     </div>
   );

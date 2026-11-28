@@ -6,7 +6,7 @@ import {
 } from './fittingStatFields';
 import { appliedDps, appliedDpsVsRange, bestRange, graphMaxRange } from './appliedDps';
 import type { TargetProfile } from './targetProfile';
-import type { CapacitorStatus, Fitting, FittingStats } from './types';
+import type { CapacitorStatus, Fitting, FittingSlotKind, FittingStats } from './types';
 
 const STAT_DIRECTION: Readonly<Partial<Record<FittingStatKey, 'higher' | 'lower'>>> = {
   totalDps: 'higher',
@@ -60,11 +60,14 @@ export interface FittingPriceTotals {
 
 export type PriceCompareKey = 'priceSell' | 'priceBuy';
 
+export type CompareDirection = 'higher' | 'lower' | 'neutral';
+
 export interface CompareRow {
   key: StatChangeKey | AppliedCompareKey | PriceCompareKey;
   values: readonly number[];
   differs: boolean;
   bestIndices: readonly number[];
+  direction: CompareDirection;
 }
 
 export type CompareSectionId =
@@ -265,6 +268,7 @@ function capacitorRow(statsList: readonly FittingStats[]): CompareRow {
     ),
     differs,
     bestIndices,
+    direction: 'higher',
   };
 }
 
@@ -281,8 +285,15 @@ function appliedRows(statsList: readonly FittingStats[], target: TargetProfile):
       values: dps,
       differs: new Set(dps).size > 1,
       bestIndices: bestIndicesFor(dps, 'higher'),
+      direction: 'higher',
     },
-    { key: 'bestRange', values: km, differs: new Set(km).size > 1, bestIndices: [] },
+    {
+      key: 'bestRange',
+      values: km,
+      differs: new Set(km).size > 1,
+      bestIndices: [],
+      direction: 'neutral',
+    },
   ];
 }
 
@@ -290,8 +301,20 @@ function priceRows(prices: readonly (FittingPriceTotals | null)[]): CompareRow[]
   const sell = prices.map((p) => (p ? round(p.sell, 0) : NaN));
   const buy = prices.map((p) => (p ? round(p.buy, 0) : NaN));
   return [
-    { key: 'priceSell', values: sell, differs: new Set(sell).size > 1, bestIndices: [] },
-    { key: 'priceBuy', values: buy, differs: new Set(buy).size > 1, bestIndices: [] },
+    {
+      key: 'priceSell',
+      values: sell,
+      differs: new Set(sell).size > 1,
+      bestIndices: [],
+      direction: 'neutral',
+    },
+    {
+      key: 'priceBuy',
+      values: buy,
+      differs: new Set(buy).size > 1,
+      bestIndices: [],
+      direction: 'neutral',
+    },
   ];
 }
 
@@ -309,6 +332,7 @@ export function compareFittingStats(
           values,
           differs: new Set(values).size > 1,
           bestIndices: bestIndicesFor(values, STAT_DIRECTION[field.key]),
+          direction: STAT_DIRECTION[field.key] ?? 'neutral',
         },
       ];
     if (values.every((value) => value === 0)) return [];
@@ -322,6 +346,7 @@ export function compareFittingStats(
           ranked,
           field.direction === 'neutral' ? undefined : field.direction
         ).filter((index) => values[index] !== 0),
+        direction: field.direction,
       },
     ];
   });
@@ -331,32 +356,107 @@ export function compareFittingStats(
   return { rows };
 }
 
-export interface ModuleDiffEntry {
-  typeId: number;
-  counts: readonly number[];
+export interface BaselineDelta {
+  percent: number;
+  tone: 'better' | 'worse' | 'neutral';
 }
 
-export function modulesThatDiffer(fittings: readonly Fitting[]): ModuleDiffEntry[] {
-  const typeIds = new Set<number>();
-  const countsByFitting = fittings.map((fitting) => {
-    const counts = new Map<number, number>();
-    for (const module of fitting.modules) {
-      counts.set(module.typeId, (counts.get(module.typeId) ?? 0) + 1);
-      typeIds.add(module.typeId);
-    }
-    return counts;
-  });
-  const result: ModuleDiffEntry[] = [];
-  for (const typeId of [...typeIds].sort((a, b) => a - b)) {
-    const counts = countsByFitting.map((byType) => byType.get(typeId) ?? 0);
-    if (new Set(counts).size > 1) result.push({ typeId, counts });
+export function baselineDelta(
+  value: number,
+  baseline: number,
+  direction: CompareDirection
+): BaselineDelta | null {
+  if (!Number.isFinite(value) || !Number.isFinite(baseline)) return null;
+  if (baseline === 0 || value === baseline) return null;
+  const percent = ((value - baseline) / Math.abs(baseline)) * 100;
+  if (direction === 'neutral') return { percent, tone: 'neutral' };
+  const better = direction === 'higher' ? percent > 0 : percent < 0;
+  return { percent, tone: better ? 'better' : 'worse' };
+}
+
+export const HEAD_TO_HEAD_KEYS: readonly CompareRow['key'][] = [
+  'appliedDps',
+  'ehp',
+  'sustainedTank',
+  'maxVelocity',
+  'maxTargetRange',
+  'capacitor',
+  'priceSell',
+];
+
+export function headToHeadRows(rows: readonly CompareRow[]): CompareRow[] {
+  return HEAD_TO_HEAD_KEYS.flatMap((key) => rows.filter((row) => row.key === key));
+}
+
+export function headToHeadWins(rows: readonly CompareRow[]): CompareRow['key'][][] {
+  const wins: CompareRow['key'][][] = [];
+  for (const row of headToHeadRows(rows)) {
+    if (row.bestIndices.length !== 1) continue;
+    (wins[row.bestIndices[0]!] ??= []).push(row.key);
   }
-  return result;
+  return wins;
 }
 
-export function compareWindow(count: number, page: number): { start: number; end: number } {
-  if (count <= 2) return { start: 0, end: count };
-  const lastPage = count - 2;
-  const clamped = Math.max(0, Math.min(page, lastPage));
-  return { start: clamped, end: clamped + 2 };
+export type LoadoutRack = FittingSlotKind | 'drones';
+
+export const LOADOUT_RACKS: readonly LoadoutRack[] = [
+  'high',
+  'medium',
+  'low',
+  'rig',
+  'subsystem',
+  'drones',
+];
+
+export interface LoadoutEntry {
+  typeId: number;
+  chargeTypeId?: number;
+  count: number;
+  shared: number;
+}
+
+export interface LoadoutRackDiff {
+  rack: LoadoutRack;
+  fits: LoadoutEntry[][];
+}
+
+type RackItem = { typeId: number; chargeTypeId?: number; count: number };
+
+function rackItems(fitting: Fitting, rack: LoadoutRack): RackItem[] {
+  if (rack === 'drones')
+    return fitting.drones.map(({ typeId, quantity }) => ({ typeId, count: quantity }));
+  return [...fitting.modules]
+    .filter((module) => module.slot === rack)
+    .sort((a, b) => a.slotIndex - b.slotIndex)
+    .map(({ typeId, chargeTypeId }) => ({ typeId, chargeTypeId, count: 1 }));
+}
+
+const itemKey = ({ typeId, chargeTypeId }: { typeId: number; chargeTypeId?: number }) =>
+  `${typeId}:${chargeTypeId ?? ''}`;
+
+function grouped(items: readonly RackItem[]): Map<string, RackItem> {
+  const groups = new Map<string, RackItem>();
+  for (const item of items) {
+    const key = itemKey(item);
+    const group = groups.get(key);
+    if (group) group.count += item.count;
+    else groups.set(key, { ...item });
+  }
+  return groups;
+}
+
+export function loadoutDiff(fittings: readonly Fitting[]): LoadoutRackDiff[] {
+  return LOADOUT_RACKS.flatMap((rack) => {
+    const groupsByFit = fittings.map((fitting) => grouped(rackItems(fitting, rack)));
+    if (groupsByFit.every((groups) => groups.size === 0)) return [];
+    const fits = groupsByFit.map((groups) =>
+      [...groups.entries()].map(([key, { typeId, chargeTypeId, count }]) => ({
+        typeId,
+        ...(chargeTypeId === undefined ? {} : { chargeTypeId }),
+        count,
+        shared: Math.min(...groupsByFit.map((other) => other.get(key)?.count ?? 0)),
+      }))
+    );
+    return [{ rack, fits }];
+  });
 }

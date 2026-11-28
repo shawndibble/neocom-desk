@@ -1,5 +1,5 @@
 import { useCallback, useLayoutEffect, useMemo, useRef } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useLocation, useSearchParams } from 'react-router-dom';
 
 export const MAX_COMPARE_SLOTS = 3;
 
@@ -26,6 +26,8 @@ export type CompareCodesUpdate =
 
 export function useCompareCodes(): [readonly string[], (update: CompareCodesUpdate) => void] {
   const [searchParams, setSearchParams] = useSearchParams();
+  const { state } = useLocation();
+  const latestState = useRef<unknown>(state);
   const fKey = searchParams.getAll('f').join('\u0000');
   // eslint-disable-next-line react-hooks/exhaustive-deps -- `fKey` is `searchParams`' own relevant slice, kept as a stable string on purpose (see above)
   const codes = useMemo(() => parseCompareCodes(searchParams), [fKey]);
@@ -33,6 +35,9 @@ export function useCompareCodes(): [readonly string[], (update: CompareCodesUpda
   useLayoutEffect(() => {
     latest.current = codes;
   }, [codes]);
+  useLayoutEffect(() => {
+    latestState.current = state;
+  }, [state]);
   const setCodes = useCallback(
     (update: CompareCodesUpdate) => {
       const next = parseCompareCodes(
@@ -42,7 +47,7 @@ export function useCompareCodes(): [readonly string[], (update: CompareCodesUpda
         )
       );
       latest.current = next;
-      setSearchParams((prev) => writeCompareCodes(prev, next));
+      setSearchParams((prev) => writeCompareCodes(prev, next), { state: latestState.current });
     },
     [setSearchParams]
   );

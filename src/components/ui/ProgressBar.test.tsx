@@ -63,4 +63,15 @@ describe('ProgressBar', () => {
     expect(bar.tagName).toBe('SPAN');
     expect(fill(bar).tagName).toBe('SPAN');
   });
+
+  it('stays out of the accessibility tree when decorative, still drawing its share', () => {
+    const { container } = render(
+      <ProgressBar label="Speed" value={50} max={200} tone="neutral" decorative />
+    );
+    expect(screen.queryByRole('progressbar')).toBeNull();
+    const bar = container.firstElementChild as HTMLElement;
+    expect(bar).toHaveAttribute('aria-hidden', 'true');
+    expect(fill(bar)).toHaveClass('bg-line-bright');
+    expect(fill(bar).style.width).toBe('25%');
+  });
 });

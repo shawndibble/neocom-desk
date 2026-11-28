@@ -2000,7 +2000,8 @@
         "mordusLegion": "Mordu's Legion",
         "triglavian": "Triglavian",
         "sleepers": "Sleepers"
-      }
+      },
+      "manageOption": "Manage profiles"
     },
     "targetProfile": {
       "label": "Target profile",
@@ -2027,7 +2028,8 @@
       },
       "resistsLabel": "Resists (%)",
       "resistLabel": "{{type}} resist (%)",
-      "resistSummary": " · resists {{resists}}%"
+      "resistSummary": " · resists {{resists}}%",
+      "manageOption": "Manage targets"
     },
     "appliedDps": {
       "raw": "Raw DPS",
@@ -2104,9 +2106,6 @@
       "emptyTitle": "Nothing to compare yet",
       "emptyHint": "Add a Fitting to start comparing. Your saved and In-game fittings are in the <library>Fittings library</library>.",
       "differencesOnly": "Show differences only",
-      "pagePrev": "Previous",
-      "pageNext": "Next",
-      "pageStatus": "Fittings {{from}}–{{to}} of {{count}}",
       "canFlyYes": "Can fly",
       "canFlyNo": "Can't fly",
       "canFlyUnknown": "Skills unknown",
@@ -2118,8 +2117,7 @@
       "overBy": "Over {{resource}} by {{amount}}",
       "priceLoading": "Loading prices…",
       "priceFailed": "Couldn't load prices for one or more Fittings.",
-      "statsTitle": "Stats",
-      "modulesTitle": "Modules that differ",
+      "statsTitle": "All stats",
       "noDifferences": "Nothing differs between the compared Fittings.",
       "csvFitsRow": "Fits",
       "csvCanFlyRow": "Can fly",
@@ -2138,7 +2136,6 @@
         "cost": "Cost",
         "utility": "Utility"
       },
-      "moduleColumn": "Module",
       "best": "(Best)",
       "fixErrorsHint": "Fix the Fitting with the error above to see the comparison.",
       "statsFailed": "Couldn't calculate stats",
@@ -2148,9 +2145,6 @@
       "profileRetry": "Try again",
       "picker": {
         "title": "Compare with"
-      },
-      "modules": {
-        "none": "Every module is shared across the compared Fittings."
       },
       "stat": {
         "tacklePoints": "Warp disruption strength",
@@ -2252,7 +2246,59 @@
         "sensorStrength": "Sensor strength",
         "cargoCapacity": "Cargo hold (m³)"
       },
-      "openInEditor": "Open in the editor"
+      "openInEditor": "Open in the editor",
+      "makeBaseline": "Compare others to this",
+      "replace": "Replace with",
+      "replaceTitle": "Replace {{name}}",
+      "bestAt": "Best at",
+      "atRange": "at {{km}} km",
+      "againstBaseline": "against the Baseline",
+      "badge": {
+        "baseline": "Baseline",
+        "saved": "Saved",
+        "edits": "Your edits"
+      },
+      "scenario": {
+        "against": "Scored against",
+        "taking": "taking",
+        "in": "in"
+      },
+      "headToHeadTitle": "Head to head",
+      "headToHeadNote": "Bars compare the Fittings; percentages are against the Baseline.",
+      "headToHead": {
+        "appliedDps": "Applied DPS",
+        "ehp": "EHP",
+        "sustainedTank": "Sustained tank",
+        "maxVelocity": "Speed",
+        "maxTargetRange": "Lock range",
+        "capacitor": "Capacitor",
+        "priceSell": "Price"
+      },
+      "loadoutTitle": "Loadout",
+      "loadoutLegend": "Marked lines are not in every Fitting",
+      "loadoutChanged": "not in every Fitting",
+      "rack": {
+        "high": "High",
+        "medium": "Mid",
+        "low": "Low",
+        "rig": "Rigs",
+        "subsystem": "Subsystems",
+        "drones": "Drones"
+      },
+      "matchingHidden_one": "{{count}} matching stat hidden.",
+      "matchingHidden_other": "{{count}} matching stats hidden.",
+      "showMatching": "Show",
+      "sectionSummary_one": "{{count}} stat differs",
+      "sectionSummary_other": "{{count}} stats differ",
+      "sectionSummaryMatching_one": "{{count}} differs · {{matching}} match",
+      "sectionSummaryMatching_other": "{{count}} differ · {{matching}} match",
+      "unit": {
+        "sustainedTank": "{{value}} EHP/s",
+        "maxVelocity": "{{value}} m/s",
+        "maxTargetRange": "{{value}} km"
+      },
+      "loadoutCount": "{{count}}× {{name}}",
+      "loadoutWithCharge": "{{name}} · {{charge}}"
     },
     "item": {
       "slot": "{{rack}} {{index}}",

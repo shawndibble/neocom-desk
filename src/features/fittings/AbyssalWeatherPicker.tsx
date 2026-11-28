@@ -80,10 +80,9 @@ export function AbyssalWeatherPicker({
       </StatField>
     );
   return (
-    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
-      <span className="text-text-dim">{label}</span>
+    <>
       {select}
-      {effect && <span className="text-text-dim">{effect}</span>}
-    </div>
+      {effect && <span className="text-xs text-text-dim">{effect}</span>}
+    </>
   );
 }
