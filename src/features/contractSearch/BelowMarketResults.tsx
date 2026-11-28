@@ -1,3 +1,4 @@
+import { TableScroll } from '@/components/ui/TableScroll';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -251,18 +252,20 @@ export function BelowMarketResults({
           }
         />
       ) : (
-        <DataTable
-          label={t('contractSearch.belowMarket.tableLabel')}
-          columns={columns}
-          rows={contracts}
-          rowKey={(row) => row.contractId}
-          {...sortProps}
-          stackLayout="dense"
-          mobileSort
-          stackSummary={t('contractSearch.belowMarket.count', { count: contracts.length })}
-          onRowClick={(row) => onOpen(row.lead)}
-          virtualize
-        />
+        <TableScroll>
+          <DataTable
+            label={t('contractSearch.belowMarket.tableLabel')}
+            columns={columns}
+            rows={contracts}
+            rowKey={(row) => row.contractId}
+            {...sortProps}
+            stackLayout="dense"
+            mobileSort
+            stackSummary={t('contractSearch.belowMarket.count', { count: contracts.length })}
+            onRowClick={(row) => onOpen(row.lead)}
+            virtualize
+          />
+        </TableScroll>
       )}
     </>
   );

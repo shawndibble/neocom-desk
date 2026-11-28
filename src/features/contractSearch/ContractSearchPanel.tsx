@@ -1,3 +1,4 @@
+import { TableScroll } from '@/components/ui/TableScroll';
 import type { PriceSide } from '@/engine/miningTax/priceBasis';
 import { formatCount } from '@/lib/formatCount';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
@@ -1002,31 +1003,33 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
                 )
               ) : (
                 <>
-                  <DataTable
-                    {...itemsExport.tableProps}
-                    label={t('contractSearch.title')}
-                    columns={columns}
-                    rows={shownRows}
-                    rowKey={(row, index) => `${row.contractId}:${row.typeId}:${index}`}
-                    {...itemsSortProps}
-                    stackLayout="dense"
-                    mobileSort
-                    stackSummary={t('contractSearch.mobile.offerCount', {
-                      count: shownRows.length,
-                    })}
-                    onRowClick={setSelectedRow}
-                    rowMoreActions
-                    rowContextMenu={(row, tr) => (
-                      <BuildPlanContextMenu
-                        typeId={row.typeId}
-                        itemName={typeNames.get(row.typeId)}
-                        seed={seedFromOfferRow(row)}
-                        extraItems={<OpenInEveMenuItem kind="contract" id={row.contractId} />}
-                        trigger={tr}
-                      />
-                    )}
-                    virtualize
-                  />
+                  <TableScroll>
+                    <DataTable
+                      {...itemsExport.tableProps}
+                      label={t('contractSearch.title')}
+                      columns={columns}
+                      rows={shownRows}
+                      rowKey={(row, index) => `${row.contractId}:${row.typeId}:${index}`}
+                      {...itemsSortProps}
+                      stackLayout="dense"
+                      mobileSort
+                      stackSummary={t('contractSearch.mobile.offerCount', {
+                        count: shownRows.length,
+                      })}
+                      onRowClick={setSelectedRow}
+                      rowMoreActions
+                      rowContextMenu={(row, tr) => (
+                        <BuildPlanContextMenu
+                          typeId={row.typeId}
+                          itemName={typeNames.get(row.typeId)}
+                          seed={seedFromOfferRow(row)}
+                          extraItems={<OpenInEveMenuItem kind="contract" id={row.contractId} />}
+                          trigger={tr}
+                        />
+                      )}
+                      virtualize
+                    />
+                  </TableScroll>
                 </>
               )}
             </>

@@ -93,7 +93,7 @@ function InfoSurface({
 }) {
   if (phone) {
     return open ? (
-      <Modal open onClose={onClose} title={title} placement="sheet" closeOnBack={false}>
+      <Modal open onClose={onClose} title={title} placement="sheet-full" closeOnBack={false}>
         {children}
       </Modal>
     ) : null;

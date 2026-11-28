@@ -9,7 +9,6 @@ import {
   type DataTableColumn,
 } from '@/components/ui';
 import { focusRingClassName, touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
-import { COL_ISK, COL_QUANTITY } from '@/components/ui/dataTableWidths';
 import { cx } from '@/lib/cx';
 import { isOnTrip, type TripLine, type TripOverride } from '@/engine/market/haulingPlan';
 import { HAULING_THRESHOLDS, type DemandKind } from '@/engine/market/haulingMarket';
@@ -64,6 +63,7 @@ interface HaulingTableInput {
   anyEnd: HaulingAnyEnd;
   cards: boolean;
   compact: boolean;
+  demandLabel: boolean;
   windowed: boolean;
   lineOf: ReadonlyMap<number, TripLine>;
   suggestedProfitOf: ReadonlyMap<number, number>;
@@ -79,6 +79,7 @@ export function useHaulingTable({
   anyEnd,
   cards,
   compact,
+  demandLabel,
   windowed,
   lineOf,
   suggestedProfitOf,
@@ -104,7 +105,7 @@ export function useHaulingTable({
     {
       id: 'select',
       header: '',
-      width: '7ch',
+      width: '6ch',
       stackEdge: 'start',
       render: (row) => (
         <label className={touchCheckboxLabelClassName}>
@@ -183,7 +184,7 @@ export function useHaulingTable({
       id: 'buy',
       headerClassName: 'whitespace-nowrap',
       header: t('market.hauling.columns.buy'),
-      width: '17ch',
+      width: '13ch',
       align: 'right',
       className: 'tabular-nums whitespace-nowrap',
       stackAffix: { before: `${t('market.hauling.columns.buy')} ` },
@@ -197,7 +198,7 @@ export function useHaulingTable({
       headerTooltip: t(
         instant ? 'market.hauling.columns.buyOrderTip' : 'market.hauling.columns.expectedTip'
       ),
-      width: '17ch',
+      width: '13ch',
       align: 'right',
       className: 'tabular-nums whitespace-nowrap',
       stackAffix: {
@@ -235,7 +236,7 @@ export function useHaulingTable({
       headerTooltip: t(
         instant ? 'market.hauling.columns.profitInstantTip' : 'market.hauling.columns.profitTip'
       ),
-      width: COL_ISK,
+      width: '15ch',
       align: 'right',
       className: 'tabular-nums whitespace-nowrap',
       cardCorner: true,
@@ -297,7 +298,7 @@ export function useHaulingTable({
       id: 'm3',
       headerClassName: 'whitespace-nowrap',
       header: t('market.hauling.columns.m3'),
-      width: COL_QUANTITY,
+      width: '10ch',
       align: 'right',
       className: 'tabular-nums whitespace-nowrap',
       stackAffix: { after: ` ${t('market.hauling.columns.m3')}` },
@@ -309,7 +310,7 @@ export function useHaulingTable({
       headerClassName: 'whitespace-nowrap',
       header: t('market.hauling.columns.days'),
       headerTooltip: t('market.hauling.columns.daysTip'),
-      width: '24ch',
+      width: demandLabel ? '24ch' : '8ch',
       className: 'tabular-nums whitespace-nowrap',
       stackAffix: { after: t('market.hauling.daysShort') },
       sortValue: (row) => (row.mode === 'list' ? row.sale.daysToSell : undefined),
@@ -325,7 +326,7 @@ export function useHaulingTable({
               />
             </Tooltip>
             {formatDaysToSell(row.sale.daysToSell)}
-            <span className="text-xs text-text-dim @max-[62rem]:sr-only">
+            <span className={demandLabel ? 'text-xs text-text-dim' : 'sr-only'}>
               · {t(`market.hauling.demand.${row.demand.demand}`)}
             </span>
           </DataTableDenseCell>
@@ -335,7 +336,7 @@ export function useHaulingTable({
       id: 'bring',
       headerClassName: 'whitespace-nowrap',
       header: t('market.hauling.columns.bring'),
-      width: '16ch',
+      width: '13ch',
       align: 'right',
       className: 'whitespace-nowrap',
       stackEdge: 'end',

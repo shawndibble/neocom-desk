@@ -60,6 +60,7 @@ interface SurveyBoardProps {
   owned?: boolean;
   footerActions?: ReactNode;
   afterPanel?: (summary: SurveySummary) => ReactNode;
+  emptyPaste?: ReactNode;
   emptyExtra?: ReactNode;
   panelTitle?: ReactNode;
 }
@@ -89,6 +90,7 @@ export function SurveyBoard({
   expiresAt,
   footerActions,
   afterPanel,
+  emptyPaste,
   emptyExtra,
   panelTitle,
 }: SurveyBoardProps) {
@@ -168,7 +170,7 @@ export function SurveyBoard({
     return (
       <div className="space-y-4">
         <EmptyState title={t('survey.emptyTitle')} hint={t('survey.emptyHint')} className="py-10" />
-        {emptyExtra}
+        {emptyPaste}
         <CollapsiblePanel
           title={t('survey.start.howToCopy')}
           expanded={howToOpen}
@@ -176,6 +178,7 @@ export function SurveyBoard({
         >
           <SurveyHowTo heading={false} />
         </CollapsiblePanel>
+        {emptyExtra}
         {footerActions}
         {scanList}
       </div>

@@ -80,6 +80,7 @@ import { formatIsk, formatIskCompact, marketIskDecimals } from '@/lib/isk';
 import { formatCount } from '@/lib/formatCount';
 import { assetHref } from '@/features/assets/assetBrowseModel';
 import { useOwnedAssetIndex } from '@/features/assets/useOwnedAssetIndex';
+import { useIsPhone } from '@/lib/useIsPhone';
 
 export interface ItemDetailModalProps {
   typeId: number;
@@ -115,6 +116,7 @@ export function ItemDetailModal({
   onLeave,
 }: ItemDetailModalProps) {
   const { t } = useTranslation();
+  const isPhone = useIsPhone();
   const leave = onLeave ?? onClose;
   const [data, setData] = useState<DetailData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -281,7 +283,7 @@ export function ItemDetailModal({
       open
       onClose={onClose}
       closeOnBack={onLeave === undefined}
-      placement="detail"
+      placement={isPhone ? 'sheet-full' : 'detail'}
       title={
         <span className="text-sm font-semibold tracking-normal text-text normal-case">
           {itemName}

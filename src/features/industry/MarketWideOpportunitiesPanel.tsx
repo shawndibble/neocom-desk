@@ -273,6 +273,7 @@ export function MarketWideOpportunitiesPanel({
           )}
           {isDesktop && hasRun && !loading && rows.length > 0 && (
             <ColumnPickerMenu
+              size="sm"
               available={MARKET_WIDE_COLUMN_IDS}
               visible={visible}
               columnsById={columnsById}

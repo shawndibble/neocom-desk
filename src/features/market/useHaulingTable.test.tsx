@@ -23,6 +23,7 @@ function sellCell(turnInOfferFor: (row: HaulingViewRow) => typeof FAILOVER | nul
       anyEnd: null,
       cards: false,
       compact: false,
+      demandLabel: true,
       windowed: false,
       lineOf: new Map(),
       suggestedProfitOf: new Map(),

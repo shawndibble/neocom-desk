@@ -667,6 +667,7 @@ export function OverviewTab({ tabBar, tabsId }: OverviewTabProps) {
                   actions={
                     <>
                       <ColumnPickerMenu
+                        size="sm"
                         available={availableColumnIds}
                         visible={activeColumnIds}
                         columnsById={columnsById}

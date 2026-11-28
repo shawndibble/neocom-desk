@@ -443,6 +443,7 @@ export function StockManagerTable({
         )}
         <span className="ml-auto flex items-center gap-2">
           <ColumnPickerMenu
+            size="sm"
             available={STOCK_COLUMN_IDS}
             visible={visible}
             columnsById={columnsById}
