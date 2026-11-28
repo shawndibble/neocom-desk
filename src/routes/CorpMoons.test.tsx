@@ -84,6 +84,7 @@ describe('CorpMoons load errors', () => {
     mount({ state: 'ready' });
     expect(screen.getByText('Try again in a moment.')).toBeInTheDocument();
     expect(screen.getByText('auth/invalid-api-key')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Moons' })).toBeInTheDocument();
   });
 });
 

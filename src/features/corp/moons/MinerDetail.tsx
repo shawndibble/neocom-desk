@@ -22,7 +22,8 @@ import {
   LiveNote,
 } from '@/components/ui';
 import { InlineError } from '@/components/ui/InlineError';
-import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
+import { plainTextActionClassName } from '@/components/ui/plainTextActionClassName';
+import { textActionClassName } from '@/components/ui/textActionClassName';
 import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
 import {
   activityFeed,
@@ -223,7 +224,7 @@ export function MinerDetail({ id }: { id: string }) {
   const noticeLink = (n: LateNotice) => (
     <button
       type="button"
-      className={entityLinkClassName(cx('whitespace-nowrap', tapTargetClassName))}
+      className={plainTextActionClassName(cx('whitespace-nowrap', tapTargetClassName))}
       aria-label={t('corpTaxBook.moons.payment.openNotice', { date: atDate(n.issuedAt, zone) })}
       onClick={() => noticeParam.open(n.id)}
     >
@@ -734,9 +735,7 @@ export function MinerDetail({ id }: { id: string }) {
                     ) ? (
                       <button
                         type="button"
-                        className={entityLinkClassName(
-                          cx('shrink-0 whitespace-nowrap', tapTargetClassName)
-                        )}
+                        className={textActionClassName('shrink-0 whitespace-nowrap')}
                         onClick={() => setDialog({ kind: 'reverse', dismissalId: d.id })}
                       >
                         {t('corpTaxBook.moons.miner.reverse')}

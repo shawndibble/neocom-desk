@@ -3,7 +3,7 @@ import { useTimeZone } from '@/lib/timeFormat';
 import { InlineError } from '@/components/ui/InlineError';
 import { useTranslation } from 'react-i18next';
 import { Button, Panel } from '@/components/ui';
-import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
+import { textActionClassName } from '@/components/ui/textActionClassName';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { minersOnMoon } from '@/engine/corpTaxBook/bookSections';
 import { extractionDetail } from '@/engine/corpTaxBook/bookView';
@@ -47,9 +47,7 @@ export function FullyMinedPanel({ id }: { id: string }) {
             {' '}
             <button
               type="button"
-              className={entityLinkClassName(
-                'aria-disabled:cursor-not-allowed aria-disabled:opacity-40'
-              )}
+              className={textActionClassName('inline-flex')}
               aria-disabled={busy || undefined}
               onClick={busy ? undefined : () => void setMark(false)}
             >
@@ -97,9 +95,7 @@ export function FullyMinedPanel({ id }: { id: string }) {
                   {' '}
                   <button
                     type="button"
-                    className={entityLinkClassName(
-                      'aria-disabled:cursor-not-allowed aria-disabled:opacity-40'
-                    )}
+                    className={textActionClassName('inline-flex')}
                     aria-disabled={busy || undefined}
                     onClick={busy ? undefined : () => void setMark(false)}
                   >

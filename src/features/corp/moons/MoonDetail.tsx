@@ -12,6 +12,7 @@ import {
   type DataTableColumn,
 } from '@/components/ui';
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
+import { textActionClassName } from '@/components/ui/textActionClassName';
 import {
   extractionBilling,
   minersOnMoon,
@@ -199,7 +200,7 @@ export function MoonDetail({ id }: { id: string }) {
             {canEdit && row.oreLines.length > 0 && row.oreSource === 'survey' && (
               <button
                 type="button"
-                className={entityLinkClassName('ml-2')}
+                className={textActionClassName('ml-2 inline-flex')}
                 onClick={() => setLinking(true)}
               >
                 {t('corpTaxBook.moons.moon.link.change')}
