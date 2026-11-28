@@ -42,6 +42,12 @@ function statsWith(cpuUsed: number): FittingStats {
   } as FittingStats;
 }
 
+function sizeRing(container: HTMLElement) {
+  vi.spyOn(container.querySelector('svg')!, 'getBoundingClientRect').mockReturnValue(
+    new DOMRect(0, 0, 400, 400)
+  );
+}
+
 describe('FittingRing', () => {
   it('draws every slot the hull has, empty ones and subsystems included', () => {
     render(<FittingRing fitting={fitting} stats={statsWith(10)} />);
@@ -232,7 +238,8 @@ describe('FittingRing', () => {
     expect(powergrid.querySelector('path[stroke-dasharray]')).not.toBeNull();
     expect(cpu.querySelector('path[stroke-dasharray]')).toBeNull();
 
-    fireEvent.pointerMove(cpu, { pointerType: 'mouse' });
+    sizeRing(container);
+    fireEvent.pointerMove(cpu, { pointerType: 'mouse', clientX: 40, clientY: 40 });
     expect(await screen.findByRole('tooltip')).toHaveTextContent('CPU: 25.0 / 100.0 tf (25%)');
   });
 
@@ -254,8 +261,11 @@ describe('FittingRing', () => {
 
   it('says how far over budget in the band’s tooltip', async () => {
     const { container } = render(<FittingRing fitting={fitting} stats={statsWith(112.5)} />);
+    sizeRing(container);
     fireEvent.pointerMove(container.querySelector('[data-gauge="cpu"]')!, {
       pointerType: 'mouse',
+      clientX: 40,
+      clientY: 40,
     });
     expect(await screen.findByRole('tooltip')).toHaveTextContent(
       'CPU: 112.5 / 100.0 tf (113%), over by 12.5'
