@@ -2,8 +2,11 @@ export type SecurityBand = 'highsec' | 'lowsec' | 'nullsec';
 
 import { clamp } from './math';
 
+const LOWEST_POSITIVE_SHOWN = 0.1;
+
 export function shownSecurity(security: number): number {
-  return Math.round(security * 10) / 10;
+  const rounded = Math.round(security * 10) / 10;
+  return security > 0 && rounded === 0 ? LOWEST_POSITIVE_SHOWN : rounded;
 }
 
 export function securityBand(security: number): SecurityBand {

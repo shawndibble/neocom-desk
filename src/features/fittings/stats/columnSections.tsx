@@ -35,6 +35,7 @@ import { OVER_BUDGET_TONE, type Figure } from './statFigures';
 import type { SectionBuilder } from './useSectionBuilder';
 import { fmt0, fmt1 } from './fixedFormat';
 import type { Translate } from '@/lib/translate';
+import { Spinner } from '@/components/ui/Spinner';
 
 const CAPACITOR_TONE_CLASS = {
   success: 'text-success',
@@ -292,7 +293,7 @@ export function shipSections({
         nothingPriced ? (
           '—'
         ) : previewIsk !== null && previewIsk !== 0 ? (
-          <span className={previewIsk < 0 ? 'text-success' : 'text-warning'}>
+          <span className={previewIsk < 0 ? 'text-isk-pos' : 'text-isk-neg'}>
             <IskLabel value={price.totals.sell} /> →{' '}
             <IskLabel value={price.totals.sell + previewIsk} />
           </span>
@@ -303,7 +304,7 @@ export function shipSections({
       priceInfo.named ? (
         <PriceBody view={{ ...priceInfo, named: priceInfo.named }} />
       ) : (
-        <StatNote>{t('fittings.stats.priceLoading')}</StatNote>
+        <Spinner size="sm" showLabel label={t('fittings.stats.priceLoading')} />
       ),
       unpriced.length > 0 ? t('fittings.stats.incomplete') : undefined
     ),

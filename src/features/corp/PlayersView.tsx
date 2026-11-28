@@ -43,6 +43,7 @@ import type { RosterRow } from './CorpRoster';
 import { useRosterColumns } from './useRosterColumns';
 import { buildPlayerLines, type CharacterChip, type PlayerLine } from './playerRows';
 import type { RosterGrouping } from './useRosterGrouping';
+import { TableScroll } from '@/components/ui/TableScroll';
 
 type Line = PlayerLine<RosterRow>;
 
@@ -312,7 +313,7 @@ export function PlayersView({
           <InlineError>{error}</InlineError>
         </div>
       )}
-      <div className="overflow-x-auto">
+      <TableScroll>
         <DataTable
           columns={columns}
           rows={lines}
@@ -329,7 +330,7 @@ export function PlayersView({
           rowMoreActions
           {...sortProps}
         />
-      </div>
+      </TableScroll>
       {removing?.group && (
         <UnlinkConfirm
           title={t('corp.members.players.removeTitle', {

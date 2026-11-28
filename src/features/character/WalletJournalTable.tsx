@@ -63,6 +63,7 @@ import {
   WALLET_JOURNAL_PHONE_OFF_BY_DEFAULT,
   type WalletJournalColumnId,
 } from './walletJournalColumns';
+import { TableScroll } from '@/components/ui/TableScroll';
 
 export interface PlayerOption {
   id: string;
@@ -554,7 +555,7 @@ export function JournalTable({
           }
         />
       ) : (
-        <div ref={tableRef} className="overflow-x-auto">
+        <TableScroll ref={tableRef}>
           <DataTable
             {...tableExport.tableProps}
             label={label}
@@ -577,7 +578,7 @@ export function JournalTable({
                 }
               : {})}
           />
-        </div>
+        </TableScroll>
       )}
       <InsuranceLossHost />
     </>

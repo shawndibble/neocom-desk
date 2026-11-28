@@ -491,6 +491,24 @@ describe('MenuGroup', () => {
     expect(screen.getAllByRole('group')).toHaveLength(2);
   });
 
+  it('gives merged items unique keys, so React never drops one', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    open(
+      <>
+        <MenuItem>Show info</MenuItem>
+        <MenuGroup id="copy">
+          <MenuItem>Copy name</MenuItem>
+        </MenuGroup>
+        <MenuGroup id="copy">
+          <MenuItem>Copy new price</MenuItem>
+        </MenuGroup>
+      </>
+    );
+    await screen.findAllByRole('menuitem');
+    expect(error.mock.calls.flat().join(' ')).not.toMatch(/same key/);
+    error.mockRestore();
+  });
+
   it('folds a track group of three or more into a submenu, and keeps a smaller one flat', async () => {
     const user = userEvent.setup();
     open(

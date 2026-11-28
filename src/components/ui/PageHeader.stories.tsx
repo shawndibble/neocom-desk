@@ -17,8 +17,10 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
+/** @summary Just the route's `<h1>`. */
 export const TitleOnly: Story = { args: { title: 'Overview' } };
 
+/** @summary Title with a meta note beside it and an action at the right. */
 export const WithMetaAndActions: Story = {
   args: {
     title: 'Assets',
@@ -27,6 +29,7 @@ export const WithMetaAndActions: Story = {
   },
 };
 
+/** @summary Title with a `DataAgeBadge` in `meta`, the shape of every ESI-backed route. */
 export const WithDataAge: Story = {
   args: {
     title: 'Wallet',
@@ -35,6 +38,7 @@ export const WithDataAge: Story = {
   },
 };
 
+/** @summary The same header at 390 wide: actions keep a 36px touch target. */
 export const Phone: Story = {
   ...WithMetaAndActions,
   globals: { viewport: { value: 'phone390', isRotated: false } },
@@ -51,6 +55,7 @@ const scopeStandIn = (
   </button>
 );
 
+/** @summary `scope` slot (stand-in trigger): first in the cluster, level with the icon buttons, one line. */
 export const WithScope: Story = {
   args: {
     title: 'Market orders',
@@ -69,6 +74,7 @@ export const WithScope: Story = {
   },
 };
 
+/** @summary `scope` at 390 wide: picker, Refresh, ⋮ and bell on one line; the title truncates. */
 export const WithScopePhone: Story = {
   args: {
     title: 'Market orders and history',
@@ -80,6 +86,22 @@ export const WithScopePhone: Story = {
           <DropdownMenuItem>Export…</DropdownMenuItem>
           <DropdownMenuItem>Page settings…</DropdownMenuItem>
         </HeaderMoreMenu>
+      </>
+    ),
+  },
+  globals: { viewport: { value: 'phone390', isRotated: false } },
+};
+
+/** @summary `actionsOwnRow` at 390 wide: a cluster too wide for the title row starts at the gutter on its own row. */
+export const ActionsOwnRowPhone: Story = {
+  args: {
+    title: 'Market',
+    actionsOwnRow: true,
+    actions: (
+      <>
+        <Button variant="ghost">Trade hub</Button>
+        <Button variant="ghost">Region</Button>
+        <IconButton label="Refresh" icon={<Icon.Refresh />} />
       </>
     ),
   },

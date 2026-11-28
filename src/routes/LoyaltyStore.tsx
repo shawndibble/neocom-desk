@@ -16,6 +16,7 @@ import {
   DataAgeBadge,
   DataTable,
   EmptyState,
+  InfoTooltip,
   Modal,
   Panel,
   LiveStatus,
@@ -342,7 +343,7 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
             </p>
           )}
           {lpBasis === 'concord' && !concordPending && (
-            <p className="border-b border-line px-3 py-1.5 text-[0.6875rem] text-text-dim">
+            <p className="flex items-center gap-1.5 border-b border-line px-3 py-1.5 text-[0.6875rem] text-text-dim">
               {concord
                 ? t(
                     concord.basis === 'assumed'
@@ -350,8 +351,11 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
                       : 'loyaltyStore.concordRateVerified',
                     { rate: concord.rate }
                   )
-                : t('loyaltyStore.noConcordExchangeNote')}{' '}
-              {t('loyaltyStore.concordExchangeHelp')}
+                : t('loyaltyStore.noConcordExchangeNote')}
+              <InfoTooltip
+                label={t('loyaltyStore.concordExchangeLabel')}
+                content={t('loyaltyStore.concordExchangeHelp')}
+              />
             </p>
           )}
           {priceBasis === 'sell' && (

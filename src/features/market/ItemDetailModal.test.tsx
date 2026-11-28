@@ -122,6 +122,52 @@ describe('ItemDetailModal', () => {
     expect(screen.queryByRole('link', { name: 'Open in Market Browser' })).not.toBeInTheDocument();
   });
 
+  it('links to Assets on the Info tab only when a Character holds the item', async () => {
+    await db.characters.put({ characterId: 7, name: 'Hauler', ownerHash: 'h', addedAt: 1 });
+    await db.esiCache.put({
+      characterId: 7,
+      key: 'assets',
+      value: [
+        {
+          item_id: 1,
+          type_id: TYPE_ID,
+          quantity: 2,
+          location_id: 60003760,
+          location_type: 'station',
+          location_flag: 'Hangar',
+        },
+      ],
+      fetchedAt: Date.now(),
+    });
+    useActiveCharacter.setState({ activeCharacterId: 7, hydrated: true });
+    server.use(
+      http.get(`${ESI_BASE_URL}/universe/types/${TYPE_ID}`, () =>
+        HttpResponse.json({
+          type_id: TYPE_ID,
+          name: 'Rifter',
+          description: '',
+          group_id: 25,
+          published: true,
+          volume: 27289,
+          dogma_attributes: [],
+        })
+      )
+    );
+    mockedLoadDictionary.mockResolvedValue({});
+    const onClose = vi.fn();
+    try {
+      render(
+        <MemoryRouter initialEntries={['/overview']}>
+          <ItemDetailModal typeId={TYPE_ID} itemName="Rifter" onClose={onClose} />
+        </MemoryRouter>
+      );
+      const link = await screen.findByRole('link', { name: 'Find in Assets' });
+      expect(link).toHaveAttribute('href', '/assets/items?chars=all&q=Rifter');
+    } finally {
+      await db.characters.clear();
+    }
+  });
+
   it("subtitles the title with the item's Group and a ship's faction", async () => {
     server.use(
       http.get(`${ESI_BASE_URL}/universe/types/${TYPE_ID}`, () =>
@@ -178,11 +224,11 @@ describe('ItemDetailModal', () => {
     ).toBeInTheDocument();
   });
 
-  it('shows a loading state while ESI and the attribute dictionary are in flight', () => {
+  it('shows a loading state while ESI and the attribute dictionary are in flight', async () => {
     server.use(http.get(`${ESI_BASE_URL}/universe/types/${TYPE_ID}`, () => new Promise(() => {})));
     mockedLoadDictionary.mockReturnValue(new Promise(() => {}));
     render(<ItemDetailModal typeId={TYPE_ID} itemName="Rifter" onClose={() => {}} />);
-    expect(screen.getByRole('status', { name: 'Loading' })).toBeInTheDocument();
+    expect(await screen.findByRole('status', { name: 'Loading' })).toBeInTheDocument();
   });
 
   it('shows an error state inside the modal, not an empty shell, when ESI fails', async () => {

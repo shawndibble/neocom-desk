@@ -18,6 +18,7 @@ import {
   type FleetShare,
 } from '@/engine/communities/fleetPayouts';
 import { formatIsk } from '@/lib/isk';
+import { Well } from '@/components/ui/Well';
 import { loadFleetShares, removeFleetPayout, setFleetShareDone } from './fleetPayoutStore';
 import { formatLeft, formatShortAge } from './requestFormat';
 import { useMyFleetShare } from './useMyFleetShare';
@@ -42,17 +43,17 @@ function MemberView({
   if (!mine.share)
     return <p className="text-text-dim">{t('communities.payouts.detail.noShare')}</p>;
   return (
-    <div className="space-y-2 rounded-xs border border-line bg-panel-2 px-3 py-3">
+    <Well size="lg" className="space-y-2">
       <p className="text-text-dim">
         {t('communities.payouts.detail.yourPilot', { name: mine.share.pilotName })}
       </p>
-      <p className="text-lg font-medium tabular-nums">
+      <p className="text-base font-medium tabular-nums">
         {t('communities.payouts.isk', { isk: formatIsk(mine.share.isk) })}
       </p>
       <Pill tone={mine.share.paid ? 'success' : 'neutral'}>
         {t(mine.share.paid ? 'communities.payouts.youPaid' : 'communities.payouts.youUnpaid')}
       </Pill>
-    </div>
+    </Well>
   );
 }
 

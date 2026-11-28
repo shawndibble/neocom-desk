@@ -73,7 +73,7 @@ export function CalendarMap({
                 isPast ? 'calendar-map-past' : ''
               )}
             >
-              <span className="flex items-baseline justify-between">
+              <span className="flex items-baseline justify-between gap-1">
                 <span
                   className={`text-[0.6875rem] tabular-nums ${
                     day.isToday ? 'font-semibold text-accent' : 'text-text-dim'

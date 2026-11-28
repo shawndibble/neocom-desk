@@ -12,10 +12,12 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
+/** @summary A title and a hint. */
 export const WithHint: Story = {
   args: { title: 'No jobs running', hint: 'Start a job in game and it shows up here.' },
 };
 
+/** @summary An empty state that offers the action resolving it. */
 export const WithAction: Story = {
   args: {
     title: 'No plans yet',
@@ -24,8 +26,13 @@ export const WithAction: Story = {
   },
 };
 
+/** @summary Decorative icon (§4): a faint glyph above the title; `aria-hidden`. */
 export const WithIcon: Story = {
   args: { title: 'No alerts', hint: 'Price alerts you set show up here.', icon: <Icon.Pending /> },
 };
 
+/** @summary Title only: the shortest form, for a small panel. */
 export const TitleOnly: Story = { args: { title: 'No orders' } };
+
+/** @summary Inline: one dim line for an empty sub-list or a list inside a dialog. */
+export const Inline: Story = { args: { title: 'No implants plugged in.', variant: 'inline' } };

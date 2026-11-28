@@ -383,9 +383,7 @@ describe('ProductionRunsPanel', () => {
     await expandRuns(user);
 
     await user.click(await screen.findByRole('button', { name: 'Calculations?' }));
-    const dialog = await screen.findByRole('dialog', {
-      name: "How this run's realized profit is calculated",
-    });
+    const dialog = await screen.findByRole('dialog', { name: 'Realized profit' });
 
     expect(
       within(dialog).getByText('Cost of lost units').closest('div')?.querySelector('dd')
@@ -412,9 +410,7 @@ describe('ProductionRunsPanel', () => {
     await expandRuns(user);
 
     await user.click(await screen.findByRole('button', { name: 'Calculations?' }));
-    const dialog = await screen.findByRole('dialog', {
-      name: "How this run's realized profit is calculated",
-    });
+    const dialog = await screen.findByRole('dialog', { name: 'Realized profit' });
 
     const value = (label: string) =>
       within(dialog).getByText(label).closest('div')?.querySelector('dd')?.textContent;

@@ -38,6 +38,7 @@ import { approxIsk } from '@/features/campaigns/turnInContent';
 import { useTurnInOffers } from '@/features/campaigns/useTurnIns';
 import type { TradeHub } from '@/market/hubs';
 import { formatCount } from '@/lib/formatCount';
+import { TableScroll } from '@/components/ui/TableScroll';
 
 export type BookSide = 'sell' | 'buy';
 
@@ -389,7 +390,7 @@ export function OrderSideCard({
         empty
       ) : (
         <>
-          <div className="overflow-x-auto">
+          <TableScroll>
             <DataTable
               {...tableExport.tableProps}
               columns={columns}
@@ -407,7 +408,7 @@ export function OrderSideCard({
               rowClassName={rowClassName}
               expandableRow={{ renderDetail, leadingIcon: true }}
             />
-          </div>
+          </TableScroll>
           {onShowAll && (
             <div className="px-3 py-2">
               <Button size="sm" onClick={onShowAll}>

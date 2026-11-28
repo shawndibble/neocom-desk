@@ -1,3 +1,4 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { Fragment, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -15,7 +16,7 @@ import { Button, EmptyState, IconButton, Panel, Tooltip } from '@/components/ui'
 import * as Icon from '@/components/ui/icons';
 import { useStableCallback } from './useStableCallback';
 import { useUrlFilter } from '@/lib/useUrlState';
-import { useTouchContext } from '@/lib/useMediaQuery';
+import { usePrefersReducedMotion, useTouchContext } from '@/lib/useMediaQuery';
 import { BuildPlanFilterBar } from './BuildPlanFilterBar';
 import {
   BUILD_PLAN_FILTER,
@@ -114,6 +115,7 @@ export function BuildPlanList({
 }: BuildPlanListProps) {
   const { t } = useTranslation();
   const touchContext = useTouchContext();
+  const reduced = usePrefersReducedMotion();
   const onSelect = useStableCallback(onSelectProp);
   const onDuplicate = useStableCallback(onDuplicateProp);
   const onDelete = useStableCallback(onDeleteProp);
@@ -351,8 +353,10 @@ export function BuildPlanList({
             measuring={{ droppable: { strategy: MeasuringStrategy.Always } }}
             autoScroll={{ threshold: { x: 0.2, y: 0.25 }, acceleration: 20 }}
           >
-            <div className="flex items-center gap-2 border-b border-line bg-panel-2 px-2 py-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-              <span className="flex-1">{t('industry.title')}</span>
+            <div
+              className={`${eyebrowClassName} flex items-center gap-2 border-b border-line bg-panel-2 px-2 py-1.5`}
+            >
+              <span className="flex-1">{t('industry.comparePlanColumn')}</span>
               <BuildPlanSortHeader
                 sortKey="profit"
                 label={t('industry.profitColumn')}
@@ -423,7 +427,7 @@ export function BuildPlanList({
                 <PlanRow key={plan.id} {...rowProps(plan)} />
               ))}
             </ul>
-            <DragOverlay>
+            <DragOverlay dropAnimation={reduced ? null : undefined}>
               {draggingPlan && (
                 <div className="rounded-xs border border-accent-dim bg-panel-2 px-2 py-1.5 text-xs">
                   {draggingPlan.name}

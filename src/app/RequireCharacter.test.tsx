@@ -16,9 +16,10 @@ function renderAt(path: string) {
     <MemoryRouter initialEntries={[path]}>
       <Routes>
         <Route path="/login" element={<LoginStub />} />
-        <Route element={<RequireCharacter />}>
+        <Route element={<RequireCharacter isKnownPath={(p) => p !== '/nowhere'} />}>
           <Route path="/market" element={<p>market browser</p>} />
           <Route path="/characters" element={<p>character list</p>} />
+          <Route path="*" element={<p>shell not found</p>} />
         </Route>
       </Routes>
     </MemoryRouter>
@@ -60,6 +61,18 @@ describe('RequireCharacter', () => {
     await addCharacter();
     renderAt('/market');
     expect(await screen.findByText('market browser')).toBeInTheDocument();
+  });
+
+  it('shows the bare not-found page for an unknown path with no Character', async () => {
+    renderAt('/nowhere');
+    expect(await screen.findByRole('heading', { name: 'Page not found' })).toBeInTheDocument();
+    expect(screen.queryByText(/login page/)).not.toBeInTheDocument();
+  });
+
+  it('keeps an unknown path inside the shell for a logged-in Character', async () => {
+    await addCharacter();
+    renderAt('/nowhere');
+    expect(await screen.findByText('shell not found')).toBeInTheDocument();
   });
 
   it('keeps /characters reachable whenever at least one Character exists', async () => {

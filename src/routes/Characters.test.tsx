@@ -574,8 +574,6 @@ describe('Characters', () => {
     await waitFor(() => expect(screen.getByRole('button', { name: 'New group' })).toHaveFocus());
 
     await user.click(screen.getByRole('button', { name: 'Delete group Mains' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Delete group' });
-    await user.click(within(dialog).getByRole('button', { name: 'Delete group' }));
     await waitFor(() => expect(screen.getByRole('heading', { name: 'Alts' })).toHaveFocus());
   });
 
@@ -590,7 +588,7 @@ describe('Characters', () => {
     ).toBeInTheDocument();
   });
 
-  it('deletes a group via the confirmation Modal, not window.confirm', async () => {
+  it('deletes a group behind an Undo toast, and commits when the toast closes', async () => {
     await useOverviewGroups.getState().setValue({
       groups: [{ id: 'a', name: 'Alts', characterIds: [] }],
       updatedAt: 1,
@@ -599,8 +597,9 @@ describe('Characters', () => {
     renderCharacters();
 
     await user.click(await screen.findByRole('button', { name: 'Delete group Alts' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Delete group' });
-    await user.click(within(dialog).getByRole('button', { name: 'Delete group' }));
+    expect(screen.queryByRole('heading', { name: 'Alts' })).not.toBeInTheDocument();
+    expect(useOverviewGroups.getState().value.groups).toHaveLength(1);
+    await user.click(screen.getByRole('button', { name: 'Close' }));
 
     await waitForSettingsValue(OVERVIEW_GROUPS_SETTING_KEY, (value) => {
       const groups = (value as { groups: { id: string }[] }).groups;
@@ -608,7 +607,7 @@ describe('Characters', () => {
     });
   });
 
-  it('cancels a group delete from the confirmation Modal without deleting', async () => {
+  it('undoes a group delete from its toast without deleting', async () => {
     await useOverviewGroups.getState().setValue({
       groups: [{ id: 'a', name: 'Alts', characterIds: [] }],
       updatedAt: 1,
@@ -617,11 +616,10 @@ describe('Characters', () => {
     renderCharacters();
 
     await user.click(await screen.findByRole('button', { name: 'Delete group Alts' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Delete group' });
-    await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+    await user.click(screen.getByRole('button', { name: 'Undo' }));
 
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Alts' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Alts' })).toBeInTheDocument();
+    expect(useOverviewGroups.getState().value.groups).toHaveLength(1);
   });
 
   it('sorts characters by name and reverses direction', async () => {
@@ -741,8 +739,8 @@ describe('Characters', () => {
     renderCharacters();
     await screen.findByText('Pilot One');
 
-    await user.click(screen.getByRole('combobox', { name: 'Density' }));
-    await user.click(await screen.findByRole('option', { name: 'Spacious' }));
+    await user.click(screen.getByRole('combobox', { name: 'Text size' }));
+    await user.click(await screen.findByRole('option', { name: 'Extra large' }));
     await waitForSettingsValue(FONT_SCALE_KEY, (value) => value === 1.25);
     expect(useFontScale.getState().value).toBe(1.25);
   });

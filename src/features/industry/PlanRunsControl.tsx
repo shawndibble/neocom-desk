@@ -80,7 +80,6 @@ export function PlanRunsControl({
       )}
       {stockRuns && (
         <span className="flex flex-wrap items-center gap-2" data-testid="stock-runs">
-          <span aria-hidden="true">·</span>
           <span className="text-xs">{stockRunsText}</span>
           {stockRuns.runs > 0 && stockRuns.runs !== runs && (
             <Button size="sm" onClick={() => onRunsChange(stockRuns.runs)}>

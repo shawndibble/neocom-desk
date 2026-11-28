@@ -37,11 +37,9 @@ export function PilotKillActivity({ characterId }: { characterId: number }) {
 export function PilotKillActivityView({
   history,
   onRetry,
-  unknown = false,
 }: {
   history: PilotKillHistoryState;
   onRetry: () => void;
-  unknown?: boolean;
 }) {
   const { t, i18n } = useTranslation();
 
@@ -106,9 +104,7 @@ export function PilotKillActivityView({
     return (
       <section ref={resultRef} tabIndex={-1} className="space-y-2 outline-none">
         {heading}
-        <p className="text-sm text-text-dim">
-          {unknown ? t('travel.pilot.activity.unknown') : t('travel.pilot.activity.empty')}
-        </p>
+        <p className="text-sm text-text-dim">{t('travel.pilot.activity.empty')}</p>
       </section>
     );
   }
@@ -208,7 +204,7 @@ export function PilotKillActivityView({
               </span>
               <span
                 className={cx(
-                  'block text-xl leading-tight font-semibold tabular-nums @sm/kills:text-2xl',
+                  'block text-xl leading-tight font-semibold tabular-nums',
                   count > 0 ? SPACE_TEXT[space] : 'text-text-dim'
                 )}
               >

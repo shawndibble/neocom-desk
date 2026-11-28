@@ -10,6 +10,7 @@ import {
   Panel,
   Tooltip,
   type DataTableColumn,
+  Spinner,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import {
@@ -310,7 +311,12 @@ export function SpendPlanPanel({
       ) : plan.status === 'failed' ? (
         <LoadFailedState onRetry={plan.retry} />
       ) : (
-        <p className={`px-3 py-2 ${noteClassName}`}>{t('loyaltyStore.walkedLoading')}</p>
+        <Spinner
+          size="sm"
+          showLabel
+          label={t('loyaltyStore.walkedLoading')}
+          className="px-3 py-2 text-[0.6875rem]"
+        />
       )}
     </Panel>
   );

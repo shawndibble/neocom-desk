@@ -8,7 +8,7 @@ import {
   SearchInput,
   Spinner,
 } from '@/components/ui';
-import { activeOptionClassName } from '@/components/ui/controlStyles';
+import { activeOptionClassName, rowInteractiveClassName } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
 import { LOOKUP_DEBOUNCE_MS } from '@/lib/useDebouncedValue';
 import { beginEveLogin } from '@/app/loginFlow';
@@ -211,7 +211,7 @@ export function BuildLocationPicker({
                   'flex cursor-pointer flex-col items-start gap-0.5 border-b border-line px-2 py-1.5 last:border-b-0',
                   index === highlightedIndex
                     ? `bg-panel-2 ${activeOptionClassName}`
-                    : 'hover:bg-panel-2'
+                    : rowInteractiveClassName
                 )}
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => pick(option)}

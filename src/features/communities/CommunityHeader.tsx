@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { CharacterAvatar } from '@/components/ui';
 import { characterIdForUid } from '@/sync/uid';
-import { communityBadgeClassName } from './communityBadge';
+import { Pill } from '@/components/ui/Pill';
 import { communityInitials } from './communityInitials';
 import type { CommunityMember, CommunitySummary } from './communityStore';
 
@@ -43,9 +43,7 @@ export function CommunityHeader({
             <h2 className="min-w-0 text-sm font-semibold break-words md:text-base">
               {community.name}
             </h2>
-            {admin && (
-              <span className={communityBadgeClassName}>{t('communities.adminBadge')}</span>
-            )}
+            {admin && <Pill>{t('communities.adminBadge')}</Pill>}
           </div>
           {names.length > 0 && (
             <div className="mt-1.5 flex min-w-0 items-center gap-2 text-xs text-text-dim">

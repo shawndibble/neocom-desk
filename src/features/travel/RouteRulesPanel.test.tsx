@@ -108,12 +108,12 @@ describe('RouteRulesPanel › More route options', () => {
 });
 
 describe('RouteHoleFields › My ship', () => {
-  function renderFields() {
+  function renderFields(enabled = true) {
     const onChange = vi.fn();
     render(
       <RouteHoleFields
         query={{
-          enabled: true,
+          enabled,
           settings: { shipSize: 'medium', minLifeHours: 1, hubs: 'all' },
           hydrated: true,
         }}
@@ -152,6 +152,15 @@ describe('RouteHoleFields › My ship', () => {
 
     expect(onChange).not.toHaveBeenCalled();
     expect(screen.queryByText(/Set from/)).toBeNull();
+  });
+
+  it('greys the wormhole-only fields while Thera / Turnur is off, and keeps My ship live', () => {
+    renderFields(false);
+
+    const size = within(screen.getByRole('group', { name: 'My ship fits' }));
+    expect(size.getByText('S').closest('button')).toBeDisabled();
+    expect(screen.getByRole('spinbutton')).toBeDisabled();
+    expect(screen.getByRole('combobox', { name: 'Ship I am moving' })).toBeEnabled();
   });
 });
 

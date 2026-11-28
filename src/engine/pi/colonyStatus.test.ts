@@ -7,9 +7,8 @@ import {
   colonyStatus,
   colonyAttention,
   sortColoniesByAttention,
-  altGroupSummary,
 } from './colonyStatus';
-import type { ExtractorYieldProgram, ColonyStatus } from './types';
+import type { ExtractorYieldProgram } from './types';
 
 const NOW = Date.parse('2026-09-01T00:00:00Z');
 
@@ -220,37 +219,5 @@ describe('colonyAttention decayed', () => {
     expect(
       colonyAttention({ idle: false, soonestExpiryMs: NOW + HOUR_MS, decayed: true }, NOW)
     ).toBe('expiring-soon');
-  });
-});
-
-describe('altGroupSummary', () => {
-  it('reports no stopped colonies and no next expiry for an empty group', () => {
-    expect(altGroupSummary([])).toEqual({ stoppedCount: 0, nextExpiryMs: null });
-  });
-
-  it('counts idle colonies as stopped and ignores their expiry as "next"', () => {
-    const idle: ColonyStatus = { idle: true, soonestExpiryMs: NOW - HOUR_MS };
-    const active: ColonyStatus = { idle: false, soonestExpiryMs: NOW + 48 * HOUR_MS };
-    expect(altGroupSummary([idle, active])).toEqual({
-      stoppedCount: 1,
-      nextExpiryMs: NOW + 48 * HOUR_MS,
-    });
-  });
-
-  it('picks the soonest expiry across every non-stopped colony, not the first', () => {
-    const soonest: ColonyStatus = { idle: false, soonestExpiryMs: NOW + HOUR_MS };
-    const later: ColonyStatus = { idle: false, soonestExpiryMs: NOW + 48 * HOUR_MS };
-    expect(altGroupSummary([later, soonest]).nextExpiryMs).toBe(NOW + HOUR_MS);
-  });
-
-  it('reports no next expiry when every colony has already stopped', () => {
-    const idleA: ColonyStatus = { idle: true, soonestExpiryMs: NOW - HOUR_MS };
-    const idleB: ColonyStatus = { idle: true, soonestExpiryMs: NOW - 2 * HOUR_MS };
-    expect(altGroupSummary([idleA, idleB])).toEqual({ stoppedCount: 2, nextExpiryMs: null });
-  });
-
-  it('leaves next expiry null for a non-stopped colony with no extractor at all', () => {
-    const noExtractor: ColonyStatus = { idle: false, soonestExpiryMs: null };
-    expect(altGroupSummary([noExtractor])).toEqual({ stoppedCount: 0, nextExpiryMs: null });
   });
 });

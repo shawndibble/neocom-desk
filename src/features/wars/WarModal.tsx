@@ -7,8 +7,8 @@ import { formatCount } from '@/lib/formatCount';
 import { formatCountdown } from '@/lib/duration';
 import { formatTimestamp } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';
-import { useIsPhone } from '@/lib/useIsPhone';
 import { warZkillUrl } from '@/lib/zkillboard';
+import { Well } from '@/components/ui/Well';
 import { usePartyName } from './usePartyName';
 import { WarParty } from './WarParty';
 import { groupWarsByCorporation, type WarGroup } from './warGroups';
@@ -22,15 +22,9 @@ interface WarModalProps {
 
 export function WarModal({ open, onClose, wars, nameCorporation = false }: WarModalProps) {
   const { t } = useTranslation();
-  const phone = useIsPhone();
   const groups = groupWarsByCorporation(wars);
   return (
-    <Modal
-      open={open}
-      onClose={onClose}
-      placement={phone ? 'sheet' : 'center'}
-      title={t('wars.modal.title', { count: wars.length })}
-    >
+    <Modal open={open} onClose={onClose} title={t('wars.modal.title', { count: wars.length })}>
       {nameCorporation || groups.length > 1 ? (
         <div className="space-y-6">
           {groups.map((group) => (
@@ -102,7 +96,7 @@ function WarCard({ hit }: { hit: WarAgainstMe }) {
 
   return (
     <section className="space-y-3">
-      <div className="space-y-1.5 rounded-xs border border-danger bg-danger/10 px-3 py-2.5">
+      <Well tone="danger" size="flat" className="space-y-1.5">
         <div className="flex items-center justify-between gap-3">
           <WarParty party={war.aggressor} />
           <Pill tone="danger" className="shrink-0">
@@ -118,7 +112,7 @@ function WarCard({ hit }: { hit: WarAgainstMe }) {
             ? t('wars.modal.declaredOnYou')
             : t('wars.modal.declaredOnAlly', { name: defender })}
         </p>
-      </div>
+      </Well>
 
       <dl className="grid grid-cols-2 gap-x-4 gap-y-2">
         <Fact label={t('wars.modal.declared')}>{formatTimestamp(new Date(war.declared), tz)}</Fact>

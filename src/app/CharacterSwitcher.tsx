@@ -1,12 +1,19 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { IconButton, Popover, PopoverContent, PopoverTrigger } from '@/components/ui';
+import {
+  IconButton,
+  NeedsConnection,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui';
 import { CharacterAvatar } from '@/components/ui/CharacterAvatar';
 import { Pill } from '@/components/ui/Pill';
 import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
 import {
+  focusRingClassName,
   focusRingInsetClassName,
   inlineLinkClassName,
   rowInteractiveClassName,
@@ -15,6 +22,7 @@ import { useCharacterPermissionCounts } from '@/features/permissions/useCharacte
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { NeedsLoginAction } from '@/features/character/NeedsLoginAction';
 import { grantMissingPath } from './grantMissingPath';
+import { beginAddCharacterLogin } from './loginFlow';
 
 export function CharacterSwitcher({
   className,
@@ -108,7 +116,7 @@ export function CharacterSwitcher({
             );
           })}
         </ul>
-        <div className="border-t border-line px-3 py-2 text-xs">
+        <div className="flex items-center justify-between gap-3 border-t border-line px-3 py-2 text-xs">
           <Link
             to="/characters"
             onClick={() => {
@@ -119,6 +127,18 @@ export function CharacterSwitcher({
           >
             {t('nav.manageCharacters')}
           </Link>
+          <NeedsConnection>
+            <button
+              type="button"
+              onClick={() => void beginAddCharacterLogin()}
+              className={cx(
+                'rounded-xs text-accent underline aria-disabled:cursor-default aria-disabled:opacity-40',
+                focusRingClassName
+              )}
+            >
+              {t('characters.add')}
+            </button>
+          </NeedsConnection>
         </div>
       </PopoverContent>
     </Popover>

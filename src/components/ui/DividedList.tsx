@@ -8,6 +8,7 @@ interface DividedListProps extends HTMLAttributes<HTMLElement> {
   as?: 'div' | 'ul';
 }
 
+/** @summary A hairline-bordered box with `divide-y` rows. */
 export function DividedList({
   surface = 'panel-2',
   as = 'div',

@@ -34,6 +34,7 @@ export function TransactionsSummaryStrip({
   const rangeSet = range != null && (range.startDate !== null || range.endDate !== null);
   const rangeFrom = rangeSet ? rangeBound(range.startDate, summary.oldest) : null;
   const rangeTo = rangeSet ? rangeBound(range.endDate, summary.newest) : null;
+  const figureCount = 3 + (trading ? 1 : 0) + (trading && trading.matched > 0 ? 1 : 0);
   return (
     <section
       aria-label={t('wallet.transactionsSummaryLabel')}
@@ -47,7 +48,12 @@ export function TransactionsSummaryStrip({
           {t('wallet.transactionsRange', { from: rangeFrom, to: rangeTo })}
         </p>
       )}
-      <dl className="grid grid-cols-2 items-start gap-x-4 gap-y-3 tabular-nums min-[26rem]:grid-cols-3 lg:grid-cols-5">
+      <dl
+        className={cx(
+          'grid grid-cols-2 items-start gap-x-4 gap-y-3 tabular-nums',
+          figureCount === 4 ? 'sm:grid-cols-4' : 'min-[26rem]:grid-cols-3 lg:grid-cols-5'
+        )}
+      >
         <SummaryFigure
           label={t('wallet.sold')}
           value={signedIsk(summary.sold, 0)}

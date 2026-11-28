@@ -64,6 +64,7 @@ import {
   NO_OWN_AFFILIATION,
   loadContactsSnapshot,
 } from '@/features/character/contactsSnapshot';
+import { TableScroll } from '@/components/ui/TableScroll';
 
 const FILTER_PARAMS = {
   q: textParam(),
@@ -359,21 +360,23 @@ export function Contacts() {
                     }
                   />
                 ) : (
-                  <DataTable
-                    {...characterExport.tableProps}
-                    label={t('contacts.title')}
-                    columns={columns}
-                    rows={filteredContacts}
-                    rowKey={(contact) => contact.contact_id}
-                    {...characterSortProps}
-                    mobileSort
-                    stackLayout="dense"
-                    onRowClick={(contact) => {
-                      const kind = contactPublicInfoKind(contact);
-                      if (kind) openPublicInfo(kind, contact.contact_id);
-                    }}
-                    rowClickable={(contact) => contactPublicInfoKind(contact) !== null}
-                  />
+                  <TableScroll>
+                    <DataTable
+                      {...characterExport.tableProps}
+                      label={t('contacts.title')}
+                      columns={columns}
+                      rows={filteredContacts}
+                      rowKey={(contact) => contact.contact_id}
+                      {...characterSortProps}
+                      mobileSort
+                      stackLayout="dense"
+                      onRowClick={(contact) => {
+                        const kind = contactPublicInfoKind(contact);
+                        if (kind) openPublicInfo(kind, contact.contact_id);
+                      }}
+                      rowClickable={(contact) => contactPublicInfoKind(contact) !== null}
+                    />
+                  </TableScroll>
                 )}
               </Panel>
             )}

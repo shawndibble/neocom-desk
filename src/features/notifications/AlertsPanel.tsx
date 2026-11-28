@@ -3,7 +3,6 @@ import { useAccountCharacters } from '@/features/character/useCharacters';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
 import {
-  EmptyState,
   IconButton,
   FilterChip,
   ToastStack,
@@ -222,24 +221,26 @@ export function AlertsPanel({ variant, onClose }: AlertsPanelRenderProps) {
           {count > 0 ? t('alerts.panel.heading', { count }) : t('alerts.panel.headingAllRead')}
         </h2>
         <span className="flex items-center gap-3">
-          <button
-            type="button"
-            className={textActionClassName()}
-            aria-disabled={readable.length === 0 || hiddenIds.has(MARK_ALL_READ_ID) || undefined}
-            onClick={() => {
-              if (readable.length === 0 || hiddenIds.has(MARK_ALL_READ_ID)) return;
-              focusAfterCommit(heading);
-              const swept = readable;
-              setMarkedReadIds(new Set(swept.map((entry) => entry.id)));
-              deferred.defer({
-                id: MARK_ALL_READ_ID,
-                message: t('alerts.panel.undoMarkedRead', { count: swept.length }),
-                commit: () => dismissFeedEntriesAndSync(swept),
-              });
-            }}
-          >
-            {t('alerts.panel.markAllRead')}
-          </button>
+          {readable.length > 0 && (
+            <button
+              type="button"
+              className={textActionClassName()}
+              aria-disabled={hiddenIds.has(MARK_ALL_READ_ID) || undefined}
+              onClick={() => {
+                if (hiddenIds.has(MARK_ALL_READ_ID)) return;
+                focusAfterCommit(heading);
+                const swept = readable;
+                setMarkedReadIds(new Set(swept.map((entry) => entry.id)));
+                deferred.defer({
+                  id: MARK_ALL_READ_ID,
+                  message: t('alerts.panel.undoMarkedRead', { count: swept.length }),
+                  commit: () => dismissFeedEntriesAndSync(swept),
+                });
+              }}
+            >
+              {t('alerts.panel.markAllRead')}
+            </button>
+          )}
           {!sheet && (
             <button type="button" className={textActionClassName()} onClick={onClose}>
               {t('alerts.panel.close')}
@@ -269,11 +270,9 @@ export function AlertsPanel({ variant, onClose }: AlertsPanelRenderProps) {
       )}
 
       {rendered.length === 0 ? (
-        <EmptyState
-          title={t('alerts.panel.empty')}
-          hint={t('alerts.panel.emptyHint')}
-          className="py-8"
-        />
+        <p className="px-3.5 py-8 text-center text-xs text-text-dim">
+          {t('alerts.panel.emptyHint')}
+        </p>
       ) : (
         <ul>
           {rendered.map((group) => {

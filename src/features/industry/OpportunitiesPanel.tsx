@@ -30,6 +30,7 @@ import { formatDuration } from '@/lib/duration';
 import { formatIsk } from '@/lib/isk';
 import { iskToneClass } from '@/features/character/format';
 import { useIsDesktop } from '@/lib/useIsDesktop';
+import { useIsXlUp } from '@/lib/useIsXlUp';
 import { evaluateSkillGate, type SkillGateVerdict } from '@/engine/industry/skillGate';
 import type { PiData } from '@/sde/types';
 import { useRowStartPlan } from './rowStartPlan';
@@ -48,6 +49,7 @@ import {
 } from './opportunitiesUrl';
 import { OpportunityBlueprintChip } from './OpportunityBlueprintChip';
 import {
+  blueprintKindKey,
   matchesActivityFilter,
   matchesStockFilter,
   ORDER_DEPTH_RANK,
@@ -92,6 +94,7 @@ import {
   useVisibleOpportunitiesColumns,
   type OpportunitiesColumnId,
 } from './opportunitiesColumns';
+import { TableScroll } from '@/components/ui/TableScroll';
 
 interface OpportunitiesPanelProps {
   catalog: BlueprintCatalog;
@@ -147,6 +150,7 @@ export function OpportunitiesPanel({
   const { t } = useTranslation();
   const unknown = t('common.unknown');
   const isDesktop = useIsDesktop();
+  const xlUp = useIsXlUp();
 
   const { candidates: characterCandidates, namesById: characterNames } = useAccountCharacters();
 
@@ -333,6 +337,13 @@ export function OpportunitiesPanel({
     );
   }
 
+  const productBlueprints = new Map<number | null, Set<string>>();
+  for (const { candidate } of rows) {
+    const id = candidate.catalogEntry.productTypeID;
+    const kinds = productBlueprints.get(id) ?? new Set<string>();
+    kinds.add(`${blueprintKindKey(candidate)}:${candidate.blueprint.runs}`);
+    productBlueprints.set(id, kinds);
+  }
   const showCharacterColumn = new Set(rows.map((r) => r.candidate.characterId)).size > 1;
 
   const csvColumns = useMemo(
@@ -394,6 +405,9 @@ export function OpportunitiesPanel({
                 nameForCharacter={(id) => characterNames.get(id) ?? unknown}
               />
             )}
+            {productTypeID !== null &&
+              (productBlueprints.get(productTypeID)?.size ?? 0) > 1 &&
+              !isVisible('blueprint') && <OpportunityBlueprintChip candidate={row.candidate} />}
             {showCharacterColumn && (
               <span className="text-[0.6875rem]">{row.candidate.characterName}</span>
             )}
@@ -537,11 +551,12 @@ export function OpportunitiesPanel({
     {
       id: 'action',
       header: '',
-      width: '16ch',
+      width: xlUp ? '16ch' : COL_ICON,
       render: (row) => (
         <StartPlanButton
           onStart={() => onStartPlan(row.candidate.catalogEntry, row)}
           planKey={row.candidate.catalogEntry}
+          compact={xlUp ? undefined : { name: row.candidate.catalogEntry.productName }}
         />
       ),
     },
@@ -755,7 +770,7 @@ export function OpportunitiesPanel({
             className="py-8"
           />
         ) : isDesktop ? (
-          <div className="overflow-x-auto">
+          <TableScroll>
             <DataTable
               {...opportunitiesExport.tableProps}
               columns={shownColumns}
@@ -763,13 +778,14 @@ export function OpportunitiesPanel({
               rowKey={opportunityRowKey}
               rowClassName={opportunityRowClassName}
               virtualize="auto"
+              density={xlUp ? 'default' : 'compact'}
               label={t('industry.opportunitiesTableLabel')}
               onRowClick={startPlanFromRow}
               rowContextMenu={rowContextMenu}
               rowMoreActions
               {...sortProps}
             />
-          </div>
+          </TableScroll>
         ) : (
           <MobileOpportunityList
             rows={rows}

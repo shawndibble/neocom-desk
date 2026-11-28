@@ -123,7 +123,7 @@ export function GroupMinersView({
         placeholder={t(k('miners.search', 'search'))}
         aria-label={t(k('miners.searchLabel', 'searchLabel'))}
       />
-      {status === 'loading' && <Spinner block="panel" delayMs={200} label={t('common.loading')} />}
+      {status === 'loading' && <Spinner block="panel" label={t('common.loading')} />}
       {status === 'failed' && (
         <InlineError>{t('corpTaxBook.moons.grouping.listFailed')}</InlineError>
       )}

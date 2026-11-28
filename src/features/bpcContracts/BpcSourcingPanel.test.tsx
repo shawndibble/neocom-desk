@@ -542,11 +542,9 @@ describe('BpcSourcingPanel', () => {
     loadPublicBpcContracts.mockResolvedValue(null);
     renderIndustry();
 
-    expect(
-      await screen.findAllByText("Can't reach contract search, and nothing is saved yet")
-    ).not.toHaveLength(0);
+    expect(await screen.findAllByText('Contract search is down')).not.toHaveLength(0);
     expect(screen.queryByText('No public BPC listings yet')).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Try again' })).not.toHaveLength(0);
   });
 
   it('announces a failed load with the same words the page shows', async () => {

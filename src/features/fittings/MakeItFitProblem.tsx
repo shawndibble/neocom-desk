@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { ProgressBar } from '@/components/ui';
 import type { FittingStats } from '@/engine/fittings/types';
+import { Well } from '@/components/ui/Well';
 import { overBudgets, roundedAmount, unitOf } from './makeItFitFreed';
 
 export function MakeItFitProblem({ before }: { before: FittingStats }) {
@@ -10,8 +11,8 @@ export function MakeItFitProblem({ before }: { before: FittingStats }) {
       {overBudgets(before).map(({ resource, used, total, over }) => {
         const unit = unitOf(resource, t);
         return (
-          <div key={resource} className="border-danger/40 bg-danger/10 rounded-xs border p-3">
-            <p className="text-danger text-lg font-semibold tabular-nums">
+          <Well tone="danger" size="lg" key={resource}>
+            <p className="text-danger text-base font-semibold tabular-nums">
               {t('fittings.makeItFit.problem', {
                 resource: t(`fittings.makeItFit.resourceName.${resource}`),
                 over: roundedAmount(Math.ceil(over)),
@@ -36,7 +37,7 @@ export function MakeItFitProblem({ before }: { before: FittingStats }) {
               <span>{t('fittings.makeItFit.using', { used: roundedAmount(used), unit })}</span>
               <span>{t('fittings.makeItFit.hullHas', { total: roundedAmount(total), unit })}</span>
             </p>
-          </div>
+          </Well>
         );
       })}
       <p className="text-text-dim text-xs">{t('fittings.makeItFit.intro')}</p>

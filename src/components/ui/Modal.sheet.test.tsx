@@ -4,6 +4,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { stubViewport } from '@/test/viewport';
+import { PHONE_QUERY } from '@/lib/useIsPhone';
 import { Modal, type ModalPlacement } from './Modal';
 
 const overlayEntry = () =>
@@ -12,9 +13,11 @@ const overlayEntry = () =>
 function SheetHarness({
   placement = 'sheet',
   closeOnBack,
+  sheetOnPhone,
 }: {
   placement?: ModalPlacement;
   closeOnBack?: boolean;
+  sheetOnPhone?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   return (
@@ -28,6 +31,7 @@ function SheetHarness({
         title="Filters"
         placement={placement}
         closeOnBack={closeOnBack}
+        sheetOnPhone={sheetOnPhone}
       >
         <button type="button">Inside</button>
       </Modal>
@@ -68,6 +72,22 @@ describe('Modal bottom sheet', () => {
   it('shows no grabber on a centered dialog', async () => {
     const user = userEvent.setup();
     const { container } = render(<SheetHarness placement="center" />);
+    await user.click(screen.getByRole('button', { name: 'Open' }));
+    expect(container.querySelector('dialog span.rounded-full')).toBeNull();
+  });
+
+  it('turns a centered dialog into a sheet on a phone', async () => {
+    stubViewport(PHONE_QUERY);
+    const user = userEvent.setup();
+    const { container } = render(<SheetHarness placement="center" />);
+    await user.click(screen.getByRole('button', { name: 'Open' }));
+    expect(container.querySelector('dialog span.rounded-full')).not.toBeNull();
+  });
+
+  it('keeps a dialog centered on a phone when it opts out', async () => {
+    stubViewport(PHONE_QUERY);
+    const user = userEvent.setup();
+    const { container } = render(<SheetHarness placement="center" sheetOnPhone={false} />);
     await user.click(screen.getByRole('button', { name: 'Open' }));
     expect(container.querySelector('dialog span.rounded-full')).toBeNull();
   });

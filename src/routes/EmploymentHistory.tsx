@@ -94,16 +94,16 @@ export function EmploymentHistory() {
         characterId={activeCharacterId}
         actions={
           <div className="flex items-center gap-2">
+            <TableActionsMenu
+              name={t('employmentHistory.title')}
+              tableExport={historyExport}
+              size="md"
+            />
             <IconButton
               icon={<Icon.Refresh />}
               label={t('employmentHistory.refresh')}
               onClick={refresh}
               busy={loading}
-            />
-            <TableActionsMenu
-              name={t('employmentHistory.title')}
-              tableExport={historyExport}
-              size="md"
             />
           </div>
         }

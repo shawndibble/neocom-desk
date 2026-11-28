@@ -113,6 +113,12 @@ export function useMarketOrderBookView({
       : allRegions
         ? t('market.allRegions')
         : (marketRegions?.find((region) => region.id === chosenRegionId)?.name ?? hubRegionName);
+  const anyRangeLabel =
+    effectiveLocation.mode === 'hub'
+      ? t('market.scope.hubStationOnly', { hub: scopeLabel })
+      : allRegions
+        ? scopeLabel
+        : t('market.scope.anywhereIn', { region: scopeLabel });
 
   const bookStationCount = new Set([...sortedSell, ...sortedBuy].map((o) => o.location_id)).size;
   const bookScope: OrderBookScope =
@@ -139,7 +145,7 @@ export function useMarketOrderBookView({
     orderRowClassName,
     orderRowContextMenu,
     noOrders,
-    scopeLabel,
+    anyRangeLabel,
     bookScope,
     priceScopeName,
     scopeNote,

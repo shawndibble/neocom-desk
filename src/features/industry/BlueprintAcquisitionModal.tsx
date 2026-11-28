@@ -17,6 +17,7 @@ import {
   Button,
   FieldError,
   IconButton,
+  InfoTooltip,
   Modal,
   Select,
   SelectContent,
@@ -173,6 +174,7 @@ export function BlueprintAcquisitionModal({
   );
   const [meError, setMeError] = useState(false);
   const [teError, setTeError] = useState(false);
+  const [manualTouched, setManualTouched] = useState(false);
   const manualErrorId = useId();
 
   const [hubId, setHubId] = useState<TradeHub['id']>(
@@ -513,9 +515,15 @@ export function BlueprintAcquisitionModal({
           )}
           {fact(
             t('industry.bpAcqInventAttempt'),
-            quote.attemptCost === null
-              ? t('industry.bpAcqInventUnpriced')
-              : t('industry.bpAcqInventAttemptValue', { isk: formatIsk(quote.attemptCost) })
+            <span className="inline-flex items-center gap-1.5">
+              {quote.attemptCost === null
+                ? t('industry.bpAcqInventUnpriced')
+                : t('industry.bpAcqInventAttemptValue', { isk: formatIsk(quote.attemptCost) })}
+              <InfoTooltip
+                label={t('industry.bpAcqInventCostLabel')}
+                content={t('industry.bpAcqInventCostTip')}
+              />
+            </span>
           )}
         </dl>
         <ul className="flex flex-col gap-1">
@@ -543,6 +551,7 @@ export function BlueprintAcquisitionModal({
           : t('industry.blueprintAcquisitionModalTitle', { name: blueprintName })
       }
       titleActions={itemActionsFor?.(blueprintTypeID)}
+      dirty={manualTouched}
     >
       <div className="flex flex-col gap-4 text-xs">
         <div className="flex flex-col gap-1">
@@ -737,7 +746,7 @@ export function BlueprintAcquisitionModal({
         <section className={SECTION_CLASS}>
           <h3 className={HEADING_CLASS}>{t('industry.blueprintAcquisitionManualHeading')}</h3>
           <p className="text-text-dim">{t('industry.blueprintAcquisitionManualHint')}</p>
-          <div className="flex flex-wrap items-end gap-2">
+          <div className="flex flex-wrap items-end gap-2" onInput={() => setManualTouched(true)}>
             <label className="flex flex-col gap-1">
               {t('industry.blueprintAcquisitionManualMe')}
               <TextInput

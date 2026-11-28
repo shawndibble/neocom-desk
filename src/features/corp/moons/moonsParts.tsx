@@ -27,7 +27,7 @@ export function StateWord({ state }: { state: ExtractionState }) {
   return (
     <span
       className={cx(
-        'text-[0.6875rem] font-semibold tracking-wider whitespace-nowrap uppercase',
+        'text-[0.6875rem] font-semibold tracking-widest whitespace-nowrap uppercase',
         STATE_TONE[state]
       )}
     >

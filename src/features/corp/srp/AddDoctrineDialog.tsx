@@ -49,6 +49,7 @@ export function AddDoctrineDialog({ source, characterId, onAdd, onClose }: Props
   const [typedName, setTypedName] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
+  const [touched, setTouched] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -117,13 +118,13 @@ export function AddDoctrineDialog({ source, characterId, onAdd, onClose }: Props
       )}
       initialFocusRef={source === 'fitting' ? selectRef : areaRef}
       placement="center"
+      dirty={touched && !busy}
       footer={
         <DialogFooter>
-          <Button size="sm" aria-disabled={busy || undefined} onClick={onClose}>
+          <Button aria-disabled={busy || undefined} onClick={onClose}>
             {t('srp.settings.doctrines.dialog.cancel')}
           </Button>
           <Button
-            size="sm"
             variant="primary"
             loading={busy}
             aria-disabled={!canAdd || undefined}
@@ -136,7 +137,7 @@ export function AddDoctrineDialog({ source, characterId, onAdd, onClose }: Props
         </DialogFooter>
       }
     >
-      <div className="grid gap-3">
+      <div className="grid gap-3" onInput={() => setTouched(true)}>
         <Fields variant="form">
           {source === 'fitting' ? (
             <Field

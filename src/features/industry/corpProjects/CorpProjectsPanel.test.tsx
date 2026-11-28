@@ -174,10 +174,10 @@ describe('CorpProjectsPanel', () => {
     expect(screen.getByText('No open manufacture projects')).toBeInTheDocument();
   });
 
-  it('shows a spinner while the projects are being read', () => {
+  it('shows a spinner while the projects are being read', async () => {
     desktop.value = true;
     renderPanel({ loading: true, entries: [] });
-    expect(screen.getByRole('status')).toBeInTheDocument();
+    expect(await screen.findByRole('status')).toBeInTheDocument();
   });
 
   it('draws cards on a phone, one per project, opening to the working', async () => {

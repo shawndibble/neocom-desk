@@ -1,16 +1,19 @@
-import { useEffect } from 'react';
+import { useEffect, useEffectEvent } from 'react';
 import { useLocation } from 'react-router-dom';
 import { trackPageView } from './analytics';
+import { useRouteTitle } from './useRouteTitle';
 import { pagePathFor } from './pagePathFor';
 import { isTabRedirectPath } from './pageTabs';
 
 export function AnalyticsPageViewTracker(): null {
-  const location = useLocation();
+  const { pathname } = useLocation();
+  const title = useRouteTitle();
+  const track = useEffectEvent(() => void trackPageView(pagePathFor(pathname), title));
 
   useEffect(() => {
-    if (isTabRedirectPath(location.pathname)) return;
-    void trackPageView(pagePathFor(location.pathname));
-  }, [location.pathname]);
+    if (isTabRedirectPath(pathname)) return;
+    track();
+  }, [pathname]);
 
   return null;
 }

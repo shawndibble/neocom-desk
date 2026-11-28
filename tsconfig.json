@@ -1,6 +1,7 @@
 {
   // Solution file: it owns no files. `npm run typecheck` builds the two
   // projects in turn (`tsc -b`); editors pick the one that includes the file.
+  "compilerOptions": { "paths": { "@/*": ["./src/*"] } },
   "files": [],
   "references": [{ "path": "./tsconfig.src.json" }, { "path": "./tsconfig.tests.json" }]
 }

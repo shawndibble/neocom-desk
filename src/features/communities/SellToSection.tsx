@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { InlineError } from '@/components/ui/InlineError';
 import { useTranslation } from 'react-i18next';
 import { GrantMissingLink } from '@/app/GrantMissingLink';
-import { LiveNote, Button, NeedsConnection, TextArea } from '@/components/ui';
+import { LiveNote, Button, NeedsConnection, TextArea, Field, Fields } from '@/components/ui';
 import { permissionsForEndpoints } from '@/esi/registry';
 import { quoteIsCurrent, quoteIsHeld, type StandingRequest } from '@/engine/communities/buyback';
 import type { CommunityRequest, RequestPledge } from '@/engine/communities/requests';
@@ -135,12 +135,12 @@ export function SellToSection({
       aria-label={t('communities.board.sellTo.label')}
       className="space-y-3 rounded-xs border border-line px-3 py-2"
     >
-      <h3 className="text-xs font-medium uppercase tracking-wide text-text-dim">
+      <h3 className="text-xs font-medium uppercase tracking-widest text-text-dim">
         {t('communities.board.sellTo.title', { name: request.ownerName })}
       </h3>
       {held && (
         <div className="space-y-2">
-          <p className="flex flex-wrap items-baseline gap-x-3 text-lg">
+          <p className="flex flex-wrap items-baseline gap-x-3 text-base">
             <CopyablePrice price={held.total}>{formatIsk(held.total)} ISK</CopyablePrice>
             <span className={stillHeld ? 'text-xs text-text-dim' : 'text-xs text-warning'}>
               {stillHeld
@@ -197,20 +197,23 @@ export function SellToSection({
           )}
         </div>
       )}
-      <label className="block space-y-1">
-        <span className="block text-xs text-text-dim">
-          {held ? t('communities.board.sellTo.pasteAgain') : t('communities.board.sellTo.paste')}
-        </span>
-        <TextArea
-          rows={4}
-          spellCheck={false}
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          onSubmitChord={() => {
-            if (busy === null && text.trim() !== '') void getQuote();
-          }}
-        />
-      </label>
+      <Fields variant="stacked">
+        <Field
+          label={
+            held ? t('communities.board.sellTo.pasteAgain') : t('communities.board.sellTo.paste')
+          }
+        >
+          <TextArea
+            rows={4}
+            spellCheck={false}
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            onSubmitChord={() => {
+              if (busy === null && text.trim() !== '') void getQuote();
+            }}
+          />
+        </Field>
+      </Fields>
       <div className="flex flex-wrap items-center gap-2">
         <NeedsConnection>
           <Button

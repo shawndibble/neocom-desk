@@ -291,7 +291,7 @@ describe('SplitDialog — typing what the first Payee keeps (issue #6180)', () =
     await userEvent.clear(keepsBox());
     await userEvent.type(keepsBox(), '130');
 
-    expect(screen.getByText(/30 more than the game reports so far/)).toBeInTheDocument();
+    expect(screen.getByText(/30 over what the game reports/)).toBeInTheDocument();
     expect(screen.getByRole('radio', { name: /Jita landlord \(keeps\)/ })).toBeDisabled();
     await userEvent.click(screen.getByRole('button', { name: 'Split · keep 30 more units' }));
 
@@ -313,8 +313,8 @@ describe('SplitDialog — typing what the first Payee keeps (issue #6180)', () =
     await userEvent.type(keepsBox(), '500');
 
     expect(keepsBox()).toHaveValue('200');
-    expect(screen.getByText(/100 more than the game reports so far/)).toBeInTheDocument();
-    expect(screen.getByText(/this UTC day only/)).toBeInTheDocument();
+    expect(screen.getByText(/100 over what the game reports/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'About the UTC day' })).toBeInTheDocument();
   });
 
   describe('a second split, with a third Assignment already the Growth Collector (#6205)', () => {

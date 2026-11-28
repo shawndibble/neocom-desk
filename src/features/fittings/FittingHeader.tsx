@@ -211,7 +211,7 @@ export function FittingHeader({
       <div className="min-w-0">
         <div className="flex min-w-0 items-center gap-1">
           <h1
-            className={`text-lg font-semibold ${compact ? 'line-clamp-2 break-words' : 'truncate'}`}
+            className={`text-xl font-semibold ${compact ? 'line-clamp-2 break-words' : 'truncate'}`}
           >
             {fitting.name}
           </h1>

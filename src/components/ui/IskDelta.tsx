@@ -7,6 +7,7 @@ interface IskDeltaProps {
   className?: string;
 }
 
+/** @summary A signed ISK change with its "+" and the isk-pos / isk-neg tone. */
 export function IskDelta({ amount, decimals, className }: IskDeltaProps) {
   const places = decimals ?? marketIskDecimals(amount);
   const classes = [className, iskTone(amount, places)].filter(Boolean).join(' ');

@@ -12,6 +12,7 @@ import {
   SelectSeparator,
   SelectTrigger,
   SelectValue,
+  Spinner,
 } from '@/components/ui';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
@@ -111,7 +112,12 @@ function CustomLevelsModal({ open, onClose }: { open: boolean; onClose: () => vo
           onChange={(event) => setQuery(event.target.value)}
         />
         {catalogue === null && needle !== '' && (
-          <p className="text-xs text-text-dim">{t('fittings.skillOverrides.loading')}</p>
+          <Spinner
+            size="sm"
+            showLabel
+            label={t('fittings.skillOverrides.loading')}
+            className="text-xs"
+          />
         )}
         <ul className="space-y-1">
           {matches.map((skill) => (

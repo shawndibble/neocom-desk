@@ -1,4 +1,5 @@
 import { fixed1 } from '@/lib/fixedFormat';
+import { securityBand, shownSecurity } from '@/engine/securityStatus';
 import type { DeadlineSeverity } from '@/engine/character/severity';
 import { extractableSp, extractorCount } from '@/engine/skills/spExtraction';
 import type { SkillQueueEntry } from '@/esi/endpoints';
@@ -322,10 +323,7 @@ export function clonesTable(t: Translate, rows: readonly CloneTableRow[]): Table
   };
 }
 
-function securityTone(security: number): 'good' | 'caution' | 'bad' {
-  const shown = Math.round(security * 10) / 10;
-  return shown >= 0.5 ? 'good' : shown >= 0.1 ? 'caution' : 'bad';
-}
+const SECURITY_TONE = { highsec: 'good', lowsec: 'caution', nullsec: 'bad' } as const;
 
 export function locationTable(
   t: Translate,
@@ -339,7 +337,10 @@ export function locationTable(
       key: 'security',
       cells: [
         t(`${D}.location.securityLabel`),
-        { text: fixed1(input.security), tone: securityTone(input.security) },
+        {
+          text: fixed1(shownSecurity(input.security)),
+          tone: SECURITY_TONE[securityBand(input.security)],
+        },
       ],
     });
   }

@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { ReauthBanner } from './ReauthBanner';
 
+/** @summary Prompt to log in again or grant a missing Permission. */
 const meta = {
   title: 'ui/ReauthBanner',
   component: ReauthBanner,
@@ -16,12 +17,16 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
+/** @summary Button cue (§5): `primary` when the banner replaces the view's content. */
 export const Primary: Story = {};
 
+/** @summary Button cue (§5): `ghost` beside a view that already has its own primary button. */
 export const Ghost: Story = { args: { variant: 'ghost' } };
 
+/** @summary Touch tier (§3): `soleAction` raises the button to `md` when it is the only control. */
 export const SoleAction: Story = { args: { soleAction: true } };
 
+/** @summary `compact`: one wrapped line beside saved data, shown when a lapsed grant must not hide what is already on this device. */
 export const Compact: Story = {
   args: {
     compact: true,

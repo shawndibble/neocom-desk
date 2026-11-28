@@ -40,12 +40,7 @@ test('Move tab fits a phone and keeps its actions reachable', async ({ page }) =
   expect(sheetFitsWidth).toBe(true);
 
   await expect(dialog.getByRole('button', { name: 'Pick a system' })).toBeInViewport();
-  const cancel = dialog.getByRole('button', { name: 'Cancel' });
-  await expect(cancel).toBeInViewport();
   await expect(dialog.getByRole('button', { name: 'Show plan' })).toBeInViewport();
-  await cancel.click();
-  await expect(page).toHaveURL(/\/assets\/items/);
-  await expect(dialog).toBeHidden();
 });
 
 test('pickup heading gives the name a row on a phone and stays one row on desktop', async ({

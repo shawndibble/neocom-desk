@@ -32,7 +32,7 @@ export function HoverCard({
       data-testid="ship-tree-hover-card"
       onMouseEnter={onPointerEnter}
       onMouseLeave={onPointerLeave}
-      className="isis-hover-card motion-fade fixed z-50 border p-3 text-xs shadow-xl shadow-black/60"
+      className="isis-hover-card motion-fade fixed z-50 border p-3 text-xs shadow-lg shadow-black/50"
       style={{
         width: WIDTH,
         left,

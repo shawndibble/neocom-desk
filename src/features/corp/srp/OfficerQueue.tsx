@@ -20,7 +20,7 @@ import {
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { useColumnVisibility } from '@/lib/columnVisibility';
 import { cx } from '@/lib/cx';
-import { formatIsk, formatIskCompact } from '@/lib/isk';
+import { formatIsk } from '@/lib/isk';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { writeToClipboard } from '@/lib/clipboard';
 import { useCopyFeedback } from '@/lib/useCopyFeedback';
@@ -62,6 +62,7 @@ import {
 import { useSrpClaimNames } from './useSrpClaimNames';
 import { useSrpResultMail, type DecidedClaim } from './useSrpResultMail';
 import type { SrpQueueData, SrpQueueState } from './useSrpQueue';
+import { TableScroll } from '@/components/ui/TableScroll';
 
 type Ready = Extract<SrpQueueState, { status: 'ready' }>;
 
@@ -307,7 +308,7 @@ export function OfficerQueue({ data, ready }: { data: SrpQueueData; ready: Ready
           <span className="text-text-dim"> · </span>
           <span className="font-semibold">
             {t('srp.officer.summary.owed', {
-              isk: phone ? formatIskCompact(owed) : formatIsk(owed),
+              isk: formatIsk(owed),
             })}
           </span>
         </p>
@@ -394,7 +395,7 @@ export function OfficerQueue({ data, ready }: { data: SrpQueueData; ready: Ready
           ) : rows.length === 0 ? (
             <EmptyState title={empty[0]} hint={empty[1]} />
           ) : (
-            <div className="overflow-x-auto">
+            <TableScroll>
               <DataTable
                 key={tab}
                 label={t(`srp.officer.title.${tab}`)}
@@ -420,7 +421,7 @@ export function OfficerQueue({ data, ready }: { data: SrpQueueData; ready: Ready
                 }
                 rowMoreActions={tab !== 'history'}
               />
-            </div>
+            </TableScroll>
           )}
           {tab === 'history' && history.status === 'ready' && history.more && (
             <div className="px-3 pb-3">

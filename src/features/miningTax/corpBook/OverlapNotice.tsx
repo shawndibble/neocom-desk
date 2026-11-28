@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui';
+import { Well } from '@/components/ui/Well';
 
 interface Props {
   corpName: string;
@@ -26,10 +27,11 @@ export function OverlapNotice({
   );
 
   return (
-    <div
+    <Well
+      tone="warning"
       role="region"
       aria-label={t('miningTax.corpBook.overlap.region')}
-      className="space-y-2 rounded-xs border border-warning/60 bg-warning/10 p-2 text-xs"
+      className="space-y-2 text-xs"
     >
       <p>
         {paid ? (
@@ -48,6 +50,6 @@ export function OverlapNotice({
         </p>
       )}
       <div className="flex flex-wrap gap-2">{other}</div>
-    </div>
+    </Well>
   );
 }

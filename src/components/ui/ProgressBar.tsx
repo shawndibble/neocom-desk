@@ -25,6 +25,7 @@ const SIZE_CLASS = { xs: 'h-1', sm: 'h-1.5', md: 'h-2' } as const;
 
 const INDETERMINATE_WIDTH = '30%';
 
+/** @summary A thin filled track for how far along something is. */
 export function ProgressBar({
   label,
   value,
@@ -54,7 +55,9 @@ export function ProgressBar({
         className={cx(
           'block h-full',
           TONE_CLASS[tone],
-          determinate ? 'motion-safe:transition-[width]' : 'motion-safe:animate-pulse'
+          determinate
+            ? 'motion-safe:transition-[width] motion-safe:duration-(--motion-quick) motion-safe:ease-(--motion-ease-out)'
+            : 'motion-safe:animate-pulse'
         )}
         style={{ width: determinate ? `${share * 100}%` : INDETERMINATE_WIDTH }}
       />

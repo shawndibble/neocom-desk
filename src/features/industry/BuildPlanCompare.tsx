@@ -52,6 +52,7 @@ import { useHubDailyOrders } from './useHubDailyOrders';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 import { useIsDesktop } from '@/lib/useIsDesktop';
 import { CompareMatrix } from './CompareMatrix';
+import { TableScroll } from '@/components/ui/TableScroll';
 
 const formatOnePlace = createNumberFormat({ maximumFractionDigits: 1 });
 
@@ -442,7 +443,7 @@ export function BuildPlanCompare({
         </p>
       )}
       {isDesktop ? (
-        <div className="overflow-x-auto">
+        <TableScroll>
           <DataTable
             {...compareExport.tableProps}
             columns={shownColumns}
@@ -451,7 +452,7 @@ export function BuildPlanCompare({
             label={t('industry.compareTableLabel')}
             defaultSort={{ columnId: 'plan', direction: 'asc' }}
           />
-        </div>
+        </TableScroll>
       ) : (
         <CompareMatrix
           columns={shownColumns}

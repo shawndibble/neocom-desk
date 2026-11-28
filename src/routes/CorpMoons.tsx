@@ -22,6 +22,7 @@ import {
 import * as Icon from '@/components/ui/icons';
 import { tabBarTabs } from '@/lib/pageTabs';
 import { cx } from '@/lib/cx';
+import { skeletonBarClassName } from '@/components/ui/skeletonBarClassName';
 import { HIGHLIGHT_PARAM } from '@/lib/highlightParam';
 import { usePageTab } from '@/lib/usePageTab';
 import { useIsPhone } from '@/lib/useIsPhone';
@@ -288,7 +289,6 @@ function ReadyBook({ sync }: { sync: ReturnType<typeof useCorpTaxBook> }) {
 
 function MoonsLoading() {
   const { t } = useTranslation();
-  const bar = 'block animate-pulse rounded-xs bg-line motion-reduce:animate-none';
   return (
     <div className="mx-auto max-w-page space-y-4">
       <PageHeader title={t('corp.moons.title')} />
@@ -298,9 +298,9 @@ function MoonsLoading() {
         className="space-y-3"
         data-testid="moons-loading"
       >
-        <span className={cx(bar, 'h-8 w-1/3')} />
-        <span className={cx(bar, 'h-40 w-full')} />
-        <span className={cx(bar, 'h-24 w-full')} />
+        <span className={cx(skeletonBarClassName, 'h-8 w-1/3')} />
+        <span className={cx(skeletonBarClassName, 'h-40 w-full')} />
+        <span className={cx(skeletonBarClassName, 'h-24 w-full')} />
       </div>
     </div>
   );

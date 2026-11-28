@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, IskInput, Modal, TextArea } from '@/components/ui';
+import { Button, IskInput, Modal, TextArea, Field, Fields } from '@/components/ui';
 import { formatIsk } from '@/lib/isk';
 import { useIsPhone } from '@/lib/useIsPhone';
 import type { SrpClaim } from '../srpClaimTypes';
@@ -12,10 +12,9 @@ import { Well } from '@/components/ui/Well';
 
 function Label({ text, children }: { text: ReactNode; children: ReactNode }) {
   return (
-    <label className="block space-y-1">
-      <span className="text-xs text-text-dim">{text}</span>
-      {children}
-    </label>
+    <Fields variant="stacked">
+      <Field label={text}>{children}</Field>
+    </Fields>
   );
 }
 
@@ -72,7 +71,6 @@ function Shell({
       open
       onClose={onClose}
       title={title}
-      placement={phone ? 'sheet' : 'center'}
       dismissOnOutsidePress={false}
       footer={<DialogFooter stacked={phone}>{buttons}</DialogFooter>}
     >

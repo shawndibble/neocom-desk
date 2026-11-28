@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button } from '@/components/ui';
+import { Button, Spinner } from '@/components/ui';
 import { useRetryFocus } from '@/lib/useRetryFocus';
 import { useRetryOnReconnect } from '@/lib/useRetryOnReconnect';
 import { useOnline } from '@/stores/network';
@@ -58,7 +58,7 @@ export function CatalogueLoadingNote() {
       message={t(online ? 'fittings.add.catalogueFailed' : 'fittings.add.catalogueOffline')}
       onRetry={retryFittingCatalogue}
     >
-      <span className="text-text-dim">{t('fittings.add.loadingCatalogue')}</span>
+      <Spinner size="sm" showLabel label={t('fittings.add.loadingCatalogue')} />
     </FailedNote>
   );
 }

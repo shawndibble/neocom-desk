@@ -16,6 +16,11 @@ describe('viewPathFor', () => {
     expect(viewPathFor('/alerts')).toBe('/alerts');
   });
 
+  it('files a Build Group under Build Plans', () => {
+    expect(viewPathFor('/industry/groups/g1')).toBe('/industry/plans');
+    expect(canHide('/industry/groups')).toBe(false);
+  });
+
   it('is null off the nav', () => {
     expect(viewPathFor('/login')).toBeNull();
   });

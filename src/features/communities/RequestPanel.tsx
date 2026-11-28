@@ -47,6 +47,7 @@ import { notePledgeEdit } from './pledgeWrites';
 import { DELIVERY_ENDPOINTS, slotKey } from './requestDelivery';
 import { useDeliverySync } from './useDeliverySync';
 import { buybackLineKey } from '@/engine/communities/buyback';
+import { Well } from '@/components/ui/Well';
 import { buyLineLabel, describeExpiry, requestHeadline, standingRateLine } from './requestFormat';
 import {
   extendRequest,
@@ -245,15 +246,17 @@ export function RequestPanel({
     >
       <div className="space-y-3 text-sm">
         {request.terms && (
-          <p className="rounded-xs border border-line bg-panel-2 px-3 py-2 text-xs">
+          <Well as="p" size="flat" className="text-xs">
             <span className="text-text-dim">{t('communities.board.termsLabel')} </span>
             {request.terms}
-          </p>
+          </Well>
         )}
         {request.standing && (
-          <section
+          <Well
+            as="section"
+            size="flat"
             aria-label={t('communities.board.buyback.termsLabel')}
-            className="space-y-2 rounded-xs border border-line bg-panel-2 px-3 py-2"
+            className="space-y-2"
           >
             <p className="text-base font-medium tabular-nums">
               {standingRateLine(request.standing, t)}
@@ -266,7 +269,7 @@ export function RequestPanel({
                 <li key={buybackLineKey(line)}>{buyLineLabel(line, t)}</li>
               ))}
             </ul>
-          </section>
+          </Well>
         )}
         {request.standing && isBuyerView && contractBuyerId !== null && (
           <BuyerQuotes

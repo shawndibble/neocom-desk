@@ -489,13 +489,15 @@ function LadderClass({
         >
           {name}
         </span>
-        <span className="flex items-center gap-0.5">
-          <SkillBlocks skills={skills} trainedLevel={trainedLevel} />
-        </span>
-        <span className="ml-auto text-xs text-text-dim tabular-nums">
-          {isShipTreeFiltered(filter)
-            ? t('ships.tree.matchesOfTotal', { n: matched, total })
-            : t('ships.tree.flyableOfTotal', { flyable, total })}
+        <span className="ml-auto flex shrink-0 items-center gap-2">
+          <span className="flex items-center gap-0.5">
+            <SkillBlocks skills={skills} trainedLevel={trainedLevel} />
+          </span>
+          <span className="text-xs text-text-dim tabular-nums">
+            {isShipTreeFiltered(filter)
+              ? t('ships.tree.matchesOfTotal', { n: matched, total })
+              : t('ships.tree.flyableOfTotal', { flyable, total })}
+          </span>
         </span>
       </summary>
       {empires.length === 2 && (

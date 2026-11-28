@@ -19,7 +19,6 @@ import {
   type NpcStandingsFilter,
 } from '@/features/character/npcStandingsRows';
 import { toggleInSet } from '@/lib/sets';
-import { useIsNarrow } from '@/lib/useIsNarrow';
 
 const ANY_LEVEL = 'any';
 const FILTER_LEVELS = [2, 3, 4, 5];
@@ -103,34 +102,23 @@ export function NpcStandingsFilterBar({
   columnPicker,
 }: NpcStandingsFilterBarProps) {
   const { t } = useTranslation();
-  const narrow = useIsNarrow();
-  const search = (
-    <SearchInput
-      value={filter.text}
-      onChange={(event) => onChange({ ...filter, text: event.target.value })}
-      placeholder={t('contacts.searchPlaceholder')}
-      aria-label={t('contacts.searchPlaceholder')}
-      className={narrow ? 'min-w-0 flex-1' : 'w-64'}
-    />
-  );
-  if (narrow) {
-    return (
-      <FilterBar
-        value={filter}
-        onChange={onChange}
-        search={search}
-        actions={columnPicker}
-        active={activeNpcStandingsFilters(filter, t)}
-      >
-        {(draft, setDraft) => <FilterControls filter={draft} onChange={setDraft} counts={counts} />}
-      </FilterBar>
-    );
-  }
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      {search}
-      <FilterControls filter={filter} onChange={onChange} counts={counts} />
-      <div className="ml-auto">{columnPicker}</div>
-    </div>
+    <FilterBar
+      value={filter}
+      onChange={onChange}
+      search={
+        <SearchInput
+          value={filter.text}
+          onChange={(event) => onChange({ ...filter, text: event.target.value })}
+          placeholder={t('contacts.searchPlaceholder')}
+          aria-label={t('contacts.searchPlaceholder')}
+          className="min-w-48 flex-1"
+        />
+      }
+      actions={columnPicker}
+      active={activeNpcStandingsFilters(filter, t)}
+    >
+      {(draft, setDraft) => <FilterControls filter={draft} onChange={setDraft} counts={counts} />}
+    </FilterBar>
   );
 }

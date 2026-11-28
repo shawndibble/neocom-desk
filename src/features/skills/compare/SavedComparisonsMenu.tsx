@@ -8,12 +8,13 @@ import {
   Button,
   EmptyState,
   IconButton,
-  Modal,
   Popover,
   PopoverContent,
   PopoverTrigger,
   TextInput,
+  ToastStack,
   Tooltip,
+  useDeferredCommits,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
@@ -25,7 +26,6 @@ import {
   useSkillComparisons,
   type SavedComparison,
 } from '../comparisons';
-import { DialogFooter } from '@/components/ui/DialogFooter';
 
 interface SavedComparisonRowProps {
   comparison: SavedComparison;
@@ -139,7 +139,9 @@ export function SavedComparisonsMenu({
   useHydratedStore(useSkillComparisons);
 
   const [open, setOpen] = useState(false);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const pendingDeletes = useDeferredCommits();
+  const unlinkedByDelete = useRef<string | null>(null);
+  const shown = pendingDeletes.visible(value.items);
   const focusAfterCommit = useFocusAfterCommit();
   const loadButtons = useRef(new Map<string, HTMLButtonElement>());
   const headingRef = useRef<HTMLHeadingElement>(null);
@@ -171,17 +173,24 @@ export function SavedComparisonsMenu({
     onApply(resolved, comparison.id, resolved.length < comparison.characterIds.length);
   }
 
-  async function handleConfirmDelete() {
-    if (!deletingId) return;
-    const id = deletingId;
-    const index = value.items.findIndex((item) => item.id === id);
-    const near = [value.items[index + 1], value.items[index - 1]].map(
+  function handleDelete(id: string) {
+    const index = shown.findIndex((item) => item.id === id);
+    if (index < 0) return;
+    const near = [shown[index + 1], shown[index - 1]].map(
       (item) => () => (item ? loadButtons.current.get(item.id) : null)
     );
-    if (activeComparisonId === id) onUnlinked();
-    setDeletingId(null);
-    await setValue(removeComparison(value, id, Date.now()));
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    if (activeComparisonId === id) {
+      unlinkedByDelete.current = id;
+      onUnlinked();
+    }
+    pendingDeletes.defer({
+      id,
+      message: t('skillCompare.deleted', { name: shown[index].name }),
+      commit: async () => {
+        const current = useSkillComparisons.getState().value;
+        await setValue(removeComparison(current, id, Date.now()));
+      },
+    });
     focusAfterCommit(...near, headingRef);
   }
 
@@ -200,17 +209,7 @@ export function SavedComparisonsMenu({
             <Icon.Expanded aria-hidden="true" />
           </Button>
         </PopoverTrigger>
-        <PopoverContent
-          align="end"
-          aria-label={t('skillCompare.saved')}
-          className="w-80 p-2"
-          onInteractOutside={(event) => {
-            if (deletingId !== null) event.preventDefault();
-          }}
-          onFocusOutside={(event) => {
-            if (deletingId !== null) event.preventDefault();
-          }}
-        >
+        <PopoverContent align="end" aria-label={t('skillCompare.saved')} className="w-80 p-2">
           <div className="mb-2 flex items-center justify-between gap-2">
             <h3
               ref={headingRef}
@@ -232,7 +231,7 @@ export function SavedComparisonsMenu({
               </Button>
             </Tooltip>
           </div>
-          {value.items.length === 0 ? (
+          {shown.length === 0 ? (
             <EmptyState
               title={t('skillCompare.savedEmpty')}
               hint={t('skillCompare.savedEmptyHint')}
@@ -240,12 +239,12 @@ export function SavedComparisonsMenu({
             />
           ) : (
             <ul className="rounded-xs border border-line">
-              {value.items.map((comparison) => (
+              {shown.map((comparison) => (
                 <SavedComparisonRow
                   key={comparison.id}
                   comparison={comparison}
                   onLoad={(loaded) => void handleLoad(loaded)}
-                  onRequestDelete={setDeletingId}
+                  onRequestDelete={handleDelete}
                   onRename={handleRename}
                   registerLoad={registerLoad}
                 />
@@ -254,21 +253,13 @@ export function SavedComparisonsMenu({
           )}
         </PopoverContent>
       </Popover>
-      <Modal
-        open={deletingId !== null}
-        onClose={() => setDeletingId(null)}
-        title={t('skillCompare.delete')}
-      >
-        <p className="text-xs text-text-dim">{t('skillCompare.deleteConfirm')}</p>
-        <DialogFooter className="mt-3">
-          <Button size="sm" onClick={() => setDeletingId(null)}>
-            {t('skillCompare.cancel')}
-          </Button>
-          <Button variant="danger" size="sm" onClick={() => void handleConfirmDelete()}>
-            {t('skillCompare.delete')}
-          </Button>
-        </DialogFooter>
-      </Modal>
+      <ToastStack
+        {...pendingDeletes.toast}
+        onUndo={(id) => {
+          pendingDeletes.undo(id);
+          if (unlinkedByDelete.current === id && activeComparisonId === null) onSaved(id);
+        }}
+      />
     </>
   );
 }

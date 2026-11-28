@@ -2,10 +2,9 @@ import { useEffect, useRef, useState } from 'react';
 import { ChartHover } from './ChartHover';
 import { barHeights } from './geometry';
 import { CHART_COLOR } from './palette';
-import { signedBarGeometry } from './signedBars';
+import { LABEL_CHAR_PX, labelClearsBars, signedBarGeometry } from './signedBars';
 import type { BarsChartModel } from './types';
 
-const LABEL_CHAR_PX = 6;
 const LABEL_GAP_PX = 8;
 const LABEL_ROOM = 'my-3.5';
 
@@ -20,15 +19,15 @@ function useLabelStride(labels: readonly string[] | undefined) {
     observer.observe(el);
     return () => observer.disconnect();
   }, [labels]);
-  if (!labels || width <= 0) return { ref, stride: 1 };
+  if (!labels || width <= 0) return { ref, width, stride: 1 };
   const widest = labels.reduce((m, label) => Math.max(m, label.length), 0);
   const slot = widest * LABEL_CHAR_PX + LABEL_GAP_PX;
-  return { ref, stride: Math.max(1, Math.ceil((labels.length * slot) / width)) };
+  return { ref, width, stride: Math.max(1, Math.ceil((labels.length * slot) / width)) };
 }
 
 export function Bars({ model, height }: { model: BarsChartModel; height: number }) {
   const signed = model.ref !== undefined || model.gains || model.values.some((v) => v < 0);
-  const { ref, stride } = useLabelStride(model.barLabels);
+  const { ref, width, stride } = useLabelStride(model.barLabels);
   const labelled = model.barLabels !== undefined;
   return (
     <div aria-hidden="true" ref={ref} className="grid gap-1">
@@ -39,7 +38,7 @@ export function Bars({ model, height }: { model: BarsChartModel; height: number 
         </div>
       )}
       {signed ? (
-        <SignedPlot model={model} height={height} stride={stride} />
+        <SignedPlot model={model} height={height} width={width} stride={stride} />
       ) : (
         <PlainPlot model={model} height={height} />
       )}
@@ -78,10 +77,12 @@ function PlainPlot({ model, height }: { model: BarsChartModel; height: number })
 function SignedPlot({
   model,
   height,
+  width,
   stride,
 }: {
   model: BarsChartModel;
   height: number;
+  width: number;
   stride: number;
 }) {
   const { bars, baseline, ref, peak } = signedBarGeometry(model.values, model.ref?.value);
@@ -120,7 +121,10 @@ function SignedPlot({
         />
       )}
       {labels?.map((label, i) =>
-        (count - 1 - i) % stride === 0 && bars[i] && bars[i].size > 0 ? (
+        (count - 1 - i) % stride === 0 &&
+        bars[i] &&
+        bars[i].size > 0 &&
+        (width <= 0 || labelClearsBars(bars, i, label.length, width, height)) ? (
           <b
             key={i}
             className="pointer-events-none absolute -translate-x-1/2 text-[0.6875rem] leading-none font-normal whitespace-nowrap text-text-dim tabular-nums"

@@ -87,14 +87,13 @@ function Hero({
     );
   const gain = row.quickWins.length > 0 ? winGain : null;
 
-  let why: string;
+  let why: string | null = null;
   if (next.kind === 'haul') {
-    why = t('piColonies.today.whyHaul', { in: hoursLabel(Math.max(0, hoursAway)) });
+    why = t('piColonies.today.whyHaul');
   } else if (next.stopped) {
     why = t('piColonies.today.whyStopped', { ago: hoursLabel(-hoursAway) });
-  } else {
-    why = t('piColonies.today.whyExpiring', { in: hoursLabel(hoursAway) });
   }
+  const shownGain = gain !== null && gain > 0 ? gain : null;
 
   return (
     <div className="flex items-start gap-3">
@@ -111,23 +110,25 @@ function Hero({
               : t('piColonies.today.in', { in: hoursLabel(hoursAway) })}
           </span>
         </p>
-        <p className="text-xs text-text-dim">
-          {why}
-          {gain !== null && gain > 0 && (
-            <>
-              {' · '}
-              {t(
-                next.kind === 'haul'
-                  ? 'piColonies.today.savesLead'
-                  : 'piColonies.today.bringsBackLead'
-              )}{' '}
-              <span className="text-isk-pos">
-                +<IskAmount value={gain} decimals={0} />
-                {t('piColonies.perDay')}
-              </span>
-            </>
-          )}
-        </p>
+        {(why !== null || shownGain !== null) && (
+          <p className="text-xs text-text-dim first-letter:uppercase">
+            {why}
+            {shownGain !== null && (
+              <>
+                {why !== null && ' · '}
+                {t(
+                  next.kind === 'haul'
+                    ? 'piColonies.today.savesLead'
+                    : 'piColonies.today.bringsBackLead'
+                )}{' '}
+                <span className="text-isk-pos">
+                  +<IskAmount value={shownGain} decimals={0} />
+                  {t('piColonies.perDay')}
+                </span>
+              </>
+            )}
+          </p>
+        )}
       </div>
     </div>
   );
@@ -227,7 +228,7 @@ function LoginNext({
         <>
           <p className="mt-0.5 flex items-baseline gap-2">
             <span
-              className={`text-2xl font-semibold tabular-nums ${now ? 'text-danger' : 'text-warning'}`}
+              className={`text-base font-semibold tabular-nums ${now ? 'text-danger' : 'text-warning'}`}
             >
               {now
                 ? t('piColonies.today.nowCap')
@@ -328,7 +329,11 @@ export function TodayPanel(props: TodayPanelProps) {
               )
             ) : (
               <Trans
-                i18nKey="piColonies.today.summary"
+                i18nKey={
+                  props.fixGainPerDay > 0
+                    ? 'piColonies.today.summary'
+                    : 'piColonies.today.summaryTuned'
+                }
                 values={{ count: props.ownCount }}
                 components={{
                   today: (

@@ -96,9 +96,13 @@ describe('the Corp Board default layout', () => {
     const { widgets } = corpDefaultLayout();
     for (const w of widgets.filter((x) => x.show === undefined)) {
       expect(w.size, w.kind).toBe(getKind(w.kind)!.defaultSize);
-      expect(w.view, w.kind).toBe(getKind(w.kind)!.defaultView);
+      if (w.kind !== 'corpMembers') expect(w.view, w.kind).toBe(getKind(w.kind)!.defaultView);
     }
     expect(new Set(widgets.map((w) => w.id)).size).toBe(widgets.length);
+  });
+
+  it('opens Members as its joins chart, so the card is not one number in an empty box', () => {
+    expect(corpDefaultLayout().widgets.find((w) => w.kind === 'corpMembers')?.view).toBe('chart');
   });
 
   it('never puts a coming-soon kind in the default', () => {

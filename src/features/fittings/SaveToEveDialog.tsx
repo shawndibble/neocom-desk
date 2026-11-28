@@ -175,7 +175,14 @@ export function SaveToEveDialog({
   }
 
   return (
-    <Modal open={open} onClose={onClose} title={t('fittings.saveToEve.title')}>
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={t('fittings.saveToEve.title')}
+      dirty={
+        (name !== clampFittingName(fitting.name) || target !== NEW_TARGET || !alsoSave) && !saving
+      }
+    >
       <form
         className="space-y-3"
         onSubmit={(e) => {

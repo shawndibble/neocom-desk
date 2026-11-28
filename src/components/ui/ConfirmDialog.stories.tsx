@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { ConfirmDialog } from './ConfirmDialog';
 
+/** @summary A confirm for one action: body text, a danger or plain action button, and its own failure line. */
 const meta = {
   title: 'ui/ConfirmDialog',
   component: ConfirmDialog,
@@ -21,10 +22,13 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
+/** @summary `danger` (default): the action button is red, for a destructive confirm. */
 export const Danger: Story = {};
 
+/** @summary `children`: a field the confirm asks for, below the body. */
 export const WithField: Story = {
   args: { children: <input type="date" aria-label="Left on" defaultValue="2026-11-10" /> },
 };
 
+/** @summary `danger={false}`: a plain primary action. */
 export const Plain: Story = { args: { danger: false, actionLabel: 'Continue' } };

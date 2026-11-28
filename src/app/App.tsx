@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, type ReactElement } from 'react';
-import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import { BrowserRouter, Navigate, Route, Routes, matchPath, useLocation } from 'react-router-dom';
 import { industryTabHref } from '@/features/industry/industryTabs';
 import { withSentryReactRouterV7Routing } from '@sentry/react';
 import { ErrorBoundary } from './ErrorBoundary';
@@ -20,7 +20,7 @@ import { startReconnectRecovery } from './reconnectRecovery';
 import { Login } from '@/routes/Login';
 import { Callback } from '@/routes/Callback';
 import * as routeChunks from './routeChunks';
-import { NotFound } from '@/routes/NotFound';
+import { ShellNotFound } from '@/routes/NotFound';
 import { preloadedLazy } from './preloadedLazy';
 import { writeSignedInShellHint } from './signedInShellHint';
 import { AnalyticsPageViewTracker } from './AnalyticsPageViewTracker';
@@ -112,7 +112,7 @@ function SignedInShell() {
   const location = useLocation();
   return (
     <ErrorBoundary resetKey={location.pathname}>
-      <Suspense fallback={<BootScreen />}>
+      <Suspense fallback={<BootScreen gate="shell" />}>
         <Layout />
       </Suspense>
     </ErrorBoundary>
@@ -173,6 +173,10 @@ const ROUTE_ELEMENTS = {
 } satisfies Record<AppRoutePath, ReactElement>;
 
 const FEATURE_ROUTES = Object.entries(ROUTE_ELEMENTS) as [AppRoutePath, ReactElement][];
+
+function isFeaturePath(pathname: string): boolean {
+  return FEATURE_ROUTES.some(([path]) => matchPath(routePatternFor(path), pathname) !== null);
+}
 
 function Root() {
   const characterCount = useCharacterCountOrLoading();
@@ -248,7 +252,7 @@ export function App() {
               <Route path="/" element={<Root />} />
               <Route path="/login" element={<Login />} />
               <Route path="/callback" element={<Callback />} />
-              <Route element={<RequireCharacter />}>
+              <Route element={<RequireCharacter isKnownPath={isFeaturePath} />}>
                 <Route element={<SignedInShell />}>
                   {FEATURE_ROUTES.map(([path, element]) => (
                     <Route
@@ -257,6 +261,7 @@ export function App() {
                       element={featureRouteElement(path, element)}
                     />
                   ))}
+                  <Route path="*" element={<ShellNotFound />} />
                 </Route>
               </Route>
               <Route path="/share/fitting" element={<FittingShared />} />
@@ -268,7 +273,6 @@ export function App() {
               <Route path="/corp-tax-book/verify/:token" element={<CorpTaxBookVerify />} />
               <Route path="/corp-tax-book/remove-now/:code" element={<CorpTaxBookRemoveNow />} />
               <Route path="/error" element={<ErrorProbe />} />
-              <Route path="*" element={<NotFound />} />
             </SentryRoutes>
           </Suspense>
           <ReloadPrompt />

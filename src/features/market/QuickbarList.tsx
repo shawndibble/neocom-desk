@@ -33,6 +33,7 @@ import { ShowInfoMenuItem } from './ItemContextMenu';
 import { hasQuickbarTarget } from './quickbar';
 import type { QuickbarItem } from '@/db';
 import type { VsPaid } from './useQuickbarVsPaid';
+import { usePrefersReducedMotion } from '@/lib/useMediaQuery';
 
 function formatPercent(percent: number): string {
   return `${percent > 0 ? '+' : ''}${percent}%`;
@@ -47,6 +48,7 @@ interface QuickbarRowProps {
   previousTypeId?: number;
   nextTypeId?: number;
   onReorder: (activeTypeId: number, overTypeId: number) => void;
+  reducedMotion: boolean;
 }
 
 function QuickbarRow({
@@ -58,10 +60,12 @@ function QuickbarRow({
   previousTypeId,
   nextTypeId,
   onReorder,
+  reducedMotion,
 }: QuickbarRowProps) {
   const { t } = useTranslation();
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: item.typeId,
+    transition: reducedMotion ? null : undefined,
   });
   const style = { transform: CSS.Transform.toString(transform), transition };
   const hasTarget = hasQuickbarTarget(item);
@@ -180,6 +184,7 @@ export function QuickbarList({
   onViewInAppraisal,
 }: QuickbarListProps) {
   const { t } = useTranslation();
+  const reducedMotion = usePrefersReducedMotion();
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
@@ -230,6 +235,7 @@ export function QuickbarList({
                   previousTypeId={items[index - 1]?.typeId}
                   nextTypeId={items[index + 1]?.typeId}
                   onReorder={onReorder}
+                  reducedMotion={reducedMotion}
                 />
               ))}
             </ul>

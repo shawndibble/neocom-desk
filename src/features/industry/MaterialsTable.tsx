@@ -77,6 +77,7 @@ import { MakeOrBuyMarker } from './MakeOrBuyMarker';
 import { SwapButton } from './SwapButton';
 import { ERRAND_GLYPH, ERRAND_LABEL_KEY, ERRAND_TONE, linkClassName } from './materialsTableStyle';
 import { formatCount } from '@/lib/formatCount';
+import { TableScroll } from '@/components/ui/TableScroll';
 
 interface MaterialsTableProps {
   materials: readonly MaterialTableRow[];
@@ -857,7 +858,7 @@ export function MaterialsTable({
                   </ul>
                 </>
               ) : (
-                <div className="overflow-x-auto">
+                <TableScroll>
                   <DataTable
                     {...exportProps}
                     rowContextMenu={rowContextMenu}
@@ -869,7 +870,7 @@ export function MaterialsTable({
                     label={t('industry.errands.tableLabel', { section: sectionLabel(errand) })}
                     density="compact"
                   />
-                </div>
+                </TableScroll>
               ))}
           </section>
         );

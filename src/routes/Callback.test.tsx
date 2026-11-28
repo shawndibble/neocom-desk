@@ -352,6 +352,16 @@ describe('Callback', () => {
     expect(tokenRequests).toBe(0);
   });
 
+  it('the error panel offers a way back into the app', async () => {
+    stashIntent();
+    renderCallback('?error=access_denied&state=state-1');
+
+    expect(await screen.findByRole('link', { name: /go to neocom desk/i })).toHaveAttribute(
+      'href',
+      '/'
+    );
+  });
+
   it('still reports the failure to a user who already has Characters (#649)', async () => {
     await db.characters.put({
       characterId: 90_000_001,

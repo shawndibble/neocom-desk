@@ -12,6 +12,8 @@ import {
   StatChip,
   StatChips,
   TextInput,
+  Field,
+  Fields,
 } from '@/components/ui';
 import { Button } from '@/components/ui/Button';
 import { InlineError } from '@/components/ui/InlineError';
@@ -60,7 +62,7 @@ function OwedToYou({ view, name }: { view: FeederView; name: string }) {
           </>
         ) : s.balanceKind === 'owed' ? (
           <>
-            <p className="text-2xl font-semibold tabular-nums">{isk(s.balanceIsk)}</p>
+            <p className="text-xl font-semibold tabular-nums">{isk(s.balanceIsk)}</p>
             <p>
               {since ? t(k('owed'), { since, pct: rate }) : t(k('owedUndated'), { pct: rate })}{' '}
               {s.lastPayout
@@ -74,7 +76,7 @@ function OwedToYou({ view, name }: { view: FeederView; name: string }) {
           </>
         ) : s.balanceKind === 'credit' ? (
           <>
-            <p className="text-2xl font-semibold tabular-nums">{isk(s.balanceIsk)}</p>
+            <p className="text-xl font-semibold tabular-nums">{isk(s.balanceIsk)}</p>
             <p>{t(k('credit'), { pct: rate })}</p>
           </>
         ) : (
@@ -121,7 +123,7 @@ function SettledOtherwise({
           {s.note && <p className="font-semibold">{s.note}</p>}
           {owed && (
             <p>
-              <span className="text-2xl font-semibold tabular-nums">{isk(s.balanceIsk)}</span>{' '}
+              <span className="text-xl font-semibold tabular-nums">{isk(s.balanceIsk)}</span>{' '}
               {t('corpTaxBook.moons.ownerView.settledOtherwise.stillOwed')}
             </p>
           )}
@@ -411,10 +413,11 @@ function AskRateDialog({
         if (pct !== null) await onRequest(pct);
       }}
     >
-      <label className="block space-y-1">
-        <span className="text-xs text-text-dim">{t('corpTaxBook.moons.ownerView.rate.field')}</span>
-        <TextInput inputMode="decimal" value={text} onChange={(e) => setText(e.target.value)} />
-      </label>
+      <Fields variant="stacked">
+        <Field label={t('corpTaxBook.moons.ownerView.rate.field')}>
+          <TextInput inputMode="decimal" value={text} onChange={(e) => setText(e.target.value)} />
+        </Field>
+      </Fields>
       <p className="text-xs text-text-dim">{t('corpTaxBook.moons.ownerView.rate.hint')}</p>
     </DialogShell>
   );

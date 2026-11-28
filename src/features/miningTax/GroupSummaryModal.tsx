@@ -18,13 +18,13 @@ import { SecurityValue } from '@/features/assets/assetBrowserRows';
 import type { MiningTaxAssignmentRecord } from '@/db';
 import { STATUS_LABEL_KEY } from '@/engine/miningTax/rowStatus';
 import { formatIsk } from '@/lib/isk';
-import { useIsPhone } from '@/lib/useIsPhone';
 import { formatDateRange } from './groupRows';
 import { PayeeLedgerLink } from './PayeeLedgerLink';
 import { STATUS_TONE } from './statusTone';
 import type { MoonMiningTaxRow } from './snapshot';
 import { LedgerActionError } from './LedgerActionError';
 import { formatCount } from '@/lib/formatCount';
+import { Well } from '@/components/ui/Well';
 
 export interface GroupMember {
   row: MoonMiningTaxRow;
@@ -73,7 +73,6 @@ export function GroupSummaryModal({
   startWithUnassignConfirm = false,
 }: GroupSummaryModalProps) {
   const { t } = useTranslation();
-  const isPhone = useIsPhone();
   const [confirmUnassign, setConfirmUnassign] = useState(startWithUnassignConfirm);
   const sorted = [...members].sort((a, b) => a.row.entry.date.localeCompare(b.row.entry.date));
   const dates = sorted.map((m) => m.row.entry.date);
@@ -123,7 +122,6 @@ export function GroupSummaryModal({
     <Modal
       open={open}
       onClose={onClose}
-      placement={isPhone ? 'sheet' : 'center'}
       title={
         <span className="flex items-center gap-1.5">
           {t('miningTax.detailTitle', { date: formatDateRange(dates), system: systemName })}
@@ -188,10 +186,7 @@ export function GroupSummaryModal({
         </p>
 
         {confirmUnassign && (
-          <div
-            role="alert"
-            className="space-y-2 rounded-xs border border-danger/60 bg-danger/10 p-2 text-xs"
-          >
+          <Well tone="danger" role="alert" className="space-y-2 text-xs">
             <p>{t('miningTax.combined.unassignConfirm', { count: members.length })}</p>
             <div className="flex gap-2">
               <Button
@@ -206,7 +201,7 @@ export function GroupSummaryModal({
                 {t('filters.cancel')}
               </Button>
             </div>
-          </div>
+          </Well>
         )}
 
         <LedgerActionError error={saveError} />

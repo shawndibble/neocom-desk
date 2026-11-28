@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const firebaseAnalytics = vi.hoisted(() => ({
   failImport: true,
   logEvent: vi.fn(),
+  setDefaultEventParameters: vi.fn(),
   initializeAnalytics: vi.fn(() => ({})),
   getAnalytics: vi.fn(() => ({})),
 }));
@@ -16,6 +17,7 @@ vi.mock('firebase/analytics', () => {
     initializeAnalytics: firebaseAnalytics.initializeAnalytics,
     isSupported: () => Promise.resolve(true),
     logEvent: firebaseAnalytics.logEvent,
+    setDefaultEventParameters: firebaseAnalytics.setDefaultEventParameters,
   };
 });
 
@@ -112,6 +114,15 @@ describe('trackPageView privacy', () => {
       'https://neocomdesk.com/market/browser#secret'
     );
     expect(params.page_location).toBe('https://neocomdesk.com/market/browser');
+  });
+
+  it('pins page_title on every hit, so gtag never falls back to document.title', async () => {
+    stubLocation('https://neocomdesk.com', '/ships', 'https://neocomdesk.com/ships');
+    const { trackPageView } = await import('./analytics');
+    await trackPageView('/ships', 'Ships — Neocom Desk');
+    expect(firebaseAnalytics.setDefaultEventParameters).toHaveBeenLastCalledWith({
+      page_title: 'Ships — Neocom Desk',
+    });
   });
 
   it('reports the route pattern, not a Share Link id', async () => {

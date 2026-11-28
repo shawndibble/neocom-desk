@@ -259,9 +259,7 @@ describe('ProductionLogPanel', () => {
 
     await user.click(within(table).getByRole('button', { name: 'Calculations?' }));
 
-    expect(
-      await screen.findByRole('dialog', { name: "How this run's realized profit is calculated" })
-    ).toBeInTheDocument();
+    expect(await screen.findByRole('dialog', { name: 'Realized profit' })).toBeInTheDocument();
   });
 
   it('excludes runs outside the selected date range, keeping runs inside it', async () => {

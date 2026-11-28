@@ -41,9 +41,10 @@ interface SortableRowChrome {
   isDragging: boolean;
 }
 
-export function useRowSortable(id: string): SortableRowChrome {
+export function useRowSortable(id: string, reducedMotion: boolean): SortableRowChrome {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id,
+    transition: reducedMotion ? null : undefined,
   });
   return {
     setNodeRef,

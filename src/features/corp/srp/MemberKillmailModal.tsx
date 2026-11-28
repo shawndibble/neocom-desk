@@ -6,7 +6,6 @@ import { Pill } from '@/components/ui/Pill';
 import { repaymentHidden, shipFitValue } from '@/engine/srpAppraisal';
 import { useKeyedLoad } from '@/lib/useAsyncLoad';
 import { formatIsk } from '@/lib/isk';
-import { useIsPhone } from '@/lib/useIsPhone';
 import type { DoctrineCheckRecord, DoctrinePreview } from '../srpTypes';
 import { basisText } from './srpClaimText';
 import { esiKillmailLink, isUsablePreview } from './srpMemberModel';
@@ -78,7 +77,6 @@ export function MemberKillmailModal({
   onClose,
 }: Props) {
   const { t } = useTranslation();
-  const phone = useIsPhone();
   const preview = usePreview(subject, previewDoctrine);
   const ready = typeof preview === 'object' ? preview : null;
   const fileable = canFile && ready?.quote.kind !== 'not-covered';
@@ -86,7 +84,7 @@ export function MemberKillmailModal({
     <Modal
       open
       onClose={onClose}
-      placement={phone ? 'sheet' : 'medium'}
+      placement="medium"
       title={subject.hullName}
       footer={
         <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">

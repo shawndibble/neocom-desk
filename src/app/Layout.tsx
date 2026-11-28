@@ -2,7 +2,7 @@ import { useNavBadges } from './navBadges';
 import { useRailSettingsNeedsAttention, useSettingsNeedsAttention } from './settingsAttention';
 import { RailUpgradeButton } from './RailUpgradeButton';
 import { UnreadAlertsContext } from '@/components/ui/unreadAlertsContext';
-import { memo, Suspense, useEffect, useRef, useState } from 'react';
+import { memo, Suspense, useEffect, useRef, useState, type ComponentProps } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
 import { pageKeyFor } from './pageTabs';
 import { useRouteFocus } from './routeFocus';
@@ -56,7 +56,7 @@ import { MailQueueMount } from '@/features/corpTaxBook/MailQueueMount';
 import { InstallPrompt } from './InstallPrompt';
 import { CommandPaletteHost } from '@/features/commandPalette/CommandPaletteHost';
 import { NAV_LOCK_PATHS } from './navDestinations';
-import { FOOTER_PAGES, viewPathFor } from './navRail';
+import { FOOTER_PAGES, navPlaceFor, viewPathFor } from './navRail';
 import { recordRecentNav } from './navPreferences';
 import { MOBILE_NAV_ACTIVE, MOBILE_NAV_IDLE, MOBILE_NAV_ITEM, NavItem } from './NavItem';
 import { RailNav } from './RailNav';
@@ -165,6 +165,23 @@ function RailCharacterFooterLink({
 }) {
   const { pathname, search } = useLocation();
   return <CharacterFooterLink activeCharacter={activeCharacter} originPath={pathname + search} />;
+}
+
+function MoreTab({
+  tabs,
+  open,
+  ...props
+}: { tabs: readonly string[]; open: boolean } & ComponentProps<'button'>) {
+  const { pagePath } = navPlaceFor(useLocation().pathname);
+  const offBar = pagePath !== null && !tabs.includes(pagePath);
+  return (
+    <button
+      type="button"
+      aria-current={offBar ? 'page' : undefined}
+      {...props}
+      className={`${MOBILE_NAV_ITEM} ${open || offBar ? MOBILE_NAV_ACTIVE : MOBILE_NAV_IDLE}`}
+    />
+  );
 }
 
 function RecentNavRecorder() {
@@ -302,14 +319,14 @@ export const Layout = memo(function Layout() {
                 {...navBadge(path)}
               />
             ))}
-            <button
-              type="button"
+            <MoreTab
+              tabs={tabs}
+              open={moreOpen}
               ref={moreButtonRef}
               aria-haspopup="dialog"
               aria-expanded={moreOpen}
               aria-controls={MORE_SHEET_ID}
               onClick={() => setMoreOpen((open) => !open)}
-              className={`${MOBILE_NAV_ITEM} ${moreOpen ? MOBILE_NAV_ACTIVE : MOBILE_NAV_IDLE}`}
               aria-label={
                 settingsAttention ? t('nav.needsAttention', { label: t('nav.more') }) : undefined
               }
@@ -323,7 +340,7 @@ export const Layout = memo(function Layout() {
                   className="absolute top-1.5 left-1/2 ml-3 size-1.5 rounded-full bg-accent"
                 />
               )}
-            </button>
+            </MoreTab>
           </nav>
 
           <KeyboardShortcuts />

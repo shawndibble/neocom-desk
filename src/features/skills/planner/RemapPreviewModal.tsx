@@ -294,9 +294,7 @@ export function OptimizeForMeModal({
       footer={
         preview &&
         (!gain ? (
-          <Button size="sm" onClick={onReject}>
-            {t('plans.remapDismiss')}
-          </Button>
+          <Button onClick={onReject}>{t('plans.remapDismiss')}</Button>
         ) : (
           <div className="flex w-full flex-wrap items-center justify-between gap-2">
             <p className="text-xs">
@@ -310,12 +308,10 @@ export function OptimizeForMeModal({
               </span>
             </p>
             <div className="flex gap-2">
-              <Button variant="primary" size="sm" onClick={onAccept}>
+              <Button variant="primary" onClick={onAccept}>
                 {t('plans.remapAccept')}
               </Button>
-              <Button size="sm" onClick={onReject}>
-                {t('plans.remapReject')}
-              </Button>
+              <Button onClick={onReject}>{t('plans.remapReject')}</Button>
             </div>
           </div>
         ))

@@ -6,6 +6,7 @@ import { displaySourceValue } from '@/engine/fittings/attributeUnits';
 import { attributeValueText, formatAttributeNumber } from './attributeValueText';
 import { useAttributeDictionary } from './useAttributeDictionary';
 import { fixed0 } from '@/lib/fixedFormat';
+import { Spinner } from '@/components/ui/Spinner';
 
 function AffectedSourceLine({
   source,
@@ -66,7 +67,9 @@ export function FittingAffectedByPanel({
 
   if (failed) return <p className="text-xs text-danger">{t('fittings.affectedBy.failed')}</p>;
   if (rows === null || dictionary === null)
-    return <p className="text-xs text-text-dim">{t('fittings.affectedBy.loading')}</p>;
+    return (
+      <Spinner size="sm" showLabel label={t('fittings.affectedBy.loading')} className="text-xs" />
+    );
   const shownRows = rows.flatMap((row) => {
     const entry = dictionary[row.attributeId];
     if (entry === undefined) return [];

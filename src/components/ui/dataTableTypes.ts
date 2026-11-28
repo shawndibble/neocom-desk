@@ -50,12 +50,16 @@ export interface DataTableGroupBy<T> {
 }
 
 export interface DataTableProps<T> {
+  /** @summary Column definitions: header text, cell renderer and optional sort value. */
   columns: readonly DataTableColumn<T>[];
+  /** @summary The data to show; one entry per table row. */
   rows: readonly T[];
+  /** @summary Stable unique key per row. */
   rowKey: (row: T, index: number) => string | number;
   rowClassName?: (row: T) => string | undefined;
   highlightRowKey?: string | number | null;
   selectedRowKey?: string | number | null;
+  /** @summary Accessible name for the table. */
   label: string;
   className?: string;
   defaultSort?: DataTableSort;

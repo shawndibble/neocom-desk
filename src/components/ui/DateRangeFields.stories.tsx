@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { DateRangeFields } from './DateRangeFields';
 
+/** @summary From and To date fields for a filter row. A box sized like a field marks a control (§6c); cleared fields report `null`. */
 const meta = {
   title: 'ui/DateRangeFields',
   component: DateRangeFields,
@@ -28,6 +29,8 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
+/** @summary Both ends open. */
 export const Empty: Story = {};
 
+/** @summary A chosen range. */
 export const Filled: Story = { args: { from: '2026-09-01', to: '2026-09-30' } };

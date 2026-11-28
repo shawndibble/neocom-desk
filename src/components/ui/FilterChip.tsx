@@ -11,20 +11,26 @@ import {
 import { Tooltip } from './Tooltip';
 
 interface FilterChipProps {
+  /** @summary Already-translated label. */
   label: string;
   icon?: ReactNode;
+  /** @summary Whether the filter is on. */
   selected: boolean;
+  /** @summary Called when the pill is clicked. */
   onToggle: () => void;
+  /** @summary Optional match count, shown after the label. */
   count?: number;
   countLabel?: string;
   className?: string;
   size?: ControlSize;
   disabled?: boolean;
   tooltip?: string;
+  /** @summary For a chip that opens a region instead of filtering: whether that region is open. */
   expanded?: boolean;
   controls?: string;
 }
 
+/** @summary A toggleable filter pill with an optional match count; accent when on. */
 export function FilterChip({
   label,
   icon,

@@ -804,14 +804,15 @@ describe('HaulingPanel states', () => {
     expect(screen.queryByRole('button', { name: 'Copy multibuy list' })).toBeNull();
   });
 
-  it('shows the empty state, with a reset, when nothing passes the filters', () => {
+  it('shows the empty state, without a reset, when no filter hid anything', () => {
     mainState = {
       status: 'ready',
       scan: { rows: [], scanned: 0, examinedTypeIds: [], overMaxPrice: 0, fetchedAt: 0 },
     };
     renderPanel();
     expect(screen.queryByRole('table')).toBeNull();
-    expect(screen.getByRole('button', { name: 'Reset filters' })).toBeInTheDocument();
+    expect(screen.getByText(/Try another category or route/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Reset filters' })).toBeNull();
   });
 });
 

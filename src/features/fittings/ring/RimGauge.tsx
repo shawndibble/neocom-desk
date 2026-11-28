@@ -66,7 +66,11 @@ export function RimGauge({
   const style = GAUGE_STYLE[gauge];
   const c = RING_VIEW / 2;
   const { filled, empty } = gaugeArc(from, to, share(budget.used, budget.total));
-  const fillClass = budget.flash.overBudget ? 'stroke-danger' : TONE_STROKE[style.tone];
+  const fillClass = budget.flash.overBudget
+    ? 'stroke-danger'
+    : budget.flash.tight
+      ? 'stroke-warning'
+      : TONE_STROKE[style.tone];
   const draw = (range: [number, number]) => arcPath(range[0], range[1], RING_GAUGE_RADIUS, c, c);
   const bands = (
     <>

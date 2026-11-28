@@ -1,7 +1,7 @@
 import { parsePercent } from '@/lib/parsePercent';
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Panel, TextInput, Tooltip } from '@/components/ui';
+import { Button, Panel, TextInput, Tooltip, Field, Fields } from '@/components/ui';
 import { useEntityName } from '@/features/character/useEntityName';
 import { useAsyncLoad } from '@/lib/useAsyncLoad';
 import { callableErrorReason } from '@/lib/callableError';
@@ -46,7 +46,7 @@ export function FeederConsent({
   const valid = rate.trim() === '' || (pct >= 0 && pct <= 100);
   const part = (key: 'sees' | 'cannot' | 'stop') => (
     <section className="space-y-1">
-      <h3 className="text-xs font-medium uppercase tracking-wide text-text-dim">
+      <h3 className="text-xs font-medium uppercase tracking-widest text-text-dim">
         {t(`corpTaxBook.moons.consent.${key}.title`)}
       </h3>
       <p>{t(`corpTaxBook.moons.consent.${key}.body`)}</p>
@@ -76,10 +76,11 @@ export function FeederConsent({
         {part('sees')}
         {part('cannot')}
         {part('stop')}
-        <label className="block space-y-1">
-          <span className="block text-xs text-text-dim">{t('corpTaxBook.moons.consent.rate')}</span>
-          <TextInput inputMode="decimal" value={rate} onChange={(e) => setRate(e.target.value)} />
-        </label>
+        <Fields variant="stacked">
+          <Field label={t('corpTaxBook.moons.consent.rate')}>
+            <TextInput inputMode="decimal" value={rate} onChange={(e) => setRate(e.target.value)} />
+          </Field>
+        </Fields>
         <p className="text-xs text-text-dim">{t('corpTaxBook.moons.consent.accountant')}</p>
         <div className="flex gap-2">
           <Button variant="ghost" onClick={onBack}>

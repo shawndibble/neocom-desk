@@ -141,6 +141,7 @@ export function DevicePanel() {
         }}
         title={t('settings.deviceLogoutConfirmTitle')}
         initialFocusRef={cancelLogoutRef}
+        sheetOnPhone={false}
       >
         <p className="text-xs text-text-dim">
           {t('settings.deviceLogoutConfirm', { count: loggedIn })}
@@ -162,13 +163,13 @@ export function DevicePanel() {
         <DialogFooter className="mt-3">
           <Button
             ref={cancelLogoutRef}
-            size="sm"
+
             aria-disabled={working || undefined}
             onClick={() => setDialog(null)}
           >
             {t('characters.cancel')}
           </Button>
-          <Button variant="danger" size="sm" loading={working} onClick={() => void confirmLogout()}>
+          <Button variant="danger" loading={working} onClick={() => void confirmLogout()}>
             {t('settings.deviceLogoutAction')}
           </Button>
         </DialogFooter>
@@ -179,6 +180,7 @@ export function DevicePanel() {
           if (!working && !unpurged) setDialog(null);
         }}
         title={t('settings.deviceDeleteConfirmTitle')}
+        sheetOnPhone={false}
       >
         <p className="text-xs text-text-dim">
           {unpurged
@@ -232,11 +234,11 @@ export function DevicePanel() {
         )}
         <DialogFooter className="mt-3">
           {!unpurged && (
-            <Button size="sm" aria-disabled={working || undefined} onClick={() => setDialog(null)}>
+            <Button aria-disabled={working || undefined} onClick={() => setDialog(null)}>
               {t('characters.cancel')}
             </Button>
           )}
-          <Button variant="danger" size="sm" loading={working} onClick={() => void confirmDelete()}>
+          <Button variant="danger" loading={working} onClick={() => void confirmDelete()}>
             {t(unpurged ? 'settings.deviceDeleteFinish' : 'settings.deviceDeleteAction')}
           </Button>
         </DialogFooter>

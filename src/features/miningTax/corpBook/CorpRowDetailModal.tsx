@@ -22,7 +22,6 @@ import { formatAge, MINUTE_MS } from '@/lib/age';
 import { cx } from '@/lib/cx';
 import { formatIsk } from '@/lib/isk';
 import { useTicker } from '@/lib/ticker';
-import { useIsPhone } from '@/lib/useIsPhone';
 import { OrePricedCard } from '../OrePricedCard';
 import { PayeeLedgerLink } from '../PayeeLedgerLink';
 import { bookRowTax } from './corpRows';
@@ -43,6 +42,7 @@ import {
 import type { ClosedDayPlan } from '@/engine/corpTaxBook/closedDayFix';
 import type { CorpRowInfo } from './corpRows';
 import { formatCount } from '@/lib/formatCount';
+import { Well } from '@/components/ui/Well';
 
 interface Props {
   open: boolean;
@@ -83,7 +83,6 @@ export function CorpRowDetailModal({
 }: Props) {
   const zone = useTimeZone();
   const { t } = useTranslation();
-  const isPhone = useIsPhone();
   const now = useTicker(MINUTE_MS);
   const [comparing, setComparing] = useState(false);
   const { view } = corp;
@@ -132,7 +131,6 @@ export function CorpRowDetailModal({
       <Modal
         open={open}
         onClose={onClose}
-        placement={isPhone ? 'sheet' : 'center'}
         title={
           <span className="flex items-center gap-1.5">
             {t('miningTax.detailTitle', { date: view.date, system: systemName })}
@@ -310,7 +308,7 @@ export function CorpRowDetailModal({
           {!conflict && notice}
 
           {view.dispute && (
-            <div className="space-y-2 rounded-xs border border-warning/60 bg-warning/10 p-2 text-xs">
+            <Well tone="warning" className="space-y-2 text-xs">
               <p className="font-semibold text-warning uppercase">
                 {view.dispute.rate && !view.dispute.quantity
                   ? t('miningTax.corpBook.disputed.rate', {
@@ -328,7 +326,7 @@ export function CorpRowDetailModal({
               <Button size="sm" onClick={() => setComparing(true)}>
                 {t('miningTax.corpBook.diff.open')}
               </Button>
-            </div>
+            </Well>
           )}
 
           <div className="flex flex-wrap gap-2 pt-1">

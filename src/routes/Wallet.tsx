@@ -170,7 +170,9 @@ export function Wallet() {
       {tab === 'journal' && <FromWalletCrumb />}
       <PageHeader
         title={t('wallet.title')}
-        meta={oldestFetchedAt ? <DataAgeBadge date={oldestFetchedAt} /> : undefined}
+        meta={
+          tab === 'balance' && oldestFetchedAt ? <DataAgeBadge date={oldestFetchedAt} /> : undefined
+        }
         scope={walletScopePicker}
         actions={
           <>
@@ -232,6 +234,7 @@ export function Wallet() {
             archive={data?.archive}
             journalResult={journalResult}
             journalNeedsReauth={journalNeedsReauth}
+            onRetryJournal={handlePersonalRefresh}
             {...journalView.panel}
             onIskPanelOpenChange={setIskPanelOpen}
           />

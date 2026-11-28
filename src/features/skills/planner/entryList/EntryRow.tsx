@@ -33,6 +33,7 @@ interface EntryRowProps {
   startDate: Date | undefined;
   columns: ColumnVisibility;
   isDesktop: boolean;
+  reducedMotion: boolean;
   continuation?: boolean;
   onRemove: (skillTypeID: number, targetLevel: number) => void;
   onStageSkillDetail: (skillTypeID: number) => void;
@@ -54,6 +55,7 @@ export const EntryRow = memo(function EntryRow({
   startDate,
   columns,
   isDesktop,
+  reducedMotion,
   continuation = false,
   onRemove,
   onStageSkillDetail,
@@ -67,7 +69,7 @@ export const EntryRow = memo(function EntryRow({
 }: EntryRowProps) {
   const { t } = useTranslation();
   const timeZone = useTimeZone();
-  const { setNodeRef, style, handleProps, isDragging } = useRowSortable(row.id);
+  const { setNodeRef, style, handleProps, isDragging } = useRowSortable(row.id, reducedMotion);
   const menu = useOpenAfterMenu();
   const { entry, stepIndices } = row;
   const takesSeconds = pinnedInProgress?.id === row.id ? pinnedInProgress.seconds : row.seconds;

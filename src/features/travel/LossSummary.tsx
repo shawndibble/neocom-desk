@@ -1,7 +1,7 @@
 import { idSetKey } from '@/lib/idSetKey';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { LiveNote } from '@/components/ui';
+import { LiveNote, Spinner } from '@/components/ui';
 import { computeNetLoss, matchInsurance, type LossInsurance } from '@/engine/losses/netLoss';
 import { useMutaplasmidLookup } from '@/features/abyssal/mutaplasmidData';
 import { loadWalletJournal } from '@/features/character/wallet';
@@ -77,9 +77,12 @@ export function LossSummary({ detail, zkbValue }: LossSummaryProps) {
   }
   if (prices === null) {
     return (
-      <LiveNote className="text-xs text-text-dim">
-        {t('travel.pilot.recent.lossSummary.loading')}
-      </LiveNote>
+      <Spinner
+        size="sm"
+        showLabel
+        label={t('travel.pilot.recent.lossSummary.loading')}
+        className="text-xs"
+      />
     );
   }
 

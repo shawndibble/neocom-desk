@@ -7,6 +7,7 @@ import {
   type ReactNode,
 } from 'react';
 import { cx } from '@/lib/cx';
+import { useChangedSinceMount } from '@/lib/useChangedSinceMount';
 import { interactiveClassName, selectedRowClassName } from './controlStyles';
 import { useLiftAfterHoldGuard } from './liftAfterHold';
 import { isRowOwnEvent } from './rowEvents';
@@ -112,6 +113,7 @@ function DataTableRowImpl<T>({
     [measureRef]
   );
   const measuredExpanded = useRef(expanded);
+  const toggled = useChangedSinceMount(expanded);
   useLayoutEffect(() => {
     const node = rowRef.current;
     if (!remeasure || !node) return;
@@ -286,7 +288,7 @@ function DataTableRowImpl<T>({
           <td
             role="cell"
             colSpan={columns.length + trailingColumns}
-            className="bg-panel-2 px-3 py-3"
+            className={cx('bg-panel-2 px-3 py-3', toggled && 'motion-fade')}
           >
             {renderDetail(row)}
           </td>

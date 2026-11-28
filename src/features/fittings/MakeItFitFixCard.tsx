@@ -84,7 +84,7 @@ export function MakeItFitFixCard({
               <span className="text-success text-base font-semibold tabular-nums">{freed}</span>
             )}
             {cost !== null && (
-              <span className={cx('ml-auto text-sm font-semibold', cost < 0 && 'text-success')}>
+              <span className={cx('ml-auto text-sm font-semibold', cost < 0 && 'text-isk-pos')}>
                 <span className={cx(STAT_DETAIL, 'mr-1.5 tracking-widest uppercase')}>
                   {t(cost < 0 ? 'fittings.makeItFit.saves' : 'fittings.makeItFit.costs')}
                 </span>

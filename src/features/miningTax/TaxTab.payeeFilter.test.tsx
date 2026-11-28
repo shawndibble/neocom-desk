@@ -117,32 +117,32 @@ async function openMenu(user: ReturnType<typeof userEvent.setup>, trigger: strin
 }
 
 describe('TaxTab: Payee filter Select all / Select none', () => {
-  it('Select none empties the Open list, reads "No payees" and holds in the URL', async () => {
+  it('Select none empties the Open list, reads "No Payees" and holds in the URL', async () => {
     const user = renderTab();
-    await openMenu(user, 'All payees');
+    await openMenu(user, 'All Payees');
     await user.click(screen.getByRole('menuitem', { name: 'Select none' }));
     expect(
-      await screen.findByRole('button', { name: 'No payees', hidden: true })
+      await screen.findByRole('button', { name: 'No Payees', hidden: true })
     ).toBeInTheDocument();
-    expect(screen.getByText('No payees selected.')).toBeInTheDocument();
+    expect(screen.getByText('No Payees selected.')).toBeInTheDocument();
     expect(payeeParam()).toBe('none');
     expect(screen.queryByText(/^Open · /)).not.toBeInTheDocument();
   });
 
-  it('restores "No payees" from a reload of the link', async () => {
+  it('restores "No Payees" from a reload of the link', async () => {
     renderTab('&tax.payee=none');
     expect(
-      await screen.findByRole('button', { name: 'No payees', hidden: true })
+      await screen.findByRole('button', { name: 'No Payees', hidden: true })
     ).toBeInTheDocument();
-    expect(screen.getByText('No payees selected.')).toBeInTheDocument();
+    expect(screen.getByText('No Payees selected.')).toBeInTheDocument();
   });
 
-  it('Select all after Select none returns to "All payees" and drops the param', async () => {
+  it('Select all after Select none returns to "All Payees" and drops the param', async () => {
     const user = renderTab('&tax.payee=none');
-    await openMenu(user, 'No payees');
+    await openMenu(user, 'No Payees');
     await user.click(screen.getByRole('menuitem', { name: 'Select all' }));
     expect(
-      await screen.findByRole('button', { name: 'All payees', hidden: true })
+      await screen.findByRole('button', { name: 'All Payees', hidden: true })
     ).toBeInTheDocument();
     expect(payeeParam()).toBeNull();
     expect(await openHeading(2)).toBeInTheDocument();
@@ -150,29 +150,29 @@ describe('TaxTab: Payee filter Select all / Select none', () => {
 
   it('ticking one Payee after Select none shows only its rows', async () => {
     const user = renderTab('&tax.payee=none');
-    await openMenu(user, 'No payees');
+    await openMenu(user, 'No Payees');
     await user.click(screen.getByRole('menuitemcheckbox', { name: 'Ashfall Prospecting' }));
     expect(
-      await screen.findByRole('button', { name: '1 payee', hidden: true })
+      await screen.findByRole('button', { name: '1 Payee', hidden: true })
     ).toBeInTheDocument();
     expect(await openHeading(1)).toBeInTheDocument();
     expect(payeeParam()).toBe('p1');
   });
 
-  it('unticking the last Payee by hand lands on "No payees"', async () => {
+  it('unticking the last Payee by hand lands on "No Payees"', async () => {
     const user = renderTab('&tax.payee=p1');
-    await openMenu(user, '1 payee');
+    await openMenu(user, '1 Payee');
     await user.click(screen.getByRole('menuitemcheckbox', { name: 'Ashfall Prospecting' }));
     expect(
-      await screen.findByRole('button', { name: 'No payees', hidden: true })
+      await screen.findByRole('button', { name: 'No Payees', hidden: true })
     ).toBeInTheDocument();
     expect(payeeParam()).toBe('none');
   });
 
-  it('a link naming only unknown Payees still reads as "All payees"', async () => {
+  it('a link naming only unknown Payees still reads as "All Payees"', async () => {
     renderTab('&tax.payee=ghost');
     expect(
-      await screen.findByRole('button', { name: 'All payees', hidden: true })
+      await screen.findByRole('button', { name: 'All Payees', hidden: true })
     ).toBeInTheDocument();
     expect(await openHeading(2)).toBeInTheDocument();
   });

@@ -1,6 +1,6 @@
 import { useId, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { IconButton, IskFigureGroup, TextInput, Tooltip } from '@/components/ui';
+import { EmptyState, IconButton, IskFigureGroup, TextInput, Tooltip } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { type ImplantDetail } from '@/features/character/clones';
 import { bySlot, implantBonusText } from '@/features/character/implantDisplay';
@@ -191,14 +191,14 @@ export function CloneCard({
             </span>
           )}
           {training.best && (
-            <span className="rounded-xs border border-success/60 px-1.5 text-[0.6875rem] font-semibold tracking-wide text-success uppercase">
+            <span className="rounded-xs border border-success/60 px-1.5 text-[0.6875rem] font-semibold tracking-widest text-success uppercase">
               {t('clones.verdict.badge')}
             </span>
           )}
         </p>
       )}
       {implantIds.length === 0 ? (
-        <p className="text-text-dim">{t('clones.noImplants')}</p>
+        <EmptyState variant="inline" title={t('clones.noImplants')} />
       ) : (
         <IskFigureGroup className="space-y-1.5">
           <ul className="divide-y divide-line border-y border-line">

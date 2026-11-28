@@ -7,7 +7,6 @@ import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
 import { SETTINGS_TABS } from '@/app/pageTabs';
 import { tabPath } from '@/lib/pageTabs';
-import { useIsPhone } from '@/lib/useIsPhone';
 import type { SettingsSectionId } from './sections';
 
 interface PageSettingsModalProps {
@@ -26,15 +25,9 @@ export function PageSettingsModal({
   children,
 }: PageSettingsModalProps) {
   const { t } = useTranslation();
-  const isPhone = useIsPhone();
   if (!open) return null;
   return (
-    <Modal
-      open
-      onClose={onClose}
-      title={t('pageSettings.title', { page: pageName })}
-      placement={isPhone ? 'sheet' : 'center'}
-    >
+    <Modal open onClose={onClose} title={t('pageSettings.title', { page: pageName })}>
       <div className="space-y-4">
         {children}
         <div className="flex justify-end border-t border-line pt-3">

@@ -18,7 +18,7 @@ export function PickupHaulList({ pickup, name }: PickupHaulListProps) {
     <div className="flex flex-col gap-2 pt-1.5 pb-1.5">
       {foldHauls(pickup.hauls).map((run) => (
         <section key={run.from} className="flex flex-col gap-1">
-          <h4 className="m-0 text-xs font-semibold tracking-wide text-text-dim uppercase tabular-nums">
+          <h4 className="m-0 text-xs font-semibold tracking-widest text-text-dim uppercase tabular-nums">
             {run.from === run.to
               ? t('assets.movePlan.haulHeading', { n: run.from, total })
               : t('assets.movePlan.haulRangeHeading', { from: run.from, to: run.to, total })}
@@ -59,7 +59,7 @@ export function PickupHaulList({ pickup, name }: PickupHaulListProps) {
       ))}
       {pickup.tooBigShips.length > 0 && (
         <section className="flex flex-col gap-1">
-          <h4 className="m-0 text-xs font-semibold tracking-wide text-warning uppercase">
+          <h4 className="m-0 text-xs font-semibold tracking-widest text-warning uppercase">
             {t('assets.movePlan.tooBigHeading')}
           </h4>
           <ul className="m-0 flex list-none flex-col p-0">
@@ -77,7 +77,7 @@ export function PickupHaulList({ pickup, name }: PickupHaulListProps) {
       )}
       {pickup.overLimit.length > 0 && (
         <section className="flex flex-col gap-1">
-          <h4 className="m-0 text-xs font-semibold tracking-wide text-warning uppercase">
+          <h4 className="m-0 text-xs font-semibold tracking-widest text-warning uppercase">
             {t('assets.movePlan.overLimitHeading')}
           </h4>
           <ul className="m-0 flex list-none flex-col p-0">
@@ -97,7 +97,7 @@ export function PickupHaulList({ pickup, name }: PickupHaulListProps) {
       )}
       {pickup.unfit.length > 0 && (
         <section className="flex flex-col gap-1">
-          <h4 className="m-0 text-xs font-semibold tracking-wide text-warning uppercase">
+          <h4 className="m-0 text-xs font-semibold tracking-widest text-warning uppercase">
             {t('assets.movePlan.unfitHeading')}
           </h4>
           <ul className="m-0 flex list-none flex-col p-0">

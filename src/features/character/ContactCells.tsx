@@ -1,3 +1,4 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { type ReactElement, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { StandingIcon, Tooltip } from '@/components/ui';
@@ -69,9 +70,7 @@ export function ContactNameCell({
     <span className="inline-flex max-w-full min-w-0 items-center gap-1.5">
       <span className="truncate">{name}</span>
       {contactKind(contact) === 'npc' && (
-        <span className="shrink-0 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-          {t('contacts.npcBadge')}
-        </span>
+        <span className={`${eyebrowClassName} shrink-0`}>{t('contacts.npcBadge')}</span>
       )}
       {flags && <span className="inline-flex shrink-0 sm:hidden">{flags}</span>}
     </span>

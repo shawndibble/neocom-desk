@@ -11,6 +11,7 @@ interface CachedNoticeProps {
   className?: string;
 }
 
+/** @summary "Showing cached data · 3h ago" line for a cached read, at every width (the phone answer to the md-hidden DataAgeBadge). */
 export function CachedNotice({
   fetchedAt = null,
   refreshFailed = false,

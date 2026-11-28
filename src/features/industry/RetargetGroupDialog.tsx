@@ -57,7 +57,8 @@ function initialTarget(group: BuildGroup): RetargetTarget {
 export function RetargetGroupDialog({ group, plans, onApply, onClose }: RetargetGroupDialogProps) {
   const { t } = useTranslation();
   const [step, setStep] = useState<'form' | 'preview'>('form');
-  const [target, setTarget] = useState<RetargetTarget>(() => initialTarget(group));
+  const [initial] = useState(() => initialTarget(group));
+  const [target, setTarget] = useState<RetargetTarget>(initial);
   const [taxText, setTaxText] = useState(() => String(target.facilityTaxPct ?? 0));
   const [taxEdited, setTaxEdited] = useState(false);
   const [checked, setChecked] = useState<ReadonlySet<string>>(
@@ -113,7 +114,17 @@ export function RetargetGroupDialog({ group, plans, onApply, onClose }: Retarget
   }
 
   return (
-    <Modal open onClose={onClose} title={t('industry.retargetGroup', { name: group.name })}>
+    <Modal
+      open
+      onClose={onClose}
+      title={t('industry.retargetGroup', { name: group.name })}
+      dirty={
+        taxEdited ||
+        (Object.keys({ ...initial, ...target }) as (keyof RetargetTarget)[]).some(
+          (key) => String(target[key]) !== String(initial[key])
+        )
+      }
+    >
       {step === 'form' ? (
         <div className="flex flex-col gap-3 text-xs">
           <p className="text-text-dim">{t('industry.retargetFormHint')}</p>

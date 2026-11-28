@@ -205,7 +205,7 @@ describe('WalletWaitingGoal', () => {
     expect(link.getAttribute('href')).toContain('/ships/fittings/edit?f=');
   });
 
-  it('removes a goal from its edit dialog', async () => {
+  it('removes a goal from its edit dialog, with an Undo before it commits', async () => {
     const user = userEvent.setup();
     useWalletGoals.setState({
       value: [{ id: 'a', name: 'Ship', target: 5_000_000_000, fittingId: null, fittingName: null }],
@@ -213,9 +213,11 @@ describe('WalletWaitingGoal', () => {
     renderPanels();
     await user.click(await screen.findByRole('button', { name: /^Edit Ship/ }));
     await user.click(screen.getByRole('button', { name: 'Remove goal' }));
-    const confirm = await screen.findAllByRole('button', { name: 'Remove goal' });
-    await user.click(confirm[confirm.length - 1]!);
     expect(await screen.findByText(/Add an ISK target/)).toBeInTheDocument();
+    expect(screen.getAllByText('Removed Ship.').length).toBeGreaterThan(0);
+    await user.click(screen.getByRole('button', { name: 'Undo' }));
+    expect(await screen.findByRole('button', { name: /^Edit Ship/ })).toBeInTheDocument();
+    expect(useWalletGoals.getState().value).toHaveLength(1);
   });
 
   it('keeps the Goals, without ISK waiting, before the first snapshot exists', async () => {

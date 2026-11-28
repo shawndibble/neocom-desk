@@ -22,6 +22,7 @@ import {
   DropdownMenuTrigger,
   EmptyState,
   IconButton,
+  LoadFailedState,
   Panel,
   SegmentedControl,
   Spinner,
@@ -75,6 +76,7 @@ import { enumParam, enumSetParam, idListParam } from '@/lib/urlState';
 import { useIndustryCharacterFilter } from './industryCharacterFilter';
 import { activeJobColumns, historyColumns, toneClass, type JobRow } from './activeJobColumns';
 import { useJobSlotSummary, useJobsFanOut } from './useJobsFanOut';
+import { TableScroll } from '@/components/ui/TableScroll';
 
 type JobStatusFilter = 'completingSoon' | 'done';
 
@@ -222,8 +224,17 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
   const personalDataAgeDate = needsJobSlotFanOut
     ? jobsFanOutOldestFetchedAt
     : (result?.cached?.fetchedAt ?? null);
-  const dataAgeDate =
-    personalDataAgeDate && corpJobs.fetchedAt
+  const personalReads = needsJobSlotFanOut
+    ? jobsFanOutSelectedEntries.map((entry) => entry.result)
+    : result
+      ? [result]
+      : [];
+  const personalReadFailed = personalReads.some(
+    (read) => read.cached === null && !read.needsReauth
+  );
+  const dataAgeDate = personalReadFailed
+    ? null
+    : personalDataAgeDate && corpJobs.fetchedAt
       ? new Date(Math.min(personalDataAgeDate.getTime(), corpJobs.fetchedAt.getTime()))
       : (personalDataAgeDate ?? corpJobs.fetchedAt);
   const fromCacheAny =
@@ -532,7 +543,7 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
   );
 
   const jobsMeta = (
-    <span className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+    <span className="flex min-w-0 flex-1 basis-0 flex-wrap items-center gap-x-3 gap-y-1">
       {showHistorySegment && (
         <SegmentedControl
           label={t('industry.jobsViewLabel')}
@@ -666,7 +677,7 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
               className="py-4"
             />
           ) : (
-            <div className="overflow-x-auto">
+            <TableScroll>
               <DataTable
                 columns={historyColumnDefs}
                 {...historyExport.tableProps}
@@ -684,7 +695,7 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
                     : undefined
                 }
               />
-            </div>
+            </TableScroll>
           )}
         </div>
       ) : listLoading ? (
@@ -694,11 +705,7 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
       ) : blockingNeedsReauth ? (
         <GrantBanner characterId={characterId} endpoints={['getCharacterIndustryJobs']} />
       ) : jobs.length === 0 ? (
-        <EmptyState
-          title={t('industry.jobsEmptyTitle')}
-          hint={t('industry.jobsEmptyHint')}
-          className="py-4"
-        />
+        <LoadFailedState onRetry={listRefresh} className="py-4" />
       ) : (
         <div className="space-y-2">
           {fromCacheAny && (
@@ -762,7 +769,7 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
               }
             />
           ) : (
-            <div className="overflow-x-auto">
+            <TableScroll>
               <DataTable
                 {...jobsExport.tableProps}
                 columns={columns}
@@ -778,7 +785,7 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
                   toneClass(jobTone(job), { warning: 'bg-warning/10', success: 'bg-success/10' })
                 }
               />
-            </div>
+            </TableScroll>
           )}
         </div>
       )}

@@ -9,13 +9,14 @@ import {
   SegmentedControl,
   TextArea,
   TextInput,
+  Field,
+  Fields,
 } from '@/components/ui';
 import type { MinerRow } from '@/engine/corpTaxBook/bookView';
 import { previewMinerPayment } from '@/engine/corpTaxBook/paymentPreview';
 import { netPayment } from '@/engine/corpTaxBook/payments';
 import { utcDay } from '@/engine/localDay';
 import { lockDateFor } from '../../../../functions/src/corpTaxBookCheckpoint';
-import { useIsPhone } from '@/lib/useIsPhone';
 import { callableErrorReason } from '@/lib/callableError';
 import { callableErrorText } from './feederErrorText';
 import { useBook } from './useBook';
@@ -37,10 +38,9 @@ import { PAYMENT_NOTE_MAX } from '../../../../functions/src/corpTaxBookKinds';
 
 export function Label({ text, children }: { text: ReactNode; children: ReactNode }) {
   return (
-    <label className="block space-y-1">
-      <span className="block text-xs text-text-dim">{text}</span>
-      {children}
-    </label>
+    <Fields variant="stacked">
+      <Field label={text}>{children}</Field>
+    </Fields>
   );
 }
 
@@ -81,7 +81,6 @@ export function DialogShell({
   children,
 }: ShellProps) {
   const { t } = useTranslation();
-  const phone = useIsPhone();
   const formId = useId();
   const reasonId = useId();
   const [busy, setBusy] = useState(false);
@@ -108,7 +107,6 @@ export function DialogShell({
       title={title}
       dirty={touched && !busy}
       initialFocusRef={initialFocusRef}
-      placement={phone ? 'sheet' : 'center'}
       footer={
         <DialogFooter>
           <Button variant="ghost" onClick={onClose}>

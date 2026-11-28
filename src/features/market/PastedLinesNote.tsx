@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { cx } from '@/lib/cx';
 import type { AppraisalUnmatched } from '@/engine/market/appraisalMatch';
+import { Well } from '@/components/ui/Well';
 
 export function PastedLinesNote({
   heading,
@@ -16,7 +17,7 @@ export function PastedLinesNote({
 }) {
   const { t } = useTranslation();
   return (
-    <div className="rounded-xs border border-line bg-panel-2 px-2.5 py-2">
+    <Well size="md">
       <p
         className={cx('text-[0.6875rem] font-semibold tracking-widest uppercase', headingClassName)}
       >
@@ -33,6 +34,6 @@ export function PastedLinesNote({
         ))}
       </ul>
       {children}
-    </div>
+    </Well>
   );
 }

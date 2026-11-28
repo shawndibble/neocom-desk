@@ -74,10 +74,10 @@ beforeEach(async () => {
 });
 
 describe('PriceHistoryPanel', () => {
-  it('shows a loading state while the request is in flight', () => {
+  it('shows a loading state while the request is in flight', async () => {
     mockedLoad.mockReturnValue(new Promise(() => {}));
     render(<PriceHistoryPanel regionId={10000002} typeId={34} itemName="Tritanium" />);
-    expect(screen.getByRole('status', { name: 'Loading' })).toBeInTheDocument();
+    expect(await screen.findByRole('status', { name: 'Loading' })).toBeInTheDocument();
   });
 
   it('shows an empty state, not the chart, when ESI has no history for the item', async () => {

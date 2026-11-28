@@ -260,11 +260,6 @@ export function ManageTemplatesDialog({ templates, fields, moon, onClose }: Mana
             ))}
           </DividedList>
         )}
-        <div className="pt-1">
-          <Button size="sm" onClick={onClose}>
-            {t('common.close')}
-          </Button>
-        </div>
       </div>
       {notice !== null && (
         <Toast message={notice.message} undo={notice.undo} onClose={() => setNotice(null)} />

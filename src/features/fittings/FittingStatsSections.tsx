@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import { usePrefersReducedMotion } from '@/lib/useMediaQuery';
 import { Button } from '@/components/ui';
 import { useShipDataNeedsConnection } from './useDogmaEngineStatus';
 import type {
@@ -106,6 +107,7 @@ export function FittingStatsSections({
   previewIsk = null,
 }: FittingStatsSectionsProps) {
   const { t } = useTranslation();
+  const reduced = usePrefersReducedMotion();
   const shipDataNeedsConnection = useShipDataNeedsConnection();
   const profileName = useDamageProfileName()(damageProfiles.selected);
   const { section, group } = useSectionBuilder();
@@ -131,7 +133,7 @@ export function FittingStatsSections({
     const el = trainRef.current;
     if (!scrollToTrain.current || !el) return;
     scrollToTrain.current = false;
-    el.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
+    el.scrollIntoView?.({ block: 'nearest', behavior: reduced ? 'auto' : 'smooth' });
   });
   const pilotTriggerRef = useRef<HTMLButtonElement>(null);
   const situationTriggerRef = useRef<HTMLButtonElement>(null);

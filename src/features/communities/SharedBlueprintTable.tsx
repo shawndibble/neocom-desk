@@ -32,6 +32,7 @@ import {
   useVisibleSharedBlueprintColumns,
   type SharedBlueprintColumnId,
 } from './sharedBlueprintColumns';
+import { TableScroll } from '@/components/ui/TableScroll';
 
 function SharedBlueprintMenu({
   row,
@@ -221,20 +222,22 @@ export function SharedBlueprintTable({
     (column) => column.id === 'name' || isVisible(column.id as SharedBlueprintColumnId)
   );
   return (
-    <DataTable
-      label={t('communities.library.sharedLabel')}
-      columns={shownColumns}
-      rows={rows}
-      rowKey={(row) => row.key}
-      rowClassName={(row) => (row.stale ? 'opacity-60' : undefined)}
-      rowContextMenu={(row, tr) => (
-        <SharedBlueprintMenu row={row} systemId={systemIdOf(row)}>
-          {tr}
-        </SharedBlueprintMenu>
-      )}
-      rowMoreActions
-      defaultSort={{ columnId: 'name', direction: 'asc' }}
-      virtualize="auto"
-    />
+    <TableScroll>
+      <DataTable
+        label={t('communities.library.sharedLabel')}
+        columns={shownColumns}
+        rows={rows}
+        rowKey={(row) => row.key}
+        rowClassName={(row) => (row.stale ? 'opacity-60' : undefined)}
+        rowContextMenu={(row, tr) => (
+          <SharedBlueprintMenu row={row} systemId={systemIdOf(row)}>
+            {tr}
+          </SharedBlueprintMenu>
+        )}
+        rowMoreActions
+        defaultSort={{ columnId: 'name', direction: 'asc' }}
+        virtualize="auto"
+      />
+    </TableScroll>
   );
 }

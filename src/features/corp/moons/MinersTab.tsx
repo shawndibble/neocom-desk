@@ -55,6 +55,7 @@ import { useCards } from './sectionHelpers';
 import { MarkNotTaxDialog, ReasonDialog, RecordPaymentDialog } from './BookDialogs';
 import { AccountStatus } from './AccountStatus';
 import { accountSortValue } from '@/engine/corpTaxBook/bookSections';
+import { TableScroll } from '@/components/ui/TableScroll';
 
 const PARAMS = {
   q: textParam(),
@@ -373,7 +374,7 @@ export function MinersTab() {
             }
           />
         ) : (
-          <div ref={tableRef} className="@container overflow-x-auto">
+          <TableScroll ref={tableRef} className="@container">
             <DataTable
               label={t('corpTaxBook.moons.tabs.miners')}
               columns={columns}
@@ -394,7 +395,7 @@ export function MinersTab() {
                 total: openMiners.length,
               })}
             />
-          </div>
+          </TableScroll>
         )}
         {hiddenGuests.length > 0 && (
           <p className="border-t border-line px-3 py-2 text-xs text-text-dim">

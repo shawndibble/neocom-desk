@@ -45,7 +45,7 @@ export function GroupTile({
         expanded && 'border-accent-dim'
       )}
     >
-      <span className="shrink-0 text-accent">{skillGroupIcon(group.groupName)}</span>
+      <span className="shrink-0 text-text-dim">{skillGroupIcon(group.groupName)}</span>
       <span className="min-w-0 flex-1">
         <span className="flex items-baseline justify-between gap-2">
           <span className="flex min-w-0 items-center gap-1.5 text-sm font-medium">
@@ -63,7 +63,7 @@ export function GroupTile({
         </span>
         <span aria-hidden="true" className="mt-1.5 flex h-1.5 overflow-hidden rounded-full bg-line">
           <span className="bg-accent" style={{ width: `${trainedShare}%` }} />
-          <span className="bg-warning/70" style={{ width: `${queuedShare}%` }} />
+          <span className="bg-line-bright" style={{ width: `${queuedShare}%` }} />
         </span>
       </span>
     </button>

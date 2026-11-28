@@ -8,6 +8,7 @@ import {
   FilterChip,
   IskAmount,
   type DataTableColumn,
+  Spinner,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
@@ -37,6 +38,7 @@ import type { TradeHub } from '@/market/hubs';
 import { SourcingInput } from '@/features/industry/SourcingInput';
 import { parseOrKeep } from '@/features/industry/planInputParsers';
 import { useRedemptionPricing } from './useRedemptionPricing';
+import { TableScroll } from '@/components/ui/TableScroll';
 
 function LoyaltyItemName({ row }: { row: LoyaltyOfferRow }) {
   const { typeId, itemName } = resolveLoyaltyRowItem(row);
@@ -261,7 +263,9 @@ export function OfferDetail({
           }}
         />
       </label>
-      {walking && <p className="text-xs text-text-dim">{t('loyaltyStore.walkedLoading')}</p>}
+      {walking && (
+        <Spinner size="sm" showLabel label={t('loyaltyStore.walkedLoading')} className="text-xs" />
+      )}
 
       <div className="flex flex-wrap gap-6">
         <div>
@@ -430,7 +434,7 @@ export function OfferDetail({
             <TableActionsMenu name={t('loyaltyStore.materials')} tableExport={materialsExport} />
           </div>
           <p className="text-[0.6875rem] text-text-dim">{t('loyaltyStore.useOwnMaterialsHint')}</p>
-          <div className="overflow-x-auto">
+          <TableScroll>
             <DataTable
               {...materialsExport.tableProps}
               label={t('loyaltyStore.materials')}
@@ -440,7 +444,7 @@ export function OfferDetail({
               density="compact"
               responsive="table"
             />
-          </div>
+          </TableScroll>
         </div>
       )}
     </div>

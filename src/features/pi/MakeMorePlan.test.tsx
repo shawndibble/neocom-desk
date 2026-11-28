@@ -158,7 +158,7 @@ describe('MakeMorePlan', () => {
     expect(screen.queryByRole('heading', { name: /Quick wins/ })).not.toBeInTheDocument();
   });
 
-  it('puts "What matters more?" on its own row in the body below sm, not in the header', () => {
+  it('puts "What matters more?" on its own row in the body below lg, not in the header', () => {
     renderPlan();
     const row = screen.getByTestId('pi-matters-row');
     expect(within(row).getByRole('group', { name: 'What matters more?' })).toBeInTheDocument();

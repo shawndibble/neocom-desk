@@ -98,7 +98,7 @@ export function StockTab({ activeCharacterId }: { activeCharacterId: number | nu
         {t('stockTargets.share.banner', { name: shared.name, count: shared.items.length })}
       </span>
       <Button
-        variant="primary"
+        variant="accent"
         onClick={() => {
           const existing = stockListAt(lists, shared.locationId);
           const id = existing?.id ?? newStockListId();

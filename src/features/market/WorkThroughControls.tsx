@@ -46,18 +46,16 @@ export function WorkThroughSummaryTail() {
   if (!workThrough.running) {
     if (workThrough.queueCount === 0) return null;
     return (
-      <>
-        <Dot />
+      <span className="flex basis-full items-center">
         <TextAction onClick={workThrough.start}>
           {t('market.orders.workThrough.start', { total: workThrough.queueCount })}
         </TextAction>
-      </>
+      </span>
     );
   }
   const { position, total } = workThrough.progress;
   return (
-    <>
-      <Dot />
+    <span className="flex basis-full items-center gap-x-1.5">
       <span className="tabular-nums text-text">
         {workThrough.currentId === null
           ? t('market.orders.workThrough.done', { total })
@@ -65,7 +63,7 @@ export function WorkThroughSummaryTail() {
       </span>
       <Dot />
       <TextAction onClick={workThrough.stop}>{t('market.orders.workThrough.stop')}</TextAction>
-    </>
+    </span>
   );
 }
 

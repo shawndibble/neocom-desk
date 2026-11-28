@@ -80,5 +80,18 @@ export function useDeferredCommits() {
     [items, settling]
   );
 
-  return { items, hiddenIds, defer, undo, commit };
+  const visible = useCallback(
+    <T extends { id: string }>(list: readonly T[]) => list.filter((i) => !hiddenIds.has(i.id)),
+    [hiddenIds]
+  );
+
+  return {
+    items,
+    hiddenIds,
+    defer,
+    undo,
+    commit,
+    visible,
+    toast: { items, onUndo: undo, onClose: commit },
+  };
 }

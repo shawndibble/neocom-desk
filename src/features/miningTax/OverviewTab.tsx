@@ -83,7 +83,8 @@ import {
   ValueMenu,
 } from './OverviewSettings';
 import { basisSummary } from './basisLabel';
-import { useMediaQuery } from '@/lib/useMediaQuery';
+import { useIsDesktop } from '@/lib/useIsDesktop';
+import { useIsXlUp } from '@/lib/useIsXlUp';
 import { YieldDetailModal } from './YieldDetailModal';
 import { yieldOverviewCsvColumns } from './yieldCsv';
 import { sumVolume, volumeDisplayMode } from './volume';
@@ -93,14 +94,14 @@ import { systemLabel } from './names';
 import type { DailyRatePoint, TypeComparisonPoint } from './MiningYieldCharts';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 import { formatCount } from '@/lib/formatCount';
+import { Well } from '@/components/ui/Well';
+import { TableScroll } from '@/components/ui/TableScroll';
 
 const LazyMiningYieldCharts = lazy(() => guarded(() => import('./MiningYieldCharts')));
 
 const EMPTY_NAMES: ReadonlyMap<number, string> = new Map();
 
 const OVERVIEW_CHARACTER_FILTER_PARAM = characterFilterParam('all');
-const WIDE_HEADER_QUERY = '(min-width: 80rem)';
-const MID_HEADER_QUERY = '(min-width: 64rem)';
 const OVERVIEW_DEFAULT_SORT = { columnId: 'date', direction: 'desc' as const };
 
 function entryVolume(row: MiningYieldRow, typeVolumes: ReadonlyMap<number, number>) {
@@ -186,8 +187,8 @@ export function OverviewTab({ tabBar, tabsId }: OverviewTabProps) {
 
   const characters = data?.characters ?? [];
   const characterIds = useMemo(() => (data?.characters ?? []).map((c) => c.characterId), [data]);
-  const isWide = useMediaQuery(WIDE_HEADER_QUERY);
-  const isMid = useMediaQuery(MID_HEADER_QUERY);
+  const isWide = useIsXlUp();
+  const isMid = useIsDesktop();
   const headerLayout: 'narrow' | 'mid' | 'wide' = isWide ? 'wide' : isMid ? 'mid' : 'narrow';
   const showCharacterColumn = characters.length > 1;
   const refiningUnavailable = showRefining && (data?.refiningUnavailable ?? false);
@@ -528,10 +529,7 @@ export function OverviewTab({ tabBar, tabsId }: OverviewTabProps) {
             </LiveStatus>
 
             {data && data.reauthCharacters.length > 0 && (
-              <div
-                role="alert"
-                className="space-y-1 rounded-xs border border-warning/60 bg-warning/10 p-2 text-xs"
-              >
+              <Well tone="warning" role="alert" className="space-y-1 text-xs">
                 <p className="font-semibold text-warning uppercase">{t('miningTax.reauthTitle')}</p>
                 <ul className="space-y-1">
                   {data.reauthCharacters.map((c) => (
@@ -550,7 +548,7 @@ export function OverviewTab({ tabBar, tabsId }: OverviewTabProps) {
                     </li>
                   ))}
                 </ul>
-              </div>
+              </Well>
             )}
 
             <div className="empty:hidden">
@@ -685,7 +683,7 @@ export function OverviewTab({ tabBar, tabsId }: OverviewTabProps) {
                     </>
                   }
                 >
-                  <div className="overflow-x-auto">
+                  <TableScroll>
                     <DataTable
                       {...overviewExport.tableProps}
                       columns={columns}
@@ -698,7 +696,7 @@ export function OverviewTab({ tabBar, tabsId }: OverviewTabProps) {
                       {...overviewSort}
                       onRowClick={(row) => setDetailRow(row)}
                     />
-                  </div>
+                  </TableScroll>
                 </Panel>
               </>
             )}

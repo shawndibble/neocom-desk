@@ -17,6 +17,7 @@ import { formatTripM3, shownUsedM3 } from './format';
 import { HaulingHoldMeters } from './HaulingHoldMeters';
 import { IskDelta } from '@/components/ui/IskDelta';
 import { iskTone, signedIsk } from '@/lib/signedIsk';
+import { Well } from '@/components/ui/Well';
 import type { HaulingFillScanState } from './useHaulingFillScan';
 import { useHubJumps } from './useHubJumps';
 
@@ -380,15 +381,12 @@ export function HaulingFillList({
     body = (
       <>
         {status === 'error' && (
-          <div
-            role="alert"
-            className="flex flex-col gap-2 rounded-xs border border-warning/45 bg-warning/10 p-2 text-xs"
-          >
+          <Well tone="warning" role="alert" className="flex flex-col gap-2 text-xs">
             <p className="text-warning">{t('market.hauling.fill.error')}</p>
             <Button size="sm" className="self-start" onClick={onMore}>
               {t('market.hauling.retry')}
             </Button>
-          </div>
+          </Well>
         )}
         {items.length > 0 && (
           <>

@@ -24,10 +24,10 @@ export function RoleChooser({ firstRun, onChoose, onCancel }: RoleChooserProps) 
   return (
     <section
       className={
-        firstRun ? 'grid max-w-2xl gap-3 rounded-xs border border-line bg-panel p-4' : 'grid gap-3'
+        firstRun ? 'grid max-w-3xl gap-3 rounded-xs border border-line bg-panel p-4' : 'grid gap-3'
       }
     >
-      {firstRun && <h2 className="text-lg font-semibold">{t('overview.roles.title')}</h2>}
+      {firstRun && <h2 className="text-base font-semibold">{t('overview.roles.title')}</h2>}
       <p className="text-sm text-text-dim">{t('overview.roles.body')}</p>
       <div role="group" aria-label={t('overview.roles.group')} className="flex flex-wrap gap-2">
         {ROLE_IDS.map((role) => (

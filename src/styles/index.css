@@ -308,6 +308,21 @@
         transparent
       );
     }
+
+    /* `TableScroll`: a painted band, not a mask, so it shows over a column gap
+       too. Trailing end only: a leading one would veil a pinned key column. */
+    .edge-fade-end {
+      animation: tab-fade-right linear both;
+      animation-timeline: scroll(self inline);
+      background-image: linear-gradient(
+        to left,
+        color-mix(in srgb, var(--color-line-bright) 40%, transparent),
+        transparent
+      );
+      background-repeat: no-repeat;
+      background-position: right;
+      background-size: var(--tab-fade-r) 100%;
+    }
   }
 
   /*
@@ -1382,6 +1397,24 @@
   }
 
   /*
+   * A `Toast` whose clock ran out drops 8px and fades. Only the timer plays
+   * it: Escape, the close button, Undo and a route change close at once.
+   * Reduced motion has no rule, so `Toast` finds no animation and closes.
+   */
+  @media (prefers-reduced-motion: no-preference) {
+    .toast-out {
+      animation: toast-out var(--motion-quick-exit) var(--motion-ease-in) forwards;
+    }
+  }
+
+  @keyframes toast-out {
+    to {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+  }
+
+  /*
    * Slides a column out from behind the nav as it opens (the Fitting editor's
    * Improve column): its whole width, under the nav rail, which sits above the
    * page (Layout's z-30). Reduced motion gets none (DESIGN.md §6c).
@@ -1407,7 +1440,7 @@
    * button appearing beside Select none. Reduced motion gets none (DESIGN.md §6c).
    */
   .grant-selected-in {
-    animation: grant-selected-in 200ms ease-out both;
+    animation: grant-selected-in var(--motion-quick) var(--motion-ease-out) both;
   }
 
   @keyframes grant-selected-in {
@@ -1534,6 +1567,12 @@
     .motion-sheet[open]::backdrop,
     .motion-page[open]::backdrop {
       animation: motion-fade-in var(--motion-medium) var(--motion-ease-out) backwards;
+    }
+
+    /* `Modal` `top` (the command palette): opened from the keyboard many
+       times a session, so it only fades, backdrop included. */
+    .motion-fade[open]::backdrop {
+      animation: motion-fade-in var(--motion-quick) var(--motion-ease-out) backwards;
     }
 
     /* `SlideOver`: in from its edge, and back out the same way. */

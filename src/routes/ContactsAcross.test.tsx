@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { act, screen, fireEvent, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import {
@@ -155,7 +156,10 @@ describe('Contacts', () => {
 
       await showAllCharacters();
 
-      expect(await screen.findByText(/last saved/)).toBeInTheDocument();
+      await userEvent
+        .setup()
+        .hover(await screen.findByRole('button', { name: 'About these contacts' }));
+      expect(await screen.findByRole('tooltip')).toHaveTextContent(/last saved/i);
       expect(screen.getByRole('button', { name: 'Refresh every character' })).toBeInTheDocument();
     });
 

@@ -11,6 +11,7 @@ import {
   activeOptionClassName,
   fieldBaseClassName,
   fieldSizeClassName,
+  rowInteractiveClassName,
   type ControlSize,
 } from './controlStyles';
 
@@ -183,7 +184,7 @@ export function RegionSelect({
               type="button"
               disabled={shortcut.disabled}
               onClick={() => void runShortcut()}
-              className="w-full rounded-xs px-2 py-1.5 text-left text-sm text-accent hover:bg-panel-2 disabled:cursor-not-allowed disabled:text-text-dim disabled:hover:bg-transparent"
+              className={`w-full rounded-xs px-2 py-1.5 text-left text-sm text-accent ${rowInteractiveClassName} disabled:cursor-not-allowed disabled:text-text-dim disabled:hover:bg-transparent`}
             >
               {shortcut.label}
             </button>
@@ -209,7 +210,8 @@ export function RegionSelect({
                 role="option"
                 aria-selected={selected}
                 className={cx(
-                  'flex cursor-pointer items-center gap-2 rounded-xs px-2 py-1.5 text-sm hover:bg-panel-2',
+                  'flex cursor-pointer items-center gap-2 rounded-xs px-2 py-1.5 text-sm',
+                  rowInteractiveClassName,
                   index === highlight && `bg-panel-2 ${activeOptionClassName}`
                 )}
                 onMouseDown={(event) => event.preventDefault()}

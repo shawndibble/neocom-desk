@@ -308,7 +308,6 @@ export function Calendar() {
 
   const periodControls = (
     <div className="flex items-center gap-1.5">
-      <span className="hidden text-xs font-semibold text-text-dim md:inline">{periodLabel}</span>
       <IconButton
         size="md"
         icon={<Icon.Back />}
@@ -393,7 +392,7 @@ export function Calendar() {
           {(data?.reauthKinds.length ?? 0) > 0 && (
             <CalendarReauthNotice characterId={activeCharacterId} kinds={data?.reauthKinds ?? []} />
           )}
-          <div className="flex flex-col gap-3 md:flex-row md:items-start">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start">
             {isNarrow ? (
               <Panel padded className="w-full">
                 <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
@@ -409,8 +408,8 @@ export function Calendar() {
                 />
               </Panel>
             ) : (
-              <div className="w-full min-w-0 space-y-3 md:flex-1">
-                <Panel padded={false} title={t('calendar.map.title')} actions={periodControls}>
+              <div className="w-full min-w-0 space-y-3 lg:flex-1">
+                <Panel padded={false} title={periodLabel} actions={periodControls}>
                   <CalendarMap
                     days={days}
                     loads={loads}

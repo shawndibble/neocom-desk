@@ -1,3 +1,4 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useNavBadges } from './navBadges';
 import { useMemo, useState, type ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
@@ -41,7 +42,7 @@ const ALL_CORP_VIEWS = {
 };
 
 const TILE_GRID = 'grid grid-cols-4 gap-1.5';
-const HEADING = 'text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase';
+const HEADING = eyebrowClassName;
 
 interface MobileMoreSheetProps {
   open: boolean;
@@ -114,7 +115,7 @@ export function MobileMoreSheet({
         label={t(page.labelKey)}
         locked={page.gating === 'scope' && locked.has(page.path)}
         presentation={presentation}
-        className={bar && editable ? 'pr-12' : undefined}
+        className={editable ? (bar ? 'pr-12' : 'pt-9') : undefined}
         onClick={onClose}
         {...navBadge(page.path)}
       />
@@ -129,7 +130,7 @@ export function MobileMoreSheet({
           label={t(page.labelKey)}
           hidden={pageHidden}
           className={
-            bar ? 'absolute top-1/2 right-0.5 -translate-y-1/2' : 'absolute bottom-0.5 left-0.5'
+            bar ? 'absolute top-1/2 right-0.5 -translate-y-1/2' : 'absolute top-0.5 left-0.5'
           }
         />
       </div>

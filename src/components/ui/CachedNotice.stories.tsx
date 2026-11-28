@@ -4,6 +4,7 @@ import { MINUTE_MS } from '@/lib/age';
 
 const ago = (minutes: number) => Date.now() - minutes * MINUTE_MS;
 
+/** @summary "Showing cached data · 3h ago" line for a cached read, at every width (the phone answer to the md-hidden DataAgeBadge). */
 const meta = {
   title: 'ui/CachedNotice',
   component: CachedNotice,
@@ -14,8 +15,11 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
+/** @summary Offline (or the network is down): the saved copy and its age. */
 export const Cached: Story = {};
 
+/** @summary A refresh was attempted and failed; the age says how old what is shown is. */
 export const RefreshFailed: Story = { args: { refreshFailed: true } };
 
+/** @summary The loader does not know when the data was fetched: the sentence alone. */
 export const UnknownAge: Story = { args: { fetchedAt: null } };

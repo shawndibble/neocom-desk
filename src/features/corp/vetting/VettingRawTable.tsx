@@ -21,6 +21,7 @@ import {
   textActionClassName,
   type DataTableColumn,
   type DataTableSort,
+  Spinner,
 } from '@/components/ui';
 import type { ActiveFilter } from '@/components/ui/activeFilters';
 import type { VettingFlag, VettingRawSource } from '@/engine/vetting';
@@ -46,6 +47,7 @@ import {
   type RawItem,
 } from './rawRowsView';
 import { evidenceWhatKey } from './vettingView';
+import { TableScroll } from '@/components/ui/TableScroll';
 
 const ALL = '__all';
 
@@ -470,7 +472,7 @@ export function VettingRawTable({
   const empty = !data.loading && !data.failed && !short && scope.length === 0;
   let body;
   if (waiting) {
-    body = <p className="p-3 text-sm text-text-dim">{t('common.loading')}</p>;
+    body = <Spinner size="sm" showLabel className="p-3 text-sm" />;
   } else if (empty || scope.length === 0) {
     body = !empty ? null : (
       <EmptyState
@@ -500,7 +502,7 @@ export function VettingRawTable({
     );
   } else {
     body = (
-      <div className="overflow-x-auto">
+      <TableScroll>
         <DataTable
           label={label}
           columns={columns}
@@ -512,7 +514,7 @@ export function VettingRawTable({
           virtualize="auto"
           rowClassName={(item) => (item.flag ? 'bg-warning/10' : undefined)}
         />
-      </div>
+      </TableScroll>
     );
   }
 

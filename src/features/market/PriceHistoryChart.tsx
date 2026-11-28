@@ -33,6 +33,7 @@ import {
   GROUPED_NUMBER_Y_AXIS_WIDTH,
 } from '@/lib/chartAxis';
 import { formatCompactNumber } from '@/lib/compactNumber';
+import { formatDateTick } from '@/lib/formatDateTick';
 import { formatIsk, formatIskCompact, formatMarketIsk } from '@/lib/isk';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { formatPriceRange, formatVolume } from './format';
@@ -52,6 +53,7 @@ import {
   type PriceSeriesChoice,
   type RegionOpenSeries,
 } from '@/engine/market/priceHistoryOpen';
+import { TableScroll } from '@/components/ui/TableScroll';
 
 export interface ComparedRegionSeries {
   regionId: number;
@@ -100,14 +102,6 @@ function priceTickDecimals(span: number): number {
   if (span < 10) return 2;
   if (span < 100) return 1;
   return 0;
-}
-
-function formatTick(date: string): string {
-  const [year, month, day] = date.split('-').map(Number);
-  return new Date(year, month - 1, day).toLocaleDateString(undefined, {
-    month: 'short',
-    day: 'numeric',
-  });
 }
 
 interface ChartRow extends Partial<Omit<MarketHistoryPoint, 'date'>> {
@@ -344,7 +338,7 @@ export default function PriceHistoryChart({
     return joined.map(({ date, primary, averages, buy, sell }) => ({
       ...primary,
       date,
-      dateLabel: formatTick(date),
+      dateLabel: formatDateTick(date),
       range: primary ? [primary.lowest, primary.highest] : undefined,
       movingAverage: maByDate.get(date),
       comparison: averages,
@@ -804,7 +798,7 @@ export default function PriceHistoryChart({
         </div>
       </div>
 
-      <div className="overflow-x-auto">
+      <TableScroll>
         <DataTable
           {...tableExport.tableProps}
           columns={columns}
@@ -814,7 +808,7 @@ export default function PriceHistoryChart({
           responsive="table"
           defaultSort={{ columnId: 'date', direction: 'asc' }}
         />
-      </div>
+      </TableScroll>
     </div>
   );
 }

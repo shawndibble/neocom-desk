@@ -1,4 +1,3 @@
-import { fixed1 } from '@/lib/fixedFormat';
 import { JumpsLink } from '@/features/route/JumpsLink';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -19,7 +18,7 @@ import { DEFAULT_JUMP_RANGE } from '@/engine/route/jumpRange';
 import { SPACE_KINDS, type SpaceKind } from '@/engine/space';
 import { toggleInSet } from '@/lib/sets';
 import { SELL_OUTLIER_FACTOR } from '@/engine/market/orderBookDepth';
-import { securityStatusColor } from '@/engine/securityStatus';
+import { SecurityStatus } from '@/components/SecurityStatus';
 import type { CurrentSystemState } from '@/features/route/currentSystem';
 import { CurrentSystemPicker, JumpRangeSelect } from '@/features/route/JumpRangeControls';
 import { useSystemName } from '@/features/route/useSolarSystems';
@@ -260,14 +259,7 @@ export function OrderBookScopeBar({
             <HintText content={scope.stationName} className="min-w-0 truncate font-semibold">
               {scope.stationName}
             </HintText>
-            {scope.security !== null && (
-              <span
-                className="font-semibold tabular-nums"
-                style={{ color: securityStatusColor(scope.security) }}
-              >
-                {fixed1(scope.security)}
-              </span>
-            )}
+            {scope.security !== null && <SecurityStatus security={scope.security} />}
             {scope.jumpsAway !== null && originName !== null && (
               <span className="whitespace-nowrap text-text-dim">
                 <JumpsLink systemId={scope.systemId}>

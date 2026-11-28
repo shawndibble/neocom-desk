@@ -29,7 +29,7 @@ import {
 } from '@/components/ui/controlStyles';
 import { db } from '@/db';
 import { CommunityDetail } from '@/features/communities/CommunityDetail';
-import { communityBadgeClassName } from '@/features/communities/communityBadge';
+import { Pill } from '@/components/ui/Pill';
 import { communityInitials } from '@/features/communities/communityInitials';
 import {
   COMMUNITY_TABS,
@@ -229,7 +229,7 @@ export function Communities() {
                       </span>
                     </span>
                     {isCommunityAdmin(community, characterId) && (
-                      <span className={communityBadgeClassName}>{t('communities.adminBadge')}</span>
+                      <Pill className="shrink-0">{t('communities.adminBadge')}</Pill>
                     )}
                     <RowCaret />
                   </button>

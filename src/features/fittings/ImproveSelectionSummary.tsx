@@ -67,7 +67,7 @@ function SelectionCost({
 }) {
   const { t } = useTranslation();
   const tone =
-    summary.isk < 0 ? 'text-success' : summary.isk > 0 ? 'text-warning' : 'text-text-dim';
+    summary.isk < 0 ? 'text-isk-pos' : summary.isk > 0 ? 'text-isk-neg' : 'text-text-dim';
   const delta =
     summary.isk === 0 ? (
       t('fittings.improve.selection.noChange')

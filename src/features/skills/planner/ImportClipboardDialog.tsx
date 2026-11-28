@@ -86,15 +86,12 @@ export function ImportClipboardDialog({
       initialFocusRef={textRef}
       footer={
         <div className="flex items-center gap-2">
-          <Button size="sm" onClick={onClose}>
-            {t('plans.importCancel')}
-          </Button>
+          <Button onClick={onClose}>{t('plans.importCancel')}</Button>
           {needsReview ? (
             <>
               {onReplace && (
                 <Tooltip content={noEntries ? t('plans.importNothingToApply') : null}>
                   <Button
-                    size="sm"
                     variant="danger"
                     onClick={() => onReplace(preview.entries)}
                     aria-disabled={noEntries || undefined}
@@ -105,7 +102,6 @@ export function ImportClipboardDialog({
               )}
               <Tooltip content={noEntries ? t('plans.importNothingToApply') : null}>
                 <Button
-                  size="sm"
                   variant="primary"
                   onClick={() => onApply(preview.entries)}
                   aria-disabled={noEntries || undefined}
@@ -119,7 +115,6 @@ export function ImportClipboardDialog({
               {onReplace && (
                 <Tooltip content={noText ? t('plans.importNeedsText') : null}>
                   <Button
-                    size="sm"
                     variant="danger"
                     onClick={() => handleImport(onReplace)}
                     aria-disabled={noText || undefined}
@@ -131,7 +126,6 @@ export function ImportClipboardDialog({
               )}
               <Tooltip content={noText ? t('plans.importNeedsText') : null}>
                 <Button
-                  size="sm"
                   variant="primary"
                   onClick={() => handleImport()}
                   aria-disabled={noText || undefined}

@@ -66,11 +66,8 @@ export function AutoBuildControl({
       >
         <p className="text-xs text-text-dim">{confirmMessage ?? t('industry.autoBuildConfirm')}</p>
         <DialogFooter className="mt-3">
-          <Button size="sm" onClick={() => setConfirmOpen(false)}>
-            {t('industry.cancel')}
-          </Button>
+          <Button onClick={() => setConfirmOpen(false)}>{t('industry.cancel')}</Button>
           <Button
-            size="sm"
             variant="danger"
             onClick={() => {
               setConfirmOpen(false);

@@ -155,6 +155,53 @@ describe('the rail', () => {
     expect(within(views).getByRole('link', { name: 'Balance' })).toBeInTheDocument();
   });
 
+  function stubRailGeometry(isBelow: (el: Element) => boolean) {
+    const rect = (top: number, bottom: number) => ({ top, bottom }) as DOMRect;
+    const geometry = vi
+      .spyOn(Element.prototype, 'getBoundingClientRect')
+      .mockImplementation(function (this: Element) {
+        if (this.tagName === 'NAV') return rect(0, 100);
+        return isBelow(this) ? rect(300, 320) : rect(10, 20);
+      });
+    const scrolled = vi.fn();
+    Element.prototype.scrollBy = scrolled;
+    const restore = () => {
+      geometry.mockRestore();
+      delete (Element.prototype as Partial<Element>).scrollBy;
+    };
+    return { scrolled, restore };
+  }
+
+  it('scrolls the rail itself to the current view, so the first Tab still reaches the skip link', () => {
+    const { scrolled, restore } = stubRailGeometry((el) => el.textContent === 'LP Store');
+    try {
+      renderAt('/wallet/lp-store/1000125');
+      expect(scrolled).toHaveBeenCalledWith({ top: 220 });
+      expect(scrolled.mock.contexts).toContain(rail());
+    } finally {
+      restore();
+    }
+  });
+
+  it('keeps the current view in sight while the rail fills in, until the pilot touches it', async () => {
+    const { scrolled, restore } = stubRailGeometry(
+      (el) => el.getAttribute('aria-current') === 'page'
+    );
+    try {
+      renderAt('/wallet/journal');
+      scrolled.mockClear();
+      act(() => void rail().append(document.createElement('div')));
+      await waitFor(() => expect(scrolled).toHaveBeenCalledWith({ top: 220 }));
+
+      rail().dispatchEvent(new Event('pointerdown'));
+      scrolled.mockClear();
+      await act(async () => void rail().append(document.createElement('div')));
+      expect(scrolled).not.toHaveBeenCalled();
+    } finally {
+      restore();
+    }
+  });
+
   it("opens the current page's views and leaves the others closed", () => {
     renderAt('/market/appraisal');
 
@@ -186,6 +233,23 @@ describe('the rail', () => {
     renderAt('/clones');
     const views = within(rail()).getByRole('list', { name: 'Overview' });
     expect(within(views).queryByRole('link', { name: 'SRP' })).not.toBeInTheDocument();
+  });
+
+  it('keeps Overview current on one of its own views', () => {
+    renderAt('/clones');
+    expect(within(rail()).getByRole('link', { name: 'Overview' })).toHaveAttribute(
+      'aria-current',
+      'page'
+    );
+  });
+
+  it('lights Build Plans on a Build Group', () => {
+    renderAt('/industry/groups/g1');
+    const views = within(rail()).getByRole('list', { name: 'Industry' });
+    expect(within(views).getByRole('link', { name: 'Build Plans' })).toHaveAttribute(
+      'aria-current',
+      'page'
+    );
   });
 
   it('lists only the SRP tabs an officer can see under Corp SRP', async () => {

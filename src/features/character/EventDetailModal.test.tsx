@@ -62,7 +62,7 @@ describe('EventDetailModal', () => {
     );
     render(<EventDetailModal characterId={CHAR_ID} event={EVENT} onClose={() => {}} />);
     expect(screen.getByRole('dialog', { name: 'Fleet Op' })).toBeInTheDocument();
-    expect(screen.getByRole('status', { name: 'Loading' })).toBeInTheDocument();
+    expect(await screen.findByRole('status', { name: 'Loading' })).toBeInTheDocument();
     await vi.waitFor(() => expect(requested).toBe(true));
   });
 

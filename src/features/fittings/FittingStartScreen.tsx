@@ -14,6 +14,7 @@ import {
   DataAgeBadge,
   EmptyState,
   IconButton,
+  InfoTooltip,
   PageHeader,
   RowActionsMenu,
   RowMoreActions,
@@ -42,13 +43,13 @@ import {
   type LibrarySourcePick,
 } from '@/engine/fittings/myFittings';
 import { useIsPhone } from '@/lib/useIsPhone';
+import { useIsDesktop } from '@/lib/useIsDesktop';
 import { NO_HOVER_QUERY, useMediaQuery } from '@/lib/useMediaQuery';
 import { formatTimestamp } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';
 import { enumParam, textParam } from '@/lib/urlState';
 import { useUrlParam } from '@/lib/useUrlState';
 import { warmDogmaEngine } from './dogmaFittingEngine';
-import { StatNote } from './StatFacts';
 import { FittingPreview } from './FittingPreview';
 import { ImportFittingCard, ImportFittingDialog, NewFromHullDialog } from './FittingStartDialogs';
 import { FittingLibraryEmpty } from './FittingLibraryEmpty';
@@ -136,7 +137,8 @@ export function FittingStartScreen({
   const isPhone = useIsPhone();
   const page = variant === 'page';
   const noHover = useMediaQuery(NO_HOVER_QUERY);
-  const previewing = preview && !isPhone && !noHover;
+  const lgUp = useIsDesktop();
+  const previewing = preview && !isPhone && !noHover && lgUp;
   const [urlQuery, setUrlQuery] = useUrlParam(QUERY_KEY, QUERY_PARAM);
   const [dialogQuery, setDialogQuery] = useState('');
   const query = page ? urlQuery : dialogQuery;
@@ -464,7 +466,10 @@ export function FittingStartScreen({
           {(showNewInToolbar || showImport) && (
             <div className={`flex gap-2 ${isPhone ? 'w-full *:flex-1' : ''}`}>
               {showNewInToolbar && (
-                <Button variant="primary" onClick={() => setHullOpen(true)}>
+                <Button
+                  variant={previewing && selected ? 'ghost' : 'primary'}
+                  onClick={() => setHullOpen(true)}
+                >
                   {t('fittings.start.newFromHull')}
                 </Button>
               )}
@@ -537,13 +542,14 @@ export function FittingStartScreen({
                 ))}
               {activeShown.length > 0 && (
                 <section className="pb-1">
-                  <h3 className={cx(eyebrowClassName, 'px-3 pt-3 pb-1')}>
-                    {t('fittings.start.activeHeading')}
-                  </h3>
-                  <ul>{activeShown.map(renderRow)}</ul>
-                  <div className="px-3 pt-1">
-                    <StatNote>{t('fittings.start.activeLag')}</StatNote>
+                  <div className="flex items-center gap-1.5 px-3 pt-3 pb-1">
+                    <h3 className={eyebrowClassName}>{t('fittings.start.activeHeading')}</h3>
+                    <InfoTooltip
+                      label={t('fittings.start.activeLagLabel')}
+                      content={t('fittings.start.activeLag')}
+                    />
                   </div>
+                  <ul>{activeShown.map(renderRow)}</ul>
                 </section>
               )}
               {groups.map((group) => (

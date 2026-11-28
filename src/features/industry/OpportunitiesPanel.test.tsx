@@ -400,10 +400,10 @@ describe('OpportunitiesPanel', () => {
       expect(await screen.findByRole('menuitem', { name: 'Price history' })).toBeInTheDocument();
     });
 
-    it('gives the row a "Plan" button that fires onStartPlan with its catalog entry (issue #1781)', async () => {
+    it('gives the row a Plan icon button (below xl) that fires onStartPlan with its catalog entry (issue #1781)', async () => {
       const onStartPlan = vi.fn(() => Promise.resolve(false));
       const { row } = await renderWithRow(1000, { onStartPlan });
-      fireEvent.click(within(row).getByRole('button', { name: 'Plan' }));
+      fireEvent.click(within(row).getByRole('button', { name: 'Start a plan for Widget Alpha' }));
       expect(onStartPlan).toHaveBeenCalledWith(
         entry(1000, 'Widget Alpha'),
         expect.objectContaining({

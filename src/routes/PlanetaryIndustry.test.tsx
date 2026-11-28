@@ -615,6 +615,100 @@ describe('PlanetaryIndustry', () => {
     expect((await db.settings.get(PI_COLONIES_SHOW_ALTS_KEY))?.value).toBe(true);
   });
 
+  it('narrows own and alt colonies to Stopped and Expiring soon, with counts, and resets', async () => {
+    const ALT_ID = 92;
+    const EXPIRING_PLANET_ID = 40000002;
+    const HEALTHY_PLANET_ID = 40000003;
+    await addAlt(ALT_ID, 'Alt Two', [PLANETS_SCOPE]);
+    const altExtractor = (expiryMs: number) => ({
+      links: [],
+      routes: [],
+      pins: [
+        {
+          pin_id: 9,
+          type_id: 2848,
+          latitude: 0,
+          longitude: 0,
+          expiry_time: new Date(expiryMs).toISOString(),
+          extractor_details: { heads: [{ head_id: 1, latitude: 0, longitude: 0 }] },
+        },
+      ],
+    });
+    await db.esiCache.bulkPut([
+      {
+        characterId: ALT_ID,
+        key: 'planets',
+        value: [EXPIRING_PLANET_ID, HEALTHY_PLANET_ID].map((planet_id) => ({
+          ...planetsPayload[0],
+          planet_id,
+          owner_id: ALT_ID,
+        })),
+        fetchedAt: Date.now(),
+      },
+      {
+        characterId: ALT_ID,
+        key: `planet:${EXPIRING_PLANET_ID}`,
+        value: altExtractor(Date.now() + 5 * 3_600_000),
+        fetchedAt: Date.now(),
+      },
+      {
+        characterId: ALT_ID,
+        key: `planet:${HEALTHY_PLANET_ID}`,
+        value: altExtractor(Date.now() + 5 * DAY_MS),
+        fetchedAt: Date.now(),
+      },
+    ]);
+    server.use(
+      http.get(`${ESI}/characters/${ALT_ID}/planets`, () => HttpResponse.json([])),
+      http.get(`${ESI}/universe/planets/:id`, ({ params }) =>
+        HttpResponse.json({
+          planet_id: Number(params.id),
+          name: Number(params.id) === PLANET_ID ? 'Jita IV' : `Alt ${String(params.id)}`,
+          system_id: SYSTEM_ID,
+          type_id: 11,
+          position: { x: 0, y: 0, z: 0 },
+        })
+      )
+    );
+
+    await renderIndustryRoutes();
+    await colonyPanelFor(/Jita IV/);
+    const user = userEvent.setup({ delay: null });
+    const filters = () => screen.getByRole('group', { name: 'Filter colonies' });
+    const chip = (name: RegExp) => within(filters()).getByRole('button', { name });
+    const statuses = () =>
+      [...coloniesPanel().querySelectorAll('[data-colony-status]')].map((row) =>
+        row.getAttribute('data-colony-status')
+      );
+
+    expect(chip(/^Stopped 1 colony$/)).toBeEnabled();
+    expect(within(filters()).queryByRole('button', { name: /^Expiring soon/ })).toBeNull();
+
+    await user.click(chip(/show \d+ alt/i));
+    expect(statuses()).toEqual(['stopped', 'expiring', 'healthy']);
+    expect(chip(/^Expiring soon 1 colony$/)).toBeEnabled();
+
+    await user.click(chip(/^Stopped/));
+    expect(statuses()).toEqual(['stopped']);
+    expect(within(coloniesPanel()).queryByText('Alt Two')).not.toBeInTheDocument();
+
+    await user.click(chip(/^Expiring soon/));
+    expect(statuses()).toEqual(['stopped', 'expiring']);
+
+    await user.click(chip(/^Stopped/));
+    expect(statuses()).toEqual(['expiring']);
+    expect(within(coloniesPanel()).queryByText('Pilot One')).not.toBeInTheDocument();
+    expect(within(coloniesPanel()).getByText('Alt Two')).toBeInTheDocument();
+
+    await user.click(chip(/show \d+ alt/i));
+    expect(statuses()).toEqual([]);
+    expect(chip(/^Expiring soon 0 colonies$/)).toBeEnabled();
+    expect(screen.getByText('No colonies in that state')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Reset filters' }));
+    expect(statuses()).toEqual(['stopped']);
+  });
+
   it('skips an alt without the planets scope: no ESI call, no re-auth banner', async () => {
     const SCOPELESS_ID = 93;
     const scopelessFetch = vi.fn();
@@ -1224,6 +1318,9 @@ describe('PlanetaryIndustry', () => {
     await user.click(screen.getByRole('button', { name: /show \d+ alt/i }));
 
     expect(within(coloniesPanel()).getByText(/^1 stopped · next \d+m$/)).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /^Expiring soon/ }));
+    expect(within(coloniesPanel()).getByText(/^next \d+m$/)).toBeInTheDocument();
   });
 
   it("badges an alt colony group's header with that alt's own cache age, not the active Character's", async () => {

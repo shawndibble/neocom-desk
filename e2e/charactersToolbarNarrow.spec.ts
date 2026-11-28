@@ -37,11 +37,11 @@ test('picking a Character from the More sheet returns to the page you switched f
   await expect(page).toHaveURL(walletUrl);
 });
 
-test('New Group, density, and view-mode controls share one row at 390px', async ({ page }) => {
+test('New Group, text size, and view-mode controls share one row at 390px', async ({ page }) => {
   await landOnCharactersAtPhoneWidth(page);
 
   const newGroup = page.getByRole('button', { name: 'New group' });
-  const density = page.getByRole('combobox', { name: 'Density' });
+  const density = page.getByRole('combobox', { name: 'Text size' });
   const cards = page.getByRole('button', { name: 'Cards' });
   const table = page.getByRole('button', { name: 'Table' });
   await expect(newGroup).toBeVisible();

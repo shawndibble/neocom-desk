@@ -110,13 +110,13 @@ export function CharacterHeader({
       {scope && (
         <PageHeaderClusterContext.Provider value={true}>{scope}</PageHeaderClusterContext.Provider>
       )}
-      {actions}
       {showSp && (
         <StatChips>
           <StatChip label={t('skills.totalSp')} value={sp(totalSp)} />
           <StatChip label={t('skills.unallocatedSp')} value={sp(unallocatedSp)} />
         </StatChips>
       )}
+      {actions}
       <AlertsBell showWhenEmpty={overview ? true : undefined} />
     </header>
   );

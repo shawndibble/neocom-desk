@@ -44,7 +44,7 @@ export function WalletWaitingGoal({ characterIds }: WalletWaitingGoalProps) {
   ] as const;
 
   return (
-    <div className="grid gap-4 lg:grid-cols-2">
+    <div className={cx('grid gap-4', rows.length > 0 && 'lg:grid-cols-2')}>
       {rows.length > 0 && (
         <Panel title={t('wallet.waiting.title')}>
           <ValueList>

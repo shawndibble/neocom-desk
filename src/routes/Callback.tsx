@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { clearRetryBudget } from '@/auth/session';
 import { beginAddCharacterLogin, retryLastLogin } from '@/app/loginFlow';
-import { Button, NeedsConnection, Panel, Spinner } from '@/components/ui';
+import { Button, NeedsConnection, Panel, Spinner, buttonClassName } from '@/components/ui';
 import { callbackRun, type ErrorKind } from './callbackRun';
 
 const MESSAGE_KEY: Record<Exclude<ErrorKind, null>, string> = {
@@ -41,20 +41,25 @@ export function Callback() {
         <Panel title={t('callback.errorTitle')} className="w-full max-w-sm">
           <div role="alert" className="space-y-3">
             <p className="text-sm text-danger">{t(MESSAGE_KEY[errorKind])}</p>
-            <NeedsConnection>
-              <Button
-                variant="primary"
-                size="sm"
-                onClick={() => {
-                  clearRetryBudget();
-                  void retryLastLogin()
-                    .then((restarted) => (restarted ? undefined : beginAddCharacterLogin()))
-                    .catch(() => setErrorKind('generic'));
-                }}
-              >
-                {t('callback.retry')}
-              </Button>
-            </NeedsConnection>
+            <div className="flex flex-wrap gap-2">
+              <NeedsConnection>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={() => {
+                    clearRetryBudget();
+                    void retryLastLogin()
+                      .then((restarted) => (restarted ? undefined : beginAddCharacterLogin()))
+                      .catch(() => setErrorKind('generic'));
+                  }}
+                >
+                  {t('callback.retry')}
+                </Button>
+              </NeedsConnection>
+              <Link to="/" className={buttonClassName({ size: 'sm' })}>
+                {t('notFound.home')}
+              </Link>
+            </div>
           </div>
         </Panel>
       )}

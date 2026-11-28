@@ -16,6 +16,7 @@ import { grabberClassName } from './controlStyles';
 import { PortalContainerProvider } from './portalContainer';
 import { RowTappableContext } from './tooltipHold';
 import { useOverlayHistory } from '@/lib/useOverlayHistory';
+import { useIsPhone } from '@/lib/useIsPhone';
 import { useSheetSwipe } from './useSheetSwipe';
 import { ConfirmDialog } from './ConfirmDialog';
 
@@ -29,14 +30,18 @@ interface ModalProps {
   title: ReactNode;
   titleActions?: ReactNode;
   children: ReactNode;
+  /** @summary Action bar at the dialog's foot (Apply / Cancel, Copy), pinned below the scrolling body. */
   footer?: ReactNode;
   initialFocusRef?: RefObject<HTMLElement | null>;
   placement?: ModalPlacement;
+  sheetOnPhone?: boolean;
   closeOnBack?: boolean;
   dismissOnOutsidePress?: boolean;
   dirty?: boolean;
   returnFocusFallback?: () => HTMLElement | null;
 }
+
+const SHEET_ON_PHONE: ReadonlySet<ModalPlacement> = new Set(['center', 'medium', 'detail']);
 
 const PLACEMENT_CLASSES: Record<ModalPlacement, { dialogClass: string; heightClass: string }> = {
   center: {
@@ -45,7 +50,7 @@ const PLACEMENT_CLASSES: Record<ModalPlacement, { dialogClass: string; heightCla
   },
   top: {
     dialogClass:
-      'motion-dialog mx-auto mt-[max(1rem,env(safe-area-inset-top))] mb-auto w-full max-w-lg md:m-auto',
+      'motion-fade mx-auto mt-[max(1rem,env(safe-area-inset-top))] mb-auto w-full max-w-lg md:mt-[12vh]',
     heightClass: 'h-fit max-h-[85dvh]',
   },
   sheet: {
@@ -87,7 +92,8 @@ export function Modal({
   titleActions,
   children,
   footer,
-  placement = 'center',
+  placement: requestedPlacement = 'center',
+  sheetOnPhone = true,
   initialFocusRef,
   closeOnBack = true,
   dismissOnOutsidePress = true,
@@ -99,6 +105,11 @@ export function Modal({
   const requestClose = () => (dirty ? setAskingDiscard(true) : onClose());
   const dialogRef = useRef<HTMLDialogElement>(null);
   const pressBeganInside = useRef(false);
+  const isPhone = useIsPhone();
+  const placement =
+    isPhone && sheetOnPhone && SHEET_ON_PHONE.has(requestedPlacement)
+      ? 'sheet'
+      : requestedPlacement;
   const isSheet = placement.startsWith('sheet');
   useOverlayHistory(open, requestClose, closeOnBack);
   const swipe = useSheetSwipe(dialogRef, requestClose, isSheet, open);

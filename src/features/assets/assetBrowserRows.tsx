@@ -1,4 +1,3 @@
-import { fixed1 } from '@/lib/fixedFormat';
 import { formatCount } from '@/lib/formatCount';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { type ReactElement, type ReactNode } from 'react';
@@ -17,11 +16,15 @@ import type { AskEstimateFigure } from '@/features/assets/assetAskFigure';
 import { HintText } from '@/components/ui/HintText';
 import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
-import { focusRingInsetClassName, tappableRowClassName } from '@/components/ui/controlStyles';
+import {
+  focusRingInsetClassName,
+  rowInteractiveClassName,
+  tappableRowClassName,
+} from '@/components/ui/controlStyles';
 import { useLiftAfterHoldGuard } from '@/components/ui/liftAfterHold';
 import { ItemInfoLink } from '@/features/entities';
 import { formatUnitVolume } from '@/lib/volume';
-import { securityStatusColor } from '@/engine/securityStatus';
+import { SecurityStatus } from '@/components/SecurityStatus';
 import { formatBadge } from './assetBrowserFormat';
 import { PlaceRowMenuItems } from './PlaceRowMenuItems';
 import { placeMenuActions } from './placeRowMenu';
@@ -45,15 +48,7 @@ interface SecurityValueProps {
 
 export function SecurityValue({ security }: SecurityValueProps) {
   if (security === null || security === undefined) return null;
-  const value = fixed1(security);
-  return (
-    <span
-      className="shrink-0 text-[0.6875rem] font-semibold tabular-nums"
-      style={{ color: securityStatusColor(security) }}
-    >
-      {value}
-    </span>
-  );
+  return <SecurityStatus security={security} className="shrink-0 text-[0.6875rem]" />;
 }
 
 interface JumpsAwayTextProps {
@@ -187,7 +182,12 @@ export function LocationRow({
   const navigate = useNavigate();
   const pinned = pinState !== 'unpinned';
   const row = (
-    <div className="relative flex items-center gap-2 border-b border-line pr-2 pl-3 hover:bg-panel-2">
+    <div
+      className={cx(
+        'relative flex items-center gap-2 border-b border-line pr-2 pl-3',
+        rowInteractiveClassName
+      )}
+    >
       {selectMode && (
         <span className="relative z-10 flex">
           <SelectionCheckbox
@@ -231,7 +231,12 @@ export function LocationRow({
             <span aria-hidden="true">·</span>
             <span className="tabular-nums">{t('assets.itemCount', { count: itemCount })}</span>
             <span aria-hidden="true">·</span>
-            <span className="tabular-nums text-isk-pos">
+            <span
+              className={cx(
+                'tabular-nums',
+                estimatedValue === 0 ? 'text-text-faint' : 'text-isk-pos'
+              )}
+            >
               <IskAmount value={estimatedValue} decimals={0} />
             </span>
           </span>
@@ -242,7 +247,9 @@ export function LocationRow({
             <span className="sr-only">{t(`assets.pin.${pinState}`)}</span>
           </span>
         )}
-        <Icon.Descend size={Icon.ICON_SIZE.md} className={rowCaretClassName} />
+        {actions.length < 2 && (
+          <Icon.Descend size={Icon.ICON_SIZE.md} className={rowCaretClassName} />
+        )}
       </div>
       {actions.length >= 2 && (
         <span className="relative z-10 flex">
@@ -313,7 +320,9 @@ export function ContainerRow({
   const name = gameName ?? label;
   const hasMenu = actions.length >= 2 || extraItems !== undefined;
   const row = (
-    <div className="flex items-center gap-2 border-b border-line pl-3 hover:bg-panel-2">
+    <div
+      className={cx('flex items-center gap-2 border-b border-line pl-3', rowInteractiveClassName)}
+    >
       {selectMode && (
         <SelectionCheckbox
           state={selectionState}
@@ -349,7 +358,7 @@ export function ContainerRow({
         <span className="shrink-0 text-[0.6875rem] text-text-dim tabular-nums">
           {formatBadge({ itemCount, estimatedValue }, t)}
         </span>
-        <Icon.Descend size={Icon.ICON_SIZE.sm} className={rowCaretClassName} />
+        {!hasMenu && <Icon.Descend size={Icon.ICON_SIZE.sm} className={rowCaretClassName} />}
       </Link>
       {hasMenu && (
         <span className="flex pr-2">
@@ -413,6 +422,7 @@ export function ItemColumnLabels({ showCost = false, sort, onSort, t }: ItemColu
         className={cx(
           cellClass,
           'inline-flex items-center gap-1 hover:text-text',
+          id !== 'volume' && 'uppercase',
           id !== 'name' && 'justify-end',
           focusRingInsetClassName
         )}
@@ -555,7 +565,9 @@ export function ItemRow({
   const volumeText =
     unitVolume === undefined ? t('assets.unknownValue') : formatUnitVolume(unitVolume);
   return (
-    <div className="flex items-center gap-2 border-b border-line pl-3 hover:bg-panel-2">
+    <div
+      className={cx('flex items-center gap-2 border-b border-line pl-3', rowInteractiveClassName)}
+    >
       {selectMode && (
         <SelectionCheckbox
           state={selectionState}
@@ -681,7 +693,7 @@ export function SearchResultRow({
   t,
 }: SearchResultRowProps) {
   return (
-    <div className="border-b border-line hover:bg-panel-2">
+    <div className={cx('border-b border-line', rowInteractiveClassName)}>
       {wrap(
         <div className="flex items-center">
           <Link

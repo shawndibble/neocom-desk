@@ -286,12 +286,6 @@ const LABEL_KEY_BY_PATH = Object.fromEntries(
   NAV_PAGES.map((page) => [page.path, page.labelKey])
 ) as Record<NavPagePath, string>;
 
-export const PARENT_PAGE_PATHS: ReadonlySet<string> = new Set(
-  NAV_PAGES.map((page) => page.path as string).filter((path) =>
-    NAV_PAGES.some((other) => other.path.startsWith(`${path}/`))
-  )
-);
-
 export function navPageLabelKey(path: NavPagePath): string {
   return LABEL_KEY_BY_PATH[path];
 }

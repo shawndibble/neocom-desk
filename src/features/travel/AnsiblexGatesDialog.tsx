@@ -174,7 +174,7 @@ export function AnsiblexGatesDialog({
   }
 
   return (
-    <Modal open onClose={onClose} title={t('travel.bridges.title')}>
+    <Modal open onClose={onClose} title={t('travel.bridges.title')} dirty={pasted.trim() !== ''}>
       <div className="space-y-5 text-sm">
         <p className="text-text-dim">{t('travel.bridges.localOnly')}</p>
 

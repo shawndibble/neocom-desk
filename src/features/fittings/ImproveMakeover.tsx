@@ -5,6 +5,7 @@ import { Checkbox, IskAmount, TypeIcon } from '@/components/ui';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
 import type { ImproveCandidate } from '@/engine/fittings/improve';
 import { moveKey } from '@/engine/fittings/improve';
+import { resourceTight } from '@/engine/fittings/skillGaps';
 import type { Makeover } from '@/engine/fittings/improve';
 import type { FittingStats } from '@/engine/fittings/types';
 import { cx } from '@/lib/cx';
@@ -51,7 +52,7 @@ function capacitorTone(before: FittingStats, after: FittingStats): Tone {
   return now.stable ? 'up' : 'over';
 }
 const resourceTone = (used: number, total: number): Tone =>
-  used > total ? 'over' : total > 0 && used / total >= 0.98 ? 'tight' : 'same';
+  used > total ? 'over' : resourceTight(used, total) ? 'tight' : 'same';
 
 function figuresOf(t: TFunction, before: FittingStats, after: FittingStats): Figure[] {
   const cap = (s: FittingStats) =>

@@ -123,6 +123,11 @@ export function SharedLink() {
             title={t('share.unsupportedTitle')}
             hint={t('share.unsupportedHint')}
             className="py-10"
+            action={
+              <Button size="sm" onClick={() => window.location.reload()}>
+                {t('error.reload')}
+              </Button>
+            }
           />
         )}
         {result?.ok === false && result.reason === 'failed' && (

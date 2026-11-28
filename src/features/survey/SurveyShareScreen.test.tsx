@@ -89,7 +89,7 @@ describe('SurveyShareScreen details', () => {
     noteStartedHere(ID);
     renderScreen();
     await openDetails();
-    fireEvent.change(await screen.findByLabelText('Moon tax payee'), {
+    fireEvent.change(await screen.findByLabelText('Moon tax Payee'), {
       target: { value: 'Bob Corp' },
     });
     const rate = screen.getByLabelText('Moon tax rate (%)');
@@ -110,7 +110,7 @@ describe('SurveyShareScreen details', () => {
   it('offers no editor to anyone else', async () => {
     renderScreen();
     await screen.findByText('0% mined');
-    expect(screen.queryByLabelText('Moon tax payee')).toBeNull();
+    expect(screen.queryByLabelText('Moon tax Payee')).toBeNull();
   });
 
   it('starts folded when this device just started the survey and no details are set', async () => {

@@ -12,10 +12,12 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
+/** @summary A titled panel with body text. */
 export const Titled: Story = {
   args: { title: 'Wallet balance', children: 'Body content sits here.' },
 };
 
+/** @summary A header with a one-line meta read beside the title. */
 export const WithMeta: Story = {
   args: {
     title: 'Active jobs',
@@ -24,10 +26,12 @@ export const WithMeta: Story = {
   },
 };
 
+/** @summary Unpadded body, for flush content such as a table. */
 export const Flush: Story = {
   args: { title: 'Flush', padded: false, children: <div className="p-1">Edge to edge</div> },
 };
 
+/** @summary Header controls at the right: `actions` hold `IconButton`s that act on the panel. */
 export const WithActions: Story = {
   args: {
     title: 'Open orders',
@@ -36,6 +40,7 @@ export const WithActions: Story = {
   },
 };
 
+/** @summary Anti-pattern: a Panel nested in a Panel. */
 export const NestedPanel: Story = {
   tags: ['!manifest'],
   args: {

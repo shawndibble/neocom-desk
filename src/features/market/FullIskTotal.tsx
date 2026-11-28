@@ -1,4 +1,4 @@
-import { LiveNote } from '@/components/ui/LiveStatus';
+import { Toast } from '@/components/ui/Toast';
 import { useTranslation } from 'react-i18next';
 import { focusRingClassName, interactiveClassName } from '@/components/ui/controlStyles';
 import { writeToClipboard } from '@/lib/clipboard';
@@ -35,14 +35,7 @@ export function FullIskTotal({ value }: { value: number }) {
       >
         {t('market.appraisal.totalFull', { full, short })}
       </button>
-      {copied && (
-        <LiveNote
-          as="span"
-          className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-1 -translate-x-1/2 rounded-xs border border-line bg-panel-2 px-2 py-0.5 text-[0.6875rem] font-medium whitespace-nowrap text-text normal-case shadow-md"
-        >
-          {t('market.appraisal.copiedToClipboard')}
-        </LiveNote>
-      )}
+      {copied && <Toast message={t('market.appraisal.copiedToClipboard')} />}
     </span>
   );
 }

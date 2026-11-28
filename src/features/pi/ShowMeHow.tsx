@@ -3,7 +3,7 @@ import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { formatCount } from '@/lib/formatCount';
 import { useEffect, useRef, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Checkbox, IskAmount, TypeIcon } from '@/components/ui';
+import { Button, Checkbox, IskAmount, TypeIcon, Spinner } from '@/components/ui';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
 import type { PlanetType } from '@/engine/pi/goalTypes';
@@ -152,7 +152,7 @@ function FindStep({
           </label>
           <div aria-live="polite">
             {state.status === 'loading' ? (
-              <p className="text-xs text-text-dim">{t('common.loading')}</p>
+              <Spinner size="sm" showLabel className="text-xs" />
             ) : state.status === 'failed' ? (
               <p className="text-xs text-text-dim">{t('piPlan.find.failed')}</p>
             ) : state.systems.length === 0 ? (

@@ -20,8 +20,11 @@ export function SurveyStartTemplates({
   const selected = templates.find((template) => template.id === selectedId);
   return (
     <div className="flex flex-col items-center gap-2 text-center">
-      <p className="text-sm text-text-dim">{t('survey.templates.startFrom')}</p>
-      <div className="flex flex-wrap justify-center gap-2">
+      <div
+        role="group"
+        aria-label={t('survey.templates.menu')}
+        className="flex flex-wrap justify-center gap-2"
+      >
         {templates.map((template) => (
           <FilterChip
             key={template.id}

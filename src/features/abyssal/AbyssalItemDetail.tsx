@@ -38,6 +38,7 @@ import { useAttributeDictionary } from '@/features/fittings/useAttributeDictiona
 import { groupMutaplasmidsByStrain } from '@/engine/fittings/mutationEdit';
 import { useMutaplasmidLookup } from './mutaplasmidData';
 import { useDynamicItemMutation, type DynamicItemState } from './useDynamicItem';
+import { TableScroll } from '@/components/ui/TableScroll';
 
 const SECTION_HEADING = `border-b border-line pb-1 ${eyebrowClassName}`;
 
@@ -384,7 +385,7 @@ function AbyssalTypeSection({
             <p className="mt-2 text-xs text-text-dim">
               {t('market.itemDetail.abyssal.rangesHint', { base: baseName })}
             </p>
-            <div className="mt-1 overflow-x-auto">
+            <TableScroll className="mt-1">
               <DataTable
                 label={t('market.itemDetail.abyssal.rangesTableLabel', { base: baseName })}
                 columns={columns}
@@ -393,7 +394,7 @@ function AbyssalTypeSection({
                 density="compact"
                 responsive="table"
               />
-            </div>
+            </TableScroll>
           </>
         )}
       </Section>
@@ -524,7 +525,7 @@ function OwnedRollsSection({
       ) : rows.length === 0 ? (
         <p className="mt-2 text-xs text-text-dim">{t('market.itemDetail.abyssal.noRolls')}</p>
       ) : (
-        <div className="mt-2 w-fit max-w-full overflow-x-auto">
+        <TableScroll className="mt-2 w-fit max-w-full">
           <DataTable
             label={t('market.itemDetail.abyssal.rollsTitle')}
             columns={columns}
@@ -533,7 +534,7 @@ function OwnedRollsSection({
             density="compact"
             responsive="table"
           />
-        </div>
+        </TableScroll>
       )}
     </Section>
   );

@@ -10,6 +10,8 @@ import { esiKillmailLink } from './srpMemberModel';
 
 const granted = vi.hoisted(() => ({ value: true as boolean | undefined }));
 vi.mock('@/app/useGrantedScopes', () => ({ useEndpointsGranted: () => granted.value }));
+const gate = vi.hoisted(() => ({ value: { status: 'denied', reason: 'capability' } as object }));
+vi.mock('../useCorpRouteGate', () => ({ useCorpRouteGate: () => gate.value }));
 vi.mock('@/features/character/typeNames', () => ({
   loadTypeNames: async (ids: number[]) =>
     new Map(
@@ -41,6 +43,7 @@ function setup(options: Parameters<typeof createSrpMemberFixture>[1] = {}) {
 
 beforeEach(() => {
   granted.value = true;
+  gate.value = { status: 'denied', reason: 'capability' };
 });
 afterEach(() => {
   cleanup();
@@ -54,6 +57,24 @@ describe('MemberSrp', () => {
       await screen.findByText('Ship replacement (SRP) is not set up for your corporation')
     ).toBeTruthy();
     expect(screen.queryByLabelText('Killmail link')).toBeNull();
+  });
+
+  it('gives an officer who can configure SRP a link to set it up', async () => {
+    gate.value = { status: 'ready' };
+    setup({ enabled: false });
+    expect(await screen.findByRole('link', { name: 'Set up SRP' })).toHaveAttribute(
+      'href',
+      '/corp/srp/settings'
+    );
+    expect(screen.getByText('Turn it on and set the rules in SRP settings.')).toBeTruthy();
+    expect(screen.queryByText(/Ask a director/)).toBeNull();
+  });
+
+  it('shows no set-up link to a member who cannot configure SRP', async () => {
+    setup({ enabled: false });
+    await screen.findByText('Ship replacement (SRP) is not set up for your corporation');
+    expect(screen.queryByRole('link', { name: 'Set up SRP' })).toBeNull();
+    expect(screen.getByText(/Ask a director/)).toBeTruthy();
   });
 
   it('lists lost ships with their outcome and My claims with state, amount and reason', async () => {

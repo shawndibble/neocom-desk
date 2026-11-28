@@ -20,7 +20,6 @@ import {
 } from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
-import { useIsPhone } from '@/lib/useIsPhone';
 import { MINING_YIELD_RANGES, type MiningYieldRange } from '@/engine/miningTax/yieldRange';
 import { basisSide, isNowBasis, type PriceBasis } from '@/engine/miningTax/priceBasis';
 import { CHART_METRICS, type ChartMetric } from './chartMetricPref';
@@ -187,7 +186,6 @@ export function ValueMenu({
 
 export function SettingsSheet({ children }: { children: ReactNode }) {
   const { t } = useTranslation();
-  const isPhone = useIsPhone();
   const [open, setOpen] = useState(false);
   const title = t('miningTax.overview.settingsTitle');
   return (
@@ -198,12 +196,7 @@ export function SettingsSheet({ children }: { children: ReactNode }) {
         onClick={() => setOpen(true)}
         aria-haspopup="dialog"
       />
-      <Modal
-        open={open}
-        onClose={() => setOpen(false)}
-        title={title}
-        placement={isPhone ? 'sheet' : 'center'}
-      >
+      <Modal open={open} onClose={() => setOpen(false)} title={title}>
         <div className="space-y-4">{children}</div>
       </Modal>
     </>

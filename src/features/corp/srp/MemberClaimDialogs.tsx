@@ -4,7 +4,6 @@ import { Button, FieldError, Modal, TextArea, TextInput, Tooltip } from '@/compo
 import { ExternalLink } from '@/components/ui/ExternalLink';
 import { SystemLink } from '@/features/entities';
 import { formatIsk } from '@/lib/isk';
-import { useIsPhone } from '@/lib/useIsPhone';
 import { useTimeZone } from '@/lib/timeFormat';
 import { formatDateOnly } from '@/lib/timestamp';
 import { ClaimStatePill } from './MemberClaimsList';
@@ -37,7 +36,6 @@ export function RefileDialog({
   onClose,
 }: RefileDialogProps) {
   const { t } = useTranslation();
-  const phone = useIsPhone();
   const noteId = useId();
   const errId = `${noteId}-err`;
   const [note, setNote] = useState('');
@@ -47,7 +45,6 @@ export function RefileDialog({
     <Modal
       open
       onClose={onClose}
-      placement={phone ? 'sheet' : 'center'}
       title={t('srpMember.refile.title', { hull: hullName })}
       footer={
         <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
@@ -129,7 +126,6 @@ export function ClaimDetailDialog({
   onClose,
 }: ClaimDetailDialogProps) {
   const { t } = useTranslation();
-  const phone = useIsPhone();
   const timeZone = useTimeZone();
   const date = (ms: number) => formatDateOnly(new Date(ms), timeZone);
   const timeline = [
@@ -140,7 +136,6 @@ export function ClaimDetailDialog({
     <Modal
       open
       onClose={onClose}
-      placement={phone ? 'sheet' : 'center'}
       title={hullName}
       footer={
         canRefile(claim) ? (

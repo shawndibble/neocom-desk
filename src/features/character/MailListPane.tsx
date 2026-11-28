@@ -121,6 +121,9 @@ export function MailListPane({
                       isSelected={selectedKey === row.key}
                       party={tab === 'sent' ? recipientSummary(header) : sender}
                       timeZone={timeZone}
+                      timeOnly={
+                        section.bucket.kind === 'today' || section.bucket.kind === 'yesterday'
+                      }
                       onOpen={onOpenRow}
                       canOrganize={organize.canOrganize(row)}
                       selecting={organize.selecting}

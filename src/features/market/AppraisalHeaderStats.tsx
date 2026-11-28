@@ -1,3 +1,4 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { fixed2 } from '@/lib/fixedFormat';
 import { usePricesUnavailableLabel } from '@/features/market/usePricesUnavailableLabel';
 import { useState } from 'react';
@@ -11,7 +12,8 @@ import {
 import { writeToClipboard } from '@/lib/clipboard';
 import { formatIsk } from '@/lib/isk';
 import { useCopyFeedback } from '@/lib/useCopyFeedback';
-import { IskAmount, LiveStatus, StatChip, StatChips, Tooltip } from '@/components/ui';
+import { IskAmount, StatChip, StatChips, Tooltip } from '@/components/ui';
+import { Toast } from '@/components/ui/Toast';
 import type { AppraisalNetTotals, AppraisalTotals, RefineBasis } from '@/engine/market/appraisal';
 import { iskToneClass } from '@/features/character/format';
 import { AppraisalVolumeChip } from './AppraisalVolumeChip';
@@ -41,8 +43,7 @@ interface AppraisalHeaderStatsProps {
   pricesUnavailable?: boolean;
 }
 
-const HEADLINE_SIZE_CLASS =
-  'text-xl @[29rem]:text-sm @[32rem]:text-base @[36rem]:text-lg @[40rem]:text-xl';
+const HEADLINE_SIZE_CLASS = 'text-xl @[29rem]:text-sm @[32rem]:text-base @[40rem]:text-xl';
 
 interface SecondFigure {
   label: string;
@@ -78,23 +79,10 @@ function useCopyFigure(value: number) {
 
 type CopyFigure = ReturnType<typeof useCopyFigure>;
 
-function CopiedFeedback({ figure, className }: { figure: CopyFigure; className: string }) {
-  return (
-    <>
-      <LiveStatus announceKey={figure.copies}>{figure.copiedMessage}</LiveStatus>
-      {figure.copiedMessage !== null && (
-        <span
-          aria-hidden="true"
-          className={cx(
-            'pointer-events-none absolute left-1/2 z-10 -translate-x-1/2 rounded-xs border border-line bg-panel-2 px-2 py-0.5 text-[0.6875rem] font-medium whitespace-nowrap text-text normal-case shadow-md',
-            className
-          )}
-        >
-          {figure.copiedMessage}
-        </span>
-      )}
-    </>
-  );
+function CopiedFeedback({ figure }: { figure: CopyFigure }) {
+  return figure.copiedMessage !== null ? (
+    <Toast message={figure.copiedMessage} instance={figure.copies} />
+  ) : null;
 }
 
 function SecondFigureArea({ title, second }: { title: string; second: SecondFigure }) {
@@ -123,7 +111,7 @@ function SecondFigureArea({ title, second }: { title: string; second: SecondFigu
           </b>
         </button>
       </Tooltip>
-      <CopiedFeedback figure={figure} className="top-full mt-1" />
+      <CopiedFeedback figure={figure} />
     </div>
   );
 }
@@ -156,7 +144,7 @@ function PriceCell({
           rowInteractiveClassName
         )}
       >
-        <h3 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+        <h3 className={eyebrowClassName}>
           <button
             type="button"
             onClick={() => void total.copy()}
@@ -176,7 +164,7 @@ function PriceCell({
           {total.full}
         </span>
         <span className="mb-1 text-[0.6875rem] text-text-dim">{hint}</span>
-        <CopiedFeedback figure={total} className="bottom-full mb-1" />
+        <CopiedFeedback figure={total} />
       </div>
       {second && <SecondFigureArea title={title} second={second} />}
     </section>

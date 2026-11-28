@@ -12,6 +12,8 @@ import {
   TextArea,
   TextInput,
   Tooltip,
+  Field,
+  Fields,
 } from '@/components/ui';
 import {
   MAX_LINES_PER_REQUEST,
@@ -139,6 +141,7 @@ export function ComposeRequestDialog({
   const catalogue: AppraisalCatalogue | null = catalogueLoad.data ?? null;
   const catalogueFailed = catalogueLoad.status === 'failed';
   const [busy, setBusy] = useState(false);
+  const [touched, setTouched] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notify, setNotify] = useState<RequestNotify>(editing?.request.notify ?? DEFAULT_NOTIFY);
   const searchRef = useRef<HTMLInputElement>(null);
@@ -294,9 +297,11 @@ export function ComposeRequestDialog({
             : 'communities.board.compose.title'
       )}
       placement="wide"
+      dirty={touched && !busy}
     >
       <form
         className="space-y-4 text-sm"
+        onInput={() => setTouched(true)}
         onSubmit={(e) => {
           e.preventDefault();
           if (!canSubmit || busy) return;
@@ -306,18 +311,16 @@ export function ComposeRequestDialog({
       >
         <div className="grid gap-3 md:grid-cols-2">
           <LocationPicker value={location} maxLength={MAX_LOCATION_LENGTH} onChange={setLocation} />
-          <label className="block space-y-1">
-            <span className="block text-xs text-text-dim">
-              {t('communities.board.compose.terms')}
-            </span>
-            <TextInput
-              className="w-full"
-              value={terms}
-              maxLength={MAX_TERMS_LENGTH}
-              placeholder={t('communities.board.compose.termsPlaceholder')}
-              onChange={(e) => setTerms(e.target.value)}
-            />
-          </label>
+          <Fields variant="stacked">
+            <Field label={t('communities.board.compose.terms')}>
+              <TextInput
+                value={terms}
+                maxLength={MAX_TERMS_LENGTH}
+                placeholder={t('communities.board.compose.termsPlaceholder')}
+                onChange={(e) => setTerms(e.target.value)}
+              />
+            </Field>
+          </Fields>
         </div>
         {!editing && (
           <label className={cx('flex items-start gap-2', tappableRowClassName)}>
@@ -351,17 +354,16 @@ export function ComposeRequestDialog({
               </LiveNote>
             )}
             {!linesLocked && (
-              <label className="block space-y-1">
-                <span className="block text-xs text-text-dim">
-                  {t('communities.board.compose.paste')}
-                </span>
-                <TextArea
-                  rows={4}
-                  value={text}
-                  aria-describedby={unmatched > 0 ? `${id}-unmatched` : undefined}
-                  onChange={(e) => setText(e.target.value)}
-                />
-              </label>
+              <Fields variant="stacked">
+                <Field label={t('communities.board.compose.paste')}>
+                  <TextArea
+                    rows={4}
+                    value={text}
+                    aria-describedby={unmatched > 0 ? `${id}-unmatched` : undefined}
+                    onChange={(e) => setText(e.target.value)}
+                  />
+                </Field>
+              </Fields>
             )}
             {unmatched > 0 && (
               <p id={`${id}-unmatched`} className="text-xs text-warning">
@@ -502,12 +504,11 @@ export function ComposeRequestDialog({
         {error && <InlineError>{error}</InlineError>}
         <LiveStatus announceKey={announce.key}>{announce.text}</LiveStatus>
         <DialogFooter>
-          <Button size="sm" variant="ghost" aria-disabled={busy || undefined} onClick={onClose}>
+          <Button variant="ghost" aria-disabled={busy || undefined} onClick={onClose}>
             {t('common.cancel')}
           </Button>
           <Tooltip content={!canSubmit ? t('common.needsInput') : null}>
             <Button
-              size="sm"
               variant="primary"
               type="submit"
               loading={busy}

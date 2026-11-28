@@ -34,6 +34,7 @@ const openPopover: Story['play'] = async ({ canvasElement }) => {
   await expect(within(document.body).getByRole('searchbox')).toBeInTheDocument();
 };
 
+/** @summary Searchable many-of-many picker in a popover, with a type-to-filter box and keyboard highlight. §6c cue: `CaretDown` inside field chrome opens a list to pick from. */
 const meta = {
   title: 'ui/MultiSelect',
   component: MultiSelect<Id>,
@@ -54,12 +55,15 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
+/** @summary Closed: the standard select-shaped trigger, the field name and a dim count of the picks, with `SelectTrigger`'s border, height, text case and chevron. */
 export const Closed: Story = {};
 
+/** @summary Open with one option ticked; the ticked options carry a check, not colour alone (§6c States, Selected). */
 export const Active: Story = { args: { active: true } };
 
 export const Open: Story = { play: openPopover };
 
+/** @summary `sm` trigger whose visible text names itself ("All hubs"), for a dense filter row. */
 export const SmallSelfNamedTrigger: Story = {
   args: {
     size: 'sm',
@@ -70,6 +74,7 @@ export const SmallSelfNamedTrigger: Story = {
   },
 };
 
+/** @summary Grouped options under non-selectable group headings. */
 export const Grouped: Story = {
   args: {
     options: undefined,
@@ -81,6 +86,7 @@ export const Grouped: Story = {
   play: openPopover,
 };
 
+/** @summary Empty result: the filter matches nothing, so `noResultsLabel` shows instead of a blank list (§6c States, empty). */
 export const NoResults: Story = {
   play: async (context) => {
     await openPopover(context);

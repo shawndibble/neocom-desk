@@ -161,7 +161,7 @@ export function SrpSettingsEditor({
   const windowErrId = `${uid}-win-err`;
 
   return (
-    <div className="grid gap-4">
+    <div className="grid max-w-5xl gap-4 xl:[--fields-label:14rem]">
       <Panel title={t('srp.settings.programTitle')}>
         <div className="grid gap-4">
           <SettingsHint>{t('srp.settings.directorsOnly')}</SettingsHint>

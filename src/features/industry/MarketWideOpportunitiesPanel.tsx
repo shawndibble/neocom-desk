@@ -50,6 +50,7 @@ import { useTableExport } from '@/components/ui/useTableExport';
 import { SORT_VALUE, useMarketWideColumns } from './useMarketWideColumns';
 import { useMarketWideFilter } from './useMarketWideFilter';
 import { useMarketWideRanking } from './useMarketWideRanking';
+import { TableScroll } from '@/components/ui/TableScroll';
 
 interface MarketWideOpportunitiesPanelProps {
   hub: TradeHub;
@@ -319,7 +320,7 @@ export function MarketWideOpportunitiesPanel({
           <EmptyState
             title={t('industry.marketOpportunitiesEmptyTitle')}
             hint={t('industry.marketOpportunitiesEmptyHint')}
-            className="py-8"
+            className="py-0!"
           />
         ) : rows.length === 0 ? (
           <div className="flex flex-col gap-2">
@@ -340,7 +341,7 @@ export function MarketWideOpportunitiesPanel({
               </p>
             )}
             {isDesktop ? (
-              <div className="overflow-x-auto">
+              <TableScroll>
                 <DataTable
                   {...marketWideExport.tableProps}
                   columns={shownColumns}
@@ -353,7 +354,7 @@ export function MarketWideOpportunitiesPanel({
                   label={t('industry.marketOpportunitiesTitle')}
                   {...sortProps}
                 />
-              </div>
+              </TableScroll>
             ) : (
               <MobileMarketWideList
                 rows={shownRows}

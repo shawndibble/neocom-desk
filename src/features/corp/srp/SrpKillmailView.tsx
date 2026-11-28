@@ -168,7 +168,7 @@ function Fit({
       {groups.length === 0 && <p className="text-xs text-text-dim">{t('srpKillmail.noFit')}</p>}
       {groups.map((g) => (
         <div key={g.slot}>
-          <div className="text-xs uppercase tracking-wide text-text-dim">
+          <div className="text-xs uppercase tracking-widest text-text-dim">
             {slotLabel(t, g.slot)}
           </div>
           <ul className="text-sm">

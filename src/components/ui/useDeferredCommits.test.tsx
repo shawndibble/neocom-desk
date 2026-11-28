@@ -16,6 +16,15 @@ describe('useDeferredCommits', () => {
     expect(result.current.hiddenIds.has('a')).toBe(true);
   });
 
+  it('drops a held item from a list until it is undone', () => {
+    const { result } = renderHook(() => useDeferredCommits());
+    const list = [{ id: 'a' }, { id: 'b' }];
+    act(() => result.current.defer(item('a')));
+    expect(result.current.visible(list)).toEqual([{ id: 'b' }]);
+    act(() => result.current.toast.onUndo('a'));
+    expect(result.current.visible(list)).toEqual(list);
+  });
+
   it('undo drops the item without committing and shows the id again', () => {
     const { result } = renderHook(() => useDeferredCommits());
     const a = item('a');

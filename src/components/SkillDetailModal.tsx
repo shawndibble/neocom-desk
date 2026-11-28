@@ -15,6 +15,7 @@ import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
 import { useItemUnlocks } from '@/features/skills/loadItemUnlocks';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useSkillDetailModalStore } from '@/stores/skillDetailModal';
+import { romanLevel } from '@/engine/projection';
 import type { EngineSkill, TrainedSkill } from '@/engine/types';
 
 type ModalState =
@@ -97,6 +98,8 @@ export function SkillDetailModal() {
   if (!request) return null;
 
   const title = state.status === 'ready' ? state.data.name : t('skills.detail.title');
+  const trainedLevel =
+    state.status === 'ready' ? (state.trainedSkills.get(request.typeID)?.level ?? 0) : 0;
 
   return (
     <Modal
@@ -145,11 +148,12 @@ export function SkillDetailModal() {
                 <p className="text-sm whitespace-pre-line text-text">{state.data.description}</p>
               )}
               <p className="text-xs text-text-dim">
-                {t('skills.inspector.facts', {
+                {t(trainedLevel > 0 ? 'skills.inspector.factsTrained' : 'skills.inspector.facts', {
                   group: state.data.groupName,
                   rank: state.data.rank,
                   primary: t(`skills.attr.${state.data.primaryAttr}`),
                   secondary: t(`skills.attr.${state.data.secondaryAttr}`),
+                  level: romanLevel(trainedLevel),
                 })}
               </p>
             </div>
@@ -169,7 +173,7 @@ export function SkillDetailModal() {
               prereqs={state.data.prereqs}
               unlocks={state.data.unlocks}
               itemUnlocks={itemUnlocks}
-              trainedLevel={state.trainedSkills.get(request.typeID)?.level ?? 0}
+              trainedLevel={trainedLevel}
               planEntries={request.planEntries}
             />
           </div>

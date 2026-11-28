@@ -96,7 +96,9 @@ export function OverviewNext({ summary }: { summary: OverviewSummary }) {
     <>
       <span className="text-text-dim">{t('overview.header.next')}</span>
       {countdown}
-      <span className="min-w-0 truncate text-text-dim normal-case md:max-w-40">{next.note}</span>
+      <span className="min-w-0 truncate text-text-dim normal-case md:max-w-40 xl:max-w-80">
+        {next.note}
+      </span>
     </>
   );
   return (

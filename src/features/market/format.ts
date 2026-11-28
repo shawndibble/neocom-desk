@@ -1,5 +1,6 @@
 import { formatMarketIsk } from '@/lib/isk';
-import { fixedFormat } from '@/lib/fixedFormat';
+import { fixed1, fixedFormat } from '@/lib/fixedFormat';
+import { shownSecurity } from '@/engine/securityStatus';
 import { createNumberFormat } from '@/lib/numberLocale';
 import { idReferenceKind } from '@/engine/market/attributeUnits';
 import type { ResolvedOrderLocation } from '@/engine/market/orderBook';
@@ -47,7 +48,7 @@ export function formatOrderLocationText(
   location: ResolvedOrderLocation,
   unknownStructureLabel: string
 ): string {
-  return `${location.stationName ?? unknownStructureLabel} · ${location.systemName} (${location.security.toFixed(1)})`;
+  return `${location.stationName ?? unknownStructureLabel} · ${location.systemName} (${fixed1(shownSecurity(location.security))})`;
 }
 
 interface HoldFigures {

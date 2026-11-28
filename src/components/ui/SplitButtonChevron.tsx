@@ -10,6 +10,7 @@ interface SplitButtonChevronProps extends Omit<
   label: string;
 }
 
+/** @summary The caret segment of a primary split button: squared left corners, a divider, 4px padding. */
 export const SplitButtonChevron = forwardRef<HTMLButtonElement, SplitButtonChevronProps>(
   function SplitButtonChevron({ label, className, ...rest }, ref) {
     return (

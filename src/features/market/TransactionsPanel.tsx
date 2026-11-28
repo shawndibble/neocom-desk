@@ -9,7 +9,6 @@ import {
   CachedEmptyState,
   ColumnPickerMenu,
   EmptyState,
-  SegmentedControl,
   IconButton,
   Panel,
   Spinner,
@@ -84,6 +83,7 @@ import type { PageHeaderSlots } from './pageHeaderSlots';
 import { useHighlightParam } from '@/lib/useHighlightParam';
 import { highlightedTransactionId } from './transactionHighlight';
 import { formatCount } from '@/lib/formatCount';
+import { TableScroll } from '@/components/ui/TableScroll';
 
 const MARGIN_GAP_COPY: Record<MarginGap, { label: string; hint: string }> = {
   noBuy: { label: 'wallet.marginGap.noBuy', hint: 'wallet.marginGapHint.noBuy' },
@@ -367,6 +367,7 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
       isPhone,
       nameFor,
       widths: numberWidths,
+      stickyStartOnPanel: true,
     });
     return [
       date,
@@ -609,16 +610,6 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
               resultCount={filteredTransactions.length}
               actions={
                 <>
-                  <SegmentedControl
-                    label={t('wallet.viewLabel')}
-                    uppercase={false}
-                    options={[
-                      { value: 'flat', label: t('wallet.viewFlat') },
-                      { value: 'station', label: t('wallet.viewByStation') },
-                    ]}
-                    value={filter.view}
-                    onChange={(view) => setFilter({ ...filter, view })}
-                  />
                   {filter.view === 'station' && (
                     <StationSortMenu
                       value={filter.stationsBy}
@@ -650,7 +641,7 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
                 }
               />
             ) : (
-              <div className="overflow-x-auto">
+              <TableScroll>
                 <DataTable
                   {...transactionsExport.tableProps}
                   label={t('wallet.transactionsTab')}
@@ -664,7 +655,7 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
                   responsive="table"
                   defaultSort={{ columnId: 'date', direction: 'desc' }}
                 />
-              </div>
+              </TableScroll>
             )}
           </>
         )}

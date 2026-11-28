@@ -136,6 +136,7 @@ export function AddStockItemDialog({
       onClose={onClose}
       title={t('stockTargets.add.searchTitle', { name: listName })}
       initialFocusRef={searchRef}
+      dirty={picked !== null || quantity !== ''}
     >
       <form
         className="space-y-3"
@@ -242,6 +243,7 @@ export function PasteStockItemsDialog({
       onClose={onClose}
       title={t('stockTargets.add.pasteTitle', { name: listName })}
       initialFocusRef={fieldRef}
+      dirty={text.trim() !== '' && !busy}
     >
       <form
         className="space-y-3"

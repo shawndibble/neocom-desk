@@ -1,5 +1,6 @@
 import { highlightHref } from '@/lib/highlightParam';
 import { fixed1 } from '@/lib/fixedFormat';
+import { shownSecurity } from '@/engine/securityStatus';
 import { LAYER_LABEL_KEYS } from '@/features/netWorth/layerMeta';
 import { CLONE_NOTE_KEY } from '@/features/character/cloneVerdictGate';
 import { journalRefTypeBreakdown } from '@/features/character/walletJournalFilter';
@@ -594,7 +595,7 @@ const location: Builder = (feeds, { t }) => {
   const security =
     system?.security === null || system?.security === undefined
       ? undefined
-      : t(`${D}.location.security`, { value: fixed1(system.security) });
+      : t(`${D}.location.security`, { value: fixed1(shownSecurity(system.security)) });
   const rows: ListRow[] = system
     ? [
         {

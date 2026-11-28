@@ -8,6 +8,7 @@ import {
 } from '@/engine/corpTaxBook/closedDayFix';
 import type { OreLine } from '@/engine/miningTax/types';
 import { formatCount } from '@/lib/formatCount';
+import { Well } from '@/components/ui/Well';
 import { closedConflictCorps, type ConflictNames } from './closedConflicts';
 import { typeLabel } from './typeLabel';
 
@@ -121,11 +122,7 @@ export function ClosedDayConflictNotice({
   const [confirming, setConfirming] = useState(false);
   const corp = closedConflictCorps(plan, names);
   return (
-    <div
-      role="region"
-      aria-label={t(k('region'))}
-      className="space-y-2 rounded-xs border border-warning/60 bg-warning/10 p-2 text-xs"
-    >
+    <Well tone="warning" role="region" aria-label={t(k('region'))} className="space-y-2 text-xs">
       <p className="font-semibold text-warning">{t(k('title'), { corp })}</p>
       <ClosedDayFacts plan={plan} names={names} />
       {countsFrom && <p className="text-text-dim">{countsFrom}</p>}
@@ -169,6 +166,6 @@ export function ClosedDayConflictNotice({
           {disputeAction}
         </div>
       )}
-    </div>
+    </Well>
   );
 }

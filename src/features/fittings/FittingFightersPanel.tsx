@@ -131,7 +131,6 @@ export function FittingFightersPanel({
                 <IconButton
                   variant="plain"
                   size="sm"
-                  tone="danger"
                   icon={<Icon.Close />}
                   label={t('fittings.fighters.remove', { name })}
                   onClick={() => onChange((f) => removeSquadron(f, index))}

@@ -19,7 +19,8 @@ import { DataTable, type DataTableColumn } from '@/components/ui';
 import { COMPACT_ISK_Y_AXIS_MARGIN_LEFT, COMPACT_ISK_Y_AXIS_WIDTH } from '@/lib/chartAxis';
 import { DAY_MS } from '@/lib/age';
 import { formatIsk, formatIskCompact } from '@/lib/isk';
-import { formatDateOnly } from '@/lib/timestamp';
+import { formatDateTick, formatDateWithYear } from '@/lib/formatDateTick';
+import { utcDay } from '@/engine/localDay';
 import { timeAxisTicks } from '@/engine/wallet/timeTicks';
 import { lineKey, tooltipLines, type LineRow, type StackRow } from '@/engine/netWorth/chartRows';
 import { LAYER_IDS, type LayerId } from '@/engine/netWorth/series';
@@ -49,7 +50,11 @@ export type NetWorthChartProps = { label: string } & (
 );
 
 function dayLabel(x: number): string {
-  return formatDateOnly(new Date(x), 'UTC');
+  return formatDateWithYear(utcDay(x));
+}
+
+function dayTick(x: number): string {
+  return formatDateTick(utcDay(x));
 }
 
 function estimatedRuns(rows: readonly StackRow[]): [number, number][] {
@@ -161,7 +166,7 @@ export default function NetWorthChart(props: NetWorthChartProps) {
       scale="time"
       domain={[axis.min, axis.max]}
       ticks={axis.ticks}
-      tickFormatter={dayLabel}
+      tickFormatter={dayTick}
       stroke="var(--color-text-dim)"
       tick={{ fontSize: '0.6875rem', fill: 'var(--color-text-dim)' }}
     />

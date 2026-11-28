@@ -147,7 +147,7 @@ export function ComingUpRail({
           </button>
         )
       }
-      className="min-w-0 md:w-[30rem] md:min-w-72 md:max-w-[45%] md:shrink-0"
+      className="min-w-0 lg:w-[30rem] lg:min-w-72 lg:max-w-[45%] lg:shrink-0"
     >
       <div className="border-b border-line px-3 py-2">
         <CalendarClocks />

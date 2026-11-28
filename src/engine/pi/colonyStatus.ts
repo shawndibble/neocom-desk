@@ -44,28 +44,6 @@ export function colonyAttention(
   return 'healthy';
 }
 
-export interface AltGroupSummary {
-  stoppedCount: number;
-  nextExpiryMs: number | null;
-}
-
-export function altGroupSummary(statuses: readonly ColonyStatus[]): AltGroupSummary {
-  let stoppedCount = 0;
-  let nextExpiryMs: number | null = null;
-  for (const status of statuses) {
-    if (status.idle) {
-      stoppedCount += 1;
-      continue;
-    }
-    if (status.soonestExpiryMs !== null) {
-      if (nextExpiryMs === null || status.soonestExpiryMs < nextExpiryMs) {
-        nextExpiryMs = status.soonestExpiryMs;
-      }
-    }
-  }
-  return { stoppedCount, nextExpiryMs };
-}
-
 export const ATTENTION_RANK: Record<ColonyAttention, number> = {
   idle: 0,
   'expiring-soon': 1,

@@ -287,7 +287,7 @@ describe('Market Browser: All regions', () => {
     );
   });
 
-  it('offers the Distance filter before any item is picked, named after the header scope', async () => {
+  it('offers the Distance filter before any item is picked, its no-range option named as a range', async () => {
     await db.settings.put({ key: ACTIVE_CHARACTER_KEY, value: 1 });
     loadCharacterSolarSystemId.mockResolvedValue(JITA);
     const user = userEvent.setup({ delay: null });
@@ -295,7 +295,7 @@ describe('Market Browser: All regions', () => {
     renderMarketRoute();
 
     const distance = await screen.findByRole('combobox', { name: 'Distance' });
-    expect(distance).toHaveTextContent('Jita');
+    expect(distance).toHaveTextContent('Jita station only');
     expect(screen.queryByRole('button', { name: /Change current system/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^Security/ })).not.toBeInTheDocument();
 

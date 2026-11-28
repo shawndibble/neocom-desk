@@ -13,6 +13,10 @@ import {
 } from '@/features/places';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { PlaceLink, SystemLink } from './EntityLink';
+import { Link } from 'react-router-dom';
+import { inlineLinkClassName } from '@/components/ui/controlStyles';
+import { assetHref } from '@/features/assets/assetBrowseModel';
+import { useOwnedAssetIndex } from '@/features/assets/useOwnedAssetIndex';
 
 function useLookup<T>(
   id: number | null | undefined,
@@ -48,6 +52,7 @@ export function PlaceInfoDialog({ id, onClose }: { id: number; onClose: () => vo
   const name = kind === 'region' ? regionName : detail?.name;
   const readFailed = isLocation ? place.status === 'failed' : regionLookup.failed;
   const retry = isLocation ? place.retry : regionLookup.retry;
+  const ownedHere = useOwnedAssetIndex(isLocation && scopeId !== null)?.placeIds.has(id) === true;
 
   let body;
   if (kind !== null && readFailed) {
@@ -88,6 +93,13 @@ export function PlaceInfoDialog({ id, onClose }: { id: number; onClose: () => vo
             </>
           )}
         </dl>
+        {ownedHere && (
+          <p className="text-sm">
+            <Link to={assetHref(id, [], '?chars=all')} className={inlineLinkClassName}>
+              {t('placeInfo.yourAssets')}
+            </Link>
+          </p>
+        )}
         {isLocation && <SetDestinationButton locationId={id} placeName={name} />}
       </div>
     );

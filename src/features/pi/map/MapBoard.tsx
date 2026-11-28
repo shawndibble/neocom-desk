@@ -722,7 +722,7 @@ function PlanetToggle({
         </span>
         <span aria-hidden="true" className="flex min-h-[0.875rem] flex-wrap justify-center gap-0.5">
           {have && (
-            <span className="inline-flex h-3.5 items-center rounded-xs border border-success/50 px-[0.1875rem] text-[0.6875rem] font-semibold tracking-wider text-success uppercase">
+            <span className="inline-flex h-3.5 items-center rounded-xs border border-success/50 px-[0.1875rem] text-[0.6875rem] font-semibold tracking-widest text-success uppercase">
               {t('piMap.tagHave')}
             </span>
           )}
@@ -735,12 +735,12 @@ function PlanetToggle({
             </span>
           ))}
           {props.tracedNeed && !props.tracedNeed.have && (
-            <span className="inline-flex h-3.5 items-center rounded-xs border border-danger/50 px-[0.1875rem] text-[0.6875rem] font-semibold tracking-wider text-danger uppercase">
+            <span className="inline-flex h-3.5 items-center rounded-xs border border-danger/50 px-[0.1875rem] text-[0.6875rem] font-semibold tracking-widest text-danger uppercase">
               {t('piMap.tagNeed')}
             </span>
           )}
           {props.whatIf && (
-            <span className="inline-flex h-3.5 items-center rounded-xs border border-map-whatif/60 px-[0.1875rem] text-[0.6875rem] font-semibold tracking-wider text-map-whatif uppercase">
+            <span className="inline-flex h-3.5 items-center rounded-xs border border-map-whatif/60 px-[0.1875rem] text-[0.6875rem] font-semibold tracking-widest text-map-whatif uppercase">
               {t('piMap.tagWhatIf')}
             </span>
           )}

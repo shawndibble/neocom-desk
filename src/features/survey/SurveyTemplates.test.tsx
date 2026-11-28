@@ -213,7 +213,7 @@ describe('SurveyStartTemplates', () => {
     const { rerender } = render(
       <SurveyStartTemplates templates={[EFA, BELT]} selectedId={null} onSelect={onSelect} />
     );
-    expect(screen.getByText(/Start from a template/)).toBeTruthy();
+    expect(screen.getByRole('group', { name: 'Templates' })).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Efa moon 4' }));
     expect(onSelect).toHaveBeenLastCalledWith('efa');
 

@@ -26,6 +26,7 @@ import {
 } from '@/features/entities/EntityLink';
 import { cx } from '@/lib/cx';
 import { resolveShowInfo, useItemKind } from './mailShowInfo';
+import { TableScroll } from '@/components/ui/TableScroll';
 
 export const BASE_SIZE_PX = 12;
 
@@ -245,7 +246,7 @@ function BodyBlocks({
           );
         };
         return (
-          <div key={index} className="overflow-x-auto">
+          <TableScroll key={index}>
             <table className="border-collapse tabular-nums">
               <thead>
                 <tr
@@ -286,7 +287,7 @@ function BodyBlocks({
                 ))}
               </tbody>
             </table>
-          </div>
+          </TableScroll>
         );
       })}
     </div>

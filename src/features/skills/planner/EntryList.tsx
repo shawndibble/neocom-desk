@@ -1,5 +1,6 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { Fragment, useMemo } from 'react';
-import { MD_UP_QUERY, useMediaQuery } from '@/lib/useMediaQuery';
+import { MD_UP_QUERY, useMediaQuery, usePrefersReducedMotion } from '@/lib/useMediaQuery';
 import {
   DndContext,
   KeyboardSensor,
@@ -83,6 +84,7 @@ export function EntryList({
 }: EntryListProps) {
   const { t } = useTranslation();
   const isDesktop = useMediaQuery(MD_UP_QUERY);
+  const reducedMotion = usePrefersReducedMotion();
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
@@ -128,7 +130,9 @@ export function EntryList({
       <SortableContext items={sortableIds} strategy={verticalListSortingStrategy}>
         <div className="rounded-xs border border-line">
           {isDesktop && (columns.perLevelTime || columns.cumulativeTime) && (
-            <div className="flex items-center justify-between gap-2 border-b border-line px-2 py-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+            <div
+              className={`${eyebrowClassName} flex items-center justify-between gap-2 border-b border-line px-2 py-1`}
+            >
               <span className="flex-1" />
               {columns.perLevelTime && <span className={TIME_CELL}>{t('plans.columnTakes')}</span>}
               {columns.cumulativeTime && (
@@ -153,6 +157,7 @@ export function EntryList({
                       startDate={startDate}
                       columns={columns}
                       isDesktop={isDesktop}
+                      reducedMotion={reducedMotion}
                       continuation={continuationIds.has(row.id)}
                       onRemove={onRemove}
                       onStageSkillDetail={onStageSkillDetail}
@@ -178,6 +183,7 @@ export function EntryList({
                       startDate={startDate}
                       columns={columns}
                       isDesktop={isDesktop}
+                      reducedMotion={reducedMotion}
                       onPromote={onPromotePrereq}
                       onStageSkillDetail={onStageSkillDetail}
                     />
@@ -188,6 +194,7 @@ export function EntryList({
                       markerIndex={row.markerIndex}
                       attributes={markerAttributesFor?.(row.markerIndex)}
                       implants={markerImplants}
+                      reducedMotion={reducedMotion}
                       onRemove={onRemoveMarker}
                       onEdit={onEditMarker}
                     />

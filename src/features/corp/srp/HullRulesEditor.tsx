@@ -33,6 +33,7 @@ import {
   type SrpSettingsForm,
 } from './srpSettingsForm';
 import type { HullCatalogState } from './useHullCatalog';
+import { TableScroll } from '@/components/ui/TableScroll';
 
 const CHOICES: readonly RuleChoice[] = ['none', ...HULL_RULE_KINDS];
 
@@ -248,13 +249,15 @@ export function HullRulesEditor({
         className={cx(
           'flex min-w-0 items-center gap-1.5 rounded-xs text-left font-semibold',
           focusRingClassName,
-          tall ? 'min-h-9 flex-1' : 'min-h-9'
+          tall ? 'min-h-9 flex-1' : 'min-h-9 flex-wrap'
         )}
       >
         <Caret size={Icon.ICON_SIZE.sm} aria-hidden="true" className="shrink-0" />
-        <span className="min-w-0 break-words">{row.name}</span>
+        <span className={cx('min-w-0', tall ? 'break-words' : 'whitespace-nowrap')}>
+          {row.name}
+        </span>
         {!tall && (
-          <span className="text-xs font-normal text-text-dim">
+          <span className="whitespace-nowrap text-xs font-normal text-text-dim">
             {t('srp.settings.hullRules.hullCount', { count: row.count })}
           </span>
         )}
@@ -285,7 +288,7 @@ export function HullRulesEditor({
       header: t('srp.settings.hullRules.amount'),
       render: (row) =>
         ruleOf(form, row.scope, row.id).kind === 'pay-fixed' ? (
-          <div className="w-56">{iskInput(row)}</div>
+          <div className="w-full min-w-36 max-w-56">{iskInput(row)}</div>
         ) : (
           <span className="text-text-dim">{helper(row)}</span>
         ),
@@ -356,14 +359,16 @@ export function HullRulesEditor({
           {rows.map(phoneLine)}
         </ul>
       ) : (
-        <DataTable
-          label={t('srp.settings.hullRules.tableLabel')}
-          columns={columns}
-          rows={rows}
-          rowKey={(r) => ruleKey(r.scope, r.id)}
-          rowClassName={(r) => (isNotCovered(form, r) ? 'bg-panel-2' : undefined)}
-          stackColumns={1}
-        />
+        <TableScroll>
+          <DataTable
+            label={t('srp.settings.hullRules.tableLabel')}
+            columns={columns}
+            rows={rows}
+            rowKey={(r) => ruleKey(r.scope, r.id)}
+            rowClassName={(r) => (isNotCovered(form, r) ? 'bg-panel-2' : undefined)}
+            stackColumns={1}
+          />
+        </TableScroll>
       )}
     </div>
   );

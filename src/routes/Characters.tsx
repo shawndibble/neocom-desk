@@ -14,7 +14,6 @@ import {
   EmptyState,
   FilterBar,
   IconButton,
-  Modal,
   PageHeader,
   SearchInput,
   Select,
@@ -25,6 +24,7 @@ import {
   Spinner,
   TextInput,
   Toast,
+  ToastStack,
   NeedsConnection,
   SplitButtonChevron,
 } from '@/components/ui';
@@ -87,16 +87,9 @@ import { returnPathAfterSwitch } from '@/features/character/characterSwitchRetur
 import { useCharacterCorpStanding } from '@/features/corp/useCharacterCorpStanding';
 import { useAlertsGrants } from '@/features/notifications/alertsGrant';
 import { isSyncConfigured } from '@/app/syncStatus';
-import { DialogFooter } from '@/components/ui/DialogFooter';
+import { FONT_SCALE_LABEL_KEYS } from '@/features/settings/fontScaleLabelKeys';
 
 const NO_CHARACTER_IDS: readonly number[] = [];
-
-const DENSITY_LABEL_KEYS = {
-  0.875: 'characters.densityCompact',
-  1: 'characters.densityCozy',
-  1.125: 'characters.densityComfortable',
-  1.25: 'characters.densitySpacious',
-} as const satisfies Record<FontScale, string>;
 
 export function Characters() {
   const { t } = useTranslation();
@@ -161,8 +154,8 @@ export function Characters() {
     newGroupButton,
     newGroupName,
     setNewGroupName,
-    deletingGroupId,
-    setDeletingGroupId,
+    shownGroups,
+    pendingGroupDeletes,
     handleMoveToGroup,
     handleCreateGroup,
     cancelCreateGroup,
@@ -223,7 +216,7 @@ export function Characters() {
     corporationNameById,
     rosterCore,
     attentionById,
-    groups: groupsValue.groups,
+    groups: shownGroups,
     starred,
     spFarm,
     alertCounts,
@@ -249,7 +242,7 @@ export function Characters() {
     (id) => void handleToggleStar(id),
     (id) => void handleToggleSpFarm(id),
     timeZone,
-    groupsValue.groups,
+    shownGroups,
     (id, groupId) => void handleMoveToGroup(id, groupId),
     achievements
   );
@@ -282,12 +275,8 @@ export function Characters() {
       ? visibleColumns.filter((existing) => existing !== id)
       : [...visibleColumns, id];
     if (
-      visibleAvailableColumns(
-        next,
-        spExtractionEnabled,
-        groupsValue.groups.length > 0,
-        isSyncConfigured()
-      ).length === 0
+      visibleAvailableColumns(next, spExtractionEnabled, shownGroups.length > 0, isSyncConfigured())
+        .length === 0
     )
       return;
     void setVisibleColumns(next);
@@ -305,7 +294,7 @@ export function Characters() {
     setRemovingCharacter({ id: characterId, name });
   }
 
-  const groupList = groupsValue.groups;
+  const groupList = shownGroups;
   const csvColumns = useMemo(
     () =>
       charactersCsvColumns(t, {
@@ -460,7 +449,7 @@ export function Characters() {
                 draft={draft}
                 setDraft={setDraft}
                 corpOptions={corpOptions}
-                hasGroups={groupsValue.groups.length > 0}
+                hasGroups={shownGroups.length > 0}
                 groupFilterOptions={groupFilterOptions}
               />
             )}
@@ -497,13 +486,13 @@ export function Characters() {
                 value={String(density)}
                 onValueChange={(value) => void setDensity(Number(value) as FontScale)}
               >
-                <SelectTrigger size="sm" aria-label={t('characters.densityLabel')} className="w-28">
+                <SelectTrigger size="sm" aria-label={t('settings.fontScaleLabel')} className="w-36">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   {FONT_SCALE_STEPS.map((step) => (
                     <SelectItem key={step} value={String(step)}>
-                      {t(DENSITY_LABEL_KEYS[step])}
+                      {t(FONT_SCALE_LABEL_KEYS[step])}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -545,7 +534,7 @@ export function Characters() {
           ) : (
             <CharactersCardView
               achievements={achievements}
-              groups={groupsValue.groups}
+              groups={shownGroups}
               ungroupedIds={ungroupedIds}
               charactersById={charactersById}
               rosterCore={rosterCore}
@@ -563,7 +552,7 @@ export function Characters() {
               onMoveToGroup={(id, groupId) => void handleMoveToGroup(id, groupId)}
               onRemove={requestRemoveCharacter}
               onRenameGroup={(id, name) => void handleRenameGroup(id, name)}
-              onRemoveGroup={setDeletingGroupId}
+              onRemoveGroup={handleRemoveGroup}
               onMoveGroup={(index, direction) => void handleMoveGroup(index, direction)}
             />
           )}
@@ -580,25 +569,7 @@ export function Characters() {
         onFailed={setRemoveFailedName}
       />
 
-      <Modal
-        open={deletingGroupId !== null}
-        onClose={() => setDeletingGroupId(null)}
-        title={t('characters.deleteGroup')}
-      >
-        <p className="text-xs text-text-dim">{t('characters.deleteGroupConfirm')}</p>
-        <DialogFooter className="mt-3">
-          <Button size="sm" onClick={() => setDeletingGroupId(null)}>
-            {t('characters.cancel')}
-          </Button>
-          <Button
-            size="sm"
-            variant="danger"
-            onClick={() => deletingGroupId && void handleRemoveGroup(deletingGroupId)}
-          >
-            {t('characters.deleteGroup')}
-          </Button>
-        </DialogFooter>
-      </Modal>
+      <ToastStack {...pendingGroupDeletes.toast} />
 
       <CustomizePermissionsDialog
         open={customizingPermissions}

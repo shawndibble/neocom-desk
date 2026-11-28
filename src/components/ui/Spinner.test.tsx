@@ -1,5 +1,6 @@
 import { act, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { stubViewport } from '@/test/viewport';
 import { Spinner } from './Spinner';
 
 describe('Spinner', () => {
@@ -14,6 +15,13 @@ describe('Spinner', () => {
   it('renders the status spinner immediately without delayMs', () => {
     render(<Spinner label="Loading orders" />);
     expect(screen.getByRole('status', { name: 'Loading orders' })).toBeInTheDocument();
+  });
+
+  it('shows its label beside the arc with showLabel, keeping the status name', () => {
+    render(<Spinner size="sm" label="Loading orders" showLabel />);
+    expect(screen.getByRole('status', { name: 'Loading orders' })).toHaveTextContent(
+      'Loading orders'
+    );
   });
 
   it('holds back the status spinner until delayMs elapses', () => {
@@ -44,9 +52,26 @@ describe('Spinner', () => {
     ['page', 'py-16'],
     ['panel', 'py-8'],
   ] as const)('block="%s" centres the spinner in a %s row', (block, padding) => {
-    const { container } = render(<Spinner block={block} label="Loading orders" />);
+    const { container } = render(<Spinner block={block} label="Loading orders" delayMs={0} />);
     expect(container.firstElementChild).toHaveClass('flex', 'justify-center', padding);
     expect(screen.getByRole('status', { name: 'Loading orders' })).toBeInTheDocument();
+  });
+
+  it('holds a block spinner back 200ms by default', () => {
+    render(<Spinner block="page" label="Loading orders" />);
+    expect(screen.queryByRole('status')).toBeNull();
+
+    act(() => {
+      vi.advanceTimersByTime(200);
+    });
+    expect(screen.getByRole('status', { name: 'Loading orders' })).toBeInTheDocument();
+  });
+
+  it('holds a block spinner back under reduced motion too', () => {
+    const restore = stubViewport('(prefers-reduced-motion: reduce)');
+    render(<Spinner block="panel" label="Loading orders" />);
+    expect(screen.queryByRole('status')).toBeNull();
+    restore();
   });
 
   it('adds no wrapper without block', () => {

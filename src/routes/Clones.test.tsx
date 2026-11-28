@@ -391,13 +391,13 @@ describe('Clones', () => {
     expect(screen.queryByRole('heading', { level: 1, name: 'Clones' })).not.toBeInTheDocument();
   });
 
-  it("keeps this view's data age and Refresh below the tabs, not in the shared header", async () => {
+  it("puts Refresh in the character header and Export in the Clones table's title bar", async () => {
     renderClonesRoute();
     await screen.findByRole('heading', { level: 1, name: 'Pilot One' });
 
-    const refresh = screen.getByRole('button', { name: 'Refresh' });
     const header = screen.getByRole('heading', { level: 1, name: 'Pilot One' }).closest('header');
-    expect(header?.contains(refresh)).toBe(false);
+    expect(header?.contains(screen.getByRole('button', { name: 'Refresh' }))).toBe(true);
+    expect(header?.contains(screen.getByRole('button', { name: /^Export/ }))).toBe(false);
     expect(await screen.findByText('just now')).toBeInTheDocument();
   });
 
@@ -492,7 +492,7 @@ describe('Clones', () => {
     expect(screen.getAllByText(/shared by every clone/)).toHaveLength(1);
     expect(screen.getAllByRole('progressbar')).toHaveLength(1);
     expect(screen.queryByText('Jump Cooldown')).not.toBeInTheDocument();
-    expect(screen.getByText(/Infomorph Synchronizing: -3 h/)).toBeInTheDocument();
+    expect(screen.getByText(/Infomorph Synchronizing 3: 3h shorter/)).toBeInTheDocument();
   });
 
   it('renders no cooldown footnote when there is no last jump and no reduction', async () => {

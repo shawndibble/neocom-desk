@@ -62,6 +62,7 @@ import { contractTimeline } from '@/engine/contracts/contractTimeline';
 import { courierDeliveryDeadlineMs } from '@/engine/contracts/courierDeadline';
 import { useTimeZone } from '@/lib/timeFormat';
 import type { Contract, ContractItem } from '@/esi/endpoints';
+import { TableScroll } from '@/components/ui/TableScroll';
 
 const formatDecimal = createNumberFormat({ maximumFractionDigits: 3 });
 
@@ -543,7 +544,7 @@ function ItemSection({
       <div className="flex items-center justify-between gap-2 border-b border-line pb-1">
         <h3 className={cx(eyebrowClassName, 'flex items-center gap-1.5')}>{title}</h3>
       </div>
-      <div className="overflow-x-auto">
+      <TableScroll>
         <DataTable
           {...tableExport.tableProps}
           label={title}
@@ -561,7 +562,7 @@ function ItemSection({
             />
           )}
         />
-      </div>
+      </TableScroll>
     </div>
   );
 }

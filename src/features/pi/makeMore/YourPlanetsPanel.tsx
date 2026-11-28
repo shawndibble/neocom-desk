@@ -33,7 +33,14 @@ export function YourPlanetsPanel({
       }
       padded={false}
     >
-      <ul className="-mr-px -mb-px grid grid-cols-2 max-sm:[&>li:last-child:nth-child(odd)]:col-span-2 sm:grid-cols-[repeat(auto-fit,minmax(13rem,1fr))]">
+      <ul
+        className={cx(
+          '-mr-px -mb-px grid grid-cols-2 max-sm:[&>li:last-child:nth-child(odd)]:col-span-2',
+          view.strips.length === 4
+            ? 'lg:grid-cols-4'
+            : 'sm:grid-cols-[repeat(auto-fit,minmax(13rem,1fr))]'
+        )}
+      >
         {view.strips.map((strip) => (
           <li
             key={strip.planetId}

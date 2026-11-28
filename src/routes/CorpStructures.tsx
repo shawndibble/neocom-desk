@@ -87,6 +87,7 @@ import { useNow } from '@/lib/useNow';
 import { useRouteSnapshot } from '@/lib/useRouteSnapshot';
 import { useUrlParam, useUrlParams } from '@/lib/useUrlState';
 import { boolParam, optionalIdParam, optionalSortParam, textParam } from '@/lib/urlState';
+import { TableScroll } from '@/components/ui/TableScroll';
 
 const FILTER_PARAMS = {
   q: textParam(),
@@ -338,7 +339,7 @@ export function CorpStructures() {
         render: (row) => {
           const system = systemOf(row);
           return (
-            <span className="inline-flex items-center gap-1.5">
+            <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
               {systemName(row)}
               {system && <SecurityStatus security={system.security} />}
             </span>
@@ -688,7 +689,7 @@ export function CorpStructures() {
                   }
                 />
               ) : (
-                <div className="overflow-x-auto">
+                <TableScroll>
                   <DataTable
                     label={t('corp.structures.title')}
                     columns={columns}
@@ -701,7 +702,7 @@ export function CorpStructures() {
                     stackLayout="dense"
                     mobileSort
                   />
-                </div>
+                </TableScroll>
               )}
               {visible.length > 0 && (
                 <div className="space-y-1 border-t border-line px-3 py-2 text-sm">

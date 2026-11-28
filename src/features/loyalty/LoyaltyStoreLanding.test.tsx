@@ -73,6 +73,7 @@ function state(over: Partial<LpStoreLandingState> = {}): LpStoreLandingState {
     jumpsStatus: 'ready',
     factions: [],
     categories: [],
+    retry: () => {},
     ...over,
   };
 }
@@ -258,9 +259,12 @@ describe('LoyaltyStoreLanding', () => {
     expect(rowNames(screen.getByRole('table', { name: 'LP Stores' }))[0]).toContain('Caldari Navy');
   });
 
-  it('says why the page is empty when the snapshot is unavailable', () => {
-    landing.mockReturnValue(state({ status: 'unavailable', stores: [], offers: [] }));
+  it('says why the page is empty when the snapshot is unavailable, with Try again', async () => {
+    const retry = vi.fn();
+    landing.mockReturnValue(state({ status: 'unavailable', stores: [], offers: [], retry }));
     renderLanding();
     expect(screen.getByText("LP Stores aren't available")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Try again' }));
+    expect(retry).toHaveBeenCalled();
   });
 });

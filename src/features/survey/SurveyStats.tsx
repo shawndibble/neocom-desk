@@ -1,3 +1,4 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { formatDuration, formatEveClock } from '@/engine/survey/chatMessage';
@@ -24,12 +25,10 @@ function Tile({
 }) {
   return (
     <div className="min-w-0 border-l-2 border-line pl-3">
-      <div className="text-[0.6875rem] font-semibold tracking-wider text-text-dim uppercase">
-        {label}
-      </div>
+      <div className={eyebrowClassName}>{label}</div>
       <div
         data-survey-stat
-        className={`text-lg font-semibold break-words tabular-nums ${emphasis ? 'text-accent' : ''}`}
+        className={`text-base font-semibold break-words tabular-nums ${emphasis ? 'text-accent' : ''}`}
       >
         {children}
       </div>

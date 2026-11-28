@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Modal, Panel, TextArea } from '@/components/ui';
+import { Button, Modal, Panel, TextArea, Field, Fields } from '@/components/ui';
 import { InlineError } from '@/components/ui/InlineError';
 import { Pill, type PillTone } from '@/components/ui/Pill';
 import { GrantNote } from '@/app/GrantNote';
@@ -161,16 +161,17 @@ export function VettingDecision({
         )}
         {canDecide && (
           <>
-            <label className="block space-y-1">
-              <span className="text-xs text-text-dim">{t('vetting.decision.note')}</span>
-              <TextArea
-                rows={2}
-                maxLength={VETTING_NOTE_MAX}
-                placeholder={t('vetting.decision.optional')}
-                value={note}
-                onChange={(event) => setNote(event.target.value)}
-              />
-            </label>
+            <Fields variant="stacked">
+              <Field label={t('vetting.decision.note')}>
+                <TextArea
+                  rows={2}
+                  maxLength={VETTING_NOTE_MAX}
+                  placeholder={t('vetting.decision.optional')}
+                  value={note}
+                  onChange={(event) => setNote(event.target.value)}
+                />
+              </Field>
+            </Fields>
             <div className="grid grid-cols-2 gap-2 [&>button]:w-full">
               <Button onClick={() => setRefusing(true)}>{verb('no')}</Button>
               <Button variant="success" loading={busy === 'yes'} onClick={() => void decide('yes')}>
@@ -217,20 +218,20 @@ export function VettingDecision({
           open
           onClose={() => busy === null && setRefusing(false)}
           title={t(`vetting.decision.refuse.${review.kind}`, { pilot: review.pilot.name })}
-          placement={phone ? 'sheet' : 'center'}
           dismissOnOutsidePress={false}
           footer={<DialogFooter stacked={phone}>{refuseButtons}</DialogFooter>}
         >
           <div className="space-y-3 text-sm">
-            <label className="block space-y-1">
-              <span className="text-xs text-text-dim">{t('vetting.decision.reason')}</span>
-              <TextArea
-                rows={3}
-                maxLength={VETTING_NOTE_MAX}
-                value={note}
-                onChange={(event) => setNote(event.target.value)}
-              />
-            </label>
+            <Fields variant="stacked">
+              <Field label={t('vetting.decision.reason')}>
+                <TextArea
+                  rows={3}
+                  maxLength={VETTING_NOTE_MAX}
+                  value={note}
+                  onChange={(event) => setNote(event.target.value)}
+                />
+              </Field>
+            </Fields>
             {error && <InlineError>{error}</InlineError>}
             <p className="text-xs text-text-dim">
               {t(

@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, type BuildPlanRecord } from '@/db';
 import { DataGate } from '@/components/DataGate';
-import { Spinner, TabPanel, Toast, useTimedToast } from '@/components/ui';
+import { Spinner, TabPanel, Toast } from '@/components/ui';
 import { useIndustryWorkspace } from '@/features/industry/useIndustryWorkspace';
 import { useAccountSkillLevels } from '@/features/skills/useAccountSkillLevels';
 import { IndustryHeader } from '@/features/industry/IndustryHeader';
@@ -28,6 +28,7 @@ import type { BuildStrategy } from '@/engine/industry/autoMakeOrBuy';
 import type { OwnedStockScope } from '@/engine/industry/types';
 import { ItemActionsProvider } from '@/features/market/ItemActionsProvider';
 import { usePageItemActions } from '@/features/market/usePageItemActions';
+import { useDocumentTitleName } from '@/app/documentTitleName';
 import type { BlueprintPasteNoticeState } from '@/lib/shortcuts';
 
 const NO_PLANS: BuildPlanRecord[] = [];
@@ -64,7 +65,6 @@ export function IndustryGroupPage() {
       parts.push(t('industry.blueprintPasteSkipped', { count: notice.skipped }));
     return parts.join(' ');
   });
-  useTimedToast(pasteNote, () => setPasteNote(null), 12000);
 
   const plansQuery = useLiveQuery(async () => {
     if (activeCharacterId === null || groupId === undefined) return undefined;
@@ -75,6 +75,11 @@ export function IndustryGroupPage() {
       .toArray();
   }, [activeCharacterId, groupId]);
   const plans = plansQuery ?? NO_PLANS;
+  useDocumentTitleName(
+    activeCharacterId === null
+      ? null
+      : buildGroupsFor(workspace.buildGroups, activeCharacterId).find((g) => g.id === groupId)?.name
+  );
 
   async function handleRetargetGroup(
     target: Parameters<typeof retargetBuildGroup>[1],
@@ -190,7 +195,9 @@ export function IndustryGroupPage() {
           </DataGate>
         </TabPanel>
       </div>
-      {pasteNote && <Toast message={pasteNote} />}
+      {pasteNote && (
+        <Toast message={pasteNote} durationMs={12000} onClose={() => setPasteNote(null)} />
+      )}
     </ItemActionsProvider>
   );
 }

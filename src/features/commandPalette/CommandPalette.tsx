@@ -20,8 +20,9 @@ import {
   activeOptionClassName,
   focusRingClassName,
   interactiveClassName,
+  rowInteractiveClassName,
 } from '@/components/ui/controlStyles';
-import { MD_UP_QUERY, useMediaQuery } from '@/lib/useMediaQuery';
+import { COARSE_POINTER_QUERY, MD_UP_QUERY, useMediaQuery } from '@/lib/useMediaQuery';
 import { cx } from '@/lib/cx';
 import { moveHighlight, type ComboboxNavKey } from '@/lib/comboboxNav';
 import { useActiveCharacter } from '@/stores/activeCharacter';
@@ -68,6 +69,7 @@ import { searchKnownPlaces } from '@/features/places/placeSearch';
 import { resolvePlace } from '@/features/places';
 import { usePlaceNicknames } from '@/features/assets/placeNicknames';
 import { fixed1 } from '@/lib/fixedFormat';
+import { shownSecurity } from '@/engine/securityStatus';
 import { readCachedLoyaltyBalances } from '@/features/character/loyalty';
 import { createCharactersProvider, createCommandsProvider, createPagesProvider } from './providers';
 import { createLpStoresProvider, NO_BALANCES } from './lpStoresProvider';
@@ -179,7 +181,7 @@ function useShippedProviders(): {
         setWaypoint,
         waypointLabel: t('commandPalette.setWaypoint'),
         describeSystem: (system) =>
-          t('commandPalette.systemSublabel', { security: fixed1(system.security) }),
+          t('commandPalette.systemSublabel', { security: fixed1(shownSecurity(system.security)) }),
         describeStation: ({ name, systemName }, nickname) =>
           [nickname === undefined ? null : name, systemName]
             .filter((part): part is string => part !== null)
@@ -274,6 +276,7 @@ export function CommandPalette({ onClose }: CommandPaletteProps) {
   const navigate = useNavigate();
   const latestPaste = useRef(0);
   const isDesktop = useMediaQuery(MD_UP_QUERY);
+  const touch = useMediaQuery(COARSE_POINTER_QUERY);
   const recent = useRecentNav((state) => state.value);
   const [query, setQuery] = useState('');
   const found = usePaletteSearch(providers, query);
@@ -504,7 +507,7 @@ export function CommandPalette({ onClose }: CommandPaletteProps) {
                                 'flex min-h-9 cursor-pointer items-center gap-2 rounded-xs px-2 py-1.5 text-sm',
                                 highlighted
                                   ? `bg-panel-2 text-text ${activeOptionClassName}`
-                                  : 'text-text-dim hover:bg-panel-2'
+                                  : cx('text-text-dim', rowInteractiveClassName)
                               )}
                             >
                               <span className="flex min-w-0 flex-1 flex-col">
@@ -596,6 +599,11 @@ export function CommandPalette({ onClose }: CommandPaletteProps) {
             )}
           >
             {altOutcome.text}
+          </p>
+        )}
+        {groups.length > 0 && !touch && (
+          <p className="hidden px-2 text-xs text-text-dim md:block">
+            {t('commandPalette.keyHint')}
           </p>
         )}
         <LiveStatus>{statusText}</LiveStatus>

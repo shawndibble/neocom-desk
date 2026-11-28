@@ -66,7 +66,7 @@ describe('AutomaticSyncSection', () => {
   it('is off by default and starts the opt-in for the active Character', async () => {
     renderSection(null);
     expect(screen.getByTestId('auto-sync-state')).toHaveTextContent(/^Off/);
-    expect(screen.getByText(/never issues a late notice and never sends mail/)).toBeInTheDocument();
+    expect(screen.getByText(/never sends mail or Late notices/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Turn on for Pilot 7' }));
     expect(beginCorpSyncLogin).toHaveBeenCalledWith(ME, CORP);
   });

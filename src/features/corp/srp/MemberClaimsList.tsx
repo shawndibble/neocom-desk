@@ -13,6 +13,7 @@ import {
   type MemberClaimColumnId,
 } from './srpMemberColumns';
 import { canRefile, orderClaims, type MemberClaim } from './srpMemberModel';
+import { TableScroll } from '@/components/ui/TableScroll';
 
 const STATE_TONE: Record<SrpClaimState, PillTone> = {
   pending: 'warning',
@@ -189,7 +190,7 @@ export function MemberClaimsList({
     [columns, isVisible]
   );
   return (
-    <div className="overflow-x-auto">
+    <TableScroll>
       <DataTable
         label={t('srpMember.claims.label')}
         columns={shownColumns}
@@ -199,6 +200,6 @@ export function MemberClaimsList({
         mobileSort
         onRowClick={onOpen}
       />
-    </div>
+    </TableScroll>
   );
 }

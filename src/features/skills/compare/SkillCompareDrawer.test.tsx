@@ -343,13 +343,27 @@ describe('SkillCompareDrawer', () => {
 
     const row = screen.getByText('Miners').closest('li')!;
     await user.click(within(row).getByRole('button', { name: 'Delete Miners' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Delete' });
-    await user.click(within(dialog).getByRole('button', { name: 'Delete' }));
     await waitFor(() => expect(screen.queryByText('Miners')).not.toBeInTheDocument());
+    expect(screen.getAllByText('Deleted Miners.').length).toBeGreaterThan(0);
     expect(screen.getByText('No saved comparisons yet.')).toBeInTheDocument();
     await waitFor(() =>
       expect(screen.getByRole('heading', { name: 'Saved comparisons' })).toHaveFocus()
     );
+  });
+
+  it('relinks the loaded comparison when its delete is undone', async () => {
+    const user = userEvent.setup();
+    renderDrawer(`?ids=${CHAR_A}`);
+
+    await user.click(await screen.findByRole('button', { name: 'Saved' }));
+    await user.click(screen.getByRole('button', { name: 'Save comparison' }));
+    await waitFor(() => expect(currentSearch().get('comparisonId')).not.toBeNull());
+    const linked = currentSearch().get('comparisonId');
+
+    await user.click(screen.getByRole('button', { name: 'Delete Untitled comparison' }));
+    await waitFor(() => expect(currentSearch().get('comparisonId')).toBeNull());
+    await user.click(screen.getAllByRole('button', { name: 'Undo' })[0]!);
+    await waitFor(() => expect(currentSearch().get('comparisonId')).toBe(linked));
   });
 
   it('clicking Save again for the same selection updates the saved entry instead of duplicating it', async () => {

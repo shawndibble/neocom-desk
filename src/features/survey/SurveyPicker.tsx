@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   IconButton,
@@ -14,6 +14,7 @@ import { countedScans, summarizeSurvey } from '@/engine/survey/series';
 import { forgetSurvey, useSurveyHistory } from './surveyHistory';
 import { loadSurveyCached } from './surveyStore';
 import { useHydratedStore } from '@/lib/useHydratedStore';
+import { formatCalendarTimestamp } from '@/lib/timestamp';
 
 type LoadedSurvey = { at: number; mined: { ore: string; percent: number } | null };
 
@@ -23,25 +24,13 @@ interface SurveyPickerProps {
 }
 
 export function SurveyPicker({ currentId, onPick }: SurveyPickerProps) {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const history = useSurveyHistory((state) => state.value);
   useHydratedStore(useSurveyHistory);
   const hintId = useId();
   const [open, setOpen] = useState(false);
   const [loaded, setLoaded] = useState<Record<string, LoadedSurvey>>({});
   const requested = useRef(new Set<string>());
-  const time = useMemo(
-    () =>
-      new Intl.DateTimeFormat(i18n.language, {
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: false,
-        timeZone: 'UTC',
-      }),
-    [i18n.language]
-  );
 
   useEffect(() => {
     if (history.length < 2) return;
@@ -80,7 +69,9 @@ export function SurveyPicker({ currentId, onPick }: SurveyPickerProps) {
   function labelFor(entry: SurveyHistoryEntry): string {
     const survey = loaded[entry.id];
     if (survey === undefined) return entry.name ?? t('common.loading');
-    const when = t('survey.eveTime', { time: time.format(survey.at) });
+    const when = t('survey.eveTime', {
+      time: formatCalendarTimestamp(new Date(survey.at), 'UTC'),
+    });
     if (entry.name !== undefined) return t('survey.historyNamed', { name: entry.name, time: when });
     return survey.mined === null
       ? t('survey.historyEmpty', { time: when })

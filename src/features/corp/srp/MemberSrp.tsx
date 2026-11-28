@@ -1,6 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Disclosure, EmptyState, LoadFailedState, Panel, Spinner, Toast } from '@/components/ui';
+import { Link } from 'react-router-dom';
+import {
+  Disclosure,
+  EmptyState,
+  LoadFailedState,
+  Panel,
+  Spinner,
+  Toast,
+  buttonClassName,
+} from '@/components/ui';
+import { useCorpRouteGate } from '../useCorpRouteGate';
 import { GrantBanner } from '@/app/GrantNote';
 import { useIsPhone } from '@/lib/useIsPhone';
 import type { DoctrineCheckRecord, FileSrpClaimInput, HullRule } from '../srpTypes';
@@ -25,6 +35,27 @@ import {
   type MemberSrp as MemberData,
 } from './useMemberSrp';
 
+function SrpNotSetUp() {
+  const { t } = useTranslation();
+  const gate = useCorpRouteGate((capabilities) => capabilities.canConfigureSrp);
+  const canSetUp = gate.status === 'ready';
+  return (
+    <Panel>
+      <EmptyState
+        title={t('srpMember.notSetUp.title')}
+        hint={t(canSetUp ? 'srpMember.notSetUp.hintDirector' : 'srpMember.notSetUp.hint')}
+        action={
+          canSetUp && (
+            <Link to="/corp/srp/settings" className={buttonClassName({ variant: 'primary' })}>
+              {t('srpMember.notSetUp.action')}
+            </Link>
+          )
+        }
+      />
+    </Panel>
+  );
+}
+
 interface MemberSrpProps {
   characterId: number;
   corporationId: number;
@@ -45,11 +76,7 @@ export function MemberSrp({ characterId, corporationId }: MemberSrpProps) {
   } else if (status.state === 'failed') {
     body = <LoadFailedState title={t('srpMember.loadFailed')} onRetry={data.retry} />;
   } else if (!status.value.enabled || !status.value.settings) {
-    body = (
-      <Panel>
-        <EmptyState title={t('srpMember.notSetUp.title')} hint={t('srpMember.notSetUp.hint')} />
-      </Panel>
-    );
+    body = <SrpNotSetUp />;
   } else {
     const { windowDays, requireFleetOrFc, hullRules } = status.value.settings;
     body = (

@@ -9,6 +9,7 @@ interface SpinnerProps {
   className?: string;
   delayMs?: number;
   block?: 'page' | 'panel';
+  showLabel?: boolean;
 }
 
 const SIZE: Record<SpinnerSize, string> = {
@@ -17,16 +18,24 @@ const SIZE: Record<SpinnerSize, string> = {
   lg: 'size-9',
 };
 
-export function Spinner({ block, ...props }: SpinnerProps) {
-  if (!block) return <SpinnerArc {...props} />;
+const BLOCK_DELAY_MS = 200;
+
+export function Spinner({ block, delayMs, ...props }: SpinnerProps) {
+  if (!block) return <SpinnerArc {...props} delayMs={delayMs} />;
   return (
     <div className={block === 'page' ? 'flex justify-center py-16' : 'flex justify-center py-8'}>
-      <SpinnerArc {...props} />
+      <SpinnerArc {...props} delayMs={delayMs ?? BLOCK_DELAY_MS} />
     </div>
   );
 }
 
-function SpinnerArc({ size = 'md', label, className = '', delayMs }: Omit<SpinnerProps, 'block'>) {
+function SpinnerArc({
+  size = 'md',
+  label,
+  className = '',
+  delayMs,
+  showLabel = false,
+}: Omit<SpinnerProps, 'block'>) {
   const { t } = useTranslation();
   const [shown, setShown] = useState(!delayMs);
 
@@ -40,11 +49,12 @@ function SpinnerArc({ size = 'md', label, className = '', delayMs }: Omit<Spinne
     return <span aria-hidden="true" className={`inline-flex ${SIZE[size]} ${className}`} />;
   }
 
+  const name = label ?? t('common.loading');
   return (
     <span
       role="status"
-      aria-label={label ?? t('common.loading')}
-      className={`inline-flex ${className}`}
+      aria-label={name}
+      className={`inline-flex ${showLabel ? 'items-center gap-2' : ''} ${className}`}
     >
       <svg
         viewBox="0 0 24 24"
@@ -59,6 +69,11 @@ function SpinnerArc({ size = 'md', label, className = '', delayMs }: Omit<Spinne
           strokeLinecap="round"
         />
       </svg>
+      {showLabel && (
+        <span aria-hidden="true" className="text-text-dim">
+          {name}
+        </span>
+      )}
     </span>
   );
 }

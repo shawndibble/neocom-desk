@@ -198,7 +198,7 @@ export function TurnInDetailView({
       <p className="font-semibold">{name}</p>
       <div>
         <p className="flex items-baseline gap-1.5">
-          <span className="text-lg leading-tight font-semibold tabular-nums">
+          <span className="text-base leading-tight font-semibold tabular-nums">
             {approxIsk(offer.totalPerItem)}
           </span>
           <span className="text-xs text-text-dim">{t('campaigns.turnIn.eachTurnedIn')}</span>

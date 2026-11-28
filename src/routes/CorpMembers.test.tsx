@@ -190,10 +190,10 @@ afterEach(() => {
 });
 
 describe('access (AC1)', () => {
-  it('waits rather than deciding while corp access is still resolving', () => {
+  it('waits rather than deciding while corp access is still resolving', async () => {
     mockedAccess.mockReturnValue(accessOf('unknown', {}));
     renderMembers();
-    expect(screen.getByRole('status', { name: 'Loading' })).toBeInTheDocument();
+    expect(await screen.findByRole('status', { name: 'Loading' })).toBeInTheDocument();
     expect(mocked.loadCorporationMemberTracking).not.toHaveBeenCalled();
   });
 

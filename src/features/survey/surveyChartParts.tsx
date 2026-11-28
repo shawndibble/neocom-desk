@@ -4,7 +4,8 @@ import type { ReactElement } from 'react';
 import { ReferenceArea, XAxis, YAxis, type CartesianViewBox } from 'recharts';
 import { formatDuration, formatEveClock } from '@/engine/survey/chatMessage';
 import { realTime } from '@/engine/survey/gapAxis';
-import i18n from '@/i18n';
+import { formatDateTick } from '@/lib/formatDateTick';
+import { utcDay } from '@/engine/localDay';
 import { spacedLabels } from '@/engine/survey/labelSpacing';
 import { timeTicks } from '@/engine/survey/timeTicks';
 import type { SurveySummary } from '@/engine/survey/series';
@@ -15,13 +16,6 @@ export const Y_AXIS_WIDTH = 52;
 export const COMPACT_Y_AXIS_WIDTH = 36;
 export const FULL_HEIGHT = 224;
 export const MARGIN = { top: 16, right: 12, bottom: 0, left: 0 };
-
-const shortDate = (t: number): string =>
-  new Date(t).toLocaleDateString(i18n.language, {
-    month: 'short',
-    day: 'numeric',
-    timeZone: 'UTC',
-  });
 
 export function timeAxis(summary: SurveySummary): {
   domain: [number, number];
@@ -53,7 +47,7 @@ export function timeAxis(summary: SurveySummary): {
         </text>
         {showsDate(payload.value) && (
           <text textAnchor="middle" dy={24} fontSize="0.6875rem">
-            {shortDate(t)}
+            {formatDateTick(utcDay(t))}
           </text>
         )}
       </g>

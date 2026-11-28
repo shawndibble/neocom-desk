@@ -10,7 +10,7 @@ import { FONT_SCALE_KEY } from '@/lib/fontScale';
 import { useActivityLog } from '@/stores/activityLog';
 import en from '@/i18n/locales/en.json';
 import { stubViewport } from '@/test/viewport';
-import { MD_UP_QUERY } from '@/lib/useMediaQuery';
+import { DESKTOP_QUERY } from '@/lib/useIsDesktop';
 import { consumeStaleStores } from '@/app/staleStoresReload';
 import { formatTimestamp } from '@/lib/timestamp';
 import { TIME_FORMAT_SETTING_KEY } from '@/lib/timeFormat';
@@ -715,9 +715,9 @@ describe('Settings — phone list', () => {
     expect(window.location.pathname).toBe('/settings');
   });
 
-  it('keeps redirecting /settings to Display from md up', async () => {
+  it('keeps redirecting /settings to Display from lg up', async () => {
     window.history.pushState({}, '', '/settings');
-    stubViewport(MD_UP_QUERY);
+    stubViewport(DESKTOP_QUERY);
     renderSettingsPage();
 
     await waitFor(() => expect(window.location.pathname).toBe('/settings/display'));

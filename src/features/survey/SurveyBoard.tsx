@@ -10,6 +10,7 @@ import {
 } from 'react';
 import { lazyNamed } from '@/app/lazyNamed';
 import { useTranslation } from 'react-i18next';
+import { formatDateOnly } from '@/lib/timestamp';
 import {
   CollapsiblePanel,
   DataAgeBadge,
@@ -91,7 +92,7 @@ export function SurveyBoard({
   emptyExtra,
   panelTitle,
 }: SurveyBoardProps) {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const scans = useMemo(() => countedScans(allScans, ignored), [allScans, ignored]);
   const oreNames = useMemo(() => scans.flatMap((s) => s.rocks.map((r) => r.ore)), [scans]);
   const orePrices = useOrePrices(oreNames);
@@ -244,7 +245,7 @@ export function SurveyBoard({
             {expiresAt !== null && (
               <p className="text-xs text-text-dim">
                 {t('survey.expires', {
-                  date: new Date(expiresAt).toLocaleDateString(i18n.language),
+                  date: formatDateOnly(new Date(expiresAt)),
                 })}
               </p>
             )}

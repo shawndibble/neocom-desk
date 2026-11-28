@@ -23,6 +23,7 @@ interface PrereqRowProps {
   startDate: Date | undefined;
   columns: ColumnVisibility;
   isDesktop: boolean;
+  reducedMotion: boolean;
   onPromote: (rowId: string) => void;
   onStageSkillDetail: (skillTypeID: number) => void;
 }
@@ -36,12 +37,13 @@ export const PrereqRow = memo(function PrereqRow({
   startDate,
   columns,
   isDesktop,
+  reducedMotion,
   onPromote,
   onStageSkillDetail,
 }: PrereqRowProps) {
   const { t } = useTranslation();
   const timeZone = useTimeZone();
-  const { setNodeRef, style, handleProps, isDragging } = useRowSortable(row.id);
+  const { setNodeRef, style, handleProps, isDragging } = useRowSortable(row.id, reducedMotion);
   const label = formatLevelLabel(name, row.step.level);
 
   const dragHandle = (

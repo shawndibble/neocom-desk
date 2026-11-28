@@ -42,6 +42,7 @@ import { useNetWorthHiddenCharacters, useNetWorthHiddenLayers } from './netWorth
 import { useWalletRange } from './walletRange';
 import { buildTableRows, type NetWorthTableRow } from './tableRows';
 import { useNetWorthData } from './useNetWorthData';
+import { TableScroll } from '@/components/ui/TableScroll';
 
 const LazyNetWorthChart = lazy(() => guarded(() => import('./NetWorthChart')));
 
@@ -419,7 +420,7 @@ export function NetWorthPanel({
         {tableRows.length === 0 ? (
           <EmptyState title={t('wallet.balanceEmpty')} className="py-8" />
         ) : (
-          <div className="overflow-x-auto">
+          <TableScroll>
             <DataTable
               {...tableExport.tableProps}
               label={t('wallet.balanceByCharacter')}
@@ -431,7 +432,7 @@ export function NetWorthPanel({
               rowClassName={() => 'group'}
               onRowClick={(row) => onDrill(row.characterId)}
             />
-          </div>
+          </TableScroll>
         )}
       </Panel>
     </div>

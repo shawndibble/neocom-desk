@@ -1,6 +1,7 @@
 import { eyebrowClassName } from './eyebrowClassName';
 import type { ReactNode, Ref } from 'react';
 import { cx } from '@/lib/cx';
+import { Collapse } from './Collapse';
 import {
   focusRingClassName,
   focusRingInsetClassName,
@@ -72,8 +73,14 @@ export function Disclosure({
   const trailingContent = trailing !== undefined && (
     <span className="text-[0.6875rem] font-medium tabular-nums text-text">{trailing}</span>
   );
-  const body = expanded && (
-    <div className="divide-y divide-line border-t border-line bg-panel-2">{children}</div>
+  const body = (
+    <Collapse
+      open={expanded}
+      closeInstantly
+      className="divide-y divide-line border-t border-line bg-panel-2"
+    >
+      {children}
+    </Collapse>
   );
 
   if (labelAccessory !== undefined) {

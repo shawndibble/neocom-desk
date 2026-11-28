@@ -11,13 +11,11 @@ import {
   DataAgeBadge,
   EmptyState,
   IconButton,
-  Modal,
   Spinner,
   TabPanel,
   Toast,
   ToastStack,
   useDeferredCommits,
-  useTimedToast,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { guarded, preloadRouteChunk } from '@/app/routeChunks';
@@ -88,7 +86,7 @@ import { useUrlParam } from '@/lib/useUrlState';
 import { boolParam } from '@/lib/urlState';
 import { loadMarketWideTrees } from '@/sde/loadSde';
 import type { MarketWideTreeMap } from '@/sde/types';
-import { DialogFooter } from '@/components/ui/DialogFooter';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 
 const BuildPlanList = lazy(() =>
   guarded(() => import('@/features/industry/BuildPlanList')).then((m) => ({
@@ -214,7 +212,6 @@ export function Industry() {
     setFitImportOpen(true);
   }, [location.key, location.state]);
   const [blueprintPasteNote, setBlueprintPasteNote] = useState<string | null>(null);
-  useTimedToast(blueprintPasteNote, () => setBlueprintPasteNote(null));
   const handledBlueprintPasteKey = useRef<string | null>(null);
   useEffect(() => {
     const text = (location.state as Partial<IndustryBlueprintListState> | null)?.blueprintListText;
@@ -864,27 +861,26 @@ export function Industry() {
           )}
         </TabPanel>
 
-        <Modal
+        <ConfirmDialog
           open={deletingGroupId !== null}
           onClose={() => setDeletingGroupId(null)}
           title={t('industry.deleteGroup')}
-        >
-          <p className="text-xs text-text-dim">{t('industry.deleteGroupConfirm')}</p>
-          <DialogFooter className="mt-3">
-            <Button size="sm" onClick={() => setDeletingGroupId(null)}>
-              {t('industry.cancel')}
-            </Button>
-            <Button
-              size="sm"
-              variant="danger"
-              onClick={() => deletingGroupId && void handleDeleteGroup(deletingGroupId)}
-            >
-              {t('industry.deleteGroup')}
-            </Button>
-          </DialogFooter>
-        </Modal>
+          body={t('industry.deleteGroupConfirm', {
+            group: groups.find((g) => g.id === deletingGroupId)?.name ?? '',
+            count: deletingGroupId ? membersOfGroup(deletingGroupId).length : 0,
+          })}
+          actionLabel={t('industry.deleteGroupAndPlans', {
+            count: deletingGroupId ? membersOfGroup(deletingGroupId).length : 0,
+          })}
+          cancelLabel={t('industry.cancel')}
+          onConfirm={async () => {
+            if (deletingGroupId) await handleDeleteGroup(deletingGroupId);
+          }}
+        />
 
-        {blueprintPasteNote && <Toast message={blueprintPasteNote} />}
+        {blueprintPasteNote && (
+          <Toast message={blueprintPasteNote} onClose={() => setBlueprintPasteNote(null)} />
+        )}
 
         <ToastStack
           items={pendingDeletes.items}

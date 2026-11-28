@@ -160,7 +160,7 @@ export function DangerAnswer({
         </span>
         {shipControl}
       </div>
-      <h3 className="mt-2 text-xl leading-tight font-semibold text-balance text-text sm:text-2xl">
+      <h3 className="mt-2 text-xl leading-tight font-semibold text-balance text-text">
         {headline}
       </h3>
       {parts.length > 0 && <p className="mt-1.5 text-sm text-text-dim">{parts.join(' ')}</p>}
@@ -198,7 +198,7 @@ export function WatchCard({
     >
       <span
         aria-hidden="true"
-        className="pt-0.5 text-center text-lg font-semibold text-warning tabular-nums"
+        className="pt-0.5 text-center text-base font-semibold text-warning tabular-nums"
       >
         {i + 1}
       </span>
@@ -207,7 +207,7 @@ export function WatchCard({
           {names.get(g.typeId) ?? `#${g.typeId}`}
           {g.count > 1 && <span className="text-text-dim tabular-nums">×{g.count}</span>}
           {g.newCount !== null && g.newCount > 0 && (
-            <span className="rounded-xs bg-warning px-1.5 py-px text-[0.6875rem] font-semibold tracking-wider text-bg uppercase">
+            <span className="rounded-xs bg-warning px-1.5 py-px text-[0.6875rem] font-semibold tracking-widest text-bg uppercase">
               {g.newCount === g.count
                 ? t(`${P}watch.new`)
                 : t(`${P}watch.newSome`, { count: g.newCount })}
@@ -238,7 +238,7 @@ export function WatchCard({
       aria-labelledby="dscan-watch-title"
       className="rounded-xs border border-line bg-panel p-4"
     >
-      <h3 id="dscan-watch-title" className="text-lg font-semibold text-text">
+      <h3 id="dscan-watch-title" className="text-base font-semibold text-text">
         {t(`${P}watch.${read.level === 'busy' ? 'titleBusy' : 'title'}`)}
       </h3>
       {rest.length === 0 ? (
@@ -294,7 +294,7 @@ export function TripwireCard({
       aria-labelledby="dscan-tripwire-title"
       className="rounded-xs border border-line bg-panel p-4"
     >
-      <h3 id="dscan-tripwire-title" className="text-lg font-semibold text-text">
+      <h3 id="dscan-tripwire-title" className="text-base font-semibold text-text">
         {t(`${P}tripwire.title`)}
       </h3>
       <ul className="mt-1">

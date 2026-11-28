@@ -32,6 +32,7 @@ import {
 import { formatCount } from '@/lib/formatCount';
 import { formatPercent } from '@/features/refining/formatPercent';
 import { useRefiningSetup } from '@/features/refining/useRefiningSetup';
+import { TableScroll } from '@/components/ui/TableScroll';
 
 interface YieldDetailModalProps {
   open: boolean;
@@ -51,7 +52,7 @@ const CARD = 'min-w-0 rounded-xs border bg-panel-2 p-2 sm:p-2.5';
 const CARD_SUGGESTED = 'border-accent-dim bg-accent/5';
 const CARD_LABEL =
   'min-h-8 text-[0.6875rem] leading-4 font-semibold tracking-wider uppercase sm:min-h-0 sm:tracking-widest';
-const CARD_FIGURE = 'mt-1 text-lg font-semibold tabular-nums sm:text-xl';
+const CARD_FIGURE = 'mt-1 text-base font-semibold tabular-nums sm:text-xl';
 const CARD_HINT = 'mt-0.5 break-words text-[0.6875rem] text-text-dim';
 const TABLE_TITLE =
   'flex items-center justify-between gap-2 border-b border-line bg-panel-2 py-1.5 pr-1 pl-2.5';
@@ -395,7 +396,7 @@ export function YieldDetailModal({
                 />
               </span>
             </div>
-            <div className="overflow-x-auto">
+            <TableScroll>
               <DataTable
                 {...oreExport.tableProps}
                 columns={oreColumns}
@@ -405,7 +406,7 @@ export function YieldDetailModal({
                 defaultSort={{ columnId: 'raw', direction: 'desc' }}
                 responsive="table"
               />
-            </div>
+            </TableScroll>
           </div>
 
           <div className="space-y-3">
@@ -429,7 +430,7 @@ export function YieldDetailModal({
                     {t('miningTax.overview.detail.refinesIntoNone')}
                   </p>
                 ) : (
-                  <div className="overflow-x-auto">
+                  <TableScroll>
                     <DataTable
                       {...refinesExport.tableProps}
                       columns={refinedColumns}
@@ -438,7 +439,7 @@ export function YieldDetailModal({
                       label={t('miningTax.overview.detail.refinesIntoTitle')}
                       responsive="table"
                     />
-                  </div>
+                  </TableScroll>
                 )}
                 {totals.unitsLeftOver > 0 && (
                   <p className="border-t border-line px-2.5 py-1.5 text-[0.6875rem] text-warning">

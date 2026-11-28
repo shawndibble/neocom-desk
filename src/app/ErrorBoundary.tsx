@@ -1,6 +1,10 @@
 import { Component, useEffect, useRef, useState, type ErrorInfo, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui';
+import { ExternalLink } from '@/components/ui/ExternalLink';
+import { inlineLinkClassName } from '@/components/ui/controlStyles';
+import { DISCORD_URL } from '@/lib/links';
+import { ROUTER_BASENAME } from './routerPath';
 
 interface Props {
   children: ReactNode;
@@ -63,6 +67,16 @@ function ErrorScreen({ inline }: { inline: boolean }) {
       <Button size="sm" onClick={() => window.location.reload()}>
         {t('error.reload', { defaultValue: 'Reload' })}
       </Button>
+      {!inline && (
+        <p className="flex flex-wrap justify-center gap-x-4 gap-y-1 text-xs">
+          <a href={ROUTER_BASENAME} className={inlineLinkClassName}>
+            {t('error.home', { defaultValue: 'Go to Neocom Desk' })}
+          </a>
+          <ExternalLink href={DISCORD_URL}>
+            {t('error.discordHint', { defaultValue: 'Keeps happening? Ask on Discord' })}
+          </ExternalLink>
+        </p>
+      )}
     </Wrapper>
   );
 }

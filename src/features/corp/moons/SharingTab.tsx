@@ -35,6 +35,7 @@ import { PopShareIcon } from './PopShareIcon';
 import { useBook } from './useBook';
 import { usePopSharing, usePopSharingCommunities } from './usePopSharing';
 import type { PopSharingCommunityStatus } from '../taxBook/popSharingClient';
+import { TableScroll } from '@/components/ui/TableScroll';
 
 const k = 'corpTaxBook.moons.sharing';
 
@@ -313,7 +314,7 @@ export function SharingTab({ onOpenSyncSettings }: { onOpenSyncSettings: () => v
         <Panel title={t(`${k}.moons`)} padded={false}>
           {rows.length === 0 && unplaced.length === 0 && <EmptyState title={t(`${k}.noMoons`)} />}
           {rows.length > 0 && (
-            <div className="overflow-x-auto">
+            <TableScroll>
               <DataTable
                 label={t(`${k}.moons`)}
                 columns={columns}
@@ -326,7 +327,7 @@ export function SharingTab({ onOpenSyncSettings }: { onOpenSyncSettings: () => v
                 stackColumns={2}
                 stackSummary={t(`${k}.moonsSummary`, { count: rows.length })}
               />
-            </div>
+            </TableScroll>
           )}
           {unplaced.length > 0 && <UnplacedRefineries refineries={unplaced} />}
         </Panel>

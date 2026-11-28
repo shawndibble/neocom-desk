@@ -112,7 +112,7 @@ export function IncursionsPanel({
                         {security !== undefined && <SecurityStatus security={security} />}
                         <span
                           className={cx(
-                            'text-[0.6875rem] font-semibold tracking-wider uppercase',
+                            'text-[0.6875rem] font-semibold tracking-widest uppercase',
                             INCURSION_STATE_TONE[row.state]
                           )}
                         >

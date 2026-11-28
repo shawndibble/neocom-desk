@@ -59,10 +59,7 @@ export function RateOverrideDialog({
       <p className="text-text-dim">{t('corpTaxBook.moons.corrections.rate.intro')}</p>
       <Label text={t('corpTaxBook.moons.corrections.rate.day')}>
         <Select value={key} onValueChange={setKey}>
-          <SelectTrigger
-            aria-label={t('corpTaxBook.moons.corrections.rate.day')}
-            className="w-full"
-          >
+          <SelectTrigger aria-label={t('corpTaxBook.moons.corrections.rate.day')}>
             <SelectValue placeholder={t('corpTaxBook.moons.corrections.rate.pickDay')} />
           </SelectTrigger>
           <SelectContent>

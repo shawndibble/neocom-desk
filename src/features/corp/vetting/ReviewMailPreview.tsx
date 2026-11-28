@@ -1,8 +1,6 @@
 import { useTranslation } from 'react-i18next';
-import { Button, Modal } from '@/components/ui';
-import { useIsPhone } from '@/lib/useIsPhone';
+import { Modal } from '@/components/ui';
 import type { RequestMailPreview } from './useVettingRequestMail';
-import { DialogFooter } from '@/components/ui/DialogFooter';
 
 export function ReviewMailPreview({
   mail,
@@ -12,18 +10,12 @@ export function ReviewMailPreview({
   onClose: () => void;
 }) {
   const { t } = useTranslation();
-  const phone = useIsPhone();
   return (
     <Modal
       open
       onClose={onClose}
       title={t('vetting.mailPreview.title', { name: mail.to })}
-      placement={phone ? 'sheet' : 'detail'}
-      footer={
-        <DialogFooter>
-          <Button onClick={onClose}>{t('vetting.mailPreview.close')}</Button>
-        </DialogFooter>
-      }
+      placement="detail"
     >
       <div className="space-y-2 rounded-xs border border-line bg-bg p-3 font-mono text-xs leading-relaxed">
         <p>

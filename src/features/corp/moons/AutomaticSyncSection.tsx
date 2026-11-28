@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Button, NeedsConnection } from '@/components/ui';
+import { Well } from '@/components/ui/Well';
 import { beginCorpSyncLogin } from '@/app/loginFlow';
 import { formatAge } from '@/lib/age';
 import type { ScheduledSyncRun } from '@/engine/corpTaxBook/scheduledSync';
@@ -101,16 +102,15 @@ export function AutomaticSyncSection() {
       </p>
       {active && <p className="text-xs text-text-dim">{lastRunLine(t, scheduled.lastRun)}</p>}
       {notice && (
-        <p
+        <Well
+          as="p"
           role="status"
-          className={
-            notice.tone === 'warning'
-              ? 'rounded-xs border border-warning/60 bg-warning/10 px-3 py-2 text-xs text-warning'
-              : 'rounded-xs border border-line bg-panel-2 px-3 py-2 text-xs text-text'
-          }
+          size="flat"
+          tone={notice.tone === 'warning' ? 'warning' : 'neutral'}
+          className={notice.tone === 'warning' ? 'text-xs text-warning' : 'text-xs text-text'}
         >
           {notice.text}
-        </p>
+        </Well>
       )}
       {canEdit ? (
         <div className="flex flex-wrap items-center gap-2">

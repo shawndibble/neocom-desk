@@ -37,6 +37,7 @@ import { SourcingInput } from './SourcingInput';
 import type { BuyMaterialRow } from './useGroupBuyRows';
 import { useDetectedOwnedStock } from './useDetectedOwnedStock';
 import { useOwnedStockBulk } from './useOwnedStockBulk';
+import { TableScroll } from '@/components/ui/TableScroll';
 
 interface GroupMaterialsPanelProps {
   group: BuildGroup;
@@ -139,6 +140,7 @@ export function GroupMaterialsPanel({
         header: t('industry.material'),
         primary: true,
         stickyStart: true,
+        stickyStartOnPanel: true,
         sortValue: (material) => nameForType(catalog, material.typeID),
         render: (material) => (
           <span className="truncate">{nameForType(catalog, material.typeID)}</span>
@@ -146,8 +148,8 @@ export function GroupMaterialsPanel({
       },
       {
         id: 'need',
-        header: t('industry.quantity'),
-        stackAffix: { before: `${t('industry.quantity')} ` },
+        header: t('industry.errands.need'),
+        stackAffix: { before: `${t('industry.errands.need')} ` },
         align: 'right',
         className: 'tabular-nums text-text-dim',
         sortValue: (material) => material.quantity,
@@ -172,7 +174,7 @@ export function GroupMaterialsPanel({
       },
       {
         id: 'owned',
-        header: t('industry.ownedQuantity'),
+        header: t('industry.errands.haveColumn'),
         stackEdge: 'end',
         align: 'right',
         sortValue: (material) => ownedStockMap.get(material.typeID) ?? 0,
@@ -209,7 +211,7 @@ export function GroupMaterialsPanel({
       },
       {
         id: 'stillToBuy',
-        header: t('industry.stillToBuyColumn'),
+        header: t('industry.errands.buyColumn'),
         cardCorner: true,
         align: 'right',
         headerClassName: 'whitespace-nowrap',
@@ -288,7 +290,7 @@ export function GroupMaterialsPanel({
           {nothingToBuy ? (
             <EmptyState title={t('industry.groupNothingToBuy')} className="py-6" />
           ) : buyRows.length > 0 ? (
-            <div className="overflow-x-auto">
+            <TableScroll>
               <DataTable
                 {...buyMaterialsExport.tableProps}
                 rowContextMenu={rowContextMenu}
@@ -302,7 +304,7 @@ export function GroupMaterialsPanel({
                 stackLayout="dense"
                 mobileSort
               />
-            </div>
+            </TableScroll>
           ) : null}
         </Panel>
         <p className="text-xs text-text-dim">{t('industry.groupEstimateNote')}</p>

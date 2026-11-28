@@ -204,6 +204,20 @@ describe('SkillDetailModal', () => {
     ).toBeInTheDocument();
   });
 
+  it('says the trained level in the facts line, even for a level with no unlocks', async () => {
+    useActiveCharacter.setState({ activeCharacterId: CHAR_ID, hydrated: true });
+    mockSkills(CHAR_ID, [{ skill_id: 2, trained_skill_level: 4 }]);
+    renderModal();
+    act(() => useSkillDetailModalStore.getState().open(2));
+
+    const dialog = await screen.findByRole('dialog');
+    expect(
+      await within(dialog).findByText(
+        'Spaceship Command · Rank 1 · Perception / Willpower · Trained IV'
+      )
+    ).toBeInTheDocument();
+  });
+
   it('prices the hub station and the whole hub region separately', async () => {
     mockBook([sellOrder(1_500_000, JITA_44), sellOrder(1_200_000, 60000364)]);
 
@@ -343,7 +357,7 @@ describe('SkillDetailModal', () => {
     const dialog = await screen.findByRole('dialog');
     await user.click(await within(dialog).findByRole('button', { name: 'Try again' }));
 
-    expect(within(dialog).getByRole('status', { name: 'Loading' })).toBeInTheDocument();
+    expect(await within(dialog).findByRole('status', { name: 'Loading' })).toBeInTheDocument();
     expect(within(dialog).queryByText('Could not load')).not.toBeInTheDocument();
 
     await act(async () => resolveRetry(FIXTURE_SKILLS));

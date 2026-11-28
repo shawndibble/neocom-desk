@@ -26,10 +26,16 @@ function renderRow(props: Partial<Parameters<typeof AcceleratorRow>[0]> = {}) {
 describe('AcceleratorRow', () => {
   it('says None when nothing is injected, and its sheet opens on the editor', async () => {
     renderRow();
-    await userEvent.click(screen.getByRole('button', { name: /^Accelerator\s*None/ }));
+    await userEvent.click(screen.getByRole('button', { name: /^Attributes\s*Accelerator · None/ }));
     const sheet = screen.getByRole('dialog', { name: 'Accelerator' });
     expect(sheet).toHaveTextContent('Time left');
     expect(sheet).toHaveTextContent('INT 38');
+  });
+
+  it('shows the attribute chips on the row itself', () => {
+    renderRow();
+    expect(screen.getByText('INT 38')).toBeVisible();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
   it('asks for the time left when the bonus was only detected', () => {

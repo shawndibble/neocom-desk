@@ -13,6 +13,8 @@ import {
   TextArea,
   TextInput,
   Tooltip,
+  Field,
+  Fields,
 } from '@/components/ui';
 import { parsePercent } from '@/lib/parsePercent';
 import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
@@ -88,6 +90,7 @@ export function ComposeFleetPayoutDialog({
   const [percentPick, setPercentPick] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [touched, setTouched] = useState(false);
 
   const savedHub = useMarketHub((state) => state.value);
   const savedPercent = useMarketPricePercent((state) => state.value);
@@ -242,38 +245,37 @@ export function ComposeFleetPayoutDialog({
       onClose={busy ? () => undefined : onClose}
       title={t('communities.payouts.compose.title')}
       placement="wide"
+      dirty={touched && !busy}
     >
       <form
         className="space-y-4 text-sm"
+        onInput={() => setTouched(true)}
         onSubmit={(e) => {
           e.preventDefault();
           if (canSubmit && !busy) void create();
         }}
       >
-        <label className="block space-y-1">
-          <span className="block text-xs text-text-dim">
-            {t('communities.payouts.compose.name')}
-          </span>
-          <TextInput
-            className="w-full"
-            value={name}
-            maxLength={MAX_PAYOUT_NAME_LENGTH}
-            placeholder={t('communities.payouts.compose.namePlaceholder')}
-            onChange={(e) => setName(e.target.value)}
-          />
-        </label>
+        <Fields variant="stacked">
+          <Field label={t('communities.payouts.compose.name')}>
+            <TextInput
+              value={name}
+              maxLength={MAX_PAYOUT_NAME_LENGTH}
+              placeholder={t('communities.payouts.compose.namePlaceholder')}
+              onChange={(e) => setName(e.target.value)}
+            />
+          </Field>
+        </Fields>
 
-        <label className="block space-y-1">
-          <span className="block text-xs text-text-dim">
-            {t('communities.payouts.compose.fleet')}
-          </span>
-          <TextArea
-            rows={4}
-            value={fleetText}
-            aria-describedby={`${id}-fleet`}
-            onChange={(e) => setFleetText(e.target.value)}
-          />
-        </label>
+        <Fields variant="stacked">
+          <Field label={t('communities.payouts.compose.fleet')}>
+            <TextArea
+              rows={4}
+              value={fleetText}
+              aria-describedby={`${id}-fleet`}
+              onChange={(e) => setFleetText(e.target.value)}
+            />
+          </Field>
+        </Fields>
         <div id={`${id}-fleet`} className="space-y-1 text-xs">
           {overLimit && (
             <p role="alert" className="text-danger">
@@ -296,17 +298,16 @@ export function ComposeFleetPayoutDialog({
           )}
         </div>
 
-        <label className="block space-y-1">
-          <span className="block text-xs text-text-dim">
-            {t('communities.payouts.compose.loot')}
-          </span>
-          <TextArea
-            rows={4}
-            value={lootText}
-            aria-describedby={`${id}-loot`}
-            onChange={(e) => setLootText(e.target.value)}
-          />
-        </label>
+        <Fields variant="stacked">
+          <Field label={t('communities.payouts.compose.loot')}>
+            <TextArea
+              rows={4}
+              value={lootText}
+              aria-describedby={`${id}-loot`}
+              onChange={(e) => setLootText(e.target.value)}
+            />
+          </Field>
+        </Fields>
         <div className="flex flex-wrap items-end gap-3">
           <label className="space-y-1">
             <span className="block text-xs text-text-dim">
@@ -347,7 +348,10 @@ export function ComposeFleetPayoutDialog({
             size="sm"
             label={t('communities.payouts.compose.basis')}
             value={basis}
-            onChange={setBasis}
+            onChange={(next) => {
+              setBasis(next);
+              setTouched(true);
+            }}
             options={[
               { value: 'buy', label: t('communities.payouts.compose.basisBuy') },
               { value: 'sell', label: t('communities.payouts.compose.basisSell') },
@@ -381,7 +385,10 @@ export function ComposeFleetPayoutDialog({
             size="sm"
             label={t('communities.payouts.compose.rule')}
             value={rule}
-            onChange={setRule}
+            onChange={(next) => {
+              setRule(next);
+              setTouched(true);
+            }}
             options={[
               { value: 'equal', label: t('communities.payouts.compose.ruleEqual') },
               { value: 'weighted', label: t('communities.payouts.compose.ruleWeighted') },
@@ -493,12 +500,11 @@ export function ComposeFleetPayoutDialog({
 
         {error && <InlineError>{error}</InlineError>}
         <DialogFooter>
-          <Button size="sm" variant="ghost" aria-disabled={busy || undefined} onClick={onClose}>
+          <Button variant="ghost" aria-disabled={busy || undefined} onClick={onClose}>
             {t('common.cancel')}
           </Button>
           <Tooltip content={!canSubmit ? t('common.needsInput') : null}>
             <Button
-              size="sm"
               variant="primary"
               type="submit"
               loading={busy}

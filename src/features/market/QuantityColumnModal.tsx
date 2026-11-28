@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Button, Modal, Radio, Tooltip } from '@/components/ui';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
 import type { AppraisalUnreadableLine } from '@/engine/market/appraisalPaste';
+import { TableScroll } from '@/components/ui/TableScroll';
 
 const PREVIEW_LINES = 3;
 
@@ -61,7 +62,7 @@ export function QuantityColumnModal({
     >
       <div className="flex flex-col gap-3">
         <p className="text-sm text-text-dim">{t('market.appraisal.quantityColumn.intro')}</p>
-        <div className="overflow-x-auto">
+        <TableScroll>
           <table className="w-full border-collapse font-mono text-[0.6875rem]">
             <thead>
               <tr>
@@ -84,7 +85,7 @@ export function QuantityColumnModal({
               ))}
             </tbody>
           </table>
-        </div>
+        </TableScroll>
         <fieldset className="flex flex-col">
           <legend className="pb-1 text-xs text-text-dim">
             {t('market.appraisal.quantityColumn.choices')}

@@ -1,7 +1,8 @@
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { usePricesUnavailableLabel } from '@/features/market/usePricesUnavailableLabel';
 import { useTranslation } from 'react-i18next';
-import { LiveStatus, Tooltip } from '@/components/ui';
+import { Tooltip } from '@/components/ui';
+import { Toast } from '@/components/ui/Toast';
 import {
   focusRingClassName,
   interactiveClassName,
@@ -18,15 +19,7 @@ import { PriceMark } from './LivePriceStatus';
 
 const COPIED_FEEDBACK_MS = 2000;
 
-function CopyableTotal({
-  value,
-  copied,
-  onCopied,
-}: {
-  value: number;
-  copied: boolean;
-  onCopied: () => void;
-}) {
+function CopyableTotal({ value, onCopied }: { value: number; onCopied: () => void }) {
   const { t } = useTranslation();
   const exact = t('common.iskExact', { amount: formatIsk(value, 0) });
 
@@ -36,7 +29,7 @@ function CopyableTotal({
   }
 
   return (
-    <Tooltip content={copied ? t('market.appraisal.copiedToClipboard') : exact}>
+    <Tooltip content={exact}>
       <button
         type="button"
         onClick={() => void copy()}
@@ -54,14 +47,12 @@ function HubFigure({
   shortLabel,
   value,
   state,
-  copied,
   onCopied,
 }: {
   label: string;
   shortLabel: string;
   value: number | null;
   state: HubComparisonRow['priceState'];
-  copied: boolean;
   onCopied: () => void;
 }) {
   return (
@@ -74,7 +65,7 @@ function HubFigure({
       </dt>
       <dd className="text-base text-text tabular-nums">
         <PriceMark state={state} />
-        {value === null ? '—' : <CopyableTotal value={value} copied={copied} onCopied={onCopied} />}
+        {value === null ? '—' : <CopyableTotal value={value} onCopied={onCopied} />}
       </dd>
     </div>
   );
@@ -134,7 +125,6 @@ export function HubCompareCards({
                   shortLabel={t('market.appraisal.sellShort')}
                   value={row.sell}
                   state={row.priceState}
-                  copied={copied === `${row.hub.id}:sell`}
                   onCopied={() => announceCopied(`${row.hub.id}:sell`)}
                 />
                 <HubFigure
@@ -142,7 +132,6 @@ export function HubCompareCards({
                   shortLabel={t('market.appraisal.buyShort')}
                   value={row.buy}
                   state={row.priceState}
-                  copied={copied === `${row.hub.id}:buy`}
                   onCopied={() => announceCopied(`${row.hub.id}:buy`)}
                 />
               </dl>
@@ -153,7 +142,9 @@ export function HubCompareCards({
           );
         })}
       </ul>
-      <LiveStatus>{copied === null ? '' : t('market.appraisal.copiedToClipboard')}</LiveStatus>
+      {copied !== null && (
+        <Toast message={t('market.appraisal.copiedToClipboard')} instance={copied} />
+      )}
     </>
   );
 }

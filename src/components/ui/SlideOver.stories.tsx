@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { SlideOver } from './SlideOver';
 
+/** @summary Non-modal panel over one edge (docs/adr/0008). */
 const meta = {
   title: 'ui/SlideOver',
   component: SlideOver,
@@ -17,8 +18,11 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
+/** @summary Right edge, the default. */
 export const Right: Story = { args: { side: 'right' } };
 
+/** @summary Left edge. */
 export const Left: Story = { args: { side: 'left' } };
 
+/** @summary `wide`: a panel holding a table, up to 64rem wide. */
 export const Wide: Story = { args: { wide: true, title: 'Cargo' } };

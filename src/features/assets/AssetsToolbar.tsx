@@ -7,6 +7,7 @@ import { AssetsFilterRow } from './AssetsFilterRow';
 import { selectionTotals } from './assetSelection';
 import type { AssetsData } from './useAssetsData';
 import type { AssetsRows } from './useAssetsRows';
+import { Well } from '@/components/ui/Well';
 
 export function AssetsToolbar({
   assetsData,
@@ -77,7 +78,7 @@ export function AssetsToolbar({
       {assetsResult && <AssetsFilterRow assetsData={assetsData} assetsRows={assetsRows} />}
 
       {selectMode && (
-        <div className="flex flex-wrap items-center gap-2 rounded-xs border border-line bg-panel-2 px-3 py-2">
+        <Well size="flat" className="flex flex-wrap items-center gap-2">
           {selectedIds.size > 0 && (
             <span className="whitespace-nowrap text-[0.6875rem] text-text-dim tabular-nums">
               {selectionParts.map((part, index) => (
@@ -130,7 +131,7 @@ export function AssetsToolbar({
               </Button>
             </>
           )}
-        </div>
+        </Well>
       )}
     </>
   );

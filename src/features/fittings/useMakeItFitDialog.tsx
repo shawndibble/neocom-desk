@@ -1,6 +1,6 @@
 import { useCallback, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Toast, useTimedToast } from '@/components/ui';
+import { Toast } from '@/components/ui';
 import { swapModuleType } from '@/engine/fittings/fittingEdit';
 import type { Fitting } from '@/engine/fittings/types';
 import type { FitResource } from './makeItFitContext';
@@ -33,7 +33,6 @@ export function useMakeItFitDialog({
   const { t } = useTranslation();
   const [resource, setResource] = useState<FitResource | null>(null);
   const [applied, setApplied] = useState<string | null>(null);
-  useTimedToast(applied, () => setApplied(null));
   const open = useCallback((next: FitResource) => setResource(next), []);
 
   const dialog = fitting && (
@@ -92,7 +91,7 @@ export function useMakeItFitDialog({
           );
         }}
       />
-      {applied !== null && <Toast message={applied} />}
+      {applied !== null && <Toast message={applied} onClose={() => setApplied(null)} />}
     </>
   );
   return { open, dialog };

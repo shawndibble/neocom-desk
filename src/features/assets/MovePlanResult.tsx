@@ -2,8 +2,10 @@ import { formatCount } from '@/lib/formatCount';
 import { useRef, useState, type ReactNode, type Ref } from 'react';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 import { useTranslation } from 'react-i18next';
-import { Button, Checkbox, Eyebrow, Modal } from '@/components/ui';
+import { Button, Checkbox, Eyebrow } from '@/components/ui';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
+import { Well } from '@/components/ui/Well';
 import {
   CUSTOM_HAULER_TYPE_ID,
   type HaulerOverride,
@@ -142,10 +144,13 @@ export function PlanResult({
         {t('assets.movePlan.title')}
       </h3>
       {active ? (
-        <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-4 gap-y-1 rounded-xs border border-accent-dim bg-accent/10 px-3.5 py-3 sm:grid-cols-[auto_minmax(0,1fr)_auto]">
-          <div className="min-w-14 text-center text-4xl leading-none font-bold text-accent tabular-nums">
+        <Well
+          size="lg"
+          className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-4 gap-y-1 sm:grid-cols-[auto_minmax(0,1fr)_auto]"
+        >
+          <div className="min-w-14 text-center text-3xl leading-none font-bold tabular-nums">
             {withShips(active.trips, tooBig)}
-            <small className="mt-0.5 block text-xs font-semibold tracking-wide uppercase">
+            <small className="mt-0.5 block text-xs font-semibold tracking-widest text-text-dim uppercase">
               {t('assets.movePlan.tripsLabel', { count: withShips(active.trips, tooBig) })}
             </small>
           </div>
@@ -171,21 +176,21 @@ export function PlanResult({
               <MaxIskInput value={maxIsk} onChange={onChangeMaxIsk} />
             </div>
           )}
-        </div>
+        </Well>
       ) : (
         <>
           {totals.shipsToFly > 0 && (
-            <div className="flex items-center gap-4 rounded-xs border border-accent-dim bg-accent/10 px-3.5 py-3">
-              <div className="min-w-14 text-center text-4xl leading-none font-bold text-accent tabular-nums">
+            <Well size="lg" className="flex items-center gap-4">
+              <div className="min-w-14 text-center text-3xl leading-none font-bold tabular-nums">
                 {totals.shipsToFly}
-                <small className="mt-0.5 block text-xs font-semibold tracking-wide uppercase">
+                <small className="mt-0.5 block text-xs font-semibold tracking-widest text-text-dim uppercase">
                   {t('assets.movePlan.tripsLabel', { count: totals.shipsToFly })}
                 </small>
               </div>
               <span className="text-sm font-bold">
                 {t('assets.movePlan.shipFlightCount', { count: totals.shipsToFly })}
               </span>
-            </div>
+            </Well>
           )}
           {totals.totalM3 > 0 && <MaxIskInput value={maxIsk} onChange={onChangeMaxIsk} />}
           {totals.totalM3 > 0 && (
@@ -411,38 +416,28 @@ export function PlanResult({
           )}
         </div>
       </div>
-      <Modal
+      <ConfirmDialog
         open={asking !== null}
         onClose={() => setAsking(null)}
         title={t('assets.movePlan.packTitle', { ship: asking ? name(asking.typeId) : '' })}
+        body={t('assets.movePlan.packRigWarning', { count: asking?.rigs ?? 0 })}
+        actionLabel={t('assets.movePlan.packAnyway')}
+        cancelLabel={t('assets.movePlan.cancel')}
         returnFocusFallback={() => firstConnected([pickupHeading])}
+        onConfirm={async () => {
+          if (!asking) return;
+          if (dontRemind) void setSkipRigWarning(true);
+          onPackShip(asking.itemId);
+          focusAfterCommit(pickupHeading);
+        }}
       >
-        <div className="flex flex-col gap-3 text-sm">
-          <p className="m-0">{t('assets.movePlan.packRigWarning', { count: asking?.rigs ?? 0 })}</p>
-          <label className={`flex cursor-pointer items-center gap-2 ${tappableRowClassName}`}>
-            <Checkbox checked={dontRemind} onChange={(e) => setDontRemind(e.target.checked)} />
-            {t('assets.movePlan.dontRemind')}
-          </label>
-          <div className="flex justify-end gap-2">
-            <Button variant="ghost" onClick={() => setAsking(null)}>
-              {t('assets.movePlan.cancel')}
-            </Button>
-            <Button
-              variant="danger"
-              onClick={() => {
-                if (asking) {
-                  if (dontRemind) void setSkipRigWarning(true);
-                  onPackShip(asking.itemId);
-                  focusAfterCommit(pickupHeading);
-                }
-                setAsking(null);
-              }}
-            >
-              {t('assets.movePlan.packAnyway')}
-            </Button>
-          </div>
-        </div>
-      </Modal>
+        <label
+          className={`mt-3 flex cursor-pointer items-center gap-2 text-xs ${tappableRowClassName}`}
+        >
+          <Checkbox checked={dontRemind} onChange={(e) => setDontRemind(e.target.checked)} />
+          {t('assets.movePlan.dontRemind')}
+        </label>
+      </ConfirmDialog>
     </div>
   );
 }
@@ -474,7 +469,7 @@ function PlanCharacter({
 function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex flex-col-reverse">
-      <dt className="text-xs tracking-wide text-text-dim uppercase">{label}</dt>
+      <dt className="text-xs tracking-widest text-text-dim uppercase">{label}</dt>
       <dd className="m-0 text-base font-bold tabular-nums">{value}</dd>
     </div>
   );

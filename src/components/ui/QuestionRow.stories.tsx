@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { QuestionRow } from './QuestionRow';
 
+/** @summary A body-size FAQ row that opens its answer below. */
 const meta = {
   title: 'ui/QuestionRow',
   component: QuestionRow,
@@ -46,6 +47,8 @@ function Demo({ framed }: { framed: boolean }) {
 
 const ARGS = { question: '', expanded: false, onToggle: () => {}, children: null };
 
+/** @summary Each question in its own card (Help › FAQ). */
 export const Cards: Story = { args: ARGS, render: () => <Demo framed /> };
 
+/** @summary Hairline-divided in one box, answers dimmed (the landing page). */
 export const Divided: Story = { args: ARGS, render: () => <Demo framed={false} /> };

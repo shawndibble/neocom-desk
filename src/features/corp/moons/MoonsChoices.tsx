@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { Button, Panel, TextInput, Tooltip, LiveNote } from '@/components/ui';
+import { Button, Panel, TextInput, Tooltip, LiveNote, Field, Fields } from '@/components/ui';
 import { parseInviteInput } from '../taxBook/feederClient';
 
 export type SetupChoice = 'own' | 'consent' | 'collect';
@@ -56,12 +56,11 @@ export function MoonsChoices({
               <p className="text-text-dim">{t('corpTaxBook.moons.setup.handled.hint')}</p>
             </div>
             <div className="space-y-2">
-              <label className="block space-y-1">
-                <span className="block text-xs text-text-dim">
-                  {t('corpTaxBook.moons.setup.paste')}
-                </span>
-                <TextInput value={paste} onChange={(e) => onPaste(e.target.value)} />
-              </label>
+              <Fields variant="stacked">
+                <Field label={t('corpTaxBook.moons.setup.paste')}>
+                  <TextInput value={paste} onChange={(e) => onPaste(e.target.value)} />
+                </Field>
+              </Fields>
               <Tooltip
                 content={
                   parseInviteInput(paste) === null

@@ -98,6 +98,7 @@ import { useKeyedLoad } from '@/lib/useAsyncLoad';
 import { useDebouncedValue } from '@/lib/useDebouncedValue';
 import { useUrlParams } from '@/lib/useUrlState';
 import { boolParam, enumParam, optionalIntParam, textParam } from '@/lib/urlState';
+import { Well } from '@/components/ui/Well';
 
 const CATEGORY_PARAM = categoryPickParam();
 
@@ -494,6 +495,7 @@ function CorpAssetsView({
     />
   );
 
+  const targetsPending = !targetsApi.hydrated || data?.corporationId == null;
   const renderToolbar = (columnPicker: ReactNode, exportMenu: ReactNode) => (
     <div className="space-y-2">
       <FilterBar<PlaceFilter>
@@ -610,17 +612,15 @@ function CorpAssetsView({
               : undefined
           }
         />
-        <Tooltip
-          content={!targetsApi.hydrated || data?.corporationId == null ? t('common.loading') : null}
-        >
-          <Button
-            className="ml-auto"
-            aria-disabled={!targetsApi.hydrated || data?.corporationId == null || undefined}
-            onClick={() => setTargetsOpen(true)}
-          >
-            {t('corp.assets.stockTargetsButton')}
-          </Button>
-        </Tooltip>
+        <IconButton
+          className="ml-auto"
+          icon={<Icon.StockTargets />}
+          label={t('corp.assets.stockTargetsButton')}
+          visibleLabel={t('corp.assets.stockTargetsButton')}
+          tooltip={targetsPending ? t('common.loading') : undefined}
+          aria-disabled={targetsPending || undefined}
+          onClick={() => setTargetsOpen(true)}
+        />
       </div>
     </div>
   );
@@ -701,12 +701,11 @@ function CorpAssetsView({
                     inputs: data.inputs,
                     version: String(data.fetchedAt?.getTime() ?? ''),
                   }}
-                  onClose={() => selectTab('all')}
                 />
               ) : (
                 <>
                   {selectMode && !byLocation && (
-                    <div className="flex flex-wrap items-center gap-2 rounded-xs border border-line bg-panel-2 px-3 py-2">
+                    <Well size="flat" className="flex flex-wrap items-center gap-2">
                       {selectedKeys.size > 0 && (
                         <span
                           aria-hidden="true"
@@ -763,7 +762,7 @@ function CorpAssetsView({
                           </Button>
                         </>
                       )}
-                    </div>
+                    </Well>
                   )}
                   <Panel padded={false} className="flex min-h-0 flex-col">
                     {byLocation ? (

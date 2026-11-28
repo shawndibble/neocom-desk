@@ -1,7 +1,6 @@
 import { InlineError } from '@/components/ui/InlineError';
 import { Panel, Toast } from '@/components/ui';
 import { useTranslation } from 'react-i18next';
-import { useIsDesktop } from '@/lib/useIsDesktop';
 import { ImplantsAssumedNote } from '@/features/character/ImplantsAssumedNote';
 import type { SkillQueueEntry } from '@/esi/endpoints';
 import type { PlanMilestone } from '@/engine/types';
@@ -9,6 +8,7 @@ import { useMilestones } from './useMilestones';
 import { SkillPicker } from './SkillPicker';
 import { EntryList } from './EntryList';
 import { PlanEditorLayout } from './PlanEditorLayout';
+import { useIsXlUp } from '@/lib/useIsXlUp';
 import { LiveQueueLead } from './LiveQueueLead';
 import { addEntry } from './skillPlanEdit';
 import { EntryListControls } from './planEditor/EntryListControls';
@@ -62,7 +62,7 @@ export function PlanEditor({
   onUpdate,
 }: PlanEditorProps) {
   const { t } = useTranslation();
-  const isDesktop = useIsDesktop();
+  const isDesktop = useIsXlUp();
   const { focusName, pastedPlanText } = usePlanLocationFlags(isDesktop);
   const viewPrefs = usePlanViewPrefs();
   const assumptions = usePlanAssumptions({

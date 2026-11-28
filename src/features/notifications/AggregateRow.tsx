@@ -127,7 +127,7 @@ export function AggregateRow({
           open && isDesktop && 'bg-panel-2'
         )}
       >
-        <div className="flex min-w-0 items-start gap-1.5 md:col-start-1 md:row-start-1">
+        <div className="flex min-w-0 items-start gap-1.5 lg:col-start-1 lg:row-start-1">
           <button
             type="button"
             aria-expanded={open}
@@ -145,9 +145,9 @@ export function AggregateRow({
               {label}
             </span>
           </button>
-          {labelAccessory !== undefined && <span className="py-3 md:py-2">{labelAccessory}</span>}
+          {labelAccessory !== undefined && <span className="py-3 lg:py-2">{labelAccessory}</span>}
         </div>
-        <div className="flex flex-wrap items-center gap-x-5 pl-6 md:contents">
+        <div className="flex flex-wrap items-center gap-x-5 pl-6 lg:contents">
           {NOTIFICATION_CHANNELS.map((channel, index) => (
             <div key={channel} className={index === 0 ? DEVICE_CELL : ALERTS_CELL}>
               <ChannelOffTip reason={channelOff[channel]}>
@@ -159,7 +159,7 @@ export function AggregateRow({
                     event: label,
                   })}
                   caption={t(`settings.notifications.column.${channel}`)}
-                  captionClassName="md:hidden"
+                  captionClassName="lg:hidden"
                 />
               </ChannelOffTip>
             </div>
@@ -167,7 +167,7 @@ export function AggregateRow({
           {summaryText !== null && (
             <span
               className={cx(
-                'ml-auto shrink-0 rounded-xs border px-1.5 py-0.5 font-mono text-[0.6875rem] md:col-start-5 md:row-start-1 md:ml-0 md:justify-self-start',
+                'ml-auto shrink-0 rounded-xs border px-1.5 py-0.5 font-mono text-[0.6875rem] lg:col-start-5 lg:row-start-1 lg:ml-0 lg:justify-self-start',
                 applicableIds.length > 0 && !summary.alike
                   ? 'border-warning/60 text-warning'
                   : 'border-line text-text-dim'
@@ -178,7 +178,7 @@ export function AggregateRow({
           )}
         </div>
         {warnAhead !== undefined && (
-          <div className="pl-6 md:col-start-4 md:row-start-1 md:pl-0">
+          <div className="pl-6 lg:col-start-4 lg:row-start-1 lg:pl-0">
             <button
               type="button"
               aria-expanded={warnOpen}
@@ -197,10 +197,10 @@ export function AggregateRow({
       </div>
       {notes !== undefined && <div className="space-y-1 px-3 pt-0.5 pb-2 pl-8">{notes}</div>}
       {warnOpen && warnAhead !== undefined && (
-        <div className="border-t border-line bg-panel-2 px-3 py-3 md:pl-8">{warnAhead.body}</div>
+        <div className="border-t border-line bg-panel-2 px-3 py-3 lg:pl-8">{warnAhead.body}</div>
       )}
       {open && isDesktop && (
-        <div className="border-t border-line bg-panel-2 px-3 py-3 md:pl-8">{body}</div>
+        <div className="border-t border-line bg-panel-2 px-3 py-3 lg:pl-8">{body}</div>
       )}
       {!isDesktop && (
         <Modal open={open} onClose={() => setChosen(false)} title={label} placement="sheet-full">

@@ -15,6 +15,7 @@ import type { FanOutCharacter } from '@/features/character/allCharactersFanOut';
 import { JOURNAL_FIELD_TO_PARAM } from '@/features/character/walletJournalFilter';
 import { IskFlowLegend } from '@/features/character/IskFlowLegend';
 import { formatIsk } from '@/lib/isk';
+import { formatDateWithYear } from '@/lib/formatDateTick';
 import { useWalletRange } from './walletRange';
 import { COARSE_POINTER_QUERY, useMediaQuery } from '@/lib/useMediaQuery';
 
@@ -133,7 +134,7 @@ export function CashFlowPanel({ characters }: CashFlowPanelProps) {
       <p className="mt-2 flex flex-wrap items-baseline justify-between gap-2 text-xs text-text-dim">
         <span>
           {flow.partial && flow.coveredFrom
-            ? t('wallet.cashFlow.partial', { day: flow.coveredFrom })
+            ? t('wallet.cashFlow.partial', { day: formatDateWithYear(flow.coveredFrom) })
             : t('wallet.cashFlow.lagNote')}
           {truncated && ` ${t('wallet.journalTruncatedHint')}`}
           {snapshot.skipped.length > 0 &&

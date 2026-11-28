@@ -15,8 +15,10 @@ import {
   compareRows,
   primaryAction,
   sortRows,
+  statusFilterView,
   todayCheck,
   HOUR_MS,
+  type CheckStatus,
   type ColonyCheckRow,
   type StatusFacts,
 } from './coloniesModel';
@@ -264,6 +266,75 @@ describe('attention sort', () => {
     const rows = [row({ planetId: 1 }), row({ planetId: 2, status: 'stopped' })];
     sortRows(rows);
     expect(rows[0].planetId).toBe(1);
+  });
+});
+
+describe('statusFilterView', () => {
+  const rows = [
+    row({ planetId: 1, status: 'stopped' }),
+    row({ planetId: 2, status: 'expiring' }),
+    row({ planetId: 3, status: 'needs-look' }),
+    row({ planetId: 4, status: 'healthy' }),
+    row({ planetId: 5, status: 'unknown' }),
+  ];
+  const ids = (statuses: CheckStatus[]) =>
+    statusFilterView(rows, [], new Set(statuses)).ownRows.map((r) => r.planetId);
+
+  it('keeps every row when no status is picked', () => {
+    expect(ids([])).toEqual([1, 2, 3, 4, 5]);
+  });
+
+  it('keeps only the rows in the one picked status', () => {
+    expect(ids(['stopped'])).toEqual([1]);
+    expect(ids(['expiring'])).toEqual([2]);
+  });
+
+  it('keeps the union of the picked statuses', () => {
+    expect(ids(['expiring', 'stopped'])).toEqual([1, 2]);
+  });
+
+  const alt = (planetId: number, status: CheckStatus, expiryHours: number | null) => ({
+    row: row({
+      key: `2:${planetId}`,
+      characterId: 2,
+      planetId,
+      status,
+      extractor: {
+        expiryMs: expiryHours === null ? null : NOW + expiryHours * HOUR_MS,
+        remainingFraction: 0.5,
+        due: 1,
+        total: 1,
+      },
+    }),
+  });
+  const group = {
+    characterId: 2,
+    colonies: [alt(11, 'stopped', -5), alt(12, 'expiring', 3), alt(13, 'healthy', 40)],
+  };
+
+  it('counts the chips across own and alt rows, keeping a picked chip at zero', () => {
+    const view = statusFilterView([row({ status: 'healthy' })], [group], new Set(['stopped']));
+    expect(view.chips).toEqual([
+      { status: 'stopped', count: 1 },
+      { status: 'expiring', count: 1 },
+    ]);
+    const none = statusFilterView([row({ status: 'healthy' })], [], new Set(['stopped']));
+    expect(none.chips).toEqual([{ status: 'stopped', count: 0 }]);
+  });
+
+  it('summarises each alt group from its shown rows only', () => {
+    const all = statusFilterView([], [group], new Set());
+    expect(all.altGroups[0].summary).toEqual({ stoppedCount: 1, nextExpiryMs: NOW + 3 * HOUR_MS });
+    const healthyOnly = statusFilterView([], [group], new Set(['healthy']));
+    expect(healthyOnly.altGroups[0].colonies.map((c) => c.row.planetId)).toEqual([13]);
+    expect(healthyOnly.altGroups[0].summary).toEqual({
+      stoppedCount: 0,
+      nextExpiryMs: NOW + 40 * HOUR_MS,
+    });
+  });
+
+  it('drops an alt group with nothing left to show', () => {
+    expect(statusFilterView([], [group], new Set(['needs-look'])).altGroups).toEqual([]);
   });
 });
 

@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { DataTable, DataTableSortPicker, type DataTableColumn } from './DataTable';
+import { TableScroll } from './TableScroll';
 
 interface Row {
   name: string;
@@ -33,8 +34,10 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
+/** @summary Rows with sortable columns. */
 export const Sortable: Story = {};
 
+/** @summary Opens already sorted by quantity, largest first. */
 export const DefaultSorted: Story = {
   args: { defaultSort: { columnId: 'quantity', direction: 'desc' } },
 };
@@ -48,6 +51,7 @@ const groupedRows: Row[] = [
   { name: 'Mexallon', quantity: 50 },
 ];
 
+/** @summary Groups ranked by `groupCompare` (most rows first) while the rows inside each stay in the column sort. */
 export const GroupsOrderedByCompare: Story = {
   args: {
     rows: groupedRows,
@@ -77,13 +81,16 @@ const denseColumns = [
 
 const phone = { globals: { viewport: { value: 'phone390', isRotated: false } } } as const;
 
+/** @summary Tighter rows for a long list. */
 export const Compact: Story = { args: { density: 'compact' } };
 
+/** @summary Phone cards: one labelled field per line, with a phone sort picker. */
 export const PhoneCards: Story = {
   args: { stacked: true, mobileSort: true, stackSummary: '3 materials' },
   ...phone,
 };
 
+/** @summary Icon-only sort picker: a 36px icon button with the OS picker laid over it. */
 export const SortPickerIconOnly: Story = {
   render: () => (
     <DataTableSortPicker
@@ -97,11 +104,13 @@ export const SortPickerIconOnly: Story = {
   ...phone,
 };
 
+/** @summary Phone cards with two short figures side by side, label above the value. */
 export const PhoneCardsTwoColumns: Story = {
   args: { stacked: true, stackColumns: 2 },
   ...phone,
 };
 
+/** @summary Phone dense cards: two-line rows for scanning a long list. */
 export const PhoneDenseCards: Story = {
   args: {
     stacked: true,
@@ -111,6 +120,7 @@ export const PhoneDenseCards: Story = {
   ...phone,
 };
 
+/** @summary Phone cards that open in place: a trailing chevron says so and turns when open. */
 export const PhoneCardsExpandable: Story = {
   args: {
     stacked: true,
@@ -126,4 +136,34 @@ export const PhoneCardsExpandable: Story = {
   ...phone,
 };
 
+/** @summary Keeps real columns on a phone and scrolls sideways; right when comparing across columns is the point. */
 export const TableOnPhone: Story = { args: { responsive: 'table' }, ...phone };
+
+const wideColumns = [
+  ...columns,
+  { id: 'unit', header: 'Unit price', align: 'right', render: () => '4.12 ISK' },
+  {
+    id: 'total',
+    header: 'Total value',
+    align: 'right',
+    render: (r) => `${(r.quantity * 4.12).toLocaleString('en')} ISK`,
+  },
+  {
+    id: 'hub',
+    header: 'Trade hub',
+    render: () => 'Jita IV - Moon 4 - Caldari Navy Assembly Plant',
+  },
+] as DataTableColumn<Row>[] as unknown as DataTableColumn<unknown>[];
+
+/** @summary `TableScroll` around the table: a right-edge band shows while columns lie past it (§6c). */
+export const TableOnPhoneEdgeFade: Story = {
+  args: { responsive: 'table', columns: wideColumns },
+  decorators: [
+    (Story) => (
+      <TableScroll>
+        <Story />
+      </TableScroll>
+    ),
+  ],
+  ...phone,
+};

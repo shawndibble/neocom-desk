@@ -14,7 +14,7 @@ import {
   StatChip,
   StatChips,
   Tooltip,
-  LiveNote,
+  Spinner,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { mailableAfterClose } from '@/engine/corpTaxBook/closeAccount';
@@ -439,9 +439,11 @@ export function LateNoticeRun() {
                   </fieldset>
                   {!inline && minerPicker}
                   {corporationName === null && (
-                    <LiveNote className="text-text-dim">
-                      {t('corpTaxBook.moons.run.loadingCorporation')}
-                    </LiveNote>
+                    <Spinner
+                      size="sm"
+                      showLabel
+                      label={t('corpTaxBook.moons.run.loadingCorporation')}
+                    />
                   )}
                   <div className="flex flex-wrap gap-2">
                     <Tooltip content={canEdit && total === 0 ? t('common.nothingToDo') : null}>
@@ -475,9 +477,11 @@ export function LateNoticeRun() {
                   </p>
                   <MailLimitNotice count={total} senderName={names.character(characterId)} />
                   {corporationName === null && (
-                    <LiveNote className="text-text-dim">
-                      {t('corpTaxBook.moons.run.loadingCorporation')}
-                    </LiveNote>
+                    <Spinner
+                      size="sm"
+                      showLabel
+                      label={t('corpTaxBook.moons.run.loadingCorporation')}
+                    />
                   )}
                   {error && (
                     <p role="alert" className="text-danger">
@@ -540,9 +544,12 @@ export function LateNoticeRun() {
                 {editablePreview ? (
                   <div className="max-h-[36rem] overflow-y-auto">{editablePreview}</div>
                 ) : (
-                  <p className="text-sm text-text-dim">
-                    {t('corpTaxBook.moons.run.loadingCorporation')}
-                  </p>
+                  <Spinner
+                    size="sm"
+                    showLabel
+                    label={t('corpTaxBook.moons.run.loadingCorporation')}
+                    className="text-sm"
+                  />
                 )}
               </section>
             )}

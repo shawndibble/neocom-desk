@@ -38,8 +38,8 @@ function CeoCard({ corp }: { corp: AddCorpsCandidate }) {
     <div className="flex items-center gap-3 rounded-xs border border-accent/40 bg-panel p-3">
       <CharacterAvatar characterId={corp.ceoCharacterId} size="lg" alt={corp.ceoName} />
       <div className="min-w-0">
-        <p className="text-xs tracking-wide text-text-dim uppercase">{t(k('choose'))}</p>
-        <p className="truncate text-lg font-semibold">{corp.ceoName}</p>
+        <p className="text-xs tracking-widest text-text-dim uppercase">{t(k('choose'))}</p>
+        <p className="truncate text-base font-semibold">{corp.ceoName}</p>
         <p className="truncate text-text-dim">{t(k('ceoOf'), { name: corp.name })}</p>
       </div>
     </div>

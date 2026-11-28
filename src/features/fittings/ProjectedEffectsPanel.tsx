@@ -102,7 +102,6 @@ export function ProjectedEffectsPanel() {
                   <IconButton
                     variant="plain"
                     size="sm"
-                    tone="danger"
                     icon={<Icon.Close />}
                     label={t('fittings.projected.remove', { name: source.name })}
                     onClick={() => update((current) => current.filter((s) => s.id !== source.id))}

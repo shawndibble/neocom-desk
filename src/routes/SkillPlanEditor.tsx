@@ -13,9 +13,10 @@ import { SkillsPageHeader } from '@/features/skills/SkillsPageHeader';
 import { SkillsSubNav } from '@/features/skills/SkillsSubNav';
 import { PlanEditor, type PlanPatch } from '@/features/skills/planner/PlanEditor';
 import { PlanEditorLayout } from '@/features/skills/planner/PlanEditorLayout';
+import { useIsXlUp } from '@/lib/useIsXlUp';
 import { PlanListPane } from '@/features/skills/planner/PlanListPane';
 import { usePlanEditorData } from '@/features/skills/planner/usePlanEditorData';
-import { useIsDesktop } from '@/lib/useIsDesktop';
+import { useDocumentTitleName } from '@/app/documentTitleName';
 
 export function SkillPlanEditor() {
   const { t } = useTranslation();
@@ -43,7 +44,7 @@ export function SkillPlanEditor() {
     loaded && catalogFailed ? 'failed' : 'busy',
     activeCharacterId
   );
-  const isDesktop = useIsDesktop();
+  const isDesktop = useIsXlUp();
   const navigate = useNavigate();
   const location = useLocation();
   const stateMessage = (location.state as Partial<OptimizeQueueToastState> | null)
@@ -83,6 +84,7 @@ export function SkillPlanEditor() {
   }, [planId]);
 
   const loadedPlan = planQuery?.plan ?? null;
+  useDocumentTitleName(loadedPlan?.name);
   const handleUpdate = useCallback(
     async (patch: PlanPatch) => {
       if (!loadedPlan) return;

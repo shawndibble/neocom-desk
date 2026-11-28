@@ -42,7 +42,7 @@ export function QuickPicks({
     pick.kind === 'incursion' ? t('travel.quick.incursion', { system: pick.name }) : pick.name;
   return (
     <div role="group" aria-labelledby={labelId} className="flex flex-wrap items-center gap-2">
-      <span id={labelId} className="text-xs font-semibold uppercase tracking-wider text-text-dim">
+      <span id={labelId} className="text-xs font-semibold uppercase tracking-widest text-text-dim">
         {t('travel.quick.label')}
       </span>
       {picks.map((pick) => (

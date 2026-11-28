@@ -1,3 +1,4 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useNavBadges } from './navBadges';
 import { Fragment, memo, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
@@ -93,10 +94,7 @@ function GoToButton() {
 
 function NavGroupLabel({ id, children }: { id: string; children: string }) {
   return (
-    <p
-      id={id}
-      className="mt-3 px-2 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
-    >
+    <p id={id} className={`${eyebrowClassName} mt-3 px-2`}>
       {children}
     </p>
   );
@@ -235,6 +233,35 @@ const RailNavBody = memo(function RailNavBody({
   const focusAfterCommit = useFocusAfterCommit();
   const doneRef = useRef<HTMLButtonElement>(null);
   const editRef = useRef<HTMLButtonElement>(null);
+  const navRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const nav = navRef.current;
+    if (!nav) return;
+    const reveal = () => {
+      const marked = nav.querySelectorAll('[aria-current="page"]');
+      const item = marked[marked.length - 1];
+      if (!item) return;
+      const box = nav.getBoundingClientRect();
+      const { top, bottom } = item.getBoundingClientRect();
+      const offset = top < box.top ? top - box.top : bottom > box.bottom ? bottom - box.bottom : 0;
+      if (offset !== 0) nav.scrollBy?.({ top: offset });
+    };
+    reveal();
+    const grown = typeof MutationObserver === 'undefined' ? null : new MutationObserver(reveal);
+    grown?.observe(nav, { childList: true, subtree: true });
+    const resized = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(reveal);
+    resized?.observe(nav);
+    const settle = () => {
+      grown?.disconnect();
+      resized?.disconnect();
+    };
+    const userEvents = ['pointerdown', 'wheel', 'focusin', 'keydown'] as const;
+    for (const type of userEvents) nav.addEventListener(type, settle, { passive: true });
+    return () => {
+      settle();
+      for (const type of userEvents) nav.removeEventListener(type, settle);
+    };
+  }, [current, activeViewPath]);
 
   const [open, setOpen] = useState<{ for: NavPagePath | null; path: string | null }>({
     for: current,
@@ -268,6 +295,7 @@ const RailNavBody = memo(function RailNavBody({
     <>
       <GoToButton />
       <nav
+        ref={navRef}
         aria-label={t('nav.railLabel')}
         className="flex flex-1 flex-col gap-0.5 overflow-y-auto p-2"
       >

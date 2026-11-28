@@ -1,6 +1,6 @@
 import { useContext, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Checkbox, Field, FilterChip, Panel, SegmentedControl, Spinner } from '@/components/ui';
+import { Checkbox, Field, Panel, SegmentedControl, Spinner } from '@/components/ui';
 import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
 import { FieldNoteContext } from '@/components/ui/fieldNote';
 
@@ -83,46 +83,6 @@ export function CheckboxField({
       <label className={touchCheckboxLabelClassName}>
         <Checkbox id={id} checked={checked} onChange={onChange} />
       </label>
-    </Field>
-  );
-}
-
-function ChipGroup({ label, children }: { label: string; children: ReactNode }) {
-  const noteId = useContext(FieldNoteContext);
-  return (
-    <div role="group" aria-label={label} aria-describedby={noteId} className="flex flex-wrap gap-2">
-      {children}
-    </div>
-  );
-}
-
-export function ChipRow<T extends string | number>({
-  label,
-  hint,
-  options,
-  selected,
-  onSelect,
-  labelFor,
-}: {
-  label: string;
-  hint?: string;
-  options: readonly T[];
-  selected: T;
-  onSelect: (value: T) => void;
-  labelFor: (value: T) => string;
-}) {
-  return (
-    <Field label={label} note={hint}>
-      <ChipGroup label={label}>
-        {options.map((option) => (
-          <FilterChip
-            key={String(option)}
-            label={labelFor(option)}
-            selected={selected === option}
-            onToggle={() => onSelect(option)}
-          />
-        ))}
-      </ChipGroup>
     </Field>
   );
 }

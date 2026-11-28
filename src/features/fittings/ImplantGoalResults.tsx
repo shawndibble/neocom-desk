@@ -34,6 +34,7 @@ import type { FittingStats } from '@/engine/fittings/types';
 import { marketLinkParams } from '@/engine/market/urlState';
 import { lpStorePath } from '@/features/loyalty/lpStorePath';
 import { getTradeHub } from '@/market/hubs';
+import { Well } from '@/components/ui/Well';
 import { type FamilyResult, type FixResult, type GradeResult } from './useImplantFinder';
 import { SourceNames } from './implantSourceNames';
 import { fmt } from './implantFinderFormat';
@@ -156,7 +157,7 @@ export function GoalResults({
         const sharedReplaces = displaced.size === 1 ? [...displaced][0]! : null;
         const single = grades.length === 1 ? grades[0]! : null;
         return (
-          <li key={family.key} className="space-y-1 rounded-xs border border-line bg-panel-2 p-2.5">
+          <Well as="li" size="md" key={family.key} className="space-y-1">
             <div className="flex items-start gap-2">
               <TypeIcon typeId={highest.typeId} size={32} width={28} height={28} />
               <div className="min-w-0 flex-1">
@@ -214,7 +215,7 @@ export function GoalResults({
                 );
               })}
             </ul>
-          </li>
+          </Well>
         );
       })}
     </ul>

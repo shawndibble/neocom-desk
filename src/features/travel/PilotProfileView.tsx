@@ -97,7 +97,9 @@ export function PilotProfileView(props: PilotProfileViewProps) {
   function retryStats() {
     setStats(null);
     setAttempt((n) => n + 1);
+    if (history.kind === 'failed') retryHistory();
   }
+  const hideActivity = killsUnknown || (zkillDown && history.kind === 'failed');
 
   return (
     <div className="@container/profile space-y-4">
@@ -110,11 +112,6 @@ export function PilotProfileView(props: PilotProfileViewProps) {
           context={{ read: threat.read, hereSpace, orgMatesHere }}
         />
       )}
-      {killsUnknown && (
-        <p className="text-sm text-text-dim">
-          {t('travel.pilot.threat.label')}: {t('travel.pilot.activity.unknown')}
-        </p>
-      )}
       {lossesUnreadable && (
         <p className="text-xs text-text-dim">{t('travel.pilot.threat.lossesUnknown')}</p>
       )}
@@ -123,6 +120,7 @@ export function PilotProfileView(props: PilotProfileViewProps) {
         corporationId={props.profile.corporationId}
         allianceId={props.profile.allianceId}
       />
+      {zkillDown && <ZkillStatsSection stats={stats} onRetry={retryStats} />}
       <div
         className={cx(
           'grid gap-3',
@@ -134,13 +132,13 @@ export function PilotProfileView(props: PilotProfileViewProps) {
             <ZkillRatioMeters stats={pilotStats} />
           </div>
         )}
-        <PilotKillActivityView history={history} onRetry={retryHistory} unknown={killsUnknown} />
+        {!hideActivity && <PilotKillActivityView history={history} onRetry={retryHistory} />}
       </div>
       <PilotShips
         kills={history.kind === 'ready' ? history.kills : null}
         flown={pilotStats?.topShips ?? null}
       />
-      <ZkillStatsSection stats={stats} onRetry={retryStats} />
+      {!zkillDown && <ZkillStatsSection stats={stats} onRetry={retryStats} />}
       <PilotKillmailsSection characterId={characterId} unknown={zkillDown} />
     </div>
   );
@@ -166,7 +164,7 @@ function PilotIdentity({
     <div className="flex items-start gap-3">
       <CharacterAvatar characterId={profile.characterId} size="lg" alt={profile.name} />
       <div className="min-w-0 space-y-0.5">
-        {!hideName && <h2 className="text-lg font-semibold text-text">{profile.name}</h2>}
+        {!hideName && <h2 className="text-xl font-semibold text-text">{profile.name}</h2>}
         <p className="flex flex-wrap items-center gap-x-1.5 text-sm">
           <span className="sr-only">{t('travel.pilot.corporation')}: </span>
           {onOpenCorporation ? (

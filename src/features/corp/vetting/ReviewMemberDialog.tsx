@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Modal, TextInput, LiveNote } from '@/components/ui';
+import { Button, Modal, TextInput, Field, Fields, Spinner } from '@/components/ui';
 import { CharacterAvatar } from '@/components/ui/CharacterAvatar';
 import { Pill } from '@/components/ui/Pill';
 import type { VettingReviewSummary } from '@/engine/vetting';
@@ -71,7 +71,6 @@ export function ReviewMemberDialog({
         open
         onClose={onClose}
         title={t('vetting.tell.title')}
-        placement={phone ? 'sheet' : 'center'}
         dismissOnOutsidePress={false}
         footer={
           <div className="flex justify-end gap-2 [&>button]:max-sm:w-full">
@@ -123,7 +122,6 @@ export function ReviewMemberDialog({
       open
       onClose={() => !busy && onClose()}
       title={t('vetting.requestDialog.title')}
-      placement={phone ? 'sheet' : 'center'}
       dismissOnOutsidePress={false}
       initialFocusRef={nameRef}
       footer={<DialogFooter stacked={phone}>{buttons}</DialogFooter>}
@@ -136,7 +134,7 @@ export function ReviewMemberDialog({
         }}
       >
         {roster.status === 'loading' ? (
-          <LiveNote className="text-xs text-text-dim">{t('vetting.member.loading')}</LiveNote>
+          <Spinner size="sm" showLabel label={t('vetting.member.loading')} className="text-xs" />
         ) : roster.status === 'ready' ? (
           picked ? (
             <PickedMember member={picked} onChange={() => setPicked(null)} />
@@ -151,16 +149,17 @@ export function ReviewMemberDialog({
           )
         ) : (
           <div className="space-y-1">
-            <label className="block space-y-1">
-              <span className="text-xs text-text-dim">{t('vetting.requestDialog.name')}</span>
-              <TextInput
-                ref={nameRef}
-                value={name}
-                onChange={(event) => setName(event.target.value)}
-                autoComplete="off"
-                spellCheck={false}
-              />
-            </label>
+            <Fields variant="stacked">
+              <Field label={t('vetting.requestDialog.name')}>
+                <TextInput
+                  ref={nameRef}
+                  value={name}
+                  onChange={(event) => setName(event.target.value)}
+                  autoComplete="off"
+                  spellCheck={false}
+                />
+              </Field>
+            </Fields>
             <p className="text-xs text-text-dim">{t('vetting.member.unreadable')}</p>
           </div>
         )}

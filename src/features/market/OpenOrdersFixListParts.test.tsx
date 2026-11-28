@@ -3,7 +3,7 @@ import { render, screen } from '@testing-library/react';
 import '@/i18n';
 import { FixListSummary } from './OpenOrdersFixListParts';
 
-const base = { actCount: 2, actIskTiedUp: 210_000_000, watchCount: 3, fineCount: 7 };
+const base = { actCount: 2, actIskTiedUp: 210_000_000 };
 
 describe('FixListSummary', () => {
   it('says nothing about the matching set while no funnel filter narrows', () => {

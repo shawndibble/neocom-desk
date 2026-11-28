@@ -44,6 +44,7 @@ import { UseGameLocationButton } from '@/features/route/UseGameLocationButton';
 import { SolarSystemSearchField } from '@/features/route/SolarSystemSearchField';
 import { useSolarSystemIndex } from '@/features/route/useSolarSystems';
 import { useIsPhone } from '@/lib/useIsPhone';
+import { usePrefersReducedMotion } from '@/lib/useMediaQuery';
 
 export type StopOrderSettings = Required<TripOptions>;
 
@@ -67,6 +68,7 @@ function StopRow({
   onRemove,
   onMove,
   count,
+  reducedMotion,
 }: {
   systemId: number;
   index: number;
@@ -76,10 +78,12 @@ function StopRow({
   onRemove: (index: number) => void;
   onMove: (from: number, to: number) => void;
   count: number;
+  reducedMotion: boolean;
 }) {
   const { t } = useTranslation();
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: systemId,
+    transition: reducedMotion ? null : undefined,
   });
   const hasMenu = count > 1;
   const li = (
@@ -179,6 +183,7 @@ export function StopsPanel({
 }) {
   const { t } = useTranslation();
   const isPhone = useIsPhone();
+  const reducedMotion = usePrefersReducedMotion();
   const [expanded, setExpanded] = useState(false);
   const systems = useSolarSystemIndex();
   const sensors = useSensors(
@@ -304,6 +309,7 @@ export function StopsPanel({
                       onRemove={remove}
                       onMove={move}
                       count={stops.length}
+                      reducedMotion={reducedMotion}
                     />
                   ))}
                 </ol>

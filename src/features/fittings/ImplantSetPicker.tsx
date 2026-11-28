@@ -240,7 +240,6 @@ function SlotList({ heading, typeIds, names, onRemove, onInfo, renderDetail }: S
                   <IconButton
                     variant="plain"
                     size="sm"
-                    tone="danger"
                     icon={<Icon.Close />}
                     label={t('fittings.implants.remove', { name })}
                     onClick={() => onRemove(index)}

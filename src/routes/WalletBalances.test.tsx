@@ -159,7 +159,7 @@ describe('Wallet', () => {
       window.history.pushState({}, '', '/wallet/lp-store');
       renderWalletRoute();
 
-      const title = await screen.findByRole('heading', { level: 1, name: 'LP Store' });
+      const title = await screen.findByRole('heading', { level: 1, name: 'Wallet' });
       expect(
         within(title.closest('header')!).queryByRole('button', { name: /characters?/i })
       ).toBeNull();

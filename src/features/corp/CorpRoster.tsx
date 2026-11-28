@@ -25,6 +25,7 @@ import {
   useVisibleCorpRosterColumns,
   type CorpRosterColumnId,
 } from './corpRosterColumns';
+import { TableScroll } from '@/components/ui/TableScroll';
 
 export interface RosterRow {
   characterId: number;
@@ -185,7 +186,7 @@ export function CorpRosterTable({
   }
 
   return (
-    <div className="overflow-x-auto">
+    <TableScroll>
       <DataTable
         {...tableProps}
         columns={shownColumns}
@@ -202,6 +203,6 @@ export function CorpRosterTable({
         rowMoreActions
         {...sortProps}
       />
-    </div>
+    </TableScroll>
   );
 }

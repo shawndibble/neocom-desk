@@ -90,9 +90,7 @@ export default function PublicInfoCorporationTab({
     ...(taxPercent === null
       ? []
       : [{ label: t('publicInfo.taxRate'), value: `${formatDecimal(taxPercent)}%` }]),
-    figures.kills,
-    figures.losses,
-    figures.iskDestroyed,
+    ...(stats?.kind === 'failed' ? [] : [figures.kills, figures.losses, figures.iskDestroyed]),
   ];
 
   return (

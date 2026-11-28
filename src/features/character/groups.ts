@@ -93,23 +93,16 @@ export function moveCharacterToGroup(
   );
 }
 
-export function reorderGroups(
+export function swapGroups(
   groups: readonly CharacterGroup[],
-  fromIndex: number,
-  toIndex: number
+  aId: string,
+  bId: string
 ): CharacterGroup[] {
-  if (
-    fromIndex === toIndex ||
-    fromIndex < 0 ||
-    fromIndex >= groups.length ||
-    toIndex < 0 ||
-    toIndex >= groups.length
-  ) {
-    return [...groups];
-  }
+  const a = groups.findIndex((group) => group.id === aId);
+  const b = groups.findIndex((group) => group.id === bId);
   const next = [...groups];
-  const [moved] = next.splice(fromIndex, 1);
-  next.splice(toIndex, 0, moved);
+  if (a < 0 || b < 0) return next;
+  [next[a], next[b]] = [next[b], next[a]];
   return next;
 }
 

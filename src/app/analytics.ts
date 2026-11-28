@@ -44,15 +44,16 @@ export async function trackPageView(pagePath: string, pageTitle?: string): Promi
   await whenPageIdle();
   if (!useAnalyticsEnabled.getState().value) return;
   let analytics: Analytics | null;
-  let logEvent: typeof import('firebase/analytics').logEvent;
+  let sdk: typeof import('firebase/analytics');
   try {
     analytics = await getAnalyticsInstance();
     if (!analytics) return;
-    ({ logEvent } = await import('firebase/analytics'));
+    sdk = await import('firebase/analytics');
   } catch {
     return;
   }
-  logEvent(analytics, 'page_view', {
+  sdk.setDefaultEventParameters({ page_title: pageTitle ?? '' });
+  sdk.logEvent(analytics, 'page_view', {
     page_path: pagePath,
     page_title: pageTitle,
     page_location: pageLocationFor(window.location, pagePath),

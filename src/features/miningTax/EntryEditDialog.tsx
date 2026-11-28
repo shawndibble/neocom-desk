@@ -34,6 +34,7 @@ import { LedgerActionError } from './LedgerActionError';
 import { LabelField } from './LabelField';
 import { labelSuggestions } from './assignmentLabel';
 import { formatCount } from '@/lib/formatCount';
+import { Well } from '@/components/ui/Well';
 
 interface EntryEditDialogProps {
   open: boolean;
@@ -191,9 +192,9 @@ export function EntryEditDialog({
     >
       <div className="space-y-3 text-sm">
         {paid && (
-          <p className="rounded-xs border border-warning/60 bg-warning/10 p-2 text-xs text-text-dim">
+          <Well as="p" tone="warning" className="text-xs text-text-dim">
             {t('miningTax.entryEdit.paidHint', { count: current.length })}
-          </p>
+          </Well>
         )}
 
         <div className="flex gap-2">

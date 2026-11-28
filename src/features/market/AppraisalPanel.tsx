@@ -55,6 +55,7 @@ import { DEFAULT_REFINING_SETUP } from '@/engine/industry/refiningSetup';
 import { basisAvailable, refineEfficiencyRange } from '@/engine/market/refineBreakdown';
 import type { AppraisalItem, RefineBasis } from '@/engine/market/appraisal';
 import type { AppraisalController } from './useAppraisal';
+import { TableScroll } from '@/components/ui/TableScroll';
 
 interface AppraisalPanelProps {
   controller: AppraisalController;
@@ -476,7 +477,7 @@ export function AppraisalPanel({
                     </Button>
                   </div>
                 )}
-                <div className="min-w-0 overflow-x-auto">
+                <TableScroll className="min-w-0">
                   <DataTable
                     {...tableExport.tableProps}
                     columns={columns}
@@ -488,7 +489,7 @@ export function AppraisalPanel({
                     rowMoreActions
                     responsive="table"
                   />
-                </div>
+                </TableScroll>
               </>
             )}
           </Panel>

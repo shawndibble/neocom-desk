@@ -11,6 +11,15 @@ describe('documentTitleFor', () => {
     expect(documentTitleFor('/mail', t)).toBe('Mail — Neocom Desk');
   });
 
+  it('leads with the open plan or fit name, so tabs tell apart', () => {
+    expect(documentTitleFor('/skills/plans/p1', t, undefined, 'Carrier V')).toBe(
+      'Carrier V — Plans — Skills — Neocom Desk'
+    );
+    expect(documentTitleFor('/skills/plans/p1', t, undefined, null)).toBe(
+      'Plans — Skills — Neocom Desk'
+    );
+  });
+
   it('titles each Corp page on its own, with no Corporation prefix', () => {
     expect(documentTitleFor('/corp', t)).toBe('Corp Board — Neocom Desk');
     expect(documentTitleFor('/corp/wallet', t)).toBe('Corp Wallet — Neocom Desk');

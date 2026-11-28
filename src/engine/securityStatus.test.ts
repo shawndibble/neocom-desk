@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { securityBand, securityStatusColor } from './securityStatus';
+import { securityBand, securityStatusColor, shownSecurity } from './securityStatus';
 
 describe('securityBand', () => {
   it('classifies 0.5 and above as highsec', () => {
@@ -22,7 +22,16 @@ describe('securityBand', () => {
     expect(securityBand(0.45)).toBe('highsec');
     expect(securityBand(0.4499)).toBe('lowsec');
     expect(securityBand(0.05)).toBe('lowsec');
-    expect(securityBand(0.0499)).toBe('nullsec');
+    expect(securityBand(0.0499)).toBe('lowsec');
+  });
+
+  it('rounds a positive status under 0.05 up to 0.1 lowsec, as CCP does', () => {
+    expect(shownSecurity(0.0346)).toBe(0.1);
+    expect(shownSecurity(0.0499)).toBe(0.1);
+    expect(securityBand(0.0346)).toBe('lowsec');
+    expect(shownSecurity(0)).toBe(0);
+    expect(securityBand(0)).toBe('nullsec');
+    expect(securityBand(-0.04)).toBe('nullsec');
   });
 
   it('leaves the real systems either side of every boundary where the game puts them', () => {
@@ -54,7 +63,6 @@ describe('securityStatusColor', () => {
 
   it('paints every nullsec system danger red, at the boundary and below it', () => {
     expect(securityStatusColor(0.0)).toBe('#ff7369');
-    expect(securityStatusColor(0.0499)).toBe('#ff7369');
     expect(securityStatusColor(-0.25)).toBe('#ff7369');
     expect(securityStatusColor(-1.0)).toBe('#ff7369');
     expect(securityStatusColor(-2.0)).toBe('#ff7369');
@@ -66,6 +74,7 @@ describe('securityStatusColor', () => {
     expect(securityStatusColor(0.25)).toBe('#fa965a');
     expect(securityStatusColor(0.1)).toBe('#fb8f5d');
     expect(securityStatusColor(0.05)).toBe('#fb8f5d');
+    expect(securityStatusColor(0.0499)).toBe('#fb8f5d');
   });
 
   it('clamps above 1.0 to the same color as 1.0', () => {
