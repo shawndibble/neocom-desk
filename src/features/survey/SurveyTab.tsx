@@ -325,21 +325,24 @@ export function SurveyTab({ tabBar, tabsId }: SurveyTabProps) {
               }
               url={currentId !== null && state.status === 'ready' ? shareUrl(currentId) : null}
               expiresAt={expiresAt}
+              emptyPaste={
+                currentId === null && characterId !== null ? (
+                  <TextArea
+                    rows={3}
+                    aria-label={t('survey.start.pasteTitle')}
+                    placeholder={t('survey.start.pastePlaceholder')}
+                    value=""
+                    onChange={() => undefined}
+                    onPaste={(event) => {
+                      event.preventDefault();
+                      void trackedAdd(event.clipboardData.getData('text/plain'));
+                    }}
+                  />
+                ) : undefined
+              }
               emptyExtra={
                 currentId === null && characterId !== null ? (
                   <>
-                    <TextArea
-                      rows={3}
-                      className="max-w-3xl"
-                      aria-label={t('survey.start.pasteTitle')}
-                      placeholder={t('survey.start.pastePlaceholder')}
-                      value=""
-                      onChange={() => undefined}
-                      onPaste={(event) => {
-                        event.preventDefault();
-                        void trackedAdd(event.clipboardData.getData('text/plain'));
-                      }}
-                    />
                     <SurveyStartTemplates
                       templates={templates}
                       selectedId={startTemplate?.id ?? null}
