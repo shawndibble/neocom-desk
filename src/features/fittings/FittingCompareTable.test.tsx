@@ -56,6 +56,19 @@ describe('FittingCompareTable', () => {
     expect(screen.getByText('1,000,000')).toBeInTheDocument();
   });
 
+  it('puts each row under its section header, in the fixed section order', () => {
+    render(<FittingCompareTable rows={ROWS} columns={COLUMNS} differencesOnly={false} />);
+    const headers = screen.getAllByRole('rowheader').map((cell) => cell.textContent);
+    expect(headers).toEqual(['Fitting', 'CPU used', 'Tank', 'EHP']);
+    expect(screen.getByText('Fitting').closest('th')).toHaveAttribute('colspan', '3');
+  });
+
+  it('prints no header for a section whose rows are all hidden', () => {
+    render(<FittingCompareTable rows={ROWS} columns={COLUMNS} differencesOnly={true} />);
+    expect(screen.getByText('Tank')).toBeInTheDocument();
+    expect(screen.queryByText('Fitting')).not.toBeInTheDocument();
+  });
+
   it('shows a message when nothing differs and differences-only is on', () => {
     const tied: CompareRow[] = [
       { key: 'ehp', values: [1000, 1000], differs: false, bestIndices: [] },
