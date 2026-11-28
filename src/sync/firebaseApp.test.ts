@@ -3,6 +3,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const connectAuthEmulator = vi.fn();
 const connectFirestoreEmulator = vi.fn();
 const connectFunctionsEmulator = vi.fn();
+const initializeFirestore = vi.fn<(app: unknown, settings: unknown) => { kind: string }>(() => ({
+  kind: 'firestore',
+}));
 const deleteCharacterApp = vi.fn<(id: number) => Promise<void>>(async () => undefined);
 const initializeAuth = vi.fn<(app: unknown, deps: unknown) => { kind: string }>(() => ({
   kind: 'auth',
@@ -17,6 +20,7 @@ vi.mock('firebase/auth', () => ({
 }));
 vi.mock('firebase/firestore/lite', () => ({
   getFirestore: vi.fn(() => ({ kind: 'firestore' })),
+  initializeFirestore: (app: unknown, settings: unknown) => initializeFirestore(app, settings),
   connectFirestoreEmulator: (...args: unknown[]) => connectFirestoreEmulator(...args),
 }));
 vi.mock('firebase/functions', () => ({
@@ -105,5 +109,16 @@ describe('firebaseApp emulator switch', () => {
     expect(deleteCharacterApp).toHaveBeenCalledWith(1);
     mod.getSyncAuth(1);
     expect(initializeAuth).toHaveBeenCalledTimes(3);
+  });
+
+  it('initializes Firestore once per Character, ignoring undefined properties', async () => {
+    const mod = await load();
+    mod.getSyncFirestore(1);
+    mod.getSyncFirestore(1);
+    expect(initializeFirestore).toHaveBeenCalledTimes(1);
+    expect(initializeFirestore).toHaveBeenCalledWith(
+      { name: 'char-1' },
+      { ignoreUndefinedProperties: true }
+    );
   });
 });

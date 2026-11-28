@@ -6,7 +6,12 @@ import {
   initializeAuth,
   type Auth,
 } from 'firebase/auth';
-import { connectFirestoreEmulator, getFirestore, type Firestore } from 'firebase/firestore/lite';
+import {
+  connectFirestoreEmulator,
+  getFirestore,
+  initializeFirestore,
+  type Firestore,
+} from 'firebase/firestore/lite';
 import { connectFunctionsEmulator, getFunctions, type Functions } from 'firebase/functions';
 import { deleteCharacterApp, emulatorsOn, getCharacterApp, getFirebaseApp } from './firebaseCore';
 
@@ -14,6 +19,7 @@ export { getFirebaseApp };
 
 const EMULATOR_HOST = '127.0.0.1';
 const authInstances = new Map<number, Auth>();
+const firestoreInitialised = new Set<number>();
 const firestoreConnected = new Set<number>();
 const functionsConnected = new Set<number | undefined>();
 let legacyAuth: Auth | undefined;
@@ -33,7 +39,11 @@ export function getSyncAuth(characterId: number): Auth {
 }
 
 export function getSyncFirestore(characterId: number): Firestore {
-  const firestore = getFirestore(getCharacterApp(characterId));
+  const app = getCharacterApp(characterId);
+  const firestore = firestoreInitialised.has(characterId)
+    ? getFirestore(app)
+    : initializeFirestore(app, { ignoreUndefinedProperties: true });
+  firestoreInitialised.add(characterId);
   if (emulatorsOn() && !firestoreConnected.has(characterId)) {
     firestoreConnected.add(characterId);
     connectFirestoreEmulator(firestore, EMULATOR_HOST, 8080);
@@ -50,6 +60,7 @@ export function getLegacySyncAuth(): Auth {
 
 export async function disposeCharacterApp(characterId: number): Promise<void> {
   authInstances.delete(characterId);
+  firestoreInitialised.delete(characterId);
   firestoreConnected.delete(characterId);
   functionsConnected.delete(characterId);
   await deleteCharacterApp(characterId);
