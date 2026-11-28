@@ -353,7 +353,16 @@ export function Contacts() {
                     title={t('contacts.noResults')}
                     className="py-8"
                     action={
-                      activeContactsFilterCount(filter) > 0 ? (
+                      !filter.types.has('npc') && counts.type.npc > 0 ? (
+                        <Button
+                          size="sm"
+                          onClick={() =>
+                            setFilter({ ...filter, types: new Set([...filter.types, 'npc']) })
+                          }
+                        >
+                          {t('contacts.showNpcs')}
+                        </Button>
+                      ) : activeContactsFilterCount(filter) > 0 ? (
                         <Button size="sm" onClick={() => setFilter(EMPTY_CONTACTS_FILTER)}>
                           {t('common.resetFilters')}
                         </Button>

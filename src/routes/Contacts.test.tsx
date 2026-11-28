@@ -215,6 +215,20 @@ describe('Contacts', () => {
     expect(await screen.findByText(/contacts not loaded yet/i)).toBeInTheDocument();
   });
 
+  it('offers Show NPCs when the only contacts are the NPCs hidden by default', async () => {
+    const user = userEvent.setup({ delay: null });
+    server.use(
+      http.get(`${ESI}/characters/${CHAR_ID}/contacts`, () =>
+        HttpResponse.json([{ contact_id: 3_008_416, contact_type: 'character', standing: 5 }])
+      )
+    );
+    renderContactsRoute();
+    expect(await screen.findByText('No contacts match the selected filters')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Show NPCs' }));
+    expect(screen.queryByText('No contacts match the selected filters')).toBeNull();
+    expect(await screen.findByRole('table')).toBeInTheDocument();
+  });
+
   it('says what fills the page when the character really has no contacts', async () => {
     server.use(http.get(`${ESI}/characters/${CHAR_ID}/contacts`, () => HttpResponse.json([])));
     renderContactsRoute();

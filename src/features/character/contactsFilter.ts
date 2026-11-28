@@ -30,7 +30,7 @@ export const DEFAULT_CONTACT_KINDS: readonly ContactKind[] = ALL_CONTACT_KINDS.f
   (kind) => kind !== 'npc'
 );
 
-function typesNarrowed(types: ReadonlySet<ContactKind>): boolean {
+function typesNotDefault(types: ReadonlySet<ContactKind>): boolean {
   return (
     types.size !== DEFAULT_CONTACT_KINDS.length ||
     DEFAULT_CONTACT_KINDS.some((kind) => !types.has(kind))
@@ -103,7 +103,7 @@ export function filterContacts(
 export function activeContactsFilterCount(filter: ContactsFilter): number {
   let count = 0;
   if (filter.text.trim() !== '') count += 1;
-  if (typesNarrowed(filter.types)) count += 1;
+  if (typesNotDefault(filter.types)) count += 1;
   if (filter.standings.size !== STANDING_CATEGORIES.length) count += 1;
   return count;
 }
@@ -119,7 +119,7 @@ export function activeContactsFilters<F extends ContactsFilter>(
   t: Translate
 ): ActiveFilter<F>[] {
   const active: ActiveFilter<F>[] = [];
-  if (typesNarrowed(filter.types))
+  if (typesNotDefault(filter.types))
     active.push({
       label: t('contacts.typeFilterLabel'),
       value: summarizeFilterValues(
