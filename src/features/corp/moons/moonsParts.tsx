@@ -1,7 +1,7 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useTimeZone } from '@/lib/timeFormat';
 import { useTranslation } from 'react-i18next';
-import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
+import { textActionClassName } from '@/components/ui/textActionClassName';
 import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import { InfoTooltip, ProgressBar } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
@@ -91,7 +91,7 @@ export function OreLine({
           />
         </span>
         {onLink && (
-          <button type="button" className={entityLinkClassName()} onClick={onLink}>
+          <button type="button" className={textActionClassName('inline-flex')} onClick={onLink}>
             {t('corpTaxBook.moons.moon.link.open')}
           </button>
         )}

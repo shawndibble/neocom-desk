@@ -338,7 +338,8 @@ function CorpMoonsView({ needsScope }: { needsScope: boolean }) {
   if (state.status === 'loading') return <MoonsLoading />;
   if (state.status === 'failed') {
     return (
-      <div className="mx-auto max-w-page">
+      <div className="mx-auto max-w-page space-y-4">
+        <PageHeader title={t('corp.moons.title')} />
         <LoadFailedState
           title={t('corpTaxBook.moons.failed')}
           hint={t('corpTaxBook.moons.failedHint')}

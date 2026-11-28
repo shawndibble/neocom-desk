@@ -4,7 +4,8 @@ import { useTranslation } from 'react-i18next';
 import { Button, Popover, PopoverContent, PopoverTrigger } from '@/components/ui';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { UnlinkConfirm } from './UnlinkConfirm';
-import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
+import { plainTextActionClassName } from '@/components/ui/plainTextActionClassName';
+import { textActionClassName } from '@/components/ui/textActionClassName';
 import type { MinerRow } from '@/engine/corpTaxBook/bookView';
 import { useCorporationName } from './lateNoticeMailing';
 import { GroupMinersDialog } from './GroupMinersDialog';
@@ -66,7 +67,7 @@ export function MinerCharacters({ miner }: { miner: MinerRow }) {
     <>
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
-          <button type="button" className={entityLinkClassName(tapTargetClassName)}>
+          <button type="button" className={plainTextActionClassName(tapTargetClassName)}>
             {t('corpTaxBook.moons.grouping.count', { count: miner.characterIds.length })}
           </button>
         </PopoverTrigger>
@@ -112,16 +113,21 @@ export function MinerCharacters({ miner }: { miner: MinerRow }) {
                     {characterId !== miner.mainCharacterId && (
                       <button
                         type="button"
-                        className={entityLinkClassName('shrink-0 whitespace-nowrap')}
+                        className={textActionClassName('shrink-0 whitespace-nowrap')}
                         onClick={() => void makeMain(characterId)}
                       >
                         {t('corpTaxBook.moons.grouping.makeMain')}
                       </button>
                     )}
+                    {characterId !== miner.mainCharacterId && isStored && (
+                      <span aria-hidden="true" className="self-center text-text-dim">
+                        ·
+                      </span>
+                    )}
                     {isStored && (
                       <button
                         type="button"
-                        className={entityLinkClassName('shrink-0 whitespace-nowrap')}
+                        className={textActionClassName('shrink-0 whitespace-nowrap')}
                         onClick={() => setUnlinking(characterId)}
                       >
                         {t('corpTaxBook.moons.grouping.unlink')}
